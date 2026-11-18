@@ -115,8 +115,29 @@ describe('a call SAP refused for its token in a new session, before anything ran
   });
 });
 
+describe('a call whose first request, a stateful LOCK, SAP answered in a new session', () => {
+  it('runs once more (the connection threw SESSION_REPLACED), and answers the repeat', async () => {
+    const update = () =>
+      server.call('UpdateInterface', {
+        interface_name: 'ZIF_A',
+        source_code: 'INTERFACE zif_a PUBLIC. ENDINTERFACE.',
+        activate: false,
+      });
+    await update();
+    // SAP ended the session: the LOCK with its cookie is answered in a new
+    // one, which the connection reads as a replaced session.
+    stand.endSession(currentSession());
+    const before = sent('POST', `${INTERFACE}?_action=LOCK`).length;
+    const answered = await update();
+    expect(answered.isError).not.toBe(true);
+    expect(textOf(answered)).not.toContain('The SAP session this connection');
+    expect(sent('POST', `${INTERFACE}?_action=LOCK`).length - before).toBe(2);
+    expect(logged).toContain(REPEATED_CALL_WORDS);
+  });
+});
+
 describe('no repeat', () => {
-  it('a call one of whose requests SAP already answered (the lock ran)', async () => {
+  it('a SESSION_REPLACED after a request of the call was answered (the lock ran, the write met it)', async () => {
     const update = () =>
       server.call('UpdateInterface', {
         interface_name: 'ZIF_A',

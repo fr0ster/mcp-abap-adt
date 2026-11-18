@@ -8,14 +8,19 @@
  * the connection reads the new id as a replaced session, marks the refusal
  * `sessionLost` (`ADT_SESSION_REPLACED`) and is spent before its own CSRF
  * resend (measured on premise, 2026-11-18). SAP checks the token before it
- * processes the request, so nothing ran.
+ * processes the request, so nothing ran. A stateful request (a LOCK) on such
+ * a session is answered in the new session, which the connection reads as
+ * replaced and throws `ADT_SESSION_REPLACED` for (measured on premise, the
+ * live run of 2026-11-18); a lock SAP took in the new session ended with
+ * that session's logoff, which the connection sends.
  *
  * A connection the factory builds counts its requests (`withRequestLedger`);
  * a call watches them (`watchRequests`) and reads, at its end, whether its
  * first request was such a refusal and whether any of its requests got an
  * answer. Read from the refusal's data alone: the status, the header
- * (`isCsrfRefusal`) and the connection's `sessionLost` mark — never SAP's
- * text. Our own logoff (`disconnect`) carries no `sessionLost` mark, and a
+ * (`isCsrfRefusal`) and the connection's `sessionLost` mark, or the
+ * connection's own session error code — never SAP's text. Our own logoff
+ * (`disconnect`) is `ADT_NOT_CONNECTED` with no `sessionLost` mark, and a
  * request on a spent connection never reaches the wire.
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -40,11 +45,16 @@ const watching = new WeakMap<object, Watch | undefined>();
 const ledgered = new WeakSet<object>();
 
 /**
- * Whether `thrown` — what a request threw — is SAP's refusal of the token
- * in a session SAP replaced: `403` with `x-csrf-token: Required`, marked
- * `sessionLost` `ADT_SESSION_REPLACED` by the connection.
+ * Whether `thrown` — what a request threw — says SAP ended the session the
+ * request was sent in and answered it in a new one, as the connection marks
+ * it: SAP's refusal of the token, `403` with `x-csrf-token: Required`,
+ * marked `sessionLost` `ADT_SESSION_REPLACED` (a stateless request); or the
+ * connection's own `ADT_SESSION_REPLACED` (a stateful one, a LOCK: the
+ * connection throws before any answer reaches the call). Our own logoff
+ * (`disconnect`) is `ADT_NOT_CONNECTED`, never this.
  */
-export function isTokenRefusalInNewSession(thrown: unknown): boolean {
+export function isSessionReplacedBySap(thrown: unknown): boolean {
+  if (child(thrown, 'code') === ADT_SESSION_ERROR.SESSION_REPLACED) return true;
   return (
     isCsrfRefusal(wireResponseOf(child(thrown, 'response'))) &&
     child(thrown, 'sessionLost') === ADT_SESSION_ERROR.SESSION_REPLACED
@@ -64,7 +74,7 @@ export function withRequestLedger<T extends IAbapConnection>(connection: T): T {
       watch.answered += 1;
       return answer;
     } catch (error) {
-      if (ordinal === 1 && isTokenRefusalInNewSession(error)) {
+      if (ordinal === 1 && isSessionReplacedBySap(error)) {
         watch.firstRefusedInNewSession = true;
       } else if (wireResponseOf(child(error, 'response')) !== undefined) {
         watch.answered += 1;

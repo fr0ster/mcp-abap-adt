@@ -274,7 +274,7 @@ function worksOnOwnConnection(
 
 /** The line a repeated call logs: the call ran once more on a new connection. */
 export const REPEATED_CALL_WORDS =
-  "SAP refused the call's first request for its session token in a new session, before anything ran: the call runs once more on a new connection";
+  "SAP answered the call's first request in a new session, its own having ended, before anything ran: the call runs once more on a new connection";
 
 /**
  * Whether a call of `tool` may run once more after SAP refused its first
@@ -2061,9 +2061,11 @@ export abstract class BaseMcpServer extends McpServer {
                   );
                 // The one repeat (the owner's named exception to "no
                 // retries", 24.0.1): a call on the instance's connection
-                // whose first request SAP refused for its token in a session
-                // SAP replaced (`watchRequests`), with no request of it
-                // answered, ran nothing; it runs once more, on the
+                // whose first request SAP answered in a new session, its own
+                // ended (`isSessionReplacedBySap`: the token refusal marked
+                // `sessionLost`, or a stateful request's
+                // `ADT_SESSION_REPLACED`), with no request of it answered
+                // (`watchRequests`), ran nothing; it runs once more, on the
                 // connection `getConnection` gives after that loss — its
                 // gates as for any call. Never a batch tool, a debugger
                 // tool or a long-session tool; background runs and long

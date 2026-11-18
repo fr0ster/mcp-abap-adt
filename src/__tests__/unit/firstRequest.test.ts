@@ -8,7 +8,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
-  isTokenRefusalInNewSession,
+  isSessionReplacedBySap,
   watchRequests,
   withRequestLedger,
 } from '../../lib/firstRequest';
@@ -25,6 +25,16 @@ function refusal(marked: boolean, header = true) {
     },
     ...(marked ? { sessionLost: ADT_SESSION_ERROR.SESSION_REPLACED } : {}),
   });
+}
+
+/** What the connection throws for a stateful request SAP answered in a new session. */
+function replaced() {
+  return Object.assign(
+    new Error('The SAP session this connection was using is gone'),
+    {
+      code: ADT_SESSION_ERROR.SESSION_REPLACED,
+    },
+  );
 }
 
 /** What the connection throws after our own `disconnect`. */
@@ -65,18 +75,21 @@ async function call(connection: IAbapConnection, count: number) {
   return watch?.end().refusedBeforeAnyRan;
 }
 
-describe('isTokenRefusalInNewSession', () => {
+describe('isSessionReplacedBySap', () => {
   it('403, x-csrf-token: Required, marked sessionLost: yes', () => {
-    expect(isTokenRefusalInNewSession(refusal(true))).toBe(true);
+    expect(isSessionReplacedBySap(refusal(true))).toBe(true);
   });
   it('without the sessionLost mark (the same session): no', () => {
-    expect(isTokenRefusalInNewSession(refusal(false))).toBe(false);
+    expect(isSessionReplacedBySap(refusal(false))).toBe(false);
   });
   it('without the header (an authorization refusal): no', () => {
-    expect(isTokenRefusalInNewSession(refusal(true, false))).toBe(false);
+    expect(isSessionReplacedBySap(refusal(true, false))).toBe(false);
+  });
+  it("a stateful request's ADT_SESSION_REPLACED: yes", () => {
+    expect(isSessionReplacedBySap(replaced())).toBe(true);
   });
   it('our own disconnect (ADT_NOT_CONNECTED, no answer, no mark): no', () => {
-    expect(isTokenRefusalInNewSession(notConnected())).toBe(false);
+    expect(isSessionReplacedBySap(notConnected())).toBe(false);
   });
 });
 
@@ -91,6 +104,12 @@ describe('watchRequests', () => {
   });
   it('the first request refused in the same session (no sessionLost): no', async () => {
     expect(await call(ledgered([refusal(false)]), 1)).toBe(false);
+  });
+  it('the first request a stateful SESSION_REPLACED: the call may run once more', async () => {
+    expect(await call(ledgered([replaced(), notConnected()]), 2)).toBe(true);
+  });
+  it('a stateful SESSION_REPLACED after a request answered: no', async () => {
+    expect(await call(ledgered(['ok', replaced()]), 2)).toBe(false);
   });
   it('our own disconnect: no', async () => {
     expect(await call(ledgered([notConnected()]), 1)).toBe(false);

@@ -294,7 +294,7 @@ Time of each batch end, in milliseconds (the last run on each; recording a call 
 
 The tools that read several independent things inside one call (the package walks,
 `GetObjectInfo`, `SearchSource`, `GetIncludesList`, `GetStructuresList`, `GetEnhancements`,
-`ListTransports`, `DescribeByList`, `GetWhereUsed`, `RuntimeListFeeds`)
+`DescribeByList`, `GetWhereUsed`, `RuntimeListFeeds`)
 send them in envelopes to `/sap/bc/adt/communication/batch`.
 Whether a destination has that endpoint is learned only from the outer status of its first
 envelope: `2xx` means served, for good; `404` means not served, and from then on that

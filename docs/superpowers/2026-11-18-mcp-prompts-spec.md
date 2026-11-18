@@ -920,8 +920,10 @@ moves the rest to `node:test`).
 10. **`unit_test`** — per family the generated steps (one call on core; run, status, result
     on compact); `include_subpackages` refused for a type other than `package`; denying
     `HandlerUnitTestStatus` removes the prompt from compact.
-11. **`where_used`** — the code of each type; the background-run step present only where the
-    schema has `background` and the reading tool is listed; `HandlerSystem.where_used` denied
+11. **`where_used`** — the code of each type; one step, `background: false` passed exactly
+    where the listed schema has `background` and nothing passed where it has none (no
+    background-run strategy), and no step reading a `run_handle` in either case (§5.4);
+    `HandlerSystem.where_used` denied
     removes the prompt from compact, `GetWhereUsed` from core.
 12. **`transport`** — per binary the completed actions (core 10, core-ro 4, compact 5,
     compact-ro 2); each action's missing required argument and unread argument refused in

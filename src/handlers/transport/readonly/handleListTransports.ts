@@ -1,38 +1,25 @@
-import * as z from 'zod';
-import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
-import { succeeded } from '../../../lib/strategies/stepResponse';
 /**
- * ListTransports Handler - List user's transport requests via ADT API
- *
- * Retrieves transport requests for the current user or specified user.
- * Uses AdtClient.getRequest().list().
+ * ListTransports — the transport requests of a user, by SAP's query
+ * (`AdtClient.getRequest().list()` with `user`, `requestStatus` and
+ * `requestType`).
  */
-
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
-import {
-  analyseException,
-  transportSearchConfigurations,
-} from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
-import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
-import { answer, answerThrown, type McpResult } from '../../../lib/answer';
-import {
-  type PhaseResult,
-  runPhase,
-  withSequentialFallback,
-} from '../../../lib/batch/phases';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
+import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { withLongToolAdvice } from '../../../lib/longTools';
-import { detailOf } from '../../../lib/strategies/detail';
+import {
+  LONG_BACKGROUND_FIELD,
+  withLongToolAdvice,
+} from '../../../lib/longTools';
+import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { parseStructure } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
-import { MAX_SEARCH_CONFIGURATIONS } from '../../../lib/strategies/transportSearch';
-import { getStatedSystemContext } from '../../../lib/systemContext';
+import { succeeded } from '../../../lib/strategies/stepResponse';
+import { getCreateSystemContext } from '../../../lib/systemContext';
 import {
   attr,
   child,
@@ -40,8 +27,6 @@ import {
   elements,
   entries,
   isList,
-  type XmlList,
-  type XmlNode,
   type XmlRead,
 } from '../../../lib/xml/tree';
 
@@ -49,7 +34,7 @@ export const TOOL_DEFINITION = {
   name: 'ListTransports',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    "[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers; ADT receives the default search alone.",
+    "[read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days.",
   ),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
@@ -57,13 +42,13 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        "The user to filter to: an SAP user id (matched in upper case); applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.",
+        'The SAP user whose requests to list, sent in upper case. Default: the current session user.',
       ),
     modifiable_only: z
       .boolean()
       .optional()
       .describe(
-        'Only return modifiable (not yet released) transports; applied client-side. Default: true.',
+        "Modifiable requests only (true, the default), or modifiable and released requests (false; released ones from SAP's default window of the last 14 days).",
       ),
     ...DETAIL_SHAPE,
   }),
@@ -89,31 +74,17 @@ const STATUS_BY_CONTAINER: Record<string, string> = {
   'tm:released': 'R',
 };
 
-/** Modifiable request statuses: D = modifiable, L = modifiable/protected. */
-const MODIFIABLE_STATUSES = new Set(['D', 'L']);
-
 /** The attribute `name` of `node` (the reading groups them under `@`), `''` when absent. */
 function attrOf(node: XmlRead, name: string): string {
   return attr(child(node, '@'), name) ?? '';
 }
 
-/**
- * What a listing's reading holds: one search's parse, or each search's parse
- * in their order when several were read.
- */
-type ListedValue = XmlRead | readonly XmlRead[];
-
-/** Whether a listing's value holds several parses (or is a list itself). */
-function isSeveral(value: ListedValue): value is readonly XmlRead[] {
-  return Array.isArray(value);
-}
-
 function collectRequestNodes(
-  node: ListedValue,
+  node: XmlRead,
   containerStatus: string,
   found: { req: Element; containerStatus: string }[],
 ): void {
-  if (isSeveral(node)) {
+  if (isList(node)) {
     for (const item of node) {
       collectRequestNodes(item, containerStatus, found);
     }
@@ -152,7 +123,7 @@ function collectRequestNodes(
  * the tree, and duplicates (same request number reached through more than one
  * branch) are collapsed, first occurrence winning.
  */
-export function parseTransportListValue(value: ListedValue): TransportEntry[] {
+export function parseTransportListValue(value: XmlRead): TransportEntry[] {
   const found: { req: Element; containerStatus: string }[] = [];
   collectRequestNodes(value, '', found);
 
@@ -189,320 +160,73 @@ export function parseTransportListXml(xmlData: string): TransportEntry[] {
   return parseTransportListValue(parseStructure(xmlData));
 }
 
-/** Unknown status is kept: never hide a request because it was not classified. */
-export function isModifiableStatus(status: string | undefined): boolean {
-  return !status || MODIFIABLE_STATUSES.has(status);
-}
+/** `D` modifiable, and `R` released beside it when asked for. */
+type RequestStatuses = readonly ['D'] | readonly ['D', 'R'];
 
-async function listTransportsOneByOne(
-  context: HandlerContext,
-  args: ListTransportsArgs,
-) {
-  const { connection, logger } = context;
-  const modifiableOnly = args?.modifiable_only !== false;
-  // `getStatedSystemContext`, not `getSystemContext`: the responsible a
-  // request carries wins over the process-wide one, so a host serving several
-  // SAP users from one process does not hand every concurrent request
-  // whichever user resolved last. Arrived on `main` while this branch was
-  // open (#202, #206); the migrated body below is this branch's.
-  // The stated context alone: the connection's parameters, where a host's
-  // rules made them, are in it.
-  // SAP stores user ids in upper case, and the owners a listing answers are
-  // upper case: the filter is upper-cased to match them.
-  const user = (
-    args?.user?.trim() ||
-    getStatedSystemContext().responsible ||
-    ''
-  )
+/** The request types listed: workbench, customizing, transport of copies. */
+const REQUEST_TYPES = ['K', 'W', 'T'] as const;
+
+/**
+ * The user a listing is for: the argument, else the session's user
+ * (`getCreateSystemContext`: the stated responsible, else the request
+ * scope's login), upper case as SAP stores user ids; `''` when neither is
+ * stated.
+ */
+function listedUser(args: ListTransportsArgs): string {
+  return (args.user?.trim() || getCreateSystemContext().responsible || '')
     .trim()
     .toUpperCase();
-
-  logger?.debug(
-    `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,
-  );
-
-  const detail = detailOf(args);
-
-  // **Both requests a listing takes are made here.**
-  //
-  // `IListTransportsOptions` carries `configUri` and NOTHING else since
-  // adt-clients 19 — `user` and `status` (the old `{user, status}` this
-  // handler used to pass to `list()`) have nowhere to go any more, and the
-  // package's own note says why: "The five filter parameters this used to
-  // take were never read by the server; filtering is a property of the saved
-  // configuration." So `user` and `modifiable_only` are applied CLIENT-SIDE
-  // below, on whatever the searches answer — the same backstop this handler
-  // already used for `modifiable_only` ("it is not established that the
-  // endpoint honours the status query param", #168), now load-bearing for
-  // `user` too.
-  //
-  // Which saved search to run is asked for rather than left to `list()`.
-  // `searchConfigurations()` arrived in adt-clients 19.1.0 for this: before
-  // it, `list()` without a `configUri` made the same request internally,
-  // behind a `protected` member no strategy of ours reached, and threw
-  // outright on a system holding several saved searches — telling the caller
-  // to pass a `configUri` this tool has no parameter for. The request count
-  // is unchanged for the ordinary one-configuration system; what changed is
-  // that both requests carry our `analyse`, and that several configurations
-  // are searched rather than refused (see `MAX_SEARCH_CONFIGURATIONS`).
-  //
-  // **This is an observable behaviour change, not merely an implementation
-  // one.** Before, `user`/`status` were sent to the server and never proven
-  // to be honoured — so the answer, in practice, was every owner's
-  // modifiable transports. `user` defaults to the request's own responsible
-  // (or `SAP_USERNAME`) when the caller passes nothing, and the filter below
-  // is now always applied — so a caller who passes no `user` gets a NARROWER
-  // list than before: only the session user's transports, not everyone's.
-  // Believed to be what the tool should answer (its own description always
-  // said "for the current or specified user"), kept deliberately rather than
-  // reverted, and named here and in the tool's own description rather than
-  // left implicit.
-
-  // Assigned by the call below and read by the projection: which searches
-  // actually ran. Only reported when there was more than one, so the ordinary
-  // answer keeps the shape it has always had.
-  let searched: string[] = [];
-  let capped = false;
-
-  return answer(
-    { tool: 'ListTransports', detail },
-    async () => {
-      // `searchConfigurations` answers the addressable list — `uri`, `etag`,
-      // and the configuration's own attributes — through
-      // `transportSearchConfigurations`. None of verbatim, structured or
-      // statusOnly gives that shape. adt-clients 22 applied this reading by
-      // default and it was kept as shipped; 23 ships the document and the
-      // reading lives in adt-strategies (MIGRATION-23 §4).
-      const request = createAdtClient(connection, logger).getRequest({
-        ...resultsFor(transportDocuments),
-        searchConfigurations: transportSearchConfigurations,
-      });
-
-      const answered = await atStep('read search configurations', () =>
-        request.searchConfigurations({
-          analyse: analyseException,
-        }),
-      )();
-      // The endpoint's own refusal, forwarded — not a sentence composed here
-      // about a call this handler made on the caller's behalf.
-      if (!answered.ok) {
-        return answered;
-      }
-
-      const configurations = answered.getResult().value;
-      if (configurations.length === 0) {
-        throw new Error(
-          `This system holds no saved transport search configuration, and a transport listing is a saved search: ${TRANSPORT_SEARCH_CONFIGURATIONS_URL} answered none. Create one in ADT's Transport Organizer and the tool will use it.`,
-        );
-      }
-
-      capped = configurations.length > MAX_SEARCH_CONFIGURATIONS;
-      const running = configurations.slice(0, MAX_SEARCH_CONFIGURATIONS);
-      searched = running.map((configuration) => configuration.uri);
-
-      const readings: AdtReading<XmlRead>[] = [];
-      for (const configuration of running) {
-        const listed = await atStep('list', () =>
-          request.list({
-            analyse: analyseException,
-            configUri: configuration.uri,
-          }),
-        )();
-        // The failing search's own answer, untouched — the rule `sequence()`
-        // follows, for the same reason: a sentence composed here would stand
-        // beside the strategy's own account of the same refusal.
-        if (!listed.ok) {
-          return listed;
-        }
-        readings.push(listed.getResult().value);
-      }
-
-      // One search: its reading, unchanged. Several: the values as an array,
-      // which `parseTransportListValue` walks like any other node, and the
-      // documents joined for `detail: 'raw'` — there is no single document to
-      // answer when several were read, and dropping all but one would be a
-      // quieter lie than joining them.
-      const merged: AdtReading<ListedValue> =
-        readings.length === 1
-          ? readings[0]
-          : {
-              value: readings.map((r) => r.value),
-              raw: readings.map((r) => r.raw).join('\n'),
-              status: readings[0]?.status ?? 200,
-            };
-
-      return succeeded(merged, 'ListTransports');
-    },
-    project(detail, (value) => {
-      const parsed = parseTransportListValue(value);
-      // Strictly the owner asked for. An entry whose `tm:owner` the document
-      // omits — the parser answers `''` for it — is one whose owner is
-      // unknown, and attributing it to whoever happens to be asking is a
-      // guess presented as an answer. The tool promises the transports of the
-      // current or specified user; a request nobody can be shown to own is
-      // not one of them, so it is left out rather than counted in.
-      const byUser = user ? parsed.filter((t) => t.owner === user) : parsed;
-      const transports = modifiableOnly
-        ? byUser.filter((t) => isModifiableStatus(t.status))
-        : byUser;
-
-      logger?.info(`ListTransports: found ${transports.length} transport(s)`);
-
-      return {
-        success: true,
-        count: transports.length,
-        transports,
-        ...(searched.length > 1 ? { searched_configurations: searched } : {}),
-        ...(capped ? { configurations_capped: MAX_SEARCH_CONFIGURATIONS } : {}),
-      };
-    }),
-  );
-}
-
-/** The transport request client over `connection`, as the sequential version builds it. */
-function transportRequestOn(
-  connection: HandlerContext['connection'],
-  logger: HandlerContext['logger'],
-) {
-  return createAdtClient(connection, logger).getRequest({
-    ...resultsFor(transportDocuments),
-    searchConfigurations: transportSearchConfigurations,
-  });
 }
 
 /**
- * The listing in ADT batch envelopes (spec §11): (1) the search
- * configurations GET; (2) the transport-request GET of every configuration
- * searched (up to `MAX_SEARCH_CONFIGURATIONS`), in one envelope. The answer
- * is assembled as the sequential version assembles it: the first search
- * that failed is the answer, in the order of the configurations. A
- * credential refusal the connection throws ends the call (`runPhase`).
+ * The listing: one `GET /sap/bc/adt/cts/transportrequests` with the query
+ * by user (adt-clients 45.5.3, `IListTransportsQuery`) — `user`,
+ * `requestStatus` `D` (or `DR` when `modifiable_only` is false) and
+ * `requestType` `KWT` — and no saved search configuration. SAP selects the
+ * requests the user owns or holds a task in (measured on premise
+ * 2026-11-18), and released ones from its default window of the last 14
+ * days; every request it returns is answered, as it returned it.
  */
-async function listTransportsInEnvelopes(
-  context: HandlerContext,
-  args: ListTransportsArgs,
-) {
-  const { logger } = context;
-  const modifiableOnly = args?.modifiable_only !== false;
-  const user = (
-    args?.user?.trim() ||
-    getStatedSystemContext().responsible ||
-    ''
-  )
-    .trim()
-    .toUpperCase();
-
-  logger?.debug(
-    `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,
-  );
-
-  const detail = detailOf(args);
-
-  const [first] = await runPhase(context, [undefined], (_item, batch) =>
-    atStep('read search configurations', () =>
-      transportRequestOn(batch, logger).searchConfigurations({
-        analyse: analyseException,
-      }),
-    )(),
-  );
-  const configured = first;
-  let lists: PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>[] = [];
-  if (configured.ok && configured.value.ok) {
-    const running = configured.value
-      .getResult()
-      .value.slice(0, MAX_SEARCH_CONFIGURATIONS);
-    if (running.length > 0) {
-      lists = await runPhase(context, running, (configuration, batch) =>
-        atStep('list', () =>
-          transportRequestOn(batch, logger).list({
-            analyse: analyseException,
-            configUri: configuration.uri,
-          }),
-        )(),
-      );
-    }
-  }
-
-  let searched: string[] = [];
-  let capped = false;
-
-  return answer(
-    { tool: 'ListTransports', detail },
-    async () => {
-      if (!configured.ok) throw configured.error;
-      const answered = configured.value;
-      if (!answered.ok) {
-        return answered;
-      }
-
-      const configurations = answered.getResult().value;
-      if (configurations.length === 0) {
-        throw new Error(
-          `This system holds no saved transport search configuration, and a transport listing is a saved search: ${TRANSPORT_SEARCH_CONFIGURATIONS_URL} answered none. Create one in ADT's Transport Organizer and the tool will use it.`,
-        );
-      }
-
-      capped = configurations.length > MAX_SEARCH_CONFIGURATIONS;
-      const running = configurations.slice(0, MAX_SEARCH_CONFIGURATIONS);
-      searched = running.map((configuration) => configuration.uri);
-
-      const readings: AdtReading<XmlRead>[] = [];
-      for (const result of lists) {
-        if (!result.ok) throw result.error;
-        const listed = result.value;
-        if (!listed.ok) {
-          return listed;
-        }
-        readings.push(listed.getResult().value);
-      }
-
-      const merged: AdtReading<ListedValue> =
-        readings.length === 1
-          ? readings[0]
-          : {
-              value: readings.map((r) => r.value),
-              raw: readings.map((r) => r.raw).join('\n'),
-              status: readings[0]?.status ?? 200,
-            };
-
-      return succeeded(merged, 'ListTransports');
-    },
-    project(detail, (value) => {
-      const parsed = parseTransportListValue(value);
-      const byUser = user ? parsed.filter((t) => t.owner === user) : parsed;
-      const transports = modifiableOnly
-        ? byUser.filter((t) => isModifiableStatus(t.status))
-        : byUser;
-
-      logger?.info(`ListTransports: found ${transports.length} transport(s)`);
-
-      return {
-        success: true,
-        count: transports.length,
-        transports,
-        ...(searched.length > 1 ? { searched_configurations: searched } : {}),
-        ...(capped ? { configurations_capped: MAX_SEARCH_CONFIGURATIONS } : {}),
-      };
-    }),
-  );
-}
-
 export async function handleListTransports(
   context: HandlerContext,
   args: ListTransportsArgs,
 ): Promise<McpResult> {
-  try {
-    return await withSequentialFallback<McpResult>(
-      context,
-      () => listTransportsInEnvelopes(context, args),
-      () => listTransportsOneByOne(context, args),
-    );
-  } catch (error) {
-    // A throw of a phase (a credential refusal the connection threw): as
-    // `answer()` renders a throw of the sequential version's call.
-    return answerThrown(error, {
-      tool: 'ListTransports',
-      detail: detailOf(args),
-    });
-  }
+  const { connection, logger } = context;
+  const detail = detailOf(args);
+  const user = listedUser(args);
+  const requestStatus: RequestStatuses =
+    args.modifiable_only === false ? ['D', 'R'] : ['D'];
+
+  logger?.debug(
+    `ListTransports: user=${user}, requestStatus=${requestStatus.join('')}`,
+  );
+
+  return answer(
+    { tool: 'ListTransports', detail },
+    async () => {
+      if (user === '') {
+        throw new Error(
+          'ListTransports has no user to list for: pass `user`, or state the session user (the responsible) on the connection.',
+        );
+      }
+      const listed = await atStep('list', () =>
+        createAdtClient(connection, logger)
+          .getRequest(resultsFor(transportDocuments))
+          .list({
+            analyse: analyseException,
+            user,
+            requestStatus,
+            requestType: REQUEST_TYPES,
+          }),
+      )();
+      // SAP's refusal, forwarded as it came.
+      if (!listed.ok) return listed;
+      return succeeded(listed.getResult().value, 'ListTransports');
+    },
+    project(detail, (value) => {
+      const transports = parseTransportListValue(value);
+      logger?.info(`ListTransports: found ${transports.length} transport(s)`);
+      return { success: true, count: transports.length, transports };
+    }),
+  );
 }

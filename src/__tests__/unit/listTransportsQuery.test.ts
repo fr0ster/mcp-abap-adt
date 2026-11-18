@@ -1,0 +1,126 @@
+/**
+ * `ListTransports` lists by user, with no saved configuration (the owner,
+ * 2026-11-18): one `GET /sap/bc/adt/cts/transportrequests` with the query
+ * SAP's handler reads — `user`, `requestStatus` and `requestType` — sent
+ * by real adt-clients code over `recordingConnection`. No search
+ * configuration is read, and the answer is every request SAP returned: SAP
+ * selects the requests the user owns or holds a task in.
+ */
+import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
+import { resetSystemContextCache } from '../../lib/systemContext';
+import { declareSystemKind } from '../../lib/systemKind';
+import { corpusBody } from '../helpers/adtCorpus';
+import { setSystemContext } from '../helpers/processSystemContext';
+import { recordingConnection } from '../helpers/recordingConnection';
+
+const COLLECTION = '/sap/bc/adt/cts/transportrequests';
+
+/** A listing with one modifiable request of another owner and one released request. */
+const LISTING =
+  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">' +
+  '<tm:workbench tm:category="Workbench"><tm:target tm:name="/TARGET/">' +
+  '<tm:modifiable><tm:request tm:number="PFXK900001" tm:owner="OTHER_OWNER" tm:desc="a request whose task the user holds" tm:type="K" tm:status="D"/></tm:modifiable>' +
+  '<tm:released><tm:request tm:number="PFXK900002" tm:owner="SESSION_USER" tm:desc="released" tm:type="K" tm:status="R"/></tm:released>' +
+  '</tm:target></tm:workbench></tm:root>';
+
+/** The one request a call sent, its URL. */
+async function sentFor(args: Parameters<typeof handleListTransports>[1]) {
+  const connection = recordingConnection([{ data: LISTING }]);
+  declareSystemKind(connection, 'onprem');
+  const answered = await handleListTransports({ connection }, args);
+  return { answered, requests: connection.requests };
+}
+
+describe('ListTransports sends the query by user', () => {
+  const previous = process.env.SAP_SYSTEM_TYPE;
+  beforeEach(() => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    setSystemContext({
+      masterSystem: 'SYSTEM_PLACEHOLDER',
+      responsible: 'session_user',
+    });
+  });
+  afterEach(() => {
+    resetSystemContextCache();
+    if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
+    else process.env.SAP_SYSTEM_TYPE = previous;
+  });
+
+  it("the session's own user: modifiable requests of every type", async () => {
+    const { requests } = await sentFor({});
+    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      `GET ${COLLECTION}?user=SESSION_USER&requestStatus=D&requestType=KWT`,
+    ]);
+  });
+
+  it('another user, named by the argument', async () => {
+    const { requests } = await sentFor({ user: ' other_user ' });
+    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      `GET ${COLLECTION}?user=OTHER_USER&requestStatus=D&requestType=KWT`,
+    ]);
+  });
+
+  it('modifiable_only false: modifiable and released', async () => {
+    const { requests } = await sentFor({ modifiable_only: false });
+    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      `GET ${COLLECTION}?user=SESSION_USER&requestStatus=DR&requestType=KWT`,
+    ]);
+  });
+
+  it('reads no search configuration', async () => {
+    for (const args of [
+      {},
+      { user: 'other_user' },
+      { modifiable_only: false },
+    ]) {
+      const { requests } = await sentFor(args);
+      expect(
+        requests.filter((r) => r.url.includes('searchconfiguration')),
+      ).toEqual([]);
+      expect(requests).toHaveLength(1);
+    }
+  });
+
+  it('answers every request SAP returned, whoever owns it and whatever its status', async () => {
+    const { answered } = await sentFor({});
+    expect(answered.isError).toBe(false);
+    const [first] = answered.content ?? [];
+    expect(JSON.parse(first?.text ?? 'null')).toEqual({
+      success: true,
+      count: 2,
+      transports: [
+        {
+          number: 'PFXK900001',
+          description: 'a request whose task the user holds',
+          type: 'K',
+          status: 'D',
+          owner: 'OTHER_OWNER',
+          target: '',
+        },
+        {
+          number: 'PFXK900002',
+          description: 'released',
+          type: 'K',
+          status: 'R',
+          owner: 'SESSION_USER',
+          target: '',
+        },
+      ],
+    });
+  });
+
+  it('the recorded listing is answered as SAP sent it', async () => {
+    const body = corpusBody(
+      'read-transport-list-structure--01-cts-transportrequests',
+    );
+    const connection = recordingConnection([{ data: body }]);
+    declareSystemKind(connection, 'onprem');
+    const answered = await handleListTransports({ connection }, {});
+    const [first] = answered.content ?? [];
+    expect(JSON.parse(first?.text ?? 'null')).toMatchObject({
+      success: true,
+      count: 1,
+      transports: [{ number: 'TRLK900438', owner: 'SAPUSER01' }],
+    });
+  });
+});

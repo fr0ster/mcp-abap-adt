@@ -108,18 +108,6 @@ jest.mock('../../handlers/unit_test/shared/runTests', () => ({
 
 const context = { connection: {} as any, logger: undefined };
 
-/**
- * The saved search `ListTransports` asks for before it lists.
- *
- * It used to be a direct request this repository made itself, which is why
- * this file once stubbed `connection.makeAdtRequest`. adt-clients 19.1.0
- * answers it as a member, so the fake client serves it like any other.
- */
-const SEARCH_CONFIGURATION = {
-  uri: '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/22D2111643541FE1A5AA03DC2D3DE702',
-  attributes: { client: '100' },
-};
-
 describe('readonlySingleCall handlers answer through the adapter and surface a refusal', () => {
   it.each([
     [
@@ -152,7 +140,7 @@ describe('readonlySingleCall handlers answer through the adapter and surface a r
     ],
     ['GetSqlQuery', handleGetSqlQuery, { sql_query: 'SELECT 1' }],
     ['GetTableContents', handleGetTableContents, { table_name: 'ZT' }],
-    ['ListTransports', handleListTransports, {}],
+    ['ListTransports', handleListTransports, { user: 'SOMEONE' }],
     [
       'GetObjectVersionDiff',
       handleGetObjectVersionDiff,
@@ -340,23 +328,22 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     expect(seen.calls.some((c) => c.member === 'getTableContents')).toBe(false);
   });
 
-  it('ListTransports asks for the saved search, then lists with its uri', async () => {
-    const seen = recordAnalyse({
-      searchConfigurations: () => [SEARCH_CONFIGURATION],
-    });
+  it('ListTransports lists once, by the user asked for', async () => {
+    const seen = recordAnalyse();
     fakeClient = seen.client;
-    await handleListTransports(context as any, {});
+    await handleListTransports(context as any, {
+      user: 'someone',
+      modifiable_only: false,
+    });
 
-    // Both requests, in order, and the second carries what the first
-    // answered — which is what keeps `list()` from resolving a search again
-    // behind a member no strategy of ours reaches, and what keeps a system
-    // holding several from throwing.
-    expect(seen.calls.map((c) => c.member)).toEqual([
-      'searchConfigurations',
-      'list',
-    ]);
+    // One request: the query by user, and no saved search configuration.
+    expect(seen.calls.map((c) => c.member)).toEqual(['list']);
     expect(seen.calls.at(-1)?.args).toEqual([
-      { configUri: SEARCH_CONFIGURATION.uri },
+      {
+        user: 'SOMEONE',
+        requestStatus: ['D', 'R'],
+        requestType: ['K', 'W', 'T'],
+      },
     ]);
   });
 
@@ -795,66 +782,43 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
 describe('ListTransports, mapped from a real captured transport list', () => {
   // `read-transport-list-structure--01-cts-transportrequests` is a real
   // `tm:root` response, re-captured 2026-09-16 when the system had one
-  // modifiable request in it. It used to be the empty answer — a bare
-  // self-closing root — and the empty shape has not lost its coverage: the
-  // #168 regression guard (`parseTransportListXml.test.ts`) keeps a verbatim
-  // capture of it, beside the reconstructed tree, and asserts against both.
+  // modifiable request in it. The empty shape keeps its coverage in the
+  // #168 regression guard (`parseTransportListXml.test.ts`).
   const body = corpusBody(
     'read-transport-list-structure--01-cts-transportrequests',
   );
   const listing = () =>
     fakeClientOf({
-      searchConfigurations: async () => okResponse([SEARCH_CONFIGURATION]),
       list: async () => okResponse(reading(parseStructure(body), body)),
     });
 
-  it('finds the request the captured document actually holds', async () => {
-    fakeClient = listing();
+  it('answers every request the captured document holds, whoever asked', async () => {
+    for (const args of [
+      { user: 'SAPUSER01' },
+      { user: 'SOMEBODY_ELSE' },
+      { user: 'SOMEBODY_ELSE', modifiable_only: false },
+    ]) {
+      fakeClient = listing();
 
-    const result: any = await handleListTransports(context as any, {});
+      const result: any = await handleListTransports(context as any, args);
 
-    expect(result.isError).toBe(false);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.count).toBe(1);
-    expect(payload.transports[0]).toEqual({
-      number: 'TRLK900438',
-      description: 'adt-clients integration tests',
-      type: 'K',
-      status: 'D',
-      owner: 'SAPUSER01',
-      target: '',
-    });
-    // One configuration was searched, so nothing is said about which — the
-    // ordinary answer keeps the three fields it has always had.
-    expect(payload).not.toHaveProperty('searched_configurations');
-  });
-
-  it("applies the caller's user client-side, because the server does not", async () => {
-    fakeClient = listing();
-
-    const result: any = await handleListTransports(context as any, {
-      user: 'SOMEBODY_ELSE',
-    });
-
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.count).toBe(0);
-    expect(payload.transports).toEqual([]);
-  });
-
-  it('keeps a released request out unless the caller asks for one', async () => {
-    fakeClient = listing();
-
-    const all: any = await handleListTransports(context as any, {
-      modifiable_only: false,
-    });
-    const modifiable: any = await handleListTransports(context as any, {});
-
-    // The captured document holds one modifiable request and no released
-    // one, so both answers are the same here — what this pins is that the
-    // filter runs on the status the document carried (`D`), rather than on
-    // something the server was asked for and may not have honoured.
-    expect(JSON.parse(all.content[0].text).count).toBe(1);
-    expect(JSON.parse(modifiable.content[0].text).count).toBe(1);
+      expect(result.isError).toBe(false);
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload).toEqual({
+        success: true,
+        count: 1,
+        transports: [
+          {
+            number: 'TRLK900438',
+            description: 'adt-clients integration tests',
+            type: 'K',
+            status: 'D',
+            owner: 'SAPUSER01',
+            target: '',
+          },
+        ],
+      });
+    }
   });
 });
 

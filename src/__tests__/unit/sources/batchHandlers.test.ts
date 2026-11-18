@@ -90,6 +90,7 @@ const LONG_BY_REQUESTS: Readonly<
   Record<string, 'independent' | 'chained' | 'by-arguments'>
 > = {
   SearchObject: 'independent',
+  ListTransports: 'independent',
   GetSqlQuery: 'independent',
   GetTableContents: 'independent',
   GetATCFindings: 'independent',
@@ -108,7 +109,6 @@ const LONG_BY_REQUESTS: Readonly<
   GetObjectsList: 'chained',
   GetStructuresList: 'chained',
   GetIncludesList: 'chained',
-  ListTransports: 'chained',
   GetObjectInfo: 'chained',
   DescribeByList: 'chained',
   SearchSource: 'chained',

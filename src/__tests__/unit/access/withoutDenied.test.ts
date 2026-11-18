@@ -17,6 +17,7 @@ import {
   withoutDenied,
 } from '../../../lib/access/withoutDenied';
 import { COMPACT_ACTIVATE } from '../../../lib/adtProjections';
+import { SYSTEM_ACTIONS, type SystemAction } from '../../../lib/compact';
 import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
 import type {
   HandlerEntry,
@@ -296,4 +297,29 @@ describe('withoutDenied', () => {
       assert.equal(group, groups[index]);
     }
   });
+});
+
+describe('HandlerSystem keeps its actions as members', () => {
+  const systemOf = (groups: readonly IHandlerGroup[]) =>
+    entryOf(groups, 'HandlerSystem').toolDefinition;
+  const without = (action: SystemAction) =>
+    SYSTEM_ACTIONS.filter((each) => each !== action);
+
+  it('with nothing denied, both variants state all eight actions in order', () => {
+    const definition = systemOf(compact());
+    assert.deepEqual(definition.variants?.onprem.members, SYSTEM_ACTIONS);
+    assert.deepEqual(definition.variants?.cloud.members, SYSTEM_ACTIONS);
+  });
+
+  it('the un-narrowed definition states no top-level members', () => {
+    assert.equal(systemOf(compact()).members, undefined);
+  });
+
+  for (const action of ['where_used', 'transports'] as const) {
+    it(`HandlerSystem.${action}: both variants state every action but ${action}`, () => {
+      const definition = systemOf(compact(`HandlerSystem.${action}`));
+      assert.deepEqual(definition.variants?.onprem.members, without(action));
+      assert.deepEqual(definition.variants?.cloud.members, without(action));
+    });
+  }
 });

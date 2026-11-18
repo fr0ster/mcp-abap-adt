@@ -2572,7 +2572,10 @@ export function handlerSystemDescription(
 /** `HandlerSystem`'s description with every action. */
 export const HANDLER_SYSTEM_DESCRIPTION = handlerSystemDescription();
 
-/** `HandlerSystem`'s description and schema on `variant` with `actions`. */
+/**
+ * `HandlerSystem`'s description, schema and members on `variant` with
+ * `actions`: its members are the actions it offers.
+ */
 export function handlerSystemDefinitionFor(
   variant: ProjectionVariant,
   actions: readonly SystemAction[],
@@ -2580,6 +2583,7 @@ export function handlerSystemDefinitionFor(
   return {
     description: handlerSystemDescription(actions),
     inputSchema: compactSystemSchemaFor(variant, actions, variant),
+    members: actions,
   };
 }
 

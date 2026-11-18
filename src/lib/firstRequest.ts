@@ -23,9 +23,13 @@
  * (`disconnect`) is `ADT_NOT_CONNECTED` with no `sessionLost` mark, and a
  * request on a spent connection never reaches the wire.
  */
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isCsrfRefusal } from './csrfRefusal';
+import { asciiUpper } from './plainText';
 import { child } from './thrownValue';
 import { wireResponseOf } from './wireResponse';
 
@@ -46,18 +50,36 @@ const ledgered = new WeakSet<object>();
 
 /**
  * Whether `thrown` — what a request threw — says SAP ended the session the
- * request was sent in and answered it in a new one, as the connection marks
- * it: SAP's refusal of the token, `403` with `x-csrf-token: Required`,
- * marked `sessionLost` `ADT_SESSION_REPLACED` (a stateless request); or the
- * connection's own `ADT_SESSION_REPLACED` (a stateful one, a LOCK: the
- * connection throws before any answer reaches the call). Our own logoff
- * (`disconnect`) is `ADT_NOT_CONNECTED`, never this.
+ * request was sent in, before the request ran, as the connection marks it:
+ *
+ * - SAP's refusal of the token, `403` with `x-csrf-token: Required`, marked
+ *   `sessionLost` `ADT_SESSION_REPLACED` — SAP refused it before processing
+ *   it, whatever the request;
+ * - the connection's own `ADT_SESSION_REPLACED` for a LOCK (`lock`): SAP
+ *   answered it in a new session, and the lock it took there ended with
+ *   that session's logoff, which the connection sends. For any other
+ *   stateful request the same throw follows an answer SAP processed (a
+ *   write in the new session), so it is not this.
+ *
+ * Our own logoff (`disconnect`) is `ADT_NOT_CONNECTED`, never this.
  */
-export function isSessionReplacedBySap(thrown: unknown): boolean {
-  if (child(thrown, 'code') === ADT_SESSION_ERROR.SESSION_REPLACED) return true;
+export function isSessionReplacedBySap(
+  thrown: unknown,
+  lock: boolean,
+): boolean {
+  if (child(thrown, 'code') === ADT_SESSION_ERROR.SESSION_REPLACED) return lock;
   return (
     isCsrfRefusal(wireResponseOf(child(thrown, 'response'))) &&
     child(thrown, 'sessionLost') === ADT_SESSION_ERROR.SESSION_REPLACED
+  );
+}
+
+/** Whether `options` is a LOCK: a POST whose `_action` is `LOCK`, in its URL or its params. */
+export function isLockRequest(options: IAbapRequestOptions): boolean {
+  if (asciiUpper(options.method ?? '') !== 'POST') return false;
+  return (
+    (options.url ?? '').includes('_action=LOCK') ||
+    child(options.params, '_action') === 'LOCK'
   );
 }
 
@@ -74,7 +96,10 @@ export function withRequestLedger<T extends IAbapConnection>(connection: T): T {
       watch.answered += 1;
       return answer;
     } catch (error) {
-      if (ordinal === 1 && isSessionReplacedBySap(error)) {
+      if (
+        ordinal === 1 &&
+        isSessionReplacedBySap(error, isLockRequest(options))
+      ) {
         watch.firstRefusedInNewSession = true;
       } else if (wireResponseOf(child(error, 'response')) !== undefined) {
         watch.answered += 1;

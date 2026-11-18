@@ -8,12 +8,14 @@
  */
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as z from 'zod';
 import { StdioServer } from '../../../server-runtime/src/stdio/StdioServer';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import { sessionEndWords } from '../../lib/sessionEnd';
 import { SESSION_RENEWED_WORDS } from '../../lib/sessionRenewed';
 import {
   type AdtStandIn,
@@ -23,29 +25,31 @@ import {
   probeGroup,
 } from '../helpers/adtStandIn';
 
-/** `ProbeStateful { id }`: one stateful POST on its connection, not caught. */
-const stateful: HandlerEntry = {
-  toolDefinition: {
-    name: 'ProbeStateful',
-    description: 'sends one stateful request on its connection',
-    inputSchema: z.object({ id: z.string() }),
-  },
-  call: async (context, args) => {
-    const connection: IAbapConnection = context.connection;
-    const id = typeof args.id === 'string' ? args.id : '';
-    connection.setSessionType('stateful');
-    try {
-      await connection.makeAdtRequest({
-        url: `${PROBE_PATH}${id}`,
-        method: 'POST',
-        timeout: 0,
-      });
-    } finally {
-      connection.setSessionType('stateless');
-    }
-    return { content: [{ type: 'text', text: JSON.stringify({ id }) }] };
-  },
-};
+/** A probe tool: one stateful POST on its connection (`query` after the id), not caught. */
+function statefulProbe(name: string, query: string): HandlerEntry {
+  return {
+    toolDefinition: {
+      name,
+      description: 'sends one stateful request on its connection',
+      inputSchema: z.object({ id: z.string() }),
+    },
+    call: async (context, args) => {
+      const connection: IAbapConnection = context.connection;
+      const id = typeof args.id === 'string' ? args.id : '';
+      connection.setSessionType('stateful');
+      try {
+        await connection.makeAdtRequest({
+          url: `${PROBE_PATH}${id}${query}`,
+          method: 'POST',
+          timeout: 0,
+        });
+      } finally {
+        connection.setSessionType('stateless');
+      }
+      return { content: [{ type: 'text', text: JSON.stringify({ id }) }] };
+    },
+  };
+}
 
 let stand: AdtStandIn;
 let previous: string | undefined;
@@ -62,10 +66,20 @@ afterEach(async () => {
   else process.env.SAP_SYSTEM_TYPE = previous;
 });
 
-it("a handler's first request rejecting ADT_SESSION_REPLACED runs once more, and says so", async () => {
+/**
+ * `tool` called once to log on, the session ended by SAP, then called
+ * again: what it answered and how often its second request went out.
+ * `created`: the stand-in answers the stateful request `201`.
+ */
+async function afterSessionEnd(tool: string, created = false) {
   const provider = new BasicAuthProvider('PROBE_USER', 'probe-password');
   const server = new StdioServer(
-    new CompositeHandlersRegistry([probeGroup([stateful])]),
+    new CompositeHandlersRegistry([
+      probeGroup([
+        statefulProbe('ProbeLock', '?_action=LOCK'),
+        statefulProbe('ProbeWrite', ''),
+      ]),
+    ]),
     {
       settingsFor: async () => ({
         url: stand.url,
@@ -75,6 +89,12 @@ it("a handler's first request rejecting ADT_SESSION_REPLACED runs once more, and
       getProvider: async () => provider,
     },
   );
+  if (created) {
+    stand.respond(
+      (request) => request.url.startsWith(`${PROBE_PATH}two`),
+      () => ({ status: 201, text: '' }),
+    );
+  }
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'repeat-thrown', version: '1.0.0' });
   await Promise.all([
@@ -82,38 +102,46 @@ it("a handler's first request rejecting ADT_SESSION_REPLACED runs once more, and
     client.connect(clientSide),
   ]);
   try {
-    await client.callTool({ name: 'ProbeStateful', arguments: { id: 'one' } });
+    await client.callTool({ name: tool, arguments: { id: 'one' } });
     const last = [...stand.requests]
       .reverse()
       .find((request) => !isLogoff(request.url));
     if (last === undefined) throw new Error('no request yet');
     stand.endSession(last.session);
-    const before = stand.requests.filter((r) =>
-      r.url.startsWith(`${PROBE_PATH}two`),
-    ).length;
-
     const answered = await client.callTool({
-      name: 'ProbeStateful',
+      name: tool,
       arguments: { id: 'two' },
     });
-
-    expect(answered.isError).not.toBe(true);
     const sent = stand.requests.filter((r) =>
       r.url.startsWith(`${PROBE_PATH}two`),
     ).length;
-    expect(sent - before).toBe(2);
     const content = answered.content;
     const first = Array.isArray(content) ? content[0] : undefined;
     const text =
       typeof first === 'object' && first !== null && 'text' in first
         ? String(first.text)
         : '';
-    expect(JSON.parse(text)).toEqual({
-      id: 'two',
-      session_renewed: SESSION_RENEWED_WORDS,
-    });
+    return { answered, sent, text };
   } finally {
     await client.close();
     await server.close();
   }
+}
+
+it('a LOCK the handler sent first, rejecting ADT_SESSION_REPLACED, runs once more, and says so', async () => {
+  const { answered, sent, text } = await afterSessionEnd('ProbeLock');
+  expect(answered.isError).not.toBe(true);
+  expect(sent).toBe(2);
+  expect(JSON.parse(text)).toEqual({
+    id: 'two',
+    session_renewed: SESSION_RENEWED_WORDS,
+  });
+});
+
+it('another stateful request answered 201 in the new session (SAP ran it) runs no second time', async () => {
+  const { answered, sent, text } = await afterSessionEnd('ProbeWrite', true);
+  expect(answered.isError).toBe(true);
+  expect(sent).toBe(1);
+  expect(text).toContain(sessionEndWords(ADT_SESSION_ERROR.SESSION_REPLACED));
+  expect(text).not.toContain('session_renewed');
 });

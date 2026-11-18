@@ -15,6 +15,7 @@ import {
   repeatsOnTokenRefusal,
 } from '../../embeddable/BaseMcpServer';
 import { CSRF_REFUSAL_WORDS } from '../../lib/csrfRefusal';
+import { SESSION_RENEWED_WORDS } from '../../lib/sessionRenewed';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -46,6 +47,17 @@ afterEach(async () => {
 /** The text of an answer. */
 function textOf(answer: { content?: Array<{ text?: string }> }): string {
   return (answer.content ?? []).map((part) => part.text ?? '').join('\n');
+}
+
+/** The `session_renewed` field of an answer's JSON, if it has one. */
+function renewedOf(answer: { content?: Array<{ text?: string }> }): unknown {
+  const [first] = answer.content ?? [];
+  const parsed: unknown = JSON.parse(first?.text ?? 'null');
+  return typeof parsed === 'object' &&
+    parsed !== null &&
+    'session_renewed' in parsed
+    ? parsed.session_renewed
+    : undefined;
 }
 
 /** The session the instance's connection works in now (its last request's). */
@@ -96,6 +108,11 @@ describe('a call SAP refused for its token in a new session, before anything ran
     expect(textOf(answered)).not.toContain(CSRF_REFUSAL_WORDS);
     expect(sent('POST', ACTIVATION)).toHaveLength(3);
     expect(logged).toContain(REPEATED_CALL_WORDS);
+    expect(renewedOf(answered)).toBe(SESSION_RENEWED_WORDS);
+  });
+
+  it('a normal call carries no session_renewed', async () => {
+    expect(renewedOf(await activate())).toBeUndefined();
   });
 
   it('a repeat that fails answers its own failure, and runs no third time', async () => {
@@ -112,6 +129,7 @@ describe('a call SAP refused for its token in a new session, before anything ran
     expect(answered.isError).toBe(true);
     expect(textOf(answered)).toContain('500');
     expect(sent('POST', ACTIVATION)).toHaveLength(3);
+    expect(renewedOf(answered)).toBe(SESSION_RENEWED_WORDS);
   });
 });
 
@@ -133,6 +151,7 @@ describe('a call whose first request, a stateful LOCK, SAP answered in a new ses
     expect(textOf(answered)).not.toContain('The SAP session this connection');
     expect(sent('POST', `${INTERFACE}?_action=LOCK`).length - before).toBe(2);
     expect(logged).toContain(REPEATED_CALL_WORDS);
+    expect(renewedOf(answered)).toBe(SESSION_RENEWED_WORDS);
   });
 });
 
@@ -241,6 +260,7 @@ describe('the repeat takes its connection as any call does', () => {
     expect(answered.isError).toBe(true);
     expect(textOf(answered)).toContain('authentication_failed');
     expect(sent('POST', ACTIVATION).length - before).toBe(1);
+    expect(renewedOf(answered)).toBe(SESSION_RENEWED_WORDS);
   });
 });
 

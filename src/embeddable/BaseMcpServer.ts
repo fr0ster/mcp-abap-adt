@@ -170,6 +170,7 @@ import {
 } from '../lib/requestSystemResolution.js';
 import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
+import { withSessionRenewed } from '../lib/sessionRenewed.js';
 import { HeldLocks, lockNotHeldWords } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
@@ -1799,6 +1800,9 @@ export abstract class BaseMcpServer extends McpServer {
             }
             let inUse: IAbapConnection | undefined;
             let leaveFlow: (() => void) | undefined;
+            // Whether the call ran once more after SAP ended its session:
+            // its answer then says so (`session_renewed`).
+            let renewed = false;
             // The batch an end call (`HandlerBatch` end, `DebugBatchEnd`) ends: the one
             // of its kind open when it came.
             const endingKind = endsBatch(entry.toolDefinition.name, args);
@@ -2086,6 +2090,7 @@ export abstract class BaseMcpServer extends McpServer {
                   this.logger.info(REPEATED_CALL_WORDS, {
                     tool: entry.toolDefinition.name,
                   });
+                  renewed = true;
                   inUse = undefined;
                   this.connectionReleased(context.connection);
                   const fresh = await this.getConnection(signal);
@@ -2121,7 +2126,10 @@ export abstract class BaseMcpServer extends McpServer {
 
               // Shared with BaseHandlerGroup so the two registration paths
               // cannot drift apart.
-              const content = normalizeToolContent(result);
+              const normalized = normalizeToolContent(result);
+              const content = renewed
+                ? withSessionRenewed(normalized)
+                : normalized;
 
               // A failed tool returns an isError result — it does not throw.
               // Throwing would make the SDK re-wrap the text with "MCP error -32603: ".
@@ -2148,7 +2156,13 @@ export abstract class BaseMcpServer extends McpServer {
               // An uncaught throw (connection setup, handler, transport) becomes a
               // structured result. return_error extracts the ADT response body,
               // which the SDK's own error.message would discard.
-              const failed = this.refusalAnswer(error);
+              const refused = this.refusalAnswer(error);
+              const failed = renewed
+                ? {
+                    ...refused,
+                    content: withSessionRenewed(normalizeToolContent(refused)),
+                  }
+                : refused;
               // the batch end failing before `execute()` — taking the connection,
               // the system lookup — ends batch mode with no map: every number
               // answers this failure, as the call answers it; nothing is

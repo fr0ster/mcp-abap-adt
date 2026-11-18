@@ -5,9 +5,10 @@
  * it the lock outlived its handle: no unlock could reach it until the
  * stream closed. The instance lives on, and its next call logs on afresh.
  *
- * The bound's timer is the idle mechanism's own `setTimeout`: a timeout of a
- * minute or more is the bound's (nothing else on this path waits that long)
- * and is run here by `expire()`; every other timer is the real one.
+ * The bound's timer is the idle mechanism's own `setTimeout`: a timeout of
+ * the bound's 30 minutes is the bound's (the session keep-alive's ticks are
+ * another interval) and is run here by `expire()`; every other timer is the
+ * real one.
  */
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
 import {
@@ -70,7 +71,8 @@ beforeEach(async () => {
   jest
     .spyOn(global, 'setTimeout')
     .mockImplementation((callback, ms, ...rest) => {
-      if (typeof ms === 'number' && ms >= MINUTE) {
+      // The bound's 30 minutes; the session keep-alive's ticks run as ever.
+      if (typeof ms === 'number' && ms === 30 * MINUTE) {
         // The bound's own timer stays armed, never firing on its own.
         const timer = realSetTimeout(() => {}, ms);
         timer.unref();

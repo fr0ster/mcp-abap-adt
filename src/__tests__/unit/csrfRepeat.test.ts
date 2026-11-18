@@ -409,6 +409,8 @@ describe('the review of #364', () => {
     try {
       await server.close();
       let checks = 0;
+      // Each start of a system lookup, counted when it starts.
+      let lookups = 0;
       server = await inProcessServer(
         'onprem',
         {
@@ -441,6 +443,9 @@ describe('the review of #364', () => {
         (message) => {
           logged.push(message);
         },
+        () => {
+          lookups += 1;
+        },
       );
       // No system information: a call asks for it before its tool, and a
       // new connection at its birth.
@@ -458,19 +463,17 @@ describe('the review of #364', () => {
       endWithTokenRefusal(currentSession(), (r) =>
         r.url.startsWith('/sap/bc/adt/core/http/systeminformation'),
       );
-      const lookups = () =>
-        sent('GET', '/sap/bc/adt/core/http/systeminformation').length;
-      const before = lookups();
+      const before = lookups;
+      // The answer comes after the call's turn ended and its connection
+      // was given back (`connectionReleased`, the call's `finally`): any
+      // lookup the repeat started had started by then.
       const answered = await update();
       expect(answered.isError).toBe(true);
       expect(logged).toContain(REPEATED_CALL_WORDS);
       expect(renewedOf(answered)).toBeUndefined();
-      // Anything the denied repeat left running would send after its
-      // answer: a window for it, then the count.
-      await new Promise((resolve) => setTimeout(resolve, 200));
       // The refused lookup, and the new connection's birth; the denied
-      // repeat asks no more.
-      expect(lookups() - before).toBe(2);
+      // repeat started none.
+      expect(lookups - before).toBe(2);
       expect(unhandled).toEqual([]);
     } finally {
       process.off('unhandledRejection', record);

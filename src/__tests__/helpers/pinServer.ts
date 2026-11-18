@@ -251,6 +251,8 @@ export async function inProcessServer(
   restriction: ServerRestriction = {},
   /** What the server logs at `info` goes here; nothing else is logged. */
   info?: (message: string) => void,
+  /** Called at each start of a system lookup, before the shipped resolver. */
+  onLookup?: () => void,
 ): Promise<PinServer> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pin-server-'));
   const runtime = path.join(dir, 'runtime');
@@ -278,7 +280,13 @@ export async function inProcessServer(
         ? silent
         : { ...silent, info: (message: string) => info(message) },
     systemType: variant,
-    systemContextResolver: defaultSystemContextResolver,
+    systemContextResolver:
+      onLookup === undefined
+        ? defaultSystemContextResolver
+        : (connection) => {
+            onLookup();
+            return defaultSystemContextResolver(connection);
+          },
     batch: new InstanceBatch({ keepRawParts: false }),
     backgroundRuns: runs,
     leftoverSessions,

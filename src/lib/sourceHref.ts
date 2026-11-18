@@ -12,18 +12,17 @@
  *
  * Plain string code: no regular expression runs over SAP's text.
  */
+import type {
+  AdtSourcePoint,
+  AdtSourcePosition,
+} from '@mcp-abap-adt/adt-strategies';
 import { isAsciiDigits } from './plainText';
 
-/** A point in a source: its line (from 1) and its column (from 0). */
-export type SourcePoint = {
-  readonly line: number;
-  readonly column: number;
-};
+/** A point in a source: its line (from 1) and its column (from 0) — the library's type. */
+export type SourcePoint = AdtSourcePoint;
 
-/** Where a message stands: its start, and its end where the href states one. */
-export type SourcePosition = SourcePoint & {
-  readonly end?: SourcePoint;
-};
+/** Where a message stands: its start, and its end where the href states one — the library's type, so a message the server reads and one adt-strategies reads answer one shape. */
+export type SourcePosition = AdtSourcePosition;
 
 /** What an href names: the source's uri, and the position in it when stated. */
 export type SourceHref = {

@@ -175,6 +175,18 @@ interface MessageCarrier {
   }>;
 }
 
+/** A message's position, rebuilt field by field as the message is. */
+function positionValue(position: SourcePosition): AnswerValue {
+  const out: { [key: string]: AnswerValue } = {
+    line: position.line,
+    column: position.column,
+  };
+  if (position.end !== undefined) {
+    out.end = { line: position.end.line, column: position.end.column };
+  }
+  return out;
+}
+
 /** The fixed words of the hint beside `CTS_WBO_API` 019. */
 export const TRANSPORT_HINT_WORDS =
   'SAP answered that the object is already locked in this transport request: pass it as transport_request and call again.';
@@ -333,7 +345,7 @@ export function failurePayload(
       if (m.object !== undefined) out.object = m.object;
       if (m.uri !== undefined) out.uri = m.uri;
       if (m.source_uri !== undefined) out.source_uri = m.source_uri;
-      if (m.position !== undefined) out.position = m.position;
+      if (m.position !== undefined) out.position = positionValue(m.position);
       if (m.code !== undefined) out.code = m.code;
       if (m.objectName !== undefined) out.objectName = m.objectName;
       if (m.t100 !== undefined) {

@@ -303,8 +303,6 @@ describe('a refusal answers each message from its own fields, never by its words
   it("the library's deprecated line is not answered", () => {
     const verdict = activationFailure(REPORTED);
     expect(verdict.messages?.[0]).toHaveProperty('line', '16');
-    for (const message of failurePayload(verdict).messages ?? []) {
-      expect(message).not.toHaveProperty('line');
-    }
+    expect(failurePayload(verdict).messages).toEqual([REPORTED_MESSAGE]);
   });
 });

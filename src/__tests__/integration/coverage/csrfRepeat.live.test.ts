@@ -14,11 +14,13 @@
  *    `POST /sap/bc/adt/activation`), then a write chain whose first request
  *    is a LOCK on the class (`UpdateClass`).
  *
- * Each must answer success on its one call, and the server must have
- * logged that it ran the call once more (`REPEATED_CALL_WORDS`). The LOCK
- * case: the connection may throw `ADT_SESSION_REPLACED` for a stateful
- * request instead of the 403 (Code, unmeasured, root-cause note) — then it
- * fails here, naming the answer.
+ * Each must answer success on its one call. On premise the server must
+ * have run each once more (`REPEATED_CALL_WORDS`: the activation met the
+ * token refusal, the LOCK the connection's `ADT_SESSION_REPLACED`), and its
+ * answer says so (`session_renewed`); on the cloud the outside logoff led
+ * to no refusal in the first live run, so a repeat is recorded, not
+ * required. After the update, a write from the suite's own session proves
+ * no lock was left on the class.
  *
  * Objects are created only where the package guard allows: on premise
  * `$TMP` or the development package, on the cloud the build package. The
@@ -30,6 +32,7 @@ import { after, before, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { REPEATED_CALL_WORDS } from '../../../embeddable/BaseMcpServer';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
+import { SESSION_RENEWED_WORDS } from '../../../lib/sessionRenewed';
 import { inProcessServer, type PinServer } from '../../helpers/pinServer';
 import {
   configuredSystemKind,
@@ -42,6 +45,7 @@ import {
   deleteRecorded,
   expectAbsent,
   expectNameFree,
+  livePrepare,
   liveSuite,
   recordCreated,
 } from '../helpers/live';
@@ -64,6 +68,25 @@ function sourceOf(value: number): string {
     '  ENDMETHOD.',
     'ENDCLASS.',
   ].join('\n');
+}
+
+/** What a call through the suite's server answers. */
+type LiveAnswerLike = Awaited<ReturnType<PinServer['call']>>;
+
+/** The `session_renewed` field of an answer's JSON, if it has one. */
+function renewedOf(answer: LiveAnswerLike): unknown {
+  const [first] = answer.content ?? [];
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(first?.text ?? 'null');
+  } catch {
+    return undefined; // a text answer: no field
+  }
+  return typeof parsed === 'object' &&
+    parsed !== null &&
+    'session_renewed' in parsed
+    ? parsed.session_renewed
+    : undefined;
 }
 
 /** The text of an answer. */
@@ -151,7 +174,7 @@ liveSuite(
       await server?.close();
     });
 
-    it('ActivateClass and UpdateClass each answer on their one call after an outside logoff, each run once more', async () => {
+    it('ActivateClass and UpdateClass each answer on their one call after an outside logoff (on premise run once more, saying so), and no lock is left', async () => {
       await expectNameFree({ tool: 'GetClass', args: { class_name: CLASS } });
       recordCreated('DeleteClass', { class_name: CLASS, ...onRequest() });
       const created = await server.call('CreateClass', {
@@ -169,33 +192,61 @@ liveSuite(
       });
       assert.notEqual(written.isError, true, textOf(written));
 
+      // On premise the outside logoff ends in SAP's answer in a new
+      // session, and both calls run once more (measured 2026-11-18); on the
+      // cloud (JWT) it led to no refusal (Inference: the token logs on
+      // again), so the calls must succeed, with or without a repeat, and
+      // which is recorded.
+      const repeatRequired = configuredSystemKind() === 'onprem';
+      const expectAnswered = (tool: string, answer: LiveAnswerLike) => {
+        console.log(`[csrfRepeat] ${tool}: ${textOf(answer)}`);
+        assert.notEqual(answer.isError, true, textOf(answer));
+        const repeated = logged.includes(REPEATED_CALL_WORDS);
+        console.log(`[csrfRepeat] ${tool} run once more: ${repeated}`);
+        if (repeatRequired) {
+          assert.ok(repeated, `${tool} was not run once more`);
+        }
+        // A repeated call says so; one that was not says nothing.
+        assert.equal(
+          renewedOf(answer),
+          repeated ? SESSION_RENEWED_WORDS : undefined,
+          textOf(answer),
+        );
+      };
+
       // A POST on the ended session: the activation.
       await logOffFromOutside(server);
       logged.length = 0;
-      const activated = await server.call('ActivateClass', {
-        class_name: CLASS,
-      });
-      console.log(`[csrfRepeat] ActivateClass: ${textOf(activated)}`);
-      assert.notEqual(activated.isError, true, textOf(activated));
-      assert.ok(
-        logged.includes(REPEATED_CALL_WORDS),
-        'ActivateClass was not run once more: the outside logoff did not end in the token refusal',
+      expectAnswered(
+        'ActivateClass',
+        await server.call('ActivateClass', { class_name: CLASS }),
       );
 
       // A chain whose first request is the LOCK: the update.
       await logOffFromOutside(server);
       logged.length = 0;
-      const updated = await server.call('UpdateClass', {
+      expectAnswered(
+        'UpdateClass',
+        await server.call('UpdateClass', {
+          class_name: CLASS,
+          source_code: sourceOf(2),
+          activate: true,
+          ...onRequest(),
+        }),
+      );
+
+      // No lock is left on the class: a write from another session — the
+      // suite's own connection — takes the lock and releases it.
+      const written2 = await livePrepare('UpdateClass', {
         class_name: CLASS,
-        source_code: sourceOf(2),
-        activate: true,
+        source_code: sourceOf(3),
+        activate: false,
         ...onRequest(),
       });
-      console.log(`[csrfRepeat] UpdateClass: ${textOf(updated)}`);
-      assert.notEqual(updated.isError, true, textOf(updated));
-      assert.ok(
-        logged.includes(REPEATED_CALL_WORDS),
-        'UpdateClass was not run once more',
+      assert.notEqual(
+        written2.isError,
+        true,
+        `a lock is left on ${CLASS}: ${written2.text}`,
       );
     });
   },

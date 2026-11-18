@@ -92,10 +92,32 @@ const stateful: HandlerEntry = {
   }) as never,
 } as unknown as HandlerEntry;
 
+/** `Twice { id }`: two requests on its connection, `<probe>/<id>-1` then `-2`. */
+const twice: HandlerEntry = {
+  toolDefinition: {
+    name: 'Twice',
+    description: 'sends two requests on its connection',
+    inputSchema: z.object({ id: z.string() }),
+  },
+  call: (async (
+    context: { connection: IAbapConnection },
+    args: { id: string },
+  ) => {
+    for (const n of [1, 2]) {
+      await context.connection.makeAdtRequest({
+        url: `${TOUCH_PATH}${args.id}-${n}`,
+        method: 'GET',
+        timeout: 0,
+      });
+    }
+    return { content: [{ type: 'text', text: args.id }] };
+  }) as never,
+} as unknown as HandlerEntry;
+
 const group: IHandlerGroup = {
   getName: () => 'keep-alive',
   registerHandlers: () => {},
-  getHandlers: () => [touch, lose, stateful],
+  getHandlers: () => [touch, lose, stateful, twice],
 } as unknown as IHandlerGroup;
 
 class KeepAliveServer extends BaseMcpServer {
@@ -467,6 +489,31 @@ describe('the session keep-alive', () => {
       await closing;
     } finally {
       held.release();
+      await s.close();
+    }
+  });
+
+  it('puts the session mode back even when switching to stateful throws', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      const connection = touched;
+      assert.ok(connection !== undefined);
+      const set = connection.setSessionType.bind(connection);
+      const asked: string[] = [];
+      connection.setSessionType = (type) => {
+        asked.push(type);
+        // The setter's logger throws on the switch to stateful.
+        if (type === 'stateful') throw new Error('the setter threw');
+        set(type);
+      };
+      mock.timers.tick(INTERVAL);
+      await settle();
+      mock.timers.tick(INTERVAL);
+      await until(() => asked.length >= 2);
+      assert.deepEqual(asked, ['stateful', 'stateless']);
+      assert.equal(connection.getSessionMode?.(), 'stateless');
+    } finally {
       await s.close();
     }
   });

@@ -613,8 +613,9 @@ export abstract class BaseMcpServer extends McpServer {
      * (`--session-keep-alive-minutes` × 60 000 in the launchers): one
      * background timer ticks this often, and a tick that finds no request
      * on the connection this instance built and holds since the previous
-     * tick sends one stateless `GET` of the ADT discovery on it, so SAP
-     * does not end the idle session. `0`: off. Default: 10 minutes. A whole
+     * tick sends one stateful `GET` of the ADT discovery on it, in its own
+     * session and its own main-flow turn, so SAP does not end the idle
+     * session. `0`: off. Default: 10 minutes. A whole
      * number from 0 to 2^31-1; anything else is refused. An injected
      * connection is the host's and is never pinged.
      */
@@ -856,8 +857,9 @@ export abstract class BaseMcpServer extends McpServer {
     try {
       if (this.liveBuilt() !== connection) return;
       const mode = connection.getSessionMode?.() ?? 'stateless';
-      connection.setSessionType('stateful');
       try {
+        // Inside the try: a setter that throws still has the mode put back.
+        connection.setSessionType('stateful');
         // Never rejects: a failure is its debug line.
         await raceRequestSignal(
           sendSessionKeepAlive(connection, this.logger),

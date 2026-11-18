@@ -7,6 +7,8 @@
  * promise per instance: a second caller joins it.
  */
 
+import assert from 'node:assert/strict';
+import { beforeEach, it } from 'node:test';
 import {
   isLatched,
   registerActiveTool,
@@ -56,15 +58,15 @@ it('in its tick: the latch, every owned connection logged off, every call interr
   });
   registerActiveTool(queued, { instance: one, name: 'UpdateClass' });
   const closing = closeInstance(one);
-  expect(isLatched(one)).toBe(true);
-  expect(isClosing(one)).toBe(true);
-  expect(isLatched()).toBe(false);
-  expect(running.signal.aborted).toBe(true);
-  expect(queued.signal.aborted).toBe(true);
-  expect(one.order).toEqual(LOGOFFS);
+  assert.equal(isLatched(one), true);
+  assert.equal(isClosing(one), true);
+  assert.equal(isLatched(), false);
+  assert.equal(running.signal.aborted, true);
+  assert.equal(queued.signal.aborted, true);
+  assert.deepStrictEqual(one.order, LOGOFFS);
   // The running call never settled: the close ends without it.
   await closing;
-  expect(one.order).toEqual([...LOGOFFS, 'let go', 'mcp close']);
+  assert.deepStrictEqual(one.order, [...LOGOFFS, 'let go', 'mcp close']);
   call?.();
 });
 
@@ -72,9 +74,9 @@ it('a second caller joins the first: one logoff each, one let-go', async () => {
   const one = instance();
   const a = closeInstance(one);
   const b = closeInstance(one);
-  expect(a).toBe(b);
+  assert.equal(a, b);
   await a;
-  expect(one.order).toEqual([...LOGOFFS, 'let go', 'mcp close']);
+  assert.deepStrictEqual(one.order, [...LOGOFFS, 'let go', 'mcp close']);
 });
 
 it('a let-go that throws changes nothing: the MCP server is still closed', async () => {
@@ -82,7 +84,7 @@ it('a let-go that throws changes nothing: the MCP server is still closed', async
     throw new Error('a secret-looking detail');
   });
   await closeInstance(one);
-  expect(one.order.slice(-2)).toEqual(['let go', 'mcp close']);
+  assert.deepStrictEqual(one.order.slice(-2), ['let go', 'mcp close']);
 });
 
 it("another instance's calls are neither interrupted nor awaited, and its connections stay", async () => {
@@ -95,8 +97,8 @@ it("another instance's calls are neither interrupted nor awaited, and its connec
   });
   await closeInstance(one);
   await turns();
-  expect(theirs.signal.aborted).toBe(false);
-  expect(other.order).toEqual([]);
+  assert.equal(theirs.signal.aborted, false);
+  assert.deepStrictEqual(other.order, []);
   call?.();
 });
 
@@ -125,9 +127,9 @@ it('a terminal close after the instance close began joins its logoffs: no second
     joined = true;
   });
   await turns();
-  expect(logoffs).toBe(1);
-  expect(joined).toBe(false);
+  assert.equal(logoffs, 1);
+  assert.equal(joined, false);
   write();
   await terminal;
-  expect(logoffs).toBe(1);
+  assert.equal(logoffs, 1);
 });

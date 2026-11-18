@@ -9,6 +9,9 @@
  * run.
  */
 
+import assert from 'node:assert/strict';
+import { after, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -40,8 +43,6 @@ import {
 import { adtStandIn } from '../../helpers/adtStandIn';
 import { type Counting, countingConnection } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
-
-jest.setTimeout(120_000);
 
 type Listed = Awaited<ReturnType<Client['listTools']>>['tools'];
 
@@ -99,30 +100,48 @@ const previous = process.env.SAP_SYSTEM_TYPE;
 beforeEach(() => {
   delete process.env.SAP_SYSTEM_TYPE;
 });
-afterAll(() => {
+after(() => {
   if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previous;
 });
 
 describe('HandlerExporter.registerOnServer lists', () => {
-  it.each<SapEnvironment | undefined>(['cloud', 'onprem', undefined])(
-    'what a plain registration of the exporter lists where %s is stated',
-    async (systemType) => {
-      const plain = new McpServer({ name: 'plain', version: '1.0.0' });
-      exporterFor(systemType).createRegistry().registerAllTools(plain);
-      const counting = countingConnection('document', undefined);
-      const listed = await listedOn(
-        registeredOn(() => counting.connection, systemType),
-      );
-      expect(listed).toEqual(await listedOn(plain));
-      expect(listed.length).toBeGreaterThan(0);
-    },
-  );
+  for (const systemType of [
+    'cloud',
+    'onprem',
+    undefined,
+  ] satisfies ReadonlyArray<SapEnvironment | undefined>) {
+    it(
+      format(
+        'what a plain registration of the exporter lists where %s is stated',
+        systemType,
+      ),
+      async () => {
+        const plain = new McpServer({ name: 'plain', version: '1.0.0' });
+        exporterFor(systemType).createRegistry().registerAllTools(plain);
+        const counting = countingConnection('document', undefined);
+        const listed = await listedOn(
+          registeredOn(() => counting.connection, systemType),
+        );
+        assert.deepStrictEqual(listed, await listedOn(plain));
+        assert.ok(listed.length > 0);
+      },
+    );
+  }
 
   it('cloud and onprem differently (the comparison is not vacuous)', async () => {
     const connection = countingConnection('document', undefined).connection;
-    expect(await listedOn(registeredOn(() => connection, 'cloud'))).not.toEqual(
-      await listedOn(registeredOn(() => connection, 'onprem')),
+    // Compared as JSON data: a key present as `undefined`, or a prototype,
+    // is no difference here, as for Jest's not.toEqual.
+    assert.notDeepStrictEqual(
+      JSON.parse(
+        JSON.stringify(await listedOn(registeredOn(() => connection, 'cloud'))),
+      ),
+      JSON.parse(
+        JSON.stringify(
+          await listedOn(registeredOn(() => connection, 'onprem')),
+        ),
+      ),
     );
   });
 });
@@ -142,13 +161,13 @@ describe('HandlerExporter.registerOnServer calls', () => {
     const client = await clientOf(server);
     try {
       await client.callTool({ name: 'GetProgram', arguments: GET_PROGRAM });
-      expect(asked).toBe(1);
-      expect(first.sent).toEqual([GET_PROGRAM_SENT]);
-      expect(second.sent).toEqual([]);
+      assert.equal(asked, 1);
+      assert.deepStrictEqual(first.sent, [GET_PROGRAM_SENT]);
+      assert.deepStrictEqual(second.sent, []);
       await client.callTool({ name: 'GetProgram', arguments: GET_PROGRAM });
-      expect(asked).toBe(2);
-      expect(first.sent).toEqual([GET_PROGRAM_SENT]);
-      expect(second.sent).toEqual([GET_PROGRAM_SENT]);
+      assert.equal(asked, 2);
+      assert.deepStrictEqual(first.sent, [GET_PROGRAM_SENT]);
+      assert.deepStrictEqual(second.sent, [GET_PROGRAM_SENT]);
     } finally {
       await client.close();
     }
@@ -164,8 +183,8 @@ describe('HandlerExporter.registerOnServer calls', () => {
       'GetProgram',
       GET_PROGRAM,
     );
-    expect(answer).not.toContain('"isError":true');
-    expect(counting.sent).toEqual([GET_PROGRAM_SENT]);
+    assert.ok(!answer.includes('"isError":true'));
+    assert.deepStrictEqual(counting.sent, [GET_PROGRAM_SENT]);
   });
 
   it('two calls at once, each on its own connection, whichever provider answers first', async () => {
@@ -200,10 +219,10 @@ describe('HandlerExporter.registerOnServer calls', () => {
       });
       releaseSlow();
       await slowCall;
-      expect(fast.sent).toEqual([
+      assert.deepStrictEqual(fast.sent, [
         'GET /sap/bc/adt/programs/programs/zfast/source/main?version=active',
       ]);
-      expect(slow.sent).toEqual([
+      assert.deepStrictEqual(slow.sent, [
         'GET /sap/bc/adt/programs/programs/zslow/source/main?version=active',
       ]);
     } finally {
@@ -211,7 +230,7 @@ describe('HandlerExporter.registerOnServer calls', () => {
     }
   });
 
-  it.each<[string, () => IAbapConnection | Promise<IAbapConnection>]>([
+  for (const [_label, provider] of [
     [
       'rejects',
       async () => {
@@ -224,20 +243,27 @@ describe('HandlerExporter.registerOnServer calls', () => {
         throw new Error('PROVIDER_SECRET_WORDS');
       },
     ],
-  ])(
-    'a provider that %s is the answer: connection_provider_failed in fixed words, the handler does not run',
-    async (_label, provider) => {
-      const answer = await call(
-        registeredOn(provider, 'onprem'),
-        'GetProgram',
-        GET_PROGRAM,
-      );
-      expect(answer).toContain('"isError":true');
-      expect(answer).toContain('connection_provider_failed');
-      expect(answer).toContain(CONNECTION_PROVIDER_FAILED_WORDS);
-      expect(answer).not.toContain('PROVIDER_SECRET_WORDS');
-    },
-  );
+  ] satisfies ReadonlyArray<
+    [string, () => IAbapConnection | Promise<IAbapConnection>]
+  >) {
+    it(
+      format(
+        'a provider that %s is the answer: connection_provider_failed in fixed words, the handler does not run',
+        _label,
+      ),
+      async () => {
+        const answer = await call(
+          registeredOn(provider, 'onprem'),
+          'GetProgram',
+          GET_PROGRAM,
+        );
+        assert.ok(answer.includes('"isError":true'));
+        assert.ok(answer.includes('connection_provider_failed'));
+        assert.ok(answer.includes(CONNECTION_PROVIDER_FAILED_WORDS));
+        assert.ok(!answer.includes('PROVIDER_SECRET_WORDS'));
+      },
+    );
+  }
 
   it("a provider's credential failure is answered as it came", async () => {
     const answer = await call(
@@ -247,10 +273,10 @@ describe('HandlerExporter.registerOnServer calls', () => {
       'GetProgram',
       GET_PROGRAM,
     );
-    expect(answer).toContain('"isError":true');
-    expect(answer).toContain('credentials_required');
-    expect(answer).toContain(CREDENTIALS_REQUIRED_WORDS);
-    expect(answer).not.toContain('connection_provider_failed');
+    assert.ok(answer.includes('"isError":true'));
+    assert.ok(answer.includes('credentials_required'));
+    assert.ok(answer.includes(CREDENTIALS_REQUIRED_WORDS));
+    assert.ok(!answer.includes('connection_provider_failed'));
   });
 
   it('with no systemType stated and SAP_SYSTEM_TYPE=cloud, a call is refused system_type_required, nothing sent', async () => {
@@ -261,29 +287,35 @@ describe('HandlerExporter.registerOnServer calls', () => {
       'GetProgram',
       GET_PROGRAM,
     );
-    expect(answer).toContain('"isError":true');
-    expect(answer).toContain(SYSTEM_TYPE_REQUIRED_WORDS);
-    expect(counting.sent).toEqual([]);
-    expect(systemKindOf(counting.connection)).toBeUndefined();
+    assert.ok(answer.includes('"isError":true'));
+    assert.ok(answer.includes(SYSTEM_TYPE_REQUIRED_WORDS));
+    assert.deepStrictEqual(counting.sent, []);
+    assert.equal(systemKindOf(counting.connection), undefined);
   });
 
-  it.each<[SapEnvironment, string]>([
+  for (const [systemType, environment] of [
     ['cloud', 'onprem'],
     ['onprem', 'cloud'],
-  ])(
-    'with systemType %s stated, the call runs on it whatever SAP_SYSTEM_TYPE (%s) says',
-    async (systemType, environment) => {
-      process.env.SAP_SYSTEM_TYPE = environment;
-      const counting = countingConnection('document', undefined);
-      await call(
-        registeredOn(() => counting.connection, systemType),
-        'GetProgram',
-        GET_PROGRAM,
-      );
-      expect(systemKindOf(counting.connection)).toBe(systemType);
-      expect(counting.sent).toEqual([GET_PROGRAM_SENT]);
-    },
-  );
+  ] satisfies ReadonlyArray<[SapEnvironment, string]>) {
+    it(
+      format(
+        'with systemType %s stated, the call runs on it whatever SAP_SYSTEM_TYPE (%s) says',
+        systemType,
+        environment,
+      ),
+      async () => {
+        process.env.SAP_SYSTEM_TYPE = environment;
+        const counting = countingConnection('document', undefined);
+        await call(
+          registeredOn(() => counting.connection, systemType),
+          'GetProgram',
+          GET_PROGRAM,
+        );
+        assert.equal(systemKindOf(counting.connection), systemType);
+        assert.deepStrictEqual(counting.sent, [GET_PROGRAM_SENT]);
+      },
+    );
+  }
 });
 
 /**
@@ -314,23 +346,25 @@ describe('HandlerExporter.registerOnServer answers as an EmbeddableMcpServer', (
     return { answer: await call(embedded, name, args), sent: counting.sent };
   }
 
-  it.each<[string, string, Record<string, unknown>]>([
+  for (const [_label, name, args] of [
     ['a readonly tool (args-only)', 'GetProgram', GET_PROGRAM],
     [
       'a high-level mutating tool (args-only, in its critical section)',
       'DeleteClass',
       { class_name: 'ZCL_PLACEHOLDER', transport_request: 'E19K900001' },
     ],
-  ])('%s', async (_label, name, args) => {
-    const exported = await onExporter(name, args);
-    const embedded = await onEmbeddable(name, args);
-    expect(exported).toEqual(embedded);
-    expect(exported.answer).not.toContain('Cannot read properties');
-    expect(exported.sent.length).toBeGreaterThan(0);
-  });
+  ] satisfies ReadonlyArray<[string, string, Record<string, unknown>]>) {
+    it(format('%s', _label), async () => {
+      const exported = await onExporter(name, args);
+      const embedded = await onEmbeddable(name, args);
+      assert.deepStrictEqual(exported, embedded);
+      assert.ok(!exported.answer.includes('Cannot read properties'));
+      assert.ok(exported.sent.length > 0);
+    });
+  }
 
   it('a long read, on a connection of its own made from the call’s', async () => {
-    expect(isLongTool('SearchObject')).toBe(true);
+    assert.equal(isLongTool('SearchObject'), true);
     async function searched(
       register: (connection: IAbapConnection) => McpServer,
     ): Promise<{ answer: string; requests: string[] }> {
@@ -369,8 +403,8 @@ describe('HandlerExporter.registerOnServer answers as an EmbeddableMcpServer', (
           handlersRegistry: exporterFor('onprem').createRegistry(),
         }),
     );
-    expect(exported).toEqual(embedded);
-    expect(exported.requests.length).toBeGreaterThan(0);
+    assert.deepStrictEqual(exported, embedded);
+    assert.ok(exported.requests.length > 0);
   });
 });
 
@@ -382,37 +416,45 @@ describe('HandlerExporter.registerOnServer answers as an EmbeddableMcpServer', (
  * (`registerHandlersOnCall`), on the compact group that has a run mode.
  */
 describe('registerHandlersOnCall (the path registerOnServer registers by)', () => {
-  it.each(['onprem', 'cloud'] as const)(
-    'on %s every compact long tool is listed answering in the call',
-    async (systemType) => {
-      const server = new McpServer({ name: 'per-call', version: '1.0.0' });
-      new CompactReadOnlyHandlersGroup({
-        ...noConnectionContext(),
+  for (const systemType of ['onprem', 'cloud'] as const) {
+    it(
+      format(
+        'on %s every compact long tool is listed answering in the call',
         systemType,
-      }).registerHandlersOnCall(server, async () => ({
-        connection: countingConnection('document', undefined).connection,
-        logger: silentLogger,
-        systemType,
-      }));
-      const client = await clientOf(server);
-      try {
-        const { tools } = await client.listTools();
-        const long = tools.filter((t) => isLongTool(t.name));
-        expect(long.length).toBeGreaterThan(3);
-        for (const tool of long) {
-          expect({
-            tool: tool.name,
-            handle: (tool.description ?? '').includes('run_handle'),
-            inCall: (tool.description ?? '').includes(
-              'Runs on an ABAP session of its own and answers its result in the call.',
-            ),
-          }).toEqual({ tool: tool.name, handle: false, inCall: true });
+      ),
+      async () => {
+        const server = new McpServer({ name: 'per-call', version: '1.0.0' });
+        new CompactReadOnlyHandlersGroup({
+          ...noConnectionContext(),
+          systemType,
+        }).registerHandlersOnCall(server, async () => ({
+          connection: countingConnection('document', undefined).connection,
+          logger: silentLogger,
+          systemType,
+        }));
+        const client = await clientOf(server);
+        try {
+          const { tools } = await client.listTools();
+          const long = tools.filter((t) => isLongTool(t.name));
+          assert.ok(long.length > 3);
+          for (const tool of long) {
+            assert.deepStrictEqual(
+              {
+                tool: tool.name,
+                handle: (tool.description ?? '').includes('run_handle'),
+                inCall: (tool.description ?? '').includes(
+                  'Runs on an ABAP session of its own and answers its result in the call.',
+                ),
+              },
+              { tool: tool.name, handle: false, inCall: true },
+            );
+          }
+        } finally {
+          await client.close();
         }
-      } finally {
-        await client.close();
-      }
-    },
-  );
+      },
+    );
+  }
 
   it('lists HandlerGet without background, and a run mode runs in the call on the call context', async () => {
     let asked = 0;
@@ -433,13 +475,15 @@ describe('registerHandlersOnCall (the path registerOnServer registers by)', () =
     try {
       const listed = await client.listTools();
       const get = listed.tools.find((t) => t.name === 'HandlerGet');
-      expect(Object.keys(get?.inputSchema.properties ?? {})).not.toContain(
-        'background',
+      assert.ok(
+        !Object.keys(get?.inputSchema.properties ?? {}).includes('background'),
       );
-      expect(get?.description ?? '').toContain(
-        'Runs on an ABAP session of its own and answers its result in the call.',
+      assert.ok(
+        (get?.description ?? '').includes(
+          'Runs on an ABAP session of its own and answers its result in the call.',
+        ),
       );
-      expect(get?.description ?? '').not.toContain('run_handle');
+      assert.ok(!(get?.description ?? '').includes('run_handle'));
     } finally {
       await client.close();
     }
@@ -448,7 +492,7 @@ describe('registerHandlersOnCall (the path registerOnServer registers by)', () =
       run_id: 'run-placeholder-1',
       background: true,
     });
-    expect(answer).not.toContain(BACKGROUND_NOT_FOR_RUN_WORDS);
-    expect(asked).toBe(1);
+    assert.ok(!answer.includes(BACKGROUND_NOT_FOR_RUN_WORDS));
+    assert.equal(asked, 1);
   });
 });

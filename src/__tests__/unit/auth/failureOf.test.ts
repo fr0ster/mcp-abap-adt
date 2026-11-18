@@ -3,6 +3,8 @@
  * and that it answers `undefined` for anything else.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   AuthProviderFailure,
   authError,
@@ -15,6 +17,7 @@ import {
   INSPECTION_ONLY_WORDS,
   ServerRefusal,
 } from '../../../lib/auth/serverRefusal';
+import { assertMatchObject } from '../../helpers/assertions';
 
 /** connection's `refusedAgain(at)`: the refusal it words itself. */
 const refusedAgain = (at: 'logon' | 'request') =>
@@ -24,12 +27,12 @@ describe('failureOf', () => {
   it('1. an AuthProviderFailure: authentication_failed with its kind, reason and hint', () => {
     const error = authError['credential-refused']({ credential: 'token' });
     const read = failureOf(new AuthProviderFailure(error));
-    expect(read).toMatchObject({
+    assertMatchObject(read, {
       error: 'authentication_failed',
       kind: 'credential-refused',
       message: error.reason,
     });
-    expect(read?.hint).toBe(error.hint);
+    assert.equal(read?.hint, error.hint);
   });
 
   it("2. connection's AuthRefusedError (refused-after-renewal): read through its own refusal", () => {
@@ -40,18 +43,18 @@ describe('failureOf', () => {
       problem: 'refused-after-renewal',
       at: 'request',
     });
-    expect(read?.error).toBe('authentication_failed');
-    expect(read?.kind).toBe('connection');
-    expect(read?.message).toBe(words.reason);
-    expect(read?.hint).toBe(words.hint);
-    expect(logFields(read?.authError as never).kind).toBe('connection');
+    assert.equal(read?.error, 'authentication_failed');
+    assert.equal(read?.kind, 'connection');
+    assert.equal(read?.message, words.reason);
+    assert.equal(read?.hint, words.hint);
+    assert.equal(logFields(read?.authError as never).kind, 'connection');
   });
 
   it("no step 3: an own code 'ADT_REQUEST_ABORTED' is not a failure it knows", () => {
     const thrown = Object.assign(new Error('socket hang up at x'), {
       code: 'ADT_REQUEST_ABORTED',
     });
-    expect(failureOf(thrown)).toBeUndefined();
+    assert.equal(failureOf(thrown), undefined);
   });
 
   it('2. any value with an own refusal that is a chain error', () => {
@@ -64,9 +67,9 @@ describe('failureOf', () => {
       refusal: error,
     };
     const read = failureOf(adtError);
-    expect(read?.error).toBe('authentication_failed');
-    expect(read?.kind).toBe('credential-refused');
-    expect(read?.message).toBe(error.reason);
+    assert.equal(read?.error, 'authentication_failed');
+    assert.equal(read?.kind, 'credential-refused');
+    assert.equal(read?.message, error.reason);
   });
 
   it("no step 3b: a refusal that only carries the connection's AuthRefusedError is not read", () => {
@@ -75,45 +78,48 @@ describe('failureOf', () => {
       origin: 'refusal',
       refusal: new AuthRefusedError(refusal, 'logon'),
     };
-    expect(failureOf(adtError)).toBeUndefined();
+    assert.equal(failureOf(adtError), undefined);
   });
 
   it('no step 3b: a refusal that is an AuthProviderFailure is not read', () => {
     const error = authError['renewal-declined']({ trigger: 'expired' });
-    expect(
+    assert.equal(
       failureOf({ refusal: new AuthProviderFailure(error) }),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it("4. the server's own refusals: their code and words", () => {
-    expect(failureOf(new ServerRefusal('inspection_only'))).toEqual({
+    assert.deepStrictEqual(failureOf(new ServerRefusal('inspection_only')), {
       error: 'inspection_only',
       message: INSPECTION_ONLY_WORDS,
     });
-    expect(
+    assert.deepStrictEqual(
       failureOf(new ServerRefusal('destination_refused', '--mcp: refused.')),
-    ).toEqual({ error: 'destination_refused', message: '--mcp: refused.' });
+      { error: 'destination_refused', message: '--mcp: refused.' },
+    );
   });
 
   it("4. a forged copy of a server refusal's fields is not one", () => {
-    expect(
+    assert.equal(
       failureOf({ serverRefusal: 'inspection_only', message: 'forged' }),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('5. anything else: undefined', () => {
-    expect(failureOf(new Error('x'))).toBeUndefined();
-    expect(failureOf({ refusal: { reason: 'no kind' } })).toBeUndefined();
-    expect(failureOf({ code: 'ECONNREFUSED' })).toBeUndefined();
-    expect(failureOf({ kind: 'credential-refused' })).toBeUndefined();
-    expect(failureOf('a string')).toBeUndefined();
+    assert.equal(failureOf(new Error('x')), undefined);
+    assert.equal(failureOf({ refusal: { reason: 'no kind' } }), undefined);
+    assert.equal(failureOf({ code: 'ECONNREFUSED' }), undefined);
+    assert.equal(failureOf({ kind: 'credential-refused' }), undefined);
+    assert.equal(failureOf('a string'), undefined);
   });
 
   it('never reads a message: a refusal is answered in its own words', () => {
     const error = authError['credential-refused']({ credential: 'token' });
     const thrown = { refusal: error, message: 'secret-in-a-message' };
-    expect(JSON.stringify(failureOf(thrown))).not.toContain(
-      'secret-in-a-message',
+    assert.ok(
+      !JSON.stringify(failureOf(thrown)).includes('secret-in-a-message'),
     );
   });
 });

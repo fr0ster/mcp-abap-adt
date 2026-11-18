@@ -4,6 +4,11 @@
  * it needs. A missing or unknown value is refused, naming it, instead of
  * becoming `basic` with an empty user.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
+import { assertMatchObject, assertThrows } from '../../helpers/assertions';
 import { getSapConfigFromEnv } from '../../integration/helpers/configHelpers';
 
 const KEYS = [
@@ -46,85 +51,102 @@ describe('getSapConfigFromEnv', () => {
   it('refuses a config that states no SAP_AUTH_TYPE', () => {
     process.env.SAP_USERNAME = 'user';
     process.env.SAP_PASSWORD = 'secret';
-    expect(() => getSapConfigFromEnv()).toThrow(
+    assertThrows(
+      () => getSapConfigFromEnv(),
       'SAP_AUTH_TYPE is not set. State one of: basic, jwt.',
     );
   });
 
-  it.each(['basci', 'snc', 'certificate', 'xsuaa'])(
-    'refuses SAP_AUTH_TYPE=%s rather than reading it as basic',
-    (value) => {
-      process.env.SAP_AUTH_TYPE = value;
-      process.env.SAP_USERNAME = 'user';
-      process.env.SAP_PASSWORD = 'secret';
-      expect(() => getSapConfigFromEnv()).toThrow(
-        `SAP_AUTH_TYPE "${value}" is not one this test helper builds: basic, jwt.`,
-      );
-    },
-  );
+  for (const value of ['basci', 'snc', 'certificate', 'xsuaa']) {
+    it(
+      format('refuses SAP_AUTH_TYPE=%s rather than reading it as basic', value),
+      () => {
+        process.env.SAP_AUTH_TYPE = value;
+        process.env.SAP_USERNAME = 'user';
+        process.env.SAP_PASSWORD = 'secret';
+        assertThrows(
+          () => getSapConfigFromEnv(),
+          `SAP_AUTH_TYPE "${value}" is not one this test helper builds: basic, jwt.`,
+        );
+      },
+    );
+  }
 
-  it.each([
+  for (const [_missing, present] of [
     ['SAP_USERNAME', { SAP_PASSWORD: 'secret' }],
     ['SAP_PASSWORD', { SAP_USERNAME: 'user' }],
-  ])('refuses basic without %s', (_missing, present) => {
-    process.env.SAP_AUTH_TYPE = 'basic';
-    Object.assign(process.env, present);
-    expect(() => getSapConfigFromEnv()).toThrow(
-      'SAP_AUTH_TYPE is basic, but SAP_USERNAME or SAP_PASSWORD is not set.',
-    );
-  });
+  ]) {
+    it(format('refuses basic without %s', _missing), () => {
+      process.env.SAP_AUTH_TYPE = 'basic';
+      Object.assign(process.env, present);
+      assertThrows(
+        () => getSapConfigFromEnv(),
+        'SAP_AUTH_TYPE is basic, but SAP_USERNAME or SAP_PASSWORD is not set.',
+      );
+    });
+  }
 
   it('refuses jwt without SAP_JWT_TOKEN', () => {
     process.env.SAP_AUTH_TYPE = 'jwt';
-    expect(() => getSapConfigFromEnv()).toThrow(
+    assertThrows(
+      () => getSapConfigFromEnv(),
       'SAP_AUTH_TYPE is jwt, but SAP_JWT_TOKEN is not set.',
     );
   });
 
-  it.each(['rfcc', 'tcp', 'https'])(
-    'refuses SAP_CONNECTION_TYPE=%s rather than running over HTTP',
-    (value) => {
-      process.env.SAP_AUTH_TYPE = 'basic';
-      process.env.SAP_USERNAME = 'user';
-      process.env.SAP_PASSWORD = 'secret';
-      process.env.SAP_CONNECTION_TYPE = value;
-      expect(() => getSapConfigFromEnv()).toThrow(
-        `SAP_CONNECTION_TYPE "${value}" is not one of: http, rfc.`,
-      );
-    },
-  );
+  for (const value of ['rfcc', 'tcp', 'https']) {
+    it(
+      format(
+        'refuses SAP_CONNECTION_TYPE=%s rather than running over HTTP',
+        value,
+      ),
+      () => {
+        process.env.SAP_AUTH_TYPE = 'basic';
+        process.env.SAP_USERNAME = 'user';
+        process.env.SAP_PASSWORD = 'secret';
+        process.env.SAP_CONNECTION_TYPE = value;
+        assertThrows(
+          () => getSapConfigFromEnv(),
+          `SAP_CONNECTION_TYPE "${value}" is not one of: http, rfc.`,
+        );
+      },
+    );
+  }
 
   it('refuses a config that states no SAP_CONNECTION_TYPE rather than running over HTTP', () => {
     process.env.SAP_AUTH_TYPE = 'basic';
     process.env.SAP_USERNAME = 'user';
     process.env.SAP_PASSWORD = 'secret';
     delete process.env.SAP_CONNECTION_TYPE;
-    expect(() => getSapConfigFromEnv()).toThrow(
+    assertThrows(
+      () => getSapConfigFromEnv(),
       'SAP_CONNECTION_TYPE is not set. State one of: http, rfc.',
     );
   });
 
-  it.each([
+  for (const [value, wire] of [
     ['http', 'http'],
     ['rfc', 'rfc'],
     // In any case, as the launcher reads an enum.
     ['RFC', 'rfc'],
     ['Http', 'http'],
-  ])('reads SAP_CONNECTION_TYPE=%s as %s', (value, wire) => {
-    process.env.SAP_AUTH_TYPE = 'basic';
-    process.env.SAP_USERNAME = 'user';
-    process.env.SAP_PASSWORD = 'secret';
-    process.env.SAP_CONNECTION_TYPE = value;
-    if (wire === 'rfc') statesRfcAddress();
-    expect(getSapConfigFromEnv().connectionType).toBe(wire);
-  });
+  ]) {
+    it(format('reads SAP_CONNECTION_TYPE=%s as %s', value, wire), () => {
+      process.env.SAP_AUTH_TYPE = 'basic';
+      process.env.SAP_USERNAME = 'user';
+      process.env.SAP_PASSWORD = 'secret';
+      process.env.SAP_CONNECTION_TYPE = value;
+      if (wire === 'rfc') statesRfcAddress();
+      assert.equal(getSapConfigFromEnv().connectionType, wire);
+    });
+  }
 
   it('builds basic from what was stated', () => {
     process.env.SAP_AUTH_TYPE = 'basic';
     process.env.SAP_USERNAME = ' user ';
     process.env.SAP_PASSWORD = 'secret';
     process.env.SAP_CLIENT = '100';
-    expect(getSapConfigFromEnv()).toMatchObject({
+    assertMatchObject(getSapConfigFromEnv(), {
       url: 'https://system.example.test:44300',
       authType: 'basic',
       username: 'user',
@@ -136,7 +158,7 @@ describe('getSapConfigFromEnv', () => {
   it('builds jwt from what was stated', () => {
     process.env.SAP_AUTH_TYPE = 'jwt';
     process.env.SAP_JWT_TOKEN = 'token-value';
-    expect(getSapConfigFromEnv()).toMatchObject({
+    assertMatchObject(getSapConfigFromEnv(), {
       authType: 'jwt',
       jwtToken: 'token-value',
     });
@@ -152,7 +174,7 @@ describe('getSapConfigFromEnv', () => {
 
     it('an application server: the RFC config as stated, no URL', () => {
       statesRfcAddress();
-      expect(getSapConfigFromEnv()).toEqual({
+      assert.deepStrictEqual(getSapConfigFromEnv(), {
         authType: 'basic',
         username: 'user',
         password: 'secret',
@@ -173,7 +195,7 @@ describe('getSapConfigFromEnv', () => {
         SAP_CLIENT: '100',
         SAP_LANGUAGE: 'EN',
       });
-      expect(getSapConfigFromEnv()).toMatchObject({
+      assertMatchObject(getSapConfigFromEnv(), {
         connectionType: 'rfc',
         mshost: 'ms.example.test',
         sysid: 'SYX',
@@ -183,7 +205,7 @@ describe('getSapConfigFromEnv', () => {
 
     /** Each refusal case, alone, with the server's words for it; no value quoted. */
     const SENTINEL = 'sentinel-value-7f3a';
-    it.each([
+    for (const [_case, env, words] of [
       [
         'RFC stating SAP_URL',
         {
@@ -272,20 +294,22 @@ describe('getSapConfigFromEnv', () => {
         },
         'is ABAP Cloud over RFC, which ABAP Cloud does not offer: SAP_SYSTEM_TYPE, SAP_CONNECTION_TYPE',
       ],
-    ])('%s: refused in its words', (_case, env, words) => {
-      delete process.env.SAP_URL;
-      Object.assign(process.env, env);
-      let thrown: unknown;
-      try {
-        getSapConfigFromEnv();
-      } catch (error) {
-        thrown = error;
-      }
-      expect(thrown).toBeInstanceOf(Error);
-      const message = thrown instanceof Error ? thrown.message : '';
-      expect(message).toContain(words);
-      expect(message).not.toContain(SENTINEL);
-    });
+    ] satisfies [string, Record<string, string>, string][]) {
+      it(format('%s: refused in its words', _case), () => {
+        delete process.env.SAP_URL;
+        Object.assign(process.env, env);
+        let thrown: unknown;
+        try {
+          getSapConfigFromEnv();
+        } catch (error) {
+          thrown = error;
+        }
+        assert.ok(thrown instanceof Error);
+        const message = thrown instanceof Error ? thrown.message : '';
+        assert.ok(message.includes(words));
+        assert.ok(!message.includes(SENTINEL));
+      });
+    }
   });
 
   describe('per wire: HTTP requires SAP_URL and takes no RFC address key', () => {
@@ -297,10 +321,10 @@ describe('getSapConfigFromEnv', () => {
 
     it('without SAP_URL: refused naming it', () => {
       delete process.env.SAP_URL;
-      expect(() => getSapConfigFromEnv()).toThrow('cannot be used: SAP_URL');
+      assertThrows(() => getSapConfigFromEnv(), 'cannot be used: SAP_URL');
     });
 
-    it.each([
+    for (const key of [
       'SAP_ASHOST',
       'SAP_SYSNR',
       'SAP_MSHOST',
@@ -308,12 +332,15 @@ describe('getSapConfigFromEnv', () => {
       'SAP_SYSID',
       'SAP_GROUP',
       'SAP_SAPROUTER',
-    ])('with %s: refused naming it', (key) => {
-      process.env[key] = 'sentinel-value-7f3a';
-      expect(() => getSapConfigFromEnv()).toThrow(
-        `is HTTP and states RFC address keys, which HTTP does not take: ${key}`,
-      );
-    });
+    ]) {
+      it(format('with %s: refused naming it', key), () => {
+        process.env[key] = 'sentinel-value-7f3a';
+        assertThrows(
+          () => getSapConfigFromEnv(),
+          `is HTTP and states RFC address keys, which HTTP does not take: ${key}`,
+        );
+      });
+    }
   });
 });
 

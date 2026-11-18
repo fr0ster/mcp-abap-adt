@@ -10,8 +10,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { readHttpConfig } from '../../../../server-runtime/src/http/config/httpParameters';
 import { httpHelp } from '../../../../server-runtime/src/http/launcher';
+import { StreamableHttpServer } from '../../../../server-runtime/src/http/StreamableHttpServer';
 import { readSseConfig } from '../../../../server-runtime/src/sse/config/sseParameters';
 import { sseHelp } from '../../../../server-runtime/src/sse/launcher';
+import { SseServer } from '../../../../server-runtime/src/sse/SseServer';
 import { readCoreConfig } from '../../../../server-runtime/src/stdio/config/coreParameters';
 import { coreHelp } from '../../../../server-runtime/src/stdio/launcher';
 import {
@@ -21,6 +23,7 @@ import {
   SESSION_KEEP_ALIVE_YAML,
 } from '../../../lib/config';
 import type { YamlConfig } from '../../../lib/config/yamlConfig';
+import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 
 const CLI = '--session-keep-alive-minutes';
 const ENV = 'MCP_SESSION_KEEP_ALIVE_MINUTES';
@@ -119,3 +122,27 @@ for (const binary of BINARIES) {
     });
   });
 }
+
+describe('an embedder’s sessionKeepAliveMs on the HTTP and SSE servers', () => {
+  it('is refused at construction, before any client traffic', () => {
+    const registry = () => new CompositeHandlersRegistry([]);
+    for (const value of [-1, 1.5, 2 ** 31]) {
+      assert.throws(
+        () =>
+          new StreamableHttpServer(registry(), {
+            systemType: 'onprem',
+            sessionKeepAliveMs: value,
+          }),
+        /Invalid sessionKeepAliveMs/,
+      );
+      assert.throws(
+        () =>
+          new SseServer(registry(), {
+            systemType: 'onprem',
+            sessionKeepAliveMs: value,
+          }),
+        /Invalid sessionKeepAliveMs/,
+      );
+    }
+  });
+});

@@ -119,6 +119,7 @@ export {
   type SapAnswerStrategy,
   skipSapAnswers,
 } from '../lib/search-source/readFailure.js';
+export { sessionKeepAliveMsOf } from '../lib/sessionKeepAlive.js';
 export * from './BaseMcpServer.js';
 export * from './ConnectionContext.js';
 export * from './EmbeddableMcpServer.js';

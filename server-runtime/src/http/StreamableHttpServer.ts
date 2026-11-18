@@ -17,6 +17,7 @@ import {
   InstanceBatch,
   type LineMatchStrategy,
   type SapAnswerStrategy,
+  sessionKeepAliveMsOf,
 } from '@mcp-abap-adt/lib/embeddable';
 import type {
   IHandlersRegistry,
@@ -278,7 +279,11 @@ export class StreamableHttpServer extends BaseMcpServer {
       systemContextRules: responsibleRules,
     });
     this.stateIdleMinutes = opts?.stateIdleMinutes;
-    this.sessionKeepAliveMs = opts?.sessionKeepAliveMs;
+    // Refused here, at startup, rather than at a pooled instance's birth.
+    this.sessionKeepAliveMs =
+      opts?.sessionKeepAliveMs === undefined
+        ? undefined
+        : sessionKeepAliveMsOf(opts.sessionKeepAliveMs, 'sessionKeepAliveMs');
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRunsStore = opts?.backgroundRuns;
     this.instanceAccessChecks = opts?.accessChecks;

@@ -17,6 +17,7 @@ import {
   BaseMcpServer,
   closeInstance,
   InstanceBatch,
+  sessionKeepAliveMsOf,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   type IHandlersRegistry,
@@ -247,7 +248,11 @@ export class SseServer {
       opts?.stateIdleMinutes === undefined
         ? undefined
         : stateIdleMinutesOf(opts.stateIdleMinutes, 'stateIdleMinutes');
-    this.sessionKeepAliveMs = opts?.sessionKeepAliveMs;
+    // Refused here, at startup, rather than at a stream's first connection.
+    this.sessionKeepAliveMs =
+      opts?.sessionKeepAliveMs === undefined
+        ? undefined
+        : sessionKeepAliveMsOf(opts.sessionKeepAliveMs, 'sessionKeepAliveMs');
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;

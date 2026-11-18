@@ -7,6 +7,23 @@ Every fact below carries its ground: **Measured** (read from the installed SDK o
 committed fixture, by running a query over it), **Code** (read in the source at
 `8a9ed531`), **Inference** (reasoned, to be confirmed by the implementation's tests).
 
+## 0. Owner decisions (2026-11-18)
+
+1. **Operation set:** the six object prompts (`create`, `get`, `update`, `delete`,
+   `activate`, `check`) plus `unit_test` (a unit-test run) and `where_used`, all in this PR,
+   with the `HandlerSystem` deny-narrowing fix (its actions left readable as `members`, not
+   only through its zod schema) and the fixture change that fix brings (§2.3–§2.4, §6a).
+2. **`update`** takes `change`, a description in words; the model reads the object and
+   writes the new content. No `source_code` argument.
+3. **Embedders:** `BaseMcpServer` and `EmbeddableMcpServer` list prompts automatically; a
+   `prompts: false` option turns them off. A plain registration and the exporter's
+   `registerOnServer` get them only through one exported opt-in function (§7).
+4. **Transports:** one `transport` prompt with an `action` argument (§2.5). The debugger
+   stays out.
+5. **Accepted defaults** (the recommendations of the first draft): plain operation names
+   (no prefix); the types only the full set has stay out of the vocabulary; `object_type`
+   completed lowercase and accepted in any case; no `part` argument on `get`.
+
 ## 1. What the code and the SDK give us
 
 ### 1.1 The SDK
@@ -178,12 +195,60 @@ Read off the table (**Measured**):
   `registerOnServer(server, provider)` registers the tools on the embedder's own `McpServer`
   through `registerAllToolsOnCall`.
 
+### 1.7 Unit-test runs, where-used and transports
+
+**Measured** (listed-schemas fixture; `o` onprem, `c` cloud, `-` not listed; every legacy
+listing lists none of them):
+
+| Tool | core | core-ro | compact | compact-ro |
+|---|---|---|---|---|
+| `RunUnitTest`, `RunProgramUnitTest`, `RunFunctionGroupUnitTest`, `RunFunctionModuleUnitTest`, `RunCdsUnitTest`, `RunAbapUnit` | oc | -- | -- | -- |
+| `GetUnitTestResult` | oc | oc | -- | -- |
+| `HandlerUnitTestRun` | -- | -- | oc | -- |
+| `HandlerUnitTestStatus`, `HandlerUnitTestResult` | -- | -- | oc | oc |
+| `GetWhereUsed` | oc | oc | -- | -- |
+| `HandlerSystem` (actions `where_used`, `transports`, …) | -- | -- | oc | oc |
+| `CreateTransport`, `CreateTransportTask`, `AddTransportObject`, `RemoveTransportObject`, `MoveTransportObjects`, `SortAndCompressTransportTask` | oc | -- | -- | -- |
+| `GetTransport`, `ListTransports`, `ReadTransportObjects`, `ReadTransportActionLog` | oc | oc | -- | -- |
+| `HandlerTransportCreate`, `HandlerTransportMoveObjects`, `HandlerTransportSortAndCompress` | -- | -- | oc | -- |
+| `HandlerCreate` (`TRANSPORT` member), `HandlerGet` (`TRANSPORT` member) | -- | -- | oc / oc | -- / oc |
+
+- **Measured.** The per-type run tools take the object's name (`class_name`,
+  `program_name`, `function_group_name`, `function_module_name` with `function_group_name`
+  for the sync runner, the CDS test class's `class_name`); `runner` (default async) and
+  `wait` (default true) make the call answer the finished result. `RunAbapUnit` and
+  `HandlerUnitTestRun` take `target`: `{ kind: object, name, type }` or `{ kind: package,
+  name, include_subpackages }`, `type` one of a closed list of run object codes (`CLAS/OC`,
+  `PROG/P`, `FUGR/F`, `FUGR/FF`, `DDLS/DF`, `DEVC/K`, …), the same list on both kinds.
+  `HandlerUnitTestRun` answers `{ run_id }` (async) and its result is read by
+  `HandlerUnitTestStatus` (`with_long_polling`) and `HandlerUnitTestResult`
+  (Code: its description).
+- **Measured.** `GetWhereUsed` takes `object_name`, `object_type` (a where-used code or a
+  name standing for one; a function module as `GROUP|FM_NAME`) or `objects`, and
+  `background` (default true: it answers a `run_handle` read by `GetBackgroundRun`).
+  `HandlerSystem` `where_used` takes the same arguments under `action: where_used`.
+  `object_type` is a plain string in the listed schema (no enum); its codes are
+  `WHERE_USED_CODES` (Code, `src/lib/adtProjections.ts`), the same on both kinds.
+- **Measured.** The transport tools' required arguments: `CreateTransport` /
+  `HandlerTransportCreate` `description`; `CreateTransportTask` `transport_number`,
+  `target_user`; `GetTransport`, `ReadTransportObjects`, `ReadTransportActionLog`,
+  `SortAndCompressTransportTask` / `HandlerTransportSortAndCompress` `transport_number`;
+  `AddTransportObject` `transport_number`, `object_name`, `object_type` (an object-directory
+  type such as `CLAS`, not an ADT code); `RemoveTransportObject` those and `position`;
+  `MoveTransportObjects` / `HandlerTransportMoveObjects` `transport_number`, `target_number`,
+  `objects` (entries with `object_name`, `object_type`, `position`). `ListTransports` /
+  `HandlerSystem` `transports` take `user` and `modifiable_only`, none required.
+- **Code.** Compact `HandlerGet` `TRANSPORT` reads the objects of a task or of every task of
+  a request (`READ_TOKENS`, `COMPACT_READ_ROUTES`: `request` `readObjects`) — the compact
+  counterpart of `ReadTransportObjects`, not of `GetTransport`.
+
 ## 2. The operation set
 
 ### 2.1 The prompts
 
-Six prompts, one per operation; each binary lists those it can serve (§4). The name is the
-operation (open question Q1 on a prefix).
+Nine prompts, one per operation; each binary lists those it can serve (§4). The name is the
+operation, with no prefix (owner decision 5). The six object prompts are below; `unit_test`,
+`where_used` and `transport` follow in §2.3–§2.5.
 
 | Prompt | Arguments (all strings) | Description (functional; `<tools>` generated, §3.4) |
 |---|---|---|
@@ -193,6 +258,9 @@ operation (open question Q1 on a prefix).
 | `delete` | `object_type` required, completed · `name` required · `transport_request` optional | Deletes an ABAP object of `object_type` named `name`: asks the model to call `<tools>`. |
 | `activate` | `object_type` required, completed · `name` required | Activates an ABAP object of `object_type` named `name`: asks the model to call `<tools>`. |
 | `check` | `object_type` required, completed · `name` required | Runs a syntax check of an ABAP object of `object_type` named `name`: asks the model to call `<tools>`. |
+| `unit_test` | `object_type` required, completed · `name` required · `include_subpackages` optional, completed | Runs the ABAP Unit tests of the object of `object_type` named `name`, or of a package: asks the model to call `<tools>` and read the result. |
+| `where_used` | `object_type` required, completed · `name` required | Lists the objects that use the object of `object_type` named `name`: asks the model to call `<tools>`. |
+| `transport` | `action` required, completed · `number` · `description` · `user` · `object_type` (completed) · `name` · `target_number` — each optional, required per action (§2.5) | Works with transport requests by `action`: asks the model to call `<tools>`. |
 
 Argument descriptions (static, functional, naming nothing concrete — the repository's
 description rule, `CLAUDE.md` "What we write names nothing concrete"):
@@ -200,7 +268,8 @@ description rule, `CLAUDE.md` "What we write names nothing concrete"):
 - `object_type` — "The object's type; the values are the types this server serves for the
   operation."
 - `name` — "The object's name (for a function module, as the type's arguments state)."
-  For `get` `TRANSPORT`: the request number.
+- `include_subpackages` — "For a package: `true` runs the tests of its subpackages too."
+- `action`, `number`, `user`, `target_number` — §2.5.
 - `package_name` — "The package the object is created in."
 - `description` — "The object's short description."
 - `transport_request` — "The transport request the change is recorded in, not a task."
@@ -213,16 +282,205 @@ The user-facing vocabulary is the compact type names (`CompactObjectType`,
 already names every type the six operations share. Per operation:
 
 - `create`: the compact `HandlerCreate` members **without `TRANSPORT`** (a request has a
-  description and no name; transports are Q5), plus the full set's `UNIT_TEST`,
+  description and no name; the `transport` prompt creates one), plus the full set's `UNIT_TEST`,
   `CDS_UNIT_TEST`, where the binary serves them.
 - `get`: the `HandlerGet` members without `UNIT_TEST` and `CDS_UNIT_TEST` (run results, §1.4
-  note ¹); `TRANSPORT` stays (`name` is the request number).
+  note ¹) and without `TRANSPORT` (the `transport` prompt's `get` and `objects`, §2.5).
 - `update`, `delete`, `activate`, `check`: the members of the compact tool, and the full
   set's types of the table in §1.4.
 - `RUNTIME_PROFILE` and `RUNTIME_DUMP` are in no operation (their CRUD matrix row is empty,
   `COMPACT_CRUD_MATRIX`).
 
-The full-set-only types (message class, function include, …) are Q6.
+The full-set-only types (message class, function include, …) stay out (owner decision 5).
+
+### 2.3 `unit_test`
+
+**Types and rows.** The run target code of each type is a typed table, `RUN_TARGET`, whose
+values are typed as the run object codes of the `target.type` enum (the list
+`HandlerUnitTestRun` and `RunAbapUnit` share, §1.7) — a code the enum does not hold is a
+compile error.
+
+| type | `RUN_TARGET` | core | compact |
+|---|---|---|---|
+| `class` | `CLAS/OC` | `RunUnitTest` (`class_name`) | `HandlerUnitTestRun` (`target: { kind: object, name, type: CLAS/OC }`) |
+| `program` | `PROG/P` | `RunProgramUnitTest` (`program_name`) | `HandlerUnitTestRun` (`PROG/P`) |
+| `function_group` | `FUGR/F` | `RunFunctionGroupUnitTest` (`function_group_name`) | `HandlerUnitTestRun` (`FUGR/F`) |
+| `function_module` | `FUGR/FF` | `RunFunctionModuleUnitTest` (`function_module_name`; `function_group_name` still to fill) | `HandlerUnitTestRun` (`FUGR/FF`) ² |
+| `ddl` | `DDLS/DF` | `RunAbapUnit` (`target: { kind: object, name, type: DDLS/DF }`, `scope.foreign_tests: true`) | `HandlerUnitTestRun` (the same target and scope) |
+| `package` | — | `RunAbapUnit` (`target: { kind: package, name, include_subpackages }`) | `HandlerUnitTestRun` (the same target) |
+
+² Inference: the name form of a function module as a run target (`FUGR/FF`) is not stated by
+the tool; the plan confirms it from the run handler's request before any code, and the type
+leaves the compact row if it cannot be confirmed.
+
+- **Per binary** (**Measured**, §1.7): core and compact serve all six types on onprem and
+  cloud; core-ro and compact-ro list no run tool, so no `unit_test`; legacy none.
+- **Reading the result.** Full rows are one call: with the defaults (`runner` async, `wait`
+  true) the call answers the finished result; when it answers a `run_id` instead, the result
+  is read with `GetUnitTestResult` (a step generated when that tool is listed). Compact rows
+  are three calls: `HandlerUnitTestRun` answers `{ run_id }`; `HandlerUnitTestStatus` with
+  `run_id` and `with_long_polling: true` until the status is `FINISHED`; then
+  `HandlerUnitTestResult` with `run_id`.
+- **Visibility.** A type is served when its row's tools are listed: compact needs
+  `HandlerUnitTestRun`, `HandlerUnitTestStatus` and `HandlerUnitTestResult` all listed; core
+  `class` needs `RunUnitTest`, `ddl` and `package` need `RunAbapUnit`. The run tools have no
+  deny narrowing by value (Code: `NARROWINGS` holds no unit-test run), so the deny list acts
+  per tool: `RunUnitTest` removes `class` from core, `HandlerUnitTestRun` removes the prompt
+  from compact.
+- **`include_subpackages`** is read for `package` alone, completed `true` / `false`; given
+  with another type it is refused in words (`unit_test: include_subpackages is read for
+  package`); absent with `package`, the instruction lists it still to fill.
+- **Text.**
+
+  core — `/unit_test class <name>`:
+  ```
+  Run the unit tests of the CLASS "<name>".
+  1. Call RunUnitTest with class_name: "<name>".
+  2. When it answers a run_id: call GetUnitTestResult with run_id: from step 1.
+  ```
+  compact — `/unit_test package <pkg> include_subpackages=true`:
+  ```
+  Run the unit tests of the PACKAGE "<pkg>".
+  1. Call HandlerUnitTestRun with target: { kind: "package", name: "<pkg>",
+     include_subpackages: true }; keep the run_id it answers.
+  2. Call HandlerUnitTestStatus with run_id: from step 1, with_long_polling: true, until the
+     status is FINISHED.
+  3. Call HandlerUnitTestResult with run_id: from step 1.
+  ```
+
+### 2.4 `where_used`
+
+**Types and rows.** The where-used code of each type is a typed table, `WHERE_USED_AS`, its
+values typed as the codes both kinds' `WHERE_USED_CODES` hold (Code: the two lists are equal):
+
+`class` `CLAS/OC`, `interface` `INTF/OI`, `program` `PROG/P`, `include` `PROG/I`,
+`function_group` `FUGR/F`, `function_module` `FUGR/FF`, `package` `DEVC/K`, `ddl` `DDLS/DF`,
+`table` `TABL/DT`, `structure` `TABL/DS`, `table_type` `TTYP/DA`, `domain` `DOMA/DD`,
+`data_element` `DTEL/DE`, `behavior_definition` `BDEF/BDO`, `metadata_extension` `DDLX/EX`,
+`service_definition` `SRVD/SRV`, `service_binding` `SRVB/SVB` — 17 types.
+
+| Binary | Tool and arguments |
+|---|---|
+| core, core-ro | `GetWhereUsed` with `object_name`, `object_type`: the code |
+| compact, compact-ro | `HandlerSystem` with `action: where_used`, `object_name`, `object_type`: the code |
+| legacy | — |
+
+- **Per binary** (**Measured**, §1.7): every non-legacy binary serves all 17 types on onprem
+  and cloud (a type is served when its code is in the kind's `WHERE_USED_CODES`).
+- **A function module's name** is `GROUP|MODULE` for both tools (Measured: their
+  `object_name` description); for `function_module` the instruction quotes the listed
+  `object_name` description of the tool, so the form comes from the definition.
+- **A background run.** Where the listed schema has `background` and the server lists the
+  tool that reads a run (`GetBackgroundRun`; compact `HandlerBackgroundRunGet`), the
+  instruction adds the step reading the `run_handle` the call answers.
+- **Visibility.** Core: `GetWhereUsed` listed. Compact: `HandlerSystem` listed with
+  `where_used` among its `members` — readable only after the fix of §6a. The deny list:
+  `GetWhereUsed` or `HandlerSystem.where_used` removes the prompt.
+- **Text.**
+
+  core-ro — `/where_used table <name>`:
+  ```
+  List where the TABLE "<name>" is used.
+  1. Call GetWhereUsed with object_name: "<name>", object_type: "TABL/DT".
+  2. When it answers a run_handle: call GetBackgroundRun with run_handle: from step 1.
+  ```
+  compact — `/where_used class <name>`:
+  ```
+  List where the CLASS "<name>" is used.
+  1. Call HandlerSystem with action: "where_used", object_name: "<name>",
+     object_type: "CLAS/OC".
+  2. When it answers a run_handle: call HandlerBackgroundRunGet with run_handle: from step 1.
+  ```
+
+### 2.5 `transport`
+
+**Actions**, in this order, each a typed row per family (an action no row of the binary
+serves is neither completed nor accepted):
+
+| action | core | core-ro | compact | compact-ro |
+|---|---|---|---|---|
+| `create` | `CreateTransport` (`description`) | — | `HandlerTransportCreate` (`description`); else `HandlerCreate` `object_type: TRANSPORT` | — |
+| `create_task` | `CreateTransportTask` (`transport_number`, `target_user`) | — | — | — |
+| `list` | `ListTransports` (`user`) | `ListTransports` | `HandlerSystem` `action: transports` (`user`) | the same |
+| `get` | `GetTransport` (`transport_number`) | `GetTransport` | — | — |
+| `objects` | `ReadTransportObjects` (`transport_number`) | `ReadTransportObjects` | `HandlerGet` `object_type: TRANSPORT` (`transport_number`) | the same |
+| `log` | `ReadTransportActionLog` (`transport_number`) | `ReadTransportActionLog` | — | — |
+| `add_object` | `AddTransportObject` (`transport_number`, `object_name`, `object_type`) | — | — | — |
+| `remove_object` | `ReadTransportObjects`, then `RemoveTransportObject` (`… position`) | — | — | — |
+| `move_objects` | `ReadTransportObjects`, then `MoveTransportObjects` (`transport_number`, `target_number`, `objects`) | — | `HandlerGet` `TRANSPORT`, then `HandlerTransportMoveObjects` | — |
+| `sort_compress` | `SortAndCompressTransportTask` (`transport_number`) | — | `HandlerTransportSortAndCompress` (`transport_number`) | — |
+
+- **Per binary** (**Measured**, §1.7): core 10 actions, core-ro 4 (`list`, `get`, `objects`,
+  `log`), compact 5 (`create`, `list`, `objects`, `move_objects`, `sort_compress`),
+  compact-ro 2 (`list`, `objects`); onprem and cloud alike; legacy none.
+- **Arguments** (all optional strings to the SDK; required per action, checked in the
+  prompt's own words before any instruction):
+
+  | Argument | Description | Read by |
+  |---|---|---|
+  | `action` | "What to do with transport requests." Completed. | every action |
+  | `number` | "The number of the request or task the action works on (a task for add_object, remove_object, move_objects, sort_compress)." | required: `create_task`, `get`, `objects`, `log`, `add_object`, `remove_object`, `move_objects`, `sort_compress` |
+  | `description` | "The new request's description." | required: `create` |
+  | `user` | "An SAP user id: the task's owner (create_task), or whose requests are listed (list)." | required: `create_task`; optional: `list` |
+  | `object_type` | "The object's type." Completed. | required: `add_object`, `remove_object`; optional: `move_objects` |
+  | `name` | "The object's name." | the same as `object_type` |
+  | `target_number` | "The task the entries move to." | required: `move_objects` |
+
+  A missing required argument is refused: `transport: action "<action>" takes <arguments>.`
+  An argument the action does not read is refused too: `transport: action "<action>" reads
+  <arguments>; "<argument>" is not one of them.` Nothing is silently dropped.
+- **`object_type` of a transport entry.** The tools take an object-directory type (`CLAS`),
+  not an ADT code. The prompt keeps the one vocabulary: a typed table,
+  `OBJECT_DIRECTORY_TYPE`, gives each type's main type — the part of its `WHERE_USED_AS`
+  code before `/`, checked by the compiler (a template-literal type over the table's codes,
+  ``C extends `${infer M}/${string}` ? M : never``; no runtime split): `class` `CLAS`,
+  `interface` `INTF`, `program` and `include` `PROG`, `function_group` `FUGR`, `table` and
+  `structure` `TABL`, `table_type` `TTYP`, `domain` `DOMA`, `data_element` `DTEL`, `ddl`
+  `DDLS`, `package` `DEVC`, `behavior_definition` `BDEF`, `metadata_extension` `DDLX`,
+  `service_definition` `SRVD`, `service_binding` `SRVB` — 16 types; `function_module` is out
+  (its entry is a `LIMU` sub-object, not `R3TR`). Inference: the main type equals the
+  object-directory type for these 16 — the plan confirms it against the transport handlers
+  and the entries `ReadTransportObjects` answers before any code (Q-T1).
+- **Completion.** `action`: the served actions in table order. `object_type`: the 16 types,
+  offered when the action argument already given (`context.arguments.action`) reads it, or
+  when none is given yet.
+- **Visibility.** An action is served when its row's tools are listed: compact `list`
+  needs `HandlerSystem` with `transports` in its `members` (§6a); compact `objects` and
+  `move_objects` need `TRANSPORT` in `HandlerGet`'s members; compact `create` needs
+  `HandlerTransportCreate`, or `TRANSPORT` in `HandlerCreate`'s members. The deny list acts
+  through them: `HandlerSystem.transports` removes `list`, `HandlerGet.TRANSPORT` removes
+  `objects` and `move_objects`, `CreateTransport*` removes `create` and `create_task` from
+  core. The prompt is listed when one action is left.
+- **Text.**
+
+  core — `/transport action=create description=<words>`:
+  ```
+  Create a transport request.
+  1. Call CreateTransport with description: "<words>".
+  ```
+  core — `/transport action=remove_object number=<task> object_type=class name=<name>`:
+  ```
+  Remove the CLASS "<name>" from the task "<task>".
+  1. Read the task's entries: call ReadTransportObjects with transport_number: "<task>";
+     take the position of the entry with object_type CLAS and object_name "<name>".
+  2. Call RemoveTransportObject with transport_number: "<task>", object_name: "<name>",
+     object_type: "CLAS", position: from step 1.
+  ```
+  compact — `/transport action=move_objects number=<task> target_number=<other>`:
+  ```
+  Move entries of the task "<task>" to the task "<other>".
+  1. Read the task's entries: call HandlerGet with object_type: "TRANSPORT",
+     transport_number: "<task>".
+  2. Call HandlerTransportMoveObjects with transport_number: "<task>",
+     target_number: "<other>", objects: the entries to move from step 1, each with its
+     object_name, object_type and position — chosen with the user.
+  ```
+  compact-ro — `/transport action=list`:
+  ```
+  List transport requests.
+  1. Call HandlerSystem with action: "transports".
+  2. When it answers a run_handle: call HandlerBackgroundRunGet with run_handle: from step 1.
+  ```
 
 ## 3. The mapping: operation × binary → tools
 
@@ -322,8 +580,9 @@ Computed **once**, at registration, from the entries the server listed on its ki
 7. **`object_type` in any case.** The value is matched without regard to case (`class`,
    `CLASS`); the instruction names the canonical upper-case member.
 
-`HandlerSystem` actions (`where_used`, `search_object`, …) carry no `members` when narrowed
-(§1.3), so any prompt routed through one needs that fixed first — it is in Q4, not in the six.
+`HandlerSystem` actions (`where_used`, `transports`) are read from its `members`, which the
+fix of §6a adds; until that step lands, compact `where_used` and `transport` `list` have no
+typed source of their visibility.
 
 ## 5. The instruction text
 
@@ -434,23 +693,67 @@ object_name: "<name>".`
   **lowercase** (`class`, `data_element`), in the tool's member order, filtered by a
   case-insensitive prefix of what the user typed (plain `startsWith`, no regex). At most 25
   types per operation, under the SDK's cut of 100.
-- No other argument has a closed set among the six prompts. `name` is not completed (object
-  names from the SAP system are out of scope, goal).
+- Other closed sets: `transport` `action` (the served actions, §2.5) and its `object_type`
+  (the 16 types of `OBJECT_DIRECTORY_TYPE`); `unit_test` `include_subpackages` (`true`,
+  `false`). `name`, `number`, `user`, `description`, `change` are not completed (names from
+  the SAP system are out of scope, goal).
 - Per binary and kind (**Measured**: the listed-schemas fixture counted under §2.2), served
   types per operation:
 
-  | Binary family, kind | create | get | update | delete | activate | check |
-  |---|---|---|---|---|---|---|
-  | core, onprem | 20 | 23 | 24 | 24 | 16 | 14 |
-  | core, cloud | 18 | 23 | 22 | 22 | 14 | 14 |
-  | core-ro, onprem / cloud | — | 19 | — | — | — | — |
-  | compact, onprem | 18 | 23 | 24 | 24 | 18 | 14 |
-  | compact, cloud | 16 | 23 | 22 | 22 | 16 | 14 |
-  | compact-ro, onprem / cloud | — | 23 | — | — | — | 14 |
-  | any, legacy | — | — | — | — | — | — |
+  | Binary family, kind | create | get | update | delete | activate | check | unit_test | where_used | transport actions |
+  |---|---|---|---|---|---|---|---|---|---|
+  | core, onprem | 20 | 22 | 24 | 24 | 16 | 14 | 6 | 17 | 10 |
+  | core, cloud | 18 | 22 | 22 | 22 | 14 | 14 | 6 | 17 | 10 |
+  | core-ro, onprem / cloud | — | 18 | — | — | — | — | — | 17 | 4 |
+  | compact, onprem | 18 | 22 | 24 | 24 | 18 | 14 | 6 ² | 17 | 5 |
+  | compact, cloud | 16 | 22 | 22 | 22 | 16 | 14 | 6 ² | 17 | 5 |
+  | compact-ro, onprem / cloud | — | 22 | — | — | — | 14 | — | 17 | 2 |
+  | any, legacy | — | — | — | — | — | — | — | — | — |
+
+  `get` leaves out `TRANSPORT` (§2.2); ² five if `function_module` leaves the compact
+  `unit_test` row (§2.3).
 
   `update` counts assume the read step of §3.3 (`READ_AS`). The fixture (§9) states each list
   exactly.
+
+## 6a. Step: `HandlerSystem` keeps its actions readable
+
+Its own step, before the prompts that read it (compact `where_used`, `transport` `list`).
+
+1. **The definition.** `handlerSystemDefinitionFor(variant, actions)`
+   (`src/lib/compact/compactSchemas.ts`) returns `members: actions` beside its description and
+   schema. The un-narrowed definition (`handlerSystemDefinition`, through `byVariant`) then
+   carries every action per variant, and the narrowed one (`NARROWINGS` `HandlerSystem`,
+   `src/lib/access/narrowing.ts`) the actions left — `withoutDenied` already copies a
+   narrowing's `members` into `variants[v]` (Code: `stated(...)` spreads the narrowing's
+   definition). The `members` doc on `ToolDefinition` / `VariantToolDefinition`
+   (`src/lib/handlers/interfaces.ts`) says "the values of its `object_type`, `target_type`
+   or, for `HandlerSystem`, `action`". Typed: `members` is `readonly SystemAction[]` at the
+   source, read as `readonly string[]` by the contract — no cast.
+2. **The search metadata.** `listedTool` hands a variant's `members` to `searchMeta`, so
+   `HandlerSystem`'s search texts are rendered with `offered` from now on
+   (`toolSearchText(name, offered)`, `src/lib/toolSearch/index.ts`). Today its
+   `tools/tool-search.json` entry has no `members` groups and a plain `semantic` string, so the
+   rendering with every action equals today's (Inference, pinned by the unchanged
+   `listed-schemas.json`). The step adds `members` groups to that entry — each keyword that
+   names one action under it (`where used`, `used by`, `references` under `where_used`;
+   `transport requests` under `transports`; …) — and turns its `semantic` into a list of one
+   item per action, so a denied action's words leave the listed search text, as a denied
+   member's do for the object-type tools. The entry is rewritten so that, with every action
+   offered, the keywords and the sentence render exactly as today.
+3. **The fixtures.**
+   - `tests/fixtures/tools/listed-schemas.json`: unchanged — every binary lists every action
+     (the test proves the rendering is byte-identical); if the item order cannot reproduce
+     the sentence exactly, the fixture is rewritten with `WRITE_LISTED_SCHEMAS=1` and the
+     difference is stated in the CHANGELOG as the one change of a listed text.
+   - `tests/fixtures/tools/rebuilt-descriptions.json`: unchanged — descriptions do not move.
+   - New expectations in `src/__tests__/unit/access/withoutDenied.test.ts`: `HandlerSystem.where_used`
+     and `HandlerSystem.transports` leave `members` without the action on both variants, and
+     the listed `_meta` without that action's keywords; nothing denied, `members` holds all
+     eight `SYSTEM_ACTIONS`.
+   - `tools/tool-search.json` tests (`TOOL_SEARCH` checks in `listedSchemas.test.ts`): every
+     `members` key of `HandlerSystem` is a `SYSTEM_ACTIONS` value.
+4. **No behaviour change** of the tool: its schema, description and dispatch stay.
 
 ## 7. Where prompts are registered
 
@@ -470,10 +773,14 @@ object_name: "<name>".`
   registry's groups and the kind they state (the rule `registerAllTools` already applies),
   e.g. `registerAbapPrompts(server, registry)`. `registerAllTools` itself registers no
   prompt, so an embedder's server gets no prompt names it did not ask for (they would collide
-  with its own: `registerPrompt` throws on a duplicate name). Q3.
+  with its own: `registerPrompt` throws on a duplicate name). Owner decision 3.
+- **`prompts: false`** — a `BaseMcpServer` option (so `EmbeddableMcpServer` too): absent or
+  `true`, the prompts are registered; `false`, none is, and no `prompts` capability is
+  declared. The twelve binaries pass nothing (prompts on). Typed `prompts?: boolean |
+  undefined`, as the server's other options.
 - **The exporter**: `createRegistry()` → through `BaseMcpServer`, as above; `registerOnServer`
   → the opt-in function, given the exporter's registry. Nothing in `HandlerExporter` changes
-  but documentation. Q3.
+  but documentation. Owner decision 3.
 - **Code placement**: `src/lib/prompts/` in `@mcp-abap-adt/lib` (lib holds the full-set
   handler modules, the compact schemas, tokens, `TAKES` and members, so every type the rows
   need is importable without a new package edge); exported as `@mcp-abap-adt/lib/prompts`
@@ -489,7 +796,9 @@ object_name: "<name>".`
 - No cast, `any`, `!`, `ts-ignore`, regex, timeout, retry or polling. `prompts/get` sends
   nothing to SAP and takes no connection.
 - Operations, families and members are literal unions; the `operation → rows` map is a
-  `Record` over the union, so a seventh operation without rows does not compile.
+  `Record` over the union, so an operation without rows does not compile. `transport`'s
+  actions and their per-action arguments (§2.5) are one typed table, `TRANSPORT_ACTIONS`,
+  from which the argument check, the completion and the text are read.
 
 ## 9. Tests
 
@@ -523,7 +832,20 @@ moves the rest to `node:test`).
 8. **Typecheck** — a `__typechecks__` file: a row with a key its tool does not take, and a
    missing `LOCKED_AS` entry, fail to compile (`@ts-expect-error`).
 9. **Plain registration** — the opt-in function on an SDK `McpServer` lists what
-   `BaseMcpServer` lists for the same groups and kind; `registerAllTools` alone lists none.
+   `BaseMcpServer` lists for the same groups and kind; `registerAllTools` alone lists none;
+   `prompts: false` lists none and declares no `prompts` capability.
+10. **`unit_test`** — per family the generated steps (one call on core; run, status, result
+    on compact); `include_subpackages` refused for a type other than `package`; denying
+    `HandlerUnitTestStatus` removes the prompt from compact.
+11. **`where_used`** — the code of each type; the background-run step present only where the
+    schema has `background` and the reading tool is listed; `HandlerSystem.where_used` denied
+    removes the prompt from compact, `GetWhereUsed` from core.
+12. **`transport`** — per binary the completed actions (core 10, core-ro 4, compact 5,
+    compact-ro 2); each action's missing required argument and unread argument refused in
+    words; `HandlerSystem.transports`, `HandlerGet.TRANSPORT`, `HandlerTransportCreate`
+    (compact `create` then routed through `HandlerCreate` `TRANSPORT`) and both denied
+    (no `create`); the object-directory type of each of the 16 types.
+13. **The `HandlerSystem` step** (§6a) — its own tests, listed there.
 
 **Live tests: none.** A prompt sends nothing to SAP and builds text from definitions the
 listing tests already pin per binary and kind; the tool calls a model then makes are the
@@ -532,7 +854,7 @@ What a live run could add — that a client shows the prompt — is the client's
 
 ## 10. Documentation
 
-- `README.md`: a "Prompts" section — the six, their arguments, one example per family.
+- `README.md`: a "Prompts" section — the nine, their arguments, one example per family.
 - `docs/user-guide/PROMPTS.md` (new): the prompt page — per binary and kind, the prompts and
   their `object_type` values, rendered from `listed-prompts.json` by
   `tools/generate-tools-docs.js` beside the tool pages; how a client shows them; the refusal.
@@ -544,48 +866,31 @@ What a live run could add — that a client shows the prompt — is the client's
 - `docs/architecture/HANDLER_EXPORTER.md`, `TOOLS_ARCHITECTURE.md`, `src/lib/handlers/README.md`:
   the prompt module, its registration paths, the opt-in function.
 - `docs/README.md`: the new page in the index.
+- `docs/user-guide/TOOL_SEARCH.md`: `HandlerSystem`'s search texts follow its actions left
+  (§6a).
 - `CHANGELOG.md`: a new minor (24.1.0, unless the release carries other work) — "Added: MCP
-  prompts". No migration note: nothing existing changes for a consumer (an embedder's
-  `BaseMcpServer` now lists prompts; Q3 covers whether that needs an option).
+  prompts", "Added: `prompts: false`", "Changed: a denied `HandlerSystem` action leaves its
+  search texts". No migration note: an embedder's `BaseMcpServer` now lists prompts, and
+  `prompts: false` keeps it as before.
 - `CLAUDE.md` is the controller's, with the owner's approval of the text; the plan names the
   lines it would add (the prompt rows, where they live).
 
 ## 11. Open questions for the owner
 
-1. **Prompt names.** `create` / `get` / … or prefixed `abap-create`? Clients namespace
-   prompts by server (a slash command usually reads `/<server>:create`), and the operation
-   names match the goal's examples. **Recommendation: plain operation names.**
-2. **`update` and the source.** A prompt argument is one string typed in a client's dialog,
-   which suits a sentence, not a whole source. **Recommendation: `change` (what to change, in
-   words), optional; the model reads the object and writes the new content, as §5.2 shows.**
-   Alternative: a `source_code` argument passed verbatim.
-3. **Embedders.** `BaseMcpServer` (and so `EmbeddableMcpServer` and the exporter's
-   `createRegistry()`) lists prompts from this release, and a plain registration gets them
-   only by the opt-in function. **Recommendation: as specified, plus a `prompts: false` option
-   on `BaseMcpServer` for an embedder that registers prompts of its own names.** Alternative:
-   opt-in everywhere but the twelve binaries' runtimes.
-4. **More operations.** Candidates, each with what it costs:
-   - unit-test run (`RunUnitTest`, `RunProgramUnitTest`, … / `HandlerUnitTestRun`, whose
-     target is an object, not an `object_type`): a row shape of its own;
-   - where-used and object search (`GetWhereUsed`, `SearchObject` / `HandlerSystem`
-     `where_used`, `search_object`): needs the narrowed `HandlerSystem` to carry its actions
-     left as `members` (§1.3), which also changes its search `_meta` — a listed-schemas fixture
-     change;
-   - validate and deletion check (compact only: `HandlerValidate`, `HandlerDeletionCheck`).
-   **Recommendation: the six now; unit-test run and where-used next, each its own change.**
-5. **Transports and the debugger.** Transports (create a request, list, read) are a request's
-   work, not an object's, and the debugger is a conversation of many calls at a stopped
-   program. **Recommendation: no prompt for either now; transports first if wanted, as a
-   `transport` prompt with an `action` argument completed from the served actions.**
-6. **Full-set-only types** (message class, function include, enhancement, transaction):
-   **Recommendation: not in the vocabulary now; compact's names are the one vocabulary, and a
-   full-only type is added with its row when asked for.**
-7. **`object_type` values as completed.** **Recommendation: lowercase (`class`,
-   `data_element`), as the goal's examples write them; any case accepted.** Alternative:
-   upper case, as the tools take them.
-8. **`get` part.** `GetClass` and `HandlerGet` take `part` (source, metadata, …), with
-   different value sets per family. **Recommendation: no `part` argument now — the tool's
-   default part (source) — and the model asks for metadata by the tool when the user does.**
+The first draft's questions are decided (§0). New ones:
+
+1. **Transport entries' object-directory type (Q-T1).** `add_object` / `remove_object` send
+   the main type of the type's ADT code as the object-directory type (`CLAS`, `TABL`, …),
+   and leave `function_module` out (a `LIMU` sub-object). The equality of main type and
+   object-directory type for the 16 types is an Inference the plan checks against the
+   transport handlers before code. **Recommendation: as specified; if a type does not match,
+   it leaves `transport`'s `object_type` rather than gaining a special case.**
+2. **Compact `unit_test` of a function module.** The run target's name form for `FUGR/FF` is
+   not stated by any tool. **Recommendation: the plan reads the run handler's request; if the
+   form is not certain, `function_module` stays a core-only `unit_test` type.**
+3. **`transport` `move_objects` with no `object_type` / `name`.** The instruction then asks
+   the model to choose the entries with the user. **Recommendation: keep it so — a move of
+   several entries is the common case, and one entry is named by the two arguments.**
 
 ## 12. Out of scope
 

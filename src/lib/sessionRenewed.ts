@@ -31,3 +31,33 @@ export function withSessionRenewed(content: TextContent): TextContent {
         };
   return [{ type: 'text', text: JSON.stringify(answer, null, 2) }, ...rest];
 }
+
+/**
+ * The words of a call that was to run once more, whose new session could
+ * not be had (its logon refused or failed): no second run began.
+ */
+export const SESSION_RENEWAL_FAILED_WORDS =
+  'SAP ended the session before the call ran, and the logon of a new session failed; the call did not run.';
+
+/** The answer of a call whose new session could not be had: the server's words, no SAP text. */
+export function sessionRenewalFailed(): {
+  isError: true;
+  content: TextContent;
+} {
+  return {
+    isError: true,
+    content: [
+      {
+        type: 'text',
+        text: JSON.stringify(
+          {
+            error: 'session_renewal_failed',
+            message: SESSION_RENEWAL_FAILED_WORDS,
+          },
+          null,
+          2,
+        ),
+      },
+    ],
+  };
+}

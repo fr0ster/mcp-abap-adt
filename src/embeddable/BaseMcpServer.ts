@@ -170,7 +170,11 @@ import {
 } from '../lib/requestSystemResolution.js';
 import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
-import { withSessionRenewed } from '../lib/sessionRenewed.js';
+import {
+  SESSION_RENEWAL_FAILED_WORDS,
+  sessionRenewalFailed,
+  withSessionRenewed,
+} from '../lib/sessionRenewed.js';
 import { HeldLocks, lockNotHeldWords } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
@@ -1803,6 +1807,11 @@ export abstract class BaseMcpServer extends McpServer {
             // Whether the call ran once more after SAP ended its session:
             // its answer then says so (`session_renewed`).
             let renewed = false;
+            // What the call's requests on the instance's connection met,
+            // watched from before the first of them reaches SAP — the
+            // access check's reads and the system lookup included — for the
+            // one repeat (`watchRequests`).
+            let watch: ReturnType<typeof watchRequests>;
             // The batch an end call (`HandlerBatch` end, `DebugBatchEnd`) ends: the one
             // of its kind open when it came.
             const endingKind = endsBatch(entry.toolDefinition.name, args);
@@ -1891,6 +1900,14 @@ export abstract class BaseMcpServer extends McpServer {
                     connection = await this.getConnection(signal);
                     inUse = connection;
                   }
+                }
+                // Watched from here: nothing of the call has reached SAP yet.
+                if (
+                  !ownConnection &&
+                  !this.batchOpenFor(entry.toolDefinition.name) &&
+                  repeatsOnTokenRefusal(entry.toolDefinition.name)
+                ) {
+                  watch = watchRequests(connection);
                 }
                 // The connection's system information, asked before the tool
                 // runs when it has none; its failure is this call's answer, and
@@ -2054,56 +2071,104 @@ export abstract class BaseMcpServer extends McpServer {
                 const runOn = (
                   on: HandlerContext,
                   known: ResolvedSystemContext | undefined,
+                  started?: () => void,
                 ) =>
-                  resolvedOn(on, known, () =>
-                    holdsFlow
+                  resolvedOn(on, known, () => {
+                    started?.();
+                    return holdsFlow
                       ? runWithAdtFailureReader(
                           (failed) => this.readAdtFailure(failed),
                           () => entry.call(on, handlerArgs),
                         )
-                      : entry.call(on, handlerArgs),
-                  );
+                      : entry.call(on, handlerArgs);
+                  });
                 // The one repeat (the owner's named exception to "no
                 // retries", 24.0.1): a call on the instance's connection
                 // whose first request SAP answered in a new session, its own
                 // ended (`isSessionReplacedBySap`: the token refusal marked
                 // `sessionLost`, or a stateful request's
-                // `ADT_SESSION_REPLACED`), with no request of it answered
-                // (`watchRequests`), ran nothing; it runs once more, on the
-                // connection `getConnection` gives after that loss — its
-                // gates as for any call. Never a batch tool, a debugger
-                // tool or a long-session tool; background runs and long
-                // reads are not on this path.
-                const watch =
-                  holdsFlow && repeatsOnTokenRefusal(entry.toolDefinition.name)
-                    ? watchRequests(context.connection)
-                    : undefined;
-                handlerPromise = (async () => {
-                  let first: ToolResultLike;
+                // `ADT_SESSION_REPLACED`), with no request of it answered —
+                // the access check's and the system lookup's included
+                // (`watchRequests`, started before them) — ran nothing,
+                // whether the handler answered or threw. It runs once more
+                // only on a connection this server builds and holds
+                // (`built`), on the one `getConnection` gives after that
+                // loss — its gates as for any call — and only when that is
+                // another connection; the access check is made again on it.
+                // Never a batch tool, a debugger tool or a long-session tool;
+                // background runs and long reads are not on this path.
+                handlerPromise = (async (): Promise<ToolResultLike> => {
+                  let first:
+                    | { ok: true; value: ToolResultLike }
+                    | { ok: false; thrown: unknown };
                   try {
-                    first = await runOn(context, system);
+                    first = { ok: true, value: await runOn(context, system) };
                   } catch (thrown) {
-                    watch?.end();
-                    throw thrown;
+                    first = { ok: false, thrown };
                   }
-                  if (watch?.end().refusedBeforeAnyRan !== true) return first;
+                  const watched = watch?.end();
+                  watch = undefined;
+                  const settled = (): ToolResultLike => {
+                    if (first.ok) return first.value;
+                    throw first.thrown;
+                  };
+                  if (
+                    watched?.refusedBeforeAnyRan !== true ||
+                    this.connectionContext?.kind !== 'built'
+                  ) {
+                    return settled();
+                  }
                   this.logger.info(REPEATED_CALL_WORDS, {
                     tool: entry.toolDefinition.name,
                   });
-                  renewed = true;
-                  inUse = undefined;
-                  this.connectionReleased(context.connection);
-                  const fresh = await this.getConnection(signal);
-                  inUse = fresh;
-                  const again = await this.systemBeforeTool(
-                    fresh,
-                    holdsFlow,
-                    signal,
-                    (taken) => {
-                      inUse = taken;
-                    },
-                  );
-                  declareSystemKind(again.connection, this.systemType);
+                  let again: {
+                    connection: IAbapConnection;
+                    system: ResolvedSystemContext | undefined;
+                  };
+                  try {
+                    inUse = undefined;
+                    this.connectionReleased(context.connection);
+                    const fresh = await this.getConnection(signal);
+                    inUse = fresh;
+                    // Not replaced: nothing to run on but the spent one.
+                    if (fresh === context.connection) return settled();
+                    again = await this.systemBeforeTool(
+                      fresh,
+                      holdsFlow,
+                      signal,
+                      (taken) => {
+                        inUse = taken;
+                      },
+                    );
+                    declareSystemKind(again.connection, this.systemType);
+                    // The access check again, on the new connection: the
+                    // first verdict is the old session's.
+                    if (
+                      this.accessChecks !== undefined &&
+                      accessCall !== undefined
+                    ) {
+                      const replaced = again.connection;
+                      const verdict = await this.accessChecks.check(
+                        accessCall,
+                        lazyPackageReader(
+                          async () => replaced,
+                          this.logger,
+                          signal,
+                        ),
+                      );
+                      if (!verdict.allowed) {
+                        return this.refusalAnswer(refusalOf(verdict));
+                      }
+                    }
+                  } catch (thrown) {
+                    // A cancel is the cancel's answer; any other failure of
+                    // the new session is answered in the server's words.
+                    if (signal.aborted) throw thrown;
+                    this.logger.debug(SESSION_RENEWAL_FAILED_WORDS, {
+                      tool: entry.toolDefinition.name,
+                    });
+                    return sessionRenewalFailed();
+                  }
                   const availability = this.batchAvailabilityOf(
                     again.connection,
                   );
@@ -2118,6 +2183,10 @@ export abstract class BaseMcpServer extends McpServer {
                         : {}),
                     },
                     again.system,
+                    // Said only once the second run has begun.
+                    () => {
+                      renewed = true;
+                    },
                   );
                 })();
               }
@@ -2175,6 +2244,7 @@ export abstract class BaseMcpServer extends McpServer {
               }
               return failed;
             } finally {
+              watch?.end();
               if (inUse !== undefined) this.connectionReleased(inUse);
               leaveFlow?.();
             }

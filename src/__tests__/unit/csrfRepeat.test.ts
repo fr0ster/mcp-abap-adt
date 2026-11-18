@@ -10,19 +10,30 @@
  * code: the stand-in ends the session (`endSession`) and refuses the stale
  * cookie's request as SAP does.
  */
+
+import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   REPEATED_CALL_WORDS,
   repeatsOnTokenRefusal,
 } from '../../embeddable/BaseMcpServer';
+import { ALLOWED } from '../../lib/access/accessChecks';
+import { createAbapConnection } from '../../lib/connectionFactory';
 import { CSRF_REFUSAL_WORDS } from '../../lib/csrfRefusal';
-import { SESSION_RENEWED_WORDS } from '../../lib/sessionRenewed';
+import {
+  SESSION_RENEWAL_FAILED_WORDS,
+  SESSION_RENEWED_WORDS,
+} from '../../lib/sessionRenewed';
 import {
   type AdtStandIn,
   adtStandIn,
   isLogoff,
   type StandInRequest,
 } from '../helpers/adtStandIn';
-import { type PinServer, pinServer } from '../helpers/pinServer';
+import {
+  inProcessServer,
+  type PinServer,
+  pinServer,
+} from '../helpers/pinServer';
 
 const ACTIVATION = '/sap/bc/adt/activation';
 const INTERFACE = '/sap/bc/adt/oo/interfaces/zif_a';
@@ -258,9 +269,100 @@ describe('the repeat takes its connection as any call does', () => {
     const before = sent('POST', ACTIVATION).length;
     const answered = await activate();
     expect(answered.isError).toBe(true);
-    expect(textOf(answered)).toContain('authentication_failed');
+    // The session ended and the new logon failed, in the server's words;
+    // no second run began, so the answer carries no session_renewed.
+    expect(textOf(answered)).toContain(SESSION_RENEWAL_FAILED_WORDS);
+    expect(textOf(answered)).not.toContain('CSRF token validation failed');
     expect(sent('POST', ACTIVATION).length - before).toBe(1);
-    expect(renewedOf(answered)).toBe(SESSION_RENEWED_WORDS);
+    expect(renewedOf(answered)).toBeUndefined();
+  });
+});
+
+describe('the review of #364', () => {
+  it('an access check that read SAP before the refusal makes the call run no second time', async () => {
+    await server.close();
+    server = await inProcessServer(
+      'onprem',
+      {
+        settings: {
+          url: stand.url,
+          client: '100',
+          authType: 'basic',
+          username: 'PIN_USER',
+        },
+        credential: new BasicAuthProvider('PIN_USER', 'pin-password'),
+      },
+      undefined,
+      {
+        accessChecks: {
+          check: async (_call, sap) => {
+            await sap.superPackageOf('ZPKG');
+            return ALLOWED;
+          },
+        },
+      },
+      (message) => {
+        logged.push(message);
+      },
+    );
+    const update = () =>
+      server.call('UpdateInterface', {
+        interface_name: 'ZIF_A',
+        source_code: 'INTERFACE zif_a PUBLIC. ENDINTERFACE.',
+        activate: false,
+        transport_request: 'PFXK900001',
+      });
+    await update();
+    // SAP ends the session once the access check's read is answered: the
+    // call's LOCK then meets the new session.
+    let ended = false;
+    stand.respond(
+      (request) => !ended && request.url.startsWith('/sap/bc/adt/packages/'),
+      (request) => {
+        ended = true;
+        stand.endSession(request.session);
+        return { status: 200, text: '' };
+      },
+    );
+    const before = sent('POST', `${INTERFACE}?_action=LOCK`).length;
+    await update();
+    expect(sent('POST', `${INTERFACE}?_action=LOCK`).length - before).toBe(1);
+    expect(logged).not.toContain(REPEATED_CALL_WORDS);
+  });
+
+  it('a host connection (injected) is never repeated: the server cannot replace it', async () => {
+    await server.close();
+    const injected = createAbapConnection(
+      {
+        url: stand.url,
+        client: '100',
+        authType: 'basic',
+        username: 'PIN_USER',
+      },
+      new BasicAuthProvider('PIN_USER', 'pin-password'),
+      undefined,
+      undefined,
+      undefined,
+      'onprem',
+    );
+    await injected.connect();
+    server = await inProcessServer(
+      'onprem',
+      { injected },
+      undefined,
+      {},
+      (message) => {
+        logged.push(message);
+      },
+    );
+    await activate();
+    endWithTokenRefusal(currentSession(), (r) => r.url.startsWith(ACTIVATION));
+    const before = sent('POST', ACTIVATION).length;
+    const answered = await activate();
+    expect(answered.isError).toBe(true);
+    expect(sent('POST', ACTIVATION).length - before).toBe(1);
+    expect(renewedOf(answered)).toBeUndefined();
+    expect(logged).not.toContain(REPEATED_CALL_WORDS);
   });
 });
 

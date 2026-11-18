@@ -106,6 +106,7 @@
   "src/__tests__/unit/config/accessRestrictions.test.ts",
   "src/__tests__/unit/config/caughtRefusalWords.test.ts",
   "src/__tests__/unit/config/enableDataTools.test.ts",
+  "src/__tests__/unit/config/sessionKeepAlive.test.ts",
   "src/__tests__/unit/coverage/coverageLedger.test.ts",
   "src/__tests__/unit/coverage/failureTextBanner.test.ts",
   "src/__tests__/unit/coverage/hardModeBinaries.test.ts",

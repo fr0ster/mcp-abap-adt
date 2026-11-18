@@ -184,6 +184,10 @@ export async function launch(
     }),
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
+    sessionKeepAliveMs:
+      config.sessionKeepAliveMinutes === undefined
+        ? undefined
+        : config.sessionKeepAliveMinutes * 60_000,
     // Batch mode: one InstanceBatch per SSE connection's instance.
     batch: { keepRawParts: config.batchKeepRawParts === true },
     // The state's lines go to stderr whatever the transport logger says.

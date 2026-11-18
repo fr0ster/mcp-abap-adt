@@ -997,6 +997,11 @@ async function launchStdio(
       deferredLogon: config.deferredLogon === true,
       restoreAtFirstBirth:
         config.deferredLogon === true && config.restoreSession === true,
+      // --session-keep-alive-minutes: the held connection's keep-alive.
+      sessionKeepAliveMs:
+        config.sessionKeepAliveMinutes === undefined
+          ? undefined
+          : config.sessionKeepAliveMinutes * 60_000,
     },
   );
   activeServer = server;

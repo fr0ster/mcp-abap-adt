@@ -28,10 +28,9 @@ import type {
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
-import axios from 'axios';
 import { isCsrfRefusal } from './csrfRefusal';
 import { asciiUpper } from './plainText';
-import { child } from './thrownValue';
+import { child, entries, isElement, isList } from './thrownValue';
 import { wireResponseOf } from './wireResponse';
 
 /** A call's watch over its connection's requests. */
@@ -75,25 +74,35 @@ export function isSessionReplacedBySap(
   );
 }
 
+/** Whether a request's `params` add nothing to its URL: absent, or empty in any form. */
+function noParams(params: unknown): boolean {
+  if (params === undefined || params === null) return true;
+  if (params instanceof URLSearchParams) return [...params.keys()].length === 0;
+  if (isList(params)) return params.length === 0;
+  if (isElement(params)) return entries(params).length === 0;
+  return false;
+}
+
 /**
- * Whether `options` is a LOCK: a POST whose query, as it goes on the wire,
- * carries exactly one `_action`, decoded `LOCK` — the form adt-clients
- * sends, `…?_action=LOCK&accessMode=MODIFY`. The query is the one the
- * HTTP transport sends: the URL and its `params` joined by axios's
- * `getUri`, as `@mcp-abap-adt/connection`'s transport fixes a request
- * (`HttpTransport.fix`) — a plain object, `URLSearchParams` and lists
- * alike — then read by `URLSearchParams`. A repeated `_action`, or `LOCK`
- * in another parameter, is no LOCK.
+ * Whether `options` is a LOCK, read conservatively: a missed LOCK only
+ * means no repeat (the safe behaviour), a false one would repeat a request
+ * SAP may have run. It qualifies only in adt-clients' URL form
+ * (`…?_action=LOCK&accessMode=MODIFY`, the form 26 of its lock requests
+ * send, on HTTP and RFC alike): a POST with no `params` (absent or empty
+ * in any form), no `#` in its URL, and the URL's own query, parsed by
+ * `URLSearchParams`, holding exactly one `_action`, `LOCK`. Everything else
+ * does not — a LOCK sent through `params` (the feature-toggle lock),
+ * `_action=LOCK_MSG` (the message-class message lock), any fragment, a
+ * repeated `_action`.
  */
 export function isLockRequest(options: IAbapRequestOptions): boolean {
   if (asciiUpper(options.method ?? '') !== 'POST') return false;
-  const sent = axios.getUri({
-    url: options.url ?? '',
-    ...(options.params !== undefined ? { params: options.params } : {}),
-  });
-  const at = sent.indexOf('?');
+  if (!noParams(options.params)) return false;
+  const url = options.url ?? '';
+  if (url.includes('#')) return false;
+  const at = url.indexOf('?');
   if (at < 0) return false;
-  const [only, other] = new URLSearchParams(sent.slice(at + 1)).getAll(
+  const [only, other] = new URLSearchParams(url.slice(at + 1)).getAll(
     '_action',
   );
   return other === undefined && only === 'LOCK';

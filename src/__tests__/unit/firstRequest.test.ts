@@ -149,79 +149,72 @@ describe('watchRequests', () => {
   });
 });
 
-describe('isLockRequest: a POST whose one _action, decoded, is LOCK', () => {
-  const post = (
-    url: string,
-    params?: Record<string, string> | URLSearchParams,
-  ) =>
+/**
+ * `isLockRequest` is conservative: a missed LOCK only means no repeat (the
+ * safe behaviour), a false one is the danger. A LOCK qualifies only in
+ * adt-clients' URL form: POST, no `params`, no `#`, the URL's own query
+ * holding exactly one `_action`, `LOCK`.
+ */
+describe("isLockRequest: a LOCK in adt-clients' URL form, and nothing else", () => {
+  const request = (url: string, params?: unknown, method = 'POST'): boolean =>
     isLockRequest({
       url,
-      method: 'POST',
+      method,
       timeout: 0,
       ...(params !== undefined ? { params } : {}),
     });
+  const CLASS = '/sap/bc/adt/oo/classes/zcl_a';
 
-  it('the form adt-clients sends: yes', () => {
+  it('the form adt-clients sends: qualifies', () => {
+    expect(request(`${CLASS}?_action=LOCK&accessMode=MODIFY`)).toBe(true);
+  });
+  it('the message class lock with its extra URL parameters: qualifies', () => {
     expect(
-      post('/sap/bc/adt/oo/classes/zcl_a?_action=LOCK&accessMode=MODIFY'),
+      request(
+        '/sap/bc/adt/messageclass/zmc?_action=LOCK&accessMode=MODIFY&msgNo=000&onSave=X',
+      ),
     ).toBe(true);
   });
-  it('an encoded LOCK (%4COCK): yes', () => {
-    expect(post('/sap/bc/adt/oo/classes/zcl_a?_action=%4COCK')).toBe(true);
-  });
-  it('an UNLOCK naming LOCK in another parameter: no', () => {
+  it('URL LOCK with params UNLOCK — object, URLSearchParams, RFC array: does not', () => {
+    expect(request(`${CLASS}?_action=LOCK`, { _action: 'UNLOCK' })).toBe(false);
     expect(
-      post('/sap/bc/adt/oo/classes/zcl_a?_action=UNLOCK&previous_action=LOCK'),
+      request(`${CLASS}?_action=LOCK`, new URLSearchParams('_action=UNLOCK')),
     ).toBe(false);
-  });
-  it('a repeated _action: no', () => {
-    expect(post('/sap/bc/adt/oo/classes/zcl_a?_action=LOCK&_action=LOCK')).toBe(
+    expect(request(`${CLASS}?_action=LOCK`, [['_action', 'UNLOCK']])).toBe(
       false,
     );
   });
-  it('lock in lower case (not the form sent): no', () => {
-    expect(post('/sap/bc/adt/oo/classes/zcl_a?_action=lock')).toBe(false);
-  });
-  it('_action in the params: read the same way', () => {
-    expect(post('/sap/bc/adt/oo/classes/zcl_a', { _action: 'LOCK' })).toBe(
-      true,
-    );
-    expect(post('/sap/bc/adt/oo/classes/zcl_a', { _action: 'UNLOCK' })).toBe(
+  it('a LOCK only in params (conservative; the feature-toggle form): does not', () => {
+    expect(request(CLASS, { _action: 'LOCK', accessMode: 'MODIFY' })).toBe(
       false,
     );
+    expect(request(CLASS, new URLSearchParams('_action=LOCK'))).toBe(false);
   });
-  it('LOCK in the URL, UNLOCK in URLSearchParams params (both on the wire): no', () => {
+  it('the message-class message lock, _action=LOCK_MSG: does not', () => {
     expect(
-      post(
-        '/sap/bc/adt/oo/classes/zcl_a?_action=LOCK',
-        new URLSearchParams('_action=UNLOCK'),
+      request(
+        '/sap/bc/adt/messageclass/zmc/messages/000?_action=LOCK_MSG&accessMode=MODIFY',
       ),
     ).toBe(false);
   });
-  it('LOCK only in URLSearchParams params: yes', () => {
-    expect(
-      post('/sap/bc/adt/oo/classes/zcl_a', new URLSearchParams('_action=LOCK')),
-    ).toBe(true);
+  it('#details?_action=LOCK: does not', () => {
+    expect(request(`${CLASS}#details?_action=LOCK`)).toBe(false);
   });
-  it('LOCK only in a plain-object params: yes', () => {
-    expect(
-      post('/sap/bc/adt/oo/classes/zcl_a?accessMode=MODIFY', {
-        _action: 'LOCK',
-      }),
-    ).toBe(true);
+  it('?_action=LOCK#details (conservative): does not', () => {
+    expect(request(`${CLASS}?_action=LOCK#details`)).toBe(false);
   });
-  it('LOCK in the URL and in the params (two values): no', () => {
-    expect(
-      post('/sap/bc/adt/oo/classes/zcl_a?_action=LOCK', { _action: 'LOCK' }),
-    ).toBe(false);
+  it('a duplicate _action: does not', () => {
+    expect(request(`${CLASS}?_action=LOCK&_action=LOCK`)).toBe(false);
   });
-  it('not a POST: no', () => {
-    expect(
-      isLockRequest({
-        url: '/sap/bc/adt/oo/classes/zcl_a?_action=LOCK',
-        method: 'GET',
-        timeout: 0,
-      }),
-    ).toBe(false);
+  it('a LOCK naming LOCK in another parameter only: does not', () => {
+    expect(request(`${CLASS}?_action=UNLOCK&previous_action=LOCK`)).toBe(false);
+  });
+  it('a GET: does not', () => {
+    expect(request(`${CLASS}?_action=LOCK`, undefined, 'GET')).toBe(false);
+  });
+  it('empty params of any form leave the URL form: qualifies', () => {
+    expect(request(`${CLASS}?_action=LOCK`, {})).toBe(true);
+    expect(request(`${CLASS}?_action=LOCK`, new URLSearchParams())).toBe(true);
+    expect(request(`${CLASS}?_action=LOCK`, [])).toBe(true);
   });
 });

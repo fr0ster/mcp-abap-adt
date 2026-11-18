@@ -13,6 +13,7 @@ import {
   type IAdtError,
   type IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { readAdtFailureInCall } from './adtFailureReading';
 import type { IAnswerSerializer } from './answerSerializer';
 import {
@@ -22,6 +23,11 @@ import {
 } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { callTransportRequest } from './callTransport';
+import {
+  CSRF_REFUSAL_WORDS,
+  isCsrfRefusal,
+  logCsrfRefusal,
+} from './csrfRefusal';
 import {
   type AnswerObject,
   type AnswerValue,
@@ -189,6 +195,48 @@ function positionValue(position: SourcePosition): AnswerValue {
   return out;
 }
 
+/**
+ * A refusal of the session token (`isCsrfRefusal`), answered: fixed words,
+ * status 403, where it arose (step, request) and what a release left — none
+ * of SAP's words, no body, no messages. The original goes to the log.
+ */
+function csrfRefusalPayload(
+  error: StepError,
+  response: IAdtWireResponse,
+): FailureEntry {
+  logCsrfRefusal(response, error.message);
+  const payload: { [key: string]: AnswerValue } = {
+    message: CSRF_REFUSAL_WORDS,
+    origin: error.origin,
+    status: 403,
+  };
+  const step = stepOf(error);
+  if (step !== undefined) payload.step = step;
+  const request = safeRequest(error.request);
+  if (request !== undefined) payload.request = request;
+  const cleanup = safeCleanup(error.cleanup);
+  if (cleanup !== undefined) payload.cleanup = cleanup;
+  if (error.operation === 'succeeded') payload.operation = 'succeeded';
+  return payload;
+}
+
+/**
+ * A thrown value that is a refusal of the session token, as a failure with
+ * its step; `undefined` for any other.
+ */
+function thrownCsrfRefusal(thrown: unknown): StepError | undefined {
+  const response = wireResponseOf(child(thrown, 'response'));
+  if (!isCsrfRefusal(response)) return undefined;
+  const carried = child(thrown, 'message');
+  const step = stepOf(thrown);
+  const failure: StepError = {
+    origin: 'connection',
+    message: typeof carried === 'string' ? carried : '',
+    response,
+  };
+  return step === undefined ? failure : withStep(failure, step);
+}
+
 /** The fixed words of the hint beside `CTS_WBO_API` 019. */
 export const TRANSPORT_HINT_WORDS =
   'SAP answered that the object is already locked in this transport request: pass it as transport_request and call again.';
@@ -297,6 +345,9 @@ export function failurePayload(
   error: StepError & MessageCarrier,
   detail?: AnswerDetail,
 ): FailureEntry {
+  if (error.response !== undefined && isCsrfRefusal(error.response)) {
+    return csrfRefusalPayload(error, error.response);
+  }
   const payload: { [key: string]: AnswerValue } = {
     message: error.message,
     origin: error.origin,
@@ -476,6 +527,8 @@ export function thrownEntry(thrown: unknown, step: string): FailureEntry {
   if (read !== undefined) return { ...chainFailurePayload(read), step };
   const carried = methodFailureOf(thrown);
   if (carried !== undefined) return failureEntry(carried, step);
+  const token = thrownCsrfRefusal(thrown);
+  if (token !== undefined) return failurePayload(withStep(token, step));
   return { error: 'client_threw', message: messageOf(thrown), step };
 }
 
@@ -604,6 +657,10 @@ export function answerThrown(
   // Refused here, before any request: not a claim about the server.
   if (thrown instanceof SystemContextMissingError) {
     return local('system_context_missing', ctx, thrown.message);
+  }
+  const token = thrownCsrfRefusal(thrown);
+  if (token !== undefined) {
+    return failures.json(withBeside(failurePayload(token, ctx.detail), ctx));
   }
   return local('client_threw', ctx, messageOf(thrown), thrown);
 }

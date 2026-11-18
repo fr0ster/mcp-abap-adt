@@ -92,6 +92,8 @@ export interface PinServer {
    * the store, never polled.
    */
   runsEnded(): Promise<void>;
+  /** The instance's connection, as the next call would take it. */
+  held(): Promise<IAbapConnection>;
   close(): Promise<void>;
 }
 
@@ -171,6 +173,12 @@ class PinMcpServer extends BaseMcpServer {
   }
   register(registry: CompositeHandlersRegistry): void {
     this.registerHandlers(registry);
+  }
+  /** The instance's connection as a call takes it (built and logged on when none is), given back at once. */
+  async held(): Promise<IAbapConnection> {
+    const connection = await this.getConnection(new AbortController().signal);
+    this.connectionReleased(connection);
+    return connection;
   }
 }
 
@@ -298,6 +306,7 @@ export async function inProcessServer(
     call: (tool, args) => client.callTool(tool, args),
     listed: async () => (await client.listTools()).map((tool) => tool.name),
     runsEnded: () => runs.ended(),
+    held: () => server.held(),
     close: async () => {
       await client.close();
       await server.terminalClose();

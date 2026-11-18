@@ -9,9 +9,11 @@
  * An in-process server builds its own connection from the configured
  * destination, with an interval of a few seconds. A first call logs on; the
  * case then waits — on the ping's answer, never on a timer — until the
- * keep-alive's discovery request went out and was answered `2xx`; a second
- * call runs in the same SAP session: the `SAP_SESSIONID` cookie is the same
- * before and after, compared here and never printed.
+ * keep-alive's stateful discovery request went out and was answered `2xx`;
+ * a second call runs in the same stateful session: the `SAP_SESSIONID` and
+ * `sap-contextid` cookies are the same before and after the ping, compared
+ * here and never printed. The probe's own read is stateful, so the context
+ * exists before the pause.
  *
  * Over an RFC connection to SAP the same case runs (the controller points
  * `MCP_TEST_CONFIG` at the on-premise RFC config): the ping goes out and is
@@ -44,24 +46,33 @@ import { McpSession } from '../helpers/testers/hardMode';
 /** A few seconds: the case idles past it once. */
 const INTERVAL_MS = 3_000;
 
-/** The `SAP_SESSIONID_<SID>_<client>` cookie's value in `cookies`, read by plain code. */
-function sessionIdOf(cookies: string | null | undefined): string | undefined {
+/** The value of the first cookie in `cookies` whose name starts with `prefix`, read by plain code. */
+function cookieOf(
+  cookies: string | null | undefined,
+  prefix: string,
+): string | undefined {
   if (cookies === null || cookies === undefined) return undefined;
   for (const part of cookies.split(';')) {
     const pair = part.trim();
     const eq = pair.indexOf('=');
-    if (eq > 0 && pair.slice(0, eq).startsWith('SAP_SESSIONID')) {
+    if (eq > 0 && pair.slice(0, eq).startsWith(prefix)) {
       return pair.slice(eq + 1);
     }
   }
   return undefined;
 }
 
+/** The stateful context a connection's cookies name: its security session and its `sap-contextid`. */
+interface StatefulContext {
+  session: string | undefined;
+  context: string | undefined;
+}
+
 /** What the probe tool saw on the server's connection. */
 const seen: {
   connection: IAbapConnection | undefined;
-  sessions: Array<string | undefined>;
-} = { connection: undefined, sessions: [] };
+  contexts: StatefulContext[];
+} = { connection: undefined, contexts: [] };
 
 /** Resolves with the status of the first keep-alive answer on the server's connection. */
 let pinged: (status: number) => void = () => {};
@@ -90,7 +101,11 @@ function watchPing(connection: IAbapConnection): void {
   };
 }
 
-/** `KeepAliveSession {}`: one read on the server's connection, then its session id as seen. */
+/**
+ * `KeepAliveSession {}`: one stateful read on the server's connection — so
+ * its stateful context exists before the pause —, its session mode put
+ * back after; then the stateful context its cookies name.
+ */
 const probe: HandlerEntry = {
   toolDefinition: {
     name: 'KeepAliveSession',
@@ -103,15 +118,25 @@ const probe: HandlerEntry = {
       seen.connection = connection;
       watchPing(connection);
     }
-    await connection.makeAdtRequest({
-      url: '/sap/bc/adt/core/http/systeminformation',
-      method: 'GET',
-      timeout: 0,
-      headers: {
-        Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
-      },
+    const mode = connection.getSessionMode?.() ?? 'stateless';
+    connection.setSessionType('stateful');
+    try {
+      await connection.makeAdtRequest({
+        url: '/sap/bc/adt/core/http/systeminformation',
+        method: 'GET',
+        timeout: 0,
+        headers: {
+          Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
+        },
+      });
+    } finally {
+      connection.setSessionType(mode);
+    }
+    const cookies = connection.sessionCookies?.();
+    seen.contexts.push({
+      session: cookieOf(cookies, 'SAP_SESSIONID'),
+      context: cookieOf(cookies, 'sap-contextid'),
     });
-    seen.sessions.push(sessionIdOf(connection.sessionCookies?.()));
     return { content: [{ type: 'text', text: 'read' }] };
   }) as never,
 } as unknown as HandlerEntry;
@@ -164,9 +189,10 @@ systemsDescribe(['onprem', 'cloud'], 'the session keep-alive, live', () => {
       const connection = seen.connection;
       assert.ok(connection !== undefined);
       const rfc = isRfcConnection(connection);
-      const before = seen.sessions[0];
+      const before = seen.contexts[0];
       if (!rfc) {
-        assert.ok(before !== undefined, 'the first call has a session cookie');
+        assert.ok(before?.session !== undefined, 'a session cookie');
+        assert.ok(before?.context !== undefined, 'a stateful context');
       }
       // Idle: the keep-alive's ping goes out after one to two intervals.
       const status = await pingAnswered;
@@ -174,7 +200,14 @@ systemsDescribe(['onprem', 'cloud'], 'the session keep-alive, live', () => {
       const second = await session.callTool('KeepAliveSession', {});
       assert.notEqual(second.isError, true, 'the call after the pause');
       // Compared, never printed; an RFC connection has no cookie to compare.
-      if (!rfc) assert.ok(seen.sessions[1] === before, 'the same SAP session');
+      if (!rfc) {
+        const after = seen.contexts[1];
+        assert.ok(after?.session === before?.session, 'the same SAP session');
+        assert.ok(
+          after?.context === before?.context,
+          'the same stateful context',
+        );
+      }
     } finally {
       await session.close();
       await server.terminalClose();

@@ -5,6 +5,9 @@
  * information — is not HANA, and fails on any other reason it cannot run —
  * so an enabled gate never passes having tested nothing.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   amdpGateVerdict,
   breakpointLineOf,
@@ -45,55 +48,75 @@ function verdict(over: {
   });
 }
 
+/**
+ * `actual` holds `words` in its string field `key` (Jest's
+ * `expect.stringContaining`), and equals `rest` in every other field.
+ */
+function assertWithWords(
+  actual: object,
+  key: string,
+  words: string,
+  rest: Record<string, unknown>,
+): void {
+  const value: unknown = Reflect.get(actual, key);
+  assert.ok(typeof value === 'string' && value.includes(words));
+  assert.deepStrictEqual(
+    Object.fromEntries(Object.entries(actual).filter(([k]) => k !== key)),
+    rest,
+  );
+}
+
 describe('the AMDP gate: run, skip or fail', () => {
   it('reads DBSystem from the system information feed', () => {
-    expect(databaseSystemOf(feed('HDB'))).toBe('HDB');
-    expect(databaseSystemOf(feed('ORA'))).toBe('ORA');
-    expect(databaseSystemOf('<atom:feed/>')).toBeUndefined();
+    assert.equal(databaseSystemOf(feed('HDB')), 'HDB');
+    assert.equal(databaseSystemOf(feed('ORA')), 'ORA');
+    assert.equal(databaseSystemOf('<atom:feed/>'), undefined);
   });
 
   it('runs on HANA with both shared objects active, at the marker line SAP answered', () => {
-    expect(breakpointLineOf(CLASS_SOURCE)).toBe(3);
-    expect(verdict({})).toEqual({ run: true, breakpointLine: 3 });
+    assert.equal(breakpointLineOf(CLASS_SOURCE), 3);
+    assert.deepStrictEqual(verdict({}), { run: true, breakpointLine: 3 });
   });
 
   it('skips only when SAP names another database system, and names it', () => {
     const answered = verdict({
       database: { systemInformation: ok(feed('ORA')) },
     });
-    expect(answered).toEqual({
+    assertWithWords(answered, 'skip', 'the database system ORA', {
       run: false,
-      skip: expect.stringContaining('the database system ORA'),
     });
   });
 
   it('fails when the system information cannot be read or names no database', () => {
-    expect(
+    assertWithWords(
       verdict({
         database: { systemInformation: { status: 403, text: 'no' } },
       }),
-    ).toEqual({ run: false, fail: expect.stringContaining('status 403') });
-    expect(
+      'fail',
+      'status 403',
+      { run: false },
+    );
+    assertWithWords(
       verdict({
         database: { systemInformation: ok('<atom:feed/>') },
       }),
-    ).toEqual({
-      run: false,
-      fail: expect.stringContaining('names no DBSystem'),
-    });
+      'fail',
+      'names no DBSystem',
+      { run: false },
+    );
   });
 
   it('takes the database system the test config states, and names where it came from', () => {
-    expect(verdict({ database: { stated: 'HDB' } })).toEqual({
+    assert.deepStrictEqual(verdict({ database: { stated: 'HDB' } }), {
       run: true,
       breakpointLine: 3,
     });
-    expect(verdict({ database: { stated: 'ORA' } })).toEqual({
-      run: false,
-      skip: expect.stringContaining(
-        'the test config states the database system ORA',
-      ),
-    });
+    assertWithWords(
+      verdict({ database: { stated: 'ORA' } }),
+      'skip',
+      'the test config states the database system ORA',
+      { run: false },
+    );
   });
 
   it('reads SAP only when the test config states no database system', async () => {
@@ -102,29 +125,37 @@ describe('the AMDP gate: run, skip or fail', () => {
       reads += 1;
       return ok(feed('HDB'));
     };
-    expect(await databaseSource('HDB', read)).toEqual({ stated: 'HDB' });
-    expect(reads).toBe(0);
-    expect(await databaseSource(undefined, read)).toEqual({
+    assert.deepStrictEqual(await databaseSource('HDB', read), {
+      stated: 'HDB',
+    });
+    assert.equal(reads, 0);
+    assert.deepStrictEqual(await databaseSource(undefined, read), {
       systemInformation: ok(feed('HDB')),
     });
-    expect(reads).toBe(1);
+    assert.equal(reads, 1);
   });
 
   it('fails, never skips, when a shared object has no active version', () => {
-    expect(verdict({ classRead: { status: 404, text: 'not found' } })).toEqual({
-      run: false,
-      fail: expect.stringContaining('CLASS ZCLS has no active version'),
-    });
-    expect(verdict({ ddlRead: { status: 404, text: 'not found' } })).toEqual({
-      run: false,
-      fail: expect.stringContaining('DDLS ZTF has no active version'),
-    });
+    assertWithWords(
+      verdict({ classRead: { status: 404, text: 'not found' } }),
+      'fail',
+      'CLASS ZCLS has no active version',
+      { run: false },
+    );
+    assertWithWords(
+      verdict({ ddlRead: { status: 404, text: 'not found' } }),
+      'fail',
+      'DDLS ZTF has no active version',
+      { run: false },
+    );
   });
 
   it('fails when the class carries no breakpoint marker', () => {
-    expect(verdict({ classRead: ok('CLASS zcls IMPLEMENTATION.') })).toEqual({
-      run: false,
-      fail: expect.stringContaining('no "-- BP:tf" line'),
-    });
+    assertWithWords(
+      verdict({ classRead: ok('CLASS zcls IMPLEMENTATION.') }),
+      'fail',
+      'no "-- BP:tf" line',
+      { run: false },
+    );
   });
 });

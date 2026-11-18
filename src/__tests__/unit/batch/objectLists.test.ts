@@ -9,6 +9,10 @@
  * connection is a fake, answering from a small model — the same model for
  * an envelope's parts and for the sequential version's requests.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -22,6 +26,7 @@ import {
 } from '../../../handlers/system/readonly/handleDescribeByList';
 import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import { createBatchAvailability } from '../../../lib/batch/availability';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -347,11 +352,12 @@ function expectEnvelopeFailure(
     JSON.stringify(request) === JSON.stringify(ENVELOPE_REQUEST);
   const own = requestsOf(sequential);
   const named = requestsOf(result);
-  expect(own.filter(isEnvelope)).toHaveLength(0);
-  expect(named).toHaveLength(own.length);
-  expect(named.filter(isEnvelope)).toHaveLength(failures);
+  assert.equal(own.filter(isEnvelope).length, 0);
+  assert.equal(named.length, own.length);
+  assert.equal(named.filter(isEnvelope).length, failures);
   let at = 0;
-  expect(wholeOf(result)).toEqual(
+  assert.deepStrictEqual(
+    wholeOf(result),
     wholeOf(sequential, (key, value) => {
       if (key !== 'request') return value;
       return isEnvelope(named[at++]) ? ENVELOPE_REQUEST : value;
@@ -415,7 +421,7 @@ const SIX = ok(
 );
 
 describe('ListTransports', () => {
-  it.each<[Record<string, unknown>, Model]>([
+  for (const [args, model] of [
     [{ user: 'owner_a' }, {}],
     [{ user: 'OWNER_B', modifiable_only: false }, {}],
     [{ modifiable_only: false, detail: 'full' }, {}],
@@ -425,18 +431,20 @@ describe('ListTransports', () => {
       { answers: { configs: ok(configurationsXml(['CFG1'])) } },
     ],
     [{ user: 'owner_a' }, { answers: { configs: SIX } }],
-  ])('same answer as the sequential version: %j', async (args, model) => {
-    const { a, b, batched, sequential } = await bothWays(
-      handleListTransports,
-      args,
-      model,
-    );
-    expect(textOf(a)).toBe(textOf(b));
-    expect((a as { isError?: boolean }).isError).toBe(false);
-    expect(batched.directs).toHaveLength(0);
-    expect(batched.envelopes.length).toBeGreaterThan(0);
-    expect(sequential.envelopes).toHaveLength(0);
-  });
+  ] satisfies ReadonlyArray<[Record<string, unknown>, Model]>) {
+    it(format('same answer as the sequential version: %j', args), async () => {
+      const { a, b, batched, sequential } = await bothWays(
+        handleListTransports,
+        args,
+        model,
+      );
+      assert.equal(textOf(a), textOf(b));
+      assert.equal((a as { isError?: boolean }).isError, false);
+      assert.equal(batched.directs.length, 0);
+      assert.ok(batched.envelopes.length > 0);
+      assert.equal(sequential.envelopes.length, 0);
+    });
+  }
 
   it('phases: the configurations, then every configuration’s search in one envelope', async () => {
     const fake = system();
@@ -444,8 +452,11 @@ describe('ListTransports', () => {
       handleListTransports(contextOn(fake), { user: 'owner_a' }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([['configs'], ['list:CFG1', 'list:CFG2']]);
-    expect(payloadOf(result)).toMatchObject({
+    assert.deepStrictEqual(phasesOf(fake), [
+      ['configs'],
+      ['list:CFG1', 'list:CFG2'],
+    ]);
+    assertMatchObject(payloadOf(result), {
       count: 2,
       searched_configurations: [
         `${CONFIGURATIONS_PATH}/CFG1`,
@@ -460,14 +471,14 @@ describe('ListTransports', () => {
       handleListTransports(contextOn(fake), {}),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['configs'],
       ['list:CFG1', 'list:CFG2', 'list:CFG3', 'list:CFG4', 'list:CFG5'],
     ]);
-    expect(payloadOf(result).configurations_capped).toBe(5);
+    assert.equal(payloadOf(result).configurations_capped, 5);
   });
 
-  it.each<[string, Model, number]>([
+  for (const [_case, model, envelopes] of [
     [
       'no configuration',
       { answers: { configs: ok(configurationsXml([])) } },
@@ -476,15 +487,24 @@ describe('ListTransports', () => {
     ['the configurations refused', { answers: { configs: FORBIDDEN } }, 1],
     ['a search refused', { answers: { 'list:CFG1': FORBIDDEN } }, 2],
     ['the second search refused', { answers: { 'list:CFG2': FORBIDDEN } }, 2],
-  ])(
-    '%s: the sequential answer; no envelope after the one that answered it',
-    async (_case, model, envelopes) => {
-      const { a, b, batched } = await bothWays(handleListTransports, {}, model);
-      expect(textOf(a)).toBe(textOf(b));
-      expect((a as { isError?: boolean }).isError).toBe(true);
-      expect(batched.envelopes).toHaveLength(envelopes);
-    },
-  );
+  ] satisfies ReadonlyArray<[string, Model, number]>) {
+    it(
+      format(
+        '%s: the sequential answer; no envelope after the one that answered it',
+        _case,
+      ),
+      async () => {
+        const { a, b, batched } = await bothWays(
+          handleListTransports,
+          {},
+          model,
+        );
+        assert.equal(textOf(a), textOf(b));
+        assert.equal((a as { isError?: boolean }).isError, true);
+        assert.equal(batched.envelopes.length, envelopes);
+      },
+    );
+  }
 
   it('a search refused: both searches were sent together, where the sequential version stops at the first', async () => {
     const { batched, sequential } = await bothWays(
@@ -492,8 +512,8 @@ describe('ListTransports', () => {
       {},
       { answers: { 'list:CFG1': FORBIDDEN } },
     );
-    expect(phasesOf(batched)[1]).toEqual(['list:CFG1', 'list:CFG2']);
-    expect(directsOf(sequential)).toEqual(['configs', 'list:CFG1']);
+    assert.deepStrictEqual(phasesOf(batched)[1], ['list:CFG1', 'list:CFG2']);
+    assert.deepStrictEqual(directsOf(sequential), ['configs', 'list:CFG1']);
   });
 
   it('a 401 SAP answered to a search ends the call as it came', async () => {
@@ -502,8 +522,8 @@ describe('ListTransports', () => {
       {},
       { answers: { 'list:CFG2': UNAUTHORIZED } },
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401, step: 'list' });
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a), { status: 401, step: 'list' });
   });
 
   it('a 401 SAP answered to the configurations ends the call; no search is sent', async () => {
@@ -512,9 +532,9 @@ describe('ListTransports', () => {
       {},
       { answers: { configs: UNAUTHORIZED } },
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
-    expect(batched.envelopes).toHaveLength(1);
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a), { status: 401 });
+    assert.equal(batched.envelopes.length, 1);
   });
 
   it("the connection's credential refusal ends the call as it came", async () => {
@@ -529,8 +549,8 @@ describe('ListTransports', () => {
         handleListTransports(contextOn(fake), {}),
         TURNS,
       );
-      expect(payloadOf(result).error).toBe('authentication_failed');
-      expect(fake.envelopes).toHaveLength(failing);
+      assert.equal(payloadOf(result).error, 'authentication_failed');
+      assert.equal(fake.envelopes.length, failing);
     }
   });
 
@@ -546,9 +566,9 @@ describe('ListTransports', () => {
       phasesOf(fake)[1] as string[],
     );
     expectEnvelopeFailure(result, expected, 1);
-    expect(payloadOf(result)).toMatchObject({ status: 500, step: 'list' });
-    expect(fake.envelopes).toHaveLength(2);
-    expect(fake.directs).toHaveLength(0);
+    assertMatchObject(payloadOf(result), { status: 500, step: 'list' });
+    assert.equal(fake.envelopes.length, 2);
+    assert.equal(fake.directs.length, 0);
   });
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
@@ -556,10 +576,14 @@ describe('ListTransports', () => {
       handleListTransports,
       { user: 'owner_a' },
     );
-    expect(textOf(result)).toBe(textOf(expected));
-    expect(fake.envelopes).toHaveLength(1);
-    expect(directsOf(fake)).toEqual(['configs', 'list:CFG1', 'list:CFG2']);
-    expect(context.batchAvailability?.available()).toBe(false);
+    assert.equal(textOf(result), textOf(expected));
+    assert.equal(fake.envelopes.length, 1);
+    assert.deepStrictEqual(directsOf(fake), [
+      'configs',
+      'list:CFG1',
+      'list:CFG2',
+    ]);
+    assert.equal(context.batchAvailability?.available(), false);
   });
 });
 
@@ -575,20 +599,22 @@ const OBJECTS = [
 ];
 
 describe('DescribeByList', () => {
-  it.each([
+  for (const [args] of [
     [{ objects: OBJECTS }],
     [{ objects: [{ name: 'ZCL_A', type: 'CLAS/OC' }] }],
     [{ objects: [{ name: 'ZMISSING', type: 'CLAS/OC' }, { name: 'ZT*' }] }],
-  ])('same answer as the sequential version: %j', async (args) => {
-    const { a, b, batched, sequential } = await bothWays(
-      handleDescribeByList,
-      args,
-    );
-    expect(contentOf(a)).toBe(contentOf(b));
-    expect(batched.directs).toHaveLength(0);
-    expect(batched.envelopes.length).toBeGreaterThan(0);
-    expect(sequential.envelopes).toHaveLength(0);
-  });
+  ]) {
+    it(format('same answer as the sequential version: %j', args), async () => {
+      const { a, b, batched, sequential } = await bothWays(
+        handleDescribeByList,
+        args,
+      );
+      assert.equal(contentOf(a), contentOf(b));
+      assert.equal(batched.directs.length, 0);
+      assert.ok(batched.envelopes.length > 0);
+      assert.equal(sequential.envelopes.length, 0);
+    });
+  }
 
   it('phases: every quickSearch, then the typeless ones for the answers that failed or were empty', async () => {
     const fake = system();
@@ -596,14 +622,14 @@ describe('DescribeByList', () => {
       handleDescribeByList(contextOn(fake), { objects: OBJECTS }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['qs:ZCL_A:CLAS', 'qs:ZPROG_B:INCL', 'qs:ZT*:', 'qs:ZNONE:'],
       ['qs:ZPROG_B:'],
     ]);
     const names = (result as { content: Array<{ text: string }> }).content.map(
       (c) => JSON.parse(c.text).name,
     );
-    expect(names).toEqual(['ZCL_A', 'ZPROG_B', 'ZT*', 'ZNONE']);
+    assert.deepStrictEqual(names, ['ZCL_A', 'ZPROG_B', 'ZT*', 'ZNONE']);
   });
 
   it('nothing to search again: one envelope', async () => {
@@ -614,7 +640,7 @@ describe('DescribeByList', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([['qs:ZCL_A:CLAS', 'qs:ZT*:']]);
+    assert.deepStrictEqual(phasesOf(fake), [['qs:ZCL_A:CLAS', 'qs:ZT*:']]);
   });
 
   it("a part's failure is that object's: the typeless search refused too is its error entry", async () => {
@@ -624,20 +650,18 @@ describe('DescribeByList', () => {
       { objects: OBJECTS },
       model,
     );
-    expect(contentOf(a)).toBe(contentOf(b));
+    assert.equal(contentOf(a), contentOf(b));
     const entries = (a as { content: Array<{ text: string }> }).content.map(
       (c) => JSON.parse(c.text),
     );
-    expect(entries[1]).toMatchObject({
+    assertMatchObject(entries[1], {
       name: 'ZPROG_B',
       error: { status: 403, step: 'search' },
     });
-    expect(entries.map((e) => e.name)).toEqual([
-      'ZCL_A',
-      'ZPROG_B',
-      'ZT*',
-      'ZNONE',
-    ]);
+    assert.deepStrictEqual(
+      entries.map((e) => e.name),
+      ['ZCL_A', 'ZPROG_B', 'ZT*', 'ZNONE'],
+    );
   });
 
   it('a 401 SAP answered to a first search ends the call as it came; no second phase', async () => {
@@ -647,9 +671,9 @@ describe('DescribeByList', () => {
       { objects: OBJECTS },
       model,
     );
-    expect(contentOf(a)).toBe(contentOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
-    expect(batched.envelopes).toHaveLength(1);
+    assert.equal(contentOf(a), contentOf(b));
+    assertMatchObject(payloadOf(a), { status: 401 });
+    assert.equal(batched.envelopes.length, 1);
   });
 
   it('a 401 SAP answered to a typeless search ends the call as it came', async () => {
@@ -659,8 +683,8 @@ describe('DescribeByList', () => {
       { objects: OBJECTS },
       model,
     );
-    expect(contentOf(a)).toBe(contentOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
+    assert.equal(contentOf(a), contentOf(b));
+    assertMatchObject(payloadOf(a), { status: 401 });
   });
 
   it("the connection's credential refusal ends the call as it came", async () => {
@@ -671,8 +695,8 @@ describe('DescribeByList', () => {
       handleDescribeByList(contextOn(fake), { objects: OBJECTS }),
       TURNS,
     );
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(fake.envelopes.length, 1);
   });
 
   it("an envelope that fails is every search's failure, as the sequential version answers each", async () => {
@@ -687,8 +711,8 @@ describe('DescribeByList', () => {
       phasesOf(fake)[1] as string[],
     );
     expectEnvelopeFailure(result, expected, 1);
-    expect(fake.envelopes).toHaveLength(2);
-    expect(fake.directs).toHaveLength(0);
+    assert.equal(fake.envelopes.length, 2);
+    assert.equal(fake.directs.length, 0);
   });
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
@@ -696,10 +720,10 @@ describe('DescribeByList', () => {
       handleDescribeByList,
       { objects: OBJECTS },
     );
-    expect(contentOf(result)).toBe(contentOf(expected));
-    expect(fake.envelopes).toHaveLength(1);
-    expect(fake.directs.length).toBeGreaterThan(0);
-    expect(context.batchAvailability?.available()).toBe(false);
+    assert.equal(contentOf(result), contentOf(expected));
+    assert.equal(fake.envelopes.length, 1);
+    assert.ok(fake.directs.length > 0);
+    assert.equal(context.batchAvailability?.available(), false);
   });
 
   it('a typed search answered 406 is that object’s error; no typeless search', async () => {
@@ -712,27 +736,27 @@ describe('DescribeByList', () => {
       handleDescribeByList(contextOn(fake), { objects: OBJECTS }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['qs:ZCL_A:CLAS', 'qs:ZPROG_B:INCL', 'qs:ZT*:', 'qs:ZNONE:'],
     ]);
     const entries = (
       result as { content: Array<{ text: string }> }
     ).content.map((c) => JSON.parse(c.text));
-    expect(entries[1]).toMatchObject({
+    assertMatchObject(entries[1], {
       name: 'ZPROG_B',
       error: { status: 406, step: 'search' },
     });
-    expect(entries.map((e) => e.name)).toEqual([
-      'ZCL_A',
-      'ZPROG_B',
-      'ZT*',
-      'ZNONE',
-    ]);
+    assert.deepStrictEqual(
+      entries.map((e) => e.name),
+      ['ZCL_A', 'ZPROG_B', 'ZT*', 'ZNONE'],
+    );
   });
 
   it('no objects: the parameter error, by the schema', () => {
-    expect(schemaWords(DESCRIBE_BY_LIST, { objects: [] })).toContain(
-      'objects (array) is required',
+    assert.ok(
+      schemaWords(DESCRIBE_BY_LIST, { objects: [] }).includes(
+        'objects (array) is required',
+      ),
     );
   });
 });

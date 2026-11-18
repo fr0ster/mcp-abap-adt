@@ -9,7 +9,9 @@
  * Real `AdtBatchConnection` (adt-clients 34.x); only the connection is a fake.
  */
 
+import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { describe, it } from 'node:test';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
@@ -18,6 +20,7 @@ import {
   MORE_ENVELOPES_WORDS,
   runPhase,
 } from '../../../lib/batch/phases';
+import { rejectionOf } from '../../helpers/assertions';
 import {
   envelopeConnection,
   partByPart,
@@ -53,15 +56,18 @@ describe('runPhase', () => {
       runPhase(contextOn(fake.connection), ITEMS, read),
     );
 
-    expect(fake.envelopes).toHaveLength(1);
-    expect(fake.envelopes[0]?.url).toBe('/sap/bc/adt/communication/batch');
-    expect(fake.envelopes[0]?.parts.map((p) => p.url)).toEqual([
-      '/sap/bc/adt/probe/item_a',
-      '/sap/bc/adt/probe/item_b',
-      '/sap/bc/adt/probe/item_c',
-    ]);
-    expect(fake.directs).toHaveLength(0);
-    expect(results).toEqual([
+    assert.equal(fake.envelopes.length, 1);
+    assert.equal(fake.envelopes[0]?.url, '/sap/bc/adt/communication/batch');
+    assert.deepStrictEqual(
+      fake.envelopes[0]?.parts.map((p) => p.url),
+      [
+        '/sap/bc/adt/probe/item_a',
+        '/sap/bc/adt/probe/item_b',
+        '/sap/bc/adt/probe/item_c',
+      ],
+    );
+    assert.equal(fake.directs.length, 0);
+    assert.deepStrictEqual(results, [
       { ok: true, value: '/sap/bc/adt/probe/item_a' },
       { ok: true, value: '/sap/bc/adt/probe/item_b' },
       { ok: true, value: '/sap/bc/adt/probe/item_c' },
@@ -80,15 +86,22 @@ describe('runPhase', () => {
       runPhase(contextOn(fake.connection), ITEMS, read),
     );
 
-    expect(fake.envelopes).toHaveLength(1);
-    expect(results[0]).toEqual({ ok: true, value: '/sap/bc/adt/probe/item_a' });
-    expect(results[2]).toEqual({ ok: true, value: '/sap/bc/adt/probe/item_c' });
+    assert.equal(fake.envelopes.length, 1);
+    assert.deepStrictEqual(results[0], {
+      ok: true,
+      value: '/sap/bc/adt/probe/item_a',
+    });
+    assert.deepStrictEqual(results[2], {
+      ok: true,
+      value: '/sap/bc/adt/probe/item_c',
+    });
     const failed = results[1];
-    expect(failed?.ok).toBe(false);
-    expect(
+    assert.equal(failed?.ok, false);
+    assert.equal(
       (failed as { error: { response?: { status?: number } } }).error.response
         ?.status,
-    ).toBe(404);
+      404,
+    );
   });
 
   it("an envelope failure is every item's, as it came", async () => {
@@ -100,11 +113,11 @@ describe('runPhase', () => {
       runPhase(contextOn(fake.connection), ITEMS, read),
     );
 
-    expect(fake.envelopes).toHaveLength(1);
-    expect(results).toHaveLength(3);
+    assert.equal(fake.envelopes.length, 1);
+    assert.equal(results.length, 3);
     for (const result of results) {
-      expect(result.ok).toBe(false);
-      expect((result as { error: unknown }).error).toBe(thrown);
+      assert.equal(result.ok, false);
+      assert.equal((result as { error: unknown }).error, thrown);
     }
   });
 
@@ -115,10 +128,13 @@ describe('runPhase', () => {
     const fake = envelopeConnection(() => {
       throw refusal;
     });
-    await expect(
-      withinTurns(runPhase(contextOn(fake.connection), ITEMS, read)),
-    ).rejects.toBe(refusal);
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal(
+      await rejectionOf(
+        withinTurns(runPhase(contextOn(fake.connection), ITEMS, read)),
+      ),
+      refusal,
+    );
+    assert.equal(fake.envelopes.length, 1);
   });
 
   describe('every read records before the envelope is sent', () => {
@@ -143,9 +159,12 @@ describe('runPhase', () => {
           return read(item, batch);
         }),
       );
-      expect(fake.envelopes).toHaveLength(1);
-      expect(fake.envelopes[0]?.parts).toHaveLength(3);
-      expect(results.every((r) => r.ok)).toBe(true);
+      assert.equal(fake.envelopes.length, 1);
+      assert.equal(fake.envelopes[0]?.parts.length, 3);
+      assert.equal(
+        results.every((r) => r.ok),
+        true,
+      );
     });
 
     it('a read that awaits real I/O before recording lands in the one envelope', async () => {
@@ -157,13 +176,19 @@ describe('runPhase', () => {
         }),
         5_000,
       );
-      expect(fake.envelopes).toHaveLength(1);
-      expect(fake.envelopes[0]?.parts.map((p) => p.url)).toEqual([
-        '/sap/bc/adt/probe/item_a',
-        '/sap/bc/adt/probe/item_b',
-        '/sap/bc/adt/probe/item_c',
-      ]);
-      expect(results.every((r) => r.ok)).toBe(true);
+      assert.equal(fake.envelopes.length, 1);
+      assert.deepStrictEqual(
+        fake.envelopes[0]?.parts.map((p) => p.url),
+        [
+          '/sap/bc/adt/probe/item_a',
+          '/sap/bc/adt/probe/item_b',
+          '/sap/bc/adt/probe/item_c',
+        ],
+      );
+      assert.equal(
+        results.every((r) => r.ok),
+        true,
+      );
     });
 
     it('a read that settles without recording is its own answer; the others go in the envelope', async () => {
@@ -173,9 +198,12 @@ describe('runPhase', () => {
           item === 'ITEM_A' ? 'nothing to read' : read(item, batch),
         ),
       );
-      expect(results[0]).toEqual({ ok: true, value: 'nothing to read' });
-      expect(fake.envelopes).toHaveLength(1);
-      expect(fake.envelopes[0]?.parts).toHaveLength(2);
+      assert.deepStrictEqual(results[0], {
+        ok: true,
+        value: 'nothing to read',
+      });
+      assert.equal(fake.envelopes.length, 1);
+      assert.equal(fake.envelopes[0]?.parts.length, 2);
     });
 
     it('no read records: nothing is sent', async () => {
@@ -183,8 +211,11 @@ describe('runPhase', () => {
       const results = await withinTurns(
         runPhase(contextOn(fake.connection), ITEMS, async () => 'none'),
       );
-      expect(fake.envelopes).toHaveLength(0);
-      expect(results.every((r) => r.ok)).toBe(true);
+      assert.equal(fake.envelopes.length, 0);
+      assert.equal(
+        results.every((r) => r.ok),
+        true,
+      );
     });
 
     it('a record made after the envelope was sent is rejected at once, not hung', async () => {
@@ -197,12 +228,12 @@ describe('runPhase', () => {
           return read(`${item}_AGAIN`, batch);
         }),
       );
-      expect(fake.envelopes).toHaveLength(1);
-      expect(results[0]?.ok).toBe(true);
-      expect(results[2]?.ok).toBe(true);
+      assert.equal(fake.envelopes.length, 1);
+      assert.equal(results[0]?.ok, true);
+      assert.equal(results[2]?.ok, true);
       const late = results[1] as { ok: false; error: Error };
-      expect(late.ok).toBe(false);
-      expect(late.error.message).toBe(LATE_RECORD_WORDS);
+      assert.equal(late.ok, false);
+      assert.equal(late.error.message, LATE_RECORD_WORDS);
     });
 
     it('a phase that would send more than one envelope fails every item with the fixed error', async () => {
@@ -223,11 +254,12 @@ describe('runPhase', () => {
             : read(item, batch),
         ),
       );
-      expect(fake.envelopes).toHaveLength(1);
-      expect(results).toHaveLength(3);
+      assert.equal(fake.envelopes.length, 1);
+      assert.equal(results.length, 3);
       for (const result of results) {
-        expect(result.ok).toBe(false);
-        expect((result as { error: Error }).error.message).toBe(
+        assert.equal(result.ok, false);
+        assert.equal(
+          (result as { error: Error }).error.message,
           MORE_ENVELOPES_WORDS,
         );
       }

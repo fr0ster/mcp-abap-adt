@@ -10,6 +10,9 @@
  * A server built from a source of settings against the ADT stand-in; the
  * real connection factory, the real `AdtBatchConnection`.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -198,34 +201,37 @@ const probeSessions = (authorization: string) =>
 
 describe('batch availability across fresh connections', () => {
   it('is a listed long read', () => {
-    expect(isLongTool(TOOL)).toBe(true);
+    assert.equal(isLongTool(TOOL), true);
   });
 
   it("after the first call's outer 404 the second call sends no envelope and runs sequentially", async () => {
-    expect(await call()).toBe('sequential');
-    expect(envelopesOf(AUTH_A)).toHaveLength(1);
+    assert.equal(await call(), 'sequential');
+    assert.equal(envelopesOf(AUTH_A).length, 1);
     const firstSessions = probeSessions(AUTH_A);
-    expect(firstSessions.size).toBe(1);
+    assert.equal(firstSessions.size, 1);
     // The envelope went on the first call's own connection.
-    expect(firstSessions.has(envelopesOf(AUTH_A)[0]?.session ?? '')).toBe(true);
+    assert.equal(
+      firstSessions.has(envelopesOf(AUTH_A)[0]?.session ?? ''),
+      true,
+    );
 
-    expect(await call()).toBe('sequential');
-    expect(envelopesOf(AUTH_A)).toHaveLength(1);
+    assert.equal(await call(), 'sequential');
+    assert.equal(envelopesOf(AUTH_A).length, 1);
     // The second call ran on a fresh connection of its own.
     const sessions = probeSessions(AUTH_A);
-    expect(sessions.size).toBe(2);
+    assert.equal(sessions.size, 2);
   });
 
   it('a call of another destination still sends its envelope', async () => {
-    expect(await call()).toBe('sequential');
-    expect(envelopesOf(AUTH_A)).toHaveLength(1);
+    assert.equal(await call(), 'sequential');
+    assert.equal(envelopesOf(AUTH_A).length, 1);
 
     await server.endInstanceConnection();
     server.answer(destination(standIn, 'BATCH_USER_B', '200'));
     const authB = basicOf('BATCH_USER_B', 'availability-password');
 
-    expect(await call()).toBe('batched');
-    expect(envelopesOf(authB)).toHaveLength(1);
-    expect(envelopesOf(AUTH_A)).toHaveLength(1);
+    assert.equal(await call(), 'batched');
+    assert.equal(envelopesOf(authB).length, 1);
+    assert.equal(envelopesOf(AUTH_A).length, 1);
   });
 });

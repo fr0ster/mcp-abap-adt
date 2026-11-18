@@ -11,6 +11,9 @@
  * an envelope's parts and for the sequential version's requests.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -31,6 +34,7 @@ import { createBatchAvailability } from '../../../lib/batch/availability';
 import { eligible } from '../../../lib/batch/eligibility';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { child, listOf } from '../../../lib/thrownValue';
+import { assertMatchObject, rejectionOf } from '../../helpers/assertions';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -358,13 +362,14 @@ function expectSame({
   batched,
   sequential,
 }: Awaited<ReturnType<typeof bothWays>>) {
-  expect(textOf(a)).toBe(textOf(b));
-  expect((a as { isError?: boolean }).isError).toBe(
+  assert.equal(textOf(a), textOf(b));
+  assert.equal(
+    (a as { isError?: boolean }).isError,
     (b as { isError?: boolean }).isError,
   );
-  expect(batched.directs).toHaveLength(0);
-  expect(batched.envelopes.length).toBeGreaterThan(0);
-  expect(sequential.envelopes).toHaveLength(0);
+  assert.equal(batched.directs.length, 0);
+  assert.ok(batched.envelopes.length > 0);
+  assert.equal(sequential.envelopes.length, 0);
 }
 
 /**
@@ -421,11 +426,12 @@ function expectEnvelopeFailure(
     JSON.stringify(request) === JSON.stringify(ENVELOPE_REQUEST);
   const own = requestsOf(sequential);
   const named = requestsOf(result);
-  expect(own.filter(isEnvelope)).toHaveLength(0);
-  expect(named).toHaveLength(own.length);
-  expect(named.filter(isEnvelope)).toHaveLength(failures);
+  assert.equal(own.filter(isEnvelope).length, 0);
+  assert.equal(named.length, own.length);
+  assert.equal(named.filter(isEnvelope).length, failures);
   let at = 0;
-  expect(wholeOf(result)).toEqual(
+  assert.deepStrictEqual(
+    wholeOf(result),
     wholeOf(sequential, (key, value) => {
       if (key !== 'request') return value;
       return isEnvelope(named[at++]) ? ENVELOPE_REQUEST : value;
@@ -505,7 +511,7 @@ const table = (name: string) => ({ object_name: name, object_type: 'table' });
 const THREE = [table('ZT_A'), table('ZT_B'), table('ZT_C')];
 
 describe('GetWhereUsed', () => {
-  it.each<[Record<string, unknown>]>([
+  for (const [args] of [
     [{ ...table('ZT_A'), enable_only_types: ['TABL/DS', 'CLAS/OC'] }],
     [{ ...table('ZT_A'), enable_all_types: true }],
     [{ ...table('ZT_B'), disable_types: ['CLAS/OC'] }],
@@ -522,9 +528,11 @@ describe('GetWhereUsed', () => {
       },
     ],
     [{ objects: [table('ZT_A')], enable_all_types: true }],
-  ])('same answer as the sequential version: %j', async (args) => {
-    expectSame(await bothWays(handleGetWhereUsed, args));
-  });
+  ] satisfies ReadonlyArray<[Record<string, unknown>]>) {
+    it(format('same answer as the sequential version: %j', args), async () => {
+      expectSame(await bothWays(handleGetWhereUsed, args));
+    });
+  }
 
   it('with a filter, two phases: every object’s scope, then every scoped request', async () => {
     const fake = system();
@@ -535,7 +543,7 @@ describe('GetWhereUsed', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['scope:ZT_A', 'scope:ZT_B', 'scope:ZT_C'],
       [
         'wu:ZT_A:TABL/DS,DDLS/DF',
@@ -543,11 +551,12 @@ describe('GetWhereUsed', () => {
         'wu:ZT_C:TABL/DS,DDLS/DF',
       ],
     ]);
-    expect(
+    assert.deepStrictEqual(
       payloadOf(result).map((e: { references: Array<{ name: string }> }) =>
         e.references.map((r) => r.name),
       ),
-    ).toEqual([['ZS_A'], ['ZDDL_B'], ['ZS_C']]);
+      [['ZS_A'], ['ZDDL_B'], ['ZS_C']],
+    );
   });
 
   it('without a filter, one phase: every object’s where-used request', async () => {
@@ -556,14 +565,17 @@ describe('GetWhereUsed', () => {
       handleGetWhereUsed(contextOn(fake), { objects: THREE }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([['wu:ZT_A', 'wu:ZT_B', 'wu:ZT_C']]);
+    assert.deepStrictEqual(phasesOf(fake), [['wu:ZT_A', 'wu:ZT_B', 'wu:ZT_C']]);
   });
 
   it('enable_only_types: each scope is read once; the sequential version reads it twice', async () => {
     const args = { ...table('ZT_A'), enable_only_types: ['CLAS/OC'] };
     const { batched, sequential } = await bothWays(handleGetWhereUsed, args);
-    expect(phasesOf(batched)).toEqual([['scope:ZT_A'], ['wu:ZT_A:CLAS/OC']]);
-    expect(directsOf(sequential)).toEqual([
+    assert.deepStrictEqual(phasesOf(batched), [
+      ['scope:ZT_A'],
+      ['wu:ZT_A:CLAS/OC'],
+    ]);
+    assert.deepStrictEqual(directsOf(sequential), [
       'scope:ZT_A',
       'scope:ZT_A',
       'wu:ZT_A:CLAS/OC',
@@ -580,19 +592,19 @@ describe('GetWhereUsed', () => {
         }),
         TURNS,
       );
-      expect(filtered.envelopes).toHaveLength(2);
-      expect(filtered.envelopes.map((e) => e.parts.length)).toEqual([
-        objects.length,
-        objects.length,
-      ]);
+      assert.equal(filtered.envelopes.length, 2);
+      assert.deepStrictEqual(
+        filtered.envelopes.map((e) => e.parts.length),
+        [objects.length, objects.length],
+      );
       const unfiltered = system();
       await withinTurns(
         handleGetWhereUsed(contextOn(unfiltered), { objects }),
         TURNS,
       );
-      expect(unfiltered.envelopes).toHaveLength(1);
-      expect(filtered.directs).toHaveLength(0);
-      expect(unfiltered.directs).toHaveLength(0);
+      assert.equal(unfiltered.envelopes.length, 1);
+      assert.equal(filtered.directs.length, 0);
+      assert.equal(unfiltered.directs.length, 0);
     }
   });
 
@@ -602,9 +614,9 @@ describe('GetWhereUsed', () => {
       handleGetWhereUsed(contextOn(fake), table('ZT_A')),
       TURNS,
     );
-    expect(fake.envelopes).toHaveLength(0);
-    expect(directsOf(fake)).toEqual(['wu:ZT_A']);
-    expect(payloadOf(result).total_references).toBe(3);
+    assert.equal(fake.envelopes.length, 0);
+    assert.deepStrictEqual(directsOf(fake), ['wu:ZT_A']);
+    assert.equal(payloadOf(result).total_references, 3);
   });
 
   it('the single argument keeps its answer; the list answers one entry per object, in order', async () => {
@@ -623,14 +635,15 @@ describe('GetWhereUsed', () => {
       }),
       TURNS,
     );
-    expect(payloadOf(single)).toMatchObject({
+    assertMatchObject(payloadOf(single), {
       object_name: 'ZT_B',
       total_references: 2,
     });
-    expect(payloadOf(list)[1]).toEqual(payloadOf(single));
-    expect(
+    assert.deepStrictEqual(payloadOf(list)[1], payloadOf(single));
+    assert.deepStrictEqual(
       payloadOf(list).map((e: { object_name: string }) => e.object_name),
-    ).toEqual(['ZT_C', 'ZT_B']);
+      ['ZT_C', 'ZT_B'],
+    );
   });
 
   it('enable_only_types the scope does not offer: that object’s error, no search for it', async () => {
@@ -648,55 +661,68 @@ describe('GetWhereUsed', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)[1]).toEqual(['wu:ZT_A:DDLS/DF', 'wu:ZT_C:DDLS/DF']);
+    assert.deepStrictEqual(phasesOf(fake)[1], [
+      'wu:ZT_A:DDLS/DF',
+      'wu:ZT_C:DDLS/DF',
+    ]);
     const entries = payloadOf(result);
-    expect(entries[1]).toMatchObject({ object_name: 'ZT_B' });
-    expect(String(entries[1].error)).toContain('DDLS/DF');
+    assertMatchObject(entries[1], { object_name: 'ZT_B' });
+    assert.ok(String(entries[1].error).includes('DDLS/DF'));
   });
 
-  it.each<[string, Record<string, unknown>]>([
+  for (const [label, filter] of [
     ['scope:ZT_B', { enable_only_types: ['CLAS/OC'] }],
     ['scope:ZT_B', { disable_types: ['CLAS/OC'] }],
     ['wu:ZT_B:CLAS/OC', { enable_only_types: ['CLAS/OC'] }],
     ['wu:ZT_B', {}],
-  ])(
-    "a part's failure (%s) is that object's: its error entry, the rest answers, as the sequential version",
-    async (label, filter) => {
-      const outcome = await bothWays(
-        handleGetWhereUsed,
-        { objects: THREE, ...filter },
-        { answers: { [label]: FORBIDDEN } },
-      );
-      expectSame(outcome);
-      const entries = payloadOf(outcome.a);
-      expect(entries[1]).toMatchObject({
-        object_name: 'ZT_B',
-        error: { status: 403 },
-      });
-      expect(entries[0].references.length).toBeGreaterThan(0);
-      expect(entries[2]).toMatchObject({ object_name: 'ZT_C' });
-      expect(entries[2].error).toBeUndefined();
-    },
-  );
+  ] satisfies ReadonlyArray<[string, Record<string, unknown>]>) {
+    it(
+      format(
+        "a part's failure (%s) is that object's: its error entry, the rest answers, as the sequential version",
+        label,
+      ),
+      async () => {
+        const outcome = await bothWays(
+          handleGetWhereUsed,
+          { objects: THREE, ...filter },
+          { answers: { [label]: FORBIDDEN } },
+        );
+        expectSame(outcome);
+        const entries = payloadOf(outcome.a);
+        assertMatchObject(entries[1], {
+          object_name: 'ZT_B',
+          error: { status: 403 },
+        });
+        assert.ok(entries[0].references.length > 0);
+        assertMatchObject(entries[2], { object_name: 'ZT_C' });
+        assert.equal(entries[2].error, undefined);
+      },
+    );
+  }
 
-  it.each<[string, Record<string, unknown>, number]>([
+  for (const [label, filter, envelopes] of [
     ['scope:ZT_B', { enable_only_types: ['CLAS/OC'] }, 1],
     ['scope:ZT_B', { enable_all_types: true }, 1],
     ['wu:ZT_B:CLAS/OC', { enable_only_types: ['CLAS/OC'] }, 2],
     ['wu:ZT_B', {}, 1],
-  ])(
-    'a 401 SAP answered to %s ends the call as it came; nothing is read after it',
-    async (label, filter, envelopes) => {
-      const outcome = await bothWays(
-        handleGetWhereUsed,
-        { objects: THREE, ...filter },
-        { answers: { [label]: UNAUTHORIZED } },
-      );
-      expectSame(outcome);
-      expect(payloadOf(outcome.a)).toMatchObject({ status: 401 });
-      expect(outcome.batched.envelopes).toHaveLength(envelopes);
-    },
-  );
+  ] satisfies ReadonlyArray<[string, Record<string, unknown>, number]>) {
+    it(
+      format(
+        'a 401 SAP answered to %s ends the call as it came; nothing is read after it',
+        label,
+      ),
+      async () => {
+        const outcome = await bothWays(
+          handleGetWhereUsed,
+          { objects: THREE, ...filter },
+          { answers: { [label]: UNAUTHORIZED } },
+        );
+        expectSame(outcome);
+        assertMatchObject(payloadOf(outcome.a), { status: 401 });
+        assert.equal(outcome.batched.envelopes.length, envelopes);
+      },
+    );
+  }
 
   it("the connection's credential refusal ends the call as it came", async () => {
     for (const [failing, filter] of [
@@ -716,43 +742,49 @@ describe('GetWhereUsed', () => {
         args,
         phasesOf(fake)[failing - 1] as string[],
       );
-      expect(wholeOf(result)).toEqual(wholeOf(expected));
-      expect(payloadOf(result).error).toBe('authentication_failed');
-      expect(fake.envelopes).toHaveLength(failing);
+      assert.deepStrictEqual(wholeOf(result), wholeOf(expected));
+      assert.equal(payloadOf(result).error, 'authentication_failed');
+      assert.equal(fake.envelopes.length, failing);
     }
   });
 
-  it.each<[string, Record<string, unknown>]>([
+  for (const [label, filter] of [
     ['wu:ZT_C', {}],
     ['wu:ZT_C:CLAS/OC', { enable_only_types: ['CLAS/OC'] }],
-  ])(
-    'a 401 SAP answered to %s: the cache holds what the sequential version leaves in it',
-    async (label, filter) => {
-      const args = { objects: THREE, ...filter };
-      const model = { answers: { [label]: UNAUTHORIZED } };
-      objectsListCache.clearCache();
-      const batched = await withinTurns(
-        handleGetWhereUsed(contextOn(system(model)), args),
-        TURNS,
-      );
-      const batchedCache = objectsListCache.getCache();
-      objectsListCache.clearCache();
-      const sequential = await withinTurns(
-        handleGetWhereUsed(contextOn(system(model), 'absent'), args),
-        TURNS,
-      );
-      const sequentialCache = objectsListCache.getCache();
-      objectsListCache.clearCache();
-      expect(wholeOf(batched)).toEqual(wholeOf(sequential));
-      expect(payloadOf(batched)).toMatchObject({ status: 401 });
-      expect(batchedCache).toEqual(sequentialCache);
-      expect(
-        child(listOf(child(batchedCache, 'content'))[0], 'json'),
-      ).toMatchObject({
-        object_name: 'ZT_B',
-      });
-    },
-  );
+  ] satisfies ReadonlyArray<[string, Record<string, unknown>]>) {
+    it(
+      format(
+        'a 401 SAP answered to %s: the cache holds what the sequential version leaves in it',
+        label,
+      ),
+      async () => {
+        const args = { objects: THREE, ...filter };
+        const model = { answers: { [label]: UNAUTHORIZED } };
+        objectsListCache.clearCache();
+        const batched = await withinTurns(
+          handleGetWhereUsed(contextOn(system(model)), args),
+          TURNS,
+        );
+        const batchedCache = objectsListCache.getCache();
+        objectsListCache.clearCache();
+        const sequential = await withinTurns(
+          handleGetWhereUsed(contextOn(system(model), 'absent'), args),
+          TURNS,
+        );
+        const sequentialCache = objectsListCache.getCache();
+        objectsListCache.clearCache();
+        assert.deepStrictEqual(wholeOf(batched), wholeOf(sequential));
+        assertMatchObject(payloadOf(batched), { status: 401 });
+        assert.deepStrictEqual(batchedCache, sequentialCache);
+        assertMatchObject(
+          child(listOf(child(batchedCache, 'content'))[0], 'json'),
+          {
+            object_name: 'ZT_B',
+          },
+        );
+      },
+    );
+  }
 
   it('401s in two phases: the batched call ends at the first 401 of the phase that met it, in the order of the objects', async () => {
     const outcome = await bothWays(
@@ -769,75 +801,83 @@ describe('GetWhereUsed', () => {
     // Batched: the scopes' phase meets the 401s of ZT_B and ZT_C and ends at
     // ZT_B's, the first in the order of the objects; ZT_A's scoped request
     // is never sent.
-    expect(phasesOf(outcome.batched)).toEqual([
+    assert.deepStrictEqual(phasesOf(outcome.batched), [
       ['scope:ZT_A', 'scope:ZT_B', 'scope:ZT_C'],
     ]);
-    expect(payloadOf(outcome.a)).toMatchObject({
+    assertMatchObject(payloadOf(outcome.a), {
       status: 401,
       step: 'read where-used scope',
     });
-    expect(JSON.stringify(payloadOf(outcome.a).request)).toContain('zt_b');
+    assert.ok(JSON.stringify(payloadOf(outcome.a).request).includes('zt_b'));
     // Sequential: ZT_A is read first, and its scoped request's 401 ends it.
-    expect(payloadOf(outcome.b)).toMatchObject({
+    assertMatchObject(payloadOf(outcome.b), {
       status: 401,
       step: 'read where-used',
     });
-    expect(JSON.stringify(payloadOf(outcome.b).request)).toContain('zt_a');
+    assert.ok(JSON.stringify(payloadOf(outcome.b).request).includes('zt_a'));
   });
 
   it('a refusal the connection throws to the validating scope read is thrown, as the sequential version throws it', async () => {
     const args = { objects: THREE, enable_only_types: ['CLAS/OC'] };
     const batched = refusingEnvelope(1);
-    const rejected = expect(
+    const rejected = rejectionOf(
       withinTurns(handleGetWhereUsed(contextOn(batched), args), TURNS),
-    ).rejects.toBeInstanceOf(AuthRefusedError);
-    await rejected;
+    );
+    assert.ok((await rejected) instanceof AuthRefusedError);
     const sequential = system();
     sequential.answerRequests(async () => {
       throw credential();
     });
-    await expect(
-      withinTurns(
-        handleGetWhereUsed(contextOn(sequential, 'absent'), args),
-        TURNS,
-      ),
-    ).rejects.toBeInstanceOf(AuthRefusedError);
+    assert.ok(
+      (await rejectionOf(
+        withinTurns(
+          handleGetWhereUsed(contextOn(sequential, 'absent'), args),
+          TURNS,
+        ),
+      )) instanceof AuthRefusedError,
+    );
   });
 
-  it.each<[number, Record<string, unknown>]>([
+  for (const [failing, filter] of [
     [1, {}],
     [1, { enable_all_types: true }],
     [2, { enable_all_types: true }],
     [2, { enable_only_types: ['CLAS/OC'] }],
-  ])(
-    "envelope %i failing is every part's failure; the answer is the sequential one with those reads failed (%j)",
-    async (failing, filter) => {
-      const args = { objects: THREE, ...filter };
-      const fake = failingEnvelope(failing);
-      const result = await withinTurns(
-        handleGetWhereUsed(contextOn(fake), args),
-        TURNS,
-      );
-      const expected = await sequentialWithFailed(
-        handleGetWhereUsed,
-        args,
-        phasesOf(fake)[failing - 1] as string[],
-      );
-      expectEnvelopeFailure(result, expected, THREE.length);
-      expect(payloadOf(result)[0].error).toMatchObject({ status: 500 });
-      expect(fake.envelopes).toHaveLength(failing);
-      expect(fake.directs).toHaveLength(0);
-    },
-  );
+  ] satisfies ReadonlyArray<[number, Record<string, unknown>]>) {
+    it(
+      format(
+        "envelope %i failing is every part's failure; the answer is the sequential one with those reads failed (%j)",
+        failing,
+        filter,
+      ),
+      async () => {
+        const args = { objects: THREE, ...filter };
+        const fake = failingEnvelope(failing);
+        const result = await withinTurns(
+          handleGetWhereUsed(contextOn(fake), args),
+          TURNS,
+        );
+        const expected = await sequentialWithFailed(
+          handleGetWhereUsed,
+          args,
+          phasesOf(fake)[failing - 1] as string[],
+        );
+        expectEnvelopeFailure(result, expected, THREE.length);
+        assertMatchObject(payloadOf(result)[0].error, { status: 500 });
+        assert.equal(fake.envelopes.length, failing);
+        assert.equal(fake.directs.length, 0);
+      },
+    );
+  }
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
     const { fake, context, result, expected } = await noCommunicationBatch(
       handleGetWhereUsed,
       { objects: THREE, enable_all_types: true },
     );
-    expect(textOf(result)).toBe(textOf(expected));
-    expect(fake.envelopes).toHaveLength(1);
-    expect(directsOf(fake)).toEqual([
+    assert.equal(textOf(result), textOf(expected));
+    assert.equal(fake.envelopes.length, 1);
+    assert.deepStrictEqual(directsOf(fake), [
       'scope:ZT_A',
       'wu:ZT_A:CLAS/OC,PROG/P,TABL/DS,DDLS/DF',
       'scope:ZT_B',
@@ -845,7 +885,7 @@ describe('GetWhereUsed', () => {
       'scope:ZT_C',
       'wu:ZT_C:CLAS/OC,PROG/P,TABL/DS,DDLS/DF',
     ]);
-    expect(context.batchAvailability?.available()).toBe(false);
+    assert.equal(context.batchAvailability?.available(), false);
   });
 
   it('exactly one of object_name/object_type or objects: its schema', () => {
@@ -853,12 +893,12 @@ describe('GetWhereUsed', () => {
       { objects: THREE, object_name: 'ZT_A' },
       { objects: [] },
     ]) {
-      expect(schemaWords(GET_WHERE_USED, args)).toContain(
-        'Give exactly one of',
+      assert.ok(
+        schemaWords(GET_WHERE_USED, args).includes('Give exactly one of'),
       );
     }
     // Not a list at all: the schema's own type words.
-    expect(schemaWords(GET_WHERE_USED, { objects: 'ZT_A' })).not.toBe('');
+    assert.notEqual(schemaWords(GET_WHERE_USED, { objects: 'ZT_A' }), '');
   });
 });
 
@@ -869,7 +909,7 @@ describe('GetWhereUsed', () => {
 const PAGED = ['dumps', 'system_messages', 'gateway_errors'];
 
 describe('RuntimeListFeeds', () => {
-  it.each<[Record<string, unknown>, Model]>([
+  for (const [args, model] of [
     [{ feed_type: 'dumps' }, {}],
     [{ feed_type: 'dumps', max_results: 230 }, {}],
     [{ feed_type: 'system_messages', max_results: 5 }, {}],
@@ -882,9 +922,11 @@ describe('RuntimeListFeeds', () => {
     [{ feed_types: [...PAGED, 'descriptors', 'variants'] }, {}],
     [{ feed_types: ['dumps', 'system_messages'], runtime_error: 'X' }, {}],
     [{ feed_types: ['gateway_errors'], max_results: 10 }, {}],
-  ])('same answer as the sequential version: %j', async (args, model) => {
-    expectSame(await bothWays(handleRuntimeListFeeds, args, model));
-  });
+  ] satisfies ReadonlyArray<[Record<string, unknown>, Model]>) {
+    it(format('same answer as the sequential version: %j', args), async () => {
+      expectSame(await bothWays(handleRuntimeListFeeds, args, model));
+    });
+  }
 
   it('phases: every feed’s first page, then per round the next page of every feed still paging', async () => {
     const fake = system();
@@ -895,7 +937,7 @@ describe('RuntimeListFeeds', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['feed:dumps:100:', 'feed:messages:100:', 'feed:gateway:100:'],
       ['feed:dumps:100:20261001065821', 'feed:gateway:100:20261001065821'],
       ['feed:dumps:33:20261001065642'],
@@ -919,24 +961,30 @@ describe('RuntimeListFeeds', () => {
       }),
       TURNS,
     );
-    expect(three.envelopes).toHaveLength(one.envelopes.length);
-    expect(one.directs).toHaveLength(0);
-    expect(three.directs).toHaveLength(0);
+    assert.equal(three.envelopes.length, one.envelopes.length);
+    assert.equal(one.directs.length, 0);
+    assert.equal(three.directs.length, 0);
   });
 
-  it.each([[{}], [{ feed_type: 'descriptors' }], [{ feed_type: 'variants' }]])(
-    'a feed of one request is sent as itself: %j',
-    async (args) => {
-      const fake = system();
-      const result = await withinTurns(
-        handleRuntimeListFeeds(contextOn(fake), args),
-        TURNS,
-      );
-      expect(fake.envelopes).toHaveLength(0);
-      expect(directsOf(fake)).toEqual(['feeds']);
-      expect((result as { isError?: boolean }).isError).toBe(false);
-    },
-  );
+  for (const [args] of [
+    [{}],
+    [{ feed_type: 'descriptors' }],
+    [{ feed_type: 'variants' }],
+  ]) {
+    it(
+      format('a feed of one request is sent as itself: %j', args),
+      async () => {
+        const fake = system();
+        const result = await withinTurns(
+          handleRuntimeListFeeds(contextOn(fake), args),
+          TURNS,
+        );
+        assert.equal(fake.envelopes.length, 0);
+        assert.deepStrictEqual(directsOf(fake), ['feeds']);
+        assert.equal((result as { isError?: boolean }).isError, false);
+      },
+    );
+  }
 
   it('the single argument keeps its answer; the list answers one entry per feed, in order', async () => {
     const single = await withinTurns(
@@ -951,14 +999,15 @@ describe('RuntimeListFeeds', () => {
       }),
       TURNS,
     );
-    expect(payloadOf(single)).toMatchObject({
+    assertMatchObject(payloadOf(single), {
       feed_type: 'system_messages',
       count: 7,
     });
-    expect(payloadOf(list)[1]).toEqual(payloadOf(single));
-    expect(
+    assert.deepStrictEqual(payloadOf(list)[1], payloadOf(single));
+    assert.deepStrictEqual(
       payloadOf(list).map((e: { feed_type: string }) => e.feed_type),
-    ).toEqual(['dumps', 'system_messages']);
+      ['dumps', 'system_messages'],
+    );
   });
 
   it("a part's failure is that feed's: its error entry, the rest answers, as the sequential version", async () => {
@@ -969,29 +1018,34 @@ describe('RuntimeListFeeds', () => {
     );
     expectSame(outcome);
     const entries = payloadOf(outcome.a);
-    expect(entries[2]).toMatchObject({
+    assertMatchObject(entries[2], {
       feed_type: 'gateway_errors',
       error: { status: 403 },
     });
-    expect(entries[0].count).toBeGreaterThan(100);
+    assert.ok(entries[0].count > 100);
   });
 
-  it.each<[string, number]>([
+  for (const [start, envelopes] of [
     ['feed:messages', 1],
     ['feed:dumps:100:2026', 2],
-  ])(
-    'a 401 SAP answered to %s ends the call as it came; no further round is sent',
-    async (start, envelopes) => {
-      const outcome = await bothWays(
-        handleRuntimeListFeeds,
-        { feed_types: PAGED, max_results: 230 },
-        { startingWith: { [start]: UNAUTHORIZED } },
-      );
-      expectSame(outcome);
-      expect(payloadOf(outcome.a)).toMatchObject({ status: 401 });
-      expect(outcome.batched.envelopes).toHaveLength(envelopes);
-    },
-  );
+  ] satisfies ReadonlyArray<[string, number]>) {
+    it(
+      format(
+        'a 401 SAP answered to %s ends the call as it came; no further round is sent',
+        start,
+      ),
+      async () => {
+        const outcome = await bothWays(
+          handleRuntimeListFeeds,
+          { feed_types: PAGED, max_results: 230 },
+          { startingWith: { [start]: UNAUTHORIZED } },
+        );
+        expectSame(outcome);
+        assertMatchObject(payloadOf(outcome.a), { status: 401 });
+        assert.equal(outcome.batched.envelopes.length, envelopes);
+      },
+    );
+  }
 
   it("the connection's credential refusal ends the call as it came", async () => {
     for (const [failing, args] of [
@@ -1009,49 +1063,54 @@ describe('RuntimeListFeeds', () => {
         args,
         phasesOf(fake)[failing - 1] as string[],
       );
-      expect(wholeOf(result)).toEqual(wholeOf(expected));
-      expect(payloadOf(result).error).toBe('authentication_failed');
-      expect(fake.envelopes).toHaveLength(failing);
+      assert.deepStrictEqual(wholeOf(result), wholeOf(expected));
+      assert.equal(payloadOf(result).error, 'authentication_failed');
+      assert.equal(fake.envelopes.length, failing);
     }
   });
 
-  it.each([
+  for (const [failing, failures] of [
     [1, 3],
     [2, 2],
-  ])(
-    "envelope %i failing is every part's failure; the answer is the sequential one with those reads failed",
-    async (failing, failures) => {
-      const args = { feed_types: PAGED, max_results: 150 };
-      const fake = failingEnvelope(failing);
-      const result = await withinTurns(
-        handleRuntimeListFeeds(contextOn(fake), args),
-        TURNS,
-      );
-      const expected = await sequentialWithFailed(
-        handleRuntimeListFeeds,
-        args,
-        phasesOf(fake)[failing - 1] as string[],
-      );
-      expectEnvelopeFailure(result, expected, failures);
-      expect(payloadOf(result)[0].error).toMatchObject({ status: 500 });
-      expect(fake.envelopes).toHaveLength(failing);
-      expect(fake.directs).toHaveLength(0);
-    },
-  );
+  ]) {
+    it(
+      format(
+        "envelope %i failing is every part's failure; the answer is the sequential one with those reads failed",
+        failing,
+      ),
+      async () => {
+        const args = { feed_types: PAGED, max_results: 150 };
+        const fake = failingEnvelope(failing);
+        const result = await withinTurns(
+          handleRuntimeListFeeds(contextOn(fake), args),
+          TURNS,
+        );
+        const expected = await sequentialWithFailed(
+          handleRuntimeListFeeds,
+          args,
+          phasesOf(fake)[failing - 1] as string[],
+        );
+        expectEnvelopeFailure(result, expected, failures);
+        assertMatchObject(payloadOf(result)[0].error, { status: 500 });
+        assert.equal(fake.envelopes.length, failing);
+        assert.equal(fake.directs.length, 0);
+      },
+    );
+  }
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
     const { fake, context, result, expected } = await noCommunicationBatch(
       handleRuntimeListFeeds,
       { feed_types: ['dumps', 'system_messages'], max_results: 150 },
     );
-    expect(textOf(result)).toBe(textOf(expected));
-    expect(fake.envelopes).toHaveLength(1);
-    expect(directsOf(fake)).toEqual([
+    assert.equal(textOf(result), textOf(expected));
+    assert.equal(fake.envelopes.length, 1);
+    assert.deepStrictEqual(directsOf(fake), [
       'feed:dumps:100:',
       'feed:dumps:52:20261001065821',
       'feed:messages:100:',
     ]);
-    expect(context.batchAvailability?.available()).toBe(false);
+    assert.equal(context.batchAvailability?.available(), false);
   });
 
   it('exactly one of feed_type or feed_types: its schema', () => {
@@ -1059,11 +1118,12 @@ describe('RuntimeListFeeds', () => {
       { feed_types: PAGED, feed_type: 'dumps' },
       { feed_types: [] },
     ]) {
-      expect(schemaWords(RUNTIME_LIST_FEEDS, args)).toContain(
-        'Give exactly one of',
+      assert.ok(
+        schemaWords(RUNTIME_LIST_FEEDS, args).includes('Give exactly one of'),
       );
     }
-    expect(schemaWords(RUNTIME_LIST_FEEDS, { feed_types: 'dumps' })).not.toBe(
+    assert.notEqual(
+      schemaWords(RUNTIME_LIST_FEEDS, { feed_types: 'dumps' }),
       '',
     );
   });
@@ -1071,15 +1131,15 @@ describe('RuntimeListFeeds', () => {
   it('feed_types through the registered schema arrives alone; feed_type absent reads descriptors', async () => {
     const schema = RUNTIME_LIST_FEEDS.inputSchema;
     const listed = schema.parse({ feed_types: PAGED });
-    expect(listed).toEqual({ feed_types: PAGED });
+    assert.deepStrictEqual(listed, { feed_types: PAGED });
     const fake = system();
     const result = await withinTurns(
       handleRuntimeListFeeds(contextOn(fake), listed as never),
       TURNS,
     );
-    expect((result as { isError?: boolean }).isError).toBeFalsy();
-    expect(payloadOf(result)).toHaveLength(PAGED.length);
-    expect(schema.parse({})).toEqual({});
+    assert.ok(!(result as { isError?: boolean }).isError);
+    assert.equal(payloadOf(result).length, PAGED.length);
+    assert.deepStrictEqual(schema.parse({}), {});
     const absent = await withinTurns(
       handleRuntimeListFeeds(contextOn(system()), {}),
       TURNS,
@@ -1090,7 +1150,7 @@ describe('RuntimeListFeeds', () => {
       }),
       TURNS,
     );
-    expect(textOf(absent)).toBe(textOf(descriptors));
+    assert.equal(textOf(absent), textOf(descriptors));
   });
 });
 
@@ -1101,7 +1161,7 @@ describe('RuntimeListFeeds', () => {
 // Batch mode is the compact sets': their where-used and feed reads of one
 // request are recorded; the full set's tools are not listed at all.
 describe('batch mode records the one-request calls only', () => {
-  it.each<[string, Record<string, unknown>, boolean]>([
+  for (const [tool, args, recorded] of [
     [
       'HandlerSystem',
       { action: 'where_used', object_type: 'table', object_name: 'ZT_A' },
@@ -1122,7 +1182,9 @@ describe('batch mode records the one-request calls only', () => {
     ['GetWhereUsed', { objects: THREE }, false],
     ['RuntimeListFeeds', {}, false],
     ['RuntimeListFeeds', { feed_type: 'variants' }, false],
-  ])('%s %j: recorded %s', (tool, args, recorded) => {
-    expect(eligible(tool, args, 'http').ok).toBe(recorded);
-  });
+  ] satisfies ReadonlyArray<[string, Record<string, unknown>, boolean]>) {
+    it(format('%s %j: recorded %s', tool, args, recorded), () => {
+      assert.equal(eligible(tool, args, 'http').ok, recorded);
+    });
+  }
 });

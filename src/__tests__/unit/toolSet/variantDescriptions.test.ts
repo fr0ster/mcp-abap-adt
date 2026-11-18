@@ -6,6 +6,8 @@
  * names only the members its own enum offers there.
  */
 
+import assert from 'node:assert/strict';
+import { after, describe, it } from 'node:test';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -19,8 +21,6 @@ import type { ToolDefinition } from '../../../lib/handlers/interfaces';
 import { fullToolSet, registryOf, type ToolSet } from '../../../lib/toolSet';
 import { servedDefinition } from '../../../lib/variantToolSet';
 import { PROJECTED_ARGUMENTS } from '../../helpers/projectedArguments';
-
-jest.setTimeout(120_000);
 
 const SETS: Readonly<Record<string, ToolSet>> = {
   core: fullToolSet,
@@ -120,7 +120,7 @@ function membersNamed(description: string, any: ReadonlySet<string>): string[] {
 describe('each declared variant’s tools carry that variant’s description', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
 
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
     resetProcessLatchForTests();
@@ -134,18 +134,19 @@ describe('each declared variant’s tools carry that variant’s description', (
         let varying = 0;
         for (const tool of tools) {
           const definition = definitions.get(tool.name);
-          expect(definition).toBeDefined();
+          assert.notEqual(definition, undefined);
           if (definition === undefined) continue;
           const served = servedDefinition(definition, variant);
-          expect(served).toBeDefined();
+          assert.notEqual(served, undefined);
           if (served === undefined) continue;
           if (definition.variants !== undefined) varying += 1;
-          expect([
+          const accepted: readonly (string | undefined)[] = [
             served.description,
             withBatchSentence(served.description, tool.name),
-          ]).toContain(tool.description);
+          ];
+          assert.ok(accepted.includes(tool.description));
         }
-        expect(varying).toBeGreaterThan(3);
+        assert.ok(varying > 3);
       });
     }
   }
@@ -154,7 +155,7 @@ describe('each declared variant’s tools carry that variant’s description', (
     for (const variant of VARIANTS) {
       it(`${kind} on ${variant}: a compact tool's description names only members its enum offers on ${variant}`, async () => {
         const set = SETS[kind];
-        expect(set).toBeDefined();
+        assert.notEqual(set, undefined);
         if (set === undefined) return;
         const tools = await listed(set, variant);
         let checked = 0;
@@ -166,12 +167,15 @@ describe('each declared variant’s tools carry that variant’s description', (
             tool.description ?? '',
             members.any,
           ).filter((member) => !members.on[variant].has(member));
-          expect({ tool: tool.name, outside }).toEqual({
-            tool: tool.name,
-            outside: [],
-          });
+          assert.deepStrictEqual(
+            { tool: tool.name, outside },
+            {
+              tool: tool.name,
+              outside: [],
+            },
+          );
         }
-        expect(checked).toBeGreaterThan(3);
+        assert.ok(checked > 3);
       });
     }
   }

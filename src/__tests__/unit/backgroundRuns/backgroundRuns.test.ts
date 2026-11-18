@@ -9,6 +9,8 @@
  * until the case lets it go — the "long run".
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BACKGROUND_RUNS_PER_CALLER } from '@mcp-abap-adt/background-runs-memory';
 import {
   activeTools,
@@ -25,6 +27,7 @@ import { closeInstance } from '../../../lib/instanceClose';
 import { forceClose } from '../../../lib/ownedConnections';
 import { logOffAtOnce } from '../../../lib/shutdownSequence';
 import { isLogoff } from '../../helpers/adtStandIn';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   type BackgroundStand,
   backgroundStand,
@@ -70,30 +73,36 @@ describe('a background run', () => {
     });
     await held.arrived;
 
-    expect(started.isError).toBe(false);
-    expect(started.payload).toMatchObject({
+    assert.equal(started.isError, false);
+    assertMatchObject(started.payload, {
       state: 'running',
       tool: 'RuntimeRunClass',
       object: 'PLACEHOLDER_CLASS',
     });
     const handle = started.payload.run_handle as string;
-    expect(handle).toMatch(/^[0-9a-f]{32}$/);
-    expect(started.payload.message).toContain('GetBackgroundRun');
-    expect(started.payload.message).toContain('DiscardBackgroundRun');
+    assert.match(handle, /^[0-9a-f]{32}$/);
+    assert.ok(
+      typeof started.payload.message === 'string' &&
+        started.payload.message.includes('GetBackgroundRun'),
+    );
+    assert.ok(
+      typeof started.payload.message === 'string' &&
+        started.payload.message.includes('DiscardBackgroundRun'),
+    );
 
     // The run is on a session of its own, still open, and reads running.
     const session = runSession();
     const instanceSession = stand.standIn.requests[0]?.session;
-    expect(session).not.toBe(instanceSession);
-    expect(logoffIndex(stand.standIn, session)).toBe(-1);
+    assert.notEqual(session, instanceSession);
+    assert.equal(logoffIndex(stand.standIn, session), -1);
     const running = await stand.a.call('GetBackgroundRun', {
       run_handle: handle,
     });
-    expect(running.payload).toMatchObject({
+    assertMatchObject(running.payload, {
       run_handle: handle,
       state: 'running',
     });
-    expect(running.content).toHaveLength(1);
+    assert.equal(running.content.length, 1);
 
     held.release();
     const read = await finished(handle);
@@ -101,13 +110,13 @@ describe('a background run', () => {
     await until(() => logoffIndex(stand.standIn, session) > -1);
     const runAt = stand.standIn.requests.findIndex(isClassRun);
     const logoffAt = logoffIndex(stand.standIn, session);
-    expect(logoffAt).toBeGreaterThan(runAt);
-    expect(read.payload).toMatchObject({
+    assert.ok(logoffAt > runAt);
+    assertMatchObject(read.payload, {
       run_handle: handle,
       state: 'finished',
       tool: 'RuntimeRunClass',
     });
-    expect(typeof read.payload.finished_at).toBe('string');
+    assert.equal(typeof read.payload.finished_at, 'string');
   });
 
   it('finished, answers what the run tool answers in the foreground', async () => {
@@ -117,21 +126,21 @@ describe('a background run', () => {
       background: true,
     });
     const read = await finished(started.payload.run_handle as string);
-    expect(read.isError).toBe(foreground.isError);
-    expect(read.content.slice(1)).toEqual(foreground.content);
+    assert.equal(read.isError, foreground.isError);
+    assert.deepStrictEqual(read.content.slice(1), foreground.content);
   });
 
   it("finished with SAP's error, answers it as the run tool does, isError included", async () => {
     stand.standIn.answer(isClassRun, 500);
     const foreground = await stand.a.call('RuntimeRunClass', RUN);
-    expect(foreground.isError).toBe(true);
+    assert.equal(foreground.isError, true);
     const started = await stand.a.call('RuntimeRunClass', {
       ...RUN,
       background: true,
     });
     const read = await finished(started.payload.run_handle as string);
-    expect(read.isError).toBe(true);
-    expect(read.content.slice(1)).toEqual(foreground.content);
+    assert.equal(read.isError, true);
+    assert.deepStrictEqual(read.content.slice(1), foreground.content);
   });
 
   it('is not cut by the instance that started it ending (its terminal close)', async () => {
@@ -149,15 +158,13 @@ describe('a background run', () => {
     // The instance's own logoff reached the system; the run's did not come.
     await until(() => logoffIndex(stand.standIn, instanceSession) > -1);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    expect(logoffIndex(stand.standIn, session)).toBe(-1);
+    assert.equal(logoffIndex(stand.standIn, session), -1);
     const released = stand.standIn.requests.length;
     held.release();
     await finished(started.payload.run_handle as string);
     // Its logoff was written after SAP's answer, before the answer was kept.
     await until(() => logoffIndex(stand.standIn, session) > -1);
-    expect(logoffIndex(stand.standIn, session)).toBeGreaterThanOrEqual(
-      released,
-    );
+    assert.ok(logoffIndex(stand.standIn, session) >= released);
   });
 
   it('runs a program too, and compact runs plain and under a profiler id, naming its own tools', async () => {
@@ -165,12 +172,12 @@ describe('a background run', () => {
       program_name: 'PLACEHOLDER_PROGRAM',
       background: true,
     });
-    expect(program.payload).toMatchObject({
+    assertMatchObject(program.payload, {
       tool: 'RuntimeRunProgram',
       object: 'PLACEHOLDER_PROGRAM',
     });
     await finished(program.payload.run_handle as string);
-    expect(stand.standIn.requests.some(isProgramRun)).toBe(true);
+    assert.equal(stand.standIn.requests.some(isProgramRun), true);
 
     for (const profiler of [{}, { profiler_id: 'PLACEHOLDER_PROFILER' }]) {
       const compact = await stand.a.call('HandlerProfileRun', {
@@ -179,9 +186,15 @@ describe('a background run', () => {
         ...profiler,
         background: true,
       });
-      expect(compact.isError).toBe(false);
-      expect(compact.payload.message).toContain('HandlerBackgroundRunGet');
-      expect(compact.payload.message).toContain('HandlerBackgroundRunDiscard');
+      assert.equal(compact.isError, false);
+      assert.ok(
+        typeof compact.payload.message === 'string' &&
+          compact.payload.message.includes('HandlerBackgroundRunGet'),
+      );
+      assert.ok(
+        typeof compact.payload.message === 'string' &&
+          compact.payload.message.includes('HandlerBackgroundRunDiscard'),
+      );
       const handle = compact.payload.run_handle as string;
       let read = await stand.a.call('HandlerBackgroundRunGet', {
         run_handle: handle,
@@ -192,7 +205,7 @@ describe('a background run', () => {
         });
         return read.payload.state === 'finished';
       });
-      expect(read.payload).toMatchObject({
+      assertMatchObject(read.payload, {
         tool: 'HandlerProfileRun',
         object: 'PLACEHOLDER_CLASS',
       });
@@ -205,14 +218,14 @@ describe('a background run', () => {
       ...RUN,
       background: false,
     });
-    expect(off).toEqual(plain);
+    assert.deepStrictEqual(off, plain);
     const listed = await stand.a.call('ListBackgroundRuns');
-    expect(listed.payload).toEqual({ runs: [] });
+    assert.deepStrictEqual(listed.payload, { runs: [] });
     // Every class run ran on the instance's own session.
     const sessions = new Set(
       stand.standIn.requests.filter(isClassRun).map((r) => r.session),
     );
-    expect(sessions.size).toBe(1);
+    assert.equal(sessions.size, 1);
   });
 });
 
@@ -231,17 +244,17 @@ describe('whose run', () => {
 
       const mine = await stand.a.call('ListBackgroundRuns');
       const runs = mine.payload.runs as Array<Record<string, unknown>>;
-      expect(runs).toHaveLength(1);
-      expect(runs[0]).toMatchObject({
+      assert.equal(runs.length, 1);
+      assertMatchObject(runs[0], {
         run_handle: handle,
         tool: 'RuntimeRunClass',
         object: 'PLACEHOLDER_CLASS',
         state: 'finished',
       });
-      expect(runs[0]).not.toHaveProperty('answer');
-      expect(mine.content).toHaveLength(1);
+      assert.ok(!('answer' in Object(runs[0])));
+      assert.equal(mine.content.length, 1);
 
-      expect((await b.call('ListBackgroundRuns')).payload).toEqual({
+      assert.deepStrictEqual((await b.call('ListBackgroundRuns')).payload, {
         runs: [],
       });
       const foreign = await b.call('GetBackgroundRun', { run_handle: handle });
@@ -255,19 +268,20 @@ describe('whose run', () => {
         run_handle: handle,
       });
       for (const answer of [foreign, unknown, notString, foreignDiscard]) {
-        expect(answer.isError).toBe(true);
-        expect(answer.payload).toMatchObject({
+        assert.equal(answer.isError, true);
+        assertMatchObject(answer.payload, {
           error: 'background_run_not_available',
           message: BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
         });
       }
-      expect(foreign.content).toEqual(unknown.content);
-      expect(foreignDiscard.content).toEqual(unknown.content);
+      assert.deepStrictEqual(foreign.content, unknown.content);
+      assert.deepStrictEqual(foreignDiscard.content, unknown.content);
       // The discard of someone else's run removed nothing.
-      expect(
+      assert.equal(
         (await stand.a.call('GetBackgroundRun', { run_handle: handle })).payload
           .state,
-      ).toBe('finished');
+        'finished',
+      );
     } finally {
       await b.close();
     }
@@ -289,17 +303,19 @@ describe('whose run', () => {
         ...RUN,
         background: true,
       });
-      expect(started.isError).toBe(false);
+      assert.equal(started.isError, false);
       const handle = started.payload.run_handle as string;
       // The same destination and backend user: the same caller.
       const listed = await basic.call('ListBackgroundRuns');
-      expect(
+      assert.deepStrictEqual(
         (listed.payload.runs as Array<{ run_handle: string }>).map(
           (r) => r.run_handle,
         ),
-      ).toEqual([handle]);
+        [handle],
+      );
       // Another user on the same destination is someone else.
-      expect((await stand.a.call('ListBackgroundRuns')).payload.runs).toEqual(
+      assert.deepStrictEqual(
+        (await stand.a.call('ListBackgroundRuns')).payload.runs,
         [],
       );
     } finally {
@@ -321,32 +337,33 @@ describe('discarding', () => {
     const refused = await stand.a.call('DiscardBackgroundRun', {
       run_handle: handle,
     });
-    expect(refused.isError).toBe(true);
-    expect(refused.payload).toMatchObject({
+    assert.equal(refused.isError, true);
+    assertMatchObject(refused.payload, {
       error: 'background_run_running',
       message: BACKGROUND_RUN_RUNNING_WORDS,
     });
     // Still there, still running: the refusal stopped nothing.
-    expect(
+    assert.equal(
       (await stand.a.call('GetBackgroundRun', { run_handle: handle })).payload
         .state,
-    ).toBe('running');
+      'running',
+    );
 
     held.release();
     await finished(handle);
     const discarded = await stand.a.call('DiscardBackgroundRun', {
       run_handle: handle,
     });
-    expect(discarded.isError).toBe(false);
-    expect(discarded.payload).toEqual({
+    assert.equal(discarded.isError, false);
+    assert.deepStrictEqual(discarded.payload, {
       run_handle: handle,
       state: 'discarded',
     });
     const gone = await stand.a.call('GetBackgroundRun', { run_handle: handle });
-    expect(gone.payload).toMatchObject({
+    assertMatchObject(gone.payload, {
       error: 'background_run_not_available',
     });
-    expect((await stand.a.call('ListBackgroundRuns')).payload).toEqual({
+    assert.deepStrictEqual((await stand.a.call('ListBackgroundRuns')).payload, {
       runs: [],
     });
   });
@@ -361,7 +378,7 @@ describe('discarding', () => {
     const second = await stand.a.call('GetBackgroundRun', {
       run_handle: handle,
     });
-    expect(second).toEqual(first);
+    assert.deepStrictEqual(second, first);
   });
 });
 
@@ -373,7 +390,7 @@ describe('the limit per caller', () => {
         ...RUN,
         background: true,
       });
-      expect(started.isError).toBe(false);
+      assert.equal(started.isError, false);
       handles.push(started.payload.run_handle as string);
     }
     for (const handle of handles) await finished(handle);
@@ -383,16 +400,19 @@ describe('the limit per caller', () => {
       ...RUN,
       background: true,
     });
-    expect(refused.isError).toBe(true);
-    expect(refused.payload).toMatchObject({
+    assert.equal(refused.isError, true);
+    assertMatchObject(refused.payload, {
       error: 'background_run_limit',
       message: backgroundRunLimitWords(
         BACKGROUND_RUNS_PER_CALLER,
         'DiscardBackgroundRun',
       ),
     });
-    expect(refused.payload.message).toContain('16');
-    expect(stand.standIn.requests.filter(isClassRun)).toHaveLength(runsBefore);
+    assert.ok(
+      typeof refused.payload.message === 'string' &&
+        refused.payload.message.includes('16'),
+    );
+    assert.equal(stand.standIn.requests.filter(isClassRun).length, runsBefore);
     // The connection opened for it was logged off: none is left open.
     await until(() => activeTools().length === 0);
 
@@ -401,9 +421,10 @@ describe('the limit per caller', () => {
       user: 'OTHER_USER',
     });
     try {
-      expect(
+      assert.equal(
         (await b.call('RuntimeRunClass', { ...RUN, background: true })).isError,
-      ).toBe(false);
+        false,
+      );
     } finally {
       await b.close();
     }
@@ -413,7 +434,7 @@ describe('the limit per caller', () => {
       ...RUN,
       background: true,
     });
-    expect(again.isError).toBe(false);
+    assert.equal(again.isError, false);
   });
 });
 
@@ -428,12 +449,12 @@ describe('without a strategy', () => {
         ...RUN,
         background: true,
       });
-      expect(refused.isError).toBe(true);
-      expect(refused.payload).toMatchObject({
+      assert.equal(refused.isError, true);
+      assertMatchObject(refused.payload, {
         error: 'background_runs_unavailable',
         message: BACKGROUND_RUNS_UNAVAILABLE_WORDS,
       });
-      expect(stand.standIn.requests).toHaveLength(before);
+      assert.equal(stand.standIn.requests.length, before);
       // Without a strategy no background-run tool is listed.
       for (const tool of [
         'ListBackgroundRuns',
@@ -441,11 +462,14 @@ describe('without a strategy', () => {
         'DiscardBackgroundRun',
       ]) {
         const answer = await bare.call(tool, { run_handle: 'x' });
-        expect(answer.isError).toBe(true);
-        expect(answer.payload.text).toContain(`Tool ${tool} not found`);
+        assert.equal(answer.isError, true);
+        assert.ok(
+          typeof answer.payload.text === 'string' &&
+            answer.payload.text.includes(`Tool ${tool} not found`),
+        );
       }
       // Without `background` the tool runs as ever.
-      expect((await bare.call('RuntimeRunClass', RUN)).isError).toBe(false);
+      assert.equal((await bare.call('RuntimeRunClass', RUN)).isError, false);
     } finally {
       await bare.close();
     }
@@ -485,9 +509,11 @@ describe('the ends', () => {
       await closeInstance(stand.a.server);
       await until(() => logoffIndex(stand.standIn, sessionA) > -1);
       // Both runs still wait for SAP: the close awaited neither.
-      expect(pending()).toEqual(['RuntimeRunClass (background) (2 calls)']);
+      assert.deepStrictEqual(pending(), [
+        'RuntimeRunClass (background) (2 calls)',
+      ]);
       await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(logoffIndex(stand.standIn, sessionB)).toBe(-1);
+      assert.equal(logoffIndex(stand.standIn, sessionB), -1);
 
       // The process ends: its logoffs reach the other instance's run.
       await logOffAtOnce();
@@ -504,17 +530,18 @@ describe('the ends', () => {
     await stand.a.call('RuntimeRunClass', { ...RUN, background: true });
     await held.arrived;
     const session = runSession();
-    expect(pending()).toContain('RuntimeRunClass (background)');
+    assert.ok(pending().includes('RuntimeRunClass (background)'));
 
     await forceClose();
     // The logoff is written while the run's request is still held: it
     // reaches the system without SAP having answered the run.
     await until(() => logoffIndex(stand.standIn, session) > -1);
-    expect(
+    assert.equal(
       stand.standIn.requests.filter(
         (r) => isLogoff(r.url) && r.session === session,
-      ),
-    ).toHaveLength(1);
+      ).length,
+      1,
+    );
     held.release();
   });
 });

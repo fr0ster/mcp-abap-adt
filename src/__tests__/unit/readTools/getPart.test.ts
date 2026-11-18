@@ -9,6 +9,9 @@
  * `404`, each part sends exactly one request.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { compactModifyEntries } from '../../../../compact-modify/src';
 import {
   compactDataEntries,
@@ -29,6 +32,7 @@ import {
   fullToolSet,
   type ToolSet,
 } from '../../../lib/toolSet';
+import { assertMatchObject } from '../../helpers/assertions';
 import { type Mode, runCase, servedTools } from '../../helpers/batchHarness';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
 import { silentLogger } from '../../helpers/lowToCompact';
@@ -140,67 +144,80 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
   const run = (tool: string, args: Record<string, unknown>, mode: Mode) =>
     runCase(tools, context, { tool, args }, mode);
 
-  describe.each(SOURCE_TYPES.map((t) => [t.tool, t] as const))(
-    '%s',
-    (_name, t) => {
+  for (const [_name, t] of SOURCE_TYPES.map((t) => [t.tool, t] as const)) {
+    describe(format('%s', _name), () => {
       it('declares part source | metadata, default source', () => {
         const entry = tools.get(t.tool);
         if (entry === undefined) throw new Error(`no served tool ${t.tool}`);
         const schema = listedJson(entry.toolDefinition.inputSchema);
-        expect(jsonAt(schema, 'part')).toMatchObject({
+        assertMatchObject(jsonAt(schema, 'part'), {
           enum: ['source', 'metadata'],
           default: 'source',
         });
       });
 
-      it.each(MODES)(
-        'part source (%s): exactly one request, the source only',
-        async (mode) => {
-          const ran = await run(t.tool, { ...t.args, part: 'source' }, mode);
-          expect(ran.sent).toHaveLength(1);
-          if (t.sourcePath !== undefined) {
-            expect(ran.sent[0]?.toLowerCase()).toContain(t.sourcePath);
-          }
-          if (mode === 'document') {
-            expect(ran.answer?.isError).toBe(false);
-            const payload = payloadOf(ran.answer?.content?.[0]?.text);
-            expect(payload).toHaveProperty('source');
-            expect(payload.part).toBe('source');
-            expect(payload).not.toHaveProperty('metadata');
-          }
-          if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
-        },
-      );
+      for (const mode of MODES) {
+        it(
+          format(
+            'part source (%s): exactly one request, the source only',
+            mode,
+          ),
+          async () => {
+            const ran = await run(t.tool, { ...t.args, part: 'source' }, mode);
+            assert.equal(ran.sent.length, 1);
+            if (t.sourcePath !== undefined) {
+              assert.ok(ran.sent[0]?.toLowerCase().includes(t.sourcePath));
+            }
+            if (mode === 'document') {
+              assert.equal(ran.answer?.isError, false);
+              const payload = payloadOf(ran.answer?.content?.[0]?.text);
+              assert.ok('source' in Object(payload));
+              assert.equal(payload.part, 'source');
+              assert.ok(!('metadata' in Object(payload)));
+            }
+            if (mode === 'not-found') assert.equal(ran.answer?.isError, true);
+          },
+        );
+      }
 
-      it.each(MODES)(
-        'part metadata (%s): exactly one request, the metadata only',
-        async (mode) => {
-          const ran = await run(t.tool, { ...t.args, part: 'metadata' }, mode);
-          expect(ran.sent).toHaveLength(1);
-          expect(ran.sent[0]?.toLowerCase()).not.toContain('/source/');
-          if (mode === 'document') {
-            expect(ran.answer?.isError).toBe(false);
-            const payload = payloadOf(ran.answer?.content?.[0]?.text);
-            expect(payload).toHaveProperty('metadata');
-            expect(payload).not.toHaveProperty('source');
-          }
-          if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
-        },
-      );
+      for (const mode of MODES) {
+        it(
+          format(
+            'part metadata (%s): exactly one request, the metadata only',
+            mode,
+          ),
+          async () => {
+            const ran = await run(
+              t.tool,
+              { ...t.args, part: 'metadata' },
+              mode,
+            );
+            assert.equal(ran.sent.length, 1);
+            assert.ok(!ran.sent[0]?.toLowerCase().includes('/source/'));
+            if (mode === 'document') {
+              assert.equal(ran.answer?.isError, false);
+              const payload = payloadOf(ran.answer?.content?.[0]?.text);
+              assert.ok('metadata' in Object(payload));
+              assert.ok(!('source' in Object(payload)));
+            }
+            if (mode === 'not-found') assert.equal(ran.answer?.isError, true);
+          },
+        );
+      }
 
       it('no part reads the source, in one request', async () => {
         const ran = await run(t.tool, { ...t.args }, 'document');
-        expect(ran.sent).toHaveLength(1);
+        assert.equal(ran.sent.length, 1);
         if (t.sourcePath !== undefined) {
-          expect(ran.sent[0]?.toLowerCase()).toContain(t.sourcePath);
+          assert.ok(ran.sent[0]?.toLowerCase().includes(t.sourcePath));
         }
         const payload = payloadOf(ran.answer?.content?.[0]?.text);
-        expect(payload).toHaveProperty('source');
-        expect(payload.part).toBe('source');
-        expect(payload).not.toHaveProperty('metadata');
+        assert.ok('source' in Object(payload));
+        assert.equal(payload.part, 'source');
+        assert.ok(!('metadata' in Object(payload)));
       });
-    },
-  );
+    });
+  }
 
   /**
    * A function module is the one type whose source read is two requests: its
@@ -224,97 +241,135 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
       if (entry === undefined)
         throw new Error('no served tool GetFunctionModule');
       const schema = listedJson(entry.toolDefinition.inputSchema);
-      expect(jsonAt(schema, 'part')).toMatchObject({
+      assertMatchObject(jsonAt(schema, 'part'), {
         enum: ['source', 'metadata'],
         default: 'source',
       });
     });
 
-    it.each([{ part: 'source' }, {}])(
-      'part source (%o): the metadata read, then the source when the group holds the module',
-      async (part) => {
-        const held = await run(
-          'GetFunctionModule',
-          { ...module, ...part },
-          'pending',
-        );
-        expect(lower(held.sent)).toEqual([expect.stringContaining(metadata)]);
+    for (const part of [{ part: 'source' }, {}]) {
+      it(
+        format(
+          'part source (%o): the metadata read, then the source when the group holds the module',
+          part,
+        ),
+        async () => {
+          const held = await run(
+            'GetFunctionModule',
+            { ...module, ...part },
+            'pending',
+          );
+          {
+            const actual = lower(held.sent);
+            assert.equal(actual.length, 1);
+            assert.ok(
+              typeof actual[0] === 'string' && actual[0].includes(metadata),
+            );
+          }
 
-        const answered = await run(
-          'GetFunctionModule',
-          { ...module, ...part },
-          'document',
-        );
-        expect(lower(answered.sent)).toEqual([
-          expect.stringContaining(metadata),
-          expect.stringContaining(source),
-        ]);
-        expect(answered.answer?.isError).toBe(false);
-        const payload = payloadOf(answered.answer?.content?.[0]?.text);
-        expect(payload).toHaveProperty('source');
-        expect(payload.part).toBe('source');
-        expect(payload).not.toHaveProperty('metadata');
+          const answered = await run(
+            'GetFunctionModule',
+            { ...module, ...part },
+            'document',
+          );
+          {
+            const actual = lower(answered.sent);
+            assert.equal(actual.length, 2);
+            assert.ok(
+              typeof actual[0] === 'string' && actual[0].includes(metadata),
+            );
+            assert.ok(
+              typeof actual[1] === 'string' && actual[1].includes(source),
+            );
+          }
+          assert.equal(answered.answer?.isError, false);
+          const payload = payloadOf(answered.answer?.content?.[0]?.text);
+          assert.ok('source' in Object(payload));
+          assert.equal(payload.part, 'source');
+          assert.ok(!('metadata' in Object(payload)));
 
-        const refused = await run(
-          'GetFunctionModule',
-          { ...module, ...part },
-          'not-found',
-        );
-        expect(lower(refused.sent)).toEqual([
-          expect.stringContaining(metadata),
-        ]);
-        expect(refused.answer?.isError).toBe(true);
-      },
-    );
+          const refused = await run(
+            'GetFunctionModule',
+            { ...module, ...part },
+            'not-found',
+          );
+          {
+            const actual = lower(refused.sent);
+            assert.equal(actual.length, 1);
+            assert.ok(
+              typeof actual[0] === 'string' && actual[0].includes(metadata),
+            );
+          }
+          assert.equal(refused.answer?.isError, true);
+        },
+      );
+    }
 
-    it.each(MODES)(
-      'part metadata (%s): exactly one request, the metadata only',
-      async (mode) => {
-        const ran = await run(
-          'GetFunctionModule',
-          { ...module, part: 'metadata' },
+    for (const mode of MODES) {
+      it(
+        format(
+          'part metadata (%s): exactly one request, the metadata only',
           mode,
-        );
-        expect(lower(ran.sent)).toEqual([expect.stringContaining(metadata)]);
-        if (mode === 'document') {
-          expect(ran.answer?.isError).toBe(false);
-          const payload = payloadOf(ran.answer?.content?.[0]?.text);
-          expect(payload).toHaveProperty('metadata');
-          expect(payload).not.toHaveProperty('source');
-        }
-        if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
-      },
-    );
+        ),
+        async () => {
+          const ran = await run(
+            'GetFunctionModule',
+            { ...module, part: 'metadata' },
+            mode,
+          );
+          {
+            const actual = lower(ran.sent);
+            assert.equal(actual.length, 1);
+            assert.ok(
+              typeof actual[0] === 'string' && actual[0].includes(metadata),
+            );
+          }
+          if (mode === 'document') {
+            assert.equal(ran.answer?.isError, false);
+            const payload = payloadOf(ran.answer?.content?.[0]?.text);
+            assert.ok('metadata' in Object(payload));
+            assert.ok(!('source' in Object(payload)));
+          }
+          if (mode === 'not-found') assert.equal(ran.answer?.isError, true);
+        },
+      );
+    }
   });
 
-  it.each(METADATA_ONLY)(
-    '%s (metadata-only type): one request, no part in the schema',
-    async (tool, args) => {
-      const entry = tools.get(tool);
-      if (entry === undefined) throw new Error(`no served tool ${tool}`);
-      const schema = listedJson(entry.toolDefinition.inputSchema);
-      expect(schema.properties).toBeDefined();
-      expect(schema.properties).not.toHaveProperty('part');
-      for (const mode of MODES) {
-        const ran = await run(tool, args, mode);
-        expect(ran.sent).toHaveLength(1);
-      }
-    },
-  );
+  for (const [tool, args] of METADATA_ONLY) {
+    it(
+      format(
+        '%s (metadata-only type): one request, no part in the schema',
+        tool,
+      ),
+      async () => {
+        const entry = tools.get(tool);
+        if (entry === undefined) throw new Error(`no served tool ${tool}`);
+        const schema = listedJson(entry.toolDefinition.inputSchema);
+        assert.notEqual(schema.properties, undefined);
+        assert.ok(!('part' in Object(schema.properties)));
+        for (const mode of MODES) {
+          const ran = await run(tool, args, mode);
+          assert.equal(ran.sent.length, 1);
+        }
+      },
+    );
+  }
 
   // One answer shape per part, whatever the type: `part` and `metadata`.
   // (A message's read needs a class document holding it: its own test.)
-  it.each(METADATA_ONLY.filter(([tool]) => tool !== 'GetMessageClassMessage'))(
-    '%s answers { part: "metadata", metadata }',
-    async (tool, args) => {
+  for (const [tool, args] of METADATA_ONLY.filter(
+    ([tool]) => tool !== 'GetMessageClassMessage',
+  )) {
+    it(format('%s answers { part: "metadata", metadata }', tool), async () => {
       const ran = await run(tool, args, 'document');
-      expect(ran.answer?.isError).toBe(false);
+      assert.equal(ran.answer?.isError, false);
       const payload = payloadOf(ran.answer?.content?.[0]?.text);
-      expect(payload.part).toBe('metadata');
-      expect(payload).toHaveProperty('metadata');
-      expect(payload).not.toHaveProperty('source');
-    },
-  );
+      assert.equal(payload.part, 'metadata');
+      assert.ok('metadata' in Object(payload));
+      assert.ok(!('source' in Object(payload)));
+    });
+  }
 });
 
 describe('the sets serve Get<Type>, and no Read<Type>', () => {
@@ -333,14 +388,16 @@ describe('the sets serve Get<Type>, and no Read<Type>', () => {
     ...METADATA_ONLY.map(([tool]) => tool),
   ];
 
-  it.each(GET_TOOLS)(
-    'the -ro set serves %s, the same tool as the full set',
-    (tool) => {
-      const ro = readOnly.get(tool);
-      expect(ro).toBeDefined();
-      expect(ro?.toolDefinition).toBe(full.get(tool)?.toolDefinition);
-    },
-  );
+  for (const tool of GET_TOOLS) {
+    it(
+      format('the -ro set serves %s, the same tool as the full set', tool),
+      () => {
+        const ro = readOnly.get(tool);
+        assert.notEqual(ro, undefined);
+        assert.equal(ro?.toolDefinition, full.get(tool)?.toolDefinition);
+      },
+    );
+  }
 
   it('no Read<Type> tool is served in any set', () => {
     const sets: ToolSet[] = [
@@ -361,7 +418,7 @@ describe('the sets serve Get<Type>, and no Read<Type>', () => {
     const objectReads = sets
       .flatMap((set) => [...entriesOf(set).keys()])
       .filter((name) => /^Read/.test(name) && !/^ReadTransport/.test(name));
-    expect(objectReads).toEqual([]);
+    assert.deepStrictEqual(objectReads, []);
   });
 });
 
@@ -385,86 +442,103 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
 
   it('declares include_name required, part and version', () => {
     // The served definition is the handler's own, read by its declared type.
-    expect(tools.get('GetInclude')?.toolDefinition).toBe(GET_INCLUDE);
+    assert.equal(tools.get('GetInclude')?.toolDefinition, GET_INCLUDE);
     const schema = listedJson(GET_INCLUDE.inputSchema);
-    expect(schema.type).toBe('object');
-    expect(schema.required).toEqual(['include_name']);
-    expect(jsonAt(schema, 'part')).toMatchObject({
+    assert.equal(schema.type, 'object');
+    assert.deepStrictEqual(schema.required, ['include_name']);
+    assertMatchObject(jsonAt(schema, 'part'), {
       enum: ['source', 'metadata'],
       default: 'source',
     });
-    expect(jsonAt(schema, 'version').enum).toEqual([
+    assert.deepStrictEqual(jsonAt(schema, 'version').enum, [
       'active',
       'inactive',
       'workingArea',
     ]);
-    expect(jsonAt(schema, 'version')).not.toHaveProperty('default');
+    assert.ok(!('default' in Object(jsonAt(schema, 'version'))));
   });
 
-  it.each([
+  for (const [_label, part] of [
     ['absent', {}],
     ['source', { part: 'source' }],
-  ])(
-    'part %s: one request for the active source, answered as the text SAP sent',
-    async (_label, part) => {
-      for (const mode of MODES) {
-        const ran = await run({ include_name: 'INCL_A', ...part }, mode);
-        expect(ran.sent).toEqual([
-          'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
+  ] satisfies [string, Record<string, unknown>][]) {
+    it(
+      format(
+        'part %s: one request for the active source, answered as the text SAP sent',
+        _label,
+      ),
+      async () => {
+        for (const mode of MODES) {
+          const ran = await run({ include_name: 'INCL_A', ...part }, mode);
+          assert.deepStrictEqual(ran.sent, [
+            'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
+          ]);
+          if (mode === 'document') {
+            assert.deepStrictEqual(ran.answer, {
+              isError: false,
+              content: [{ type: 'text', text: SOURCE }],
+            });
+          }
+          if (mode === 'not-found') assert.equal(ran.answer?.isError, true);
+        }
+      },
+    );
+  }
+
+  for (const version of ['inactive', 'active', 'workingArea']) {
+    it(
+      format(
+        'version %s: the one source request asks for that version',
+        version,
+      ),
+      async () => {
+        const ran = await run({ include_name: 'INCL_A', version }, 'document');
+        assert.deepStrictEqual(ran.sent, [
+          `GET /sap/bc/adt/programs/includes/incl_a/source/main?version=${version}`,
+        ]);
+        assert.equal(ran.answer?.content?.[0]?.text, SOURCE);
+      },
+    );
+  }
+
+  for (const mode of MODES) {
+    it(
+      format(
+        'part metadata (%s): one request for the active metadata document, the GetProgram shape',
+        mode,
+      ),
+      async () => {
+        const DOCUMENT = '<include:abapInclude adtcore:name="INCL_A"/>';
+        const ran = await run(
+          { include_name: 'incl_a', part: 'metadata' },
+          mode,
+          DOCUMENT,
+        );
+        assert.deepStrictEqual(ran.sent, [
+          'GET /sap/bc/adt/programs/includes/incl_a?version=active',
         ]);
         if (mode === 'document') {
-          expect(ran.answer).toEqual({
-            isError: false,
-            content: [{ type: 'text', text: SOURCE }],
+          assert.equal(ran.answer?.isError, false);
+          assert.deepStrictEqual(payloadOf(ran.answer?.content?.[0]?.text), {
+            success: true,
+            include_name: 'INCL_A',
+            part: 'metadata',
+            metadata: DOCUMENT,
           });
         }
-        if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
-      }
-    },
-  );
-
-  it.each(['inactive', 'active', 'workingArea'])(
-    'version %s: the one source request asks for that version',
-    async (version) => {
-      const ran = await run({ include_name: 'INCL_A', version }, 'document');
-      expect(ran.sent).toEqual([
-        `GET /sap/bc/adt/programs/includes/incl_a/source/main?version=${version}`,
-      ]);
-      expect(ran.answer?.content?.[0]?.text).toBe(SOURCE);
-    },
-  );
-
-  it.each(MODES)(
-    'part metadata (%s): one request for the active metadata document, the GetProgram shape',
-    async (mode) => {
-      const DOCUMENT = '<include:abapInclude adtcore:name="INCL_A"/>';
-      const ran = await run(
-        { include_name: 'incl_a', part: 'metadata' },
-        mode,
-        DOCUMENT,
-      );
-      expect(ran.sent).toEqual([
-        'GET /sap/bc/adt/programs/includes/incl_a?version=active',
-      ]);
-      if (mode === 'document') {
-        expect(ran.answer?.isError).toBe(false);
-        expect(payloadOf(ran.answer?.content?.[0]?.text)).toEqual({
-          success: true,
-          include_name: 'INCL_A',
-          part: 'metadata',
-          metadata: DOCUMENT,
-        });
-      }
-      if (mode === 'not-found') expect(ran.answer?.isError).toBe(true);
-    },
-  );
+        if (mode === 'not-found') assert.equal(ran.answer?.isError, true);
+      },
+    );
+  }
 
   it('another part is refused by the schema before any request, naming the two', async () => {
     const ran = await run({ include_name: 'INCL_A', part: 'urls' }, 'document');
-    expect(ran.sent).toEqual([]);
-    expect(ran.answer).toBeUndefined();
-    expect(String(ran.threw)).toContain(
-      'Invalid arguments for tool GetInclude: Invalid option: expected one of "source"|"metadata" at part',
+    assert.deepStrictEqual(ran.sent, []);
+    assert.equal(ran.answer, undefined);
+    assert.ok(
+      String(ran.threw).includes(
+        'Invalid arguments for tool GetInclude: Invalid option: expected one of "source"|"metadata" at part',
+      ),
     );
   });
 });

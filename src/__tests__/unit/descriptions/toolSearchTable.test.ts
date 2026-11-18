@@ -5,13 +5,17 @@
  * the package, read through one literal `require` (a bundler carries it), and
  * served by `tools/list` on each tool as `_meta["mcp-abap-adt/search"]`.
  */
+
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { before, describe, it } from 'node:test';
 import {
   TOOL_SEARCH_META_KEY,
   toolSearchText,
   toolSearchTexts,
 } from '../../../lib/toolSearch';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   SETS,
   type ServedTool,
@@ -20,7 +24,7 @@ import {
   TRANSPORTS,
 } from './catalog';
 
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 
 async function everyServedTool(): Promise<Map<string, ServedTool>> {
   const served = new Map<string, ServedTool>();
@@ -38,7 +42,7 @@ async function everyServedTool(): Promise<Map<string, ServedTool>> {
 
 describe('tools/tool-search.json', () => {
   let served: Map<string, ServedTool>;
-  beforeAll(async () => {
+  before(async () => {
     served = await everyServedTool();
   });
 
@@ -46,7 +50,7 @@ describe('tools/tool-search.json', () => {
     const table = toolSearchTexts();
     const missing = [...served.keys()].filter((name) => !table.has(name));
     const unknown = [...table.keys()].filter((name) => !served.has(name));
-    expect({ missing, unknown }).toEqual({ missing: [], unknown: [] });
+    assert.deepStrictEqual({ missing, unknown }, { missing: [], unknown: [] });
   });
 
   it('gives each tool keywords and one or two semantic sentences', () => {
@@ -74,11 +78,11 @@ describe('tools/tool-search.json', () => {
         malformed.push(`${name}: semantic`);
       }
     }
-    expect(malformed).toEqual([]);
+    assert.deepStrictEqual(malformed, []);
   });
 
   it('is what tools/list carries on each tool, under _meta["mcp-abap-adt/search"]', () => {
-    expect(TOOL_SEARCH_META_KEY).toBe('mcp-abap-adt/search');
+    assert.equal(TOOL_SEARCH_META_KEY, 'mcp-abap-adt/search');
     const differing: string[] = [];
     for (const [name, tool] of served) {
       const text = toolSearchText(name);
@@ -90,14 +94,14 @@ describe('tools/tool-search.json', () => {
         differing.push(name);
       }
     }
-    expect(differing).toEqual([]);
+    assert.deepStrictEqual(differing, []);
   });
 
   it('ships in the package', () => {
     const manifest = JSON.parse(
       fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
     ) as { files: string[] };
-    expect(manifest.files).toContain('tools/tool-search.json');
+    assert.ok(manifest.files.includes('tools/tool-search.json'));
   });
 
   // The portable build bundles the bin into a single executable, where no
@@ -108,14 +112,15 @@ describe('tools/tool-search.json', () => {
       'utf8',
     );
     const literal = "require('../../../tools/tool-search.json')";
-    expect(source.split(literal)).toHaveLength(2);
-    expect(source).not.toContain('readFileSync');
-    expect(
+    assert.equal(source.split(literal).length, 2);
+    assert.ok(!source.includes('readFileSync'));
+    assert.equal(
       path.resolve(
         REPO,
         'src/lib/toolSearch',
         '../../../tools/tool-search.json',
       ),
-    ).toBe(path.join(REPO, 'tools', 'tool-search.json'));
+      path.join(REPO, 'tools', 'tool-search.json'),
+    );
   });
 });

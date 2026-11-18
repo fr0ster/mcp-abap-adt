@@ -9,6 +9,8 @@
  * (`TYPE(arg*, …)`) are held to the same takes.
  */
 
+import assert from 'node:assert/strict';
+import { after, describe, it } from 'node:test';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -45,8 +47,6 @@ import {
   COMPACT_VALIDATE_TAKES,
 } from '../../../lib/compact/compactSchemas';
 import { registryOf, type ToolSet } from '../../../lib/toolSet';
-
-jest.setTimeout(120_000);
 
 /** One tool's takes, read as plain lists. */
 interface Takes {
@@ -189,7 +189,7 @@ function namedArguments(
 describe('a compact tool offers on each variant the properties its offered members take', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
 
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
     resetProcessLatchForTests();
@@ -215,8 +215,11 @@ describe('a compact tool offers on each variant the properties its offered membe
           );
           if (absent.length > 0) missing[tool.name] = absent;
         }
-        expect(checked).toBeGreaterThanOrEqual(kind === 'compact' ? 11 : 4);
-        expect({ untaken, missing }).toEqual({ untaken: {}, missing: {} });
+        assert.ok(checked >= (kind === 'compact' ? 11 : 4));
+        assert.deepStrictEqual(
+          { untaken, missing },
+          { untaken: {}, missing: {} },
+        );
       });
 
       it(`${kind} on ${variant}: every argument a description names for a member is one that member takes`, async () => {
@@ -235,15 +238,18 @@ describe('a compact tool offers on each variant the properties its offered membe
             properties,
           )) {
             named += 1;
-            expect({
-              tool: tool.name,
-              member,
-              argument,
-              taken: takenOn(declared.takes, [member]).has(argument),
-            }).toEqual({ tool: tool.name, member, argument, taken: true });
+            assert.deepStrictEqual(
+              {
+                tool: tool.name,
+                member,
+                argument,
+                taken: takenOn(declared.takes, [member]).has(argument),
+              },
+              { tool: tool.name, member, argument, taken: true },
+            );
           }
         }
-        expect(named).toBeGreaterThan(20);
+        assert.ok(named > 20);
       });
     }
   }

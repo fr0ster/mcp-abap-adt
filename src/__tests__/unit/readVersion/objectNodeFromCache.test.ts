@@ -5,6 +5,9 @@
  * the rest of the address's query kept.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   handleGetObjectNodeFromCache,
   TOOL_DEFINITION,
@@ -33,7 +36,7 @@ const NODE = {
 };
 
 describe('GetObjectNodeFromCache reads the active version of the cached object', () => {
-  it.each([
+  for (const [uri, sent] of [
     [
       '/sap/bc/adt/programs/programs/zprog',
       '/sap/bc/adt/programs/programs/zprog?version=active',
@@ -50,20 +53,23 @@ describe('GetObjectNodeFromCache reads the active version of the cached object',
       '/sap/bc/adt/programs/programs/zprog?version=inactive',
       '/sap/bc/adt/programs/programs/zprog?version=active',
     ],
-  ])('OBJECT_URI %s is read as %s', async (uri, sent) => {
-    cacheWith(uri);
-    const connection = recordingConnection([{ data: '<doc/>' }]);
-    const result = await handleGetObjectNodeFromCache(
-      { connection, logger: undefined },
-      NODE,
-    );
-    expect(result.isError).not.toBe(true);
-    expect(connection.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `GET ${sent}`,
-    ]);
-  });
+  ]) {
+    it(format('OBJECT_URI %s is read as %s', uri, sent), async () => {
+      cacheWith(uri);
+      const connection = recordingConnection([{ data: '<doc/>' }]);
+      const result = await handleGetObjectNodeFromCache(
+        { connection, logger: undefined },
+        NODE,
+      );
+      assert.notEqual(result.isError, true);
+      assert.deepStrictEqual(
+        connection.requests.map((r) => `${r.method} ${r.url}`),
+        [`GET ${sent}`],
+      );
+    });
+  }
 
   it('says it reads the active version', () => {
-    expect(TOOL_DEFINITION.description.includes('active version')).toBe(true);
+    assert.equal(TOOL_DEFINITION.description.includes('active version'), true);
   });
 });

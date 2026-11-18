@@ -14,6 +14,8 @@
  *   the declared one.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
@@ -60,16 +62,17 @@ describe('every tool of the object-oriented groups is classified', () => {
     const neither = names.filter(
       (name) => !TOOL_NEEDS.has(name) && !TOOLS_WITHOUT_NEED.has(name),
     );
-    expect({ both, neither }).toEqual({ both: [], neither: [] });
+    assert.deepStrictEqual({ both, neither }, { both: [], neither: [] });
   });
 
   it('names no tool the groups do not have', () => {
     const known = new Set(names);
-    expect(
+    assert.deepStrictEqual(
       [...TOOL_NEEDS.keys(), ...TOOLS_WITHOUT_NEED].filter(
         (name) => !known.has(name),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 });
 
@@ -78,37 +81,43 @@ describe('the needs against the tables', () => {
     const unserved = [...TOOL_NEEDS].filter(
       ([, need]) => !variantServes('onprem', need),
     );
-    expect(unserved).toEqual([]);
+    assert.deepStrictEqual(unserved, []);
   });
 
   it('a need a table does not list is not served there', () => {
     // ADT_TYPES_CLOUD lists a program's read, never its create or run.
-    expect(ADT_TYPES_CLOUD.program.codes['PROG/P'].operations).not.toContain(
-      'create',
-    );
-    expect(variantServes('cloud', { api: 'program', operation: 'read' })).toBe(
+    // Widened to strings: Jest's toContain took any value.
+    const operations: readonly string[] =
+      ADT_TYPES_CLOUD.program.codes['PROG/P'].operations;
+    assert.ok(!operations.includes('create'));
+    assert.equal(
+      variantServes('cloud', { api: 'program', operation: 'read' }),
       true,
     );
-    expect(
+    assert.equal(
       variantServes('cloud', { api: 'program', operation: 'create' }),
-    ).toBe(false);
-    expect(variantServes('cloud', { api: 'program', operation: 'run' })).toBe(
       false,
     );
-    expect(variantServes('onprem', { api: 'program', operation: 'run' })).toBe(
+    assert.equal(
+      variantServes('cloud', { api: 'program', operation: 'run' }),
+      false,
+    );
+    assert.equal(
+      variantServes('onprem', { api: 'program', operation: 'run' }),
       true,
     );
     // A codeless entry reads its own operations.
-    expect(ADT_TYPES_ONPREM.request.operations).toContain('createTask');
-    expect(
+    assert.ok(ADT_TYPES_ONPREM.request.operations.includes('createTask'));
+    assert.equal(
       variantServes('cloud', { api: 'request', operation: 'createTask' }),
-    ).toBe(true);
+      true,
+    );
   });
 
   it('legacy reads the on-premise table, cloud its own', () => {
-    expect(variantOfEnvironment('onprem')).toBe('onprem');
-    expect(variantOfEnvironment('legacy')).toBe('onprem');
-    expect(variantOfEnvironment('cloud')).toBe('cloud');
+    assert.equal(variantOfEnvironment('onprem'), 'onprem');
+    assert.equal(variantOfEnvironment('legacy'), 'onprem');
+    assert.equal(variantOfEnvironment('cloud'), 'cloud');
   });
 });
 
@@ -121,14 +130,14 @@ describe('servedDefinition', () => {
 
   it('drops a tool whose need the table does not list, keeps it where it does', () => {
     const definition = tool('RuntimeRunProgram', z.object({}));
-    expect(servedDefinition(definition, 'cloud')).toBeUndefined();
-    expect(servedDefinition(definition, 'onprem')).toBe(definition);
+    assert.equal(servedDefinition(definition, 'cloud'), undefined);
+    assert.equal(servedDefinition(definition, 'onprem'), definition);
   });
 
   it('keeps a tool with no need on every variant', () => {
     const definition = tool('SearchObject', z.object({}));
-    expect(servedDefinition(definition, 'cloud')).toBe(definition);
-    expect(servedDefinition(definition, 'onprem')).toBe(definition);
+    assert.equal(servedDefinition(definition, 'cloud'), definition);
+    assert.equal(servedDefinition(definition, 'onprem'), definition);
   });
 
   it('a tool that states itself per variant is registered as it states itself there', () => {
@@ -141,17 +150,17 @@ describe('servedDefinition', () => {
         cloud: { description: 'on cloud', inputSchema: cloud },
       },
     };
-    expect(servedDefinition(definition, 'cloud')).toEqual({
+    assert.deepStrictEqual(servedDefinition(definition, 'cloud'), {
       ...definition,
       description: 'on cloud',
       inputSchema: cloud,
     });
-    expect(servedDefinition(definition, 'cloud')?.inputSchema).toBe(cloud);
-    expect(servedDefinition(definition, 'onprem')).toEqual({
+    assert.equal(servedDefinition(definition, 'cloud')?.inputSchema, cloud);
+    assert.deepStrictEqual(servedDefinition(definition, 'onprem'), {
       ...definition,
       description: 'on premise',
       inputSchema: onprem,
     });
-    expect(servedDefinition(definition, 'onprem')?.inputSchema).toBe(onprem);
+    assert.equal(servedDefinition(definition, 'onprem')?.inputSchema, onprem);
   });
 });

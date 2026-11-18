@@ -15,6 +15,9 @@
  * variant (`MEMBER(arg*, …)`): what the description promises is what is sent.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   ADT_TYPES_CLOUD,
   ADT_TYPES_ONPREM,
@@ -109,8 +112,6 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from '../../helpers/recordingConnection';
-
-jest.setTimeout(60_000);
 
 const TABLES: { readonly [V in ProjectionVariant]: AdtApiTable<string> } = {
   onprem: ADT_TYPES_ONPREM,
@@ -630,52 +631,60 @@ describe('every projected value reaches a served path', () => {
     for (const projected of PROJECTED_ARGUMENTS) {
       const key = `${projected.tool}.${projected.argument}`;
       const each = WALKS[key];
-      expect({ key, walked: each !== undefined }).toEqual({
-        key,
-        walked: true,
-      });
-      for (const variant of PROJECTION_VARIANTS) {
-        expect({ key, variant, values: each?.values(variant) }).toEqual({
+      assert.deepStrictEqual(
+        { key, walked: each !== undefined },
+        {
           key,
-          variant,
-          values: projected.values[variant],
-        });
-      }
-    }
-    expect(Object.keys(WALKS).length).toBe(PROJECTED_ARGUMENTS.length);
-    expect(cases.length).toBeGreaterThan(400);
-  });
-
-  it.each(
-    cases.map(([key, variant, step]) => [key, variant, step.value, step]),
-  )('%s on %s: %s', async (key, variant, value, step) => {
-    const route = step.route;
-    process.env.SAP_SYSTEM_TYPE = variant;
-    const connection = recordingConnection();
-    declareSystemKind(connection, variant);
-    // The instance locked what the walk writes under.
-    const context: HandlerContext = {
-      connection,
-      heldLocks: holding('LOCKHANDLE'),
-    };
-    const answered = await step
-      .send(context)
-      .catch((thrown: unknown) => ({ thrown: String(thrown) }));
-    const sent = connection.requests;
-    if (sent.length === 0) {
-      throw new Error(
-        `${key} ${value} on ${variant} sent nothing: ${textOf(answered)}`,
+          walked: true,
+        },
       );
-    }
-    if (route.addressed) {
-      const collection = route.collection(variant);
-      if (!sent.some((request) => names(request, collection))) {
-        throw new Error(
-          `${key} ${value} on ${variant} named no ${collection}: ${sent
-            .map((request) => `${request.method} ${request.url}`)
-            .join('; ')}`,
+      for (const variant of PROJECTION_VARIANTS) {
+        assert.deepStrictEqual(
+          { key, variant, values: each?.values(variant) },
+          {
+            key,
+            variant,
+            values: projected.values[variant],
+          },
         );
       }
     }
+    assert.equal(Object.keys(WALKS).length, PROJECTED_ARGUMENTS.length);
+    assert.ok(cases.length > 400);
   });
+
+  for (const [key, variant, value, step] of cases.map(
+    ([key, variant, step]) => [key, variant, step.value, step] as const,
+  )) {
+    it(format('%s on %s: %s', key, variant, value), async () => {
+      const route = step.route;
+      process.env.SAP_SYSTEM_TYPE = variant;
+      const connection = recordingConnection();
+      declareSystemKind(connection, variant);
+      // The instance locked what the walk writes under.
+      const context: HandlerContext = {
+        connection,
+        heldLocks: holding('LOCKHANDLE'),
+      };
+      const answered = await step
+        .send(context)
+        .catch((thrown: unknown) => ({ thrown: String(thrown) }));
+      const sent = connection.requests;
+      if (sent.length === 0) {
+        throw new Error(
+          `${key} ${value} on ${variant} sent nothing: ${textOf(answered)}`,
+        );
+      }
+      if (route.addressed) {
+        const collection = route.collection(variant);
+        if (!sent.some((request) => names(request, collection))) {
+          throw new Error(
+            `${key} ${value} on ${variant} named no ${collection}: ${sent
+              .map((request) => `${request.method} ${request.url}`)
+              .join('; ')}`,
+          );
+        }
+      }
+    });
+  }
 });

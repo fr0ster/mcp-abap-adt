@@ -112,28 +112,33 @@ async function sessionOf(
   return { url, cookies };
 }
 
+/** The server's current session cookies, as its connection holds them. */
+async function cookiesOf(server: PinServer): Promise<string> {
+  return (await sessionOf(await server.held())).cookies;
+}
+
 /**
  * The server's SAP session, logged off by a separate HTTP client: SAP ends
- * it as its idle timeout would. The cookies are sent, never printed.
+ * it as its idle timeout would. The logoff's OWN answer counts — no
+ * redirect is followed — and is returned; the cookies are sent, never
+ * printed. On premise the logoff itself must succeed (2xx).
  */
-async function logOffFromOutside(server: PinServer): Promise<boolean> {
+async function logOffFromOutside(server: PinServer): Promise<number> {
   const { url, cookies } = await sessionOf(await server.held());
   const base = url.endsWith('/') ? url.slice(0, -1) : url;
   const answered = await fetch(`${base}/sap/public/bc/icf/logoff`, {
     headers: { Cookie: cookies },
+    redirect: 'manual',
   });
   await answered.arrayBuffer();
   console.log(`[csrfRepeat] the outside logoff answered ${answered.status}`);
-  // On premise the logoff must end the session (both calls then run once
-  // more); on the cloud its answer is recorded only — a second logoff was
-  // answered 400 there (live run, 2026-11-18).
   if (configuredSystemKind() === 'onprem') {
     assert.ok(
-      answered.status < 400,
+      answered.status >= 200 && answered.status < 300,
       `the outside logoff answered ${answered.status}`,
     );
   }
-  return answered.status < 400;
+  return answered.status;
 }
 
 liveSuite(
@@ -209,14 +214,27 @@ liveSuite(
       // again), so the calls must succeed, with or without a repeat, and
       // which is recorded.
       const repeatRequired = configuredSystemKind() === 'onprem';
-      let loggedOff = false;
-      let anyRepeated = false;
-      const expectAnswered = (tool: string, answer: LiveAnswerLike) => {
+      // A case exercised recovery when the logoff itself answered 2xx and
+      // the session was then replaced: the call ran once more, or the
+      // server's connection holds another session's cookies.
+      let exercised = false;
+      const afterLogoff = async (
+        tool: string,
+        call: () => Promise<LiveAnswerLike>,
+      ) => {
+        const cookiesBefore = await cookiesOf(server);
+        const status = await logOffFromOutside(server);
+        logged.length = 0;
+        const answer = await call();
         console.log(`[csrfRepeat] ${tool}: ${textOf(answer)}`);
         assert.notEqual(answer.isError, true, textOf(answer));
         const repeated = logged.includes(REPEATED_CALL_WORDS);
-        console.log(`[csrfRepeat] ${tool} run once more: ${repeated}`);
-        anyRepeated ||= repeated;
+        const replaced =
+          repeated || (await cookiesOf(server)) !== cookiesBefore;
+        console.log(
+          `[csrfRepeat] ${tool}: logoff ${status}, run once more: ${repeated}, session replaced: ${replaced}`,
+        );
+        if (status >= 200 && status < 300 && replaced) exercised = true;
         if (repeatRequired) {
           assert.ok(repeated, `${tool} was not run once more`);
         }
@@ -229,19 +247,13 @@ liveSuite(
       };
 
       // A POST on the ended session: the activation.
-      loggedOff = (await logOffFromOutside(server)) || loggedOff;
-      logged.length = 0;
-      expectAnswered(
-        'ActivateClass',
-        await server.call('ActivateClass', { class_name: CLASS }),
+      await afterLogoff('ActivateClass', () =>
+        server.call('ActivateClass', { class_name: CLASS }),
       );
 
       // A chain whose first request is the LOCK: the update.
-      loggedOff = (await logOffFromOutside(server)) || loggedOff;
-      logged.length = 0;
-      expectAnswered(
-        'UpdateClass',
-        await server.call('UpdateClass', {
+      await afterLogoff('UpdateClass', () =>
+        server.call('UpdateClass', {
           class_name: CLASS,
           source_code: sourceOf(2),
           activate: true,
@@ -249,12 +261,11 @@ liveSuite(
         }),
       );
 
-      // Neither logoff ended a session and neither call ran once more: the
-      // case exercised no recovery at all (the cloud's two logoffs both
-      // refused), which is a failure, not a pass.
+      // No logoff itself succeeded with the session then replaced: the run
+      // exercised no recovery, which is a failure, not a pass.
       assert.ok(
-        loggedOff || anyRepeated,
-        'neither outside logoff succeeded and neither call ran once more: this run exercised no recovery',
+        exercised,
+        'no recovery exercised: no outside logoff answered 2xx with the session replaced after it',
       );
 
       // No lock is left on the class: a write from another session — the

@@ -116,7 +116,7 @@ async function sessionOf(
  * The server's SAP session, logged off by a separate HTTP client: SAP ends
  * it as its idle timeout would. The cookies are sent, never printed.
  */
-async function logOffFromOutside(server: PinServer): Promise<void> {
+async function logOffFromOutside(server: PinServer): Promise<boolean> {
   const { url, cookies } = await sessionOf(await server.held());
   const base = url.endsWith('/') ? url.slice(0, -1) : url;
   const answered = await fetch(`${base}/sap/public/bc/icf/logoff`, {
@@ -133,6 +133,7 @@ async function logOffFromOutside(server: PinServer): Promise<void> {
       `the outside logoff answered ${answered.status}`,
     );
   }
+  return answered.status < 400;
 }
 
 liveSuite(
@@ -175,9 +176,13 @@ liveSuite(
     });
 
     after(async () => {
-      await deleteRecorded();
-      await expectAbsent({ tool: 'GetClass', args: { class_name: CLASS } });
-      await server?.close();
+      // The server logs off whatever the cleanup met.
+      try {
+        await deleteRecorded();
+        await expectAbsent({ tool: 'GetClass', args: { class_name: CLASS } });
+      } finally {
+        await server?.close();
+      }
     });
 
     it('ActivateClass and UpdateClass each answer on their one call after an outside logoff (on premise run once more, saying so), and no lock is left', async () => {
@@ -204,11 +209,14 @@ liveSuite(
       // again), so the calls must succeed, with or without a repeat, and
       // which is recorded.
       const repeatRequired = configuredSystemKind() === 'onprem';
+      let loggedOff = false;
+      let anyRepeated = false;
       const expectAnswered = (tool: string, answer: LiveAnswerLike) => {
         console.log(`[csrfRepeat] ${tool}: ${textOf(answer)}`);
         assert.notEqual(answer.isError, true, textOf(answer));
         const repeated = logged.includes(REPEATED_CALL_WORDS);
         console.log(`[csrfRepeat] ${tool} run once more: ${repeated}`);
+        anyRepeated ||= repeated;
         if (repeatRequired) {
           assert.ok(repeated, `${tool} was not run once more`);
         }
@@ -221,7 +229,7 @@ liveSuite(
       };
 
       // A POST on the ended session: the activation.
-      await logOffFromOutside(server);
+      loggedOff = (await logOffFromOutside(server)) || loggedOff;
       logged.length = 0;
       expectAnswered(
         'ActivateClass',
@@ -229,7 +237,7 @@ liveSuite(
       );
 
       // A chain whose first request is the LOCK: the update.
-      await logOffFromOutside(server);
+      loggedOff = (await logOffFromOutside(server)) || loggedOff;
       logged.length = 0;
       expectAnswered(
         'UpdateClass',
@@ -239,6 +247,14 @@ liveSuite(
           activate: true,
           ...onRequest(),
         }),
+      );
+
+      // Neither logoff ended a session and neither call ran once more: the
+      // case exercised no recovery at all (the cloud's two logoffs both
+      // refused), which is a failure, not a pass.
+      assert.ok(
+        loggedOff || anyRepeated,
+        'neither outside logoff succeeded and neither call ran once more: this run exercised no recovery',
       );
 
       // No lock is left on the class: a write from another session — the

@@ -6,11 +6,12 @@
  * session is alive — a ping, like a WebSocket's ping-pong (the owner's fix).
  *
  * **A named exception to "no timers in production"** (the owner,
- * 2026-11-18): a wrapper around the connection the server builds
- * (`withSessionKeepAlive`) with one timer, `unref()`'d so it never keeps
- * the process alive, re-armed by the end of every request that goes through
- * it and stopped by the connection's logoff, its replacement or the
- * server's close; a replaced connection gets a wrapper of its own. The ping is one stateless `GET` of the
+ * 2026-11-18): one background timer per server, `unref()`'d so it never
+ * keeps the process alive, ticking every interval and stopped by the
+ * server's close. Each connection the server builds carries a request mark
+ * (`withRequestMark`), bumped by every request; a tick that finds the held
+ * connection's mark unchanged since the previous tick, and the connection
+ * live, sends the ping through it. The ping is one stateless `GET` of the
  * ADT discovery, never retried; a failure is logged at `debug` in fixed
  * words with its status only.
  *
@@ -93,114 +94,35 @@ export function sessionKeepAliveMsOf(value: number, name: string): number {
   return value;
 }
 
-/** What the wrapper needs beside the connection. */
-export interface SessionKeepAliveOptions {
-  /** The interval, in milliseconds (`sessionKeepAliveMsOf`); `0`: no wrapper. */
-  readonly intervalMs: number;
-  /** Where a failed ping's line goes, at `debug`. */
-  readonly logger: Logger;
-  /**
-   * The holder's own say beside the connection's: whether it still holds
-   * the connection as its live one (not ended, not replaced, its instance
-   * not closed). Read before every ping.
-   */
-  readonly held: () => boolean;
-}
-
-/** Each wrapper's stop, by the wrapper handed out. */
-const stops = new WeakMap<object, () => void>();
+/** Each wrapped connection's request mark: how many requests went through it. */
+const marks = new WeakMap<object, number>();
 
 /**
- * `connection` with a keep-alive: a decorator that forwards every member
- * as it is and sees every `makeAdtRequest` — so it alone knows when the
- * last request ended and how many are in flight. Once none has been in
- * flight for the whole interval, and the connection is live — connected
- * (`isConnected()`, so its session exists and a ping needs no logon) and
- * `held` —, it sends the ping through itself. A ping never connects: a
- * connection not yet connected, spent or ended is never pinged, and its
- * timer is not armed again.
- *
- * One timer per wrapper, `unref()`'d, re-armed when the last request in
- * flight ends and after `connect()`; stopped for good by `disconnect()`
- * (the logoff) and by `stopSessionKeepAlive`. With an interval of `0` the
- * connection is returned as it is.
+ * `connection` with a request mark: a thin wrapper over `makeAdtRequest`
+ * that counts each request as it goes out, and does nothing else; every
+ * other member is forwarded as it is. The server's keep-alive reads the
+ * mark (`requestMark`) on each tick: a mark unchanged since the previous
+ * tick is a connection with no request for the whole interval.
  */
-export function withSessionKeepAlive(
-  connection: IAbapConnection,
-  options: SessionKeepAliveOptions,
-): IAbapConnection {
-  if (options.intervalMs === 0) return connection;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  let inFlight = 0;
-  let stopped = false;
-  const clear = (): void => {
-    if (timer !== undefined) clearTimeout(timer);
-    timer = undefined;
-  };
-  const live = (): boolean => {
-    if (stopped) return false;
-    try {
-      return connection.isConnected?.() === true && options.held();
-    } catch {
-      return false;
-    }
-  };
-  const arm = (): void => {
-    clear();
-    if (inFlight > 0 || !live()) return;
-    timer = setTimeout(due, options.intervalMs);
-    timer.unref(); // never keeps the process alive
-  };
-  const makeAdtRequest: IAbapConnection['makeAdtRequest'] = async (request) => {
-    inFlight += 1;
-    clear();
-    try {
-      return await connection.makeAdtRequest(request);
-    } finally {
-      inFlight -= 1;
-      if (inFlight === 0) arm();
-    }
-  };
-  const connect: IAbapConnection['connect'] = async () => {
-    await connection.connect();
-    arm();
-  };
-  const stop = (): void => {
-    stopped = true;
-    clear();
-  };
-  const disconnect = async (): Promise<void> => {
-    stop();
-    await connection.disconnect?.();
+export function withRequestMark(connection: IAbapConnection): IAbapConnection {
+  const makeAdtRequest: IAbapConnection['makeAdtRequest'] = (request) => {
+    marks.set(wrapped, (marks.get(wrapped) ?? 0) + 1);
+    return connection.makeAdtRequest(request);
   };
   const wrapped = new Proxy(connection, {
     get(target, property) {
       if (property === 'makeAdtRequest') return makeAdtRequest;
-      if (property === 'connect') return connect;
-      if (property === 'disconnect' && target.disconnect !== undefined) {
-        return disconnect;
-      }
       const value: unknown = Reflect.get(target, property, target);
       return typeof value === 'function' ? value.bind(target) : value;
     },
   });
-  // The ping goes through the wrapper: counted in flight, and its end
-  // re-arms the timer for a whole interval.
-  function due(): void {
-    timer = undefined;
-    if (inFlight > 0 || !live()) return;
-    void sendSessionKeepAlive(wrapped, options.logger);
-  }
-  stops.set(wrapped, stop);
+  marks.set(wrapped, 0);
   return wrapped;
 }
 
-/**
- * Stops `connection`'s keep-alive for good (a connection replaced, its
- * holder closed); nothing for a connection without one.
- */
-export function stopSessionKeepAlive(connection: object): void {
-  stops.get(connection)?.();
+/** `connection`'s request mark; `undefined` for a connection not wrapped. */
+export function requestMark(connection: object): number | undefined {
+  return marks.get(connection);
 }
 
 /**

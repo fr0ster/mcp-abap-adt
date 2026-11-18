@@ -168,9 +168,10 @@ import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
 import {
   DEFAULT_SESSION_KEEP_ALIVE_MINUTES,
+  requestMark,
+  sendSessionKeepAlive,
   sessionKeepAliveMsOf,
-  stopSessionKeepAlive,
-  withSessionKeepAlive,
+  withRequestMark,
 } from '../lib/sessionKeepAlive.js';
 import { HeldLocks, lockNotHeldWords } from '../lib/state/heldLocks.js';
 import {
@@ -360,8 +361,11 @@ export abstract class BaseMcpServer extends McpServer {
   /** Every tool call of this instance still running, tracked from its entry. */
   private readonly inFlight = new Set<Promise<void>>();
 
-  /** The session keep-alive's interval in milliseconds; `0`: off. */
-  private readonly sessionKeepAliveMs: number;
+  /** The session keep-alive's one timer; `undefined`: off, or stopped. */
+  private keepAliveTimer: ReturnType<typeof setInterval> | undefined;
+
+  /** The held connection and its request mark, as the previous tick saw them. */
+  private keepAliveSeen: { connection: object; mark: number } | undefined;
 
   /** The built entry of each connection handed out: what a release counts down. */
   private readonly entries = new WeakMap<IAbapConnection, BuiltConnection>();
@@ -594,24 +598,33 @@ export abstract class BaseMcpServer extends McpServer {
     accessChecks?: IAccessChecks | undefined;
     /**
      * The session keep-alive's interval, in milliseconds
-     * (`--session-keep-alive-minutes` × 60 000 in the launchers): the
-     * connection this instance builds is wrapped (`withSessionKeepAlive`),
-     * and once no request has gone over it for that long, one stateless
-     * `GET` of the ADT discovery is sent on it, so SAP does not end the idle
-     * session. `0`: off. Default: 10 minutes. A whole number from 0 to
-     * 2^31-1; anything else is refused. An injected connection is the
-     * host's and is never wrapped.
+     * (`--session-keep-alive-minutes` × 60 000 in the launchers): one
+     * background timer ticks this often, and a tick that finds no request
+     * on the connection this instance built and holds since the previous
+     * tick sends one stateless `GET` of the ADT discovery on it, so SAP
+     * does not end the idle session. `0`: off. Default: 10 minutes. A whole
+     * number from 0 to 2^31-1; anything else is refused. An injected
+     * connection is the host's and is never pinged.
      */
     sessionKeepAliveMs?: number | undefined;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
-    this.sessionKeepAliveMs =
+    const keepAliveMs =
       options.sessionKeepAliveMs === undefined
         ? DEFAULT_SESSION_KEEP_ALIVE_MINUTES * 60_000
         : sessionKeepAliveMsOf(
             options.sessionKeepAliveMs,
             'sessionKeepAliveMs',
           );
+    // The session keep-alive: the owner's named exception to "no timers in
+    // production" (2026-11-18). One timer per instance, unref'd so it never
+    // keeps the process alive, stopped by the instance's close.
+    if (keepAliveMs > 0) {
+      this.keepAliveTimer = setInterval(() => {
+        this.keepAliveTick();
+      }, keepAliveMs);
+      this.keepAliveTimer.unref();
+    }
     this.logger = options.logger ?? getDefaultLogger();
     this.accessChecks = options.accessChecks;
     this.readOnlyTools =
@@ -747,32 +760,57 @@ export abstract class BaseMcpServer extends McpServer {
    * never conditional on it.
    */
   terminalClose(): Promise<void> {
+    this.stopKeepAlive();
     return closeOwnedConnections(this);
   }
 
-  /**
-   * The MCP server's close: the held connection's keep-alive stops with it
-   * (the connection's logoff, when one follows, stops it too).
-   */
+  /** The MCP server's close: the keep-alive stops with it. */
   override async close(): Promise<void> {
-    const held = this.built?.ready;
-    if (held !== undefined) stopSessionKeepAlive(held);
+    this.stopKeepAlive();
     await super.close();
   }
 
+  private stopKeepAlive(): void {
+    if (this.keepAliveTimer !== undefined) clearInterval(this.keepAliveTimer);
+    this.keepAliveTimer = undefined;
+  }
+
   /**
-   * A connection this instance builds, with its keep-alive
-   * (`withSessionKeepAlive`): pinged only while the instance is not closed
-   * and the connection not ended. A replaced connection's keep-alive stops
-   * (`retire`); its replacement is wrapped afresh.
+   * A tick of the keep-alive: the connection this instance built and holds,
+   * when it is live — connected, not spent, not ended, not replaced, the
+   * instance not closed, so a request needs no logon — and its request mark
+   * unchanged since the previous tick, gets one ping. Nothing else: no
+   * connection is built or connected here, and an injected one is the
+   * host's.
    */
-  private keptAlive(connection: IAbapConnection): IAbapConnection {
-    const wrapped: IAbapConnection = withSessionKeepAlive(connection, {
-      intervalMs: this.sessionKeepAliveMs,
-      logger: this.logger,
-      held: () => !isLatched(this) && !isEnded(wrapped),
-    });
-    return wrapped;
+  private keepAliveTick(): void {
+    const connection = this.liveBuilt();
+    const mark = connection === undefined ? undefined : requestMark(connection);
+    if (connection === undefined || mark === undefined) {
+      this.keepAliveSeen = undefined;
+      return;
+    }
+    const seen = this.keepAliveSeen;
+    if (seen?.connection === connection && seen.mark === mark) {
+      void sendSessionKeepAlive(connection, this.logger);
+    }
+    // After the ping went out, so the ping itself is not read as a request.
+    this.keepAliveSeen = { connection, mark: requestMark(connection) ?? mark };
+  }
+
+  /** The held connection this instance built, while it is live; else `undefined`. */
+  private liveBuilt(): IAbapConnection | undefined {
+    if (this.connectionContext?.kind !== 'built') return undefined;
+    if (isLatched(this)) return undefined;
+    const entry = this.built;
+    if (entry === undefined || entry.retired) return undefined;
+    const ready = entry.ready;
+    if (ready === undefined || isSpent(ready)) return undefined;
+    try {
+      return ready.isConnected?.() === true ? ready : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -1343,8 +1381,6 @@ export abstract class BaseMcpServer extends McpServer {
     if (entry.ready !== undefined) this.heldLocks.mainSessionEnded();
     entry.connection.then(
       (connection) => {
-        // Replaced: it is kept alive no longer, whoever still works on it.
-        stopSessionKeepAlive(connection);
         if (entry.users === 0) void endConnection(connection);
       },
       () => undefined, // a failed connect was ended where it failed
@@ -1503,8 +1539,9 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<IAbapConnection> {
     // A closed instance logs on nowhere: nothing is built or sent.
     refuseIfClosed(this);
-    // Built for the instance's kind, with its logger, and kept alive.
-    const connection = this.keptAlive(
+    // Built for the instance's kind, with its logger; its requests marked
+    // for the keep-alive (`withRequestMark`).
+    const connection = withRequestMark(
       createAbapConnection(
         resolved.settings,
         resolved.credential,
@@ -1564,7 +1601,7 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<IAbapConnection> {
     let connection: IAbapConnection;
     try {
-      connection = this.keptAlive(
+      connection = withRequestMark(
         createAbapConnection(
           resolved.settings,
           resolved.credential,

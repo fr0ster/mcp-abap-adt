@@ -123,7 +123,6 @@
   "src/__tests__/unit/draft/getObjectDraft.test.ts",
   "src/__tests__/unit/embeddable/dataTools.test.ts",
   "src/__tests__/unit/installMatrix.test.ts",
-  "src/__tests__/unit/keepAlive/connectionWrapper.test.ts",
   "src/__tests__/unit/keepAlive/sessionKeepAlive.test.ts",
   "src/__tests__/unit/launchers/accessRestrictionsAtStart.test.ts",
   "src/__tests__/unit/launchers/dataToolsAtStart.test.ts",

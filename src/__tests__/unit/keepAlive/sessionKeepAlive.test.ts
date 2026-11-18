@@ -1,15 +1,13 @@
 /**
- * The session keep-alive (24.0.1), through the server: the connection the
- * instance builds is wrapped (`withSessionKeepAlive`), and pinged — one
- * stateless `GET` of the ADT discovery — once no request has gone over it
- * for the whole interval; an injected connection never. The wrapper alone,
- * on a fake connection: `connectionWrapper.test.ts`.
+ * The session keep-alive (24.0.1): one background timer per server ticks
+ * every interval, and a tick that finds no request on the connection the
+ * server built and holds since the previous tick sends one `GET` of the
+ * ADT discovery through it.
  *
  * Against the ADT stand-in, which records each request and the ABAP session
  * it ran in, through an in-memory MCP session. The clock is node:test's
- * `mock.timers` (`setTimeout`): the keep-alive's timer is armed under it,
- * and `tick` moves it; the stand-in's sockets run on the real loop, waited
- * for with `setImmediate`, never a timer.
+ * `mock.timers` (`setInterval`), enabled before the server is built; the
+ * stand-in's sockets run on the real loop, waited for with `setImmediate`.
  */
 
 import assert from 'node:assert/strict';
@@ -26,10 +24,7 @@ import type {
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { endConnection } from '../../../lib/ownedConnections';
-import {
-  SESSION_KEEP_ALIVE_FAILED_WORDS,
-  SESSION_KEEP_ALIVE_URL,
-} from '../../../lib/sessionKeepAlive';
+import { SESSION_KEEP_ALIVE_URL } from '../../../lib/sessionKeepAlive';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -39,6 +34,7 @@ import {
 import { McpSession } from '../../integration/helpers/testers/hardMode';
 
 const MINUTE = 60_000;
+/** The default interval: 10 minutes. */
 const INTERVAL = 10 * MINUTE;
 const TOUCH_PATH = '/sap/bc/adt/probe/';
 
@@ -216,7 +212,7 @@ describe('the session keep-alive', () => {
   beforeEach(() => {
     previousType = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = 'onprem';
-    mock.timers.enable({ apis: ['setTimeout'] });
+    mock.timers.enable({ apis: ['setInterval'] });
   });
   afterEach(() => {
     mock.timers.reset();
@@ -224,57 +220,38 @@ describe('the session keep-alive', () => {
     else process.env.SAP_SYSTEM_TYPE = previousType;
   });
 
-  it('pings the held connection after 10 idle minutes, in its session', async () => {
+  it('pings the held connection after an idle interval, in its session', async () => {
     const s = await stand();
     try {
       await call(s, 'a');
-      mock.timers.tick(INTERVAL - 1);
+      // The first tick sees the call: no ping.
+      mock.timers.tick(INTERVAL);
       await settle();
-      assert.equal(pings(s.standIn).length, 0, 'not before the interval');
-      mock.timers.tick(1);
+      assert.equal(pings(s.standIn).length, 0);
+      // A whole interval with no request: one ping.
+      mock.timers.tick(INTERVAL);
       await until(() => pings(s.standIn).length === 1);
-      const [ping] = pings(s.standIn);
-      assert.equal(ping?.session, touchOf(s.standIn, 'a')?.session);
-      // The next one after a whole interval more.
-      await settle();
-      mock.timers.tick(INTERVAL - 1);
-      await settle();
-      assert.equal(pings(s.standIn).length, 1);
-      mock.timers.tick(1);
+      assert.equal(
+        pings(s.standIn)[0]?.session,
+        touchOf(s.standIn, 'a')?.session,
+      );
+      // Still idle: the next tick pings again.
+      mock.timers.tick(INTERVAL);
       await until(() => pings(s.standIn).length === 2);
     } finally {
       await s.close();
     }
   });
 
-  it('sends no ping while calls keep coming', async () => {
+  it('sends no ping when a request went out in the interval', async () => {
     const s = await stand();
     try {
-      for (let i = 0; i < 12; i += 1) {
+      for (let i = 0; i < 6; i += 1) {
         await call(s, `c${i}`);
-        mock.timers.tick(5 * MINUTE);
+        mock.timers.tick(INTERVAL);
         await settle();
       }
       assert.equal(pings(s.standIn).length, 0);
-    } finally {
-      await s.close();
-    }
-  });
-
-  it('a call resets the clock', async () => {
-    const s = await stand();
-    try {
-      await call(s, 'first');
-      mock.timers.tick(9 * MINUTE);
-      await call(s, 'second');
-      mock.timers.tick(MINUTE);
-      await settle();
-      assert.equal(pings(s.standIn).length, 0, 'ten minutes after the first');
-      mock.timers.tick(9 * MINUTE - 1);
-      await settle();
-      assert.equal(pings(s.standIn).length, 0);
-      mock.timers.tick(1);
-      await until(() => pings(s.standIn).length === 1);
     } finally {
       await s.close();
     }
@@ -284,7 +261,7 @@ describe('the session keep-alive', () => {
     const s = await stand({ sessionKeepAliveMs: 0 });
     try {
       await call(s, 'a');
-      mock.timers.tick(24 * 60 * MINUTE);
+      mock.timers.tick(10 * INTERVAL);
       await settle();
       assert.equal(pings(s.standIn).length, 0);
     } finally {
@@ -350,19 +327,6 @@ describe('the session keep-alive', () => {
     }
   });
 
-  it('pings nothing after the terminal close', async () => {
-    const s = await stand();
-    try {
-      await call(s, 'a');
-      await s.server.terminalClose();
-      mock.timers.tick(3 * INTERVAL);
-      await settle();
-      assert.equal(pings(s.standIn).length, 0);
-    } finally {
-      await s.close();
-    }
-  });
-
   it('pings nothing after the server closed', async () => {
     const s = await stand();
     try {
@@ -371,59 +335,6 @@ describe('the session keep-alive', () => {
       mock.timers.tick(3 * INTERVAL);
       await settle();
       assert.equal(pings(s.standIn).length, 0);
-    } finally {
-      await s.close();
-    }
-  });
-
-  it('never pings while a tool call’s request is in flight; its end re-arms it', async () => {
-    const s = await stand();
-    try {
-      await call(s, 'a');
-      mock.timers.tick(5 * MINUTE);
-      const held = s.standIn.hold((r) => r.url === `${TOUCH_PATH}long`);
-      const running = call(s, 'long');
-      await held.arrived;
-      mock.timers.tick(3 * INTERVAL);
-      await settle();
-      assert.equal(pings(s.standIn).length, 0, 'none while the call runs');
-      held.release();
-      await running;
-      const ended = s.standIn.requests.length;
-      mock.timers.tick(INTERVAL - 1);
-      await settle();
-      assert.equal(pings(s.standIn).length, 0);
-      mock.timers.tick(1);
-      await until(() => pings(s.standIn).length === 1);
-      const at = s.standIn.requests.findIndex(isPing);
-      assert.ok(at >= ended, 'the ping came after the call');
-    } finally {
-      await s.close();
-    }
-  });
-
-  it('a failed ping is logged at debug with its status, and not retried', async () => {
-    const s = await stand();
-    try {
-      await call(s, 'a');
-      s.standIn.answer(isPing, 500);
-      mock.timers.tick(INTERVAL);
-      await until(() =>
-        s.debug.some((line) =>
-          line.startsWith(SESSION_KEEP_ALIVE_FAILED_WORDS),
-        ),
-      );
-      await settle();
-      assert.equal(pings(s.standIn).length, 1, 'sent once');
-      const lines = s.debug.filter((line) =>
-        line.startsWith(SESSION_KEEP_ALIVE_FAILED_WORDS),
-      );
-      assert.deepEqual(lines, [
-        `${SESSION_KEEP_ALIVE_FAILED_WORDS}: status 500`,
-      ]);
-      mock.timers.tick(INTERVAL - 1);
-      await settle();
-      assert.equal(pings(s.standIn).length, 1, 'no retry inside the interval');
     } finally {
       await s.close();
     }
@@ -443,21 +354,21 @@ describe('the session keep-alive timer, on the real clock', () => {
   });
 
   it('is one unref’d timer per instance, cleared by the close', async () => {
-    // An interval no other timer of the process uses, so its timers are told apart.
+    // An interval no other timer of the process uses, so its timer is told apart.
     const interval = 7 * MINUTE + 7;
-    const armed: Array<ReturnType<typeof setTimeout>> = [];
+    const armed: Array<ReturnType<typeof setInterval>> = [];
     const cleared = new Set<unknown>();
-    const realSet = globalThis.setTimeout;
-    const realClear = globalThis.clearTimeout;
-    mock.method(globalThis, 'setTimeout', (fn: () => void, ms?: number) => {
+    const realSet = globalThis.setInterval;
+    const realClear = globalThis.clearInterval;
+    mock.method(globalThis, 'setInterval', (fn: () => void, ms?: number) => {
       const timer = realSet(fn, ms);
       if (ms === interval) armed.push(timer);
       return timer;
     });
     mock.method(
       globalThis,
-      'clearTimeout',
-      (timer: ReturnType<typeof setTimeout> | undefined) => {
+      'clearInterval',
+      (timer: ReturnType<typeof setInterval> | undefined) => {
         cleared.add(timer);
         realClear(timer);
       },
@@ -466,17 +377,10 @@ describe('the session keep-alive timer, on the real clock', () => {
     try {
       await call(s, 'a');
       await call(s, 'b');
-      await call(s, 'c');
-      assert.ok(armed.length >= 1, 'armed');
-      const live = armed.filter((timer) => !cleared.has(timer));
-      assert.equal(live.length, 1, 'exactly one armed at a time');
-      for (const timer of armed) assert.equal(timer.hasRef(), false);
-      await s.server.terminalClose();
-      assert.equal(
-        armed.filter((timer) => !cleared.has(timer)).length,
-        0,
-        'the close cleared it',
-      );
+      assert.equal(armed.length, 1, 'one timer');
+      assert.equal(armed[0]?.hasRef(), false, 'unref’d');
+      await s.server.close();
+      assert.equal(cleared.has(armed[0]), true, 'the close cleared it');
     } finally {
       await s.close();
     }

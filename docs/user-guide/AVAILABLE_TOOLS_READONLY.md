@@ -1249,4 +1249,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-16*
+*Last updated: 2026-11-18*

@@ -1875,7 +1875,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="activateobjects-high-level-common"></a>
 #### ActivateObjects (High-Level / Common)
-**Description:** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages; an error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.
+**Description:** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.
 
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
@@ -4648,4 +4648,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-16*
+*Last updated: 2026-11-18*

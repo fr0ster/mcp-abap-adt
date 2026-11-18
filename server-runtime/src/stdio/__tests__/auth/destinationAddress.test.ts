@@ -8,6 +8,9 @@
  * URL is not read, the process environment's `SAP_URL` is never read.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { assertRejects } from '../../../../../src/__tests__/helpers/assertions';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import {
   DestinationAddressRefusal,
@@ -66,10 +69,10 @@ async function refusalOf(
   }
   // The answer: destination_refused, its words and a hint; no value.
   const read = destinationFailureOf(thrown);
-  expect(read?.error).toBe('destination_refused');
-  expect(read?.message).toBe(thrown.message);
-  expect(read?.hint).toBeDefined();
-  expect(JSON.stringify(read)).not.toContain(SENTINEL);
+  assert.equal(read?.error, 'destination_refused');
+  assert.equal(read?.message, thrown.message);
+  assert.notEqual(read?.hint, undefined);
+  assert.ok(!JSON.stringify(read).includes(SENTINEL));
   return thrown;
 }
 
@@ -83,9 +86,14 @@ describe('readSettings refuses before any connection opens', () => {
       ],
       { connectionType: 'http' },
     );
-    expect(refusal.case).toBe('http-with-rfc-keys');
-    expect(refusal.keys).toEqual(['SAP_ASHOST', 'SAP_SYSNR', 'SAP_SAPROUTER']);
-    expect(refusal.message).toBe(
+    assert.equal(refusal.case, 'http-with-rfc-keys');
+    assert.deepStrictEqual(refusal.keys, [
+      'SAP_ASHOST',
+      'SAP_SYSNR',
+      'SAP_SAPROUTER',
+    ]);
+    assert.equal(
+      refusal.message,
       'Destination "dest" is HTTP and states RFC address keys, which HTTP does not take: SAP_ASHOST, SAP_SYSNR, SAP_SAPROUTER',
     );
   });
@@ -104,7 +112,7 @@ describe('readSettings refuses before any connection opens', () => {
     } catch (error) {
       thrown = error;
     }
-    expect(thrown).toBeInstanceOf(DestinationAddressRefusal);
+    assert.ok(thrown instanceof DestinationAddressRefusal);
   });
 
   it('3. RFC stating SAP_URL in its own .env: refused naming SAP_URL', async () => {
@@ -112,8 +120,8 @@ describe('readSettings refuses before any connection opens', () => {
       [`SAP_URL=https://${SENTINEL}.example.test`, ...APP, ...LOGON],
       { connectionType: 'rfc' },
     );
-    expect(refusal.case).toBe('rfc-with-url');
-    expect(refusal.keys).toEqual(['SAP_URL']);
+    assert.equal(refusal.case, 'rfc-with-url');
+    assert.deepStrictEqual(refusal.keys, ['SAP_URL']);
   });
 
   it('4. two addresses', async () => {
@@ -121,26 +129,26 @@ describe('readSettings refuses before any connection opens', () => {
       [...APP, `SAP_MSHOST=${SENTINEL}`, ...LOGON],
       { connectionType: 'rfc' },
     );
-    expect(refusal.case).toBe('two-addresses');
+    assert.equal(refusal.case, 'two-addresses');
   });
 
   it('5. no address', async () => {
     const refusal = await refusalOf([...LOGON], { connectionType: 'rfc' });
-    expect(refusal.case).toBe('no-address');
+    assert.equal(refusal.case, 'no-address');
   });
 
   it('6. an incomplete address', async () => {
     const refusal = await refusalOf([`SAP_ASHOST=${SENTINEL}`, ...LOGON], {
       connectionType: 'rfc',
     });
-    expect(refusal.case).toBe('incomplete-address');
-    expect(refusal.keys).toEqual(['SAP_SYSNR']);
+    assert.equal(refusal.case, 'incomplete-address');
+    assert.deepStrictEqual(refusal.keys, ['SAP_SYSNR']);
   });
 
   it('7. no client and no language: both named', async () => {
     const refusal = await refusalOf([...APP], { connectionType: 'rfc' });
-    expect(refusal.case).toBe('logon-incomplete');
-    expect(refusal.keys).toEqual(['SAP_CLIENT', 'SAP_LANGUAGE']);
+    assert.equal(refusal.case, 'logon-incomplete');
+    assert.deepStrictEqual(refusal.keys, ['SAP_CLIENT', 'SAP_LANGUAGE']);
   });
 
   it('8. ABAP Cloud over RFC', async () => {
@@ -148,8 +156,11 @@ describe('readSettings refuses before any connection opens', () => {
       connectionType: 'rfc',
       systemType: 'cloud',
     });
-    expect(refusal.case).toBe('cloud-over-rfc');
-    expect(refusal.keys).toEqual(['SAP_SYSTEM_TYPE', 'SAP_CONNECTION_TYPE']);
+    assert.equal(refusal.case, 'cloud-over-rfc');
+    assert.deepStrictEqual(refusal.keys, [
+      'SAP_SYSTEM_TYPE',
+      'SAP_CONNECTION_TYPE',
+    ]);
   });
 
   it('a step with faults of two steps answers the earlier one only', async () => {
@@ -157,16 +168,17 @@ describe('readSettings refuses before any connection opens', () => {
       [`SAP_URL=https://${SENTINEL}.example.test`, `SAP_ASHOST=${SENTINEL}`],
       { connectionType: 'rfc', systemType: 'cloud' },
     );
-    expect(refusal.case).toBe('rfc-with-url');
+    assert.equal(refusal.case, 'rfc-with-url');
   });
 
   it('no connection type: refused naming it, before the settings are built', async () => {
     base.writeSession('dest', [...BASIC, ...APP, ...LOGON]);
     const config = factoryConfig(base, recordingLogins());
     const { connectionType: _dropped, ...withoutWire } = config;
-    await expect(
+    await assertRejects(
       new AuthBrokerFactory(withoutWire).settingsFor('dest'),
-    ).rejects.toThrow('SAP_CONNECTION_TYPE');
+      'SAP_CONNECTION_TYPE',
+    );
   });
 });
 
@@ -190,10 +202,10 @@ describe('the URL sources of an RFC destination', () => {
     } catch (error) {
       thrown = error;
     }
-    expect(thrown).toBeInstanceOf(DestinationAddressRefusal);
+    assert.ok(thrown instanceof DestinationAddressRefusal);
     if (!(thrown instanceof DestinationAddressRefusal)) return;
-    expect(thrown.case).toBe('rfc-with-url');
-    expect(thrown.keys).toEqual(['XSUAA_MCP_URL']);
+    assert.equal(thrown.case, 'rfc-with-url');
+    assert.deepStrictEqual(thrown.keys, ['XSUAA_MCP_URL']);
   });
 
   it("an ABAP service key's url is not read over RFC", async () => {
@@ -212,8 +224,8 @@ describe('the URL sources of an RFC destination', () => {
     const settings = await factory({ connectionType: 'rfc' }).settingsFor(
       'dest',
     );
-    expect(Object.hasOwn(settings, 'url')).toBe(false);
-    expect(settings.connectionType).toBe('rfc');
+    assert.equal(Object.hasOwn(settings, 'url'), false);
+    assert.equal(settings.connectionType, 'rfc');
   });
 
   it("the process environment's SAP_URL is never read: RFC is served, HTTP is refused", async () => {
@@ -222,11 +234,12 @@ describe('the URL sources of an RFC destination', () => {
     const settings = await factory({ connectionType: 'rfc' }).settingsFor(
       'dest',
     );
-    expect(Object.hasOwn(settings, 'url')).toBe(false);
+    assert.equal(Object.hasOwn(settings, 'url'), false);
     base.writeSession('http', [...BASIC]);
-    await expect(
+    await assertRejects(
       factory({ connectionType: 'http' }).settingsFor('http'),
-    ).rejects.toThrow('SAP_URL');
+      'SAP_URL',
+    );
   });
 
   it('a blank SAP_URL is no URL: RFC is served', async () => {
@@ -234,7 +247,7 @@ describe('the URL sources of an RFC destination', () => {
     const settings = await factory({ connectionType: 'rfc' }).settingsFor(
       'dest',
     );
-    expect(settings.connectionType).toBe('rfc');
+    assert.equal(settings.connectionType, 'rfc');
   });
 });
 
@@ -247,17 +260,18 @@ describe('a complete RFC destination', () => {
       'SAP_SAPROUTER=/H/router.example.test/S/3299/H/',
       ...LOGON,
     ]);
-    expect(
+    assert.deepStrictEqual(
       await factory({ connectionType: 'rfc' }).settingsFor('dest'),
-    ).toEqual({
-      authType: 'basic',
-      connectionType: 'rfc',
-      client: '100',
-      language: 'EN',
-      saprouter: '/H/router.example.test/S/3299/H/',
-      ashost: 'host.example.test',
-      sysnr: '00',
-    });
+      {
+        authType: 'basic',
+        connectionType: 'rfc',
+        client: '100',
+        language: 'EN',
+        saprouter: '/H/router.example.test/S/3299/H/',
+        ashost: 'host.example.test',
+        sysnr: '00',
+      },
+    );
   });
 });
 
@@ -285,10 +299,13 @@ describe('what a destination states is checked before its authentication is serv
 
   it('9. a client certificate over RFC: refused in its case, naming both keys', async () => {
     const thrown = await thrownBy(CERTIFICATE);
-    expect(thrown).toBeInstanceOf(DestinationAddressRefusal);
+    assert.ok(thrown instanceof DestinationAddressRefusal);
     if (!(thrown instanceof DestinationAddressRefusal)) return;
-    expect(thrown.case).toBe('certificate-over-rfc');
-    expect(thrown.keys).toEqual(['SAP_AUTH_TYPE', 'SAP_CONNECTION_TYPE']);
+    assert.equal(thrown.case, 'certificate-over-rfc');
+    assert.deepStrictEqual(thrown.keys, [
+      'SAP_AUTH_TYPE',
+      'SAP_CONNECTION_TYPE',
+    ]);
   });
 
   it('9 with 3: the URL answers first', async () => {
@@ -296,10 +313,10 @@ describe('what a destination states is checked before its authentication is serv
       ...CERTIFICATE,
       'SAP_URL=https://sentinel.example.test',
     ]);
-    expect(thrown).toBeInstanceOf(DestinationAddressRefusal);
+    assert.ok(thrown instanceof DestinationAddressRefusal);
     if (!(thrown instanceof DestinationAddressRefusal)) return;
-    expect(thrown.case).toBe('rfc-with-url');
-    expect(thrown.keys).toEqual(['SAP_URL']);
+    assert.equal(thrown.case, 'rfc-with-url');
+    assert.deepStrictEqual(thrown.keys, ['SAP_URL']);
   });
 });
 
@@ -333,26 +350,28 @@ describe('an XSUAA-shaped destination over RFC: every URL key of its file refuse
     if (!(thrown instanceof DestinationAddressRefusal)) {
       throw new Error(`not a DestinationAddressRefusal: ${String(thrown)}`);
     }
-    expect(thrown.case).toBe('rfc-with-url');
+    assert.equal(thrown.case, 'rfc-with-url');
     return thrown.keys;
   }
 
   it('SAP_URL in its file: refused naming SAP_URL', async () => {
-    expect(
+    assert.deepStrictEqual(
       await refusedKeys([
         'SAP_URL=https://sentinel.example.test',
         ...XSUAA_LINES,
       ]),
-    ).toEqual(['SAP_URL']);
+      ['SAP_URL'],
+    );
   });
 
   it('SAP_URL and XSUAA_MCP_URL: both named in one refusal', async () => {
-    expect(
+    assert.deepStrictEqual(
       await refusedKeys([
         'SAP_URL=https://sentinel.example.test',
         'XSUAA_MCP_URL=https://sentinel.example.test',
         ...XSUAA_LINES,
       ]),
-    ).toEqual(['SAP_URL', 'XSUAA_MCP_URL']);
+      ['SAP_URL', 'XSUAA_MCP_URL'],
+    );
   });
 });

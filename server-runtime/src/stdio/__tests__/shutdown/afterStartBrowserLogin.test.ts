@@ -14,11 +14,16 @@
  * logging on in its first call and a long read's fresh connection.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, it } from 'node:test';
+import { format } from 'node:util';
+import {
+  assertMatchObject,
+  rejectionOf,
+} from '../../../../../src/__tests__/helpers/assertions';
 import { longReadUrl } from '../../../../../src/__tests__/helpers/shutdownTools';
 import { ownedConnections } from '../../../../../src/lib/ownedConnections';
 import { bindsFree, type Stand, stand, until } from '../helpers/loginStand';
-
-jest.setTimeout(30_000);
 
 let s: Stand;
 
@@ -32,119 +37,138 @@ const triggers: [string, (st: Stand) => void][] = [
   ['SIGTERM', (st) => st.processLike.emit('SIGTERM')],
 ];
 
-it.each(triggers)(
-  '%s while a connect waits for its browser login: the login ends aborted, exit 0 once, nothing owned, the callback port free',
-  async (_name, trigger) => {
-    s = await stand({ kind: 'cloud', auth: 'jwt', shutdown: {} });
-    s.browser.answering(false);
-    const r1 = s.call('r1');
-    // The connect is in its login: the browser was given its URL, the
-    // callback listens, the connection is owned.
-    await s.browser.opened(1);
-    const port = s.browser.ports[0] ?? 0;
-    expect(port).toBeGreaterThan(0);
-    await expect(bindsFree(port)).rejects.toMatchObject({
-      code: 'EADDRINUSE',
-    });
-    expect(ownedConnections()).toHaveLength(1);
+for (const [_name, trigger] of triggers) {
+  it(
+    format(
+      '%s while a connect waits for its browser login: the login ends aborted, exit 0 once, nothing owned, the callback port free',
+      _name,
+    ),
+    async () => {
+      s = await stand({ kind: 'cloud', auth: 'jwt', shutdown: {} });
+      s.browser.answering(false);
+      const r1 = s.call('r1');
+      // The connect is in its login: the browser was given its URL, the
+      // callback listens, the connection is owned.
+      await s.browser.opened(1);
+      const port = s.browser.ports[0] ?? 0;
+      assert.ok(port > 0);
+      assertMatchObject(await rejectionOf(bindsFree(port)), {
+        code: 'EADDRINUSE',
+      });
+      assert.equal(ownedConnections().length, 1);
 
-    trigger(s);
-    // The test's own bound: a hang reads as `hung`, not as a Jest timeout.
-    let bound: ReturnType<typeof setTimeout> | undefined;
-    const outcome = await Promise.race([
-      s.exited,
-      new Promise<'hung'>((r) => {
-        bound = setTimeout(() => r('hung'), 10_000);
-      }),
-    ]);
-    clearTimeout(bound);
-    expect(outcome).toBe(0);
-    // Long enough for a second exit, were there one, to be recorded.
-    await new Promise((r) => setTimeout(r, 50));
-    expect(s.exits).toEqual([0]);
-    expect(s.shutdownLines).toEqual([]);
-    await until(() => s.logins.length === 1);
-    expect(s.logins).toEqual(['aborted']);
-    expect(ownedConnections()).toEqual([]);
-    expect(s.tokens.grants).toEqual([]);
-    expect(s.reached('r1')).toBe(false);
-    expect(await r1.done).not.toEqual({ text: 'r1', isError: false });
-    // The login ended with the shutdown: its callback port binds again.
-    await bindsFree(port);
-  },
-);
+      trigger(s);
+      // The test's own bound: a hang reads as `hung`, not as a Jest timeout.
+      let bound: ReturnType<typeof setTimeout> | undefined;
+      const outcome = await Promise.race([
+        s.exited,
+        new Promise<'hung'>((r) => {
+          bound = setTimeout(() => r('hung'), 10_000);
+        }),
+      ]);
+      clearTimeout(bound);
+      assert.equal(outcome, 0);
+      // Long enough for a second exit, were there one, to be recorded.
+      await new Promise((r) => setTimeout(r, 50));
+      assert.deepStrictEqual(s.exits, [0]);
+      assert.deepStrictEqual(s.shutdownLines, []);
+      await until(() => s.logins.length === 1);
+      assert.deepStrictEqual(s.logins, ['aborted']);
+      assert.deepStrictEqual(ownedConnections(), []);
+      assert.deepStrictEqual(s.tokens.grants, []);
+      assert.equal(s.reached('r1'), false);
+      assert.notDeepStrictEqual(await r1.done, { text: 'r1', isError: false });
+      // The login ended with the shutdown: its callback port binds again.
+      await bindsFree(port);
+    },
+  );
+}
 
-it.each(triggers)(
-  "%s while a long read's fresh connection waits in its connect for a browser login: the login ends aborted, exit 0 once, nothing owned, the callback port free",
-  async (_name, trigger) => {
-    s = await stand({ kind: 'cloud', auth: 'jwt', shutdown: {} });
-    // The instance's connection logs on: the user answers the first login.
-    expect(await s.call('r0').done).toEqual({ text: 'r0', isError: false });
-    expect(s.logins).toEqual(['ok']);
-    // From now on SAP refuses the token, the refresh is refused, and the
-    // user never answers the second login: the fresh connection's connect
-    // waits on it.
-    s.browser.answering(false);
-    s.tokens.refuseRefresh(true);
-    s.adt.refuse(true);
-    const running = s.callTool('LongRead', { id: 'L' });
-    await s.browser.opened(2);
-    const port = s.browser.ports[1] ?? 0;
-    expect(port).toBeGreaterThan(0);
-    await expect(bindsFree(port)).rejects.toMatchObject({
-      code: 'EADDRINUSE',
-    });
-    expect(ownedConnections()).toHaveLength(2);
-    expect(s.adt.requests.some((r) => r.url.startsWith(longReadUrl('L')))).toBe(
-      false,
-    );
+for (const [_name, trigger] of triggers) {
+  it(
+    format(
+      "%s while a long read's fresh connection waits in its connect for a browser login: the login ends aborted, exit 0 once, nothing owned, the callback port free",
+      _name,
+    ),
+    async () => {
+      s = await stand({ kind: 'cloud', auth: 'jwt', shutdown: {} });
+      // The instance's connection logs on: the user answers the first login.
+      assert.deepStrictEqual(await s.call('r0').done, {
+        text: 'r0',
+        isError: false,
+      });
+      assert.deepStrictEqual(s.logins, ['ok']);
+      // From now on SAP refuses the token, the refresh is refused, and the
+      // user never answers the second login: the fresh connection's connect
+      // waits on it.
+      s.browser.answering(false);
+      s.tokens.refuseRefresh(true);
+      s.adt.refuse(true);
+      const running = s.callTool('LongRead', { id: 'L' });
+      await s.browser.opened(2);
+      const port = s.browser.ports[1] ?? 0;
+      assert.ok(port > 0);
+      assertMatchObject(await rejectionOf(bindsFree(port)), {
+        code: 'EADDRINUSE',
+      });
+      assert.equal(ownedConnections().length, 2);
+      assert.equal(
+        s.adt.requests.some((r) => r.url.startsWith(longReadUrl('L'))),
+        false,
+      );
 
-    trigger(s);
-    let bound: ReturnType<typeof setTimeout> | undefined;
-    const outcome = await Promise.race([
-      s.exited,
-      new Promise<'hung'>((r) => {
-        bound = setTimeout(() => r('hung'), 10_000);
-      }),
-    ]);
-    clearTimeout(bound);
-    expect(outcome).toBe(0);
-    await new Promise((r) => setTimeout(r, 50));
-    expect(s.exits).toEqual([0]);
-    expect(s.shutdownLines).toEqual([]);
-    await until(() => s.logins.length === 2);
-    expect(s.logins).toEqual(['ok', 'aborted']);
-    expect(ownedConnections()).toEqual([]);
-    expect(await running).not.toEqual({ text: 'L', isError: false });
-    expect(s.adt.requests.some((r) => r.url.startsWith(longReadUrl('L')))).toBe(
-      false,
-    );
-    await bindsFree(port);
-  },
-);
+      trigger(s);
+      let bound: ReturnType<typeof setTimeout> | undefined;
+      const outcome = await Promise.race([
+        s.exited,
+        new Promise<'hung'>((r) => {
+          bound = setTimeout(() => r('hung'), 10_000);
+        }),
+      ]);
+      clearTimeout(bound);
+      assert.equal(outcome, 0);
+      await new Promise((r) => setTimeout(r, 50));
+      assert.deepStrictEqual(s.exits, [0]);
+      assert.deepStrictEqual(s.shutdownLines, []);
+      await until(() => s.logins.length === 2);
+      assert.deepStrictEqual(s.logins, ['ok', 'aborted']);
+      assert.deepStrictEqual(ownedConnections(), []);
+      assert.notDeepStrictEqual(await running, { text: 'L', isError: false });
+      assert.equal(
+        s.adt.requests.some((r) => r.url.startsWith(longReadUrl('L'))),
+        false,
+      );
+      await bindsFree(port);
+    },
+  );
+}
 
 it("the client's transport close (the session's end) while a long read's fresh connection waits in its connect for a browser login: the login ends aborted, nothing owned, the callback port free", async () => {
   s = await stand({ kind: 'cloud', auth: 'jwt', shutdown: {} });
-  expect(await s.call('r0').done).toEqual({ text: 'r0', isError: false });
+  assert.deepStrictEqual(await s.call('r0').done, {
+    text: 'r0',
+    isError: false,
+  });
   s.browser.answering(false);
   s.tokens.refuseRefresh(true);
   s.adt.refuse(true);
   const running = s.callTool('LongRead', { id: 'L' });
   await s.browser.opened(2);
   const port = s.browser.ports[1] ?? 0;
-  expect(port).toBeGreaterThan(0);
-  expect(ownedConnections()).toHaveLength(2);
+  assert.ok(port > 0);
+  assert.equal(ownedConnections().length, 2);
 
   await s.client.close();
   await until(() => s.logins.length === 2);
-  expect(s.logins).toEqual(['ok', 'aborted']);
+  assert.deepStrictEqual(s.logins, ['ok', 'aborted']);
   await until(() => s.active() === 0);
-  expect(ownedConnections()).toEqual([]);
-  expect(await running).not.toEqual({ text: 'L', isError: false });
-  expect(s.adt.requests.some((r) => r.url.startsWith(longReadUrl('L')))).toBe(
+  assert.deepStrictEqual(ownedConnections(), []);
+  assert.notDeepStrictEqual(await running, { text: 'L', isError: false });
+  assert.equal(
+    s.adt.requests.some((r) => r.url.startsWith(longReadUrl('L'))),
     false,
   );
   // The session's end is not the process's: no exit.
-  expect(s.exits).toEqual([]);
+  assert.deepStrictEqual(s.exits, []);
   await bindsFree(port);
 });

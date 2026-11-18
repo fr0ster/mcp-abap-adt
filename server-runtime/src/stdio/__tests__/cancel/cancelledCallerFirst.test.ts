@@ -6,9 +6,9 @@
  * run. Nothing rejects unhandled.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import { type Stand, stand, turns, until } from '../helpers/loginStand';
-
-jest.setTimeout(30_000);
 
 let s: Stand;
 const unhandled: unknown[] = [];
@@ -35,21 +35,21 @@ it('R1 is sent a cancel while both wait in the connect: both run to their end on
   // Both have their provider and wait in the one connect().
   await until(() => s.providersAnswered() === 2);
   await turns();
-  expect(s.active()).toBe(2);
+  assert.equal(s.active(), 2);
 
   r1.cancel();
-  expect(await r1.done).toBe('cancelled');
+  assert.equal(await r1.done, 'cancelled');
   // R1 is still a live call while the endpoint holds the code.
   await turns(50);
-  expect(s.active()).toBe(2);
-  expect(s.tokens.grants).toEqual(['authorization_code']);
+  assert.equal(s.active(), 2);
+  assert.deepStrictEqual(s.tokens.grants, ['authorization_code']);
 
   s.tokens.releaseCodes();
-  expect(await r2.done).toEqual({ text: 'r2', isError: false });
+  assert.deepStrictEqual(await r2.done, { text: 'r2', isError: false });
   await until(() => s.active() === 0);
-  expect(s.reached('r1')).toBe(true);
-  expect(s.reached('r2')).toBe(true);
-  expect(s.logins).toEqual(['ok']);
+  assert.equal(s.reached('r1'), true);
+  assert.equal(s.reached('r2'), true);
+  assert.deepStrictEqual(s.logins, ['ok']);
   await turns();
-  expect(unhandled).toEqual([]);
+  assert.deepStrictEqual(unhandled, []);
 });

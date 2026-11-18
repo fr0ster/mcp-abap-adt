@@ -4,6 +4,8 @@
  * message, stack or string form.
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import {
   AuthProviderFailure,
   authError,
@@ -15,18 +17,20 @@ const SECRET = 'SECRET-IN-A-MESSAGE-9';
 
 it('an error of no known shape: the fixed unknown fields, nothing of the message', () => {
   const thrown = new Error(`could not parse "${SECRET}"`);
-  expect(launcherFailedLine(thrown)).toBe(
+  assert.equal(
+    launcherFailedLine(thrown),
     `[MCP] launcher failed: ${JSON.stringify(
       logFields(authError.unknown({ operation: 'unfamiliar-error' })),
     )}`,
   );
-  expect(launcherFailedLine(thrown)).not.toContain(SECRET);
-  expect(launcherFailedLine(SECRET)).not.toContain(SECRET);
+  assert.ok(!launcherFailedLine(thrown).includes(SECRET));
+  assert.ok(!launcherFailedLine(SECRET).includes(SECRET));
 });
 
 it('a chain failure: its logFields', () => {
   const error = authError['credential-refused']({ credential: 'token' });
-  expect(launcherFailedLine(new AuthProviderFailure(error))).toBe(
+  assert.equal(
+    launcherFailedLine(new AuthProviderFailure(error)),
     `[MCP] launcher failed: ${JSON.stringify(logFields(error))}`,
   );
 });

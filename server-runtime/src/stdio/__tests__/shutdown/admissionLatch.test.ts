@@ -6,14 +6,15 @@
  * tool set: the parity suite.)
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, it } from 'node:test';
+import { assertMatchObject } from '../../../../../src/__tests__/helpers/assertions';
 import {
   isLockOf,
   isUnlockOf,
 } from '../../../../../src/__tests__/helpers/shutdownTools';
 import { SHUTDOWN_SENTENCE } from '../../auth/serverSentences';
 import { type Stand, stand, turns, until } from '../helpers/loginStand';
-
-jest.setTimeout(30_000);
 
 let s: Stand;
 
@@ -30,21 +31,24 @@ it("a call read after stdin's end gets the shutdown answer and sends nothing; ex
 
   s.processLike.stdin.emit('end');
   const late = await s.callTool('LockedUpdate', { id: 'LATE' });
-  expect(late).not.toBe('cancelled');
+  assert.notEqual(late, 'cancelled');
   const { text, isError } = late as { text: string; isError: boolean };
-  expect(isError).toBe(true);
-  expect(JSON.parse(text)).toMatchObject({
+  assert.equal(isError, true);
+  assertMatchObject(JSON.parse(text), {
     error: 'authentication_failed',
     kind: 'interactive-login',
     server: SHUTDOWN_SENTENCE,
   });
-  expect(await s.exited).toBe(0);
+  assert.equal(await s.exited, 0);
   await turns(10);
   // Nothing of the late call was sent; the only request after the trigger is
   // the connector's logoff.
-  expect(s.adt.requests.some((r) => isLockOf('LATE')(r.url))).toBe(false);
+  assert.equal(
+    s.adt.requests.some((r) => isLockOf('LATE')(r.url)),
+    false,
+  );
   await until(() => s.adt.logoffs() === 1);
-  expect(s.adt.requests.length).toBe(before + 1);
+  assert.equal(s.adt.requests.length, before + 1);
   hold.release();
   await until(() => s.active() === 0);
 });

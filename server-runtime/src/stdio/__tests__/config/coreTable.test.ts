@@ -1,6 +1,9 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
@@ -10,6 +13,7 @@ import {
 } from '@mcp-abap-adt/lib/config';
 import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
 import { load } from 'js-yaml';
+import { assertThrows } from '../../../../../src/__tests__/helpers/assertions';
 import {
   CORE_PARAMETERS,
   CORE_ROWS,
@@ -78,44 +82,49 @@ afterEach(() => {
 
 describe('the table', () => {
   it('has the destination rows, then the system type it shares', () => {
-    expect(AUTH_PARAMETERS.map((p) => p.cli)).toEqual([
-      '--mcp',
-      '--env',
-      '--env-path',
-      '--auth-broker-path',
-      '--unsafe',
-      '--browser',
-      '--browser-program',
-      '--renewal',
-      '--browser-auth-port',
-      '--deferred-logon',
-      '--restore-session',
-      '--connection-type',
-      '--system-type',
-    ]);
+    assert.deepStrictEqual(
+      AUTH_PARAMETERS.map((p) => p.cli),
+      [
+        '--mcp',
+        '--env',
+        '--env-path',
+        '--auth-broker-path',
+        '--unsafe',
+        '--browser',
+        '--browser-program',
+        '--renewal',
+        '--browser-auth-port',
+        '--deferred-logon',
+        '--restore-session',
+        '--connection-type',
+        '--system-type',
+      ],
+    );
   });
 
   it('names each form as the spec does (spec section 6)', () => {
-    expect(AUTH_PARAMETERS.map((p) => [p.cli, p.env, p.yaml])).toEqual([
-      ['--mcp', undefined, 'mcp'],
-      ['--env', undefined, 'env'],
-      ['--env-path', 'MCP_ENV_PATH', 'env-path'],
-      ['--auth-broker-path', 'AUTH_BROKER_PATH', 'auth-broker-path'],
-      ['--unsafe', 'MCP_UNSAFE', 'unsafe'],
-      ['--browser', 'MCP_BROWSER', 'browser'],
-      ['--browser-program', 'MCP_BROWSER_PROGRAM', 'browser-program'],
-      ['--renewal', 'MCP_RENEWAL', 'renewal'],
-      ['--browser-auth-port', 'MCP_BROWSER_AUTH_PORT', 'browser-auth-port'],
-      ['--deferred-logon', 'MCP_DEFERRED_LOGON', 'deferred-logon'],
-      ['--restore-session', 'MCP_RESTORE_SESSION', 'restore-session'],
-      ['--connection-type', 'SAP_CONNECTION_TYPE', 'connection-type'],
-      ['--system-type', 'SAP_SYSTEM_TYPE', 'system-type'],
-    ]);
+    assert.deepStrictEqual(
+      AUTH_PARAMETERS.map((p) => [p.cli, p.env, p.yaml]),
+      [
+        ['--mcp', undefined, 'mcp'],
+        ['--env', undefined, 'env'],
+        ['--env-path', 'MCP_ENV_PATH', 'env-path'],
+        ['--auth-broker-path', 'AUTH_BROKER_PATH', 'auth-broker-path'],
+        ['--unsafe', 'MCP_UNSAFE', 'unsafe'],
+        ['--browser', 'MCP_BROWSER', 'browser'],
+        ['--browser-program', 'MCP_BROWSER_PROGRAM', 'browser-program'],
+        ['--renewal', 'MCP_RENEWAL', 'renewal'],
+        ['--browser-auth-port', 'MCP_BROWSER_AUTH_PORT', 'browser-auth-port'],
+        ['--deferred-logon', 'MCP_DEFERRED_LOGON', 'deferred-logon'],
+        ['--restore-session', 'MCP_RESTORE_SESSION', 'restore-session'],
+        ['--connection-type', 'SAP_CONNECTION_TYPE', 'connection-type'],
+        ['--system-type', 'SAP_SYSTEM_TYPE', 'system-type'],
+      ],
+    );
   });
 
-  describe.each(AUTH_PARAMETERS.map((p) => [p.cli, p] as const))(
-    '%s',
-    (_n, row) => {
+  for (const [_n, row] of AUTH_PARAMETERS.map((p) => [p.cli, p] as const)) {
+    describe(format('%s', _n), () => {
       const p = row as typeof row & { env: string; yaml: string };
       const hasEnv = row.env !== undefined;
       const value = p.kind === 'flag' ? true : typed(p, sample(p));
@@ -129,30 +138,33 @@ describe('the table', () => {
             ? fromCli
             : readAuthParameters([p.cli, sample(p)], {}, null);
         const fromYaml = readAuthParameters([], {}, { [p.yaml]: value });
-        expect(fromCli).toEqual({ [p.key]: value });
-        expect(fromSpace).toEqual(fromCli);
+        assert.deepStrictEqual(fromCli, { [p.key]: value });
+        assert.deepStrictEqual(fromSpace, fromCli);
         if (hasEnv) {
-          expect(readAuthParameters([], { [p.env]: envValue }, null)).toEqual(
+          assert.deepStrictEqual(
+            readAuthParameters([], { [p.env]: envValue }, null),
             fromCli,
           );
         }
-        expect(fromYaml).toEqual(fromCli);
+        assert.deepStrictEqual(fromYaml, fromCli);
       });
 
       it('CLI beats env beats YAML', () => {
         if (!hasEnv) return;
         if (p.kind === 'flag') {
           // a flag can only be true on the CLI; env false/YAML true shows the order
-          expect(
+          assert.deepStrictEqual(
             readAuthParameters(
               [p.cli],
               { [p.env]: 'false' },
               { [p.yaml]: false },
             ),
-          ).toEqual({ [p.key]: true });
-          expect(
+            { [p.key]: true },
+          );
+          assert.deepStrictEqual(
             readAuthParameters([], { [p.env]: 'false' }, { [p.yaml]: true }),
-          ).toEqual({ [p.key]: false });
+            { [p.key]: false },
+          );
           return;
         }
         const a = sample(p);
@@ -163,86 +175,101 @@ describe('the table', () => {
             : p.values
               ? (p.values[2] ?? p.values[0])
               : 'value-three';
-        expect(
+        assert.deepStrictEqual(
           readAuthParameters(
             [`${p.cli}=${a}`],
             { [p.env]: b },
             { [p.yaml]: c },
           ),
-        ).toEqual({ [p.key]: typed(p, a) });
-        expect(readAuthParameters([], { [p.env]: b }, { [p.yaml]: c })).toEqual(
+          { [p.key]: typed(p, a) },
+        );
+        assert.deepStrictEqual(
+          readAuthParameters([], { [p.env]: b }, { [p.yaml]: c }),
           { [p.key]: typed(p, b) },
         );
       });
 
       it('absent everywhere is absent', () => {
-        expect(readAuthParameters([], {}, {})).not.toHaveProperty(p.key);
+        // The keys are flat names (coreParameters.ts), so Jest's path walk
+        // is one step.
+        assert.ok(!(p.key in Object(readAuthParameters([], {}, {}))));
       });
 
       it('is named in the --config template and in the help', () => {
-        expect(template()).toMatch(new RegExp(`^${p.yaml}:`, 'm'));
+        assert.match(template(), new RegExp(`^${p.yaml}:`, 'm'));
         const help = generateHelp();
-        expect(help).toContain(p.cli);
-        if (hasEnv) expect(help).toContain(p.env);
+        assert.ok(help.includes(p.cli));
+        if (hasEnv) assert.ok(help.includes(p.env));
       });
-    },
-  );
+    });
+  }
 });
 
 describe('--auth-broker is gone in every form', () => {
   it('has no row, no help line, no template key', () => {
-    expect(AUTH_PARAMETERS.map((p) => p.cli)).not.toContain('--auth-broker');
-    expect(AUTH_PARAMETERS.map((p) => p.yaml)).not.toContain('auth-broker');
+    assert.ok(!AUTH_PARAMETERS.map((p) => p.cli).includes('--auth-broker'));
+    assert.ok(!AUTH_PARAMETERS.map((p) => p.yaml).includes('auth-broker'));
     const help = generateHelp();
-    expect(help).not.toMatch(/--auth-broker(?!-path)/);
-    expect(help).not.toContain(REMOVED_ENV);
-    expect(template()).not.toMatch(/^auth-broker:/m);
+    assert.doesNotMatch(help, /--auth-broker(?!-path)/);
+    assert.ok(!help.includes(REMOVED_ENV));
+    assert.doesNotMatch(template(), /^auth-broker:/m);
   });
 
-  it.each([
+  for (const [argv, env, yaml, name] of [
     [['--auth-broker'], {}, undefined, '--auth-broker'],
     [['--auth-broker=true'], {}, undefined, '--auth-broker'],
     [[], { [REMOVED_ENV]: 'true' }, undefined, REMOVED_ENV],
     [[], { [REMOVED_ENV]: 'false' }, undefined, REMOVED_ENV],
     [[], {}, { 'auth-broker': true }, 'auth-broker (config file)'],
     [[], {}, { 'auth-broker': false }, 'auth-broker (config file)'],
-  ] as const)(
-    'a leftover form stops the start, naming it (%j %j %j)',
-    (argv, env, yaml, name) => {
-      expect(() => readAuthParameters(argv, { ...env }, yaml as never)).toThrow(
-        `${name} was removed in 16.0.0 — remove it from the configuration`,
-      );
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        'a leftover form stops the start, naming it (%j %j %j)',
+        argv,
+        env,
+        yaml,
+      ),
+      () => {
+        assertThrows(
+          () => readAuthParameters(argv, { ...env }, yaml as never),
+          `${name} was removed in 16.0.0 — remove it from the configuration`,
+        );
+      },
+    );
+  }
 
   it('the reader refuses a leftover form, so the start stops', () => {
     process.argv = ['node', 'server', '--auth-broker'];
-    expect(() => parse()).toThrow('--auth-broker was removed in 16.0.0');
+    assertThrows(() => parse(), '--auth-broker was removed in 16.0.0');
     process.argv = ['node', 'server'];
     process.env[REMOVED_ENV] = 'true';
-    expect(() => parse()).toThrow(`${REMOVED_ENV} was removed in 16.0.0`);
+    assertThrows(() => parse(), `${REMOVED_ENV} was removed in 16.0.0`);
   });
 
   it('a YAML config with the removed key fails validation, naming it', () => {
     const result = validateYamlConfig({ 'auth-broker': true } as never);
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContain(
-      'auth-broker (config file) was removed in 16.0.0 — remove it from the configuration',
+    assert.equal(result.valid, false);
+    assert.ok(
+      result.errors.includes(
+        'auth-broker (config file) was removed in 16.0.0 — remove it from the configuration',
+      ),
     );
   });
 
   it('--auth-broker-path is not mistaken for the removed flag', () => {
-    expect(
+    assert.deepStrictEqual(
       readAuthParameters(['--auth-broker-path=/x'], {}, undefined),
-    ).toEqual({ authBrokerPath: '/x' });
+      { authBrokerPath: '/x' },
+    );
   });
 });
 
 describe('the generated template', () => {
   it('is valid YAML config and sets nothing', () => {
     const config = load(template()) as never;
-    expect(validateYamlConfig(config).errors).toEqual([]);
-    expect(readAuthParameters([], {}, config)).toEqual({
+    assert.deepStrictEqual(validateYamlConfig(config).errors, []);
+    assert.deepStrictEqual(readAuthParameters([], {}, config), {
       unsafe: false,
       deferredLogon: false,
     });
@@ -253,50 +280,57 @@ describe('ports', () => {
   const port = AUTH_PARAMETERS.find((p) => p.key === 'browserAuthPort');
   if (!port) throw new Error('row missing');
 
-  it.each(['abc', '0', '70000', '-1', '12.5'])(
-    'refuses %s in each form, naming the form',
-    (bad) => {
-      expect(() =>
-        readAuthParameters([`--browser-auth-port=${bad}`], {}, null),
-      ).toThrow(/--browser-auth-port/);
-      expect(() =>
-        readAuthParameters([], { MCP_BROWSER_AUTH_PORT: bad }, null),
-      ).toThrow(/MCP_BROWSER_AUTH_PORT/);
-      expect(() =>
-        readAuthParameters([], {}, { 'browser-auth-port': bad }),
-      ).toThrow(/browser-auth-port/);
-      expect(
+  for (const bad of ['abc', '0', '70000', '-1', '12.5']) {
+    it(format('refuses %s in each form, naming the form', bad), () => {
+      assertThrows(
+        () => readAuthParameters([`--browser-auth-port=${bad}`], {}, null),
+        /--browser-auth-port/,
+      );
+      assertThrows(
+        () => readAuthParameters([], { MCP_BROWSER_AUTH_PORT: bad }, null),
+        /MCP_BROWSER_AUTH_PORT/,
+      );
+      assertThrows(
+        () => readAuthParameters([], {}, { 'browser-auth-port': bad }),
+        /browser-auth-port/,
+      );
+      assert.match(
         validateYamlConfig({ 'browser-auth-port': bad } as never).errors.join(),
-      ).toMatch(/browser-auth-port/);
-    },
-  );
+        /browser-auth-port/,
+      );
+    });
+  }
 
   it('refuses a YAML number out of range', () => {
-    expect(() =>
-      readAuthParameters([], {}, { 'browser-auth-port': 70000 }),
-    ).toThrow(/browser-auth-port/);
-    expect(() =>
-      readAuthParameters([], {}, { 'browser-auth-port': 0 }),
-    ).toThrow(/browser-auth-port/);
+    assertThrows(
+      () => readAuthParameters([], {}, { 'browser-auth-port': 70000 }),
+      /browser-auth-port/,
+    );
+    assertThrows(
+      () => readAuthParameters([], {}, { 'browser-auth-port': 0 }),
+      /browser-auth-port/,
+    );
   });
 
   it('accepts 61001 and leaves an absent port undefined', () => {
-    expect(
+    assert.equal(
       readAuthParameters(['--browser-auth-port=61001'], {}, null)
         .browserAuthPort,
-    ).toBe(61001);
-    expect(readAuthParameters([], {}, null).browserAuthPort).toBeUndefined();
+      61001,
+    );
+    assert.equal(readAuthParameters([], {}, null).browserAuthPort, undefined);
   });
 
   it('refuses a flag-looking next argument as a missing value', () => {
-    expect(() =>
-      readAuthParameters(['--browser-auth-port', '--unsafe'], {}, null),
-    ).toThrow(/--browser-auth-port needs a value/);
+    assertThrows(
+      () => readAuthParameters(['--browser-auth-port', '--unsafe'], {}, null),
+      /--browser-auth-port needs a value/,
+    );
   });
 });
 
 describe('enums', () => {
-  it.each([
+  for (const [cli, env, yaml, values] of [
     [
       '--connection-type',
       'SAP_CONNECTION_TYPE',
@@ -309,72 +343,84 @@ describe('enums', () => {
       'system-type',
       ['onprem', 'cloud', 'legacy'],
     ],
-  ])('%s accepts only its values', (cli, env, yaml, values) => {
-    for (const v of values as string[]) {
-      expect(
-        Object.values(readAuthParameters([`${cli}=${v}`], {}, null)),
-      ).toEqual([v]);
-    }
-    expect(
-      Object.values(
-        readAuthParameters(
-          [`${cli}=RFC`.replace('RFC', (values as string[])[0].toUpperCase())],
-          {},
-          null,
+  ] satisfies [string, string, string, string[]][]) {
+    it(format('%s accepts only its values', cli), () => {
+      for (const v of values as string[]) {
+        assert.deepStrictEqual(
+          Object.values(readAuthParameters([`${cli}=${v}`], {}, null)),
+          [v],
+        );
+      }
+      assert.deepStrictEqual(
+        Object.values(
+          readAuthParameters(
+            [
+              `${cli}=RFC`.replace(
+                'RFC',
+                (values as string[])[0].toUpperCase(),
+              ),
+            ],
+            {},
+            null,
+          ),
         ),
-      ),
-    ).toEqual([(values as string[])[0]]);
-    expect(() => readAuthParameters([`${cli}=nope`], {}, null)).toThrow(
-      new RegExp(cli),
-    );
-    expect(() =>
-      readAuthParameters([], { [env as string]: 'nope' }, null),
-    ).toThrow(new RegExp(env as string));
-    expect(() =>
-      readAuthParameters([], {}, { [yaml as string]: 'nope' }),
-    ).toThrow(new RegExp(yaml as string));
-    expect(
-      validateYamlConfig({ [yaml as string]: 'nope' } as never).valid,
-    ).toBe(false);
-  });
+        [(values as string[])[0]],
+      );
+      assertThrows(
+        () => readAuthParameters([`${cli}=nope`], {}, null),
+        new RegExp(cli),
+      );
+      assertThrows(
+        () => readAuthParameters([], { [env as string]: 'nope' }, null),
+        new RegExp(env as string),
+      );
+      assertThrows(
+        () => readAuthParameters([], {}, { [yaml as string]: 'nope' }),
+        new RegExp(yaml as string),
+      );
+      assert.equal(
+        validateYamlConfig({ [yaml as string]: 'nope' } as never).valid,
+        false,
+      );
+    });
+  }
 });
 
 describe('flags', () => {
   it('refuse a word that is not true or false', () => {
-    expect(() => readAuthParameters([], { MCP_UNSAFE: 'yes' }, null)).toThrow(
+    assertThrows(
+      () => readAuthParameters([], { MCP_UNSAFE: 'yes' }, null),
       /MCP_UNSAFE/,
     );
-    expect(() => readAuthParameters([], {}, { unsafe: 'yes' })).toThrow(
-      /unsafe/,
-    );
+    assertThrows(() => readAuthParameters([], {}, { unsafe: 'yes' }), /unsafe/);
   });
 });
 
 describe('through the parser and the manager', () => {
   it('--browser, MCP_BROWSER and YAML browser reach CoreConfig.browser', () => {
     process.argv = ['node', 'server', '--browser=firefox'];
-    expect(parse().browser).toBe('firefox');
+    assert.equal(parse().browser, 'firefox');
 
     process.argv = ['node', 'server'];
     process.env.MCP_BROWSER = 'edge';
-    expect(parse().browser).toBe('edge');
+    assert.equal(parse().browser, 'edge');
   });
 
   it('env forms reach the config', () => {
     process.env.MCP_BROWSER_AUTH_PORT = '61005';
     const c = parse();
-    expect(c.browserAuthPort).toBe(61005);
+    assert.equal(c.browserAuthPort, 61005);
   });
 
   it('--mcp and --env have no env form', () => {
     process.env.MCP_DESTINATION = 'DEST';
     process.env.MCP_ENV = 'ENVDEST';
     const c = parse();
-    expect(c.mcpDestination).toBeUndefined();
-    expect(c.envFile).toBeUndefined();
-    expect(readAuthParameters([], process.env, null)).toEqual({});
+    assert.equal(c.mcpDestination, undefined);
+    assert.equal(c.envFile, undefined);
+    assert.deepStrictEqual(readAuthParameters([], process.env, null), {});
     const help = generateHelp();
-    for (const n of NO_ENV) expect(help).not.toMatch(new RegExp(`\\b${n}\\b`));
+    for (const n of NO_ENV) assert.doesNotMatch(help, new RegExp(`\\b${n}\\b`));
   });
 
   it('YAML is the lowest source: env beats it, CLI beats env', () => {
@@ -386,9 +432,9 @@ describe('through the parser and the manager', () => {
     process.env.MCP_BROWSER = 'edge';
     process.argv = ['node', 'server', '--connection-type=http'];
     const parsed = parse({ ...yaml });
-    expect(parsed.mcpDestination).toBe('FROM_YAML');
-    expect(parsed.browser).toBe('edge');
-    expect(parsed.connectionType).toBe('http');
+    assert.equal(parsed.mcpDestination, 'FROM_YAML');
+    assert.equal(parsed.browser, 'edge');
+    assert.equal(parsed.connectionType, 'http');
   });
 
   // The parser states the value and its source and leaves the environment
@@ -400,9 +446,9 @@ describe('through the parser and the manager', () => {
     process.argv = ['node', 'server', '--system-type=onprem'];
     try {
       const parsed = parse();
-      expect(parsed.systemType).toBe('onprem');
-      expect(parsed.systemTypeSource).toBe('--system-type');
-      expect(process.env.SAP_SYSTEM_TYPE).toBeUndefined();
+      assert.equal(parsed.systemType, 'onprem');
+      assert.equal(parsed.systemTypeSource, '--system-type');
+      assert.equal(process.env.SAP_SYSTEM_TYPE, undefined);
     } finally {
       if (before === undefined) delete process.env.SAP_SYSTEM_TYPE;
       else process.env.SAP_SYSTEM_TYPE = before;
@@ -430,35 +476,44 @@ describe('the env file names its source', () => {
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it.each([
+  for (const [argv, env, yaml, source] of [
     [['--env-path=./conn.env'], {}, undefined, '--env-path'],
     [['--env=./conn.env'], {}, undefined, '--env'],
     [[], { MCP_ENV_PATH: './conn.env' }, undefined, 'MCP_ENV_PATH'],
     [[], {}, { 'env-path': './conn.env' }, 'env-path (config file)'],
     [[], {}, { env: './conn.env' }, 'env (config file)'],
     // --env with --env-path is refused (D26 D3): contradictoryDestination.test.ts
-  ] as const)('%j %j %j → %s', (argv, env, yaml, source) => {
-    process.argv = ['node', 'server', ...argv];
-    Object.assign(process.env, env);
-    const parsed = parse(yaml);
-    expect(parsed.envFile).toBe(path.resolve(dir, 'conn.env'));
-    expect(parsed.envFileSource).toBe(source);
-  });
-
-  it.each([[[], {}, undefined]] as const)(
-    "the working directory's .env is never read (%j %j %j)",
-    (argv, env, yaml) => {
-      fs.writeFileSync(
-        path.join(dir, '.env'),
-        'SAP_URL=https://x.example.test\n',
-      );
+  ] as const) {
+    it(format('%j %j %j → %s', argv, env, yaml, source), () => {
       process.argv = ['node', 'server', ...argv];
       Object.assign(process.env, env);
       const parsed = parse(yaml);
-      expect(parsed.envFile).toBeUndefined();
-      expect(parsed.envFileSource).toBeUndefined();
-    },
-  );
+      assert.equal(parsed.envFile, path.resolve(dir, 'conn.env'));
+      assert.equal(parsed.envFileSource, source);
+    });
+  }
+
+  for (const [argv, env, yaml] of [[[], {}, undefined]] as const) {
+    it(
+      format(
+        "the working directory's .env is never read (%j %j %j)",
+        argv,
+        env,
+        yaml,
+      ),
+      () => {
+        fs.writeFileSync(
+          path.join(dir, '.env'),
+          'SAP_URL=https://x.example.test\n',
+        );
+        process.argv = ['node', 'server', ...argv];
+        Object.assign(process.env, env);
+        const parsed = parse(yaml);
+        assert.equal(parsed.envFile, undefined);
+        assert.equal(parsed.envFileSource, undefined);
+      },
+    );
+  }
 
   it('a relative --env-path still resolves against the working directory', () => {
     fs.writeFileSync(
@@ -466,15 +521,15 @@ describe('the env file names its source', () => {
       'SAP_URL=https://x.example.test\n',
     );
     process.argv = ['node', 'server', '--env-path=./.env'];
-    expect(parse().envFile).toBe(path.resolve(dir, '.env'));
+    assert.equal(parse().envFile, path.resolve(dir, '.env'));
   });
 
   it('no env file → no source', () => {
-    expect(parse().envFileSource).toBeUndefined();
+    assert.equal(parse().envFileSource, undefined);
   });
 
   it('reaches CoreConfig through the reader', () => {
     process.argv = ['node', 'server', '--env-path=./conn.env'];
-    expect(parse().envFileSource).toBe('--env-path');
+    assert.equal(parse().envFileSource, '--env-path');
   });
 });

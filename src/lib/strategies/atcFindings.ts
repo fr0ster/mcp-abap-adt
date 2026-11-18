@@ -32,6 +32,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import { fragmentStart, hrefParts } from '../sourceHref';
 import { parseXml } from '../xml/node';
 
 import {
@@ -155,17 +156,11 @@ const attribute = (element: Element, name: string): string | undefined => {
   return typeof value === 'string' && value !== '' ? value : undefined;
 };
 
-/** A run of decimal digits as a number; anything else is absent. */
-function digits(text: string | undefined): number | undefined {
-  if (!text) return undefined;
-  for (const c of text) if (c < '0' || c > '9') return undefined;
-  return Number(text);
-}
-
 /**
  * `/…/source/main#start=9,0` → the source, the 9 and the 0. ADT separates the
  * fragment's parts with `;` — `#start=8,0;end=8,0`,
- * `#type=CLAS%2FOM;name=POST;start=29` — and `start` is `LINE[,COLUMN]`.
+ * `#type=CLAS%2FOM;name=POST;start=29` — and `start` is `LINE[,COLUMN]`
+ * (`fragmentStart`, the one reader of an href's fragment).
  */
 function position(location: string | undefined): {
   location?: string;
@@ -173,16 +168,11 @@ function position(location: string | undefined): {
   column?: number | undefined;
 } {
   if (!location) return {};
-  const hash = location.indexOf('#');
-  if (hash < 0) return { location };
-  const uri = location.slice(0, hash);
-  const start = location
-    .slice(hash + 1)
-    .split(';')
-    .find((part) => part.startsWith('start='));
-  if (!start) return { location: uri };
-  const [line, column] = start.slice('start='.length).split(',');
-  return { location: uri, line: digits(line), column: digits(column) };
+  const { uri, fragment } = hrefParts(location);
+  if (fragment === undefined) return { location: uri };
+  const start = fragmentStart(fragment);
+  if (start === undefined) return { location: uri };
+  return { location: uri, line: start.line, column: start.column };
 }
 
 const DOCUMENTATION_RELATION = 'http://www.sap.com/adt/relations/documentation';

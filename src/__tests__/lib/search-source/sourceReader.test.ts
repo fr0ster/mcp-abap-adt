@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { EnumeratedObject } from '../../../lib/search-source/packageEnumerator';
 import { skipSapAnswers } from '../../../lib/search-source/readFailure';
 import {
@@ -7,6 +9,7 @@ import {
   readSourceUnits,
   type SourceUnit,
 } from '../../../lib/search-source/sourceReader';
+import { assertRejects, rejectionOf } from '../../helpers/assertions';
 import { recordingConnection } from '../../helpers/recordingConnection';
 import { fakeKeyOf, sapAnswered } from '../../helpers/sourceReaderFake';
 
@@ -71,16 +74,18 @@ describe('readSourceUnits', () => {
     const units = await collect(
       readSourceUnits(deps, PROG, 'active', skipSapAnswers),
     );
-    expect(units).toEqual([
+    assert.deepStrictEqual(units, [
       {
         include: 'Z_PROG',
         lines: ['PROG:Z_PROG', 'line2'],
         source: '/sap/bc/adt/programs/programs/z_prog/source/main|active',
-        module: undefined,
+        // Stated as the unit carries it: a `member` key, present as undefined
+        // (Jest's toEqual read the `module: undefined` written here as absent).
+        member: undefined,
         last: true,
       },
     ]);
-    expect(calls).toEqual(['PROG:Z_PROG']);
+    assert.deepStrictEqual(calls, ['PROG:Z_PROG']);
   });
 
   it('FUGR yields one unit per child, VIEW* modules included, function modules first, each by name', async () => {
@@ -99,13 +104,13 @@ describe('readSourceUnits', () => {
     const units = await collect(
       readSourceUnits(deps, FUGR, 'active', skipSapAnswers),
     );
-    expect(includes(units)).toEqual([
+    assert.deepStrictEqual(includes(units), [
       'VIEW_DIALOG_GEN',
       'Z_FM_A',
       'Z_FM_B',
       'LZ_FGF01',
     ]);
-    expect(calls).toEqual([
+    assert.deepStrictEqual(calls, [
       'FM:Z_FG/VIEW_DIALOG_GEN',
       'FM:Z_FG/Z_FM_A',
       'FM:Z_FG/Z_FM_B',
@@ -167,14 +172,14 @@ describe('readSourceUnits', () => {
     const units = await collect(
       readSourceUnits(deps, FUGR, 'active', skipSapAnswers),
     );
-    expect(calls).toEqual([
+    assert.deepStrictEqual(calls, [
       'FM:Z_FG/Z_FM_A',
       'INC:LSVIMFXX',
       'FINC:Z_FG/LZ_FGF01',
       'FINC:Z_FG/LZ_FGO01',
       'FINC:Z_FG/LZ_FGTOP',
     ]);
-    expect(includes(units)).toEqual([
+    assert.deepStrictEqual(includes(units), [
       'Z_FM_A',
       'LSVIMFXX',
       'LZ_FGF01',
@@ -195,7 +200,7 @@ describe('readSourceUnits', () => {
     ];
     const { deps, calls } = makeDeps({ structure });
     await collect(readSourceUnits(deps, FUGR, 'active', skipSapAnswers));
-    expect(calls).toEqual(['FM:Z_FG/Z_FM_A', 'FINC:Z_FG/LZ_FGTOP']);
+    assert.deepStrictEqual(calls, ['FM:Z_FG/Z_FM_A', 'FINC:Z_FG/LZ_FGTOP']);
   });
 
   it('the structure is read through the objectStructure strategy: every FUGR node with its objecturi', async () => {
@@ -207,7 +212,7 @@ describe('readSourceUnits', () => {
 </projectexplorer:objectstructure>`;
     const connection = recordingConnection([{ data: xml }]);
     const deps = createSourceReaderDeps({ connection, logger: undefined });
-    expect(await deps.readStructure('Z_FG')).toEqual({
+    assert.deepStrictEqual(await deps.readStructure('Z_FG'), {
       ok: true,
       value: [
         {
@@ -223,9 +228,11 @@ describe('readSourceUnits', () => {
         },
       ],
     });
-    expect(connection.requests).toHaveLength(1);
-    expect(connection.requests[0]?.url).toContain(
-      '/sap/bc/adt/repository/objectstructure',
+    assert.equal(connection.requests.length, 1);
+    assert.ok(
+      connection.requests[0]?.url.includes(
+        '/sap/bc/adt/repository/objectstructure',
+      ),
     );
   });
 
@@ -234,13 +241,13 @@ describe('readSourceUnits', () => {
     const units = await collect(
       readSourceUnits(deps, CLAS, 'active', skipSapAnswers),
     );
-    expect(includes(units)).toEqual([
+    assert.deepStrictEqual(includes(units), [
       'Z_CLAS',
       'definitions',
       'implementations',
       'testclasses',
     ]);
-    expect(calls).toEqual([
+    assert.deepStrictEqual(calls, [
       'CLAS:Z_CLAS',
       'CLASINC:Z_CLAS/definitions',
       'CLASINC:Z_CLAS/implementations',
@@ -254,13 +261,13 @@ describe('readSourceUnits', () => {
     const units = await collect(
       readSourceUnits(deps, CLAS, 'active', skipSapAnswers),
     );
-    expect(includes(units)).toEqual([
+    assert.deepStrictEqual(includes(units), [
       'definitions',
       'implementations',
       'macros',
       'testclasses',
     ]);
-    expect(calls).toHaveLength(5);
+    assert.equal(calls.length, 5);
   });
 
   it('a unit whose read throws with no response is thrown, decided at its place (DO22)', async () => {
@@ -270,10 +277,11 @@ describe('readSourceUnits', () => {
       { objecttype: 'FUGR/FF', objectname: 'Z_FM_C' },
     ];
     const { deps, calls } = makeDeps({ structure, failing: 'FM:Z_FG/Z_FM_B' });
-    await expect(
+    await assertRejects(
       collect(readSourceUnits(deps, FUGR, 'active', skipSapAnswers)),
-    ).rejects.toThrow('boom');
-    expect(calls).toEqual(['FM:Z_FG/Z_FM_A', 'FM:Z_FG/Z_FM_B']);
+      'boom',
+    );
+    assert.deepStrictEqual(calls, ['FM:Z_FG/Z_FM_A', 'FM:Z_FG/Z_FM_B']);
   });
 
   it('a SAP answer at a later unit is skipped; the reads go on with the rest', async () => {
@@ -286,7 +294,7 @@ describe('readSourceUnits', () => {
     const units = await collect(
       readSourceUnits(deps, FUGR, 'active', skipSapAnswers),
     );
-    expect(includes(units)).toEqual(['Z_FM_A', 'Z_FM_C']);
+    assert.deepStrictEqual(includes(units), ['Z_FM_A', 'Z_FM_C']);
   });
 
   it('a function group whose structure SAP refuses yields nothing', async () => {
@@ -298,9 +306,10 @@ describe('readSourceUnits', () => {
         return { ok: false, error: sapAnswered(500) };
       },
     };
-    expect(
+    assert.deepStrictEqual(
       await collect(readSourceUnits(deps, FUGR, 'active', skipSapAnswers)),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('a credential failure SAP answered ends the reads, thrown', async () => {
@@ -312,9 +321,12 @@ describe('readSourceUnits', () => {
         return { ok: true, value: [] };
       },
     };
-    await expect(
-      collect(readSourceUnits(deps, PROG, 'active', skipSapAnswers)),
-    ).rejects.toBeDefined();
+    assert.notEqual(
+      await rejectionOf(
+        collect(readSourceUnits(deps, PROG, 'active', skipSapAnswers)),
+      ),
+      undefined,
+    );
   });
 
   it('lazy iteration: aborting after the first FUGR unit prevents later fetches', async () => {
@@ -326,8 +338,8 @@ describe('readSourceUnits', () => {
     const { deps, calls } = makeDeps({ structure });
     const gen = readSourceUnits(deps, FUGR, 'active', skipSapAnswers);
     const first = await gen.next();
-    expect(first.done).toBe(false);
+    assert.equal(first.done, false);
     await gen.return(undefined);
-    expect(calls).toEqual(['FM:Z_FG/Z_FM_A']);
+    assert.deepStrictEqual(calls, ['FM:Z_FG/Z_FM_A']);
   });
 });

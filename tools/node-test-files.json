@@ -83,6 +83,8 @@
   "src/__tests__/admin/shared-deps/check.test.ts",
   "src/__tests__/admin/shared-deps/setup.test.ts",
   "src/__tests__/admin/shared-deps/teardown.test.ts",
+  "src/__tests__/handlers.test.ts",
+  "src/__tests__/index.test.ts",
   "src/__tests__/integration/batch/amdpHttpHandle.test.ts",
   "src/__tests__/integration/batch/batchedReadsTiming.test.ts",
   "src/__tests__/integration/batch/communicationBatch.test.ts",
@@ -159,6 +161,11 @@
   "src/__tests__/integration/readOnly/transport/ListTransportsHandlers.test.ts",
   "src/__tests__/integration/server/EmbeddableMcpServer.systemType.test.ts",
   "src/__tests__/integration/server/serverSystemKind.test.ts",
+  "src/__tests__/lib/connectionAuthRouting.test.ts",
+  "src/__tests__/lib/search-source/lineScanner.test.ts",
+  "src/__tests__/lib/search-source/orchestrator.test.ts",
+  "src/__tests__/lib/search-source/packageEnumerator.test.ts",
+  "src/__tests__/lib/search-source/sourceReader.test.ts",
   "src/__tests__/unit/access/accessLists.test.ts",
   "src/__tests__/unit/access/accessWrappers.test.ts",
   "src/__tests__/unit/access/builders.test.ts",
@@ -359,5 +366,6 @@
   "src/__tests__/unit/xml/node.test.ts",
   "src/__tests__/unit/xml/ordered.test.ts",
   "src/__tests__/unit/xml/tree.test.ts",
+  "src/__tests__/utils.test.ts",
   "sse-ro/src/__tests__/launcher.test.ts"
 ]

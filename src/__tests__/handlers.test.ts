@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { TOOL_DEFINITION as GET_CLASS_TOOL } from '../handlers/class/high/handleGetClass';
 import { TOOL_DEFINITION as GET_FUNCTION_MODULE_TOOL } from '../handlers/function_module/high/handleGetFunctionModule';
 import { TOOL_DEFINITION as GET_PROGRAM_TOOL } from '../handlers/program/high/handleGetProgram';
@@ -7,47 +9,47 @@ import { TOOL_DEFINITION as GET_TABLE_TOOL } from '../handlers/table/high/handle
 describe('Tool Definitions', () => {
   describe('Tool Names', () => {
     it('should have correct tool names', () => {
-      expect(GET_PROGRAM_TOOL.name).toBe('GetProgram');
-      expect(GET_CLASS_TOOL.name).toBe('GetClass');
-      expect(GET_FUNCTION_MODULE_TOOL.name).toBe('GetFunctionModule');
-      expect(GET_TABLE_TOOL.name).toBe('GetTable');
-      expect(SEARCH_OBJECT_TOOL.name).toBe('SearchObject');
+      assert.equal(GET_PROGRAM_TOOL.name, 'GetProgram');
+      assert.equal(GET_CLASS_TOOL.name, 'GetClass');
+      assert.equal(GET_FUNCTION_MODULE_TOOL.name, 'GetFunctionModule');
+      assert.equal(GET_TABLE_TOOL.name, 'GetTable');
+      assert.equal(SEARCH_OBJECT_TOOL.name, 'SearchObject');
     });
   });
 
   describe('Tool Descriptions', () => {
     it('should have non-empty descriptions', () => {
-      expect(GET_PROGRAM_TOOL.description).toBeTruthy();
-      expect(GET_CLASS_TOOL.description).toBeTruthy();
-      expect(GET_FUNCTION_MODULE_TOOL.description).toBeTruthy();
-      expect(GET_TABLE_TOOL.description).toBeTruthy();
-      expect(SEARCH_OBJECT_TOOL.description).toBeTruthy();
+      assert.ok(GET_PROGRAM_TOOL.description);
+      assert.ok(GET_CLASS_TOOL.description);
+      assert.ok(GET_FUNCTION_MODULE_TOOL.description);
+      assert.ok(GET_TABLE_TOOL.description);
+      assert.ok(SEARCH_OBJECT_TOOL.description);
     });
 
     it('descriptions should be strings', () => {
-      expect(typeof GET_PROGRAM_TOOL.description).toBe('string');
-      expect(typeof GET_CLASS_TOOL.description).toBe('string');
-      expect(typeof GET_FUNCTION_MODULE_TOOL.description).toBe('string');
-      expect(typeof GET_TABLE_TOOL.description).toBe('string');
-      expect(typeof SEARCH_OBJECT_TOOL.description).toBe('string');
+      assert.equal(typeof GET_PROGRAM_TOOL.description, 'string');
+      assert.equal(typeof GET_CLASS_TOOL.description, 'string');
+      assert.equal(typeof GET_FUNCTION_MODULE_TOOL.description, 'string');
+      assert.equal(typeof GET_TABLE_TOOL.description, 'string');
+      assert.equal(typeof SEARCH_OBJECT_TOOL.description, 'string');
     });
   });
 
   describe('Input Schemas', () => {
     it('should have inputSchema defined', () => {
-      expect(GET_PROGRAM_TOOL.inputSchema).toBeDefined();
-      expect(GET_CLASS_TOOL.inputSchema).toBeDefined();
-      expect(GET_FUNCTION_MODULE_TOOL.inputSchema).toBeDefined();
-      expect(GET_TABLE_TOOL.inputSchema).toBeDefined();
-      expect(SEARCH_OBJECT_TOOL.inputSchema).toBeDefined();
+      assert.notEqual(GET_PROGRAM_TOOL.inputSchema, undefined);
+      assert.notEqual(GET_CLASS_TOOL.inputSchema, undefined);
+      assert.notEqual(GET_FUNCTION_MODULE_TOOL.inputSchema, undefined);
+      assert.notEqual(GET_TABLE_TOOL.inputSchema, undefined);
+      assert.notEqual(SEARCH_OBJECT_TOOL.inputSchema, undefined);
     });
 
     it('should have object type inputSchema', () => {
-      expect(typeof GET_PROGRAM_TOOL.inputSchema).toBe('object');
-      expect(typeof GET_CLASS_TOOL.inputSchema).toBe('object');
-      expect(typeof GET_FUNCTION_MODULE_TOOL.inputSchema).toBe('object');
-      expect(typeof GET_TABLE_TOOL.inputSchema).toBe('object');
-      expect(typeof SEARCH_OBJECT_TOOL.inputSchema).toBe('object');
+      assert.equal(typeof GET_PROGRAM_TOOL.inputSchema, 'object');
+      assert.equal(typeof GET_CLASS_TOOL.inputSchema, 'object');
+      assert.equal(typeof GET_FUNCTION_MODULE_TOOL.inputSchema, 'object');
+      assert.equal(typeof GET_TABLE_TOOL.inputSchema, 'object');
+      assert.equal(typeof SEARCH_OBJECT_TOOL.inputSchema, 'object');
     });
   });
 });

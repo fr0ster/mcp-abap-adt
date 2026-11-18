@@ -315,6 +315,8 @@ export abstract class BaseMcpServer extends McpServer {
    * Logger used for handler context
    */
   protected readonly logger: Logger;
+  /** What a connection's logon itself threw (`buildConnection`), by identity. */
+  private readonly logonFailures = new WeakSet<object>();
 
   /**
    * Connection context: the instance's one source — set once for
@@ -1357,7 +1359,17 @@ export abstract class BaseMcpServer extends McpServer {
     // call puts another in force (`getConnection`).
     const current = new CurrentCredential(credential);
     const connecting = (async () => {
-      const connection = await birth({ ...resolved, credential: current });
+      let connection: IAbapConnection;
+      try {
+        connection = await birth({ ...resolved, credential: current });
+      } catch (error) {
+        // The logon itself failed: told apart from a failure after it (the
+        // system lookup) by this stage, for the one repeat's answer.
+        if (typeof error === 'object' && error !== null) {
+          this.logonFailures.add(error);
+        }
+        throw error;
+      }
       this.destinationOf.set(connection, destination);
       this.systemContexts.set(connection, resolved.systemContext);
       try {
@@ -2142,12 +2154,19 @@ export abstract class BaseMcpServer extends McpServer {
                 try {
                   fresh = await this.getConnection(signal);
                 } catch (thrown) {
-                  // Only the new logon's failure is answered so; a cancel is
-                  // the cancel's, and a refusal the server words itself
-                  // (stdio's `no_connection`) keeps its error and cause.
-                  if (signal.aborted) throw thrown;
-                  const read = readGuarded((t) => this.readFailure(t), thrown);
-                  if (read?.error === 'no_connection') throw thrown;
+                  // Only the new logon's own failure is answered so (told by
+                  // its stage, `logonFailures`); anything else of
+                  // `getConnection` — the system lookup after the logon, the
+                  // kind, stdio's `no_connection` with its cause — and a
+                  // cancel answer as on any call.
+                  if (
+                    signal.aborted ||
+                    typeof thrown !== 'object' ||
+                    thrown === null ||
+                    !this.logonFailures.has(thrown)
+                  ) {
+                    throw thrown;
+                  }
                   this.logger.debug(SESSION_RENEWAL_FAILED_WORDS, {
                     tool: entry.toolDefinition.name,
                   });

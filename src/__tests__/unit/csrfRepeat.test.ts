@@ -477,6 +477,28 @@ describe('the review of #364', () => {
     }
   });
 
+  it('the new connection logged on, its system information refusing the credential: that refusal is the answer, no renewal field', async () => {
+    // No system information kept: a new connection asks for it at birth.
+    stand.systemInformation(null);
+    await activate();
+    const old = currentSession();
+    endWithTokenRefusal(old, (r) =>
+      r.url.startsWith('/sap/bc/adt/core/http/systeminformation'),
+    );
+    // The new session's lookup refuses the credential (after its logon).
+    stand.respond(
+      (request) =>
+        request.url.startsWith('/sap/bc/adt/core/http/systeminformation') &&
+        !(request.cookie ?? '').includes(`=${old}`),
+      () => ({ status: 401, text: '' }),
+    );
+    const answered = await activate();
+    expect(answered.isError).toBe(true);
+    expect(textOf(answered)).not.toContain(SESSION_RENEWAL_FAILED_WORDS);
+    expect(textOf(answered)).toContain('authentication_failed');
+    expect(renewedOf(answered)).toBeUndefined();
+  });
+
   it('a host connection (injected) is never repeated: the server cannot replace it', async () => {
     await server.close();
     const injected = createAbapConnection(

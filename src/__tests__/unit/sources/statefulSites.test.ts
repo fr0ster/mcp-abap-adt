@@ -202,7 +202,7 @@ describe('every stateful site is listed with its window', () => {
     }
   });
 
-  it("the server's one stateful site is the debugger's own session", () => {
+  it("the server's stateful sites are the debugger's own session and the keep-alive's ping", () => {
     // The batch's session-kind reader names the header only to read it, as
     // adt-clients' batch connection reads it: it makes nothing stateful.
     const readsOnly = 'src/lib/batch/sessionKind.ts requestKind';
@@ -215,7 +215,10 @@ describe('every stateful site is listed with its window', () => {
           r.site === 'inStatefulSession' ||
           r.site === 'x-sap-adt-sessiontype'),
     );
+    // The session keep-alive's ping goes into the held connection's
+    // stateful session, in its own main-flow turn, the mode put back after.
     expect(stateful.map((r) => `${r.file} ${r.function}`)).toEqual([
+      'src/embeddable/BaseMcpServer.ts BaseMcpServer.pingInTurn',
       'src/lib/debugger/ports.ts openStateful',
     ]);
   });

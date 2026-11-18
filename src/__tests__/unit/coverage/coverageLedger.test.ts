@@ -52,6 +52,8 @@ import {
   type Finding,
   reasonRows,
   repoReader,
+  scanLiveText,
+  scanUnitText,
 } from './ledgerScan';
 
 const REPO = repositoryRoot(__dirname);
@@ -129,6 +131,47 @@ function testFilesUnder(dir: string, out: string[] = []): string[] {
   return out;
 }
 
+/**
+ * The guard's computed key → pin and key → live maps (spec §6, §8 "Pins"),
+ * for `npm run test:parity -- pins <out.json>`: every counted `pinCases` row
+ * of every scanned file as `<file> <variant>`, and every `liveCall` of the
+ * integration tree as `<file> <systems>`, sorted, keys sorted. No line
+ * numbers: a file that moves runners keeps its map when its rows stay.
+ */
+function ledgerMaps(input: CheckInput): {
+  pins: Record<string, string[]>;
+  live: Record<string, string[]>;
+} {
+  const pins = new Map<string, string[]>();
+  const live = new Map<string, string[]>();
+  const add = (map: Map<string, string[]>, key: string, entry: string) => {
+    map.set(key, [...(map.get(key) ?? []), entry]);
+  };
+  for (const file of [...new Set(input.scanned)].sort()) {
+    const text = input.read(file);
+    if (text === undefined) continue;
+    for (const ref of scanUnitText(file, text)) {
+      if (ref.key !== undefined && ref.counts) {
+        add(pins, ref.key, `${file} ${ref.variant ?? '-'}`);
+      }
+    }
+    if (file.startsWith('src/__tests__/integration/')) {
+      for (const ref of scanLiveText(file, text)) {
+        if (ref.key !== undefined) {
+          add(live, ref.key, `${file} ${[...ref.systems].sort().join(',')}`);
+        }
+      }
+    }
+  }
+  const sorted = (map: Map<string, string[]>): Record<string, string[]> =>
+    Object.fromEntries(
+      [...map.keys()]
+        .sort()
+        .map((key) => [key, [...(map.get(key) ?? [])].sort()]),
+    );
+  return { pins: sorted(pins), live: sorted(live) };
+}
+
 const codes = (findings: readonly Finding[]): Check[] =>
   findings.map((finding) => finding.check);
 
@@ -158,6 +201,14 @@ describe('the coverage ledger guard', () => {
     };
     findings = checkLedger(input);
     debtFindings = checkDebt(input, readJson(DEBT));
+    // `npm run test:parity -- pins <out.json>` sets it; nothing is written otherwise.
+    const mapOut = process.env.LEDGER_MAP_OUT;
+    if (mapOut !== undefined && mapOut !== '') {
+      fs.writeFileSync(
+        mapOut,
+        `${JSON.stringify(ledgerMaps(input), null, 2)}\n`,
+      );
+    }
   });
 
   after(() => {

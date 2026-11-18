@@ -126,6 +126,8 @@ dist-portable/
 /.test-build/
 # The runner's tests write their fixture repositories here (D27).
 /.test-fixtures/
+# `npm run test:parity -- record` writes each file's Jest record here.
+/.test-parity/
 
 # The type gate's fixtures read a third party's package by path: exactly these
 # files under the fixtures' node_modules are tracked, nothing else under it.

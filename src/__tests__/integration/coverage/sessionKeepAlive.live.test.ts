@@ -11,8 +11,12 @@
  * case then waits — on the ping's answer, never on a timer — until the
  * keep-alive's discovery request went out and was answered `2xx`; a second
  * call runs in the same SAP session: the `SAP_SESSIONID` cookie is the same
- * before and after, compared here and never printed. HTTP only: an RFC
- * connection carries no session cookie, and the case skips saying so.
+ * before and after, compared here and never printed.
+ *
+ * Over an RFC connection to SAP the same case runs (the controller points
+ * `MCP_TEST_CONFIG` at the on-premise RFC config): the ping goes out and is
+ * answered `2xx`, and the call after the pause succeeds. An RFC connection
+ * carries no session cookie, so there the session is not compared.
  */
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
@@ -159,19 +163,18 @@ systemsDescribe(['onprem', 'cloud'], 'the session keep-alive, live', () => {
       assert.notEqual(first.isError, true, 'the first call');
       const connection = seen.connection;
       assert.ok(connection !== undefined);
-      if (isRfcConnection(connection)) {
-        t.skip('an RFC connection carries no session cookie to compare');
-        return;
-      }
+      const rfc = isRfcConnection(connection);
       const before = seen.sessions[0];
-      assert.ok(before !== undefined, 'the first call has a session cookie');
-      // Idle: the keep-alive's ping goes out after a whole interval.
+      if (!rfc) {
+        assert.ok(before !== undefined, 'the first call has a session cookie');
+      }
+      // Idle: the keep-alive's ping goes out after one to two intervals.
       const status = await pingAnswered;
       assert.ok(status >= 200 && status < 300, 'the ping was answered 2xx');
       const second = await session.callTool('KeepAliveSession', {});
       assert.notEqual(second.isError, true, 'the call after the pause');
-      // Compared, never printed.
-      assert.ok(seen.sessions[1] === before, 'the same SAP session');
+      // Compared, never printed; an RFC connection has no cookie to compare.
+      if (!rfc) assert.ok(seen.sessions[1] === before, 'the same SAP session');
     } finally {
       await session.close();
       await server.terminalClose();

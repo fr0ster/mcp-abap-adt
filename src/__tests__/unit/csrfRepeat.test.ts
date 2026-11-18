@@ -330,6 +330,76 @@ describe('the review of #364', () => {
     expect(logged).not.toContain(REPEATED_CALL_WORDS);
   });
 
+  it("the access check's first read refused in a new session: the whole call runs once more, its check again", async () => {
+    await server.close();
+    server = await inProcessServer(
+      'onprem',
+      {
+        settings: {
+          url: stand.url,
+          client: '100',
+          authType: 'basic',
+          username: 'PIN_USER',
+        },
+        credential: new BasicAuthProvider('PIN_USER', 'pin-password'),
+      },
+      undefined,
+      {
+        // As the shipped package-tree check: a read that fails is
+        // `package_tree_unreadable`, and the call refused.
+        accessChecks: {
+          check: async (_call, sap) => {
+            try {
+              await sap.superPackageOf('ZPKG');
+            } catch {
+              return {
+                allowed: false,
+                code: 'package_tree_unreadable',
+                argument: 'transport_request',
+                value: 'PFXK900001',
+              };
+            }
+            return ALLOWED;
+          },
+        },
+      },
+      (message) => {
+        logged.push(message);
+      },
+    );
+    const update = () =>
+      server.call('UpdateInterface', {
+        interface_name: 'ZIF_A',
+        source_code: 'INTERFACE zif_a PUBLIC. ENDINTERFACE.',
+        activate: false,
+        transport_request: 'PFXK900001',
+      });
+    await update();
+    endWithTokenRefusal(currentSession(), (r) =>
+      r.url.startsWith('/sap/bc/adt/packages/'),
+    );
+    const reads = sent('GET', '/sap/bc/adt/packages/').length;
+    const answered = await update();
+    expect(answered.isError).not.toBe(true);
+    expect(sent('GET', '/sap/bc/adt/packages/').length - reads).toBe(2);
+    expect(renewedOf(answered)).toBe(SESSION_RENEWED_WORDS);
+    expect(logged).toContain(REPEATED_CALL_WORDS);
+  });
+
+  it("the system lookup, the call's first request, refused in a new session: the call runs once more", async () => {
+    // No system information: the call asks for it before each tool.
+    stand.systemInformation(null);
+    await activate();
+    endWithTokenRefusal(currentSession(), (r) =>
+      r.url.startsWith('/sap/bc/adt/core/http/systeminformation'),
+    );
+    const before = sent('POST', ACTIVATION).length;
+    const answered = await activate();
+    expect(answered.isError).not.toBe(true);
+    expect(sent('POST', ACTIVATION).length - before).toBe(1);
+    expect(renewedOf(answered)).toBe(SESSION_RENEWED_WORDS);
+  });
+
   it('a host connection (injected) is never repeated: the server cannot replace it', async () => {
     await server.close();
     const injected = createAbapConnection(

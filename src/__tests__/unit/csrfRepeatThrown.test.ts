@@ -6,6 +6,8 @@
  * the session; the stateful request with its cookie is answered in a new
  * one, which the connection throws for.
  */
+
+import { createServer } from 'node:net';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -71,8 +73,14 @@ afterEach(async () => {
  * again: what it answered and how often its second request went out.
  * `created`: the stand-in answers the stateful request `201`.
  */
-async function afterSessionEnd(tool: string, created = false) {
+async function afterSessionEnd(
+  tool: string,
+  created = false,
+  deferred?: { readonly unreachable: string },
+) {
   const provider = new BasicAuthProvider('PROBE_USER', 'probe-password');
+  // The system's address; `deferred.unreachable` once the session ended.
+  let url = stand.url;
   const server = new StdioServer(
     new CompositeHandlersRegistry([
       probeGroup([
@@ -82,12 +90,13 @@ async function afterSessionEnd(tool: string, created = false) {
     ]),
     {
       settingsFor: async () => ({
-        url: stand.url,
+        url,
         client: '100',
         authType: 'basic' as const,
       }),
       getProvider: async () => provider,
     },
+    deferred === undefined ? undefined : { deferredLogon: true },
   );
   if (created) {
     stand.respond(
@@ -108,6 +117,7 @@ async function afterSessionEnd(tool: string, created = false) {
       .find((request) => !isLogoff(request.url));
     if (last === undefined) throw new Error('no request yet');
     stand.endSession(last.session);
+    if (deferred !== undefined) url = deferred.unreachable;
     const answered = await client.callTool({
       name: tool,
       arguments: { id: 'two' },
@@ -144,4 +154,27 @@ it('another stateful request answered 201 in the new session (SAP ran it) runs n
   expect(sent).toBe(1);
   expect(text).toContain(sessionEndWords(ADT_SESSION_ERROR.SESSION_REPLACED));
   expect(text).not.toContain('session_renewed');
+});
+
+it('deferred stdio: the new logon unreachable answers no_connection as the CLI options say, with no session_renewed', async () => {
+  // A loopback port bound and closed: nothing listens there.
+  const port = await new Promise<number>((resolve, reject) => {
+    const probe = createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const address = probe.address();
+      const bound =
+        typeof address === 'object' && address !== null ? address.port : 0;
+      probe.close(() => resolve(bound));
+    });
+  });
+  const { answered, sent, text } = await afterSessionEnd('ProbeLock', false, {
+    unreachable: `http://127.0.0.1:${port}`,
+  });
+  expect(answered.isError).toBe(true);
+  expect(sent).toBe(1);
+  const payload = JSON.parse(text);
+  expect(payload.error).toBe('no_connection');
+  expect(payload.message).toContain('ECONNREFUSED');
+  expect(payload).not.toHaveProperty('session_renewed');
 });

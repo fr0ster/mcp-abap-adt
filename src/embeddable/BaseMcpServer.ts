@@ -1935,263 +1935,254 @@ export abstract class BaseMcpServer extends McpServer {
                 taken ??= acquire();
                 return taken;
               };
-              // The access checks (spec §3.2): once, before the call takes
-              // its connection; a refused call takes none, sends nothing and
-              // takes no batch number. A strategy that reads takes the call's
-              // connection through the reader, and the call goes on with it.
+              // The access checks (spec §3.2) see the call's arguments once.
               const accessCall =
                 this.accessChecks === undefined || checked === undefined
                   ? undefined
                   : accessCallOf(entry.toolDefinition.name, checked, args);
-              if (this.accessChecks !== undefined && accessCall !== undefined) {
-                const verdict = await this.accessChecks.check(
-                  accessCall,
-                  lazyPackageReader(
-                    async () => (await take()).connection,
-                    this.logger,
-                    signal,
-                  ),
-                );
-                if (!verdict.allowed) {
-                  return this.refusalAnswer(refusalOf(verdict));
-                }
-              }
-              const { connection, system, batchAvailability } = await take();
-              const context: HandlerContext = {
-                connection,
-                logger: this.logger,
-                adtHeaders: this.adtHeadersOf(connection),
-                state: this.state,
-                debugger: () => this.takeDebugger(),
-                onMainConnection: (send) => this.onMainConnection(signal, send),
-                ...(this.batch !== undefined ? { batch: this.batch } : {}),
-                ...(batchAvailability !== undefined
-                  ? { batchAvailability }
-                  : {}),
-                ...this.searchStrategies(),
-                heldLocks: this.heldLocks,
-                ...(this.longSessionPort !== undefined
-                  ? { longSession: this.longSessionPort }
-                  : {}),
-                ...(this.systemType !== undefined
-                  ? { systemType: this.systemType }
-                  : {}),
-                ...(this.leftoverSessions !== undefined
-                  ? { sessionFiles: this.leftoverSessions }
-                  : {}),
-              };
-
-              // If handler expects context+args (preferred), pass both.
-              // Otherwise, update group context and call with args only for backward compatibility.
-              // NOTE: Always await the handler result to ensure we get the resolved value for normalization
-              // Both branches run inside withKnownSystemContext: the
-              // responsible/master system are what the system names
-              // (src/lib/requestSystemResolution.ts), over anything stated.
-              // The destination's own .env enters the scope first, below the
-              // request's headers; it stands only where an on-premise system
-              // has no systeminformation.
-              // The whole call runs in the request signal scope, and
-              // a call whose signal aborted before its tool starts — after
-              // the connection is ready, after the system lookup — never
-              // reaches the tool.
-              const holdsFlow = leaveFlow !== undefined;
-              const resolvedOn = <T>(
-                on: HandlerContext,
-                known: ResolvedSystemContext | undefined,
-                fn: () => Promise<T>,
-              ) =>
-                this.inHeldFlow(holdsFlow, on.connection, () =>
-                  runWithRequestSignal(signal, () =>
-                    withDestinationSystemContext(
-                      this.statedContextOf(on.connection),
-                      () =>
-                        // Asked before the tool (`systemBeforeTool`):
-                        // nothing is sent here.
-                        withKnownSystemContext(known, () => {
-                          throwIfRequestAborted(signal);
-                          // The call's own transport request, for the
-                          // failure renderer's transport hint.
-                          return runWithCallTransport(args, fn);
-                        }),
+              // One attempt of the call: its preflight (the access check, the
+              // connection with its system lookup, `take()`), then its tool.
+              // `started` is said when the tool's handler begins.
+              const attempt = async (
+                started?: () => void,
+              ): Promise<ToolResultLike> => {
+                // The access checks (spec §3.2): once, before the call takes
+                // its connection; a refused call takes none, sends nothing and
+                // takes no batch number. A strategy that reads takes the call's
+                // connection through the reader, and the call goes on with it.
+                if (
+                  this.accessChecks !== undefined &&
+                  accessCall !== undefined
+                ) {
+                  const verdict = await this.accessChecks.check(
+                    accessCall,
+                    lazyPackageReader(
+                      async () => (await take()).connection,
+                      this.logger,
+                      signal,
                     ),
-                  ),
-                );
-              const resolved = <T>(fn: () => Promise<T>) =>
-                resolvedOn(context, system, fn);
-              // Batch mode (read inside the call's turn): an eligible call is
-              // recorded, every other refused — before any handler is chosen.
-              if (this.batchOpenFor(entry.toolDefinition.name)) {
-                return await this.recordCall({
-                  tool: entry.toolDefinition.name,
-                  call: entry.call,
-                  context,
-                  args: handlerArgs,
-                  askedBackground: longRead && args.background === true,
-                  holdsFlow,
-                  runsInBackground,
-                  system,
-                  signal,
-                });
-              }
-              let handlerPromise: Promise<ToolResultLike>;
-              if (runsInBackground) {
-                // A background run — a code run, or a listed long read — on
-                // its one connection of its own (the read's handler runs on
-                // it directly, no `runLongCall`), answered at once with its
-                // handle; its answer goes to the strategy.
-                handlerPromise = resolved(() =>
-                  this.startBackground(
-                    entry.toolDefinition.name,
-                    longRead ? 'read' : 'code',
-                    entry.call,
-                    context,
-                    handlerArgs,
-                    signal,
-                  ),
-                );
-              } else if (longRead) {
-                // A listed long tool in the call: a read on a connection of
-                // its own, logged off after the answer.
-                handlerPromise = resolved(() =>
-                  runLongCall({
-                    name: entry.toolDefinition.name,
-                    connection,
-                    logger: this.logger,
-                    run: (own) =>
-                      callHandler(
-                        entry.call,
-                        { ...context, connection: own },
-                        handlerArgs,
-                      ),
-                  }),
-                );
-              } else {
-                // On the instance's connection, a handler's failure is read
-                // by the instance first (`readAdtFailure`).
-                const runOn = (
+                  );
+                  if (!verdict.allowed) {
+                    return this.refusalAnswer(refusalOf(verdict));
+                  }
+                }
+                const { connection, system, batchAvailability } = await take();
+                const context: HandlerContext = {
+                  connection,
+                  logger: this.logger,
+                  adtHeaders: this.adtHeadersOf(connection),
+                  state: this.state,
+                  debugger: () => this.takeDebugger(),
+                  onMainConnection: (send) =>
+                    this.onMainConnection(signal, send),
+                  ...(this.batch !== undefined ? { batch: this.batch } : {}),
+                  ...(batchAvailability !== undefined
+                    ? { batchAvailability }
+                    : {}),
+                  ...this.searchStrategies(),
+                  heldLocks: this.heldLocks,
+                  ...(this.longSessionPort !== undefined
+                    ? { longSession: this.longSessionPort }
+                    : {}),
+                  ...(this.systemType !== undefined
+                    ? { systemType: this.systemType }
+                    : {}),
+                  ...(this.leftoverSessions !== undefined
+                    ? { sessionFiles: this.leftoverSessions }
+                    : {}),
+                };
+
+                // If handler expects context+args (preferred), pass both.
+                // Otherwise, update group context and call with args only for backward compatibility.
+                // NOTE: Always await the handler result to ensure we get the resolved value for normalization
+                // Both branches run inside withKnownSystemContext: the
+                // responsible/master system are what the system names
+                // (src/lib/requestSystemResolution.ts), over anything stated.
+                // The destination's own .env enters the scope first, below the
+                // request's headers; it stands only where an on-premise system
+                // has no systeminformation.
+                // The whole call runs in the request signal scope, and
+                // a call whose signal aborted before its tool starts — after
+                // the connection is ready, after the system lookup — never
+                // reaches the tool.
+                const holdsFlow = leaveFlow !== undefined;
+                const resolvedOn = <T>(
                   on: HandlerContext,
                   known: ResolvedSystemContext | undefined,
-                  started?: () => void,
+                  fn: () => Promise<T>,
                 ) =>
-                  resolvedOn(on, known, () => {
-                    started?.();
-                    return holdsFlow
-                      ? runWithAdtFailureReader(
-                          (failed) => this.readAdtFailure(failed),
-                          () => entry.call(on, handlerArgs),
-                        )
-                      : entry.call(on, handlerArgs);
+                  this.inHeldFlow(holdsFlow, on.connection, () =>
+                    runWithRequestSignal(signal, () =>
+                      withDestinationSystemContext(
+                        this.statedContextOf(on.connection),
+                        () =>
+                          // Asked before the tool (`systemBeforeTool`):
+                          // nothing is sent here.
+                          withKnownSystemContext(known, () => {
+                            throwIfRequestAborted(signal);
+                            // The call's own transport request, for the
+                            // failure renderer's transport hint.
+                            return runWithCallTransport(args, fn);
+                          }),
+                      ),
+                    ),
+                  );
+                const resolved = <T>(fn: () => Promise<T>) =>
+                  resolvedOn(context, system, fn);
+                // Batch mode (read inside the call's turn): an eligible call is
+                // recorded, every other refused — before any handler is chosen.
+                if (this.batchOpenFor(entry.toolDefinition.name)) {
+                  return await this.recordCall({
+                    tool: entry.toolDefinition.name,
+                    call: entry.call,
+                    context,
+                    args: handlerArgs,
+                    askedBackground: longRead && args.background === true,
+                    holdsFlow,
+                    runsInBackground,
+                    system,
+                    signal,
                   });
-                // The one repeat (the owner's named exception to "no
-                // retries", 24.0.1): a call on the instance's connection
-                // whose first request SAP answered in a new session, its own
-                // ended (`isSessionReplacedBySap`: the token refusal marked
-                // `sessionLost`, or a stateful request's
-                // `ADT_SESSION_REPLACED`), with no request of it answered —
-                // the access check's and the system lookup's included
-                // (`watchRequests`, started before them) — ran nothing,
-                // whether the handler answered or threw. It runs once more
-                // only on a connection this server builds and holds
-                // (`built`), on the one `getConnection` gives after that
-                // loss — its gates as for any call — and only when that is
-                // another connection; the access check is made again on it.
-                // Never a batch tool, a debugger tool or a long-session tool;
-                // background runs and long reads are not on this path.
-                handlerPromise = (async (): Promise<ToolResultLike> => {
-                  let first:
-                    | { ok: true; value: ToolResultLike }
-                    | { ok: false; thrown: unknown };
-                  try {
-                    first = { ok: true, value: await runOn(context, system) };
-                  } catch (thrown) {
-                    first = { ok: false, thrown };
-                  }
-                  const watched = watch?.end();
-                  watch = undefined;
-                  const settled = (): ToolResultLike => {
-                    if (first.ok) return first.value;
-                    throw first.thrown;
-                  };
-                  if (
-                    watched?.refusedBeforeAnyRan !== true ||
-                    this.connectionContext?.kind !== 'built'
-                  ) {
-                    return settled();
-                  }
-                  this.logger.info(REPEATED_CALL_WORDS, {
+                }
+                let handlerPromise: Promise<ToolResultLike>;
+                if (runsInBackground) {
+                  // A background run — a code run, or a listed long read — on
+                  // its one connection of its own (the read's handler runs on
+                  // it directly, no `runLongCall`), answered at once with its
+                  // handle; its answer goes to the strategy.
+                  handlerPromise = resolved(() =>
+                    this.startBackground(
+                      entry.toolDefinition.name,
+                      longRead ? 'read' : 'code',
+                      entry.call,
+                      context,
+                      handlerArgs,
+                      signal,
+                    ),
+                  );
+                } else if (longRead) {
+                  // A listed long tool in the call: a read on a connection of
+                  // its own, logged off after the answer.
+                  handlerPromise = resolved(() =>
+                    runLongCall({
+                      name: entry.toolDefinition.name,
+                      connection,
+                      logger: this.logger,
+                      run: (own) =>
+                        callHandler(
+                          entry.call,
+                          { ...context, connection: own },
+                          handlerArgs,
+                        ),
+                    }),
+                  );
+                } else {
+                  // On the instance's connection, a handler's failure is read
+                  // by the instance first (`readAdtFailure`).
+                  const runOn = (
+                    on: HandlerContext,
+                    known: ResolvedSystemContext | undefined,
+                    started?: () => void,
+                  ) =>
+                    resolvedOn(on, known, () => {
+                      started?.();
+                      return holdsFlow
+                        ? runWithAdtFailureReader(
+                            (failed) => this.readAdtFailure(failed),
+                            () => entry.call(on, handlerArgs),
+                          )
+                        : entry.call(on, handlerArgs);
+                    });
+                  handlerPromise = runOn(context, system, started);
+                }
+                return handlerPromise;
+              };
+
+              // The one repeat (the owner's named exception to "no retries",
+              // 24.0.1): a call on the instance's connection whose first
+              // request — its preflight's included, watched from before it
+              // (`watchRequests`) — met SAP's end of its session before
+              // anything ran (`isSessionReplacedBySap`: SAP's token refusal
+              // in a new session, or a first LOCK's `ADT_SESSION_REPLACED`),
+              // with no request of it answered, whether the attempt answered
+              // or threw. It runs once more, whole — the preflight again on
+              // the new connection — only on a connection this server builds
+              // and holds (`built`) and only when `getConnection` gives
+              // another one. Never a batch tool, a debugger tool or a
+              // long-session tool; background runs and long reads are not
+              // watched.
+              let first:
+                | { ok: true; value: ToolResultLike }
+                | { ok: false; thrown: unknown };
+              try {
+                first = { ok: true, value: await attempt() };
+              } catch (thrown) {
+                first = { ok: false, thrown };
+              }
+              const watched = watch?.end();
+              watch = undefined;
+              let result: ToolResultLike;
+              const spent = inUse;
+              if (
+                watched?.refusedBeforeAnyRan === true &&
+                this.connectionContext?.kind === 'built' &&
+                spent !== undefined
+              ) {
+                this.logger.info(REPEATED_CALL_WORDS, {
+                  tool: entry.toolDefinition.name,
+                });
+                inUse = undefined;
+                this.connectionReleased(spent);
+                let fresh: IAbapConnection;
+                try {
+                  fresh = await this.getConnection(signal);
+                } catch (thrown) {
+                  // Only the new logon's failure is answered so; a cancel is
+                  // the cancel's, and a refusal the server words itself
+                  // (stdio's `no_connection`) keeps its error and cause.
+                  if (signal.aborted) throw thrown;
+                  const read = readGuarded((t) => this.readFailure(t), thrown);
+                  if (read?.error === 'no_connection') throw thrown;
+                  this.logger.debug(SESSION_RENEWAL_FAILED_WORDS, {
                     tool: entry.toolDefinition.name,
                   });
-                  let again: {
-                    connection: IAbapConnection;
-                    system: ResolvedSystemContext | undefined;
-                  };
-                  try {
-                    inUse = undefined;
-                    this.connectionReleased(context.connection);
-                    const fresh = await this.getConnection(signal);
-                    inUse = fresh;
-                    // Not replaced: nothing to run on but the spent one.
-                    if (fresh === context.connection) return settled();
-                    again = await this.systemBeforeTool(
+                  return sessionRenewalFailed();
+                }
+                inUse = fresh;
+                if (fresh === spent) {
+                  // Not replaced: nothing to run on but the spent one.
+                  if (!first.ok) throw first.thrown;
+                  result = first.value;
+                } else {
+                  // The preflight again, on the new connection: its own
+                  // failures are the call's, as on any call.
+                  taken = (async () => {
+                    const again = await this.systemBeforeTool(
                       fresh,
-                      holdsFlow,
+                      leaveFlow !== undefined,
                       signal,
                       (taken) => {
                         inUse = taken;
                       },
                     );
                     declareSystemKind(again.connection, this.systemType);
-                    // The access check again, on the new connection: the
-                    // first verdict is the old session's.
-                    if (
-                      this.accessChecks !== undefined &&
-                      accessCall !== undefined
-                    ) {
-                      const replaced = again.connection;
-                      const verdict = await this.accessChecks.check(
-                        accessCall,
-                        lazyPackageReader(
-                          async () => replaced,
-                          this.logger,
-                          signal,
-                        ),
-                      );
-                      if (!verdict.allowed) {
-                        return this.refusalAnswer(refusalOf(verdict));
-                      }
-                    }
-                  } catch (thrown) {
-                    // A cancel is the cancel's answer; any other failure of
-                    // the new session is answered in the server's words.
-                    if (signal.aborted) throw thrown;
-                    this.logger.debug(SESSION_RENEWAL_FAILED_WORDS, {
-                      tool: entry.toolDefinition.name,
-                    });
-                    return sessionRenewalFailed();
-                  }
-                  const availability = this.batchAvailabilityOf(
-                    again.connection,
-                  );
-                  const { batchAvailability: _old, ...rest } = context;
-                  return runOn(
-                    {
-                      ...rest,
+                    return {
                       connection: again.connection,
-                      adtHeaders: this.adtHeadersOf(again.connection),
-                      ...(availability !== undefined
-                        ? { batchAvailability: availability }
-                        : {}),
-                    },
-                    again.system,
+                      system: again.system,
+                      batchAvailability: this.batchAvailabilityOf(
+                        again.connection,
+                      ),
+                    };
+                  })();
+                  result = await attempt(() => {
                     // Said only once the second run has begun.
-                    () => {
-                      renewed = true;
-                    },
-                  );
-                })();
+                    renewed = true;
+                  });
+                }
+              } else {
+                if (!first.ok) throw first.thrown;
+                result = first.value;
               }
-
-              const result = await handlerPromise;
 
               // Shared with BaseHandlerGroup so the two registration paths
               // cannot drift apart.

@@ -389,8 +389,6 @@ describe('cleanup', () => {
 
 const TM = 'http://www.sap.com/cts/adt/tm';
 const ADTCORE = 'http://www.sap.com/adt/core';
-const CONFIG_URI =
-  '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/C1';
 
 interface StandRequest {
   number: string;
@@ -421,12 +419,6 @@ function organizer(requests: StandRequest[]): void {
       request.method === 'POST' &&
       request.url.startsWith('/sap/bc/adt/communication/batch'),
     404,
-  );
-  stand.body(
-    isGet(
-      '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations',
-    ),
-    `<?xml version="1.0" encoding="utf-8"?><configurations:configurations xmlns:configurations="http://www.sap.com/adt/configurations"><configuration:configuration xmlns:configuration="http://www.sap.com/adt/configuration"><atom:link href="${CONFIG_URI}" rel="http://www.sap.com/adt/categories/configurations" type="application/vnd.sap.adt.configuration.v1+xml" etag="1" xmlns:atom="http://www.w3.org/2005/Atom"/></configuration:configuration></configurations:configurations>`,
   );
   stand.respond(
     (request) =>

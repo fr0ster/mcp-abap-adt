@@ -9,9 +9,9 @@
  * different targets is refused (measured, `TransportObjectToolsCrud.test.ts`).
  *
  * - **Both systems:** HandlerTransportCreate creates a request,
- *   ListTransports lists the session user's modifiable requests (an empty
- *   list is a valid answer: the system's saved search decides what it
- *   holds), and HandlerTransportSortAndCompress sorts and compresses the
+ *   ListTransports lists the session user's modifiable requests by SAP's
+ *   query (no saved search configuration), the request just created among
+ *   them, and HandlerTransportSortAndCompress sorts and compresses the
  *   new request's task. On
  *   premise the task holds an own interface's entry (the package has a
  *   transport layer, so SAP records it there), still held once after. The
@@ -259,13 +259,20 @@ liveSuite(['onprem', 'cloud'], 'Compact transports', () => {
     own.push(await ownRequest(plan, created));
   });
 
-  it("ListTransports lists the session user's modifiable requests", async () => {
+  it("ListTransports lists the session user's modifiable requests, the one just created among them", async () => {
     const answered = await liveCall('ListTransports', {});
     const listed = payloadOf(succeeded('ListTransports', answered));
     assert.equal(member(listed, 'success'), true);
     const transports = member(listed, 'transports');
     if (!Array.isArray(transports)) throw new Error('no transports list');
     assert.equal(member(listed, 'count'), transports.length);
+    const numbers = transports.map((transport) => member(transport, 'number'));
+    for (const created of own) {
+      assert.ok(
+        numbers.includes(created.request),
+        `the request ${created.request} created by this suite is not listed`,
+      );
+    }
     for (const transport of transports) {
       const number = member(transport, 'number');
       assert.equal(typeof number, 'string');

@@ -239,6 +239,30 @@ export function answerTokenRefusal(thrown: unknown): FailureAnswer | undefined {
 }
 
 /**
+ * A failure's words as the consumer may read them: the server's for SAP's
+ * refusal of the session token and for a session error code the connection
+ * reported (`step`, where it arose, named in them), else the failure's own
+ * message.
+ */
+export function failureWords(error: IAdtError, step?: string): string {
+  if (error.response !== undefined && isCsrfRefusal(error.response)) {
+    return CSRF_REFUSAL_WORDS;
+  }
+  if (error.origin === 'connection' && error.sessionError !== undefined) {
+    return sessionEndWords(error.sessionError, step ?? stepOf(error));
+  }
+  return error.message;
+}
+
+/** A throw's words as the consumer may read them (`failureWords`'s rule), else its message. */
+export function thrownWords(thrown: unknown, step?: string): string {
+  if (thrownCsrfRefusal(thrown) !== undefined) return CSRF_REFUSAL_WORDS;
+  const code = thrownSessionCode(thrown);
+  if (code !== undefined) return sessionEndWords(code, step ?? stepOf(thrown));
+  return messageOf(thrown);
+}
+
+/**
  * A failure the connection reported with a session error code, answered:
  * the server's words for it (`sessionEndWords`, with the step where one is
  * named) and the code as `session_error`, where it arose and what a release

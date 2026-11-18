@@ -1,4 +1,5 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { sessionEndWords } from '../../lib/sessionEnd';
 import {
   attachCleanup,
   carryCleanup,
@@ -342,7 +343,10 @@ describe('withLock, a release on a spent connection', () => {
       OBJECT,
     );
     const cleanup = (result as { cleanup?: Record<string, unknown> }).cleanup;
-    expect(cleanup).toMatchObject(leftLockedBy('words that are never read'));
+    // The connection's words are never read: the reason is the server's.
+    expect(cleanup).toMatchObject(
+      leftLockedBy(sessionEndWords('ADT_RELEASE_PENDING', 'unlock')),
+    );
   });
 });
 

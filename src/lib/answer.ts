@@ -36,7 +36,6 @@ import {
   safeRequest,
   thrownCleanup,
 } from './strategies/safeFields';
-import { locatedMessages } from './strategies/sourceMessages';
 import { methodFailureOf, stepOf, withStep } from './strategies/step';
 import { cleanupOf, type StepError } from './strategies/stepResponse';
 import {
@@ -320,18 +319,13 @@ export function failurePayload(
   // match on without reading English, and `no` stays the zero-padded string SAP
   // sent — SADT_RESOURCE/26 is a key no system knows.
   //
-  // Where each message stands is read from SAP's document the strategy read
-  // them from (`locatedMessages`): a checklist's or a check run's message
-  // states its object (`objDescr`) and its href, whose `#start=` is the
-  // source position. A strategy's `line` is a checklist `msg`'s ordinal, not
-  // a source line, and is not answered.
-  const body = wireValueOf(error.response?.data);
+  // Where each message stands is the message's own: the strategy states its
+  // `object` (`objDescr`), `uri` and `position` (its href's `#start=`), and
+  // an activation run's message its `source_uri` (adt-strategies 0.23.2,
+  // `activationMessagesOf`). The library's deprecated `line` is
+  // `String(position.line)` and is not answered: `position` carries it.
   if (error.messages !== undefined) {
-    const messages =
-      body.kind === 'text'
-        ? locatedMessages(error.messages, body.text)
-        : error.messages;
-    payload.messages = messages.map((m) => {
+    payload.messages = error.messages.map((m) => {
       const out: { [key: string]: AnswerValue } = {
         type: m.type,
         text: m.text,
@@ -393,6 +387,7 @@ export function failurePayload(
   //
   // The empty string is not a document — emitting `raw_body: ""` would read as
   // "SAP sent an empty body" when nothing was sent at all.
+  const body = wireValueOf(error.response?.data);
   const answeredOk =
     typeof status === 'number' && status >= 200 && status < 300;
   if (

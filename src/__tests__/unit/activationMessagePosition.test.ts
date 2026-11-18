@@ -231,3 +231,80 @@ describe('check runs: chkrun:uri carries the position', () => {
     expect(parsed.errors).toEqual([SYNTAX_MESSAGE]);
   });
 });
+
+describe('a refusal answers each message from its own fields, never by its words', () => {
+  /** A refusal over the reported document, its messages as given. */
+  function refusalWith(
+    messages: ReadonlyArray<{
+      type: string;
+      text: string;
+      object?: string;
+      uri?: string;
+      position?: { line: number; column: number };
+      code?: string;
+    }>,
+  ) {
+    return {
+      origin: 'refusal' as const,
+      message: 'refused',
+      messages,
+      response: { data: REPORTED, status: 200, statusText: 'OK', headers: {} },
+    };
+  }
+
+  it('a message that states no location gets none from a document sentence with the same words', () => {
+    const payload = failurePayload(
+      refusalWith([{ type: 'E', text: 'Field "LV_UNDEFINED" is unknown.' }]),
+    );
+    expect(payload.messages).toEqual([
+      { type: 'E', text: 'Field "LV_UNDEFINED" is unknown.' },
+    ]);
+  });
+
+  it('every message is answered, with its own location, whatever its words', () => {
+    const payload = failurePayload(
+      refusalWith([
+        {
+          type: 'E',
+          text: 'same words',
+          object: 'Class A',
+          uri: '/a',
+          position: { line: 1, column: 2 },
+        },
+        {
+          type: 'E',
+          text: 'same words',
+          object: 'Class B',
+          uri: '/b',
+          position: { line: 3, column: 4 },
+        },
+        { type: 'W', text: 'words no document says', code: 'X(1)' },
+      ]),
+    );
+    expect(payload.messages).toEqual([
+      {
+        type: 'E',
+        text: 'same words',
+        object: 'Class A',
+        uri: '/a',
+        position: { line: 1, column: 2 },
+      },
+      {
+        type: 'E',
+        text: 'same words',
+        object: 'Class B',
+        uri: '/b',
+        position: { line: 3, column: 4 },
+      },
+      { type: 'W', text: 'words no document says', code: 'X(1)' },
+    ]);
+  });
+
+  it("the library's deprecated line is not answered", () => {
+    const verdict = activationFailure(REPORTED);
+    expect(verdict.messages?.[0]).toHaveProperty('line', '16');
+    for (const message of failurePayload(verdict).messages ?? []) {
+      expect(message).not.toHaveProperty('line');
+    }
+  });
+});

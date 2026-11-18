@@ -464,7 +464,9 @@ describe('AmdpSession', () => {
         sessionError: 'ADT_RELEASE_PENDING',
       });
     };
-    await expect(w.session.stop()).rejects.toThrow(/stop: .*pending/);
+    await expect(w.session.stop()).rejects.toThrow(
+      /stop: .*still being released/,
+    );
     expect(w.dropped).toHaveLength(0);
     expect(w.session.holdsState()).toBe(true);
   });

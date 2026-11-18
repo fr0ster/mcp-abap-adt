@@ -13,7 +13,10 @@ import {
   type IAdtError,
   type IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  AdtSessionErrorCode,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { readAdtFailureInCall } from './adtFailureReading';
 import type { IAnswerSerializer } from './answerSerializer';
 import {
@@ -34,6 +37,11 @@ import {
   type JsonValue,
   parseJson,
 } from './json';
+import {
+  logSessionEnd,
+  sessionEndWords,
+  thrownSessionCode,
+} from './sessionEnd';
 import type { SourcePosition } from './sourceHref';
 import type { AnswerDetail } from './strategies/projections';
 import {
@@ -226,8 +234,51 @@ function csrfRefusalPayload(
  * own catch takes (`return_error`) before it reads SAP's body.
  */
 export function answerTokenRefusal(thrown: unknown): FailureAnswer | undefined {
-  const token = thrownCsrfRefusal(thrown);
+  const token = thrownCsrfRefusal(thrown) ?? thrownSessionEnd(thrown);
   return token === undefined ? undefined : failures.json(failurePayload(token));
+}
+
+/**
+ * A failure the connection reported with a session error code, answered:
+ * the server's words for it (`sessionEndWords`, with the step where one is
+ * named) and the code as `session_error`, where it arose and what a release
+ * left — none of the connection's words. The original goes to the log.
+ */
+function sessionEndPayload(
+  error: StepError,
+  code: AdtSessionErrorCode,
+): FailureEntry {
+  logSessionEnd(code, error.message);
+  const step = stepOf(error);
+  const payload: { [key: string]: AnswerValue } = {
+    message: sessionEndWords(code, step),
+    origin: error.origin,
+    session_error: code,
+  };
+  if (step !== undefined) payload.step = step;
+  const request = safeRequest(error.request);
+  if (request !== undefined) payload.request = request;
+  const cleanup = safeCleanup(error.cleanup);
+  if (cleanup !== undefined) payload.cleanup = cleanup;
+  if (error.operation === 'succeeded') payload.operation = 'succeeded';
+  return payload;
+}
+
+/**
+ * A thrown value the connection threw with a session error code, as a
+ * failure with its step; `undefined` for any other.
+ */
+export function thrownSessionEnd(thrown: unknown): StepError | undefined {
+  const code = thrownSessionCode(thrown);
+  if (code === undefined) return undefined;
+  const carried = child(thrown, 'message');
+  const step = stepOf(thrown);
+  const failure: StepError = {
+    origin: 'connection',
+    message: typeof carried === 'string' ? carried : '',
+    sessionError: code,
+  };
+  return step === undefined ? failure : withStep(failure, step);
 }
 
 /**
@@ -357,6 +408,9 @@ export function failurePayload(
 ): FailureEntry {
   if (error.response !== undefined && isCsrfRefusal(error.response)) {
     return csrfRefusalPayload(error, error.response);
+  }
+  if (error.origin === 'connection' && error.sessionError !== undefined) {
+    return sessionEndPayload(error, error.sessionError);
   }
   const payload: { [key: string]: AnswerValue } = {
     message: error.message,
@@ -537,7 +591,7 @@ export function thrownEntry(thrown: unknown, step: string): FailureEntry {
   if (read !== undefined) return { ...chainFailurePayload(read), step };
   const carried = methodFailureOf(thrown);
   if (carried !== undefined) return failureEntry(carried, step);
-  const token = thrownCsrfRefusal(thrown);
+  const token = thrownCsrfRefusal(thrown) ?? thrownSessionEnd(thrown);
   if (token !== undefined) return failurePayload(withStep(token, step));
   return { error: 'client_threw', message: messageOf(thrown), step };
 }
@@ -668,7 +722,7 @@ export function answerThrown(
   if (thrown instanceof SystemContextMissingError) {
     return local('system_context_missing', ctx, thrown.message);
   }
-  const token = thrownCsrfRefusal(thrown);
+  const token = thrownCsrfRefusal(thrown) ?? thrownSessionEnd(thrown);
   if (token !== undefined) {
     return failures.json(withBeside(failurePayload(token, ctx.detail), ctx));
   }
@@ -760,10 +814,12 @@ export function requestErrorOf(
   // The thrown value is outside the type system: its answer is read, and one
   // that is not a wire answer is none.
   const response = wireResponseOf(child(thrown, 'response'));
+  const sessionError = thrownSessionCode(thrown);
   const verdict: IAdtError = {
     origin: 'connection',
     message,
     response,
+    ...(sessionError !== undefined ? { sessionError } : {}),
     ...(sent !== undefined
       ? { request: { method: sent.method, url: sent.url } }
       : {}),

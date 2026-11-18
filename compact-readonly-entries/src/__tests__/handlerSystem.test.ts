@@ -95,7 +95,7 @@ const ARGS: Readonly<Record<SystemAction, ToolArgs>> = {
   search_object: { object_name: 'ZCL_A*' },
   where_used: { object_name: 'ZCL_A', object_type: 'class' },
   package_tree: { package_name: 'ZPKG_A' },
-  transports: {},
+  transports: { user: 'USER_A' },
   atc_findings: { worklist_id: 'WORKLIST_A' },
   atc_results: { created_by: '*' },
   atc_result: { display_id: 'RESULT_A' },

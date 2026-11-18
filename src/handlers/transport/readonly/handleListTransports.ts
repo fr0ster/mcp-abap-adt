@@ -13,13 +13,18 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
+import { getRequestContext } from '../../../lib/requestContext';
+import { statedUserOf } from '../../../lib/requestSystemResolution';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { parseStructure } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { succeeded } from '../../../lib/strategies/stepResponse';
-import { getCreateSystemContext } from '../../../lib/systemContext';
+import {
+  isSystemInformationUnavailable,
+  readSystemInformation,
+} from '../../../lib/systemInformation';
 import {
   attr,
   child,
@@ -42,7 +47,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        'The SAP user whose requests to list, sent in upper case. Default: the current session user.',
+        "The SAP user whose requests to list, sent in upper case. Default: the session's login user.",
       ),
     modifiable_only: z
       .boolean()
@@ -167,15 +172,30 @@ type RequestStatuses = readonly ['D'] | readonly ['D', 'R'];
 const REQUEST_TYPES = ['K', 'W', 'T'] as const;
 
 /**
- * The user a listing is for: the argument, else the session's user
- * (`getCreateSystemContext`: the stated responsible, else the request
- * scope's login), upper case as SAP stores user ids; `''` when neither is
- * stated.
+ * The user a listing is for, upper case as SAP stores user ids: the
+ * argument; else the session's login (`statedUserOf`: the connection's
+ * `SAP_USERNAME`, else the request scope's `x-sap-login`) — a request's
+ * owner is its creator's login, so the responsible is never read here;
+ * else, with no login stated (a token's session), the user the system's
+ * `systeminformation` names. `''` when none of them names one: the
+ * endpoint absent (`404`) names none, and any other failure of that read
+ * is thrown as it came.
  */
-function listedUser(args: ListTransportsArgs): string {
-  return (args.user?.trim() || getCreateSystemContext().responsible || '')
-    .trim()
-    .toUpperCase();
+async function listedUser(
+  args: ListTransportsArgs,
+  connection: HandlerContext['connection'],
+): Promise<string> {
+  const named =
+    args.user?.trim() ||
+    statedUserOf(connection, getRequestContext()?.login)?.trim();
+  if (named) return named.toUpperCase();
+  try {
+    const { user } = await readSystemInformation(connection);
+    return (user ?? '').trim().toUpperCase();
+  } catch (error) {
+    if (isSystemInformationUnavailable(error)) return '';
+    throw error;
+  }
 }
 
 /**
@@ -193,22 +213,21 @@ export async function handleListTransports(
 ): Promise<McpResult> {
   const { connection, logger } = context;
   const detail = detailOf(args);
-  const user = listedUser(args);
   const requestStatus: RequestStatuses =
     args.modifiable_only === false ? ['D', 'R'] : ['D'];
-
-  logger?.debug(
-    `ListTransports: user=${user}, requestStatus=${requestStatus.join('')}`,
-  );
 
   return answer(
     { tool: 'ListTransports', detail },
     async () => {
+      const user = await listedUser(args, connection);
       if (user === '') {
         throw new Error(
-          'ListTransports has no user to list for: pass `user`, or state the session user (the responsible) on the connection.',
+          'ListTransports has no user to list for: the session states no login and the system names no user. Pass `user`.',
         );
       }
+      logger?.debug(
+        `ListTransports: user=${user}, requestStatus=${requestStatus.join('')}`,
+      );
       const listed = await atStep('list', () =>
         createAdtClient(connection, logger)
           .getRequest(resultsFor(transportDocuments))

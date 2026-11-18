@@ -7,6 +7,7 @@
  * selects the requests the user owns or holds a task in.
  */
 import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
+import { runWithRequestContext } from '../../lib/requestContext';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
@@ -23,11 +24,22 @@ const LISTING =
   '<tm:released><tm:request tm:number="PFXK900002" tm:owner="SESSION_USER" tm:desc="released" tm:type="K" tm:status="R"/></tm:released>' +
   '</tm:target></tm:workbench></tm:root>';
 
-/** The one request a call sent, its URL. */
+/** What a call sent and answered, its session's login `session_user`. */
 async function sentFor(args: Parameters<typeof handleListTransports>[1]) {
-  const connection = recordingConnection([{ data: LISTING }]);
+  return sentAs({ login: 'session_user' }, args, [{ data: LISTING }]);
+}
+
+/** What a call sent and answered in a request scope stating `scope`. */
+async function sentAs(
+  scope: Parameters<typeof runWithRequestContext>[0],
+  args: Parameters<typeof handleListTransports>[1],
+  answers: Parameters<typeof recordingConnection>[0],
+) {
+  const connection = recordingConnection(answers);
   declareSystemKind(connection, 'onprem');
-  const answered = await handleListTransports({ connection }, args);
+  const answered = await runWithRequestContext(scope, () =>
+    handleListTransports({ connection }, args),
+  );
   return { answered, requests: connection.requests };
 }
 
@@ -37,7 +49,7 @@ describe('ListTransports sends the query by user', () => {
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     setSystemContext({
       masterSystem: 'SYSTEM_PLACEHOLDER',
-      responsible: 'session_user',
+      responsible: 'design_owner',
     });
   });
   afterEach(() => {
@@ -46,10 +58,46 @@ describe('ListTransports sends the query by user', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
-  it("the session's own user: modifiable requests of every type", async () => {
+  it("the session's login, not the responsible: modifiable requests of every type", async () => {
     const { requests } = await sentFor({});
     expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
       `GET ${COLLECTION}?user=SESSION_USER&requestStatus=D&requestType=KWT`,
+    ]);
+  });
+
+  it('login and responsible both stated (systeminformation unavailable): the login', async () => {
+    const { requests } = await sentAs(
+      { login: 'alice', responsible: 'design_owner' },
+      {},
+      [{ data: LISTING }],
+    );
+    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
+      `GET ${COLLECTION}?user=ALICE&requestStatus=D&requestType=KWT`,
+    ]);
+  });
+
+  it("no login stated: the system's user, as systeminformation names it", async () => {
+    const { requests } = await sentAs({ responsible: 'design_owner' }, {}, [
+      { data: '{"userName":"bob","systemID":"SID"}' },
+      { data: LISTING },
+    ]);
+    expect(requests.map((r) => r.url)).toEqual([
+      '/sap/bc/adt/core/http/systeminformation',
+      `${COLLECTION}?user=BOB&requestStatus=D&requestType=KWT`,
+    ]);
+  });
+
+  it('no login and no system user: an error, and no listing is sent', async () => {
+    const { answered, requests } = await sentAs(
+      { responsible: 'design_owner' },
+      {},
+      [{ status: 404, statusText: 'Not Found', data: '' }],
+    );
+    expect(answered.isError).toBe(true);
+    const [first] = answered.content ?? [];
+    expect(first?.text).toContain('Pass `user`');
+    expect(requests.map((r) => r.url)).toEqual([
+      '/sap/bc/adt/core/http/systeminformation',
     ]);
   });
 
@@ -113,9 +161,9 @@ describe('ListTransports sends the query by user', () => {
     const body = corpusBody(
       'read-transport-list-structure--01-cts-transportrequests',
     );
-    const connection = recordingConnection([{ data: body }]);
-    declareSystemKind(connection, 'onprem');
-    const answered = await handleListTransports({ connection }, {});
+    const { answered } = await sentAs({ login: 'session_user' }, {}, [
+      { data: body },
+    ]);
     const [first] = answered.content ?? [];
     expect(JSON.parse(first?.text ?? 'null')).toMatchObject({
       success: true,

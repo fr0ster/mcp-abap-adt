@@ -1339,7 +1339,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `modifiable_only` (boolean, optional) - Modifiable requests only (true, the default), or modifiable and released requests (false; released ones from SAP's default window of the last 14 days).
-- `user` (string, optional) - The SAP user whose requests to list, sent in upper case. Default: the current session user.
+- `user` (string, optional) - The SAP user whose requests to list, sent in upper case. Default: the session's login user.
 
 ---
 

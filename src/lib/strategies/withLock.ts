@@ -5,13 +5,12 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import {
   failureEntry,
-  failureWords,
   isCredentialFailure,
   isCredentialPayload,
+  messageOf,
   thrownEntry,
-  thrownWords,
 } from '../answer';
-import { spentBy, spentByThrown } from '../sessionLoss';
+import { spentBy } from '../sessionLoss';
 import {
   type Cleanup,
   type LeftLocked,
@@ -79,9 +78,7 @@ async function runRelease<H, U>(
   } catch (error) {
     // No origin. `connection` and `refusal` are both claims about the server,
     // and neither is true of an argument-validation defect in this process.
-    // The server's words for a session end or SAP's token refusal; the
-    // throw's own message otherwise.
-    const message = thrownWords(error, 'unlock');
+    const message = messageOf(error);
     return {
       kind: 'threw',
       thrown: error,
@@ -91,14 +88,7 @@ async function runRelease<H, U>(
         // The throw as an entry, with its step: a credential failure as it
         // came, a carried method error as it is.
         failures: [thrownEntry(error, 'unlock')],
-        // A spent connection, as on the refused path: the lock went with
-        // its SAP session — no `left_locked`, no handle.
-        ...(spentByThrown(error)
-          ? {
-              object: { type: object.type, name: object.name },
-              warning: LOCK_WENT_WITH_SESSION_WORDS,
-            }
-          : leftLocked(handle, object, message)),
+        ...leftLocked(handle, object, message),
       },
     };
   }
@@ -111,7 +101,7 @@ async function runRelease<H, U>(
     // thrown error, where it can be logged or rethrown long before `answer()`
     // renders it.
     carrier: {
-      message: failureWords(error, 'unlock'),
+      message: error.message,
       origin: error.origin,
       request: safeRequest(error.request),
       // The method's error as it is — status, code, adt_type, T100 messages,
@@ -125,7 +115,7 @@ async function runRelease<H, U>(
             object: { type: object.type, name: object.name },
             warning: LOCK_WENT_WITH_SESSION_WORDS,
           }
-        : leftLocked(handle, object, failureWords(error, 'unlock'))),
+        : leftLocked(handle, object, error.message)),
     },
   };
 }

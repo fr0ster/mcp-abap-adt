@@ -37,10 +37,11 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # As in ci.yml: any known advisory of moderate severity or above stops
-      # the release, dev dependencies included.
+      # As in ci.yml: any known advisory of moderate severity or above in a
+      # production dependency stops the release (dev dependencies again once
+      # the tests leave Jest, #361).
       - name: Security audit (moderate+)
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Run Biome lint
         run: npm run lint:check -- --diagnostic-level=error

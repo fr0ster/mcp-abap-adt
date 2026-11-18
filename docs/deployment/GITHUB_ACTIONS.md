@@ -28,8 +28,10 @@ hung test ends the run instead of GitHub's 6-hour default.
 Every step gates the run; none is `continue-on-error`.
 
 **On Ubuntu / Node 22 only:**
-- `npm audit --audit-level=moderate` — every known advisory of moderate severity or above fails the
-  run, dev dependencies included
+- `npm audit --omit=dev --audit-level=moderate` — every known advisory of moderate severity or above
+  in a production dependency fails the run; dev dependencies are gated again once the tests leave
+  Jest (#361), since the picomatch advisory GHSA-fc5q-39xc-vjpf has no fixed release and comes in
+  only through jest and lint-staged
 - `npm pack` of all eighteen packages (`lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`,
   `compact-modify`, `server-runtime`, `http`, `sse`, `core`, `compact`, `compact-http`, `compact-sse`, `core-ro`,
   `http-ro`, `sse-ro`, `compact-ro`, `compact-http-ro`, `compact-sse-ro`)

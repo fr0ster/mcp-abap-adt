@@ -7,6 +7,10 @@
  *
  * Real adt-clients code runs over a recording connection.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
@@ -156,52 +160,62 @@ const TYPES: Array<[string, string, string]> = [
 
 describe('HandlerDeletionCheck is the one deletion check', () => {
   it('covers every type a deletion request removes, and only those', () => {
-    expect(TYPES.map(([t]) => t).sort()).toEqual([...DELETION_TYPES].sort());
-    expect(
+    assert.deepStrictEqual(
+      TYPES.map(([t]) => t).sort(),
+      [...DELETION_TYPES].sort(),
+    );
+    assert.deepStrictEqual(
       [
         ...(jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'object_type')
           .enum ?? []),
       ].sort(),
-    ).toEqual([...DELETION_TYPES].sort());
+      [...DELETION_TYPES].sort(),
+    );
   });
 
-  it.each(TYPES)(
-    '%s: exactly one request, the deletion check of the object, the same held, answered or 404 (a function module: its metadata read first)',
-    async (object_type, object_name, uri) => {
-      const args = { object_type, object_name };
-      const held = await check('pending', args);
-      const answered = await check({ status: 200, data: ALLOWS }, args);
-      const notFound = await check({ status: 404, data: '' }, args);
+  for (const [object_type, object_name, uri] of TYPES) {
+    it(
+      format(
+        '%s: exactly one request, the deletion check of the object, the same held, answered or 404 (a function module: its metadata read first)',
+        object_type,
+      ),
+      async () => {
+        const args = { object_type, object_name };
+        const held = await check('pending', args);
+        const answered = await check({ status: 200, data: ALLOWS }, args);
+        const notFound = await check({ status: 404, data: '' }, args);
 
-      // A function module's metadata is read at the group given, and the
-      // check sent only when that group holds it (#2).
-      const checked = object_type === 'FUNCTION_MODULE';
-      const first = checked
-        ? [{ method: 'GET', url: MODULE_METADATA, data: undefined }]
-        : [];
-      const [request, ...more] = answered.sent.slice(first.length);
-      if (request === undefined) throw new Error('no deletion check was sent');
-      expect(more).toEqual([]);
-      expect(answered.sent.slice(0, first.length)).toEqual(first);
-      expect(request.method).toBe('POST');
-      expect(request.url).toBe('/sap/bc/adt/deletion/check');
-      expect(String(request.data).toLowerCase()).toContain(
-        `adtcore:uri="${uri}"`,
-      );
-      expect(held.sent).toEqual(checked ? first : [request]);
-      expect(notFound.sent).toEqual(held.sent);
-      expect(answered.answer?.isError).not.toBe(true);
-      expect(notFound.answer?.isError).toBe(true);
-    },
-  );
+        // A function module's metadata is read at the group given, and the
+        // check sent only when that group holds it (#2).
+        const checked = object_type === 'FUNCTION_MODULE';
+        const first = checked
+          ? [{ method: 'GET', url: MODULE_METADATA, data: undefined }]
+          : [];
+        const [request, ...more] = answered.sent.slice(first.length);
+        if (request === undefined)
+          throw new Error('no deletion check was sent');
+        assert.deepStrictEqual(more, []);
+        assert.deepStrictEqual(answered.sent.slice(0, first.length), first);
+        assert.equal(request.method, 'POST');
+        assert.equal(request.url, '/sap/bc/adt/deletion/check');
+        assert.ok(
+          String(request.data).toLowerCase().includes(`adtcore:uri="${uri}"`),
+        );
+        assert.deepStrictEqual(held.sent, checked ? first : [request]);
+        assert.deepStrictEqual(notFound.sent, held.sent);
+        assert.notEqual(answered.answer?.isError, true);
+        assert.equal(notFound.answer?.isError, true);
+      },
+    );
+  }
 
   it('answers deletable as SAP permitted it', async () => {
     const answered = await check(
       { status: 200, data: ALLOWS },
       { object_type: 'CLASS', object_name: 'ZMCP_BLD_ANSCH01' },
     );
-    expect(answered.answer?.isError).not.toBe(true);
-    expect(JSON.parse(textOf(answered.answer))).toEqual({
+    assert.notEqual(answered.answer?.isError, true);
+    assert.deepStrictEqual(JSON.parse(textOf(answered.answer)), {
       deletable: true,
       object: 'ZMCP_BLD_ANSCH01',
     });
@@ -212,10 +226,12 @@ describe('HandlerDeletionCheck is the one deletion check', () => {
       { status: 200, data: REFUSES },
       { object_type: 'CLASS', object_name: 'ZMCP_BLD_ANSCH01' },
     );
-    expect(answered.sent).toHaveLength(1);
-    expect(answered.answer?.isError).toBe(true);
-    expect(textOf(answered.answer)).toContain(
-      'You are already editing ZMCP_BLD_ANSCH01',
+    assert.equal(answered.sent.length, 1);
+    assert.equal(answered.answer?.isError, true);
+    assert.ok(
+      textOf(answered.answer).includes(
+        'You are already editing ZMCP_BLD_ANSCH01',
+      ),
     );
   });
 
@@ -224,38 +240,42 @@ describe('HandlerDeletionCheck is the one deletion check', () => {
       { status: 200, data: ABSENT },
       { object_type: 'CLASS', object_name: 'ZCL_GONE' },
     );
-    expect(answered.answer?.isError).not.toBe(true);
-    expect(JSON.parse(textOf(answered.answer))).toEqual({
+    assert.notEqual(answered.answer?.isError, true);
+    assert.deepStrictEqual(JSON.parse(textOf(answered.answer)), {
       deletable: true,
       object: 'ZCL_GONE',
       message: { type: 'W', text: 'ZCL_GONE does not exist' },
     });
   });
 
-  it.each([
+  for (const [args, words] of [
     [{ object_type: 'CLASS' }, 'object_name is required'],
     [{ object_type: 'FUNCTION_MODULE', object_name: 'Z_FM_A' }, 'GROUP|MODULE'],
     [
       { object_type: 'LOCAL_TYPES', object_name: 'ZCL_A' },
       'Unsupported deletion check for object_type: LOCAL_TYPES',
     ],
-  ])('%j: refused before any request', async (args, words) => {
-    const answered = await check({ status: 200, data: ALLOWS }, args);
-    expect(answered.sent).toEqual([]);
-    expect(answered.answer?.isError).toBe(true);
-    expect(textOf(answered.answer)).toContain(words);
-  });
+  ] satisfies [Record<string, unknown>, string][]) {
+    it(format('%j: refused before any request', args), async () => {
+      const answered = await check({ status: 200, data: ALLOWS }, args);
+      assert.deepStrictEqual(answered.sent, []);
+      assert.equal(answered.answer?.isError, true);
+      assert.ok(textOf(answered.answer).includes(words));
+    });
+  }
 
   it('names no other tool', () => {
-    expect(TOOL_DEFINITION.description).not.toMatch(/Handler[A-Z]/);
+    assert.doesNotMatch(TOOL_DEFINITION.description, /Handler[A-Z]/);
   });
 
   it('asks about an include and a table type on ABAP cloud too', () => {
     const cloud = TOOL_DEFINITION.variants.cloud;
-    expect(jsonAt(listedJson(cloud.inputSchema), 'object_type').enum).toEqual(
-      expect.arrayContaining(['INCLUDE', 'TABLE_TYPE']),
-    );
-    expect(cloud.description).toContain('INCLUDE');
+    const named = jsonAt(listedJson(cloud.inputSchema), 'object_type').enum;
+    assert.ok(Array.isArray(named));
+    for (const type of ['INCLUDE', 'TABLE_TYPE']) {
+      assert.ok(named.some((e) => isDeepStrictEqual(e, type)));
+    }
+    assert.ok(cloud.description.includes('INCLUDE'));
   });
 });
 
@@ -272,10 +292,10 @@ describe('HandlerDeletionCheck is served by compact and compact-ro', () => {
 
   it('the read-only half carries it', () => {
     const read = compactReadOnlyEntries().map((e) => e.toolDefinition.name);
-    expect(read).toContain('HandlerDeletionCheck');
+    assert.ok(read.includes('HandlerDeletionCheck'));
   });
 
-  it.each([
+  for (const [_kind, set] of [
     [
       'compact',
       // The modifying half is not this package's to import; the read-only
@@ -293,9 +313,13 @@ describe('HandlerDeletionCheck is served by compact and compact-ro', () => {
         data: compactDataEntries,
       }),
     ],
-  ])('%s serves it', (_kind, set) => {
-    expect(
-      namesOf(set.groups(context, 'stdio', { dataTools: false }) as never),
-    ).toContain('HandlerDeletionCheck');
-  });
+  ] satisfies [string, ReturnType<typeof compactToolSetOf>][]) {
+    it(format('%s serves it', _kind), () => {
+      assert.ok(
+        namesOf(
+          set.groups(context, 'stdio', { dataTools: false }) as never,
+        ).includes('HandlerDeletionCheck'),
+      );
+    });
+  }
 });

@@ -5,9 +5,11 @@
  * `src/__tests__/parity/toolSetParity.test.ts`'s.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
 import { fullReadOnlyToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { main, readOnlyToolSet } from '../launcher';
 
@@ -44,14 +46,14 @@ const shape = (set: typeof readOnlyToolSet) =>
 
 describe('mcp-abap-adt-ro', () => {
   it('is @mcp-abap-adt/core-ro, and its bin is mcp-abap-adt-ro', () => {
-    expect(manifest.name).toBe('@mcp-abap-adt/core-ro');
-    expect(manifest.bin).toEqual({
+    assert.equal(manifest.name, '@mcp-abap-adt/core-ro');
+    assert.deepStrictEqual(manifest.bin, {
       'mcp-abap-adt-ro': './bin/mcp-abap-adt-ro.js',
     });
   });
 
   it('answers this package’s version, on stdout', async () => {
-    expect(await stopped(['--version'])).toEqual({
+    assert.deepStrictEqual(await stopped(['--version']), {
       stdout: [manifest.version],
       stderr: [],
       exits: [0],
@@ -60,22 +62,26 @@ describe('mcp-abap-adt-ro', () => {
 
   it('names itself in USAGE, and lists its tools, not an exposition', async () => {
     const { stderr, exits } = await stopped(['--help']);
-    expect(exits).toEqual([0]);
-    expect(stderr.join('\n')).toContain('USAGE:\n  mcp-abap-adt-ro [options]');
-    expect(stderr.join('\n')).toContain(
-      '\nTOOLS:\n  mcp-abap-adt-ro serves one fixed tool set',
+    assert.deepStrictEqual(exits, [0]);
+    assert.ok(
+      stderr.join('\n').includes('USAGE:\n  mcp-abap-adt-ro [options]'),
     );
-    expect(stderr.join('\n')).not.toContain('--exposition=<');
+    assert.ok(
+      stderr
+        .join('\n')
+        .includes('\nTOOLS:\n  mcp-abap-adt-ro serves one fixed tool set'),
+    );
+    assert.ok(!stderr.join('\n').includes('--exposition=<'));
   });
 
   it('serves the read-only set without the data tools: 71 tools (no batch tool: the compact binaries serve batch mode), the background-run tools, none of a run or a leftover-session logoff', () => {
-    expect(shape(readOnlyToolSet)).toEqual(shape(fullReadOnlyToolSet));
-    expect(shape(readOnlyToolSet).flatMap((g) => g.tools)).toHaveLength(71);
-    expect(readOnlyToolSet.backgroundRuns).toBe(true);
+    assert.deepStrictEqual(shape(readOnlyToolSet), shape(fullReadOnlyToolSet));
+    assert.equal(shape(readOnlyToolSet).flatMap((g) => g.tools).length, 71);
+    assert.equal(readOnlyToolSet.backgroundRuns, true);
   });
 
   it('stops on --exposition, naming the write binary its words ask for', async () => {
-    expect(await stopped(['--exposition=high'])).toEqual({
+    assert.deepStrictEqual(await stopped(['--exposition=high']), {
       stdout: [],
       stderr: [
         `[MCP] --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the high tools are served, beside the readonly ones, by \`mcp-abap-adt\` (\`@mcp-abap-adt/core\`)`,

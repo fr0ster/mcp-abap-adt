@@ -8,6 +8,9 @@
  * every other failure stays a failure and the handle stays held.
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
+import { format } from 'node:util';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -53,18 +56,23 @@ const unlock = (context: HandlerContext) =>
 const textOf = (answered: { content?: Array<{ text?: unknown }> }) =>
   (answered.content ?? []).map((part) => String(part.text ?? '')).join('');
 
-it.each(['ADT_SESSION_REPLACED', 'ADT_NOT_CONNECTED'])(
-  'an unlock the connection answers %s: the lock went with the session, the handle is no longer held',
-  async (code) => {
-    const { context, heldLocks } = contextOver(
-      unlockRejecting(Object.assign(new Error('words never read'), { code })),
-    );
-    const answered = await unlock(context);
-    expect(answered.isError).toBeFalsy();
-    expect(textOf(answered)).toContain(LOCK_WENT_WITH_SESSION_WORDS);
-    expect(heldLocks.holds(HANDLE)).toBe(false);
-  },
-);
+for (const code of ['ADT_SESSION_REPLACED', 'ADT_NOT_CONNECTED']) {
+  it(
+    format(
+      'an unlock the connection answers %s: the lock went with the session, the handle is no longer held',
+      code,
+    ),
+    async () => {
+      const { context, heldLocks } = contextOver(
+        unlockRejecting(Object.assign(new Error('words never read'), { code })),
+      );
+      const answered = await unlock(context);
+      assert.ok(!answered.isError);
+      assert.ok(textOf(answered).includes(LOCK_WENT_WITH_SESSION_WORDS));
+      assert.equal(heldLocks.holds(HANDLE), false);
+    },
+  );
+}
 
 it('an unlock that fails otherwise stays a failure, and the handle stays held', async () => {
   const { context, heldLocks } = contextOver(
@@ -75,7 +83,7 @@ it('an unlock that fails otherwise stays a failure, and the handle stays held', 
     ),
   );
   const answered = await unlock(context);
-  expect(answered.isError).toBe(true);
-  expect(textOf(answered)).not.toContain(LOCK_WENT_WITH_SESSION_WORDS);
-  expect(heldLocks.holds(HANDLE)).toBe(true);
+  assert.equal(answered.isError, true);
+  assert.ok(!textOf(answered).includes(LOCK_WENT_WITH_SESSION_WORDS));
+  assert.equal(heldLocks.holds(HANDLE), true);
 });

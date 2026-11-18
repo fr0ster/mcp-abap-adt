@@ -5,6 +5,9 @@
  * UNLOCK whatever handle it names, so only the handles an instance kept tell
  * its own lock from another's, and without an owner there are none.
  */
+
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
 import { declareSystemKind } from '../../../src/lib/systemKind';
@@ -29,10 +32,10 @@ it('HandlerLock without held locks is refused, sending nothing', async () => {
     object_type: 'CLASS',
     object_name: 'ZCL_A',
   });
-  expect(textOf(answered)).toContain(
-    'locks are not kept by this server instance',
+  assert.ok(
+    textOf(answered).includes('locks are not kept by this server instance'),
   );
-  expect(connection.requests).toEqual([]);
+  assert.deepStrictEqual(connection.requests, []);
 });
 
 it('HandlerUnlock and HandlerUpdate without held locks are refused, sending nothing', async () => {
@@ -42,8 +45,8 @@ it('HandlerUnlock and HandlerUpdate without held locks are refused, sending noth
     object_name: 'ZCL_A',
     lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
   });
-  expect(textOf(unlocked)).toContain(
-    'lock_handle is not held by this instance',
+  assert.ok(
+    textOf(unlocked).includes('lock_handle is not held by this instance'),
   );
   const updated = await handleHandlerUpdate(context, {
     object_type: 'CLASS',
@@ -51,6 +54,8 @@ it('HandlerUnlock and HandlerUpdate without held locks are refused, sending noth
     source_code: 'placeholder source',
     lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
   });
-  expect(textOf(updated)).toContain('lock_handle is not held by this instance');
-  expect(connection.requests).toEqual([]);
+  assert.ok(
+    textOf(updated).includes('lock_handle is not held by this instance'),
+  );
+  assert.deepStrictEqual(connection.requests, []);
 });

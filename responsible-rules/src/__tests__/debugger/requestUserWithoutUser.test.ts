@@ -14,11 +14,18 @@
  * anything else `system_lookup_failed` — never the login in its place.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   adtStandIn,
   type StandInRequest,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import {
+  assertMatchObject,
+  rejectionOf,
+} from '../../../../src/__tests__/helpers/assertions';
 import { failureOf } from '../../../../src/lib/auth/failures';
 import {
   ServerRefusal,
@@ -112,9 +119,9 @@ describe('on-premise', () => {
     try {
       standIn.body(isLookup, JSON.stringify({ userName: 'system_user' }));
       await runWithRequestContext({ login: 'scopelogin' }, async () => {
-        await expect(userOf(connection)).resolves.toBe('SYSTEM_USER');
+        assert.equal(await userOf(connection), 'SYSTEM_USER');
       });
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+      assert.equal(standIn.requests.filter(isLookup).length, 1);
     } finally {
       await closeBoth(standIn, connection);
     }
@@ -124,8 +131,8 @@ describe('on-premise', () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
-      await expect(userOf(connection)).rejects.toMatchObject(USER_UNKNOWN);
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+      assertMatchObject(await rejectionOf(userOf(connection)), USER_UNKNOWN);
+      assert.equal(standIn.requests.filter(isLookup).length, 1);
     } finally {
       await closeBoth(standIn, connection);
     }
@@ -136,7 +143,7 @@ describe('on-premise', () => {
     try {
       standIn.answer(isLookup, 404);
       await runWithRequestContext({ login: 'scopelogin' }, async () => {
-        await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
+        assert.equal(await userOf(connection), 'SCOPELOGIN');
       });
     } finally {
       await closeBoth(standIn, connection);
@@ -148,13 +155,13 @@ describe('on-premise', () => {
     try {
       standIn.answer(isLookup, 404);
       delete process.env.SAP_USERNAME;
-      await expect(userOf(connection)).rejects.toMatchObject(USER_UNKNOWN);
+      assertMatchObject(await rejectionOf(userOf(connection)), USER_UNKNOWN);
     } finally {
       await closeBoth(standIn, connection);
     }
   });
 
-  it.each([
+  for (const [_what, scope, processLogin, expected] of [
     ['responsible only', { responsible: 'resp_user' }, undefined, 'RESP_USER'],
     ['login only', { login: 'scopelogin' }, undefined, 'SCOPELOGIN'],
     [
@@ -163,22 +170,32 @@ describe('on-premise', () => {
       'PROCESS_LOGIN',
       'RESP_USER',
     ],
-  ])(
-    'without the function (404), %s: the responsible if stated, else the login',
-    async (_what, scope, processLogin, expected) => {
-      const { standIn, connection } = await standConnection();
-      try {
-        standIn.answer(isLookup, 404);
-        if (processLogin === undefined) delete process.env.SAP_USERNAME;
-        else process.env.SAP_USERNAME = processLogin;
-        await runWithRequestContext(scope, async () => {
-          await expect(userOf(connection)).resolves.toBe(expected);
-        });
-      } finally {
-        await closeBoth(standIn, connection);
-      }
-    },
-  );
+  ] satisfies [
+    string,
+    Parameters<typeof runWithRequestContext>[0],
+    string | undefined,
+    string,
+  ][]) {
+    it(
+      format(
+        'without the function (404), %s: the responsible if stated, else the login',
+        _what,
+      ),
+      async () => {
+        const { standIn, connection } = await standConnection();
+        try {
+          standIn.answer(isLookup, 404);
+          if (processLogin === undefined) delete process.env.SAP_USERNAME;
+          else process.env.SAP_USERNAME = processLogin;
+          await runWithRequestContext(scope, async () => {
+            assert.equal(await userOf(connection), expected);
+          });
+        } finally {
+          await closeBoth(standIn, connection);
+        }
+      },
+    );
+  }
 
   it('without the function (404), a responsible stated for the process (SAP_RESPONSIBLE) is taken over the login', async () => {
     const { standIn, connection } = await standConnection();
@@ -186,7 +203,7 @@ describe('on-premise', () => {
     systemContextFromConfiguration();
     try {
       standIn.answer(isLookup, 404);
-      await expect(userOf(connection)).resolves.toBe('PROCESS_RESP');
+      assert.equal(await userOf(connection), 'PROCESS_RESP');
     } finally {
       delete process.env.SAP_RESPONSIBLE;
       resetSystemContextCache();
@@ -199,7 +216,7 @@ describe('on-premise', () => {
     try {
       standIn.body(isLookup, JSON.stringify({ userName: 'system_user' }));
       await runWithRequestContext({ responsible: 'resp_user' }, async () => {
-        await expect(userOf(connection)).resolves.toBe('SYSTEM_USER');
+        assert.equal(await userOf(connection), 'SYSTEM_USER');
       });
     } finally {
       await closeBoth(standIn, connection);
@@ -211,72 +228,81 @@ describe('on-premise', () => {
     try {
       standIn.answer(isLookup, 404);
       await runWithRequestContext({ login: 'scopelogin' }, async () => {
-        await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
+        assert.equal(await userOf(connection), 'SCOPELOGIN');
       });
       // Made once: the login gone later changes nothing.
-      await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
-      await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+      assert.equal(await userOf(connection), 'SCOPELOGIN');
+      assert.equal(await userOf(connection), 'SCOPELOGIN');
+      assert.equal(standIn.requests.filter(isLookup).length, 1);
     } finally {
       await closeBoth(standIn, connection);
     }
   });
 
-  it.each(WITHOUT_USER)(
-    'an answer with %s: the request scope login, else unknown',
-    async (_what, body) => {
-      const { standIn, connection } = await standConnection();
-      try {
-        standIn.body(isLookup, body);
-        await runWithRequestContext({ login: 'scopelogin' }, async () => {
-          await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
-        });
-        // Made once, with the connection: the same user after.
-        await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
-        // Another connection, no login stated: unknown — the process
-        // SAP_USERNAME does not stand in.
-        const second = await standConnection();
+  for (const [_what, body] of WITHOUT_USER) {
+    it(
+      format('an answer with %s: the request scope login, else unknown', _what),
+      async () => {
+        const { standIn, connection } = await standConnection();
         try {
-          second.standIn.body(isLookup, body);
-          await expect(userOf(second.connection)).rejects.toMatchObject(
-            USER_UNKNOWN,
-          );
+          standIn.body(isLookup, body);
+          await runWithRequestContext({ login: 'scopelogin' }, async () => {
+            assert.equal(await userOf(connection), 'SCOPELOGIN');
+          });
+          // Made once, with the connection: the same user after.
+          assert.equal(await userOf(connection), 'SCOPELOGIN');
+          // Another connection, no login stated: unknown — the process
+          // SAP_USERNAME does not stand in.
+          const second = await standConnection();
+          try {
+            second.standIn.body(isLookup, body);
+            assertMatchObject(
+              await rejectionOf(userOf(second.connection)),
+              USER_UNKNOWN,
+            );
+          } finally {
+            await closeBoth(second.standIn, second.connection);
+          }
         } finally {
-          await closeBoth(second.standIn, second.connection);
+          await closeBoth(standIn, connection);
         }
-      } finally {
-        await closeBoth(standIn, connection);
-      }
-    },
-  );
+      },
+    );
+  }
 
-  it.each([405, 501, 500])(
-    'systeminformation answered %i: the request scope login, else unknown',
-    async (status) => {
-      const { standIn, connection } = await standConnection();
-      try {
-        standIn.answer(isLookup, status);
-        await runWithRequestContext({ login: 'scopelogin' }, async () => {
-          await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
-        });
-        // Made once, with the connection: the same user after.
-        await expect(userOf(connection)).resolves.toBe('SCOPELOGIN');
-        // Another connection, no login stated: unknown — the process
-        // SAP_USERNAME does not stand in.
-        const second = await standConnection();
+  for (const status of [405, 501, 500]) {
+    it(
+      format(
+        'systeminformation answered %i: the request scope login, else unknown',
+        status,
+      ),
+      async () => {
+        const { standIn, connection } = await standConnection();
         try {
-          second.standIn.answer(isLookup, status);
-          await expect(userOf(second.connection)).rejects.toMatchObject(
-            USER_UNKNOWN,
-          );
+          standIn.answer(isLookup, status);
+          await runWithRequestContext({ login: 'scopelogin' }, async () => {
+            assert.equal(await userOf(connection), 'SCOPELOGIN');
+          });
+          // Made once, with the connection: the same user after.
+          assert.equal(await userOf(connection), 'SCOPELOGIN');
+          // Another connection, no login stated: unknown — the process
+          // SAP_USERNAME does not stand in.
+          const second = await standConnection();
+          try {
+            second.standIn.answer(isLookup, status);
+            assertMatchObject(
+              await rejectionOf(userOf(second.connection)),
+              USER_UNKNOWN,
+            );
+          } finally {
+            await closeBoth(second.standIn, second.connection);
+          }
         } finally {
-          await closeBoth(second.standIn, second.connection);
+          await closeBoth(standIn, connection);
         }
-      } finally {
-        await closeBoth(standIn, connection);
-      }
-    },
-  );
+      },
+    );
+  }
 });
 
 describe('ABAP Cloud', () => {
@@ -288,84 +314,97 @@ describe('ABAP Cloud', () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.body(isLookup, JSON.stringify({ userName: 'cloud_user' }));
-      await expect(userOf(connection)).resolves.toBe('CLOUD_USER');
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+      assert.equal(await userOf(connection), 'CLOUD_USER');
+      assert.equal(standIn.requests.filter(isLookup).length, 1);
     } finally {
       await closeBoth(standIn, connection);
     }
   });
 
-  it.each(WITHOUT_USER)(
-    'an answer with %s is system_lookup_failed, the login not used',
-    async (_what, body) => {
-      const { standIn, connection } = await standConnection();
-      try {
-        standIn.body(isLookup, body);
-        const error = await userOf(connection).then(
-          () => undefined,
-          (thrown: unknown) => thrown,
-        );
-        expect(error).toBeInstanceOf(ServerRefusal);
-        expect((error as ServerRefusal).serverRefusal).toBe(
-          'system_lookup_failed',
-        );
-      } finally {
-        await closeBoth(standIn, connection);
-      }
-    },
-  );
+  for (const [_what, body] of WITHOUT_USER) {
+    it(
+      format(
+        'an answer with %s is system_lookup_failed, the login not used',
+        _what,
+      ),
+      async () => {
+        const { standIn, connection } = await standConnection();
+        try {
+          standIn.body(isLookup, body);
+          const error = await userOf(connection).then(
+            () => undefined,
+            (thrown: unknown) => thrown,
+          );
+          assert.ok(error instanceof ServerRefusal);
+          assert.equal(
+            (error as ServerRefusal).serverRefusal,
+            'system_lookup_failed',
+          );
+        } finally {
+          await closeBoth(standIn, connection);
+        }
+      },
+    );
+  }
 
   it('systeminformation answered 404: the configuration is inconsistent — cloud_without_systeminformation, the login not used', async () => {
     const { standIn, connection } = await standConnection();
     try {
       standIn.answer(isLookup, 404);
-      await expect(userOf(connection)).rejects.toMatchObject({
+      assertMatchObject(await rejectionOf(userOf(connection)), {
         serverRefusal: 'cloud_without_systeminformation',
         message:
           'the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration or the headers are inconsistent; the tool did not run',
       });
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+      assert.equal(standIn.requests.filter(isLookup).length, 1);
     } finally {
       await closeBoth(standIn, connection);
     }
   });
 
-  it.each([405, 501, 500])(
-    'systeminformation answered %i: system_lookup_failed, the login not used',
-    async (status) => {
+  for (const status of [405, 501, 500]) {
+    it(
+      format(
+        'systeminformation answered %i: system_lookup_failed, the login not used',
+        status,
+      ),
+      async () => {
+        const { standIn, connection } = await standConnection();
+        try {
+          standIn.answer(isLookup, status);
+          assertMatchObject(await rejectionOf(userOf(connection)), {
+            serverRefusal: 'system_lookup_failed',
+          });
+          assert.equal(standIn.requests.filter(isLookup).length, 1);
+        } finally {
+          await closeBoth(standIn, connection);
+        }
+      },
+    );
+  }
+});
+
+for (const [_kind, kind] of [
+  ['on-premise', 'onprem'],
+  ['ABAP Cloud', 'cloud'],
+]) {
+  describe(format('%s: a 401 on the lookup', _kind), () => {
+    it('is the credential failure as it came — no login stands in, no other error', async () => {
+      process.env.SAP_SYSTEM_TYPE = kind;
       const { standIn, connection } = await standConnection();
       try {
-        standIn.answer(isLookup, status);
-        await expect(userOf(connection)).rejects.toMatchObject({
-          serverRefusal: 'system_lookup_failed',
+        standIn.answer(isLookup, 401);
+        const error = await userOf(connection).then(
+          () => undefined,
+          (thrown: unknown) => thrown,
+        );
+        assert.ok(!(error instanceof ServerRefusal));
+        assertMatchObject(failureOf(error), {
+          error: 'authentication_failed',
         });
-        expect(standIn.requests.filter(isLookup)).toHaveLength(1);
       } finally {
         await closeBoth(standIn, connection);
       }
-    },
-  );
-});
-
-describe.each([
-  ['on-premise', 'onprem'],
-  ['ABAP Cloud', 'cloud'],
-])('%s: a 401 on the lookup', (_kind, kind) => {
-  it('is the credential failure as it came — no login stands in, no other error', async () => {
-    process.env.SAP_SYSTEM_TYPE = kind;
-    const { standIn, connection } = await standConnection();
-    try {
-      standIn.answer(isLookup, 401);
-      const error = await userOf(connection).then(
-        () => undefined,
-        (thrown: unknown) => thrown,
-      );
-      expect(error).not.toBeInstanceOf(ServerRefusal);
-      expect(failureOf(error)).toMatchObject({
-        error: 'authentication_failed',
-      });
-    } finally {
-      await closeBoth(standIn, connection);
-    }
+    });
   });
-});
+}

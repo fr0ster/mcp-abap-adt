@@ -1,11 +1,15 @@
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import {
   jsonFind,
   listedJson,
 } from '../../../src/__tests__/helpers/listedJson';
+import { repositoryRoot } from '../../../src/__tests__/helpers/repoRoot';
 
 /**
  * A compact tool offered on cloud must not offer PROGRAM without saying where
@@ -28,9 +32,11 @@ import {
  * tool offering PROGRAM is covered the day it is written.
  */
 // The compact tools live in two packages now, so the scan covers both halves.
+// From the repository root, so the compiled node:test file reads the sources.
+const REPO = repositoryRoot(__dirname);
 const COMPACT_DIRS = [
-  join(__dirname, '../../../compact-readonly-entries/src/handlers'),
-  join(__dirname, '../../../compact-modify/src/handlers'),
+  join(REPO, 'compact-readonly-entries/src/handlers'),
+  join(REPO, 'compact-modify/src/handlers'),
 ];
 
 /** Every compact tool file, as `[label, absolute path]`. */
@@ -53,12 +59,11 @@ function availabilityOf(source: string): string {
 
 describe('compact tools that mention PROGRAM', () => {
   it('finds the tools to check, so the assertion is not vacuous', () => {
-    expect(handlers.length).toBeGreaterThan(10);
+    assert.ok(handlers.length > 10);
   });
 
-  it.each(handlers)(
-    '%s says where PROGRAM works, if it offers one',
-    (name, file) => {
+  for (const [name, file] of handlers) {
+    it(format('%s says where PROGRAM works, if it offers one', name), () => {
       const source = readFileSync(file, 'utf8');
       const description = descriptionOf(source);
       // `\bPROGRAM\b`, not `PROGRAM\(`. The first version of this test looked
@@ -71,12 +76,15 @@ describe('compact tools that mention PROGRAM', () => {
       const onCloud = availabilityOf(source).includes('cloud');
       if (!offersProgram || !onCloud) return;
 
-      expect({ name, marked: /onprem only/.test(description) }).toEqual({
-        name,
-        marked: true,
-      });
-    },
-  );
+      assert.deepStrictEqual(
+        { name, marked: /onprem only/.test(description) },
+        {
+          name,
+          marked: true,
+        },
+      );
+    });
+  }
 });
 
 /**
@@ -104,18 +112,19 @@ describe('compact tools that offer INCLUDE on ABAP cloud', () => {
   };
 
   it('finds tools that offer INCLUDE on premise, so the check is not vacuous', () => {
-    expect(
+    assert.ok(
       entries.filter((entry) => membersOn(entry, 'onprem').includes('INCLUDE'))
-        .length,
-    ).toBeGreaterThan(5);
+        .length > 5,
+    );
   });
 
   it('offers it only where cloud serves it', () => {
-    expect(
+    assert.deepStrictEqual(
       entries
         .filter((entry) => membersOn(entry, 'cloud').includes('INCLUDE'))
         .map((entry) => entry.toolDefinition.name)
         .sort(),
-    ).toEqual(['HandlerDeletionCheck', 'HandlerGet']);
+      ['HandlerDeletionCheck', 'HandlerGet'],
+    );
   });
 });

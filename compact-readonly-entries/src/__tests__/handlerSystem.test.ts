@@ -9,6 +9,9 @@
  * targets (`systemCall`): the target of the action sees the call, no other.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   SYSTEM_ACTIONS,
   type SystemAction,
@@ -44,8 +47,6 @@ import {
   systemCall,
   TOOL_DEFINITION,
 } from '../handlers/handleHandlerSystem';
-
-jest.setTimeout(60_000);
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
@@ -231,7 +232,7 @@ describe('HandlerSystem', () => {
   );
 
   it('offers exactly the eight actions, each one full tool', () => {
-    expect(SYSTEM_ACTIONS).toEqual([
+    assert.deepStrictEqual(SYSTEM_ACTIONS, [
       'search_source',
       'search_object',
       'where_used',
@@ -241,69 +242,88 @@ describe('HandlerSystem', () => {
       'atc_results',
       'atc_result',
     ]);
-    expect(Object.values(FULL).map((full) => full.tool)).toEqual([
-      'SearchSource',
-      'SearchObject',
-      'GetWhereUsed',
-      'GetPackageTree',
-      'ListTransports',
-      'GetATCFindings',
-      'ListATCResults',
-      'GetATCResult',
-    ]);
+    assert.deepStrictEqual(
+      Object.values(FULL).map((full) => full.tool),
+      [
+        'SearchSource',
+        'SearchObject',
+        'GetWhereUsed',
+        'GetPackageTree',
+        'ListTransports',
+        'GetATCFindings',
+        'ListATCResults',
+        'GetATCResult',
+      ],
+    );
   });
 
-  it.each(perVariant)(
-    "each action calls exactly its full tool's path: %s on %s",
-    async (action, variant) => {
-      const full = await run(variant, (c) =>
-        FULL[action].call(c, ARGS[action]),
-      );
-      const system = await run(variant, systemOf(action, ARGS[action]));
-      expect(full.sent).toBeGreaterThan(0);
-      expect(system).toEqual(full);
-    },
-  );
-
-  it.each(perVariant)(
-    'background is HandlerSystem’s own: %s on %s with background false sends what the full tool sends',
-    async (action, variant) => {
-      const full = await run(variant, (c) =>
-        FULL[action].call(c, ARGS[action]),
-      );
-      const system = await run(
-        variant,
-        systemOf(action, { ...ARGS[action], background: false }),
-      );
-      expect(system).toEqual(full);
-    },
-  );
-
-  it.each(SYSTEM_ACTIONS)(
-    "each action goes through its target's entry: %s",
-    async (action) => {
-      const { seen, targets } = recordingTargets();
-      const parsed = TOOL_DEFINITION.inputSchema.parse({
+  for (const [action, variant] of perVariant) {
+    it(
+      format(
+        "each action calls exactly its full tool's path: %s on %s",
         action,
-        background: false,
-        ...ARGS[action],
-      });
-      await systemCall(targets, context, parsed);
-      // The target gets the call's arguments without action and background.
-      expect(seen).toEqual([{ action, args: ARGS[action] }]);
-    },
-  );
+        variant,
+      ),
+      async () => {
+        const full = await run(variant, (c) =>
+          FULL[action].call(c, ARGS[action]),
+        );
+        const system = await run(variant, systemOf(action, ARGS[action]));
+        assert.ok(full.sent > 0);
+        assert.deepStrictEqual(system, full);
+      },
+    );
+  }
+
+  for (const [action, variant] of perVariant) {
+    it(
+      format(
+        'background is HandlerSystem’s own: %s on %s with background false sends what the full tool sends',
+        action,
+        variant,
+      ),
+      async () => {
+        const full = await run(variant, (c) =>
+          FULL[action].call(c, ARGS[action]),
+        );
+        const system = await run(
+          variant,
+          systemOf(action, { ...ARGS[action], background: false }),
+        );
+        assert.deepStrictEqual(system, full);
+      },
+    );
+  }
+
+  for (const action of SYSTEM_ACTIONS) {
+    it(
+      format("each action goes through its target's entry: %s", action),
+      async () => {
+        const { seen, targets } = recordingTargets();
+        const parsed = TOOL_DEFINITION.inputSchema.parse({
+          action,
+          background: false,
+          ...ARGS[action],
+        });
+        await systemCall(targets, context, parsed);
+        // The target gets the call's arguments without action and background.
+        assert.deepStrictEqual(seen, [{ action, args: ARGS[action] }]);
+      },
+    );
+  }
 
   describe('argument errors, nothing sent', () => {
     it('action is required', async () => {
       const { requests, answered } = await run('onprem', (c) =>
         entry.call(c, { object_name: 'Z*' }),
       );
-      expect(answered).toContain(
-        'Input validation error: Invalid arguments for tool HandlerSystem',
+      assert.ok(
+        answered.includes(
+          'Input validation error: Invalid arguments for tool HandlerSystem',
+        ),
       );
-      expect(answered).toContain('at action');
-      expect(requests).toBe('[]');
+      assert.ok(answered.includes('at action'));
+      assert.equal(requests, '[]');
     });
 
     it('an action outside the eight is refused, naming the eight', async () => {
@@ -314,15 +334,15 @@ describe('HandlerSystem', () => {
         action: 'search',
         object_name: 'Z*',
       });
-      expect(parsed.success).toBe(false);
-      expect(JSON.parse(answered)).toEqual({
+      assert.equal(parsed.success, false);
+      assert.deepStrictEqual(JSON.parse(answered), {
         thrown: invalidArgumentsWords(
           'HandlerSystem',
           parsed.error?.issues ?? [],
         ),
       });
-      for (const action of SYSTEM_ACTIONS) expect(answered).toContain(action);
-      expect(requests).toBe('[]');
+      for (const action of SYSTEM_ACTIONS) assert.ok(answered.includes(action));
+      assert.equal(requests, '[]');
     });
 
     /** Each argument its full tool requires, missing, and the target's words. */
@@ -380,86 +400,110 @@ describe('HandlerSystem', () => {
       ],
     ];
 
-    it.each(MISSING)(
-      "%s without %s: refused in the target's words",
-      async (action, _argument, args, words) => {
-        for (const variant of VARIANTS) {
-          const { requests, answered } = await run(
-            variant,
-            systemOf(action, args),
+    for (const [action, _argument, args, words] of MISSING) {
+      it(
+        format(
+          "%s without %s: refused in the target's words",
+          action,
+          _argument,
+        ),
+        async () => {
+          for (const variant of VARIANTS) {
+            const { requests, answered } = await run(
+              variant,
+              systemOf(action, args),
+            );
+            assert.ok(answered.includes(words));
+            assert.equal(requests, '[]');
+          }
+        },
+      );
+    }
+
+    for (const action of SYSTEM_ACTIONS) {
+      it(
+        format(
+          'a malformed argument of the action itself is refused before dispatch: %s',
+          action,
+        ),
+        async () => {
+          const { seen, targets } = recordingTargets();
+          const args = { action, ...MALFORMED[action] };
+          const parsed = TOOL_DEFINITION.inputSchema.safeParse(args);
+          assert.equal(parsed.success, false);
+          const { requests, answered } = await run('onprem', (c) =>
+            entry.call(c, args),
           );
-          expect(answered).toContain(words);
-          expect(requests).toBe('[]');
-        }
-      },
-    );
+          assert.deepStrictEqual(JSON.parse(answered), {
+            thrown: invalidArgumentsWords(
+              'HandlerSystem',
+              parsed.error?.issues ?? [],
+            ),
+          });
+          assert.equal(requests, '[]');
+          // The handler never ran: no target saw a call.
+          assert.deepStrictEqual(seen, []);
+          assert.notEqual(targets, undefined);
+        },
+      );
+    }
 
-    it.each(SYSTEM_ACTIONS)(
-      'a malformed argument of the action itself is refused before dispatch: %s',
-      async (action) => {
-        const { seen, targets } = recordingTargets();
-        const args = { action, ...MALFORMED[action] };
-        const parsed = TOOL_DEFINITION.inputSchema.safeParse(args);
-        expect(parsed.success).toBe(false);
-        const { requests, answered } = await run('onprem', (c) =>
-          entry.call(c, args),
-        );
-        expect(JSON.parse(answered)).toEqual({
-          thrown: invalidArgumentsWords(
-            'HandlerSystem',
-            parsed.error?.issues ?? [],
-          ),
-        });
-        expect(requests).toBe('[]');
-        // The handler never ran: no target saw a call.
-        expect(seen).toEqual([]);
-        expect(targets).toBeDefined();
-      },
-    );
-
-    it.each(SYSTEM_ACTIONS)(
-      'a wrong-typed argument of another action is refused before dispatch: %s',
-      async (action) => {
-        const args = { action, ...ARGS[action], ...FOREIGN_WRONG[action] };
-        const parsed = TOOL_DEFINITION.inputSchema.safeParse(args);
-        expect(parsed.success).toBe(false);
-        const { requests, answered } = await run('onprem', (c) =>
-          entry.call(c, args),
-        );
-        expect(JSON.parse(answered)).toEqual({
-          thrown: invalidArgumentsWords(
-            'HandlerSystem',
-            parsed.error?.issues ?? [],
-          ),
-        });
-        expect(requests).toBe('[]');
-      },
-    );
+    for (const action of SYSTEM_ACTIONS) {
+      it(
+        format(
+          'a wrong-typed argument of another action is refused before dispatch: %s',
+          action,
+        ),
+        async () => {
+          const args = { action, ...ARGS[action], ...FOREIGN_WRONG[action] };
+          const parsed = TOOL_DEFINITION.inputSchema.safeParse(args);
+          assert.equal(parsed.success, false);
+          const { requests, answered } = await run('onprem', (c) =>
+            entry.call(c, args),
+          );
+          assert.deepStrictEqual(JSON.parse(answered), {
+            thrown: invalidArgumentsWords(
+              'HandlerSystem',
+              parsed.error?.issues ?? [],
+            ),
+          });
+          assert.equal(requests, '[]');
+        },
+      );
+    }
   });
 
-  it.each(perVariant)(
-    'a well-typed argument of another action is dropped: %s on %s',
-    async (action, variant) => {
-      const plain = await run(variant, systemOf(action, ARGS[action]));
-      const foreign = await run(
+  for (const [action, variant] of perVariant) {
+    it(
+      format(
+        'a well-typed argument of another action is dropped: %s on %s',
+        action,
         variant,
-        systemOf(action, { ...ARGS[action], ...FOREIGN[action] }),
-      );
-      expect(foreign).toEqual(plain);
-    },
-  );
+      ),
+      async () => {
+        const plain = await run(variant, systemOf(action, ARGS[action]));
+        const foreign = await run(
+          variant,
+          systemOf(action, { ...ARGS[action], ...FOREIGN[action] }),
+        );
+        assert.deepStrictEqual(foreign, plain);
+      },
+    );
+  }
 
-  it.each(perVariant)(
-    'a key no action declares is dropped: %s on %s',
-    async (action, variant) => {
-      const plain = await run(variant, systemOf(action, ARGS[action]));
-      const undeclared = await run(
-        variant,
-        systemOf(action, { ...ARGS[action], made_up_key: 'x' }),
-      );
-      expect(undeclared).toEqual(plain);
-    },
-  );
+  for (const [action, variant] of perVariant) {
+    it(
+      format('a key no action declares is dropped: %s on %s', action, variant),
+      async () => {
+        const plain = await run(variant, systemOf(action, ARGS[action]));
+        const undeclared = await run(
+          variant,
+          systemOf(action, { ...ARGS[action], made_up_key: 'x' }),
+        );
+        assert.deepStrictEqual(undeclared, plain);
+      },
+    );
+  }
 
   const DETAIL_TAKERS: readonly SystemAction[] = [
     'search_object',
@@ -468,33 +512,38 @@ describe('HandlerSystem', () => {
     'atc_result',
   ];
 
-  it.each(
-    DETAIL_TAKERS.flatMap((action) =>
-      (['terse', 'full', 'raw'] as const).map(
-        (detail) => [action, detail] as const,
-      ),
+  for (const [action, detail] of DETAIL_TAKERS.flatMap((action) =>
+    (['terse', 'full', 'raw'] as const).map(
+      (detail) => [action, detail] as const,
     ),
-  )(
-    "detail is each detail-taking action's own: %s with %s answers as the full tool",
-    async (action, detail) => {
-      const args = { ...ARGS[action], detail };
-      const full = await run('onprem', (c) => FULL[action].call(c, args));
-      const system = await run('onprem', systemOf(action, args));
-      expect(system).toEqual(full);
-    },
-  );
+  )) {
+    it(
+      format(
+        "detail is each detail-taking action's own: %s with %s answers as the full tool",
+        action,
+        detail,
+      ),
+      async () => {
+        const args = { ...ARGS[action], detail };
+        const full = await run('onprem', (c) => FULL[action].call(c, args));
+        const system = await run('onprem', systemOf(action, args));
+        assert.deepStrictEqual(system, full);
+      },
+    );
+  }
 
-  it.each(SYSTEM_ACTIONS.filter((action) => !DETAIL_TAKERS.includes(action)))(
-    'the other actions drop detail: %s',
-    async (action) => {
+  for (const action of SYSTEM_ACTIONS.filter(
+    (action) => !DETAIL_TAKERS.includes(action),
+  )) {
+    it(format('the other actions drop detail: %s', action), async () => {
       const plain = await run('onprem', systemOf(action, ARGS[action]));
       const detailed = await run(
         'onprem',
         systemOf(action, { ...ARGS[action], detail: 'full' }),
       );
-      expect(detailed).toEqual(plain);
-    },
-  );
+      assert.deepStrictEqual(detailed, plain);
+    });
+  }
 
   describe('the action alone picks the tool', () => {
     it('atc_results with a worklist_id still lists the ATC results', async () => {
@@ -508,7 +557,7 @@ describe('HandlerSystem', () => {
           worklist_id: 'WORKLIST_A',
         }),
       );
-      expect(system).toEqual(full);
+      assert.deepStrictEqual(system, full);
     });
 
     it('atc_findings with a display_id and no worklist_id is refused for the worklist_id', async () => {
@@ -516,10 +565,12 @@ describe('HandlerSystem', () => {
         'onprem',
         systemOf('atc_findings', { display_id: 'RESULT_A' }),
       );
-      expect(answered).toContain(
-        'HandlerSystem: GetATCFindings: worklist_id is required. RunATC answers one on every run. at worklist_id',
+      assert.ok(
+        answered.includes(
+          'HandlerSystem: GetATCFindings: worklist_id is required. RunATC answers one on every run. at worklist_id',
+        ),
       );
-      expect(requests).toBe('[]');
+      assert.equal(requests, '[]');
     });
   });
 });

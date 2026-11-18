@@ -2,7 +2,14 @@
  * The pool keeps the instance that holds state: handle routing, lease,
  * eviction, shutdown. Driven by a fake part, no transport.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { InstanceState } from '@mcp-abap-adt/lib/state';
+import {
+  assertRejects,
+  assertThrows,
+} from '../../../../src/__tests__/helpers/assertions';
 import {
   BatchWithHandleError,
   handleFrom,
@@ -16,11 +23,17 @@ import {
  * is a bearer secret and these strings reach the log.
  */
 const named = (message: string) =>
-  expect.stringMatching(
-    new RegExp(
-      `^instance \\d+: ${message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
-    ),
+  new RegExp(
+    `^instance \\d+: ${message.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
   );
+
+/** `failures` is one failure, named as the pool names `message`. */
+function assertNamedOnly(failures: readonly string[], message: string): void {
+  assert.equal(failures.length, 1);
+  const [only] = failures;
+  assert.ok(typeof only === 'string');
+  assert.match(only, named(message));
+}
 
 /** A poolable whose one part we drive by hand. */
 class Fake {
@@ -96,19 +109,25 @@ const tick = () => new Promise((r) => setImmediate(r));
 
 describe('handleOf', () => {
   it('reads state_handle from a single tools/call only; refuses a batch carrying one', () => {
-    expect(
+    assert.equal(
       handleOf({
         method: 'tools/call',
         params: { arguments: { state_handle: 'H' } },
       }),
-    ).toBe('H');
-    expect(handleOf({ method: 'tools/list' })).toBeUndefined();
-    expect(() =>
-      handleOf([
-        { method: 'tools/call', params: { arguments: { state_handle: 'H' } } },
-      ]),
-    ).toThrow(BatchWithHandleError);
-    expect(handleOf([{ method: 'tools/list' }])).toBeUndefined();
+      'H',
+    );
+    assert.equal(handleOf({ method: 'tools/list' }), undefined);
+    assertThrows(
+      () =>
+        handleOf([
+          {
+            method: 'tools/call',
+            params: { arguments: { state_handle: 'H' } },
+          },
+        ]),
+      BatchWithHandleError,
+    );
+    assert.equal(handleOf([{ method: 'tools/list' }]), undefined);
   });
 });
 
@@ -119,28 +138,30 @@ describe('handleFrom', () => {
   });
 
   it('reads the x-mcp-state-handle header first, else the tools/call argument', () => {
-    expect(handleFrom({ 'x-mcp-state-handle': 'H' }, call('A'))).toBe('H');
-    expect(handleFrom({ 'x-mcp-state-handle': 'H' }, call())).toBe('H');
-    expect(handleFrom({ 'x-mcp-state-handle': 'H' }, { method: 'ping' })).toBe(
+    assert.equal(handleFrom({ 'x-mcp-state-handle': 'H' }, call('A')), 'H');
+    assert.equal(handleFrom({ 'x-mcp-state-handle': 'H' }, call()), 'H');
+    assert.equal(
+      handleFrom({ 'x-mcp-state-handle': 'H' }, { method: 'ping' }),
       'H',
     );
-    expect(handleFrom({}, call('A'))).toBe('A');
-    expect(handleFrom({}, call())).toBeUndefined();
+    assert.equal(handleFrom({}, call('A')), 'A');
+    assert.equal(handleFrom({}, call()), undefined);
   });
 
   it('an empty header is absent', () => {
-    expect(handleFrom({ 'x-mcp-state-handle': '' }, call('A'))).toBe('A');
-    expect(handleFrom({ 'x-mcp-state-handle': '' }, call())).toBeUndefined();
+    assert.equal(handleFrom({ 'x-mcp-state-handle': '' }, call('A')), 'A');
+    assert.equal(handleFrom({ 'x-mcp-state-handle': '' }, call()), undefined);
   });
 
   it('a JSON-RPC batch carrying state_handle is refused, with the header too', () => {
     const batch = [call('A')];
-    expect(() => handleFrom({}, batch)).toThrow(BatchWithHandleError);
-    expect(() => handleFrom({ 'x-mcp-state-handle': 'H' }, batch)).toThrow(
+    assertThrows(() => handleFrom({}, batch), BatchWithHandleError);
+    assertThrows(
+      () => handleFrom({ 'x-mcp-state-handle': 'H' }, batch),
       BatchWithHandleError,
     );
     // A batch without the argument routes by the header.
-    expect(handleFrom({ 'x-mcp-state-handle': 'H' }, [call()])).toBe('H');
+    assert.equal(handleFrom({ 'x-mcp-state-handle': 'H' }, [call()]), 'H');
   });
 });
 
@@ -161,7 +182,7 @@ describe('InstancePool', () => {
     await pool.serve({ handle: first.stateHandle }, create, async (i) => {
       second = i;
     });
-    expect(second).toBe(first);
+    assert.equal(second, first);
   });
 
   it('disposes an instance that holds nothing', async () => {
@@ -170,8 +191,8 @@ describe('InstancePool', () => {
     await pool.serve({}, create, async (i) => {
       i0 = i;
     });
-    expect(pool.size()).toBe(0);
-    expect(i0.disposed).toBe(1);
+    assert.equal(pool.size(), 0);
+    assert.equal(i0.disposed, 1);
   });
 
   it('an unknown handle gets a fresh instance', async () => {
@@ -181,7 +202,7 @@ describe('InstancePool', () => {
     await pool.serve({ handle: 'NOPE' }, create, async (i) => {
       got = i;
     });
-    expect(got).not.toBe(held);
+    assert.notEqual(got, held);
   });
 
   it('serves one instance one request at a time; a queued request whose instance left the pool gets a new one', async () => {
@@ -201,11 +222,11 @@ describe('InstancePool', () => {
       second = i;
     });
     await tick();
-    expect(order).toEqual(['a-in']);
+    assert.deepStrictEqual(order, ['a-in']);
     g.open();
     await Promise.all([a, b]);
-    expect(order).toEqual(['a-in', 'a-out', 'b-in']);
-    expect(second).not.toBe(held); // `a` emptied it: it left the pool before `b`'s turn
+    assert.deepStrictEqual(order, ['a-in', 'a-out', 'b-in']);
+    assert.notEqual(second, held); // `a` emptied it: it left the pool before `b`'s turn
   });
 
   it('an instance that empties on its own is evicted and disposed without a request', async () => {
@@ -213,8 +234,8 @@ describe('InstancePool', () => {
     const held = await holding(pool);
     held.set(false);
     await tick();
-    expect(pool.size()).toBe(0);
-    expect(held.disposed).toBe(1);
+    assert.equal(pool.size(), 0);
+    assert.equal(held.disposed, 1);
   });
 
   it('an instance emptied during its own request is disposed once, after the request', async () => {
@@ -226,9 +247,9 @@ describe('InstancePool', () => {
       await tick();
       disposedDuringWork = i.disposed;
     });
-    expect(disposedDuringWork).toBe(0);
-    expect(held.disposed).toBe(1);
-    expect(pool.size()).toBe(0);
+    assert.equal(disposedDuringWork, 0);
+    assert.equal(held.disposed, 1);
+    assert.equal(pool.size(), 0);
   });
 
   it("a disposal that fails on an instance holding nothing: out of routing, retained for shutdown's retry", async () => {
@@ -238,18 +259,18 @@ describe('InstancePool', () => {
     held.failDispose = true;
     held.set(false); // empties: eviction runs and fails
     await tick();
-    expect(held.disposed).toBe(1);
-    expect(pool.size()).toBe(0); // no longer counted
-    expect((pool as any).index.size).toBe(0); // no longer routed
-    expect((pool as any).retained.has(held)).toBe(true); // kept for a retry
+    assert.equal(held.disposed, 1);
+    assert.equal(pool.size(), 0); // no longer counted
+    assert.equal((pool as any).index.size, 0); // no longer routed
+    assert.equal((pool as any).retained.has(held), true); // kept for a retry
     let got!: Fake;
     await pool.serve({ handle }, create, async (i) => {
       got = i;
     });
-    expect(got).not.toBe(held);
+    assert.notEqual(got, held);
     held.failDispose = false;
-    expect(await pool.shutdown()).toEqual([]); // the retry succeeded
-    expect(held.disposed).toBe(2);
+    assert.deepStrictEqual(await pool.shutdown(), []); // the retry succeeded
+    assert.equal(held.disposed, 2);
   });
 
   it('a disposal that fails for good on an instance holding nothing is reported by shutdown', async () => {
@@ -259,10 +280,10 @@ describe('InstancePool', () => {
     const handle = held.stateHandle;
     held.set(false);
     await tick();
-    expect(pool.size()).toBe(0);
+    assert.equal(pool.size(), 0);
     const failures = await pool.shutdown();
-    expect(failures.join('\n')).not.toContain(handle);
-    expect(failures).toEqual([named('listener still up')]);
+    assert.ok(!failures.join('\n').includes(handle));
+    assertNamedOnly(failures, 'listener still up');
   });
 
   it('a fresh instance whose disposal fails is retained and retried at shutdown', async () => {
@@ -277,10 +298,10 @@ describe('InstancePool', () => {
       },
       async () => {},
     );
-    expect(fresh.disposed).toBe(1);
+    assert.equal(fresh.disposed, 1);
     fresh.failDispose = false;
-    expect(await pool.shutdown()).toEqual([]);
-    expect(fresh.disposed).toBe(2);
+    assert.deepStrictEqual(await pool.shutdown(), []);
+    assert.equal(fresh.disposed, 2);
   });
 
   it('a disposal that leaves state finishing keeps ownership; shutdown waits for it to empty', async () => {
@@ -293,9 +314,9 @@ describe('InstancePool', () => {
       return f;
     });
     await tick();
-    expect(done).toBe(false);
+    assert.equal(done, false);
     held.set(false); // the last batch arrived
-    expect(await shutting).toEqual([]);
+    assert.deepStrictEqual(await shutting, []);
   });
 
   it('a cleanup that fails after its disposal returned is retried once and reported; shutdown ends', async () => {
@@ -305,8 +326,8 @@ describe('InstancePool', () => {
     const shutting = pool.shutdown();
     await tick();
     held.failLate('release debuggee D1: busy'); // the last batch arrived; its release failed
-    expect(await shutting).toEqual([named('release debuggee D1: busy')]);
-    expect(held.disposed).toBe(2); // retried once
+    assertNamedOnly(await shutting, 'release debuggee D1: busy');
+    assert.equal(held.disposed, 2); // retried once
   });
 
   it('a disposal that throws while its cleanup is still finishing: shutdown waits for it, then reports only what is left', async () => {
@@ -321,33 +342,33 @@ describe('InstancePool', () => {
       return f;
     });
     await tick();
-    expect(done).toBe(false); // both still finishing
+    assert.equal(done, false); // both still finishing
     a.set(false); // a's last batch closed everything
     b.failLate('release debuggee D1: busy'); // b's did not
-    expect(await shutting).toEqual([named('release debuggee D1: busy')]);
+    assertNamedOnly(await shutting, 'release debuggee D1: busy');
   });
 
   it('a request that leaves nothing behind leaves no entry in the pool', async () => {
     const pool = new InstancePool<Fake>();
     await pool.serve({}, create, async () => {});
-    expect((pool as any).busy.size).toBe(0);
-    expect((pool as any).retained.size).toBe(0);
-    expect(pool.size()).toBe(0);
+    assert.equal((pool as any).busy.size, 0);
+    assert.equal((pool as any).retained.size, 0);
+    assert.equal(pool.size(), 0);
   });
 
   it('a part that empties synchronously inside dispose re-enters the eviction harmlessly: disposed once', async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
     held.notifyInDispose = true; // dispose empties the part and tells the state at once → onEmpty → evict() again
-    expect(await pool.shutdown()).toEqual([]);
-    expect(held.disposed).toBe(1);
+    assert.deepStrictEqual(await pool.shutdown(), []);
+    assert.equal(held.disposed, 1);
   });
 
   it('an unknown handle gets a fresh instance whose state is not available', async () => {
     const pool = new InstancePool<Fake>();
     await holding(pool);
     await pool.serve({ handle: 'NOPE' }, create, async (i) => {
-      expect(() => i.state.check('NOPE')).toThrow('state is not available');
+      assertThrows(() => i.state.check('NOPE'), 'state is not available');
     });
   });
 
@@ -362,20 +383,20 @@ describe('InstancePool', () => {
       i.set(true);
     });
     const rotated = held.stateHandle;
-    expect(rotated).not.toBe(old);
-    expect(pool.size()).toBe(1);
-    expect([...(pool as any).index.keys()]).toEqual([rotated]);
+    assert.notEqual(rotated, old);
+    assert.equal(pool.size(), 1);
+    assert.deepStrictEqual([...(pool as any).index.keys()], [rotated]);
     let viaOld!: Fake;
     await pool.serve({ handle: old }, create, async (i) => {
       viaOld = i;
     });
-    expect(viaOld).not.toBe(held);
-    expect(() => viaOld.state.check(old)).toThrow('state is not available');
+    assert.notEqual(viaOld, held);
+    assertThrows(() => viaOld.state.check(old), 'state is not available');
     let viaNew!: Fake;
     await pool.serve({ handle: rotated }, create, async (i) => {
       viaNew = i;
     });
-    expect(viaNew).toBe(held);
+    assert.equal(viaNew, held);
   });
 
   it('a rotation outside a request, on an instance whose disposal failed, routes neither handle to it', async () => {
@@ -386,16 +407,16 @@ describe('InstancePool', () => {
     held.state.endWhenEmpty();
     held.set(false); // empties: rotates; eviction fails, the instance is retained only
     await tick();
-    expect(pool.size()).toBe(0);
-    expect(held.stateHandle).not.toBe(old);
-    expect((pool as any).index.size).toBe(0);
+    assert.equal(pool.size(), 0);
+    assert.notEqual(held.stateHandle, old);
+    assert.equal((pool as any).index.size, 0);
     let got!: Fake;
     await pool.serve({ handle: old }, create, async (i) => {
       got = i;
     });
-    expect(got).not.toBe(held);
+    assert.notEqual(got, held);
     held.failDispose = false;
-    expect(await pool.shutdown()).toEqual([]);
+    assert.deepStrictEqual(await pool.shutdown(), []);
   });
 
   it('a queued request whose handle rotated while it waited gets a new instance', async () => {
@@ -416,8 +437,8 @@ describe('InstancePool', () => {
     await tick();
     g.open();
     await Promise.all([a, b]);
-    expect(second).not.toBe(held);
-    expect(pool.size()).toBe(1);
+    assert.notEqual(second, held);
+    assert.equal(pool.size(), 1);
   });
 
   it('shutdown stops admission, waits for an active lease, disposes held instances and reports failures', async () => {
@@ -437,11 +458,12 @@ describe('InstancePool', () => {
     await tick();
     const shutting = pool.shutdown();
     await tick();
-    expect(leaseDone).toBe(false); // still waiting for the lease
+    assert.equal(leaseDone, false); // still waiting for the lease
     g.open();
     await active;
-    expect(await shutting).toEqual([named('listener still up')]);
-    await expect(pool.serve({}, create, async () => {})).rejects.toThrow(
+    assertNamedOnly(await shutting, 'listener still up');
+    await assertRejects(
+      pool.serve({}, create, async () => {}),
       PoolClosedError,
     );
   });
@@ -465,9 +487,9 @@ describe('the pool never names a failure by its handle', () => {
     b.failDispose = true;
     const handles = [a.stateHandle, b.stateHandle];
     const failures = await pool.shutdown();
-    expect(failures).toHaveLength(2);
-    expect(new Set(failures).size).toBe(2);
-    for (const h of handles) expect(failures.join('\n')).not.toContain(h);
+    assert.equal(failures.length, 2);
+    assert.equal(new Set(failures).size, 2);
+    for (const h of handles) assert.ok(!failures.join('\n').includes(h));
   });
 });
 
@@ -517,8 +539,8 @@ describe('unique handles across the pool', () => {
       async () => {},
     );
     const second = new Drawn(pool, source(1, 2));
-    expect(first.stateHandle).toBe(hex(1));
-    expect(second.stateHandle).toBe(hex(2));
+    assert.equal(first.stateHandle, hex(1));
+    assert.equal(second.stateHandle, hex(2));
   });
 
   it('a rotation that would repeat a handle in the pool draws again', async () => {
@@ -539,6 +561,6 @@ describe('unique handles across the pool', () => {
     );
     second.held = false;
     second.state.endWhenEmpty();
-    expect(second.stateHandle).toBe(hex(3));
+    assert.equal(second.stateHandle, hex(3));
   });
 });

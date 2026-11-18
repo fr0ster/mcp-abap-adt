@@ -5,9 +5,11 @@
  * and, where one is close, the key it may mean.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import {
   type ParameterTable,
   readStartupConfig,
@@ -93,21 +95,20 @@ function startWith(
   }
 }
 
-describe.each(LAUNCHERS)(
-  '$name: unknown, positional and repeated arguments',
-  (launcher) => {
+for (const launcher of LAUNCHERS) {
+  describe(`${launcher.name}: unknown, positional and repeated arguments`, () => {
     it('an unknown argument is refused, naming it and the program', () => {
       const { lines, exits } = startWith(launcher, ['--zzzz-qqq']);
-      expect(exits).toEqual([1]);
-      expect(lines).toEqual([
+      assert.deepStrictEqual(exits, [1]);
+      assert.deepStrictEqual(lines, [
         `[MCP] --zzzz-qqq is not an argument of ${launcher.name}`,
       ]);
     });
 
     it('a close misspelling names the argument it may mean', () => {
       const { lines, exits } = startWith(launcher, ['--sytem-type=onprem']);
-      expect(exits).toEqual([1]);
-      expect(lines).toEqual([
+      assert.deepStrictEqual(exits, [1]);
+      assert.deepStrictEqual(lines, [
         `[MCP] --sytem-type is not an argument of ${launcher.name}; did you mean --system-type?`,
       ]);
     });
@@ -117,16 +118,16 @@ describe.each(LAUNCHERS)(
         '--system-type=onprem',
         'stray',
       ]);
-      expect(exits).toEqual([1]);
-      expect(lines).toEqual([
+      assert.deepStrictEqual(exits, [1]);
+      assert.deepStrictEqual(lines, [
         `[MCP] "stray" is not an argument of ${launcher.name}: every argument is --name or --name=<value>`,
       ]);
     });
 
     it('a single-dash argument other than -h and -v is refused', () => {
       const { lines, exits } = startWith(launcher, ['-x']);
-      expect(exits).toEqual([1]);
-      expect(lines).toEqual([
+      assert.deepStrictEqual(exits, [1]);
+      assert.deepStrictEqual(lines, [
         `[MCP] -x is not an argument of ${launcher.name}`,
       ]);
     });
@@ -137,68 +138,89 @@ describe.each(LAUNCHERS)(
         '--system-type',
         'cloud',
       ]);
-      expect(exits).toEqual([1]);
-      expect(lines).toEqual([
+      assert.deepStrictEqual(exits, [1]);
+      assert.deepStrictEqual(lines, [
         '[MCP] --system-type is given twice (--system-type=onprem, --system-type cloud): state it once',
       ]);
     });
 
     it("a value given in a parameter's two-word form is not a positional", () => {
       const { exits, config } = startWith(launcher, ['--system-type', 'cloud']);
-      expect(exits).toEqual([]);
-      expect(config).toHaveProperty('systemType', 'cloud');
+      assert.deepStrictEqual(exits, []);
+      assert.ok('systemType' in Object(config));
+      assert.deepStrictEqual(
+        Reflect.get(Object(config), 'systemType'),
+        'cloud',
+      );
     });
-  },
-);
-
-describe.each(LAUNCHERS)('$name: unknown YAML keys', (launcher) => {
-  it('a top-level misspelling is refused, naming the key and the known one', () => {
-    const { lines, exits } = startWith(launcher, [], 'system_type: cloud\n');
-    expect(exits).toEqual([1]);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain(
-      'Config file key "system_type" is not a parameter of this binary; did you mean "system-type"?',
-    );
   });
+}
 
-  it('a nested misspelling is refused, naming its dotted path', () => {
-    const yaml = JSON.stringify(launcher.nested.yaml);
-    const { lines, exits } = startWith(launcher, [], `${yaml}\n`);
-    expect(exits).toEqual([1]);
-    expect(lines).toHaveLength(1);
-    expect(lines[0]).toContain(
-      `Config file key "${launcher.nested.key}" is not a parameter of this binary`,
-    );
-  });
+for (const launcher of LAUNCHERS) {
+  describe(`${launcher.name}: unknown YAML keys`, () => {
+    it('a top-level misspelling is refused, naming the key and the known one', () => {
+      const { lines, exits } = startWith(launcher, [], 'system_type: cloud\n');
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(lines.length, 1);
+      assert.ok(
+        lines[0].includes(
+          'Config file key "system_type" is not a parameter of this binary; did you mean "system-type"?',
+        ),
+      );
+    });
 
-  it('an unknown key nothing resembles is refused without a suggestion', () => {
-    const { lines } = startWith(launcher, [], 'zzzz: 1\n');
-    expect(
-      lines[0]?.endsWith(
-        'Config file key "zzzz" is not a parameter of this binary',
-      ),
-    ).toBe(true);
-  });
-});
+    it('a nested misspelling is refused, naming its dotted path', () => {
+      const yaml = JSON.stringify(launcher.nested.yaml);
+      const { lines, exits } = startWith(launcher, [], `${yaml}\n`);
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(lines.length, 1);
+      assert.ok(
+        lines[0].includes(
+          `Config file key "${launcher.nested.key}" is not a parameter of this binary`,
+        ),
+      );
+    });
 
-describe.each(LAUNCHERS)('$name: an empty value is not given', (launcher) => {
-  it('--system-type= is read as not given, and the next form decides', () => {
-    const { exits, config } = startWith(
-      launcher,
-      ['--system-type='],
-      'system-type: cloud\n',
-    );
-    expect(exits).toEqual([]);
-    expect(config).toHaveProperty('systemType', 'cloud');
+    it('an unknown key nothing resembles is refused without a suggestion', () => {
+      const { lines } = startWith(launcher, [], 'zzzz: 1\n');
+      assert.equal(
+        lines[0]?.endsWith(
+          'Config file key "zzzz" is not a parameter of this binary',
+        ),
+        true,
+      );
+    });
   });
+}
 
-  it('a YAML key with no value is a known key, read as not given', () => {
-    const { exits, config } = startWith(
-      launcher,
-      ['--system-type=onprem'],
-      'enable-data-tools:\n',
-    );
-    expect(exits).toEqual([]);
-    expect(config).toHaveProperty('enableDataTools', false);
+for (const launcher of LAUNCHERS) {
+  describe(`${launcher.name}: an empty value is not given`, () => {
+    it('--system-type= is read as not given, and the next form decides', () => {
+      const { exits, config } = startWith(
+        launcher,
+        ['--system-type='],
+        'system-type: cloud\n',
+      );
+      assert.deepStrictEqual(exits, []);
+      assert.ok('systemType' in Object(config));
+      assert.deepStrictEqual(
+        Reflect.get(Object(config), 'systemType'),
+        'cloud',
+      );
+    });
+
+    it('a YAML key with no value is a known key, read as not given', () => {
+      const { exits, config } = startWith(
+        launcher,
+        ['--system-type=onprem'],
+        'enable-data-tools:\n',
+      );
+      assert.deepStrictEqual(exits, []);
+      assert.ok('enableDataTools' in Object(config));
+      assert.deepStrictEqual(
+        Reflect.get(Object(config), 'enableDataTools'),
+        false,
+      );
+    });
   });
-});
+}

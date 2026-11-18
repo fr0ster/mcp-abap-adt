@@ -6,6 +6,9 @@
  * and YAML null are not given, as before.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   type ParameterTable,
   validateYamlConfig,
@@ -27,7 +30,7 @@ const errorsOf = (table: ParameterTable, text: string) =>
   validateYamlConfig(table, yaml(text)).errors;
 
 describe('a section of the wrong shape is refused, naming its key', () => {
-  it.each([
+  for (const [_case, text, key] of [
     ['sse as a list', 'sse:\n  - port: 3001\n', 'sse'],
     ['sse as a value', 'sse: on\n', 'sse'],
     ['sse.tls as a value', 'sse:\n  tls: 1\n', 'sse.tls'],
@@ -36,16 +39,18 @@ describe('a section of the wrong shape is refused, naming its key', () => {
       'restrictions:\n  - deny-actions: DeleteClass\n',
       'restrictions',
     ],
-  ])('%s', (_case, text, key) => {
-    const errors = errorsOf(SSE_PARAMETERS, text);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain(`"${key}"`);
-    expect(errors[0]).toContain('mapping');
-  });
+  ]) {
+    it(format('%s', _case), () => {
+      const errors = errorsOf(SSE_PARAMETERS, text);
+      assert.equal(errors.length, 1);
+      assert.ok(errors[0].includes(`"${key}"`));
+      assert.ok(errors[0].includes('mapping'));
+    });
+  }
 });
 
 describe('a value of the wrong shape is refused, naming its key', () => {
-  it.each([
+  for (const [_case, text, key] of [
     ['a port as a list', 'sse:\n  port: [3001]\n', 'sse.port'],
     ['a host as a mapping', 'sse:\n  host: {a: b}\n', 'sse.host'],
     [
@@ -53,19 +58,23 @@ describe('a value of the wrong shape is refused, naming its key', () => {
       'sse:\n  allowed-hosts: {a: b}\n',
       'sse.allowed-hosts',
     ],
-  ])('%s', (_case, text, key) => {
-    const errors = errorsOf(SSE_PARAMETERS, text);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain(key);
-  });
+  ]) {
+    it(format('%s', _case), () => {
+      const errors = errorsOf(SSE_PARAMETERS, text);
+      assert.equal(errors.length, 1);
+      assert.ok(errors[0].includes(key));
+    });
+  }
 });
 
 describe('an empty value and null are not given', () => {
-  it.each([
+  for (const [_case, text] of [
     ['sse null', 'sse:\n'],
     ['sse empty', "sse: ''\n"],
     ['sse.tls null', 'sse:\n  tls:\n'],
-  ])('%s', (_case, text) => {
-    expect(errorsOf(SSE_PARAMETERS, text)).toEqual([]);
-  });
+  ]) {
+    it(format('%s', _case), () => {
+      assert.deepStrictEqual(errorsOf(SSE_PARAMETERS, text), []);
+    });
+  }
 });

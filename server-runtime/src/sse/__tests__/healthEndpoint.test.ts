@@ -1,5 +1,7 @@
+import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { after, before, describe, it } from 'node:test';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
@@ -26,7 +28,7 @@ describe('Health endpoint — SseServer', () => {
   let httpServer: Server;
   let baseUrl: string;
 
-  beforeAll(async () => {
+  before(async () => {
     const sseServer = new SseServer(emptyRegistry, {
       version: '1.2.3',
     });
@@ -35,7 +37,7 @@ describe('Health endpoint — SseServer', () => {
     baseUrl = result.baseUrl;
   });
 
-  afterAll(
+  after(
     () =>
       new Promise<void>((resolve) => {
         httpServer.close(() => resolve());
@@ -44,13 +46,13 @@ describe('Health endpoint — SseServer', () => {
 
   it('returns 200 with status ok and activeSessions', async () => {
     const res = await fetch(`${baseUrl}/mcp/health`);
-    expect(res.status).toBe(200);
+    assert.equal(res.status, 200);
 
     const body = (await res.json()) as any;
-    expect(body.status).toBe('ok');
-    expect(body.transport).toBe('sse');
-    expect(body.version).toBe('1.2.3');
-    expect(typeof body.uptime).toBe('number');
-    expect(body.activeSessions).toBe(0);
+    assert.equal(body.status, 'ok');
+    assert.equal(body.transport, 'sse');
+    assert.equal(body.version, '1.2.3');
+    assert.equal(typeof body.uptime, 'number');
+    assert.equal(body.activeSessions, 0);
   });
 });

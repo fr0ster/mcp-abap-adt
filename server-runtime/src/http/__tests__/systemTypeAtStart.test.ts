@@ -6,13 +6,14 @@
  * listens — so no tool list is ever filtered for a kind nobody stated.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
+import { afterEach, it } from 'node:test';
+import { format } from 'node:util';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { listenerSystemTypeRequiredWords } from '@mcp-abap-adt/responsible-rules';
 import { main } from '../launcher';
-
-jest.setTimeout(30_000);
 
 const savedEnv = process.env;
 afterEach(() => {
@@ -71,27 +72,31 @@ it('without a kind: exit 1 in fixed words, and nothing listens', async () => {
     ['--host=127.0.0.1', `--port=${port}`],
     {},
   );
-  expect(server).toBeUndefined();
-  expect(exits).toEqual([1]);
-  expect(stderr).toEqual([`[MCP] ${listenerSystemTypeRequiredWords()}`]);
-  expect(await listening(port)).toBe(false);
+  assert.equal(server, undefined);
+  assert.deepStrictEqual(exits, [1]);
+  assert.deepStrictEqual(stderr, [
+    `[MCP] ${listenerSystemTypeRequiredWords()}`,
+  ]);
+  assert.equal(await listening(port), false);
 });
 
-it.each([
+for (const [_what, extra, env] of [
   ['--system-type', ['--system-type=onprem'], {}],
   ['SAP_SYSTEM_TYPE', [], { SAP_SYSTEM_TYPE: 'cloud' }],
-] as const)('stated by %s: it listens', async (_what, extra, env) => {
-  const port = await freePort();
-  const { server, exits } = await start(
-    ['--host=127.0.0.1', `--port=${port}`, ...extra],
-    { ...env },
-  );
-  try {
-    expect(exits).toEqual([]);
-    expect(server).toBeDefined();
-    expect(await listening(port)).toBe(true);
-  } finally {
-    await server?.stop();
-  }
-  expect(await listening(port)).toBe(false);
-});
+] as const) {
+  it(format('stated by %s: it listens', _what), async () => {
+    const port = await freePort();
+    const { server, exits } = await start(
+      ['--host=127.0.0.1', `--port=${port}`, ...extra],
+      { ...env },
+    );
+    try {
+      assert.deepStrictEqual(exits, []);
+      assert.notEqual(server, undefined);
+      assert.equal(await listening(port), true);
+    } finally {
+      await server?.stop();
+    }
+    assert.equal(await listening(port), false);
+  });
+}

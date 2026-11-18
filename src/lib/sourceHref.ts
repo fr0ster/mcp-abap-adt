@@ -15,21 +15,21 @@
 import { isAsciiDigits } from './plainText';
 
 /** A point in a source: its line (from 1) and its column (from 0). */
-export interface SourcePoint {
+export type SourcePoint = {
   readonly line: number;
   readonly column: number;
-}
+};
 
 /** Where a message stands: its start, and its end where the href states one. */
-export interface SourcePosition extends SourcePoint {
+export type SourcePosition = SourcePoint & {
   readonly end?: SourcePoint;
-}
+};
 
 /** What an href names: the source's uri, and the position in it when stated. */
-export interface SourceHref {
+export type SourceHref = {
   readonly uri: string;
   readonly position?: SourcePosition;
-}
+};
 
 /** A fragment's `start`: its line, and its column where it states one. */
 export interface FragmentStart {

@@ -13,6 +13,8 @@
  * runs.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -33,8 +35,6 @@ import {
   until,
 } from '../backgroundRuns/harness';
 import { isLock, isUnlock, oneToolGroup, statefulStand } from './harness';
-
-jest.setTimeout(30_000);
 
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
 const of = (name: string) => (r: StandInRequest) =>
@@ -112,17 +112,20 @@ it('a cancel sent while the call’s system lookup is on the wire aborts nothing
     await held.arrived;
     // The SDK's client sends notifications/cancelled for this request.
     cancel.abort('the user cancelled');
-    expect(await first).toBe('the client stopped waiting');
+    assert.equal(await first, 'the client stopped waiting');
     await settleWhile();
     // Still a live call, its signal not aborted.
-    expect(live()).toBe(1);
-    expect(activeTools().every((tool) => !tool.signal.aborted)).toBe(true);
+    assert.equal(live(), 1);
+    assert.equal(
+      activeTools().every((tool) => !tool.signal.aborted),
+      true,
+    );
     held.release();
     // The call ran to its end: its tool's request reached the system.
     await until(() => standIn.requests.some(of('ZCL_FIRST')));
     await until(() => live() === 0);
     const lookup = standIn.requests.findIndex(isLookup);
-    expect(standIn.requests.findIndex(of('ZCL_FIRST'))).toBeGreaterThan(lookup);
+    assert.ok(standIn.requests.findIndex(of('ZCL_FIRST')) > lookup);
   } finally {
     await s.close();
     await standIn.close();
@@ -144,11 +147,11 @@ it('a cancel sent while the call waits in the main flow aborts nothing: it keeps
       .catch(() => 'the client stopped waiting');
     await until(() => activeTools().length === 2);
     cancel.abort('the user cancelled');
-    expect(await queued).toBe('the client stopped waiting');
+    assert.equal(await queued, 'the client stopped waiting');
     await settleWhile();
     // Still queued: two live calls, nothing of the queued one sent.
-    expect(activeTools()).toHaveLength(2);
-    expect(s.standIn.requests.some(of('ZCL_QUEUED'))).toBe(false);
+    assert.equal(activeTools().length, 2);
+    assert.equal(s.standIn.requests.some(of('ZCL_QUEUED')), false);
     held.release();
     await holder;
     await until(() => s.standIn.requests.some(of('ZCL_QUEUED')));
@@ -156,9 +159,7 @@ it('a cancel sent while the call waits in the main flow aborts nothing: it keeps
     const unlock = s.standIn.requests.findIndex(
       (r) => isUnlock(r) && of('ZCL_HOLDER')(r),
     );
-    expect(s.standIn.requests.findIndex(of('ZCL_QUEUED'))).toBeGreaterThan(
-      unlock,
-    );
+    assert.ok(s.standIn.requests.findIndex(of('ZCL_QUEUED')) > unlock);
   } finally {
     await s.close();
   }
@@ -176,14 +177,14 @@ it('the instance closes while a call’s system lookup is on the wire: the logof
     // The client closed: its transport closes, and the instance is closed —
     // as an SSE stream's close does.
     await s.client.close();
-    expect(await first).toBe('the session ended');
+    assert.equal(await first, 'the session ended');
     await closeInstance(s.server);
     // The logoff went out under the lookup still held: nothing waited for it.
     await until(() => standIn.requests.some((r) => isLogoff(r.url)));
-    expect(live()).toBe(1);
+    assert.equal(live(), 1);
     held.release();
     await until(() => live() === 0);
-    expect(standIn.requests.some(of('ZCL_FIRST'))).toBe(false);
+    assert.equal(standIn.requests.some(of('ZCL_FIRST')), false);
   } finally {
     await s.close();
     await standIn.close();

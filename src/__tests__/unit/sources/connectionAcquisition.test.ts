@@ -11,10 +11,13 @@
  * connected). Pinned beside them: a source resolved, a birth, a build.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const ROOT = path.resolve(__dirname, '../../../..');
+const ROOT = repositoryRoot(__dirname);
 
 /** The production sources: every package's `src`, tests and builds left out. */
 function productionSources(): string[] {
@@ -119,7 +122,7 @@ describe('the paths that hand a connection to work', () => {
         found[key] = { ...(found[key] ?? {}), [primitive]: n };
       }
     }
-    expect(found).toEqual(PINNED);
+    assert.deepStrictEqual(found, PINNED);
   });
 
   it('getConnection checks the one kind before it resolves, builds or hands on', () => {
@@ -130,9 +133,9 @@ describe('the paths that hand a connection to work', () => {
     const start = text.indexOf('protected async getConnection(');
     const body = text.slice(start, text.indexOf('\n  }\n', start));
     const check = body.indexOf('this.kindRefusal()');
-    expect(check).toBeGreaterThan(0);
-    expect(check).toBeLessThan(body.indexOf('return context.connection'));
-    expect(check).toBeLessThan(body.indexOf('context.source.resolve('));
+    assert.ok(check > 0);
+    assert.ok(check < body.indexOf('return context.connection'));
+    assert.ok(check < body.indexOf('context.source.resolve('));
   });
 
   it('bornAtStart checks the one kind before it resolves or builds', () => {
@@ -143,9 +146,9 @@ describe('the paths that hand a connection to work', () => {
     const start = text.indexOf('protected async bornAtStart(');
     const body = text.slice(start, text.indexOf('\n  }\n', start));
     const check = body.indexOf('this.kindRefusal()');
-    expect(check).toBeGreaterThan(0);
-    expect(check).toBeLessThan(body.indexOf('context.source.resolve('));
-    expect(check).toBeLessThan(body.indexOf('this.birthEntry('));
+    assert.ok(check > 0);
+    assert.ok(check < body.indexOf('context.source.resolve('));
+    assert.ok(check < body.indexOf('this.birthEntry('));
   });
 
   it('openFreshConnection checks the host’s connection before it connects it', () => {
@@ -157,7 +160,7 @@ describe('the paths that hand a connection to work', () => {
     const body = text.slice(start, text.indexOf('\n}\n', start));
     const factory = body.indexOf('hostFactories.get(');
     const check = body.indexOf('admitOnKind(', factory);
-    expect(check).toBeGreaterThan(factory);
-    expect(check).toBeLessThan(body.indexOf('connectedOrClosed(given'));
+    assert.ok(check > factory);
+    assert.ok(check < body.indexOf('connectedOrClosed(given'));
   });
 });

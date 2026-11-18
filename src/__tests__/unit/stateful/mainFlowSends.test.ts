@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { afterEach, it } from 'node:test';
 import * as z from 'zod';
 /**
  * Every send on the instance's connection is inside its main flow; only work
@@ -23,8 +25,6 @@ import { readSystemInformation } from '../../../lib/systemInformation';
 import { adtStandIn, type StandInRequest } from '../../helpers/adtStandIn';
 import { callerOn } from '../backgroundRuns/harness';
 import { isLock, isUnlock, oneToolGroup, statefulStand } from './harness';
-
-jest.setTimeout(30_000);
 
 const SOURCE = 'CLASS zcl_placeholder DEFINITION. ENDCLASS.';
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
@@ -120,16 +120,16 @@ it('a holding DebugWait blocks no GetClass; the request user sends nothing', asy
     const wait = s.call('DebugWait', {});
     await settleWhile();
     const read = await s.call('GetClass', { class_name: 'ZCL_READ' });
-    expect(read.isError).not.toBe(true);
-    expect(s.standIn.requests.some(of('ZCL_READ'))).toBe(true);
+    assert.notEqual(read.isError, true);
+    assert.equal(s.standIn.requests.some(of('ZCL_READ')), true);
     releaseWait();
     await wait;
 
     // The request user: the connection's parameters, nothing sent.
     const lookupsBefore = s.standIn.requests.filter(isLookup).length;
     const start = await s.call('DebugStartListener', {});
-    expect(start.isError).not.toBe(true);
-    expect(s.standIn.requests.filter(isLookup).length).toBe(lookupsBefore);
+    assert.notEqual(start.isError, true);
+    assert.equal(s.standIn.requests.filter(isLookup).length, lookupsBefore);
   } finally {
     releaseWait();
     await s.close();
@@ -166,8 +166,8 @@ it('a lookup from inside a call that holds the flow runs directly, without waiti
       deadlock,
     ]);
     clearTimeout(timer);
-    expect(outcome).toBe('answered');
-    expect(s.standIn.requests.some(isLookup)).toBe(true);
+    assert.equal(outcome, 'answered');
+    assert.equal(s.standIn.requests.some(isLookup), true);
   } finally {
     await s.close();
   }

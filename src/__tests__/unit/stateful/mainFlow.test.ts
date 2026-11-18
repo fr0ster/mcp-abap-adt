@@ -16,6 +16,8 @@
  * (A cancel sent to a queued call aborts nothing: `noCallCancel.test.ts`.)
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
@@ -34,8 +36,6 @@ import {
   oneToolGroup,
   statefulStand,
 } from './harness';
-
-jest.setTimeout(30_000);
 
 const SOURCE = 'CLASS zcl_placeholder DEFINITION. ENDCLASS.';
 const HANDLE = 'B92E65858E83454C783181344F429D4BFD8E395D';
@@ -127,7 +127,7 @@ describe('one main flow per instance', () => {
       });
       await settleWhile();
       // The first holds the flow: nothing of the second has reached SAP.
-      expect(firstIndex(standIn, of('ZCL_SECOND'))).toBe(-1);
+      assert.equal(firstIndex(standIn, of('ZCL_SECOND')), -1);
       held.release();
       await Promise.all([first, second]);
 
@@ -135,10 +135,8 @@ describe('one main flow per instance', () => {
         standIn,
         (r) => isUnlock(r as never) && of('ZCL_FIRST')(r),
       );
-      expect(firstUnlock).toBeGreaterThanOrEqual(0);
-      expect(firstIndex(standIn, of('ZCL_SECOND'))).toBeGreaterThan(
-        firstUnlock,
-      );
+      assert.ok(firstUnlock >= 0);
+      assert.ok(firstIndex(standIn, of('ZCL_SECOND')) > firstUnlock);
     } finally {
       await s.close();
       await standIn.close();
@@ -168,7 +166,7 @@ describe('one main flow per instance', () => {
         class_name: 'ZCL_BACKGROUND',
         background: true,
       });
-      expect(background.isError).toBe(false);
+      assert.equal(background.isError, false);
       await until(() => standIn.requests.some(isClassRun));
 
       let foregroundDone = false;
@@ -179,12 +177,12 @@ describe('one main flow per instance', () => {
           return answer;
         });
       await settleWhile();
-      expect(foregroundDone).toBe(false);
-      expect(firstIndex(standIn, of('ZCL_FOREGROUND'))).toBe(-1);
+      assert.equal(foregroundDone, false);
+      assert.equal(firstIndex(standIn, of('ZCL_FOREGROUND')), -1);
 
       held.release();
       await holder;
-      expect((await foreground).isError).toBe(false);
+      assert.equal((await foreground).isError, false);
     } finally {
       await caller.close();
       await standIn.close();
@@ -242,9 +240,9 @@ describe('one main flow per instance', () => {
       const sent = s.standIn.requests.filter(
         (r) => isUnlock(r) && of('ZCL_A')(r),
       );
-      expect(sent).toHaveLength(1);
-      expect(sent.every(isStateful)).toBe(true);
-      expect(sent.every(carriesContext)).toBe(true);
+      assert.equal(sent.length, 1);
+      assert.equal(sent.every(isStateful), true);
+      assert.equal(sent.every(carriesContext), true);
     } finally {
       await s.close();
     }

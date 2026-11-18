@@ -7,8 +7,10 @@
  * `oneRequestPerEntry.test.ts` runs held open and answered.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import {
   CompactDataHandlersGroup,
@@ -28,8 +30,13 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { LONG_TOOLS } from '../../../lib/longTools';
 import { BATCH_ENTRY_CASES, SAMPLE_CALLS } from '../../helpers/batchEntryCases';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
+// Where the running code lives, and eligible() with it: the repository under
+// Jest, `.test-build/tree/` under node:test, the build placing
+// tools/batch-handlers.json beside the compiled code.
+const CODE_ROOT = path.resolve(__dirname, '../../../..');
 
 const listed = (): BatchEntry[] =>
   JSON.parse(
@@ -166,23 +173,24 @@ describe('tools/batch-handlers.json', () => {
   const served = servedBySet();
 
   it('is the file eligible() reads, each entry in it', () => {
-    expect(path.resolve(BATCH_HANDLERS_FILE)).toBe(
-      path.join(REPO, 'tools/batch-handlers.json'),
+    assert.equal(
+      path.resolve(BATCH_HANDLERS_FILE),
+      path.join(CODE_ROOT, 'tools/batch-handlers.json'),
     );
-    expect(batchEntries()).toEqual(
-      // eligible() keeps file order within a tool.
+    assert.deepStrictEqual(
+      batchEntries(), // eligible() keeps file order within a tool.
       [...new Set(entries.map((e) => e.tool))].flatMap((tool) =>
         entries.filter((e) => e.tool === tool),
       ),
     );
-    expect(entries.length).toBeGreaterThan(40);
+    assert.ok(entries.length > 40);
   });
 
   it('ships with the package, so eligible() finds it in dist too', () => {
     const manifest = JSON.parse(
       fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
     ) as { files: string[] };
-    expect(manifest.files).toContain('tools/batch-handlers.json');
+    assert.ok(manifest.files.includes('tools/batch-handlers.json'));
   });
 
   // The portable build bundles the bin into a single executable, where no
@@ -195,12 +203,17 @@ describe('tools/batch-handlers.json', () => {
       'utf8',
     );
     const literal = "require('../../../tools/batch-handlers.json')";
-    expect(source.split(literal)).toHaveLength(2);
-    expect(source).not.toContain('readFileSync');
-    expect(source).not.toContain("from 'node:fs'");
-    expect(
-      path.resolve(REPO, 'src/lib/batch', '../../../tools/batch-handlers.json'),
-    ).toBe(path.resolve(BATCH_HANDLERS_FILE));
+    assert.equal(source.split(literal).length, 2);
+    assert.ok(!source.includes('readFileSync'));
+    assert.ok(!source.includes("from 'node:fs'"));
+    assert.equal(
+      path.resolve(
+        CODE_ROOT,
+        'src/lib/batch',
+        '../../../tools/batch-handlers.json',
+      ),
+      path.resolve(BATCH_HANDLERS_FILE),
+    );
   });
 
   it('every entry has the shape: tool, set, handler, sends, and a well-formed when / connection', () => {
@@ -211,62 +224,75 @@ describe('tools/batch-handlers.json', () => {
             k,
           ),
       );
-      expect({ tool: entry.tool, extra: keys }).toEqual({
-        tool: entry.tool,
-        extra: [],
-      });
-      expect(entry.set).toBe('compact');
-      if (entry.connection !== undefined) expect(entry.connection).toBe('http');
+      assert.deepStrictEqual(
+        { tool: entry.tool, extra: keys },
+        {
+          tool: entry.tool,
+          extra: [],
+        },
+      );
+      assert.equal(entry.set, 'compact');
+      if (entry.connection !== undefined)
+        assert.equal(entry.connection, 'http');
       for (const rule of entry.when ?? []) {
-        expect(typeof rule.argument).toBe('string');
-        expect(
+        assert.equal(typeof rule.argument, 'string');
+        assert.equal(
           rule.equals !== undefined ||
             rule.notEquals !== undefined ||
             rule.present !== undefined,
-        ).toBe(true);
+          true,
+        );
       }
     }
   });
 
   it('every entry names a tool its set serves and a handler that exists', () => {
     for (const entry of entries) {
-      expect({
-        tool: entry.tool,
-        served: served[entry.set].has(entry.tool),
-      }).toEqual({ tool: entry.tool, served: true });
+      assert.deepStrictEqual(
+        {
+          tool: entry.tool,
+          served: served[entry.set].has(entry.tool),
+        },
+        { tool: entry.tool, served: true },
+      );
       const [file, fn] = entry.handler.split('#');
       const source = fs.readFileSync(path.join(REPO, file ?? ''), 'utf8');
-      expect({
-        tool: entry.tool,
-        exported:
-          source.includes(`export async function ${fn}(`) ||
-          source.includes(`export function ${fn}(`),
-        named: namesTool(source, entry.tool, fn ?? ''),
-      }).toEqual({ tool: entry.tool, exported: true, named: true });
+      assert.deepStrictEqual(
+        {
+          tool: entry.tool,
+          exported:
+            source.includes(`export async function ${fn}(`) ||
+            source.includes(`export function ${fn}(`),
+          named: namesTool(source, entry.tool, fn ?? ''),
+        },
+        { tool: entry.tool, exported: true, named: true },
+      );
     }
   });
 
   it('no tool name is served by both sets: eligible() keys entries by name alone', () => {
     const both = [...served.full].filter((name) => served.compact.has(name));
-    expect(both).toEqual([]);
+    assert.deepStrictEqual(both, []);
     const sets = new Map<string, Set<string>>();
     for (const entry of entries) {
       sets.set(entry.tool, (sets.get(entry.tool) ?? new Set()).add(entry.set));
     }
-    expect(
+    assert.deepStrictEqual(
       [...sets].filter(([, s]) => s.size > 1).map(([tool]) => tool),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it("every entry's sends names what it sends", () => {
     const offending = entries
       .filter((e) => !METHODS.some((m) => e.sends.includes(m)))
       .map((e) => `${e.tool}: ${e.sends}`);
-    expect(offending).toEqual([]);
+    assert.deepStrictEqual(offending, []);
   });
 
   it('classifies every long tool', () => {
-    expect(Object.keys(LONG_BY_REQUESTS).sort()).toEqual(
+    assert.deepStrictEqual(
+      Object.keys(LONG_BY_REQUESTS).sort(),
       [...LONG_TOOLS].sort(),
     );
   });
@@ -275,14 +301,17 @@ describe('tools/batch-handlers.json', () => {
     const offending = entries
       .filter((e) => LONG_BY_REQUESTS[e.tool] === 'chained')
       .map((e) => e.tool);
-    expect(offending).toEqual([]);
+    assert.deepStrictEqual(offending, []);
     // A long read that is chained in some modes is listed only under the others.
     for (const entry of entries) {
       if (LONG_BY_REQUESTS[entry.tool] === 'by-arguments') {
-        expect({
-          tool: entry.tool,
-          when: (entry.when ?? []).length > 0,
-        }).toEqual({ tool: entry.tool, when: true });
+        assert.deepStrictEqual(
+          {
+            tool: entry.tool,
+            when: (entry.when ?? []).length > 0,
+          },
+          { tool: entry.tool, when: true },
+        );
       }
     }
   });
@@ -291,7 +320,10 @@ describe('tools/batch-handlers.json', () => {
     const tools = new Set(entries.map((e) => e.tool));
     for (const [tool, kind] of Object.entries(LONG_BY_REQUESTS)) {
       if (kind === 'chained' || !served.compact.has(tool)) continue;
-      expect({ tool, listed: tools.has(tool) }).toEqual({ tool, listed: true });
+      assert.deepStrictEqual(
+        { tool, listed: tools.has(tool) },
+        { tool, listed: true },
+      );
     }
   });
 
@@ -322,17 +354,19 @@ describe('tools/batch-handlers.json', () => {
         }
       }
     }
-    expect(missing).toEqual([]);
+    assert.deepStrictEqual(missing, []);
   });
 
   it("every sample call of a compact tool is in the batch proof; the others are the full set's", () => {
     const tools = new Set(entries.map((e) => e.tool));
     const unlisted = SAMPLE_CALLS.filter((c) => !tools.has(c.tool));
-    expect(
+    assert.deepStrictEqual(
       unlisted.filter((c) => served.compact.has(c.tool)).map((c) => c.tool),
-    ).toEqual([]);
-    expect(
+      [],
+    );
+    assert.deepStrictEqual(
       unlisted.filter((c) => !served.full.has(c.tool)).map((c) => c.tool),
-    ).toEqual([]);
+      [],
+    );
   });
 });

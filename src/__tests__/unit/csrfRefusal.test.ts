@@ -22,6 +22,7 @@ import { CSRF_REFUSAL_WORDS } from '../../lib/csrfRefusal';
 import { logger } from '../../lib/logger';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { extractAdtErrorMessage, return_error } from '../../lib/utils';
 import { statusError } from '../helpers/batchEnvelope';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
@@ -59,6 +60,11 @@ function throwing(thrown: () => Error): IAbapConnection {
 function payloadOf(answered: { content?: Array<{ text?: string }> }) {
   const [first] = answered.content ?? [];
   return JSON.parse(first?.text ?? 'null');
+}
+
+/** An answer's whole text. */
+function textOf(answered: { content?: Array<{ text?: string }> }): string {
+  return (answered.content ?? []).map((part) => part.text ?? '').join('\n');
 }
 
 /** The fixed answer, and none of SAP's words anywhere in it. */
@@ -129,6 +135,20 @@ describe('a refusal of the session token is answered in fixed words', () => {
   it('a throw no strategy read (answerThrown)', () => {
     expectFixed(
       payloadOf(answerThrown(csrfThrown(), { tool: 'T', detail: 'terse' })),
+    );
+  });
+
+  it("a handler's own catch (return_error), which relays SAP's body for any other refusal", () => {
+    expectFixed(payloadOf(return_error(csrfThrown())));
+    expect(textOf(return_error(forbiddenThrown()))).toContain(
+      'No authorization for the object',
+    );
+  });
+
+  it('the words a handler builds from a failure (/utils extractAdtErrorMessage)', () => {
+    expect(extractAdtErrorMessage(csrfThrown())).toBe(CSRF_REFUSAL_WORDS);
+    expect(extractAdtErrorMessage(forbiddenThrown())).toBe(
+      'No authorization for the object',
     );
   });
 

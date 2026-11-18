@@ -16,7 +16,12 @@ import type {
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { XMLParser } from 'fast-xml-parser';
-import { answerFailure, type McpResult } from './answer';
+import {
+  answerFailure,
+  answerTokenRefusal,
+  type McpResult,
+  thrownCsrfRefusal,
+} from './answer';
 import { answerRead, type FailureAnswer } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import {
@@ -29,6 +34,7 @@ import {
   systemKindOf,
 } from './connectionFactory.js';
 import { credentialFromSapConfig } from './credentialSources.js';
+import { CSRF_REFUSAL_WORDS } from './csrfRefusal';
 import type { SapEnvironment } from './handlers/interfaces';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
@@ -265,6 +271,8 @@ export function extractAdtErrorMessage(
   if (!error) {
     return fallback;
   }
+  // SAP's refusal of the session token: fixed words, none of SAP's body.
+  if (thrownCsrfRefusal(error) !== undefined) return CSRF_REFUSAL_WORDS;
 
   const response = child(error, 'response');
   const responseData = child(response, 'data');
@@ -386,6 +394,9 @@ export function return_error(error: unknown): FailureAnswer {
       content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
     };
   }
+  // SAP's refusal of the session token: fixed words, none of SAP's body.
+  const token = answerTokenRefusal(error);
+  if (token !== undefined) return token;
 
   // Safely extract error message to avoid circular reference issues
   // Always extract only safe properties, never serialize the entire error object

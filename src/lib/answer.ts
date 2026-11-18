@@ -221,10 +221,20 @@ function csrfRefusalPayload(
 }
 
 /**
+ * A throw that is a refusal of the session token, answered in fixed words
+ * (`csrfRefusalPayload`); `undefined` for any other — the path a handler's
+ * own catch takes (`return_error`) before it reads SAP's body.
+ */
+export function answerTokenRefusal(thrown: unknown): FailureAnswer | undefined {
+  const token = thrownCsrfRefusal(thrown);
+  return token === undefined ? undefined : failures.json(failurePayload(token));
+}
+
+/**
  * A thrown value that is a refusal of the session token, as a failure with
  * its step; `undefined` for any other.
  */
-function thrownCsrfRefusal(thrown: unknown): StepError | undefined {
+export function thrownCsrfRefusal(thrown: unknown): StepError | undefined {
   const response = wireResponseOf(child(thrown, 'response'));
   if (!isCsrfRefusal(response)) return undefined;
   const carried = child(thrown, 'message');

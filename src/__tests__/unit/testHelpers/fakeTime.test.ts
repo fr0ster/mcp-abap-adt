@@ -7,8 +7,9 @@
  * case fails instead of hanging.
  */
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 import { afterEach, describe, it, mock } from 'node:test';
+import { promisify } from 'node:util';
 import {
   advanceTimersByTimeAsync,
   advanceWithRealTime,
@@ -140,6 +141,37 @@ describe('useFakeTimers / useRealTimers / reset', () => {
     assert.equal(globalThis.setInterval, REAL.setInterval);
     assert.equal(globalThis.clearInterval, REAL.clearInterval);
     assert.throws(() => getTimerCount(), /not on/);
+  });
+  it("a direct mock.timers.reset() before the helper's reset leaves the real globals", () => {
+    const names = [
+      'setTimeout',
+      'clearTimeout',
+      'setInterval',
+      'clearInterval',
+      'setImmediate',
+      'clearImmediate',
+      'Date',
+    ] as const;
+    const realGlobals = () =>
+      names.filter((name) => Reflect.get(globalThis, name) !== REAL[name]);
+    try {
+      useFakeTimers({ apis: ALL, now: 0 });
+      mock.timers.reset();
+      reset();
+      assert.deepEqual(realGlobals(), [], 'after the helper reset');
+      useFakeTimers({ apis: ALL, now: 0 });
+      reset();
+      assert.deepEqual(realGlobals(), [], 'after the next useFakeTimers');
+    } finally {
+      // A failure here must not leave dead fakes for the cases after it.
+      for (const name of names) {
+        Object.defineProperty(globalThis, name, {
+          value: REAL[name],
+          configurable: true,
+          writable: true,
+        });
+      }
+    }
   });
 });
 
@@ -415,17 +447,18 @@ describe('realTurn', () => {
     await settlesWithin(realTurn(), 5);
   });
 
-  it('realTurn lets a rejection without a handler reach unhandledRejection before it resolves', () => {
+  it('realTurn lets a rejection without a handler reach unhandledRejection before it resolves', async (t) => {
     // In a plain node process: node:test's own handler would fail this
-    // case on the rejection the scenario leaves unhandled.
+    // case on the rejection the scenario leaves unhandled. Asynchronous,
+    // and killed when the case is cancelled (its signal).
     const env = { ...process.env };
     delete env.NODE_TEST_CONTEXT;
-    const run = spawnSync(process.execPath, [REAL_TURN_UNHANDLED], {
-      encoding: 'utf8',
-      env,
-    });
-    assert.equal(run.status, 0, run.stderr);
-    const lines = run.stdout.trim().split('\n');
+    const { stdout } = await promisify(execFile)(
+      process.execPath,
+      [REAL_TURN_UNHANDLED],
+      { encoding: 'utf8', env, signal: t.signal, killSignal: 'SIGKILL' },
+    );
+    const lines = stdout.trim().split('\n');
     assert.deepEqual(JSON.parse(lines[lines.length - 1] ?? ''), {
       seenBeforeResolve: ['left unhandled'],
     });

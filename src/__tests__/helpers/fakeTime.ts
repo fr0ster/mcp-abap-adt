@@ -43,8 +43,6 @@ export function realTurn(): Promise<void> {
 let pending: Set<unknown> | undefined;
 /** How many counted timer callbacks have run since `enable`. */
 let fired = 0;
-/** The globals as `mock.timers` left them, restored by `reset`. */
-let unwrap: (() => void) | undefined;
 
 /** Puts `value` in place of the global `name`. */
 function setGlobal(name: string, value: unknown): void {
@@ -61,11 +59,11 @@ function countPair(
   clear: string,
   repeats: boolean,
   live: Set<unknown>,
-): () => void {
+): void {
   const original = Reflect.get(globalThis, set);
   const originalClear = Reflect.get(globalThis, clear);
   if (typeof original !== 'function' || typeof originalClear !== 'function') {
-    return () => {};
+    return;
   }
   setGlobal(set, (callback: unknown, ...rest: unknown[]) => {
     const run = (...args: unknown[]) => {
@@ -82,10 +80,6 @@ function countPair(
     live.delete(handle);
     Reflect.apply(originalClear, globalThis, [handle]);
   });
-  return () => {
-    setGlobal(set, original);
-    setGlobal(clear, originalClear);
-  };
 }
 
 /**
@@ -103,27 +97,26 @@ export function useFakeTimers(options: {
       : { apis: options.apis, now: options.now },
   );
   const live = new Set<unknown>();
-  const restores: (() => void)[] = [];
   if (options.apis.includes('setTimeout')) {
-    restores.push(countPair('setTimeout', 'clearTimeout', false, live));
+    countPair('setTimeout', 'clearTimeout', false, live);
   }
   if (options.apis.includes('setInterval')) {
-    restores.push(countPair('setInterval', 'clearInterval', true, live));
+    countPair('setInterval', 'clearInterval', true, live);
   }
   if (options.apis.includes('setImmediate')) {
-    restores.push(countPair('setImmediate', 'clearImmediate', false, live));
+    countPair('setImmediate', 'clearImmediate', false, live);
   }
   pending = live;
   fired = 0;
-  unwrap = () => {
-    for (const restore of restores) restore();
-  };
 }
 
-/** Restores `mock.timers` and the counting wrappers: the real globals. */
+/**
+ * Restores the real globals: `mock.timers.reset()` puts back the globals it
+ * saw before `enable`, over the counting wrappers too. Nothing is restored
+ * from the wrappers' own saved values: those are mock.timers' fakes, and
+ * after a direct `mock.timers.reset()` they are dead.
+ */
 export function reset(): void {
-  unwrap?.();
-  unwrap = undefined;
   pending = undefined;
   mock.timers.reset();
 }

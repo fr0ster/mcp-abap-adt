@@ -360,6 +360,7 @@ describe('ActivateObjects answers the measured refusal', () => {
         uri: BROKEN_URI,
         source_uri: SOURCE,
         position: { line: 7, column: 4 },
+        line: '7',
       },
       { type: 'E', text: LV, objectName: BROKEN, uri: BROKEN_URI },
     ]);
@@ -384,7 +385,14 @@ describe('ActivateObjects answers the measured refusal', () => {
         'its results say activationExecuted="false": none of the 2 object(s) was activated',
       );
       expect(payload.message).toContain(`${BROKEN}: ${DAAT}`);
-      expect(payload.messages).toEqual(messages);
+      // A refusal answers each message's deprecated `line`: its position's.
+      expect(payload.messages).toEqual(
+        messages.map((message) =>
+          'position' in message
+            ? { ...message, line: String(message.position.line) }
+            : message,
+        ),
+      );
     },
   );
 });

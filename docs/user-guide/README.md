@@ -186,6 +186,7 @@ success and in a refusal alike. Each message carries what SAP states of it:
 | `uri` | the source the message points into (`/sap/bc/adt/oo/classes/zcl_x/source/main`) |
 | `position` | where in that source: `{ line, column }`, with `end: { line, column }` where SAP gives a range; lines count from 1, columns from 0 |
 | `code` | SAP's message code (`MESSAGE(GTU)`, `D0(408)`) |
+| `line` | deprecated, in a refusal only: the source line of `position` as text (`String(position.line)`); read `position.line` |
 
 A field is present where SAP states it: a DDIC object's message names its uri alone, and a
 message about no object (`Activation was cancelled.`) carries its type and text. A message of an

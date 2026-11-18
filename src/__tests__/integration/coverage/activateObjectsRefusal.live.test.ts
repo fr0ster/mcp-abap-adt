@@ -15,7 +15,7 @@
  *    is `refusal`, and the broken class is named in the answer;
  *    `ActivateClass` of `BROKEN` alone is SAP's refusal, an error message
  *    standing on source line 7 (`uri` the class's `/source/main`, `position`
- *    `{ line, column }`, no `line` field; #351);
+ *    `{ line, column }`, `line` its deprecated text; #351);
  * 4. `GetClass` of a name nobody created is SAP's `404`, answered as a tool
  *    answer.
  *
@@ -210,8 +210,8 @@ liveSuite(
       );
 
       // 3b. The broken class alone: SAP's refusal, each message saying where
-      // it stands (#351) — its source uri and position, never the message's
-      // ordinal as a line. `DAAT` stands on source line 7.
+      // it stands (#351) — its source uri and position, and `line` the source
+      // line, never the message's ordinal. `DAAT` stands on source line 7.
       const alone = await livePrepare('ActivateClass', { class_name: BROKEN });
       console.log(`[activateObjectsRefusal] broken class alone: ${alone.text}`);
       assert.equal(alone.isError, true);
@@ -235,8 +235,15 @@ liveSuite(
         ),
         `an error message at source line 7: ${alone.text}`,
       );
+      // `line` is kept, deprecated: the source line of the position.
       for (const message of messages) {
-        assert.equal(fieldOf(message, 'line'), undefined);
+        const position = fieldOf(message, 'position');
+        assert.equal(
+          fieldOf(message, 'line'),
+          position === undefined
+            ? undefined
+            : String(fieldOf(position, 'line')),
+        );
       }
 
       // 4. SAP's "not found" is a tool answer, not a throw.

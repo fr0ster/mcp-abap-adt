@@ -172,6 +172,8 @@ interface MessageCarrier {
     position?: SourcePosition;
     /** The source an activation run's message's href names. */
     source_uri?: string;
+    /** A strategy's deprecated `line`: not read — the answer's comes from `position`. */
+    line?: string;
   }>;
 }
 
@@ -334,8 +336,9 @@ export function failurePayload(
   // Where each message stands is the message's own: the strategy states its
   // `object` (`objDescr`), `uri` and `position` (its href's `#start=`), and
   // an activation run's message its `source_uri` (adt-strategies 0.23.2,
-  // `activationMessagesOf`). The library's deprecated `line` is
-  // `String(position.line)` and is not answered: `position` carries it.
+  // `activationMessagesOf`). `line` is answered deprecated as the source
+  // line of `position` (`String(position.line)`), absent without one; a
+  // strategy's own `line` is not read.
   if (error.messages !== undefined) {
     payload.messages = error.messages.map((m) => {
       const out: { [key: string]: AnswerValue } = {
@@ -345,7 +348,12 @@ export function failurePayload(
       if (m.object !== undefined) out.object = m.object;
       if (m.uri !== undefined) out.uri = m.uri;
       if (m.source_uri !== undefined) out.source_uri = m.source_uri;
-      if (m.position !== undefined) out.position = positionValue(m.position);
+      if (m.position !== undefined) {
+        out.position = positionValue(m.position);
+        // Deprecated (24.0.1): the source line as text, kept for a reader
+        // of `line`; `position.line` is the field to read.
+        out.line = String(m.position.line);
+      }
       if (m.code !== undefined) out.code = m.code;
       if (m.objectName !== undefined) out.objectName = m.objectName;
       if (m.t100 !== undefined) {

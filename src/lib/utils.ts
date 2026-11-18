@@ -38,6 +38,7 @@ import {
   NAME_TAKEN_KEYS,
 } from './messageKeys';
 import { endConnection } from './ownedConnections.js';
+import type { SourcePosition } from './sourceHref';
 import {
   messageLocation,
   type SourceMessage,
@@ -1111,6 +1112,31 @@ function xmlTextOf(
 }
 
 /**
+ * A message `parseActivationResponse` answers: its type, words and where it
+ * stands, with `line` and `column` kept, deprecated, as the numbers of its
+ * `position` (24.0.1) — absent without one.
+ */
+export type ParsedActivationMessage = SourceMessage & {
+  /** @deprecated Use `position.line`: the source line, from 1. */
+  readonly line?: number | undefined;
+  /** @deprecated Use `position.column`: the source column, from 0. */
+  readonly column?: number | undefined;
+};
+
+/** A location with `line` and `column` copied from its position, when it has one. */
+function withDeprecatedPoint<L extends { readonly position?: SourcePosition }>(
+  location: L,
+): L & { line?: number; column?: number } {
+  return location.position === undefined
+    ? location
+    : {
+        ...location,
+        line: location.position.line,
+        column: location.position.column,
+      };
+}
+
+/**
  * An activation answer parsed: the document, text as it is; an answer that
  * is not text read by its `data` member as fast-xml-parser reads it, else
  * written whole as JSON. No answer at all is refused in fast-xml-parser's
@@ -1147,7 +1173,7 @@ export function parseActivationResponse(responseData: unknown) {
     const generated = isTrue(nodeChild(properties, '@_generationExecuted'));
     // A message's `line` attribute is its ordinal, not a source line: where
     // it stands is its `href` (`messageLocation`).
-    const messages: Array<SourceMessage> = [];
+    const messages: Array<ParsedActivationMessage> = [];
     const stated = (value: XmlRead) =>
       typeof value === 'string' || typeof value === 'number'
         ? String(value)
@@ -1161,11 +1187,13 @@ export function parseActivationResponse(responseData: unknown) {
           text: String(
             nodeChild(shortText, 'txt') || shortText || 'Unknown message',
           ),
-          ...messageLocation({
-            href: stated(nodeChild(msg, '@_href')),
-            object: stated(nodeChild(msg, '@_objDescr')),
-            code: stated(nodeChild(msg, '@_code')),
-          }),
+          ...withDeprecatedPoint(
+            messageLocation({
+              href: stated(nodeChild(msg, '@_href')),
+              object: stated(nodeChild(msg, '@_objDescr')),
+              code: stated(nodeChild(msg, '@_code')),
+            }),
+          ),
         });
       }
     }

@@ -45,6 +45,32 @@ const FAILS_MESSAGE = {
   code: 'MESSAGE(GTH)',
 };
 
+/**
+ * A message as a refusal answers it: `line` kept, deprecated, as the source
+ * line `String(position.line)` (absent without a position).
+ */
+function refused<M extends { position?: { line: number } }>(message: M) {
+  return message.position === undefined
+    ? message
+    : { ...message, line: String(message.position.line) };
+}
+
+/**
+ * A message as `/utils`' `parseActivationResponse` answers it: `line` and
+ * `column` kept, deprecated, as the position's numbers.
+ */
+function parsed<M extends { position?: { line: number; column: number } }>(
+  message: M,
+) {
+  return message.position === undefined
+    ? message
+    : {
+        ...message,
+        line: message.position.line,
+        column: message.position.column,
+      };
+}
+
 /** A run's results of one type, as `MEASURED_RUNS` holds them. */
 function resultsOf(system: 'onprem' | 'cloud', kind: string): string {
   const run = MEASURED_RUNS.find(
@@ -67,9 +93,9 @@ function activationFailure(data: string) {
 }
 
 describe('the reported 751 answer', () => {
-  it('a refusal names the position, the object and the uri, and no line 1', () => {
+  it('a refusal names the position, the object and the uri, and line 16, never the ordinal 1', () => {
     const payload = failurePayload(activationFailure(REPORTED));
-    expect(payload.messages).toEqual([REPORTED_MESSAGE]);
+    expect(payload.messages).toEqual([refused(REPORTED_MESSAGE)]);
   });
 
   it('the terse checklist answer names them too', () => {
@@ -79,7 +105,7 @@ describe('the reported 751 answer', () => {
 
   it('parseActivationResponse names them too', () => {
     expect(parseActivationResponse(REPORTED).messages).toEqual([
-      REPORTED_MESSAGE,
+      parsed(REPORTED_MESSAGE),
     ]);
   });
 });
@@ -109,14 +135,14 @@ describe('ActivateObjectLow answers the reported refusal with the position', () 
     expect(answered.isError).toBe(true);
     const [first] = answered.content ?? [];
     const payload = JSON.parse(first?.text ?? 'null');
-    expect(payload.messages).toEqual([REPORTED_MESSAGE]);
+    expect(payload.messages).toEqual([refused(REPORTED_MESSAGE)]);
   });
 });
 
 describe('the ;end= form and the recorded refusal', () => {
   it('a refusal', () => {
     const payload = failurePayload(activationFailure(corpusBody(FAILS)));
-    expect(payload.messages).toEqual([FAILS_MESSAGE]);
+    expect(payload.messages).toEqual([refused(FAILS_MESSAGE)]);
   });
 
   it('the terse answer', () => {
@@ -126,7 +152,7 @@ describe('the ;end= form and the recorded refusal', () => {
 
   it('parseActivationResponse', () => {
     expect(parseActivationResponse(corpusBody(FAILS)).messages).toEqual([
-      FAILS_MESSAGE,
+      parsed(FAILS_MESSAGE),
     ]);
   });
 });
@@ -223,7 +249,7 @@ describe('check runs: chkrun:uri carries the position', () => {
       headers: {},
     });
     if (verdict === ADT_NO_FAILURE) throw new Error('not refused');
-    expect(failurePayload(verdict).messages).toEqual([SYNTAX_MESSAGE]);
+    expect(failurePayload(verdict).messages).toEqual([refused(SYNTAX_MESSAGE)]);
   });
 
   it('parseCheckRunResponse', () => {
@@ -288,6 +314,7 @@ describe('a refusal answers each message from its own fields, never by its words
         object: 'Class A',
         uri: '/a',
         position: { line: 1, column: 2 },
+        line: '1',
       },
       {
         type: 'E',
@@ -295,14 +322,39 @@ describe('a refusal answers each message from its own fields, never by its words
         object: 'Class B',
         uri: '/b',
         position: { line: 3, column: 4 },
+        line: '3',
       },
       { type: 'W', text: 'words no document says', code: 'X(1)' },
     ]);
   });
 
-  it("the library's deprecated line is not answered", () => {
+  it('the deprecated line is the source line of the position, and absent without one', () => {
     const verdict = activationFailure(REPORTED);
-    expect(verdict.messages?.[0]).toHaveProperty('line', '16');
-    expect(failurePayload(verdict).messages).toEqual([REPORTED_MESSAGE]);
+    expect(failurePayload(verdict).messages).toEqual([
+      { ...REPORTED_MESSAGE, line: '16' },
+    ]);
+    // A strategy's line that disagrees with the position is not answered.
+    const disagreeing = failurePayload({
+      origin: 'refusal',
+      message: 'refused',
+      messages: [
+        {
+          type: 'E',
+          text: 'words',
+          line: '1',
+          position: { line: 16, column: 15 },
+        },
+        { type: 'W', text: 'no position', line: '2' },
+      ],
+    });
+    expect(disagreeing.messages).toEqual([
+      {
+        type: 'E',
+        text: 'words',
+        position: { line: 16, column: 15 },
+        line: '16',
+      },
+      { type: 'W', text: 'no position' },
+    ]);
   });
 });

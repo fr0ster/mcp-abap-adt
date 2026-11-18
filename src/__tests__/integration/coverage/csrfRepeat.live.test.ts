@@ -234,7 +234,18 @@ liveSuite(
         console.log(
           `[csrfRepeat] ${tool}: logoff ${status}, run once more: ${repeated}, session replaced: ${replaced}`,
         );
-        if (status >= 200 && status < 300 && replaced) exercised = true;
+        // On premise: the logoff itself 2xx and the session then replaced.
+        // On the cloud a logoff's status says little (a 200 that ended no
+        // visible session, a 400 after which the LOCK met a replaced one,
+        // live run 2026-11-18): a tool that met a replaced session and ran
+        // once more is recovery exercised, whatever the statuses.
+        if (
+          repeatRequired
+            ? status >= 200 && status < 300 && replaced
+            : replaced && repeated
+        ) {
+          exercised = true;
+        }
         if (repeatRequired) {
           assert.ok(repeated, `${tool} was not run once more`);
         }
@@ -265,7 +276,9 @@ liveSuite(
       // exercised no recovery, which is a failure, not a pass.
       assert.ok(
         exercised,
-        'no recovery exercised: no outside logoff answered 2xx with the session replaced after it',
+        repeatRequired
+          ? 'no recovery exercised: no outside logoff answered 2xx with the session replaced after it'
+          : 'no recovery exercised: no tool met a replaced session and ran once more',
       );
 
       // No lock is left on the class: a write from another session — the

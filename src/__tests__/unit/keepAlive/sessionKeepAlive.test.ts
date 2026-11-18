@@ -1,12 +1,12 @@
 /**
  * The session keep-alive (24.0.1): one background timer per server ticks
- * every interval, and a tick that finds no request on the connection the
+ * every interval — a `setTimeout` re-armed once the tick's ping settled —, and a tick that finds no request on the connection the
  * server built and holds since the previous tick sends one `GET` of the
  * ADT discovery through it.
  *
  * Against the ADT stand-in, which records each request and the ABAP session
  * it ran in, through an in-memory MCP session. The clock is node:test's
- * `mock.timers` (`setInterval`), enabled before the server is built; the
+ * `mock.timers` (`setTimeout`), enabled before the server is built; the
  * stand-in's sockets run on the real loop, waited for with `setImmediate`.
  */
 
@@ -199,6 +199,20 @@ async function until(done: () => boolean, turns = 5_000): Promise<void> {
   throw new Error('the condition never held');
 }
 
+/**
+ * Counts the keep-alive's arms on the fake clock: `setTimeout` calls with
+ * the interval, through the mocked `setTimeout` (installed after it).
+ */
+function countArms(): { count(): number } {
+  let arms = 0;
+  const mocked = globalThis.setTimeout;
+  mock.method(globalThis, 'setTimeout', (fn: () => void, ms?: number) => {
+    if (ms === INTERVAL) arms += 1;
+    return mocked(fn, ms);
+  });
+  return { count: () => arms };
+}
+
 async function call(s: Stand, id: string): Promise<void> {
   const answer = await s.session.callTool('Touch', { id });
   assert.notEqual(answer.isError, true, `Touch ${id} failed`);
@@ -212,9 +226,10 @@ describe('the session keep-alive', () => {
   beforeEach(() => {
     previousType = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = 'onprem';
-    mock.timers.enable({ apis: ['setInterval'] });
+    mock.timers.enable({ apis: ['setTimeout'] });
   });
   afterEach(() => {
+    mock.restoreAll();
     mock.timers.reset();
     if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previousType;
@@ -235,7 +250,8 @@ describe('the session keep-alive', () => {
         pings(s.standIn)[0]?.session,
         touchOf(s.standIn, 'a')?.session,
       );
-      // Still idle: the next tick pings again.
+      // Still idle: once the ping settled, the next tick pings again.
+      await settle();
       mock.timers.tick(INTERVAL);
       await until(() => pings(s.standIn).length === 2);
     } finally {
@@ -327,6 +343,53 @@ describe('the session keep-alive', () => {
     }
   });
 
+  it('sends no second ping while a slow ping is still pending', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      mock.timers.tick(INTERVAL);
+      await settle();
+      const held = s.standIn.hold(isPing);
+      const arms = countArms();
+      mock.timers.tick(INTERVAL);
+      await held.arrived;
+      // The slow ping is pending: no tick is armed until it settles.
+      mock.timers.tick(5 * INTERVAL);
+      await settle();
+      assert.equal(pings(s.standIn).length, 1);
+      assert.equal(arms.count(), 0, 'not armed while the ping is pending');
+      held.release();
+      await settle();
+      assert.equal(arms.count(), 1, 'armed once it settled');
+      mock.timers.tick(INTERVAL);
+      await until(() => pings(s.standIn).length === 2);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('a tick running at the close does not arm again', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      mock.timers.tick(INTERVAL);
+      await settle();
+      const held = s.standIn.hold(isPing);
+      const arms = countArms();
+      mock.timers.tick(INTERVAL);
+      await held.arrived;
+      await s.server.close();
+      held.release();
+      await settle();
+      mock.timers.tick(5 * INTERVAL);
+      await settle();
+      assert.equal(pings(s.standIn).length, 1);
+      assert.equal(arms.count(), 0, 'never armed after the close');
+    } finally {
+      await s.close();
+    }
+  });
+
   it('pings nothing after the server closed', async () => {
     const s = await stand();
     try {
@@ -356,19 +419,19 @@ describe('the session keep-alive timer, on the real clock', () => {
   it('is one unref’d timer per instance, cleared by the close', async () => {
     // An interval no other timer of the process uses, so its timer is told apart.
     const interval = 7 * MINUTE + 7;
-    const armed: Array<ReturnType<typeof setInterval>> = [];
+    const armed: Array<ReturnType<typeof setTimeout>> = [];
     const cleared = new Set<unknown>();
-    const realSet = globalThis.setInterval;
-    const realClear = globalThis.clearInterval;
-    mock.method(globalThis, 'setInterval', (fn: () => void, ms?: number) => {
+    const realSet = globalThis.setTimeout;
+    const realClear = globalThis.clearTimeout;
+    mock.method(globalThis, 'setTimeout', (fn: () => void, ms?: number) => {
       const timer = realSet(fn, ms);
       if (ms === interval) armed.push(timer);
       return timer;
     });
     mock.method(
       globalThis,
-      'clearInterval',
-      (timer: ReturnType<typeof setInterval> | undefined) => {
+      'clearTimeout',
+      (timer: ReturnType<typeof setTimeout> | undefined) => {
         cleared.add(timer);
         realClear(timer);
       },

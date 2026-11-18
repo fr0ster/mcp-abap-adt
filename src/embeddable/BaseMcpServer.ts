@@ -361,8 +361,14 @@ export abstract class BaseMcpServer extends McpServer {
   /** Every tool call of this instance still running, tracked from its entry. */
   private readonly inFlight = new Set<Promise<void>>();
 
-  /** The session keep-alive's one timer; `undefined`: off, or stopped. */
-  private keepAliveTimer: ReturnType<typeof setInterval> | undefined;
+  /** The session keep-alive's interval in milliseconds; `0`: off. */
+  private readonly keepAliveMs: number;
+
+  /** The session keep-alive's pending tick; `undefined`: none armed. */
+  private keepAliveTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** The close stopped the keep-alive: no tick arms it again. */
+  private keepAliveStopped = false;
 
   /** The held connection and its request mark, as the previous tick saw them. */
   private keepAliveSeen: { connection: object; mark: number } | undefined;
@@ -618,13 +624,10 @@ export abstract class BaseMcpServer extends McpServer {
           );
     // The session keep-alive: the owner's named exception to "no timers in
     // production" (2026-11-18). One timer per instance, unref'd so it never
-    // keeps the process alive, stopped by the instance's close.
-    if (keepAliveMs > 0) {
-      this.keepAliveTimer = setInterval(() => {
-        this.keepAliveTick();
-      }, keepAliveMs);
-      this.keepAliveTimer.unref();
-    }
+    // keeps the process alive, re-armed after each tick settled, stopped by
+    // the instance's close.
+    this.keepAliveMs = keepAliveMs;
+    this.armKeepAlive();
     this.logger = options.logger ?? getDefaultLogger();
     this.accessChecks = options.accessChecks;
     this.readOnlyTools =
@@ -771,8 +774,23 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   private stopKeepAlive(): void {
-    if (this.keepAliveTimer !== undefined) clearInterval(this.keepAliveTimer);
+    this.keepAliveStopped = true;
+    if (this.keepAliveTimer !== undefined) clearTimeout(this.keepAliveTimer);
     this.keepAliveTimer = undefined;
+  }
+
+  /**
+   * Arms the next tick, one interval from now — at construction and at the
+   * end of each tick, after its ping settled, so ticks never overlap. Never
+   * after the close, and never with an interval of `0`.
+   */
+  private armKeepAlive(): void {
+    if (this.keepAliveStopped || this.keepAliveMs === 0) return;
+    this.keepAliveTimer = setTimeout(() => {
+      this.keepAliveTimer = undefined;
+      void this.keepAliveTick();
+    }, this.keepAliveMs);
+    this.keepAliveTimer.unref(); // never keeps the process alive
   }
 
   /**
@@ -783,19 +801,28 @@ export abstract class BaseMcpServer extends McpServer {
    * connection is built or connected here, and an injected one is the
    * host's.
    */
-  private keepAliveTick(): void {
-    const connection = this.liveBuilt();
-    const mark = connection === undefined ? undefined : requestMark(connection);
-    if (connection === undefined || mark === undefined) {
-      this.keepAliveSeen = undefined;
-      return;
+  private async keepAliveTick(): Promise<void> {
+    try {
+      const connection = this.liveBuilt();
+      const mark =
+        connection === undefined ? undefined : requestMark(connection);
+      if (connection === undefined || mark === undefined) {
+        this.keepAliveSeen = undefined;
+        return;
+      }
+      const seen = this.keepAliveSeen;
+      if (seen?.connection === connection && seen.mark === mark) {
+        // Never rejects: a failure is its debug line.
+        await sendSessionKeepAlive(connection, this.logger);
+      }
+      // After the ping settled, so the ping itself is not read as a request.
+      this.keepAliveSeen = {
+        connection,
+        mark: requestMark(connection) ?? mark,
+      };
+    } finally {
+      this.armKeepAlive();
     }
-    const seen = this.keepAliveSeen;
-    if (seen?.connection === connection && seen.mark === mark) {
-      void sendSessionKeepAlive(connection, this.logger);
-    }
-    // After the ping went out, so the ping itself is not read as a request.
-    this.keepAliveSeen = { connection, mark: requestMark(connection) ?? mark };
   }
 
   /** The held connection this instance built, while it is live; else `undefined`. */

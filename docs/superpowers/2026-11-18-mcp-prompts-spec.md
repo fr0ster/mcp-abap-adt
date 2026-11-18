@@ -370,9 +370,9 @@ values typed as the codes both kinds' `WHERE_USED_CODES` hold (Code: the two lis
 - **A function module's name** is `GROUP|MODULE` for both tools (Measured: their
   `object_name` description); for `function_module` the instruction quotes the listed
   `object_name` description of the tool, so the form comes from the definition.
-- **A background run.** Where the listed schema has `background` and the server lists the
-  tool that reads a run (`GetBackgroundRun`; compact `HandlerBackgroundRunGet`), the
-  instruction adds the step reading the `run_handle` the call answers.
+- **A long tool.** `GetWhereUsed` and `HandlerSystem` are long tools: the call passes
+  `background: false` where their listed schema has `background`, so the answer is the
+  result itself (§5.4).
 - **Visibility.** Core: `GetWhereUsed` listed. Compact: `HandlerSystem` listed with
   `where_used` among its `members` — readable only after the fix of §6a. The deny list:
   `GetWhereUsed` or `HandlerSystem.where_used` removes the prompt.
@@ -381,15 +381,14 @@ values typed as the codes both kinds' `WHERE_USED_CODES` hold (Code: the two lis
   core-ro — `/where_used table <name>`:
   ```
   List where the TABLE "<name>" is used.
-  1. Call GetWhereUsed with object_name: "<name>", object_type: "TABL/DT".
-  2. When it answers a run_handle: call GetBackgroundRun with run_handle: from step 1.
+  1. Call GetWhereUsed with object_name: "<name>", object_type: "TABL/DT",
+     background: false.
   ```
   compact — `/where_used class <name>`:
   ```
   List where the CLASS "<name>" is used.
   1. Call HandlerSystem with action: "where_used", object_name: "<name>",
-     object_type: "CLAS/OC".
-  2. When it answers a run_handle: call HandlerBackgroundRunGet with run_handle: from step 1.
+     object_type: "CLAS/OC", background: false.
   ```
 
 ### 2.5 `transport`
@@ -441,6 +440,27 @@ serves is neither completed nor accepted):
   (its entry is a `LIMU` sub-object, not `R3TR`). Inference: the main type equals the
   object-directory type for these 16 — the plan confirms it against the transport handlers
   and the entries `ReadTransportObjects` answers before any code (Q-T1).
+- **Entries read, entries sent.** `ReadTransportObjects` — and compact `HandlerGet`
+  `TRANSPORT`, which routes to the same handler (Code: `compactReadRoutes.ts`,
+  `TRANSPORT: defineTool(D.ReadTransportObjects, handleReadTransportObjects)`) — answers each
+  entry as `{ pgmid, type, name, position, task?, … }`, `pgmid` `R3TR` when SAP gave none and
+  `position` `null` when SAP gave none (Code: `handleReadTransportObjects.ts`, its terse
+  projection). `MoveTransportObjects` / `HandlerTransportMoveObjects` take entries
+  `{ object_name, object_type, position, pgmid? }`, an absent `pgmid` read as `R3TR`
+  (Code: `handleMoveTransportObjects.ts`, `MOVED_ENTRY`); `RemoveTransportObject` takes the
+  same four at the top level. So the text maps each entry field by a typed table,
+  `ENTRY_ARGUMENT`: `name` → `object_name`, `type` → `object_type`, `position` →
+  `position`, `pgmid` → `pgmid` — its values typed as the keys of `MOVED_ENTRY`'s output and
+  its keys as the fields of the read's terse entry (the plan exports that entry's type from
+  the handler, or the table's keys are pinned by a test if the type cannot be exported without
+  a cast). `pgmid` is always carried, so a `LIMU` entry (a method, a function module) stays
+  addressed as itself. `remove_object` picks the entry whose `name`, `type`
+  (`OBJECT_DIRECTORY_TYPE`) and `pgmid` `R3TR` match the prompt's arguments; `move_objects`
+  with `object_type` and `name` picks the same way, without them the user chooses. An entry
+  whose `position` is `null` cannot be removed or moved (the handler's own note): the text says
+  to name it to the user and leave it out of the call. `add_object` sends `object_name`,
+  `object_type` and no `pgmid` (every one of the 16 types is an `R3TR` object, so the tool's
+  default is the right one).
 - **Completion.** `action`: the served actions in table order. `object_type`: the 16 types,
   offered when the action argument already given (`context.arguments.action`) reads it, or
   when none is given yet.
@@ -462,24 +482,26 @@ serves is neither completed nor accepted):
   ```
   Remove the CLASS "<name>" from the task "<task>".
   1. Read the task's entries: call ReadTransportObjects with transport_number: "<task>";
-     take the position of the entry with object_type CLAS and object_name "<name>".
-  2. Call RemoveTransportObject with transport_number: "<task>", object_name: "<name>",
-     object_type: "CLAS", position: from step 1.
+     take the entry whose name is "<name>", type "CLAS" and pgmid "R3TR".
+  2. Call RemoveTransportObject with transport_number: "<task>", object_name: the entry's
+     name, object_type: the entry's type, position: the entry's position, pgmid: the
+     entry's pgmid. An entry whose position is null is named to the user and not sent.
   ```
   compact — `/transport action=move_objects number=<task> target_number=<other>`:
   ```
   Move entries of the task "<task>" to the task "<other>".
   1. Read the task's entries: call HandlerGet with object_type: "TRANSPORT",
-     transport_number: "<task>".
+     transport_number: "<task>", background: false.
   2. Call HandlerTransportMoveObjects with transport_number: "<task>",
-     target_number: "<other>", objects: the entries to move from step 1, each with its
-     object_name, object_type and position — chosen with the user.
+     target_number: "<other>", objects: the entries to move from step 1, chosen with the
+     user, each as { object_name: the entry's name, object_type: the entry's type,
+     position: the entry's position, pgmid: the entry's pgmid }. An entry whose position
+     is null is named to the user and not sent.
   ```
   compact-ro — `/transport action=list`:
   ```
   List transport requests.
-  1. Call HandlerSystem with action: "transports".
-  2. When it answers a run_handle: call HandlerBackgroundRunGet with run_handle: from step 1.
+  1. Call HandlerSystem with action: "transports", background: false.
   ```
 
 ## 3. The mapping: operation × binary → tools
@@ -496,8 +518,8 @@ full row, the one-call workflows). Neither registered: the type is not served.
 | Operation | core (`mcp-abap-adt`, `-http`, `-sse`) | core-ro | compact (`-compact`, `-compact-http`, `-compact-sse`) | compact-ro | legacy (all) |
 |---|---|---|---|---|---|
 | create | `Create<Type>` (`CreateClass`, …): name → type's name argument, `package_name`, `description`, `transport_request` | — | `HandlerCreate`: `object_type`, the member's name argument, `package_name`, `description`, `transport_request` | — | — |
-| get | `Get<Type>`: name → name argument | `Get<Type>` (no `GetLocal*`) | `HandlerGet`: `object_type`, the member's name argument | `HandlerGet` | — |
-| update | `Get<Type>` to read, `Update<Type>` to write: name, `source_code` (or the type's content argument), `transport_request` | — | `HandlerGet` to read; `HandlerLock` → `HandlerUpdate` (`lock_handle`, content argument, `transport_request`) → `HandlerUnlock` | — | — |
+| get | `Get<Type>`: name → name argument | `Get<Type>` (no `GetLocal*`) | `HandlerGet`: `object_type`, the member's name argument, `part: "metadata"` for a `SOURCELESS` type (`READ_PART`), `background: false` where listed (§5.4) | `HandlerGet`, the same | — |
+| update | `Get<Type>` to read, `Update<Type>` to write: name, `source_code` (or the type's content argument), `transport_request` | — | `HandlerGet` to read (`READ_PART`, `background: false` where listed); `HandlerLock` → `HandlerUpdate` (`lock_handle`, content argument, `transport_request`) → `HandlerUnlock` | — | — |
 | delete | `Delete<Type>`: name, `transport_request` | — | `HandlerDelete`: `object_type`, name, `transport_request`; a class include or `UNIT_TEST` inside `HandlerLock` / `HandlerUnlock` of its class | — | — |
 | activate | `Activate<Type>`: name | — | `HandlerActivate`: `object_type`, `object_name` | — | — |
 | check | `Check<Type>`: name | — | `HandlerCheckRun`: `object_type`, `object_name` | `HandlerCheckRun` | — |
@@ -520,6 +542,23 @@ member's argument token.
 - Compact rows: per operation the tool (`HandlerCreate`, …) and per member the name key, typed
   against the member's entry in `COMPACT_<OP>_TAKES` — a key the member does not take is a
   compile error.
+- The read part of a compact read (`get`, `update`'s read step): `READ_PART`. `HandlerGet`
+  reads `part: "source"` when none is given, and refuses it for a type with no source
+  (Code: `handleHandlerGet.ts`, "part=source is not available"). Those types are
+  `SOURCELESS` in `compact-readonly-entries/src/handlers/compactPartRoutes.ts` (`PACKAGE`,
+  `DOMAIN`, `DATA_ELEMENT`, `FUNCTION_GROUP`, `TABLE_TYPE`), behind `hasSourcePart`. The step
+  moves `SOURCELESS` into lib's compact kernel (`src/lib/compact/`, exported through
+  `@mcp-abap-adt/lib/compact-shared`), and `compactPartRoutes.ts` imports it from there — one
+  list, read by the handler and by the prompts. A compact read of a `SOURCELESS` type passes
+  `part: "metadata"`; any other type passes no `part` (the source). A test in
+  `compact-readonly-entries` asserts that for every `SOURCELESS` type `partsFor` offers
+  `metadata`, and for every other `get` type it offers `source` — so the prompt's choice is
+  the handler's. Compact `update` of a `SOURCELESS` type then writes, as its token says, the
+  whole metadata document in `source_code`.
+  The full set needs no part (**Measured**): `GetPackage`, `GetDomain`, `GetDataElement`,
+  `GetFunctionGroup`, `GetTableType` take no `part` and read the metadata document; every
+  other full `Get<Type>` a row names either takes no `part` or takes `source | metadata` and
+  reads the source by default. The schema test (§9, test 14) pins both families.
 - The read step of `update`: `READ_AS`, typed `Partial<Record<UpdateType, ReadType>>` — the
   type itself, but `UNIT_TEST` and `CDS_UNIT_TEST`, whose content (`test_class_source`) is the
   class's local test classes, read as `LOCAL_TEST_CLASS` (Inference from the update tokens; the
@@ -553,8 +592,13 @@ Computed **once**, at registration, from the entries the server listed on its ki
 `listedTool` result `registerHandlers` already computes), after the deny list:
 
 1. **A type is served by an operation** when its row's tools are all listed and the type is
-   in each compact tool's members on the kind (`variants[kind].members`; the narrowed
-   `members` with no kind stated; the definition's own with neither). Compact `update`:
+   in each compact tool's members on the kind: `variants[kind].members`. With no kind stated
+   the members are `variants.onprem.members` — the on-premise statement is the one a listing
+   with no kind serves (`byVariant`: "the on-premise statement is also the definition's own",
+   Code `src/lib/variantDefinition.ts`), and a narrowed definition's `variants` carry the
+   members left (`withoutDenied` spreads the narrowing's statement, which holds `members`).
+   The top-level `members` is not read: `byVariant` does not set it (Code), and only the
+   narrowing does. No change to `byVariant`, so no fixture moves. Compact `update`:
    `HandlerGet`, `HandlerUpdate`, `HandlerLock`, `HandlerUnlock` all serve it (the lock and
    unlock as `LOCKED_AS` names it, the get as `READ_AS` names it). Full `update`: the get
    tool of `READ_AS`'s type and `Update<Type>` listed.
@@ -565,6 +609,14 @@ Computed **once**, at registration, from the entries the server listed on its ki
    member list and has no listed full tool, so it is neither completed nor accepted (cloud
    `create program`). No kind stated: the definitions as they are (the on-premise ones),
    as tools are listed then.
+   **A listing with no kind does happen** (Code), so the fallback stays: stdio's
+   inspection-only mode (no destination; `registerHandlers`' own comment: "stdio's
+   inspection-only mode, which has no system"), an embedder's `BaseMcpServer` with neither
+   `systemType` nor `SAP_SYSTEM_TYPE` (or `systemTypeFromEnvironment: false`), and a plain
+   registration of groups whose context states none. Tools are listed there with their
+   on-premise statement and every call that would reach a system is refused
+   `system_type_required`; prompts follow the tools — listed from the on-premise members, and
+   the calls their text names refused the same way.
 4. **The deny list** acts through the registered definitions: `CreateClass` or
    `HandlerCreate.CLASS` removes `class` from `create`; `HandlerLock.CLASS` removes `class`
    (and every class include) from compact `update`; `Create*` or `HandlerCreate` removes the
@@ -644,7 +696,8 @@ CLASS takes CLASS(class_name*, package_name*); * marks a required argument.
 
 ```
 Update the CLASS "<name>".
-1. Read it: call HandlerGet with object_type: "CLASS", class_name: "<name>".
+1. Read it: call HandlerGet with object_type: "CLASS", class_name: "<name>",
+   background: false.
 2. Lock it: call HandlerLock with object_type: "CLASS", object_name: "<name>"; keep the
    lock_handle and the state_handle it answers.
 3. Write it: call HandlerUpdate with object_type: "CLASS", class_name: "<name>",
@@ -686,6 +739,34 @@ object_name: "<name>".`
 | compact member token | the exported token accessor the description uses (§3.3) |
 | full "still to fill" | the listed schema's required properties minus those filled, each with its description |
 | lock steps, `state_handle` | compact rows with `LOCKED_AS`; the server's `stateHandleArgument` |
+| `part` of a compact read | `READ_PART`: `metadata` for lib's `SOURCELESS`, else none (§3.3) |
+| `background: false` | the tool is in `LONG_TOOLS` and its listed schema has `background` (§5.4) |
+| a transport entry's arguments | `ENTRY_ARGUMENT`, `pgmid` carried (§2.5) |
+
+### 5.4 Long tools
+
+A long tool (`LONG_TOOLS`, Code `src/lib/longTools.ts`) runs in the background by default:
+an omitted `background` reads as `true` (`readLongBackground`) and the call answers a
+`run_handle`, not the content. The prompts call four of them: `HandlerGet` (`get`,
+`update`'s read step, `transport` `objects` and `move_objects`), `HandlerSystem`
+(`where_used`, `transport` `list`), `GetWhereUsed`, `ListTransports`. The rule:
+
+- Where the tool's **listed** schema has `background`, every step calling it passes
+  `background: false`: the prompt's work needs the content in the same turn, and a read the
+  model would then have to collect by handle adds a call and a way to forget it.
+- Where the listed schema has no `background` — a server with no background-run strategy
+  (`BaseMcpServer` lists a long tool "in the call", without the parameter, when it holds no
+  `backgroundRuns` or does not serve the tool that reads its runs: `longToolsInTheCall`,
+  `longToolInTheCall`, Code), the exporter's plain registration, a plain group registration —
+  the step passes nothing: the call answers its result in the call there (`LONG_TOOL_IN_CALL_ADVICE`).
+- The choice is read from the listed schema (whether it has the property), so both cases are
+  the same code. `HandlerGet`'s run modes, which refuse `background`
+  (`BACKGROUND_NOT_FOR_RUN_WORDS`: `UNIT_TEST`, `CDS_UNIT_TEST`, the activation parts,
+  `draft`), are called by no prompt.
+- Not long, and so untouched: the per-type `Get<Type>` tools, `ReadTransportObjects`,
+  `GetTransport`, `ReadTransportActionLog`. The unit-test runs are not long tools either: the
+  full ones answer the finished result with their defaults (`runner` async, `wait` true), and
+  the compact run is followed by its status and result steps (§2.3).
 
 ## 6. Completion
 
@@ -723,7 +804,9 @@ Its own step, before the prompts that read it (compact `where_used`, `transport`
 1. **The definition.** `handlerSystemDefinitionFor(variant, actions)`
    (`src/lib/compact/compactSchemas.ts`) returns `members: actions` beside its description and
    schema. The un-narrowed definition (`handlerSystemDefinition`, through `byVariant`) then
-   carries every action per variant, and the narrowed one (`NARROWINGS` `HandlerSystem`,
+   carries every action in `variants.onprem` and `variants.cloud` (`byVariant` keeps a
+   statement's `members` inside `variants` and sets no top-level `members`; the prompts read
+   `variants`, §4.1), and the narrowed one (`NARROWINGS` `HandlerSystem`,
    `src/lib/access/narrowing.ts`) the actions left — `withoutDenied` already copies a
    narrowing's `members` into `variants[v]` (Code: `stated(...)` spreads the narrowing's
    definition). The `members` doc on `ToolDefinition` / `VariantToolDefinition`
@@ -846,6 +929,21 @@ moves the rest to `node:test`).
     (compact `create` then routed through `HandlerCreate` `TRANSPORT`) and both denied
     (no `create`); the object-directory type of each of the 16 types.
 13. **The `HandlerSystem` step** (§6a) — its own tests, listed there.
+14. **Every generated call validates against its tool's listed schema.** The generator
+    builds each step as data — the tool and its arguments, each a value the prompt fills, a
+    value from an earlier step, or one the model writes — and renders the text from it. For
+    every binary, every kind (`onprem`, `cloud`, none stated), every prompt, every served
+    type or action, with and without a background-run strategy, and on Streamable HTTP with
+    `state_handle`: each step's arguments, the model's values stood in by a value of the
+    property's type (a string, and for `objects` one entry built through `ENTRY_ARGUMENT` from
+    a read entry of the handler's shape, `pgmid` `LIMU` included), are parsed by the tool's
+    **listed** zod schema (its variant's, with its rules: `HandlerGet`'s refusal of `source`
+    for a `SOURCELESS` type is such a rule) and must parse. Beside the parse, two assertions
+    the schema cannot make: a step calling a tool of `LONG_TOOLS` passes `background: false`
+    exactly when the listed schema has `background`; and a step reading a transport entry
+    passes on its `pgmid`. Each of the four findings of the spec's review (a missing
+    `background`, a missing `part`, members unread with no kind, entry fields unmapped) fails
+    this test; the plan proves it by breaking each rule once and watching the test go red.
 
 **Live tests: none.** A prompt sends nothing to SAP and builds text from definitions the
 listing tests already pin per binary and kind; the tool calls a model then makes are the

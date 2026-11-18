@@ -341,7 +341,10 @@ accessors. Every `compact…Description` uses them.
 - `requiredArguments(tool: ListedPromptTool): readonly { name: string; description: string | undefined }[]`
   (`z.toJSONSchema`, `io: 'input'`).
 - The step model:
-  - `type ArgumentValue = { from: 'user'; value: JsonValue } | { from: 'step'; step: number; field: string } | { from: 'model'; writes: string; shape: 'string' | 'entries' }`;
+  - `type ArgumentValue = { from: 'user'; value: JsonValue } | { from: 'step'; step: number; field: string } | { from: 'model'; writes: string } | { from: 'entries'; step: number; writes: string; fields: readonly (readonly [sent: string, read: ReadEntryField])[] }`.
+    The `entries` variant is a list of transport entries, chosen from the entries step
+    `step` read. `fields` names, for each sent field of an entry, the read field it is
+    taken from (`ReadEntryField = 'name' | 'type' | 'position' | 'pgmid'`);
   - `interface PromptStep { tool: string; lead?: string; arguments: readonly (readonly [string, ArgumentValue])[]; keeps?: readonly string[]; repeat?: string; condition?: string; finally?: number; note?: string; stillToFill: readonly string[] }`.
     `stillToFill` lists the tool's required arguments (`requiredArguments`) that the step
     does not set. It is empty when there are none. The still-to-fill line of §5.1 is
@@ -564,7 +567,8 @@ target.
 
 ### 3.5 `transport`
 
-**Files:** `src/lib/prompts/transportPrompt.ts`, `src/__tests__/unit/prompts/transportPrompt.test.ts`.
+**Files:** `src/lib/prompts/transportEntry.ts` (`ENTRY_ARGUMENT`, `OBJECT_DIRECTORY_TYPE`),
+`src/lib/prompts/transportPrompt.ts`, `src/__tests__/unit/prompts/transportPrompt.test.ts`.
 
 **Interfaces.** Produces:
 - `TRANSPORT_ACTIONS`: per action, in §2.5 order, its required and read arguments and its
@@ -600,7 +604,26 @@ target.
     removes `objects` and `move_objects`; denying `HandlerTransportCreate` routes `create`
     through `HandlerCreate`; denying both leaves no `create`;
   - the object-directory type of each of the 16 types;
-  - review focus 3 for `number`.
+  - review focus 3 for `number`;
+  - **the sent entry fields come from `ENTRY_ARGUMENT` alone.** This case reads the
+    generated `PromptInstruction` itself, and nothing from test 14's helper. For core
+    `remove_object`, `move_objects` and `add_object`, and compact `move_objects`, each with
+    `object_type: "class"` and `name` given:
+    - `remove_object`: the send step's arguments whose value is
+      `{ from: 'step', step: <the read step> }` form exactly the pairs
+      `[ENTRY_ARGUMENT[f], f]` for `f` of `name`, `type`, `position` and `pgmid`, each
+      value's `field` equal to `f`;
+    - `move_objects`, core and compact: the `objects` argument is
+      `{ from: 'entries', step: <the read step> }`, and its `fields` equal the same four
+      pairs, in any order;
+    - `add_object`: its arguments are `ENTRY_ARGUMENT.name` and `ENTRY_ARGUMENT.type` with
+      `user` values (the name, and `CLAS`), and neither `ENTRY_ARGUMENT.position` nor
+      `ENTRY_ARGUMENT.pgmid` appears;
+    - a source scan of `src/lib/prompts/transportPrompt.ts` (plain string search) finds
+      none of the literals `'object_name'`, `'position'` and `'pgmid'`, so the generator
+      names no sent entry field itself. `ENTRY_ARGUMENT` lives in `transportEntry.ts`.
+      `'object_type'` is left out of the scan, because the generator names it for
+      `HandlerGet`'s `TRANSPORT` read.
 - [ ] Implement.
 - [ ] Verify with `npm test -- src/__tests__/unit/prompts/transportPrompt.test.ts
   src/__tests__/unit/sources/typeCodeLiterals.test.ts` and `npm run test:check`.
@@ -746,16 +769,17 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
     - a `user` value is used as given;
     - a `step` value whose step is an entry read is that fixture entry's field
       (`{ from: 'step', step, field }` → `ENTRY[field]`);
-    - the `entries` value is `[ENTRY]` mapped through `ENTRY_ARGUMENT`;
+    - an `entries` value is `[ENTRY]` mapped by the value's own `fields`: each `[sent,
+      read]` pair gives `sent: ENTRY[read]`. The test helper never reads
+      `ENTRY_ARGUMENT` itself, so a mapping fault reaches the parse only through the
+      generated step data;
     - every other `step` value (a `lock_handle`, a `run_id`, a `state_handle`) and every
       string `model` value stand in as `"X1"`. These have no earlier-step source in the
       fixture.
 
-    This depends on the generator. A transport step that sends an entry builds each
-    argument name as `ENTRY_ARGUMENT[readField]`, with value
-    `{ from: 'step', step: <the read>, field: readField }`: top level for `remove_object`,
-    and inside `objects` for `move_objects` through `entries`. The generator never names a
-    sent entry field itself. Task 3.5 states this rule, and its tests assert it;
+    The fixture can stand in for the read only because the generator builds every sent
+    entry field from `ENTRY_ARGUMENT`. Task 3.5's case "the sent entry fields come from
+    `ENTRY_ARGUMENT` alone" checks that on the step data, independently of this test;
   - fill each name in the step's `stillToFill` from the property's JSON schema in the
     listed schema (`z.toJSONSchema`, `io: 'input'`), by one test helper,
     `placeholderFor(property)`:

@@ -236,11 +236,11 @@ describe.each(WORKFLOWS)('%s installs and runs nothing unreviewed', (file) => {
     ).toEqual([]);
   });
 
-  it('gates on every known advisory of moderate severity or above', () => {
+  it('gates on every known advisory of moderate severity or above in a production dependency (dev again once #361 removes Jest)', () => {
     const audit = step(lines, 'Security audit (moderate+)').map((line) =>
       line.trim(),
     );
-    expect(audit).toContain('run: npm audit --audit-level=moderate');
+    expect(audit).toContain('run: npm audit --omit=dev --audit-level=moderate');
     expect(
       lines.filter((line) => line.trim().startsWith('continue-on-error')),
     ).toEqual([]);

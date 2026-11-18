@@ -192,11 +192,15 @@ describe('no request of a started tool carries a signal', () => {
     return client;
   }
 
-  /** The prototype that owns a built connection's `makeAdtRequest`. */
+  /**
+   * The prototype that owns a built connection's `makeAdtRequest` — past
+   * the instance, whose own one is the factory's request ledger
+   * (`withRequestLedger`) over it.
+   */
   function requestOwner(connection: object): {
     makeAdtRequest(options: IAbapRequestOptions): Promise<unknown>;
   } {
-    let at: object | null = connection;
+    let at: object | null = Object.getPrototypeOf(connection);
     while (at && !Object.hasOwn(at, 'makeAdtRequest')) {
       at = Object.getPrototypeOf(at);
     }

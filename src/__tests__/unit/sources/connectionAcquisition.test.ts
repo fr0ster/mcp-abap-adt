@@ -80,7 +80,9 @@ const PINNED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
     'bornAtStart(': 1,
   },
   'src/embeddable/BaseMcpServer.ts': {
-    '.getConnection(': 5,
+    // The sixth: the one repeat of a call SAP refused for its token in a
+    // new session takes the instance's connection again, as any call does.
+    '.getConnection(': 6,
     '.source.resolve(': 3,
     'birthEntry(': 3,
     'bornAtStart(': 1,

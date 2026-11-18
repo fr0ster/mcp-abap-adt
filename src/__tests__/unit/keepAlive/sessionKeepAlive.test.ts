@@ -493,6 +493,28 @@ describe('the session keep-alive', () => {
     }
   });
 
+  it('skips the ping when a request went out while it waited for its turn', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      const held = s.standIn.hold((r) => r.url === `${TOUCH_PATH}t-1`);
+      const running = s.session.callTool('Twice', { id: 't' });
+      await held.arrived;
+      // The first tick sees t-1; the second is due and waits for the call.
+      mock.timers.tick(INTERVAL);
+      await settle();
+      mock.timers.tick(INTERVAL);
+      await settle();
+      held.release();
+      // The call's second request goes out before the ping's turn comes.
+      await running;
+      await settle();
+      assert.equal(pings(s.standIn).length, 0);
+    } finally {
+      await s.close();
+    }
+  });
+
   it('puts the session mode back even when switching to stateful throws', async () => {
     const s = await stand();
     try {

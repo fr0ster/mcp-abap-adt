@@ -150,7 +150,10 @@ describe('watchRequests', () => {
 });
 
 describe('isLockRequest: a POST whose one _action, decoded, is LOCK', () => {
-  const post = (url: string, params?: Record<string, string>) =>
+  const post = (
+    url: string,
+    params?: Record<string, string> | URLSearchParams,
+  ) =>
     isLockRequest({
       url,
       method: 'POST',
@@ -186,6 +189,31 @@ describe('isLockRequest: a POST whose one _action, decoded, is LOCK', () => {
     expect(post('/sap/bc/adt/oo/classes/zcl_a', { _action: 'UNLOCK' })).toBe(
       false,
     );
+  });
+  it('LOCK in the URL, UNLOCK in URLSearchParams params (both on the wire): no', () => {
+    expect(
+      post(
+        '/sap/bc/adt/oo/classes/zcl_a?_action=LOCK',
+        new URLSearchParams('_action=UNLOCK'),
+      ),
+    ).toBe(false);
+  });
+  it('LOCK only in URLSearchParams params: yes', () => {
+    expect(
+      post('/sap/bc/adt/oo/classes/zcl_a', new URLSearchParams('_action=LOCK')),
+    ).toBe(true);
+  });
+  it('LOCK only in a plain-object params: yes', () => {
+    expect(
+      post('/sap/bc/adt/oo/classes/zcl_a?accessMode=MODIFY', {
+        _action: 'LOCK',
+      }),
+    ).toBe(true);
+  });
+  it('LOCK in the URL and in the params (two values): no', () => {
+    expect(
+      post('/sap/bc/adt/oo/classes/zcl_a?_action=LOCK', { _action: 'LOCK' }),
+    ).toBe(false);
   });
   it('not a POST: no', () => {
     expect(

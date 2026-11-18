@@ -28,9 +28,10 @@ import type {
   IAbapRequestOptions,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
+import axios from 'axios';
 import { isCsrfRefusal } from './csrfRefusal';
 import { asciiUpper } from './plainText';
-import { child, isList } from './thrownValue';
+import { child } from './thrownValue';
 import { wireResponseOf } from './wireResponse';
 
 /** A call's watch over its connection's requests. */
@@ -75,24 +76,26 @@ export function isSessionReplacedBySap(
 }
 
 /**
- * Whether `options` is a LOCK: a POST whose one `_action` parameter,
- * decoded, is exactly `LOCK` — the form adt-clients sends,
- * `…?_action=LOCK&accessMode=MODIFY` — read from the URL's query by the
- * platform's parser, or from the request's params the same way. A repeated
- * `_action`, or `LOCK` in another parameter, is no LOCK.
+ * Whether `options` is a LOCK: a POST whose query, as it goes on the wire,
+ * carries exactly one `_action`, decoded `LOCK` — the form adt-clients
+ * sends, `…?_action=LOCK&accessMode=MODIFY`. The query is the one the
+ * HTTP transport sends: the URL and its `params` joined by axios's
+ * `getUri`, as `@mcp-abap-adt/connection`'s transport fixes a request
+ * (`HttpTransport.fix`) — a plain object, `URLSearchParams` and lists
+ * alike — then read by `URLSearchParams`. A repeated `_action`, or `LOCK`
+ * in another parameter, is no LOCK.
  */
 export function isLockRequest(options: IAbapRequestOptions): boolean {
   if (asciiUpper(options.method ?? '') !== 'POST') return false;
-  const url = options.url ?? '';
-  const at = url.indexOf('?');
-  const fromUrl =
-    at < 0 ? [] : new URLSearchParams(url.slice(at + 1)).getAll('_action');
-  const param = child(options.params, '_action');
-  const actions =
-    param === undefined
-      ? fromUrl
-      : [...fromUrl, ...(isList(param) ? param : [param])];
-  const [only, other] = actions;
+  const sent = axios.getUri({
+    url: options.url ?? '',
+    ...(options.params !== undefined ? { params: options.params } : {}),
+  });
+  const at = sent.indexOf('?');
+  if (at < 0) return false;
+  const [only, other] = new URLSearchParams(sent.slice(at + 1)).getAll(
+    '_action',
+  );
   return other === undefined && only === 'LOCK';
 }
 

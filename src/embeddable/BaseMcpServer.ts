@@ -1931,8 +1931,13 @@ export abstract class BaseMcpServer extends McpServer {
                 return { connection, system, batchAvailability };
               };
               let taken: ReturnType<typeof acquire> | undefined;
+              // How `take()` acquires: the call's turn and connection, or —
+              // for the one repeat — the new connection's lookup. Lazy, so a
+              // preflight that refuses before it needs the connection starts
+              // nothing it then leaves running.
+              let acquiring: () => ReturnType<typeof acquire> = acquire;
               const take = () => {
-                taken ??= acquire();
+                taken ??= acquiring();
                 return taken;
               };
               // The access checks (spec §3.2) see the call's arguments once.
@@ -2156,7 +2161,8 @@ export abstract class BaseMcpServer extends McpServer {
                 } else {
                   // The preflight again, on the new connection: its own
                   // failures are the call's, as on any call.
-                  taken = (async () => {
+                  taken = undefined;
+                  acquiring = async () => {
                     const again = await this.systemBeforeTool(
                       fresh,
                       leaveFlow !== undefined,
@@ -2173,7 +2179,7 @@ export abstract class BaseMcpServer extends McpServer {
                         again.connection,
                       ),
                     };
-                  })();
+                  };
                   result = await attempt(() => {
                     // Said only once the second run has begun.
                     renewed = true;

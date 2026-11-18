@@ -400,6 +400,83 @@ describe('the review of #364', () => {
     expect(renewedOf(answered)).toBe(SESSION_RENEWED_WORDS);
   });
 
+  it('a repeat its access check denies starts no system lookup, and leaves nothing pending', async () => {
+    const unhandled: unknown[] = [];
+    const record = (reason: unknown) => {
+      unhandled.push(reason);
+    };
+    process.on('unhandledRejection', record);
+    try {
+      await server.close();
+      let checks = 0;
+      server = await inProcessServer(
+        'onprem',
+        {
+          settings: {
+            url: stand.url,
+            client: '100',
+            authType: 'basic',
+            username: 'PIN_USER',
+          },
+          credential: new BasicAuthProvider('PIN_USER', 'pin-password'),
+        },
+        undefined,
+        {
+          // Allows the first two calls, denies the third (the repeat),
+          // reading nothing of SAP.
+          accessChecks: {
+            check: async () => {
+              checks += 1;
+              return checks < 3
+                ? ALLOWED
+                : {
+                    allowed: false,
+                    code: 'request_not_allowed',
+                    argument: 'transport_request',
+                    value: 'PFXK900001',
+                  };
+            },
+          },
+        },
+        (message) => {
+          logged.push(message);
+        },
+      );
+      // No system information: a call asks for it before its tool, and a
+      // new connection at its birth.
+      stand.systemInformation(null);
+      const update = () =>
+        server.call('UpdateInterface', {
+          interface_name: 'ZIF_A',
+          source_code: 'INTERFACE zif_a PUBLIC. ENDINTERFACE.',
+          activate: false,
+          transport_request: 'PFXK900001',
+        });
+      await update();
+      // The call's first request, its lookup, meets SAP's token refusal in
+      // a new session.
+      endWithTokenRefusal(currentSession(), (r) =>
+        r.url.startsWith('/sap/bc/adt/core/http/systeminformation'),
+      );
+      const lookups = () =>
+        sent('GET', '/sap/bc/adt/core/http/systeminformation').length;
+      const before = lookups();
+      const answered = await update();
+      expect(answered.isError).toBe(true);
+      expect(logged).toContain(REPEATED_CALL_WORDS);
+      expect(renewedOf(answered)).toBeUndefined();
+      // Anything the denied repeat left running would send after its
+      // answer: a window for it, then the count.
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      // The refused lookup, and the new connection's birth; the denied
+      // repeat asks no more.
+      expect(lookups() - before).toBe(2);
+      expect(unhandled).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', record);
+    }
+  });
+
   it('a host connection (injected) is never repeated: the server cannot replace it', async () => {
     await server.close();
     const injected = createAbapConnection(

@@ -181,8 +181,17 @@ them. The task that owns each one adds its test.
 ### 1.2 Search texts follow the actions left
 
 **Files:** `tools/tool-search.json` (the `HandlerSystem` entry),
-`src/__tests__/unit/access/withoutDenied.test.ts`,
+`src/lib/toolSearch/index.ts`, `src/__tests__/unit/toolSearch/semanticItems.test.ts`
+(new, node:test), `src/__tests__/unit/access/withoutDenied.test.ts`,
 `src/__tests__/unit/toolSet/listedSchemas.test.ts` (Jest, changed in place).
+
+**Interfaces.** The table's format gains two optional fields. Every existing entry
+renders as before.
+- A semantic item may name `members: readonly string[]` in place of `member`. It is kept
+  while at least one of those members is offered. An item names `member` or `members`,
+  never both; the parser (`entryOf`) refuses both, or an empty `members`, as malformed.
+- A semantic list may state `serial: true`. With three or more kept items, the last is
+  joined with `, <join> ` in place of ` <join> ` (`joined`).
 
 - [ ] Tests first:
   - `withoutDenied.test.ts`: with `HandlerSystem.where_used` denied,
@@ -192,6 +201,21 @@ them. The task that owns each one adds its test.
   - with `HandlerSystem.transports` denied, there is no `transport requests` keyword and no
     `list transport requests` phrase;
   - with nothing denied, the keywords and the sentence equal today's;
+  - with `HandlerSystem.atc_findings`, `HandlerSystem.atc_results` and
+    `HandlerSystem.atc_result` all denied, the sentence has no `read ATC findings and
+    results` and the keywords have no `ATC findings` and no `ATC results`; the sentence
+    then ends `show a package tree, and list transport requests.`;
+  - with only `HandlerSystem.atc_findings` denied, the ATC phrase stays and the
+    `ATC findings` keyword leaves;
+  - `semanticItems.test.ts`, on the parser and renderer alone, with table entries built
+    in the test:
+    - an item with `members` is kept when any one member is offered and dropped when none
+      is;
+    - `serial: true` renders `A, B, and C`, and still renders `A and B` for two items and
+      `A` for one;
+    - without `serial`, the rendering is `A, B and C`, as today;
+    - an item naming both `member` and `members`, or `members: []`, is refused as
+      malformed;
   - `listedSchemas.test.ts`, the `TOOL_SEARCH` block: every `members` key of
     `HandlerSystem` is a `SYSTEM_ACTIONS` value.
 - [ ] Rewrite the entry.
@@ -200,21 +224,24 @@ them. The task that owns each one adds its test.
     `where used`, `used by` and `references`; `package_tree` holds `package tree` and
     `subpackages`; `transports` holds `transport requests`; `atc_findings` holds
     `ATC findings`; `atc_results` holds `ATC results`.
-  - **`semantic`:** `before` is `Read across the system by action: ` and `join` is `and`.
-    The items are:
+  - **`semantic`:** `before` is `Read across the system by action: `, `join` is `and`,
+    and `serial` is `true`. The items are:
     - `search source code in packages` (`search_source`);
     - `find objects by name or pattern` (`search_object`);
     - `list where an object is used` (`where_used`);
     - `show a package tree` (`package_tree`);
-    - `list transport requests,` (`transports`; the item carries the serial comma);
-    - `read ATC findings and results`, with no member.
+    - `list transport requests` (`transports`);
+    - `read ATC findings and results`, with `members`: `atc_findings`, `atc_results` and
+      `atc_result`.
 
     `after` is `.`.
 
-  With every action offered, this renders today's sentence byte for byte. My call: the
-  three ATC actions share one phrase, so that phrase names no member and stays while the
-  tool is listed.
+  With every action offered, this renders today's sentence byte for byte, serial comma
+  included. The shared ATC phrase leaves once all three ATC actions are denied (spec §6a).
+- [ ] Implement `members` and `serial` in `src/lib/toolSearch/index.ts`. Both are parsed
+  once from the JSON, and the rendering stays plain string code.
 - [ ] Verify with `npm test -- src/__tests__/unit/access/withoutDenied.test.ts
+  src/__tests__/unit/toolSearch/semanticItems.test.ts
   src/__tests__/unit/toolSet/fixtureBytes.test.ts src/__tests__/unit/toolSet/listedSchemas.test.ts`.
   **Expected:** all pass, and `git diff --stat tests/fixtures` is empty. If the sentence
   cannot be reproduced, run
@@ -315,7 +342,10 @@ accessors. Every `compact…Description` uses them.
   (`z.toJSONSchema`, `io: 'input'`).
 - The step model:
   - `type ArgumentValue = { from: 'user'; value: JsonValue } | { from: 'step'; step: number; field: string } | { from: 'model'; writes: string; shape: 'string' | 'entries' }`;
-  - `interface PromptStep { tool: string; lead?: string; arguments: readonly (readonly [string, ArgumentValue])[]; keeps?: readonly string[]; repeat?: string; condition?: string; finally?: number; note?: string }`;
+  - `interface PromptStep { tool: string; lead?: string; arguments: readonly (readonly [string, ArgumentValue])[]; keeps?: readonly string[]; repeat?: string; condition?: string; finally?: number; note?: string; stillToFill: readonly string[] }`.
+    `stillToFill` lists the tool's required arguments (`requiredArguments`) that the step
+    does not set. It is empty when there are none. The still-to-fill line of §5.1 is
+    rendered from it, so the text and test 14 read the same list;
   - `interface PromptInstruction { headline: string; steps: readonly PromptStep[]; notes: readonly string[] }`.
 - `renderInstruction(i: PromptInstruction): string` follows spec §5.1–§5.2. A step is
   `<n>. [<lead>: ]call <tool> with <arg>: <value>, …`. A user value is rendered as a JSON
@@ -377,7 +407,7 @@ values.
 
 **Files:** `src/lib/prompts/objectRows.ts`, `src/lib/prompts/objectPrompts.ts`,
 `src/lib/prompts/prompts.ts`, `src/__tests__/unit/prompts/objectPrompts.test.ts`,
-`src/__typechecks__/prompts/rows.ts` (spec test 8, first half).
+`src/__typechecks__/prompts/rows.ts` (spec test 8).
 
 **Interfaces.** Produces:
 - `fullRow(definition, name, extra?)`, typed so that `name` is
@@ -387,7 +417,13 @@ values.
 - `COMPACT_ROWS: { readonly [O in ObjectOperation]: CompactRow<O> }`, with the tool name and,
   per member, the name key typed as a property of that member's `COMPACT_<OP>_TAKES` entry
   (or `every`);
-- `READ_PART: (type: CompactObjectType) => 'metadata' | undefined`, from `isSourceless`.
+- `READ_PART: (type: CompactObjectType) => 'metadata' | undefined`, from `isSourceless`;
+- `LOCKED_AS: Record<Exclude<UpdateMember, LockMember>, LockMember>`, with every class
+  include, `UNIT_TEST` and `CDS_UNIT_TEST` mapped to `CLASS`. The compact include delete
+  here uses it, and so does the compact `update` of Task 3.2;
+- `READ_AS: Partial<Record<UpdateType, ReadType>>`, with `UNIT_TEST` and `CDS_UNIT_TEST`
+  mapped to `LOCAL_TEST_CLASS`. It is defined here beside the other tables, and only
+  Task 3.2 reads it.
 
 **Rules (spec):**
 - **Vocabulary (§2.2):** `create` leaves out `TRANSPORT`, and keeps the full set's
@@ -403,7 +439,8 @@ values.
   `<TYPE> takes <token>; * marks a required argument.` A full text ends with the
   still-to-fill line when one is due.
 - **Compact include delete (§3.2, §3.5):** a compact delete of a class include,
-  `UNIT_TEST` or `CDS_UNIT_TEST` runs inside the class lock (§5.2 `delete local_types`).
+  `UNIT_TEST` or `CDS_UNIT_TEST` runs inside the lock that `LOCKED_AS` names (§5.2
+  `delete local_types`).
   `state_handle` is carried when `source.stateHandle`.
 - **Visibility (§4.1):** a type is served when its row's tools are all listed and it is in
   each compact tool's `membersOn`. A delete inside the class lock needs `CLASS` in
@@ -427,8 +464,9 @@ values.
   - review focus 1 and 3 for `get`;
   - the completion of `object_type` for `create` on compact onprem is the 18 types in
     lowercase, in member order.
-- [ ] Typecheck file `src/__typechecks__/prompts/rows.ts`: a `fullRow(CreateClass, 'program_name')`
-  and a compact `CREATE` name key `program_name` for `CLASS`, each under `@ts-expect-error`.
+- [ ] Typecheck file `src/__typechecks__/prompts/rows.ts` (test 8), each case under
+  `@ts-expect-error`: a `fullRow(CreateClass, 'program_name')`; a compact `CREATE` name key
+  `program_name` for `CLASS`; a `LOCKED_AS` without `LOCAL_TYPES`.
 - [ ] Implement the rows and the five prompts.
 - [ ] Verify with `npm test -- src/__tests__/unit/prompts/objectPrompts.test.ts
   src/__tests__/unit/sources/typeCodeLiterals.test.ts` and `npm run test:check`.
@@ -438,15 +476,10 @@ values.
 
 ### 3.2 `update`
 
-**Files:** `src/lib/prompts/objectRows.ts`, `src/lib/prompts/updatePrompt.ts`,
-`src/__tests__/unit/prompts/updatePrompt.test.ts`, `src/__typechecks__/prompts/rows.ts`
-(test 8, second half).
+**Files:** `src/lib/prompts/objectRows.ts` (the content keys),
+`src/lib/prompts/updatePrompt.ts`, `src/__tests__/unit/prompts/updatePrompt.test.ts`.
 
-**Interfaces.** Produces:
-- `READ_AS: Partial<Record<UpdateType, ReadType>>`, with `UNIT_TEST` and `CDS_UNIT_TEST`
-  mapped to `LOCAL_TEST_CLASS`;
-- `LOCKED_AS: Record<Exclude<UpdateMember, LockMember>, LockMember>`, with every class
-  include, `UNIT_TEST` and `CDS_UNIT_TEST` mapped to `CLASS`;
+**Interfaces.** Consumes `READ_AS`, `LOCKED_AS` and `READ_PART` from Task 3.1. Produces:
 - the per-row content key: full per tool, compact from the member's update token, typed
   against `COMPACT_UPDATE_TAKES`.
 
@@ -468,7 +501,6 @@ values.
   - test 4's case: with `HandlerLock.CLASS` denied, compact `update` serves no class
     include, no `CLASS` and no `UNIT_TEST`, and a compact `delete` of `local_types` is
     refused.
-- [ ] Typecheck: a `LOCKED_AS` without `LOCAL_TYPES` under `@ts-expect-error`.
 - [ ] Implement.
 - [ ] Verify with `npm test -- src/__tests__/unit/prompts/updatePrompt.test.ts` and
   `npm run test:check`. **Expected:** pass.
@@ -701,15 +733,35 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
 `backgroundRuns` on and off, with `stateHandleArgument` on HTTP.
 
 - [ ] Test, for every prompt, every served type or action and every instruction step:
-  - build the arguments from the step data. A `user` value is used as given. A `step` or
-    string `model` value stands in as `"x"`. The `entries` value is one entry mapped through
-    `ENTRY_ARGUMENT` from a `ReadTransportEntry` with `pgmid: "LIMU"` and
-    `position: "000001"`.
+  - build the arguments from the step data:
+    - a `user` value is used as given;
+    - a `step` value, or a string `model` value, stands in as `"X1"`;
+    - the `entries` value is one entry, mapped through `ENTRY_ARGUMENT` from a
+      `ReadTransportEntry`
+      `{ pgmid: "LIMU", type: "METH", name: "ZCL_X=>M", position: "000001" }`;
+  - fill each name in the step's `stillToFill` from the property's JSON schema in the
+    listed schema (`z.toJSONSchema`, `io: 'input'`), by one test helper,
+    `placeholderFor(property)`:
+    - `enum` or `const`: its first value;
+    - `string`: `"X1"`, padded to `minLength` when one is stated;
+    - `boolean`: `false`;
+    - `integer` or `number`: `minimum` when stated, else `1`;
+    - `array`: one placeholder of `items`, repeated to `minItems`;
+    - `object`: each of its `required` properties, recursively;
+    - `anyOf` / `oneOf`: the first branch.
+
+    A property the helper cannot fill is a test failure naming the tool and the property.
+    It is never skipped. For example, core `get function_module` fills
+    `function_group_name: "X1"`;
+  - assert that, after the fill, every name in the listed schema's `required` is present.
+    This shows the step data and the listed schema agree on what is required;
   - parse with `promptSource.tools.get(step.tool).inputSchema` (the variant's, rules
     included). `success` must be `true`, and a failure prints the step and zod's issues.
   - a step whose tool is in `LONG_TOOLS` passes `background: false` exactly when the
     listed schema has `background`.
-  - a step that sends transport entries carries `pgmid`.
+  - a step that sends transport entries carries each read field under its sent name, with
+    the read value: `object_name` `ZCL_X=>M`, `object_type` `METH`, `position` `000001`,
+    `pgmid` `LIMU`.
   - with no kind, each binary's served counts per prompt equal its `onprem` counts (spec
     §6). This turns the members-unread mutation red, where an empty served set would
     otherwise pass the test vacuously.
@@ -723,8 +775,13 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
      `part=source is not available for object_type=PACKAGE` on `onprem`.
   3. **Members read from the top level:** make `membersOn` read `definition.members`.
      **Expected:** red on the no-kind served counts.
-  4. **Entry fields unmapped:** map `name` to `name` in `ENTRY_ARGUMENT`. **Expected:** red,
-     with zod's `objects[0].object_name` required.
+  4. **An entry field mapped wrong:** map `pgmid` to `position` in `ENTRY_ARGUMENT`. The
+     declared type allows this, because the value is a key of `MOVED_ENTRY`, so the build
+     compiles. The sent entry then has no `pgmid`, and its `position` is the read
+     `pgmid`. **Expected:** red at the test, on the transport-entry assertion
+     (`pgmid` absent, `position` `LIMU` not `000001`), on core `remove_object` and compact
+     `move_objects`. Before observing it, confirm `npm run test:check` passes with the
+     mutation in place.
 
   After the last revert, `git status --short` shows only the new test file.
 - [ ] Commit `test(prompts): every generated call parses against its tool's listed schema`.
@@ -821,6 +878,6 @@ sibling ranges, `package-lock.json`, and every other place the previous minor bu
 | §6a | 1.1, 1.2 |
 | §7 | 4.1, 4.2 |
 | §8 | 2.4, 3.1, 3.2 |
-| §9 tests 1–14 | 1 (13), 3.1 (3, 8), 3.2 (4, 8), 3.3 (10), 3.4 (11), 3.5 (12), 4.2 (9), 4.3 (1, 2, 4, 5, 6, 7), 5 (14) |
+| §9 tests 1–14 | 1 (13), 3.1 (3, 8), 3.2 (4), 3.3 (10), 3.4 (11), 3.5 (12), 4.2 (9), 4.3 (1, 2, 4, 5, 6, 7), 5 (14) |
 | §10 | 6, 7 |
 | §11 | settled above |

@@ -3,11 +3,14 @@
  * nothing reaches SAP, and no credential travels with the check.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import {
   type AdtStandIn,
   adtStandIn,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
+import { assertRejects } from '../../helpers/assertions';
 import { realmCheck } from '../../integration/helpers/realmCheck';
 
 const REALM = 'STAND IN REALM [STD/100]';
@@ -46,59 +49,67 @@ const withCredential = (request: StandInRequest): boolean =>
 
 describe('realmCheck', () => {
   it('a wrong realm throws before any credential is sent', async () => {
-    await expect(
+    await assertRejects(
       realmCheck('onprem', stand.url, 'ANOTHER REALM', { jwt: undefined }),
-    ).rejects.toThrow(`the system's realm is "${REALM}"`);
-    expect(stand.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      'GET /sap/bc/adt/discovery',
-    ]);
-    expect(stand.requests.filter(withCredential)).toEqual([]);
+      `the system's realm is "${REALM}"`,
+    );
+    assert.deepStrictEqual(
+      stand.requests.map((r) => `${r.method} ${r.url}`),
+      ['GET /sap/bc/adt/discovery'],
+    );
+    assert.deepStrictEqual(stand.requests.filter(withCredential), []);
   });
 
   it('the expected realm passes, with no credential sent', async () => {
-    await expect(
-      realmCheck('onprem', stand.url, REALM, { jwt: undefined }),
-    ).resolves.toBeUndefined();
-    expect(stand.requests.filter(withCredential)).toEqual([]);
+    assert.equal(
+      await realmCheck('onprem', stand.url, REALM, { jwt: undefined }),
+      undefined,
+    );
+    assert.deepStrictEqual(stand.requests.filter(withCredential), []);
   });
 
   it('an empty expected realm refuses', async () => {
-    await expect(
+    await assertRejects(
       realmCheck('onprem', stand.url, '', { jwt: undefined }),
-    ).rejects.toThrow('environment.expected_realm is empty');
-    expect(stand.requests).toEqual([]);
+      'environment.expected_realm is empty',
+    );
+    assert.deepStrictEqual(stand.requests, []);
   });
 
   it('an answer other than 401 refuses', async () => {
     const open = await adtStandIn();
     try {
-      await expect(
+      await assertRejects(
         realmCheck('onprem', open.url, REALM, { jwt: undefined }),
-      ).rejects.toThrow('answered 200 without a credential, not 401');
+        'answered 200 without a credential, not 401',
+      );
     } finally {
       await open.close();
     }
   });
 
   it('an expired JWT refuses with no request', async () => {
-    await expect(
+    await assertRejects(
       realmCheck('cloud', stand.url, '', { jwt: jwtExpiring(-60) }),
-    ).rejects.toThrow('the session JWT expired at');
-    expect(stand.requests).toEqual([]);
+      'the session JWT expired at',
+    );
+    assert.deepStrictEqual(stand.requests, []);
   });
 
   it('a cloud session without a JWT refuses with no request', async () => {
-    await expect(
+    await assertRejects(
       realmCheck('cloud', stand.url, '', { jwt: undefined }),
-    ).rejects.toThrow('the cloud session holds no JWT');
-    expect(stand.requests).toEqual([]);
+      'the cloud session holds no JWT',
+    );
+    assert.deepStrictEqual(stand.requests, []);
   });
 
   it('a live JWT passes on the 401, with no credential sent', async () => {
-    await expect(
-      realmCheck('cloud', stand.url, '', { jwt: jwtExpiring(600) }),
-    ).resolves.toBeUndefined();
-    expect(stand.requests.filter(withCredential)).toEqual([]);
-    expect(stand.requests).toHaveLength(1);
+    assert.equal(
+      await realmCheck('cloud', stand.url, '', { jwt: jwtExpiring(600) }),
+      undefined,
+    );
+    assert.deepStrictEqual(stand.requests.filter(withCredential), []);
+    assert.equal(stand.requests.length, 1);
   });
 });

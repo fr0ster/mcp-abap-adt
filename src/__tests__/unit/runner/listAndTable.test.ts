@@ -12,16 +12,19 @@
  * process (`--showConfig`, `--listTests`), never by importing it.
  */
 
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import type { ResolveFnOutput, ResolveHookContext } from 'node:module';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
 import { readNameTable } from '../../helpers/nameTable';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { tableResolve } from '../../helpers/resolveHook';
 
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 const JEST = require.resolve('jest/bin/jest');
 /** Jest's own rule: a relative `./x.js` import is the `./x.ts` source. */
 const RELATIVE_JS: [string, string] = ['^(\\.{1,2}/.*)\\.js$', '$1'];
@@ -111,7 +114,7 @@ describe('one list, one name table', () => {
       ]),
       RELATIVE_JS,
     ];
-    expect(loadedConfig().moduleNameMapper).toEqual(expected);
+    assert.deepStrictEqual(loadedConfig().moduleNameMapper, expected);
   });
 
   it('Jest ignores every listed path', () => {
@@ -148,12 +151,12 @@ describe('one list, one name table', () => {
       const withEmpty = configWith('empty.config.js', empty);
       // The list's one path, and nothing else since the live ignores went
       // (D27 step 11: the live suites are on the list).
-      expect(loadedConfig(withList).testPathIgnorePatterns).toHaveLength(1);
+      assert.equal(loadedConfig(withList).testPathIgnorePatterns.length, 1);
       const found = listedTests(withList);
       const foundWithout = listedTests(withEmpty);
-      expect(foundWithout).toContain(listedFile);
-      expect(found).not.toContain(listedFile);
-      expect(found).toHaveLength(foundWithout.length - 1);
+      assert.ok(foundWithout.includes(listedFile));
+      assert.ok(!found.includes(listedFile));
+      assert.equal(found.length, foundWithout.length - 1);
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -178,17 +181,17 @@ describe('one list, one name table', () => {
       handed.push(specifier);
       return { url: `node-own:${specifier}` };
     };
-    expect(hook('@mcp-abap-adt/lib', context, next)).toEqual({
+    assert.deepStrictEqual(hook('@mcp-abap-adt/lib', context, next), {
       url: pathToFileURL(path.join(buildDir, 'src', 'index.js')).href,
       shortCircuit: true,
     });
-    expect(hook('@mcp-abap-adt/core/auth', context, next)).toEqual({
+    assert.deepStrictEqual(hook('@mcp-abap-adt/core/auth', context, next), {
       url: pathToFileURL(
         path.join(buildDir, 'server', 'src', 'auth', 'index.js'),
       ).href,
       shortCircuit: true,
     });
-    expect(handed).toEqual([]);
+    assert.deepStrictEqual(handed, []);
     // Not in the table: a sibling's other subpath, a registry package, a
     // relative import — each is Node's own.
     for (const other of [
@@ -196,9 +199,11 @@ describe('one list, one name table', () => {
       '@mcp-abap-adt/adt-clients',
       './index.js',
     ]) {
-      expect(hook(other, context, next)).toEqual({ url: `node-own:${other}` });
+      assert.deepStrictEqual(hook(other, context, next), {
+        url: `node-own:${other}`,
+      });
     }
-    expect(handed).toEqual([
+    assert.deepStrictEqual(handed, [
       '@mcp-abap-adt/lib/handlers',
       '@mcp-abap-adt/adt-clients',
       './index.js',
@@ -209,8 +214,9 @@ describe('one list, one name table', () => {
     const manifest: unknown = JSON.parse(
       fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
     );
-    expect(
+    assert.equal(
       typeof manifest === 'object' && manifest !== null && 'jest' in manifest,
-    ).toBe(false);
+      false,
+    );
   });
 });

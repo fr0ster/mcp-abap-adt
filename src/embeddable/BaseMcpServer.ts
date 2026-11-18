@@ -624,10 +624,10 @@ export abstract class BaseMcpServer extends McpServer {
           );
     // The session keep-alive: the owner's named exception to "no timers in
     // production" (2026-11-18). One timer per instance, unref'd so it never
-    // keeps the process alive, re-armed after each tick settled, stopped by
-    // the instance's close.
+    // keeps the process alive, armed once the instance's connection is
+    // born, re-armed after each tick settled while that connection lives,
+    // stopped by the instance's close.
     this.keepAliveMs = keepAliveMs;
-    this.armKeepAlive();
     this.logger = options.logger ?? getDefaultLogger();
     this.accessChecks = options.accessChecks;
     this.readOnlyTools =
@@ -780,12 +780,14 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Arms the next tick, one interval from now — at construction and at the
-   * end of each tick, after its ping settled, so ticks never overlap. Never
-   * after the close, and never with an interval of `0`.
+   * Arms the next tick, one interval from now — when the instance's
+   * connection is born, and at the end of each tick, after its ping settled,
+   * while a live connection is held — so ticks never overlap. Never after
+   * the close, never with an interval of `0`, never a second one.
    */
   private armKeepAlive(): void {
     if (this.keepAliveStopped || this.keepAliveMs === 0) return;
+    if (this.keepAliveTimer !== undefined) return; // one at a time
     this.keepAliveTimer = setTimeout(() => {
       this.keepAliveTimer = undefined;
       void this.keepAliveTick();
@@ -807,6 +809,7 @@ export abstract class BaseMcpServer extends McpServer {
       const mark =
         connection === undefined ? undefined : requestMark(connection);
       if (connection === undefined || mark === undefined) {
+        // Nothing live to keep: not armed again until the next birth.
         this.keepAliveSeen = undefined;
         return;
       }
@@ -821,7 +824,7 @@ export abstract class BaseMcpServer extends McpServer {
         mark: requestMark(connection) ?? mark,
       };
     } finally {
-      this.armKeepAlive();
+      if (this.liveBuilt() !== undefined) this.armKeepAlive();
     }
   }
 
@@ -1482,6 +1485,8 @@ export abstract class BaseMcpServer extends McpServer {
     connecting.then(
       (connection) => {
         entry.ready = connection;
+        // Born: the keep-alive ticks from now on (one timer per instance).
+        this.armKeepAlive();
       },
       () => undefined,
     );

@@ -98,26 +98,22 @@ export function sessionKeepAliveMsOf(value: number, name: string): number {
 const marks = new WeakMap<object, number>();
 
 /**
- * `connection` with a request mark: a thin wrapper over `makeAdtRequest`
- * that counts each request as it goes out, and does nothing else; every
- * other member is forwarded as it is. The server's keep-alive reads the
- * mark (`requestMark`) on each tick: a mark unchanged since the previous
- * tick is a connection with no request for the whole interval.
+ * Gives `connection` a request mark: its `makeAdtRequest` is replaced, on
+ * the connection itself, by a thin wrapper that counts each request as it
+ * goes out and sends it as before — nothing else. The connection stays the
+ * same object (every record keyed by it still finds it). The server's
+ * keep-alive reads the mark (`requestMark`) on each tick: a mark unchanged
+ * since the previous tick is a connection with no request for the whole
+ * interval. Answers `connection`.
  */
 export function withRequestMark(connection: IAbapConnection): IAbapConnection {
-  const makeAdtRequest: IAbapConnection['makeAdtRequest'] = (request) => {
-    marks.set(wrapped, (marks.get(wrapped) ?? 0) + 1);
-    return connection.makeAdtRequest(request);
+  const send = connection.makeAdtRequest;
+  marks.set(connection, 0);
+  connection.makeAdtRequest = (request) => {
+    marks.set(connection, (marks.get(connection) ?? 0) + 1);
+    return send.call(connection, request);
   };
-  const wrapped = new Proxy(connection, {
-    get(target, property) {
-      if (property === 'makeAdtRequest') return makeAdtRequest;
-      const value: unknown = Reflect.get(target, property, target);
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
-  marks.set(wrapped, 0);
-  return wrapped;
+  return connection;
 }
 
 /** `connection`'s request mark; `undefined` for a connection not wrapped. */

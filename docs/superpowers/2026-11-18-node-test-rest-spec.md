@@ -252,7 +252,7 @@ refuses another name, Code), and `assert` from `node:assert/strict`.
 | `.toStrictEqual(b)` | `assert.deepStrictEqual(a, b)` |
 | `.toMatchObject(b)` / `.not.toMatchObject(b)` | `assertMatchObject(a, b)` / `assert.throws(() => assertMatchObject(a, b), AssertionError)` |
 | `.toContain(x)` / `.not.toContain(x)` | `assert.ok(a.includes(x))` / `assert.ok(!a.includes(x))` (string: substring; array: `===`, as Jest's) |
-| `.toContainEqual(x)` / `.not…` | `assert.ok(a.some((e) => isDeepStrictEqual(e, x)))` / its negation (`node:util`) |
+| `.toContainEqual(x)` / `.not.toContainEqual(x)` | `assert.ok(a.some((e) => isDeepStrictEqual(e, x)))` / its negation (`node:util`) — the negation is weaker than Jest's, see §3.2 |
 | `.toHaveLength(n)` | `assert.equal(a.length, n)` |
 | `.toBeUndefined()` / `.not.toBeUndefined()` / `.toBeDefined()` | `assert.equal(a, undefined)` / `assert.notEqual(a, undefined)` / `assert.notEqual(a, undefined)` |
 | `.toBeNull()` / `.not.toBeNull()` | `assert.equal(a, null)` / `assert.notEqual(a, null)` |
@@ -295,6 +295,13 @@ refuses another name, Code), and `assert` from `node:assert/strict`.
   in an `undefined` key or a prototype, where Jest's failed: the negation is weaker. Each of
   the 15 is checked by hand in its commit: where the operands could differ only that way,
   the assertion is rewritten to name the difference it proves (a field, a value).
+- `not.toContainEqual` has the same weakness: a negated `isDeepStrictEqual` passes when an
+  element differs from `x` only in an `undefined` key or a prototype, where Jest's equality
+  finds it and fails. Both (Measured: `unit/debugger/AmdpSession.test.ts:935` and
+  `:939`) gets the same hand check as `not.toEqual`: where an element could differ from `x`
+  only that way, the assertion is rewritten to name what it proves is absent (no element
+  with that field, that value). The same check applies to every other negated equality a
+  commit writes (`!isDeepStrictEqual`, `notDeepStrictEqual`), not only to these forms.
 
 ### 3.3 `describe.each` / `it.each` / `test.each`
 
@@ -374,7 +381,8 @@ first wave's contract has it.
   - `http/…/shutdown/pooledInstance` (2 cases) and `unit/shutdown/undoFailsLogoff` run a
     real HTTP stand under fake time (Code). They get the helper's **real-time advance**:
     while the awaited work runs, fake time follows real time in small steps, which is what
-    sinon's `shouldAdvanceTime` does for Jest (Code). No injected clock is added: S16 is
+    sinon's `shouldAdvanceTime` does for Jest (Code), up to a fake-time horizon each case
+    states, after which an unsettled work fails (§3.8). No injected clock is added: S16 is
     not added (owner, 2026-11-18, §10 decision 8).
 - **A missed timer fails, it does not hang.** With no runner timeout, a test that awaits a
   promise waiting on a fake timer that never fires would hang. Rule: a promise whose
@@ -407,7 +415,15 @@ each clause by a case that fails when the clause is broken.
   `fn`; no throw fails. The value's message is its `message` when that is a string, else
   `String(value)`. `expected`: absent — any throw; a string — the message includes it; a
   RegExp — `expected.test(message)`, never `String(error)`; a class — `instanceof`; an
-  `Error` object — equal messages. It never hands a RegExp or a string to `assert.throws`.
+  `Error` object — what Jest's `toThrowExpectedObject` compares (Code, `expect` 30.5.2), all
+  of it: (1) equal messages; (2) equal "message and cause": when either error has a truthy
+  `cause`, each is serialised as Jest's `createMessageAndCause` does — its own property
+  names sorted, `stack`, `fileName` and `lineNumber` left out, `cause` serialised the same
+  way recursively, circular references dropped, `bigint` and `undefined` as their string —
+  and the two serialisations must be equal; otherwise the messages alone; (3) when both are
+  `Error` instances and the expected one's constructor is not named `Error`, the thrown value
+  is an instance of that constructor. Each of the three has its own case in the helper's
+  test. It never hands a RegExp or a string to `assert.throws`.
 - **`assertRejects(promise, expected?)`** — Jest's `.rejects.toThrow`; returns the reason. A
   fulfilment fails; a reason that is not an `Error` fails (as Jest's, §1); `expected` as for
   `assertThrows`.
@@ -425,8 +441,17 @@ each clause by a case that fails when the clause is broken.
     held by the helper from before any `enable`, so it works with `setImmediate` faked;
   - `runAllTimersAsync()` — turns and `runAll()` until no timer is pending, failing after
     the loop limit Jest uses (100 000) instead of looping forever;
-  - the real-time advance (if chosen, §3.7) — while `work` runs, fake time follows real
-    time in fixed steps through a real, unreferenced interval, stopped when `work` settles;
+  - the real-time advance (`advanceWithRealTime(work, horizon)`, §3.7) — while `work`
+    runs, fake time follows real time in fixed steps through a real, unreferenced interval.
+    It is bounded in **fake** time, never in wall-clock time: `horizon` is a fake-time span
+    the caller states (the timer the suite pins, plus what the work needs, e.g. the idle
+    bound's 30 minutes and a margin); once fake time has advanced by `horizon`, the interval
+    stops and the helper asserts that `work` has settled — an unsettled `work` fails with the
+    horizon named, it does not hang. It stops earlier when `work` settles. No runner
+    timeout and no wall-clock timeout is involved (goal); a missed timer fails because fake
+    time ran out, not because real time did. Its test proves both ends: a `work` waiting on
+    a timer inside the horizon settles and passes, one waiting on a timer beyond it (or on
+    none) fails;
   - `track(promise)` — `{ settled, value, error }` read without awaiting; reading `value`
     of an unsettled or rejected promise fails.
   The spike's 1 ms stepping makes a long advance cost one real turn per fake millisecond
@@ -482,6 +507,35 @@ each clause by a case that fails when the clause is broken.
 - **Lockfile:** regenerated by `npm install` after the manifest change, never edited by
   hand; afterwards no `"link": true`, no Jest package, everything resolved from the npm
   registry; `npm ci --ignore-scripts` and the audit gate pass.
+- **Jest-only invocations in the tooling** (Measured, `git grep` over `tools/`, `scripts/`,
+  `docs/`, `.vscode/`, `.github/` and the manifests for `--testPathPattern(s)`,
+  `--testPathIgnorePatterns`, `--runInBand`, `--testNamePattern`, `--forceExit`,
+  `--detectOpenHandles`, `--listTests`, `--runTestsByPath`, `--showConfig`, `npx jest`,
+  `jest/bin/jest`, `.bin/jest`):
+  - `tools/run-program-hard-test.js:54` runs `npm test -- --testPathPattern=<pattern>`, its
+    default pattern `integration/high/program/ProgramHighHandlers.test.ts`, a live file on
+    node:test. It is already broken today (Code): `tools/npm-test.mjs` hands the flag to
+    Jest, whose configuration ignores every file of the node:test list, so with
+    `--passWithNoTests` the probe runs nothing and passes; and the runner refuses a live file
+    outside a live script (`tools/run-tests.mjs`). **Migrated**, not retired: it runs
+    `npm run test:high -- <exact source path>` (the live script whose root holds the file,
+    which takes exact repository paths under the family-selection contract), its `--pattern`
+    option replaced by `--file <src/__tests__/….test.ts>`, refused unless the path names an
+    existing file under `src/__tests__/integration/high/`; `tools/README.md:97` says how to
+    run it.
+  - `.vscode/launch.json:52-53` runs `node_modules/.bin/jest --runInBand`: replaced (next
+    item).
+  - `tools/npm-test.mjs` (`jest/bin/jest`, `--runTestsByPath`, `--listTests`): goes with
+    Jest (above).
+  - `docs/development/tests/TESTING_GUIDE.md:120-148` describes `npm test`'s Jest arguments
+    (`--runTestsByPath`, `-t`, `--testNamePattern`, `--testPathIgnorePatterns`,
+    `jest --listTests --json`): rewritten for the runner's options (`--root`, named files,
+    `--test-name-pattern` as node:test reads it).
+  - `docs/MIGRATION-24.0.md:1444-1447` names Jest flags as history of a released version:
+    not rewritten.
+  - Nothing in `scripts/`, the workflows or any `package.json` script (Measured). The plan
+    repeats the sweep in the end-state commit, and the end state has no hit outside released
+    documents and the CHANGELOG.
 - **Other files:** `.npmignore` / `.dockerignore` entries for `jest.config.js` and
   `jest.setup.js` go; `.vscode/launch.json`'s Jest configuration is replaced by one for the
   runner; comments in `src` that name Jest as the runner (e.g. `src/lib/utils.ts`) say
@@ -518,6 +572,13 @@ guarantee has a Jest variant. For each:
 
 ## 7. The injection points, for the owner
 
+**No default changes behaviour.** A seam's default is exactly what the production code does
+today, guards and refusals included; in particular S1, S3 and S4 keep the missing-responsible
+refusal (`src/lib/systemContextGuard.ts`) and the variant refusals on every default path. Each
+such seam's commit carries a test that the guard still refuses through the default (a create
+with no responsible is refused before anything is sent) and, for S4, through a supplied base
+class too.
+
 **Nothing below is added before the owner approves it, item by item.** The owner's
 decisions of 2026-11-18 (§10) approve S1 (option B), S2, S2b, S2c, S3, S4, S5 (both
 halves), S6, S7, S8, S9, S10, S11, S12, S13 and S14; S15 is approved only if the plan's
@@ -529,12 +590,12 @@ prove the same without a seam, that is offered as the alternative.
 
 | # | Status | Production file / function | Parameter or option | Type | Default | Suites |
 |---|---|---|---|---|---|---|
-| S1 | approved | `src/lib/clients.ts` — `adtClientOf`, `createAdtClient`, `createOnPremAdtClient`, `createOnPremExecutor`, `variantOf` | **(B)**, chosen: clients supplied for one connection, read by `adtClientOf` before building (option (A), a `HandlerContext.adtClients?` field read at each call site, not taken) | `ServerAdtClient` (and the executor's type) keyed by the connection object | the real functions | the 40 of Appendix A, `lib/clients` |
+| S1 | approved | `src/lib/clients.ts` — `adtClientOf`, `createAdtClient`, `createOnPremAdtClient`, `createOnPremExecutor`, `variantOf` | **(B)**, chosen: clients supplied for one connection, read by `adtClientOf` before building (option (A), a `HandlerContext.adtClients?` field read at each call site, not taken) | `ServerAdtClient` (and the executor's type) keyed by the connection object | the real functions, unchanged: with nothing supplied for the connection, `adtClientOf` refuses an undeclared variant and builds `GuardedAdtClientOnPrem` / `GuardedAdtClientCloud` with `guardedOptions` (`src/lib/clients.ts:49-71, 89-114`), and `createOnPremAdtClient` / `createOnPremExecutor` refuse `variant_not_served` as today. Only a connection a test supplied clients for gets the supplied ones | the 40 of Appendix A, `lib/clients` |
 | S2 | approved | `src/embeddable/BaseMcpServer.ts` — `connectedLogon`, `resumedSession`, `logoffLeftover` | option `connectionFactory?` of the server's options, passed through by the stdio, HTTP and SSE servers | `typeof createAbapConnection` | `createAbapConnection` | the 20 of Appendix A, `connectionFactory`, less those S2b/S2c serve alone |
 | S2b | approved | `src/lib/packageSessions.ts` — `openFreshConnection` | the factory that built the original, carried in its `ConnectionRecord` (`siblingRecordOf`), so a sibling is built by the same factory | `typeof createAbapConnection` | `createAbapConnection` | `unit/packageSessions`, `unit/connectionEnds`, `unit/batch/*` that mock `siblingRecordOf` |
 | S2c | approved | `src/lib/utils.ts` — `setConfigOverride`, the fallback of `getManagedConnection` | an optional last parameter of `setConfigOverride`, kept for the cache's rebuilds | `typeof createAbapConnection` | `createAbapConnection` | `unit/connectionEnds` |
-| S3 | approved | `src/lib/clients.ts` — new `runtimeClientOf`, `executorOf`; the 13 handler files that do `new AdtRuntimeClient(…)` and the 7 that do `new AdtExecutor(…)` (`src/lib/debugger/ports.ts`, `handlers/unit_test/shared/*`, …) call them | served by S1 (B) | `(connection, logger?) => AdtRuntimeClient` / `AdtExecutor` | the real constructors | `atcTools`, `dumpFeedPagingAndFilters`, `runtimeReadersFixRound1`, `runtimeProfiling`, `staticSequences`, `readonlySingleCall` (its `runTests.testRunner` mock) |
-| S4 | approved | `src/lib/clients.ts` — `adtClientOf` | an optional parameter: the client classes it builds from | `{ onprem: typeof AdtClientOnPrem; cloud: typeof AdtClientCloud }` | the shipped classes | `masterLanguageHeaderLeak`, `responsibleRequestScope`, `responsible-rules/…/requestSystemResolution` (all read the options a client was constructed with) |
+| S3 | approved | `src/lib/clients.ts` — new `runtimeClientOf`, `executorOf`; the 13 handler files that do `new AdtRuntimeClient(…)` and the 7 that do `new AdtExecutor(…)` (`src/lib/debugger/ports.ts`, `handlers/unit_test/shared/*`, …) call them | served by S1 (B) | `(connection, logger?) => AdtRuntimeClient` / `AdtExecutor` | exactly what each site constructs today, with the same arguments; `createOnPremExecutor` keeps its `variant_not_served` refusal before anything is built (`src/lib/clients.ts:151-159`) | `atcTools`, `dumpFeedPagingAndFilters`, `runtimeReadersFixRound1`, `runtimeProfiling`, `staticSequences`, `readonlySingleCall` (its `runTests.testRunner` mock) |
+| S4 | approved | `src/lib/clients.ts` — `adtClientOf` | an optional parameter: the **base** classes the guarded clients extend. `adtClientOf` always builds the guarded client — the `GuardedAdtClientOnPrem` / `GuardedAdtClientCloud` subclass of the given base, its constructor installing `guardedOptions(options)` as `systemContext` (`src/lib/clients.ts:49-71`) — so a supplied base replaces only what the guard wraps, never the guard | `{ onprem: typeof AdtClientOnPrem; cloud: typeof AdtClientCloud }` | `AdtClientOnPrem` / `AdtClientCloud`, giving today's `GuardedAdtClientOnPrem` / `GuardedAdtClientCloud` with their guarded options, unchanged | `masterLanguageHeaderLeak`, `responsibleRequestScope`, `responsible-rules/…/requestSystemResolution` (all read the options a client was constructed with) |
 | S5 | approved | `src/lib/requestSystemResolution.ts` (caller of `readSystemInformation`) and `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts` (caller of adt-clients' `getSystemInformation`) | an option of the resolution, and of the handler's context | `typeof readSystemInformation` / `typeof getSystemInformation` | the real functions | `systemContextRequired` (2), `requestSystemResolution`, `embeddable/connectionContext`, `serviceBindingPreviewUrl` |
 | S6 | approved | `server-runtime/src/stdio/auth/brokerFactory.ts` — the `new AuthBroker(…)` site | `IAuthBrokerFactoryConfig.createBroker?` | `(...args: ConstructorParameters<typeof AuthBroker>) => AuthBroker` | `(...a) => new AuthBroker(...a)` | the 5 `auth-broker` suites |
 | S7 | approved | `server-runtime/src/stdio/auth/browser.ts` — the browser factories it calls | an option of the browser choice, reached from the launcher's options | the factories' own types (`typeof linuxDefaultBrowser`, …) | auth-providers' factories | `stdio/…/launcherDestination` |

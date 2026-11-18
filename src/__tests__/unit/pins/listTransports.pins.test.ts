@@ -20,43 +20,114 @@ const LISTING = [
   },
 ];
 
-/** The one GET of a listing, its query as given. */
-const listing = (query: string) => ({
-  method: 'GET',
-  url: `/sap/bc/adt/cts/transportrequests?${query}`,
-  headers: {
-    Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
-  },
-  body: undefined,
+describe('onprem', () => {
+  pinCases([
+    {
+      tool: 'ListTransports',
+      variant: 'onprem',
+      stand: 'recording',
+      args: { user: 'PIN_USER', modifiable_only: true },
+      answers: LISTING,
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/cts/transportrequests?user=PIN_USER&requestStatus=D&requestType=KWT',
+          headers: {
+            Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
+          },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'ListTransports',
+      variant: 'onprem',
+      stand: 'recording',
+      args: { user: 'pin_other' },
+      answers: LISTING,
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/cts/transportrequests?user=PIN_OTHER&requestStatus=D&requestType=KWT',
+          headers: {
+            Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
+          },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'ListTransports',
+      variant: 'onprem',
+      stand: 'recording',
+      args: { user: 'PIN_USER', modifiable_only: false },
+      answers: LISTING,
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/cts/transportrequests?user=PIN_USER&requestStatus=DR&requestType=KWT',
+          headers: {
+            Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
+          },
+          body: undefined,
+        },
+      ],
+    },
+  ]);
 });
 
-for (const variant of ['onprem', 'cloud'] as const) {
-  describe(variant, () => {
-    pinCases([
-      {
-        tool: 'ListTransports',
-        variant,
-        stand: 'recording',
-        args: { user: 'PIN_USER', modifiable_only: true },
-        answers: LISTING,
-        expected: [listing('user=PIN_USER&requestStatus=D&requestType=KWT')],
-      },
-      {
-        tool: 'ListTransports',
-        variant,
-        stand: 'recording',
-        args: { user: 'pin_other' },
-        answers: LISTING,
-        expected: [listing('user=PIN_OTHER&requestStatus=D&requestType=KWT')],
-      },
-      {
-        tool: 'ListTransports',
-        variant,
-        stand: 'recording',
-        args: { user: 'PIN_USER', modifiable_only: false },
-        answers: LISTING,
-        expected: [listing('user=PIN_USER&requestStatus=DR&requestType=KWT')],
-      },
-    ]);
-  });
-}
+describe('cloud', () => {
+  pinCases([
+    {
+      tool: 'ListTransports',
+      variant: 'cloud',
+      stand: 'recording',
+      args: { user: 'PIN_USER', modifiable_only: true },
+      answers: LISTING,
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/cts/transportrequests?user=PIN_USER&requestStatus=D&requestType=KWT',
+          headers: {
+            Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
+          },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'ListTransports',
+      variant: 'cloud',
+      stand: 'recording',
+      args: { user: 'pin_other' },
+      answers: LISTING,
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/cts/transportrequests?user=PIN_OTHER&requestStatus=D&requestType=KWT',
+          headers: {
+            Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
+          },
+          body: undefined,
+        },
+      ],
+    },
+    {
+      tool: 'ListTransports',
+      variant: 'cloud',
+      stand: 'recording',
+      args: { user: 'PIN_USER', modifiable_only: false },
+      answers: LISTING,
+      expected: [
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/cts/transportrequests?user=PIN_USER&requestStatus=DR&requestType=KWT',
+          headers: {
+            Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
+          },
+          body: undefined,
+        },
+      ],
+    },
+  ]);
+});

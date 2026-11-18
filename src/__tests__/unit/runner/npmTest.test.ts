@@ -104,11 +104,19 @@ describe('npm test', () => {
     // The list holds files outside every sub-package root, so a filter that
     // did not reach the runner would show them.
     const everyListed = listed([]).nodeTest;
+    // While the files move, a root may hold files of one runner only (all of
+    // background-runs-memory's are on node:test): each root finds something
+    // on one runner at least, and each runner finds something in some root,
+    // so neither filter check below is vacuous.
+    let jestFound = 0;
+    let nodeTestFound = 0;
     for (const { dir, args } of scripts) {
       assert.deepEqual(args, ['--roots', `${dir}/src`], dir);
       const root = path.join(REPO, dir, 'src');
       const { jest, nodeTest } = listed(args);
-      assert.ok(jest.length > 0, `${dir}: Jest found nothing`);
+      assert.ok(jest.length + nodeTest.length > 0, `${dir}: nothing found`);
+      jestFound += jest.length;
+      nodeTestFound += nodeTest.length;
       assert.deepEqual(
         jest.filter((file) => !isUnder(root, file)),
         [],
@@ -123,6 +131,8 @@ describe('npm test', () => {
         everyListed.some((source) => !isUnder(root, path.join(REPO, source))),
       );
     }
+    assert.ok(jestFound > 0, 'Jest found nothing in any root');
+    assert.ok(nodeTestFound > 0, 'the runner found nothing in any root');
   });
 
   describe('a root with no node:test file', () => {

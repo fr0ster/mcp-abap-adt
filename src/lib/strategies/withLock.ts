@@ -11,7 +11,7 @@ import {
   thrownEntry,
   thrownWords,
 } from '../answer';
-import { spentBy } from '../sessionLoss';
+import { spentBy, spentByThrown } from '../sessionLoss';
 import {
   type Cleanup,
   type LeftLocked,
@@ -91,7 +91,14 @@ async function runRelease<H, U>(
         // The throw as an entry, with its step: a credential failure as it
         // came, a carried method error as it is.
         failures: [thrownEntry(error, 'unlock')],
-        ...leftLocked(handle, object, message),
+        // A spent connection, as on the refused path: the lock went with
+        // its SAP session — no `left_locked`, no handle.
+        ...(spentByThrown(error)
+          ? {
+              object: { type: object.type, name: object.name },
+              warning: LOCK_WENT_WITH_SESSION_WORDS,
+            }
+          : leftLocked(handle, object, message)),
       },
     };
   }

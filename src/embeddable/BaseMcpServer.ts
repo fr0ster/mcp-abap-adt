@@ -14,6 +14,7 @@ import {
 import { refusalOf } from '../lib/access/listedAccessChecks.js';
 import { lazyPackageReader } from '../lib/access/packageReader.js';
 import {
+  isLatched,
   registerActiveTool,
   shutdownRefusalAnswer,
 } from '../lib/activeTools.js';
@@ -165,6 +166,12 @@ import {
 } from '../lib/requestSystemResolution.js';
 import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
+import {
+  DEFAULT_SESSION_KEEP_ALIVE_MINUTES,
+  sessionKeepAliveMsOf,
+  stopSessionKeepAlive,
+  withSessionKeepAlive,
+} from '../lib/sessionKeepAlive.js';
 import { HeldLocks, lockNotHeldWords } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
@@ -352,6 +359,9 @@ export abstract class BaseMcpServer extends McpServer {
 
   /** Every tool call of this instance still running, tracked from its entry. */
   private readonly inFlight = new Set<Promise<void>>();
+
+  /** The session keep-alive's interval in milliseconds; `0`: off. */
+  private readonly sessionKeepAliveMs: number;
 
   /** The built entry of each connection handed out: what a release counts down. */
   private readonly entries = new WeakMap<IAbapConnection, BuiltConnection>();
@@ -582,8 +592,26 @@ export abstract class BaseMcpServer extends McpServer {
      * no call is checked, and no `AccessCall` is built.
      */
     accessChecks?: IAccessChecks | undefined;
+    /**
+     * The session keep-alive's interval, in milliseconds
+     * (`--session-keep-alive-minutes` × 60 000 in the launchers): the
+     * connection this instance builds is wrapped (`withSessionKeepAlive`),
+     * and once no request has gone over it for that long, one stateless
+     * `GET` of the ADT discovery is sent on it, so SAP does not end the idle
+     * session. `0`: off. Default: 10 minutes. A whole number from 0 to
+     * 2^31-1; anything else is refused. An injected connection is the
+     * host's and is never wrapped.
+     */
+    sessionKeepAliveMs?: number | undefined;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
+    this.sessionKeepAliveMs =
+      options.sessionKeepAliveMs === undefined
+        ? DEFAULT_SESSION_KEEP_ALIVE_MINUTES * 60_000
+        : sessionKeepAliveMsOf(
+            options.sessionKeepAliveMs,
+            'sessionKeepAliveMs',
+          );
     this.logger = options.logger ?? getDefaultLogger();
     this.accessChecks = options.accessChecks;
     this.readOnlyTools =
@@ -720,6 +748,31 @@ export abstract class BaseMcpServer extends McpServer {
    */
   terminalClose(): Promise<void> {
     return closeOwnedConnections(this);
+  }
+
+  /**
+   * The MCP server's close: the held connection's keep-alive stops with it
+   * (the connection's logoff, when one follows, stops it too).
+   */
+  override async close(): Promise<void> {
+    const held = this.built?.ready;
+    if (held !== undefined) stopSessionKeepAlive(held);
+    await super.close();
+  }
+
+  /**
+   * A connection this instance builds, with its keep-alive
+   * (`withSessionKeepAlive`): pinged only while the instance is not closed
+   * and the connection not ended. A replaced connection's keep-alive stops
+   * (`retire`); its replacement is wrapped afresh.
+   */
+  private keptAlive(connection: IAbapConnection): IAbapConnection {
+    const wrapped: IAbapConnection = withSessionKeepAlive(connection, {
+      intervalMs: this.sessionKeepAliveMs,
+      logger: this.logger,
+      held: () => !isLatched(this) && !isEnded(wrapped),
+    });
+    return wrapped;
   }
 
   /**
@@ -1290,6 +1343,8 @@ export abstract class BaseMcpServer extends McpServer {
     if (entry.ready !== undefined) this.heldLocks.mainSessionEnded();
     entry.connection.then(
       (connection) => {
+        // Replaced: it is kept alive no longer, whoever still works on it.
+        stopSessionKeepAlive(connection);
         if (entry.users === 0) void endConnection(connection);
       },
       () => undefined, // a failed connect was ended where it failed
@@ -1448,14 +1503,16 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<IAbapConnection> {
     // A closed instance logs on nowhere: nothing is built or sent.
     refuseIfClosed(this);
-    // Built for the instance's kind, with its logger.
-    const connection = createAbapConnection(
-      resolved.settings,
-      resolved.credential,
-      this.logger,
-      undefined,
-      undefined,
-      this.builtKind(),
+    // Built for the instance's kind, with its logger, and kept alive.
+    const connection = this.keptAlive(
+      createAbapConnection(
+        resolved.settings,
+        resolved.credential,
+        this.logger,
+        undefined,
+        undefined,
+        this.builtKind(),
+      ),
     );
     // The instance's own from here on: it ends with a logoff.
     own(connection, { owner: this, role: 'built' });
@@ -1507,13 +1564,15 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<IAbapConnection> {
     let connection: IAbapConnection;
     try {
-      connection = createAbapConnection(
-        resolved.settings,
-        resolved.credential,
-        this.logger,
-        undefined,
-        claimed.cookies,
-        this.builtKind(),
+      connection = this.keptAlive(
+        createAbapConnection(
+          resolved.settings,
+          resolved.credential,
+          this.logger,
+          undefined,
+          claimed.cookies,
+          this.builtKind(),
+        ),
       );
     } catch (error) {
       owner.release(claimed);

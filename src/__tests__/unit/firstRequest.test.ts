@@ -8,6 +8,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
+  isLockRequest,
   isSessionReplacedBySap,
   watchRequests,
   withRequestLedger,
@@ -145,5 +146,54 @@ describe('watchRequests', () => {
     const connection = ledgered(['ok', refusal(true)]);
     await connection.makeAdtRequest({ url: '/x', method: 'GET', timeout: 0 });
     expect(await call(connection, 1)).toBe(true);
+  });
+});
+
+describe('isLockRequest: a POST whose one _action, decoded, is LOCK', () => {
+  const post = (url: string, params?: Record<string, string>) =>
+    isLockRequest({
+      url,
+      method: 'POST',
+      timeout: 0,
+      ...(params !== undefined ? { params } : {}),
+    });
+
+  it('the form adt-clients sends: yes', () => {
+    expect(
+      post('/sap/bc/adt/oo/classes/zcl_a?_action=LOCK&accessMode=MODIFY'),
+    ).toBe(true);
+  });
+  it('an encoded LOCK (%4COCK): yes', () => {
+    expect(post('/sap/bc/adt/oo/classes/zcl_a?_action=%4COCK')).toBe(true);
+  });
+  it('an UNLOCK naming LOCK in another parameter: no', () => {
+    expect(
+      post('/sap/bc/adt/oo/classes/zcl_a?_action=UNLOCK&previous_action=LOCK'),
+    ).toBe(false);
+  });
+  it('a repeated _action: no', () => {
+    expect(post('/sap/bc/adt/oo/classes/zcl_a?_action=LOCK&_action=LOCK')).toBe(
+      false,
+    );
+  });
+  it('lock in lower case (not the form sent): no', () => {
+    expect(post('/sap/bc/adt/oo/classes/zcl_a?_action=lock')).toBe(false);
+  });
+  it('_action in the params: read the same way', () => {
+    expect(post('/sap/bc/adt/oo/classes/zcl_a', { _action: 'LOCK' })).toBe(
+      true,
+    );
+    expect(post('/sap/bc/adt/oo/classes/zcl_a', { _action: 'UNLOCK' })).toBe(
+      false,
+    );
+  });
+  it('not a POST: no', () => {
+    expect(
+      isLockRequest({
+        url: '/sap/bc/adt/oo/classes/zcl_a?_action=LOCK',
+        method: 'GET',
+        timeout: 0,
+      }),
+    ).toBe(false);
   });
 });

@@ -30,7 +30,7 @@ import type {
 import { ADT_SESSION_ERROR } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isCsrfRefusal } from './csrfRefusal';
 import { asciiUpper } from './plainText';
-import { child } from './thrownValue';
+import { child, isList } from './thrownValue';
 import { wireResponseOf } from './wireResponse';
 
 /** A call's watch over its connection's requests. */
@@ -74,13 +74,26 @@ export function isSessionReplacedBySap(
   );
 }
 
-/** Whether `options` is a LOCK: a POST whose `_action` is `LOCK`, in its URL or its params. */
+/**
+ * Whether `options` is a LOCK: a POST whose one `_action` parameter,
+ * decoded, is exactly `LOCK` — the form adt-clients sends,
+ * `…?_action=LOCK&accessMode=MODIFY` — read from the URL's query by the
+ * platform's parser, or from the request's params the same way. A repeated
+ * `_action`, or `LOCK` in another parameter, is no LOCK.
+ */
 export function isLockRequest(options: IAbapRequestOptions): boolean {
   if (asciiUpper(options.method ?? '') !== 'POST') return false;
-  return (
-    (options.url ?? '').includes('_action=LOCK') ||
-    child(options.params, '_action') === 'LOCK'
-  );
+  const url = options.url ?? '';
+  const at = url.indexOf('?');
+  const fromUrl =
+    at < 0 ? [] : new URLSearchParams(url.slice(at + 1)).getAll('_action');
+  const param = child(options.params, '_action');
+  const actions =
+    param === undefined
+      ? fromUrl
+      : [...fromUrl, ...(isList(param) ? param : [param])];
+  const [only, other] = actions;
+  return other === undefined && only === 'LOCK';
 }
 
 /** `connection` with its requests counted for a watching call; the same object. */

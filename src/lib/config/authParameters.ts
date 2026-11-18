@@ -1049,7 +1049,7 @@ export const SESSION_KEEP_ALIVE_ROW: Parameter = {
   default: DEFAULT_SESSION_KEEP_ALIVE_MINUTES,
   valueHint: '=<minutes>',
   section: 'SESSION',
-  help: `Once no request has gone over the server's own SAP connection for this many minutes, one GET of the ADT discovery is sent on it, so SAP does not end the idle session (the first call after a long pause would otherwise fail). Default: 10; 0 turns it off; at most ${MAX_SESSION_KEEP_ALIVE_MINUTES}; a whole number. A connection the server did not build, or one not connected yet, is never pinged, and a ping never logs on.`,
+  help: `The session keep-alive of the server's own connection to SAP (HTTP or RFC): a tick every this many minutes sends one GET of the ADT discovery on it when no request went out since the previous tick, so SAP does not end the idle ABAP session (the first call after a long pause would otherwise fail); the first ping comes one to two intervals after the last request. Default: 10; 0 turns it off; at most ${MAX_SESSION_KEEP_ALIVE_MINUTES}; a whole number. It starts at the connection's logon and stops at its logoff or end; it never opens a connection, and a connection the host injected is never pinged.`,
 };
 
 /** The longest `--shutdown-timeout`: a day. */

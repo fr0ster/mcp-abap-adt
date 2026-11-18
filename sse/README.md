@@ -75,7 +75,7 @@ As before 19.0.0, under the same names: `--sse-host` / `MCP_SSE_HOST`, `--sse-po
 `MCP_SSE_PORT` (default `3001`), `--sse-path` (default `/sse`), `--post-path` (default
 `/messages`), `--sse-allowed-hosts` / `MCP_SSE_ALLOWED_HOSTS`, `--sse-allowed-origins` /
 `MCP_SSE_ALLOWED_ORIGINS`, `--sse-enable-dns-protection` / `MCP_SSE_ENABLE_DNS_PROTECTION`,
-`--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--conf`, `--help`, `--version`;
+`--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--session-keep-alive-minutes` / `MCP_SESSION_KEEP_ALIVE_MINUTES` (the session keep-alive of each instance's connection to SAP; default 10, `0` off), `--conf`, `--help`, `--version`;
 new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#shutdown)).
 
 ## A closed connection disposes its instance

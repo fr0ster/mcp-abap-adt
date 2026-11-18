@@ -15,10 +15,11 @@
  * connection's mark unchanged since the previous tick, and the connection
  * live, sends the ping through it in the main flow's turn. So the first
  * ping comes one to two intervals after the last request. The ping is one
- * ordinary `GET` of the ADT discovery on the server's own connection to
- * SAP, HTTP or RFC alike: the mechanism starts when that connection logged
- * on and stops when it is logged off, ended, spent or closed; it never
- * opens a connection. The tick sends it
+ * stateful discovery request in the server's own session — the long-lived
+ * connection to SAP that holds it, HTTP or RFC alike (fresh connections
+ * for background runs and long reads are not pinged): the mechanism starts
+ * when that connection logged on and stops when it is logged off, ended,
+ * spent or closed; it never opens a connection. The tick sends it
  * once; a failure is logged at `debug` in fixed words with its status only.
  *
  * The interval is `--session-keep-alive-minutes` /
@@ -128,8 +129,8 @@ export function requestMark(connection: object): number | undefined {
 }
 
 /**
- * The ping: one `GET` of the ADT discovery on `connection`, as the
- * connection's ordinary request — no timeout, never retried. A status other
+ * The ping: one `GET` of the ADT discovery on `connection`, in the session
+ * mode the caller set (the server's: stateful) — no timeout, sent once. A status other
  * than a `2xx`, an answer that shows the session lost, or a failure is
  * logged at `debug` in fixed words with the status only. A lost or replaced
  * session spends the connection as any request's answer does; the next

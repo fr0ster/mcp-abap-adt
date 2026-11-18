@@ -71,7 +71,7 @@ As before 19.0.0, under the same names: `--host` / `--http-host` / `MCP_HTTP_HOS
 `/mcp/stream/http`), `--http-json-response` / `MCP_HTTP_ENABLE_JSON_RESPONSE`,
 `--http-allowed-hosts` / `MCP_HTTP_ALLOWED_HOSTS`, `--http-allowed-origins` /
 `MCP_HTTP_ALLOWED_ORIGINS`, `--http-enable-dns-protection` / `MCP_HTTP_ENABLE_DNS_PROTECTION`,
-`--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--session-keep-alive-minutes` / `MCP_SESSION_KEEP_ALIVE_MINUTES` (the session keep-alive of each instance's connection to SAP; default 10, `0` off), `--conf`, `--help`, `--version`;
+`--tls-cert` / `--tls-key` / `--tls-ca` (`MCP_TLS_*`), `--system-type`, `--state-idle-minutes` / `MCP_STATE_IDLE_MINUTES`, `--session-keep-alive-minutes` / `MCP_SESSION_KEEP_ALIVE_MINUTES` (the session keep-alive of the server's long-lived connection to SAP, which holds its session (HTTP or RFC); fresh connections for background runs and long reads are not pinged; default 10, `0` off), `--conf`, `--help`, `--version`;
 new in 19.0.0, `--shutdown-timeout` / `MCP_SHUTDOWN_TIMEOUT` (see [Shutdown](#shutdown)).
 `mcp-abap-adt-http --help` lists them.
 

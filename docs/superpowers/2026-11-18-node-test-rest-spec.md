@@ -519,10 +519,9 @@ guarantee has a Jest variant. For each:
 ## 7. The injection points, for the owner
 
 **Nothing below is added before the owner approves it, item by item.** The owner's
-decisions of 2026-11-18 (§10) approve S1 (option B), S2, S2b, S2c, S5 (both halves), S9,
-S10, S11, S12 and S14; S15 is approved only if the plan's measurement shows it necessary;
-S16 is not added. S3, S4, S6, S7, S8 and S13 were not part of those decisions and still
-wait for the owner's approval before their commits. Each is typed by the
+decisions of 2026-11-18 (§10) approve S1 (option B), S2, S2b, S2c, S3, S4, S5 (both
+halves), S6, S7, S8, S9, S10, S11, S12, S13 and S14; S15 is approved only if the plan's
+measurement shows it necessary; S16 is not added. Each is typed by the
 real module's contract, defaults to the real module, and adds no cast, `any`, `!` or
 `ts-ignore` in production. The plan confirms, before a seam's commit, that each suite named
 reaches the production site named (by a deliberate break of the seam, §8). Where a suite can
@@ -534,17 +533,17 @@ prove the same without a seam, that is offered as the alternative.
 | S2 | approved | `src/embeddable/BaseMcpServer.ts` — `connectedLogon`, `resumedSession`, `logoffLeftover` | option `connectionFactory?` of the server's options, passed through by the stdio, HTTP and SSE servers | `typeof createAbapConnection` | `createAbapConnection` | the 20 of Appendix A, `connectionFactory`, less those S2b/S2c serve alone |
 | S2b | approved | `src/lib/packageSessions.ts` — `openFreshConnection` | the factory that built the original, carried in its `ConnectionRecord` (`siblingRecordOf`), so a sibling is built by the same factory | `typeof createAbapConnection` | `createAbapConnection` | `unit/packageSessions`, `unit/connectionEnds`, `unit/batch/*` that mock `siblingRecordOf` |
 | S2c | approved | `src/lib/utils.ts` — `setConfigOverride`, the fallback of `getManagedConnection` | an optional last parameter of `setConfigOverride`, kept for the cache's rebuilds | `typeof createAbapConnection` | `createAbapConnection` | `unit/connectionEnds` |
-| S3 | awaiting approval | `src/lib/clients.ts` — new `runtimeClientOf`, `executorOf`; the 13 handler files that do `new AdtRuntimeClient(…)` and the 7 that do `new AdtExecutor(…)` (`src/lib/debugger/ports.ts`, `handlers/unit_test/shared/*`, …) call them | served by S1 (B) | `(connection, logger?) => AdtRuntimeClient` / `AdtExecutor` | the real constructors | `atcTools`, `dumpFeedPagingAndFilters`, `runtimeReadersFixRound1`, `runtimeProfiling`, `staticSequences`, `readonlySingleCall` (its `runTests.testRunner` mock) |
-| S4 | awaiting approval | `src/lib/clients.ts` — `adtClientOf` | an optional parameter: the client classes it builds from | `{ onprem: typeof AdtClientOnPrem; cloud: typeof AdtClientCloud }` | the shipped classes | `masterLanguageHeaderLeak`, `responsibleRequestScope`, `responsible-rules/…/requestSystemResolution` (all read the options a client was constructed with) |
+| S3 | approved | `src/lib/clients.ts` — new `runtimeClientOf`, `executorOf`; the 13 handler files that do `new AdtRuntimeClient(…)` and the 7 that do `new AdtExecutor(…)` (`src/lib/debugger/ports.ts`, `handlers/unit_test/shared/*`, …) call them | served by S1 (B) | `(connection, logger?) => AdtRuntimeClient` / `AdtExecutor` | the real constructors | `atcTools`, `dumpFeedPagingAndFilters`, `runtimeReadersFixRound1`, `runtimeProfiling`, `staticSequences`, `readonlySingleCall` (its `runTests.testRunner` mock) |
+| S4 | approved | `src/lib/clients.ts` — `adtClientOf` | an optional parameter: the client classes it builds from | `{ onprem: typeof AdtClientOnPrem; cloud: typeof AdtClientCloud }` | the shipped classes | `masterLanguageHeaderLeak`, `responsibleRequestScope`, `responsible-rules/…/requestSystemResolution` (all read the options a client was constructed with) |
 | S5 | approved | `src/lib/requestSystemResolution.ts` (caller of `readSystemInformation`) and `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts` (caller of adt-clients' `getSystemInformation`) | an option of the resolution, and of the handler's context | `typeof readSystemInformation` / `typeof getSystemInformation` | the real functions | `systemContextRequired` (2), `requestSystemResolution`, `embeddable/connectionContext`, `serviceBindingPreviewUrl` |
-| S6 | awaiting approval | `server-runtime/src/stdio/auth/brokerFactory.ts` — the `new AuthBroker(…)` site | `IAuthBrokerFactoryConfig.createBroker?` | `(...args: ConstructorParameters<typeof AuthBroker>) => AuthBroker` | `(...a) => new AuthBroker(...a)` | the 5 `auth-broker` suites |
-| S7 | awaiting approval | `server-runtime/src/stdio/auth/browser.ts` — the browser factories it calls | an option of the browser choice, reached from the launcher's options | the factories' own types (`typeof linuxDefaultBrowser`, …) | auth-providers' factories | `stdio/…/launcherDestination` |
-| S8 | awaiting approval | `src/lib/connectionFactory.ts` — `createAbapConnection` | none: the spec handed to `createConnection` is extracted into a pure exported function the tests call directly; the chain test uses S2 with a factory that records the settings | — | — | `config/rfcMessageServer`, `rfcWireLogging`, `stdio/…/rfcMessageServerChain` |
+| S6 | approved | `server-runtime/src/stdio/auth/brokerFactory.ts` — the `new AuthBroker(…)` site | `IAuthBrokerFactoryConfig.createBroker?` | `(...args: ConstructorParameters<typeof AuthBroker>) => AuthBroker` | `(...a) => new AuthBroker(...a)` | the 5 `auth-broker` suites |
+| S7 | approved | `server-runtime/src/stdio/auth/browser.ts` — the browser factories it calls | an option of the browser choice, reached from the launcher's options | the factories' own types (`typeof linuxDefaultBrowser`, …) | auth-providers' factories | `stdio/…/launcherDestination` |
+| S8 | approved | `src/lib/connectionFactory.ts` — `createAbapConnection` | none: the spec handed to `createConnection` is extracted into a pure exported function the tests call directly; the chain test uses S2 with a factory that records the settings | — | — | `config/rfcMessageServer`, `rfcWireLogging`, `stdio/…/rfcMessageServerChain` |
 | S9 | approved | `src/lib/httpTransport/headerSource.ts` — its `credentialFromHeaders` call | an option of the header source | `typeof credentialFromHeaders` | the real function | `http/…/cancel/cancelBeforeTool`, `sse/…/cancel/cancelBeforeTool`, `embeddable/connectionContext` |
 | S10 | approved | the handler entries of the compact routers and the read-only group (where `handleSearchSource`, `handleActivateObjectOnce` and the read handlers are bound) | an option of the group: the handler functions it binds | the handlers' own types | the real handlers | `searchStrategies` (3), `strategyRoutesServed`, `compactActivateTypes`, `compactSearchData` |
 | S11 | approved | `src/handlers/system/readonly/handleSearchSource.ts` — its `runSearchSourceWithContext` call | an option of the handler's context | `typeof runSearchSourceWithContext` | the real function | `searchSourceRfc` |
 | S12 | approved | `src/handlers/package/high/handleDeletePackage.ts` — its `openFreshConnection`, `closeQuietly` and `answer` calls | S2b for the connection; `answer` left real | — | — | `deletePackageSchema` |
-| S13 | awaiting approval | `src/lib/instance.ts` — the label computed at load | the label as a pure exported function of an `isSea` | `() => boolean` | `node:sea`'s `isSea` | `libInstance` |
+| S13 | approved | `src/lib/instance.ts` — the label computed at load | the label as a pure exported function of an `isSea` | `() => boolean` | `node:sea`'s `isSea` | `libInstance` |
 | S14 | approved | `server-runtime/src/{http,sse,stdio}` servers' fallback version | a constructor option of the runtime classes: the version answered when none is given; the http, sse and server classes pass their own (§10 decision 9) | `string` | the runtime's `RUNTIME_VERSION` | `http`, `server`, `sse` `exports` |
 | S15 | approved if measured necessary | the stdio server's output stream | option `stdout?`, only if the plan measures that spying on `process.stdout.write` disturbs the runner (§9) | `NodeJS.WritableStream` | `process.stdout` | the 7 suites of §1, "Process output" |
 | S16 | **not added** | `src/lib/state/InstanceState.ts` — the idle timer (`setTimeout` at line 269) | not added: the real-time advance helper serves these suites (§3.7, §10 decision 8) | `Pick<typeof globalThis, 'setTimeout' \| 'clearTimeout'>` | `globalThis` | `pooledInstance`, `undoFailsLogoff` |
@@ -652,8 +651,10 @@ own proposal):
 14. **The ledger scan's Jest forms** are removed at the end, with their Jest-only fixtures
     (§5).
 
-**Still open:** the seams S3, S4, S6, S7, S8 and S13 (§7) were not part of these decisions;
-each waits for the owner's approval before its commit.
+15. **The remaining seams are approved:** S3, S4, S6, S7, S8 and S13 (§7).
+
+**Still open:** nothing but what the plan measures — S15 is added only if the plan's
+measurement shows it necessary (decision 13).
 
 **This spec's own decisions**, for the review to check:
 

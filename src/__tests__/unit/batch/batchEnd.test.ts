@@ -182,7 +182,7 @@ describe('BatchEnd', () => {
     await sent;
     const [, taken] = s.built;
     expect(s.built).toHaveLength(2);
-    expect(recording?.connection.disconnect).toHaveBeenCalledTimes(1);
+    expect(recording?.calls.disconnect).toBe(1);
     // While the envelope runs, SAP ends BatchEnd's session too: the next
     // call replaces it, and BatchEnd holds its use, so no logoff comes
     // under it.
@@ -193,14 +193,14 @@ describe('BatchEnd', () => {
     });
     await new Promise((r) => setImmediate(r));
     expect(s.built).toHaveLength(3);
-    expect(taken?.connection.disconnect).not.toHaveBeenCalled();
+    expect(taken?.calls.disconnect).toBe(0);
     release();
     const { summary } = await ending;
     expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
     await later;
     expect(recording?.envelopes).toEqual([]);
     expect(taken?.envelopes).toHaveLength(1);
-    expect(taken?.connection.disconnect).toHaveBeenCalledTimes(1);
+    expect(taken?.calls.disconnect).toBe(1);
     await s.close();
   });
 

@@ -49,9 +49,9 @@ describe('the transport creates in a batch', () => {
         message: batchNotRecordableWords(tool),
       });
       expect(s.owner.opened()?.recorded ?? []).toEqual([]);
-      expect(
-        s.built.map((b) => b.connection.makeAdtRequest.mock.calls.length),
-      ).toEqual(s.built.map(() => 0));
+      expect(s.built.map((b) => b.calls.makeAdtRequest.length)).toEqual(
+        s.built.map(() => 0),
+      );
       expect(s.executes).not.toHaveBeenCalled();
       await s.close();
     },

@@ -452,13 +452,10 @@ async function sequentialWithThrown(
   labels: string[],
 ) {
   const fake = system();
-  const answering = fake.connection.makeAdtRequest.getMockImplementation();
-  fake.connection.makeAdtRequest.mockImplementation(
-    async (request: IAbapRequestOptions) => {
-      if (labels.includes(directLabel(request))) throw credential();
-      return (answering as NonNullable<typeof answering>)(request);
-    },
-  );
+  fake.answerRequests(async (request, previous) => {
+    if (labels.includes(directLabel(request))) throw credential();
+    return previous(request);
+  });
   return withinTurns(handler(contextOn(fake, 'absent'), args), TURNS);
 }
 
@@ -796,7 +793,7 @@ describe('GetWhereUsed', () => {
     ).rejects.toBeInstanceOf(AuthRefusedError);
     await rejected;
     const sequential = system();
-    sequential.connection.makeAdtRequest.mockImplementation(async () => {
+    sequential.answerRequests(async () => {
       throw credential();
     });
     await expect(

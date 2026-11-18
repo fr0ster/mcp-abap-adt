@@ -466,7 +466,7 @@ describe.each(SETS)('the debugger batch, %s set', (set) => {
     // The stop as it was: the same stop, the same view, its connection open.
     expect(session.current).toBe(stopBefore);
     expect(session.current?.view).toEqual(viewBefore);
-    expect(s.stopConnection().connection.disconnect).not.toHaveBeenCalled();
+    expect(s.stopConnection().calls.disconnect).toBe(0);
   });
 
   it("after the end the debug session opens from the call's own connection, and an ordinary debugger call that opens a connection succeeds", async () => {

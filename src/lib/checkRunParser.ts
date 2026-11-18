@@ -1,4 +1,8 @@
 import { XMLParser } from 'fast-xml-parser';
+import {
+  messageLocation,
+  type SourceMessage,
+} from './strategies/sourceMessages';
 import { parseXml } from './xml/node';
 import {
   child,
@@ -13,24 +17,9 @@ export interface ParsedCheckRunResult {
   success: boolean;
   status: string;
   message: string;
-  errors: Array<{
-    type: string;
-    text: string;
-    line?: string | number | undefined;
-    href?: string | undefined;
-  }>;
-  warnings: Array<{
-    type: string;
-    text: string;
-    line?: string | number | undefined;
-    href?: string | undefined;
-  }>;
-  info: Array<{
-    type: string;
-    text: string;
-    line?: string | number | undefined;
-    href?: string | undefined;
-  }>;
+  errors: SourceMessage[];
+  warnings: SourceMessage[];
+  info: SourceMessage[];
   total_messages: number;
   has_errors: boolean;
   has_warnings: boolean;
@@ -121,22 +110,23 @@ export function parseCheckRunResponse(response: {
           shortText ||
           '',
       );
-      const line = child(msg, '@_line') || child(msg, 'line');
+      // Where a message stands is its uri's `#start=`: a check message
+      // carries no line of its own (`messageLocation`).
       const href =
         child(msg, '@_chkrun:uri') ||
         child(msg, '@_href') ||
         child(msg, 'href');
+      const code = child(msg, '@_chkrun:code') || child(msg, '@_code');
 
       const bucket =
         msgType === 'E' ? errors : msgType === 'W' ? warnings : info;
       bucket.push({
         type: msgType,
         text,
-        line:
-          typeof line === 'string' || typeof line === 'number'
-            ? line
-            : undefined,
-        href: typeof href === 'string' ? href : undefined,
+        ...messageLocation({
+          href: typeof href === 'string' ? href : undefined,
+          code: typeof code === 'string' ? code : undefined,
+        }),
       });
     });
 

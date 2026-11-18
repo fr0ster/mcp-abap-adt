@@ -38,6 +38,10 @@ import {
   NAME_TAKEN_KEYS,
 } from './messageKeys';
 import { endConnection } from './ownedConnections.js';
+import {
+  messageLocation,
+  type SourceMessage,
+} from './strategies/sourceMessages';
 import { methodFailureOf, payloadCarriedBy } from './strategies/step';
 import { getSystemContext } from './systemContext';
 import { type AbapSystemKind, statedSystemKind } from './systemKind';
@@ -1141,14 +1145,13 @@ export function parseActivationResponse(responseData: unknown) {
     const activated = isTrue(nodeChild(properties, '@_activationExecuted'));
     const checked = isTrue(nodeChild(properties, '@_checkExecuted'));
     const generated = isTrue(nodeChild(properties, '@_generationExecuted'));
-    const messages: Array<{
-      type: string;
-      text: string;
-      line?: number | undefined;
-      column?: number | undefined;
-    }> = [];
-    const numberOrNone = (value: XmlRead) =>
-      typeof value === 'number' ? value : undefined;
+    // A message's `line` attribute is its ordinal, not a source line: where
+    // it stands is its `href` (`messageLocation`).
+    const messages: Array<SourceMessage> = [];
+    const stated = (value: XmlRead) =>
+      typeof value === 'string' || typeof value === 'number'
+        ? String(value)
+        : undefined;
     const msgData = nodeAt(result, 'chkl:messages', 'msg');
     if (msgData) {
       for (const msg of nodeList(msgData)) {
@@ -1158,8 +1161,11 @@ export function parseActivationResponse(responseData: unknown) {
           text: String(
             nodeChild(shortText, 'txt') || shortText || 'Unknown message',
           ),
-          line: numberOrNone(nodeChild(msg, '@_line')),
-          column: numberOrNone(nodeChild(msg, '@_column')),
+          ...messageLocation({
+            href: stated(nodeChild(msg, '@_href')),
+            object: stated(nodeChild(msg, '@_objDescr')),
+            code: stated(nodeChild(msg, '@_code')),
+          }),
         });
       }
     }

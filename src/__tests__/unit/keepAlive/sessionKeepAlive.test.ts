@@ -24,7 +24,11 @@ import type {
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { endConnection } from '../../../lib/ownedConnections';
-import { SESSION_KEEP_ALIVE_URL } from '../../../lib/sessionKeepAlive';
+import {
+  SESSION_KEEP_ALIVE_FAILED_WORDS,
+  SESSION_KEEP_ALIVE_URL,
+  sendSessionKeepAlive,
+} from '../../../lib/sessionKeepAlive';
 import {
   type AdtStandIn,
   adtStandIn,
@@ -75,10 +79,23 @@ const lose: HandlerEntry = {
   }) as never,
 } as unknown as HandlerEntry;
 
+/** `Stateful {}`: leaves its connection in the stateful mode, as a held lock does. */
+const stateful: HandlerEntry = {
+  toolDefinition: {
+    name: 'Stateful',
+    description: 'leaves its connection stateful',
+    inputSchema: z.object({}),
+  },
+  call: (async (context: { connection: IAbapConnection }) => {
+    context.connection.setSessionType('stateful');
+    return { content: [{ type: 'text', text: 'stateful' }] };
+  }) as never,
+} as unknown as HandlerEntry;
+
 const group: IHandlerGroup = {
   getName: () => 'keep-alive',
   registerHandlers: () => {},
-  getHandlers: () => [touch, lose],
+  getHandlers: () => [touch, lose, stateful],
 } as unknown as IHandlerGroup;
 
 class KeepAliveServer extends BaseMcpServer {
@@ -331,6 +348,121 @@ describe('the session keep-alive', () => {
     }
   });
 
+  it('a ping due while a call runs waits for it in the main flow, and goes stateless', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      const held = s.standIn.hold((r) => r.url === `${TOUCH_PATH}long`);
+      const running = call(s, 'long');
+      await held.arrived;
+      // The first tick sees the call's request; the second finds nothing
+      // new and is due while the call still runs: it waits for its turn.
+      mock.timers.tick(INTERVAL);
+      await settle();
+      mock.timers.tick(INTERVAL);
+      await settle();
+      assert.equal(pings(s.standIn).length, 0, 'not beside the running call');
+      held.release();
+      await running;
+      await until(() => pings(s.standIn).length === 1);
+      const ping = pings(s.standIn)[0];
+      assert.notEqual(ping?.sessionType, 'stateful');
+      assert.ok(
+        (ping === undefined ? -1 : s.standIn.requests.indexOf(ping)) >
+          s.standIn.requests.findIndex((r) => r.url === `${TOUCH_PATH}long`),
+      );
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('sends no ping while the connection is stateful (a lock held)', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      const answer = await s.session.callTool('Stateful', {});
+      assert.notEqual(answer.isError, true);
+      mock.timers.tick(3 * INTERVAL);
+      await settle();
+      assert.equal(pings(s.standIn).length, 0);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('pings an RFC connection after its logon, as an HTTP one', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      const connection = touched;
+      assert.ok(connection !== undefined);
+      // The connection states RFC: nothing changes for the keep-alive.
+      connection.getConfig = () => ({ connectionType: 'rfc' });
+      mock.timers.tick(INTERVAL);
+      await settle();
+      mock.timers.tick(INTERVAL);
+      await until(() => pings(s.standIn).length === 1);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('keeps one tick chain when a connection is born while a ping is pending', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      mock.timers.tick(INTERVAL);
+      await settle();
+      const held = s.standIn.hold(isPing);
+      const arms = countArms();
+      mock.timers.tick(INTERVAL);
+      await held.arrived;
+      // SAP lost the session: the next call builds a new connection,
+      // born while the ping is still pending.
+      const first = touched;
+      assert.ok(first !== undefined);
+      first.isConnected = () => false;
+      const next = call(s, 'b');
+      // The new connection is born (its connect answered) while the ping
+      // holds the main flow.
+      const before = s.standIn.requests.length;
+      await until(() => s.standIn.requests.length > before);
+      await settle(200);
+      assert.equal(arms.count(), 0, 'no second chain while the tick runs');
+      held.release();
+      await next;
+      await settle();
+      assert.equal(arms.count(), 1, 'the tick re-arms once');
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('the close aborts a pending ping, and nothing arms again', async () => {
+    const s = await stand();
+    const held = s.standIn.hold(isPing);
+    try {
+      await call(s, 'a');
+      mock.timers.tick(INTERVAL);
+      await settle();
+      const arms = countArms();
+      mock.timers.tick(INTERVAL);
+      await held.arrived;
+      // The close does not wait for SAP's answer to the ping: the tick ends.
+      const closing = s.server.close();
+      await settle();
+      mock.timers.tick(5 * INTERVAL);
+      await settle();
+      assert.equal(arms.count(), 0);
+      assert.equal(pings(s.standIn).length, 1);
+      held.release();
+      await closing;
+    } finally {
+      held.release();
+      await s.close();
+    }
+  });
+
   it('pings no injected connection', async () => {
     const s = await stand({ source: 'injected' });
     try {
@@ -461,5 +593,36 @@ describe('the session keep-alive timer, on the real clock', () => {
         /Invalid sessionKeepAliveMs/,
       );
     }
+  });
+});
+
+describe('the ping’s failure line', () => {
+  it('reads the status from the failure, or from its cause', async () => {
+    const lines: string[] = [];
+    const logger = {
+      info() {},
+      warn() {},
+      error() {},
+      debug: (line: string) => {
+        lines.push(line);
+      },
+    };
+    const failing = (thrown: unknown): IAbapConnection =>
+      ({
+        makeAdtRequest: async () => {
+          throw thrown;
+        },
+      }) as unknown as IAbapConnection;
+    await sendSessionKeepAlive(failing({ response: { status: 503 } }), logger);
+    await sendSessionKeepAlive(
+      failing({ cause: { response: { status: 401 } } }),
+      logger,
+    );
+    await sendSessionKeepAlive(failing(new Error('no status')), logger);
+    assert.deepEqual(lines, [
+      `${SESSION_KEEP_ALIVE_FAILED_WORDS}: status 503`,
+      `${SESSION_KEEP_ALIVE_FAILED_WORDS}: status 401`,
+      `${SESSION_KEEP_ALIVE_FAILED_WORDS}: status none`,
+    ]);
   });
 });

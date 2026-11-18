@@ -370,6 +370,12 @@ export abstract class BaseMcpServer extends McpServer {
   /** The close stopped the keep-alive: no tick arms it again. */
   private keepAliveStopped = false;
 
+  /** A tick is running: its end arms the next one, nothing else does. */
+  private keepAliveTicking = false;
+
+  /** Aborted by the close: a pending ping is waited for no longer. */
+  private readonly keepAliveClose = new AbortController();
+
   /** The held connection and its request mark, as the previous tick saw them. */
   private keepAliveSeen: { connection: object; mark: number } | undefined;
 
@@ -775,6 +781,7 @@ export abstract class BaseMcpServer extends McpServer {
 
   private stopKeepAlive(): void {
     this.keepAliveStopped = true;
+    this.keepAliveClose.abort();
     if (this.keepAliveTimer !== undefined) clearTimeout(this.keepAliveTimer);
     this.keepAliveTimer = undefined;
   }
@@ -787,7 +794,8 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private armKeepAlive(): void {
     if (this.keepAliveStopped || this.keepAliveMs === 0) return;
-    if (this.keepAliveTimer !== undefined) return; // one at a time
+    // One tick chain: none beside a pending timer or a running tick.
+    if (this.keepAliveTimer !== undefined || this.keepAliveTicking) return;
     this.keepAliveTimer = setTimeout(() => {
       this.keepAliveTimer = undefined;
       void this.keepAliveTick();
@@ -804,6 +812,7 @@ export abstract class BaseMcpServer extends McpServer {
    * host's.
    */
   private async keepAliveTick(): Promise<void> {
+    this.keepAliveTicking = true;
     try {
       const connection = this.liveBuilt();
       const mark =
@@ -815,16 +824,42 @@ export abstract class BaseMcpServer extends McpServer {
       }
       const seen = this.keepAliveSeen;
       if (seen?.connection === connection && seen.mark === mark) {
-        // Never rejects: a failure is its debug line.
-        await sendSessionKeepAlive(connection, this.logger);
+        await this.pingInTurn(connection);
       }
       // After the ping settled, so the ping itself is not read as a request.
       this.keepAliveSeen = {
         connection,
         mark: requestMark(connection) ?? mark,
       };
+    } catch {
+      // The close aborted the wait: nothing more to do.
     } finally {
+      this.keepAliveTicking = false;
       if (this.liveBuilt() !== undefined) this.armKeepAlive();
+    }
+  }
+
+  /**
+   * The ping, in its own turn of the main flow — the serialisation tool
+   * calls use — so it never runs beside a call; sent only if, once the turn
+   * came, the connection is still the live one and not in the stateful
+   * mode (a lock held: its session is the lock's, and the ping is a
+   * stateless request). The close aborts the wait for the turn and for the
+   * answer; no deadline of the server's own.
+   */
+  private async pingInTurn(connection: IAbapConnection): Promise<void> {
+    const signal = this.keepAliveClose.signal;
+    const leave = await this.enterMainFlow(signal);
+    try {
+      if (this.liveBuilt() !== connection) return;
+      if (connection.getSessionMode?.() === 'stateful') return;
+      // Never rejects: a failure is its debug line.
+      await raceRequestSignal(
+        sendSessionKeepAlive(connection, this.logger),
+        signal,
+      );
+    } finally {
+      leave();
     }
   }
 

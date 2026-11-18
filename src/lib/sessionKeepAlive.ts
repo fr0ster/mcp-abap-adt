@@ -4,16 +4,22 @@
  * (a POST `403 CSRF token validation failed`, a LOCK `SESSION_REPLACED`).
  * A request now and then on the held connection lets the system see the
  * session is alive — a ping, like a WebSocket's ping-pong (the owner's fix).
+ * The credentials are accepted after the pause; what SAP ended is the ABAP
+ * user session.
  *
  * **A named exception to "no timers in production"** (the owner,
- * 2026-11-18): one background timer per server, `unref()`'d so it never
- * keeps the process alive, ticking every interval and stopped by the
+ * 2026-11-18): one `setTimeout` per server, `unref()`'d so it never keeps
+ * the process alive, re-armed after each tick settled, cleared at the
  * server's close. Each connection the server builds carries a request mark
  * (`withRequestMark`), bumped by every request; a tick that finds the held
  * connection's mark unchanged since the previous tick, and the connection
- * live, sends the ping through it. The ping is one stateless `GET` of the
- * ADT discovery, never retried; a failure is logged at `debug` in fixed
- * words with its status only.
+ * live, sends the ping through it in the main flow's turn. So the first
+ * ping comes one to two intervals after the last request. The ping is one
+ * ordinary `GET` of the ADT discovery on the server's own connection to
+ * SAP, HTTP or RFC alike: the mechanism starts when that connection logged
+ * on and stops when it is logged off, ended, spent or closed; it never
+ * opens a connection. The tick sends it
+ * once; a failure is logged at `debug` in fixed words with its status only.
  *
  * The interval is `--session-keep-alive-minutes` /
  * `MCP_SESSION_KEEP_ALIVE_MINUTES` / YAML `session-keep-alive-minutes`: a
@@ -161,11 +167,15 @@ export async function sendSessionKeepAlive(
   }
 }
 
-/** The HTTP status a failed request carries, if it is a number (read guarded). */
+/** The HTTP status a failed request or its cause carries, if a number (read guarded). */
 function statusOf(error: unknown): number | undefined {
   try {
-    const status = childAt(error, 'response', 'status');
-    return typeof status === 'number' ? status : undefined;
+    // The failure's own, else its cause's: a refusal the credential's
+    // answer wraps carries the wire's failure as its cause.
+    const own = childAt(error, 'response', 'status');
+    if (typeof own === 'number') return own;
+    const cause = childAt(error, 'cause', 'response', 'status');
+    return typeof cause === 'number' ? cause : undefined;
   } catch {
     return undefined;
   }

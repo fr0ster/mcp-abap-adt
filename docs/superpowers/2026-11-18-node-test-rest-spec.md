@@ -9,7 +9,7 @@ commits.
 
 Labels: **Measured** (counted or run, on `refactor/node-test-rest` at `90da705d`, its code
 equal to `main` at `8a9ed531`), **Code** (read in the source), **Inference**. Where the
-owner must decide, the item says **Owner decides** and is collected in §10.
+owner had to decide, the item names its decision of 2026-11-18, collected in §10.
 
 ## 0. Prior art
 
@@ -344,9 +344,8 @@ first wave's contract has it.
   `jest.mocked(x)` → the `Mock` held from where it was made. No cast is added for it.
 - **A spy on an export of this repository's own module** (the 8 suites of §1) becomes
   `mock.method` on that module's namespace object, as node:test files already do (§1), and
-  stays in the spies wave. **Owner decides** whether this counts as a module mock (§10,
-  question 1); if it does, those 8 suites move to the module-mock wave and use the seams of
-  §7 (S2, and new ones for `openFreshConnection`, `runLongCall`, `eligible`).
+  stays in the spies wave (owner, 2026-11-18, §10 decision 6). This holds for those 8
+  suites only: the 90 module-mock suites go through the injection points of §7.
 
 ### 3.7 Fake timers (the spike's results, as decided)
 
@@ -375,9 +374,8 @@ first wave's contract has it.
   - `http/…/shutdown/pooledInstance` (2 cases) and `unit/shutdown/undoFailsLogoff` run a
     real HTTP stand under fake time (Code). They get the helper's **real-time advance**:
     while the awaited work runs, fake time follows real time in small steps, which is what
-    sinon's `shouldAdvanceTime` does for Jest (Code). If the plan's measurement shows that
-    insufficient, the fallback is the injected clock S16 (§7). **Owner decides** between the
-    two before the wave (§10, question 3).
+    sinon's `shouldAdvanceTime` does for Jest (Code). No injected clock is added: S16 is
+    not added (owner, 2026-11-18, §10 decision 8).
 - **A missed timer fails, it does not hang.** With no runner timeout, a test that awaits a
   promise waiting on a fake timer that never fires would hang. Rule: a promise whose
   settling depends on a fake timer is never awaited directly while the timer may still be
@@ -474,7 +472,7 @@ each clause by a case that fails when the clause is broken.
 - **The ledger scan** (`unit/coverage/ledgerScan.ts`) drops its recognition of Jest's
   globals and the fixtures that exist only for Jest forms (`live-xit`, `live-xtest`,
   `pin-xdescribe`, and any other the plan finds), since a Jest global no longer compiles;
-  its node:test forms and their fixtures stay. **Owner decides** (§10, question 9).
+  its node:test forms and their fixtures stay (owner, 2026-11-18, §10 decision 14).
 - **npm scripts:** `test` = the build, then the runner with `--concurrency 2`; the
   sub-packages' `test` = `npm --prefix .. test -- --root <package>/src` (the runner's
   option); `test:check` unchanged. No shell prefix (goal).
@@ -520,50 +518,49 @@ guarantee has a Jest variant. For each:
 
 ## 7. The injection points, for the owner
 
-**Nothing below is added before the owner approves it, item by item.** Each is typed by the
+**Nothing below is added before the owner approves it, item by item.** The owner's
+decisions of 2026-11-18 (§10) approve S1 (option B), S2, S2b, S2c, S5 (both halves), S9,
+S10, S11, S12 and S14; S15 is approved only if the plan's measurement shows it necessary;
+S16 is not added. S3, S4, S6, S7, S8 and S13 were not part of those decisions and still
+wait for the owner's approval before their commits. Each is typed by the
 real module's contract, defaults to the real module, and adds no cast, `any`, `!` or
 `ts-ignore` in production. The plan confirms, before a seam's commit, that each suite named
 reaches the production site named (by a deliberate break of the seam, §8). Where a suite can
 prove the same without a seam, that is offered as the alternative.
 
-| # | Production file / function | Parameter or option | Type | Default | Suites |
-|---|---|---|---|---|---|
-| S1 | `src/lib/clients.ts` — `adtClientOf`, `createAdtClient`, `createOnPremAdtClient`, `createOnPremExecutor`, `variantOf` | **(A)** `HandlerContext.adtClients?` in `src/handlers/interfaces.ts`, read at each call site; or **(B)** clients supplied for one connection, read by `adtClientOf` before building | (A) `Pick<typeof import('lib/clients'), 'adtClientOf' \| 'createAdtClient' \| 'createOnPremAdtClient' \| 'createOnPremExecutor' \| 'variantOf'>`; (B) `ServerAdtClient` (and the executor's type) keyed by the connection object | the real functions | the 40 of Appendix A, `lib/clients` |
-| S2 | `src/embeddable/BaseMcpServer.ts` — `connectedLogon`, `resumedSession`, `logoffLeftover` | option `connectionFactory?` of the server's options, passed through by the stdio, HTTP and SSE servers | `typeof createAbapConnection` | `createAbapConnection` | the 20 of Appendix A, `connectionFactory`, less those S2b/S2c serve alone |
-| S2b | `src/lib/packageSessions.ts` — `openFreshConnection` | the factory that built the original, carried in its `ConnectionRecord` (`siblingRecordOf`), so a sibling is built by the same factory | `typeof createAbapConnection` | `createAbapConnection` | `unit/packageSessions`, `unit/connectionEnds`, `unit/batch/*` that mock `siblingRecordOf` |
-| S2c | `src/lib/utils.ts` — `setConfigOverride`, the fallback of `getManagedConnection` | an optional last parameter of `setConfigOverride`, kept for the cache's rebuilds | `typeof createAbapConnection` | `createAbapConnection` | `unit/connectionEnds` |
-| S3 | `src/lib/clients.ts` — new `runtimeClientOf`, `executorOf`; the 13 handler files that do `new AdtRuntimeClient(…)` and the 7 that do `new AdtExecutor(…)` (`src/lib/debugger/ports.ts`, `handlers/unit_test/shared/*`, …) call them | served by S1 (A or B) | `(connection, logger?) => AdtRuntimeClient` / `AdtExecutor` | the real constructors | `atcTools`, `dumpFeedPagingAndFilters`, `runtimeReadersFixRound1`, `runtimeProfiling`, `staticSequences`, `readonlySingleCall` (its `runTests.testRunner` mock) |
-| S4 | `src/lib/clients.ts` — `adtClientOf` | an optional parameter: the client classes it builds from | `{ onprem: typeof AdtClientOnPrem; cloud: typeof AdtClientCloud }` | the shipped classes | `masterLanguageHeaderLeak`, `responsibleRequestScope`, `responsible-rules/…/requestSystemResolution` (all read the options a client was constructed with) |
-| S5 | `src/lib/requestSystemResolution.ts` (caller of `readSystemInformation`) and `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts` (caller of adt-clients' `getSystemInformation`) | an option of the resolution, and of the handler's context | `typeof readSystemInformation` / `typeof getSystemInformation` | the real functions | `systemContextRequired` (2), `requestSystemResolution`, `embeddable/connectionContext`, `serviceBindingPreviewUrl` |
-| S6 | `server-runtime/src/stdio/auth/brokerFactory.ts` — the `new AuthBroker(…)` site | `IAuthBrokerFactoryConfig.createBroker?` | `(...args: ConstructorParameters<typeof AuthBroker>) => AuthBroker` | `(...a) => new AuthBroker(...a)` | the 5 `auth-broker` suites |
-| S7 | `server-runtime/src/stdio/auth/browser.ts` — the browser factories it calls | an option of the browser choice, reached from the launcher's options | the factories' own types (`typeof linuxDefaultBrowser`, …) | auth-providers' factories | `stdio/…/launcherDestination` |
-| S8 | `src/lib/connectionFactory.ts` — `createAbapConnection` | none: the spec handed to `createConnection` is extracted into a pure exported function the tests call directly; the chain test uses S2 with a factory that records the settings | — | — | `config/rfcMessageServer`, `rfcWireLogging`, `stdio/…/rfcMessageServerChain` |
-| S9 | `src/lib/httpTransport/headerSource.ts` — its `credentialFromHeaders` call | an option of the header source | `typeof credentialFromHeaders` | the real function | `http/…/cancel/cancelBeforeTool`, `sse/…/cancel/cancelBeforeTool`, `embeddable/connectionContext` |
-| S10 | the handler entries of the compact routers and the read-only group (where `handleSearchSource`, `handleActivateObjectOnce` and the read handlers are bound) | an option of the group: the handler functions it binds | the handlers' own types | the real handlers | `searchStrategies` (3), `strategyRoutesServed`, `compactActivateTypes`, `compactSearchData` |
-| S11 | `src/handlers/system/readonly/handleSearchSource.ts` — its `runSearchSourceWithContext` call | an option of the handler's context | `typeof runSearchSourceWithContext` | the real function | `searchSourceRfc` |
-| S12 | `src/handlers/package/high/handleDeletePackage.ts` — its `openFreshConnection`, `closeQuietly` and `answer` calls | S2b for the connection; `answer` left real | — | — | `deletePackageSchema` |
-| S13 | `src/lib/instance.ts` — the label computed at load | the label as a pure exported function of an `isSea` | `() => boolean` | `node:sea`'s `isSea` | `libInstance` |
-| S14 | `server-runtime/src/{http,sse,stdio}` servers' fallback version | **none proposed**; see §10, question 4 | — | — | `http`, `server`, `sse` `exports` |
-| S15 | the stdio server's output stream | option `stdout?`, only if the plan measures that spying on `process.stdout.write` disturbs the runner (§9) | `NodeJS.WritableStream` | `process.stdout` | the 7 suites of §1, "Process output" |
-| S16 | `src/lib/state/InstanceState.ts` — the idle timer (`setTimeout` at line 269) | option `timers?`, only if the real-time advance is not chosen (§3.7) | `Pick<typeof globalThis, 'setTimeout' \| 'clearTimeout'>` | `globalThis` | `pooledInstance`, `undoFailsLogoff` |
+| # | Status | Production file / function | Parameter or option | Type | Default | Suites |
+|---|---|---|---|---|---|---|
+| S1 | approved | `src/lib/clients.ts` — `adtClientOf`, `createAdtClient`, `createOnPremAdtClient`, `createOnPremExecutor`, `variantOf` | **(B)**, chosen: clients supplied for one connection, read by `adtClientOf` before building (option (A), a `HandlerContext.adtClients?` field read at each call site, not taken) | `ServerAdtClient` (and the executor's type) keyed by the connection object | the real functions | the 40 of Appendix A, `lib/clients` |
+| S2 | approved | `src/embeddable/BaseMcpServer.ts` — `connectedLogon`, `resumedSession`, `logoffLeftover` | option `connectionFactory?` of the server's options, passed through by the stdio, HTTP and SSE servers | `typeof createAbapConnection` | `createAbapConnection` | the 20 of Appendix A, `connectionFactory`, less those S2b/S2c serve alone |
+| S2b | approved | `src/lib/packageSessions.ts` — `openFreshConnection` | the factory that built the original, carried in its `ConnectionRecord` (`siblingRecordOf`), so a sibling is built by the same factory | `typeof createAbapConnection` | `createAbapConnection` | `unit/packageSessions`, `unit/connectionEnds`, `unit/batch/*` that mock `siblingRecordOf` |
+| S2c | approved | `src/lib/utils.ts` — `setConfigOverride`, the fallback of `getManagedConnection` | an optional last parameter of `setConfigOverride`, kept for the cache's rebuilds | `typeof createAbapConnection` | `createAbapConnection` | `unit/connectionEnds` |
+| S3 | awaiting approval | `src/lib/clients.ts` — new `runtimeClientOf`, `executorOf`; the 13 handler files that do `new AdtRuntimeClient(…)` and the 7 that do `new AdtExecutor(…)` (`src/lib/debugger/ports.ts`, `handlers/unit_test/shared/*`, …) call them | served by S1 (B) | `(connection, logger?) => AdtRuntimeClient` / `AdtExecutor` | the real constructors | `atcTools`, `dumpFeedPagingAndFilters`, `runtimeReadersFixRound1`, `runtimeProfiling`, `staticSequences`, `readonlySingleCall` (its `runTests.testRunner` mock) |
+| S4 | awaiting approval | `src/lib/clients.ts` — `adtClientOf` | an optional parameter: the client classes it builds from | `{ onprem: typeof AdtClientOnPrem; cloud: typeof AdtClientCloud }` | the shipped classes | `masterLanguageHeaderLeak`, `responsibleRequestScope`, `responsible-rules/…/requestSystemResolution` (all read the options a client was constructed with) |
+| S5 | approved | `src/lib/requestSystemResolution.ts` (caller of `readSystemInformation`) and `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts` (caller of adt-clients' `getSystemInformation`) | an option of the resolution, and of the handler's context | `typeof readSystemInformation` / `typeof getSystemInformation` | the real functions | `systemContextRequired` (2), `requestSystemResolution`, `embeddable/connectionContext`, `serviceBindingPreviewUrl` |
+| S6 | awaiting approval | `server-runtime/src/stdio/auth/brokerFactory.ts` — the `new AuthBroker(…)` site | `IAuthBrokerFactoryConfig.createBroker?` | `(...args: ConstructorParameters<typeof AuthBroker>) => AuthBroker` | `(...a) => new AuthBroker(...a)` | the 5 `auth-broker` suites |
+| S7 | awaiting approval | `server-runtime/src/stdio/auth/browser.ts` — the browser factories it calls | an option of the browser choice, reached from the launcher's options | the factories' own types (`typeof linuxDefaultBrowser`, …) | auth-providers' factories | `stdio/…/launcherDestination` |
+| S8 | awaiting approval | `src/lib/connectionFactory.ts` — `createAbapConnection` | none: the spec handed to `createConnection` is extracted into a pure exported function the tests call directly; the chain test uses S2 with a factory that records the settings | — | — | `config/rfcMessageServer`, `rfcWireLogging`, `stdio/…/rfcMessageServerChain` |
+| S9 | approved | `src/lib/httpTransport/headerSource.ts` — its `credentialFromHeaders` call | an option of the header source | `typeof credentialFromHeaders` | the real function | `http/…/cancel/cancelBeforeTool`, `sse/…/cancel/cancelBeforeTool`, `embeddable/connectionContext` |
+| S10 | approved | the handler entries of the compact routers and the read-only group (where `handleSearchSource`, `handleActivateObjectOnce` and the read handlers are bound) | an option of the group: the handler functions it binds | the handlers' own types | the real handlers | `searchStrategies` (3), `strategyRoutesServed`, `compactActivateTypes`, `compactSearchData` |
+| S11 | approved | `src/handlers/system/readonly/handleSearchSource.ts` — its `runSearchSourceWithContext` call | an option of the handler's context | `typeof runSearchSourceWithContext` | the real function | `searchSourceRfc` |
+| S12 | approved | `src/handlers/package/high/handleDeletePackage.ts` — its `openFreshConnection`, `closeQuietly` and `answer` calls | S2b for the connection; `answer` left real | — | — | `deletePackageSchema` |
+| S13 | awaiting approval | `src/lib/instance.ts` — the label computed at load | the label as a pure exported function of an `isSea` | `() => boolean` | `node:sea`'s `isSea` | `libInstance` |
+| S14 | approved | `server-runtime/src/{http,sse,stdio}` servers' fallback version | a constructor option of the runtime classes: the version answered when none is given; the http, sse and server classes pass their own (§10 decision 9) | `string` | the runtime's `RUNTIME_VERSION` | `http`, `server`, `sse` `exports` |
+| S15 | approved if measured necessary | the stdio server's output stream | option `stdout?`, only if the plan measures that spying on `process.stdout.write` disturbs the runner (§9) | `NodeJS.WritableStream` | `process.stdout` | the 7 suites of §1, "Process output" |
+| S16 | **not added** | `src/lib/state/InstanceState.ts` — the idle timer (`setTimeout` at line 269) | not added: the real-time advance helper serves these suites (§3.7, §10 decision 8) | `Pick<typeof globalThis, 'setTimeout' \| 'clearTimeout'>` | `globalThis` | `pooledInstance`, `undoFailsLogoff` |
 
 - **No seam:** `unit/coverage/realmCheckUrl` mocks a test helper (`integration/helpers/
-  realmCheck`), not production; its parameter is added there freely. `freshConnection`'s
-  watch of credential construction: either S2's factory records the credential it is handed
-  (the suite then proves the same credential object reused instead of "no provider
-  constructed") or a seam on credential construction — **Owner decides** (§10, question 5).
-- **S1, (A) or (B).** (A) is a declared field of every handler's context, read where the
-  client is built — explicit, but 289 call sites in 217 files change (Measured). (B) needs
-  no call site to change: one module, one lookup keyed by the connection object the test
-  owns — but it is a lookup, not a parameter. **Owner decides** (§10, question 2).
-- **Fewest seams.** If the owner answers question 1 so that a `mock.method` on an export of
-  this repository's own module is a spy, not a module mock, then S1, S2, S2b, S2c, S9, S10,
-  S11, S12 and S5's `readSystemInformation` are not needed — every suite they serve
-  replaces a function of this repository's own modules after load (the plan confirms per
-  suite that the function is read through the exports object at call time, not bound at
-  load). What then remains are the third-party ones, whose exports cannot be replaced (§1):
-  S3/S4 (adt-clients classes), S5's `getSystemInformation`, S6, S7, S8; the load-time ones:
-  S13 (`node:sea`), S14 (a constant); and S15/S16 if chosen.
+  realmCheck`), not production; its parameter is added there freely. `freshConnection`
+  goes through S2: the factory records the credential it is handed, and the suite proves the
+  same credential object is reused, instead of "no provider constructed" — a change of what
+  is observed, named in its commit. No credential-construction seam (§10 decision 10).
+- **S1 is option (B)** (§10 decision 7): no call site changes; one module, one lookup keyed
+  by the connection object the test owns. Option (A) would have changed 289 call sites in
+  217 files (Measured).
+- **Own-module exports.** A `mock.method` on an export of this repository's own module is a
+  spy only in the 8 spies suites (§3.6); the 90 module-mock suites use the seams above,
+  S1, S2, S2b, S2c, S5, S9–S12 included, even where the function replaced is this
+  repository's own (§10 decision 6).
 
 ## 8. Proving nothing is weakened
 
@@ -602,8 +599,9 @@ prove the same without a seam, that is offered as the alternative.
 - **stdout under process isolation.** A file's process may report to the runner through
   stdout (Inference); a spy on `process.stdout.write` may then see or swallow the runner's
   writes. The plan measures on one of the 7 suites before their commit; S15 only if needed.
-- **`advanceTimers: true` over real HTTP** (§3.7): the real-time advance is not measured;
-  S16 is its fallback.
+- **`advanceTimers: true` over real HTTP** (§3.7): the real-time advance is not measured
+  yet; the plan measures it first. S16 is not added (§10 decision 8): if the helper falls
+  short, that goes back to the owner.
 - **`runAllTimersAsync`:** not measured (owner); the helper's loop is measured first.
 - **The async advance's cost** (§3.8): measured on the slowest suite.
 - **`deepStrictEqual` failures** where `toEqual` passed (§3.2): count unknown until the
@@ -633,35 +631,29 @@ prove the same without a seam, that is offered as the alternative.
 4. The debugger directory moves together (§3.7).
 5. The spike's cast in `fakes.ts` is not taken (§3.7).
 
-**Questions for the owner** (each with this spec's proposal):
+**The owner's decisions on the spec's questions** (2026-11-18, binding; each is the spec's
+own proposal):
 
-1. **Is a `mock.method` on an export of this repository's own module a module mock?**
-   node:test files already do it (Code). Proposal: it is a spy for the 8 spies suites
-   (§3.6). If the owner extends that to the module-mock suites that replace only an
-   own-module function, S1, S2, S2b, S2c, S9–S12 are not needed (§7, "Fewest seams").
-2. **S1: (A) a `HandlerContext` field, or (B) clients supplied per connection** (§7).
-   Proposal: (B), for its size; (A) if the owner wants the parameter form strictly.
-3. **The two suites over real HTTP with `advanceTimers: true`:** the real-time advance
-   helper, or the injected clock S16 (§3.7). Proposal: the helper, S16 only if measured
-   insufficient.
-4. **The `exports` suites' version check** (S14): today they mock `RUNTIME_VERSION` to tell
-   it from `HTTP_VERSION`, and both are `24.0.0` (Measured), so without a mock or a seam the
-   check cannot tell them apart. Options: (a) a seam — the runtime servers' fallback version
-   as a constructor option of the runtime class, the http/sse/server classes passing theirs;
-   (b) the suite asserts the answered version equals the package's own and states that it
-   cannot distinguish while the versions are equal — a weaker proof, named. Proposal: (a).
-5. **`freshConnection`**: prove "no credential constructed" with a seam on construction, or
-   "the same credential object reused" through S2 (§7). Proposal: through S2, named as a
-   change of what is observed.
-6. **Seams S5 and S10 versus answering on the wire.** `readSystemInformation` sends a
-   request the stand-in connection could answer; the search routes could be observed by
-   which strategy the real handler calls. Proposal: the seams, since the wire answers would
-   change what those suites prove.
-7. **Equality** (§3.2): `toEqual` → `deepStrictEqual` with stricter expected values; each
-   `not.toEqual` checked by hand. Proposal as written; the owner confirms no loose helper.
-8. **S15** (stdout): only if measured necessary. Proposal as written.
-9. **The ledger scan's Jest forms** go at the end, with their Jest-only fixtures (§5).
-   Proposal as written.
+6. **Own-module exports.** A `mock.method` on an export of this repository's own module
+   counts as a spy only in the 8 spies suites (§3.6). The 90 module-mock suites go through
+   typed injection points: S1, S2, S2b, S2c, S9–S12, and S5's `readSystemInformation` (§7).
+7. **S1 is option (B):** clients supplied per connection object, so only one module changes
+   (§7).
+8. **`advanceTimers: true` over real HTTP** (`pooledInstance`, `undoFailsLogoff`): a test
+   helper that advances fake time with real time (§3.7, §3.8). `closeWithBatch` gets explicit
+   advances. S16, the injected clock, is not added.
+9. **The `exports` suites** get the seam S14: a constructor option for the version (§7).
+10. **`freshConnection`** goes through S2: the test proves the same credential object is
+    reused. No separate credential seam (§7).
+11. **S5 and S10 are seams**, not answers on the wire (§7).
+12. **Equality** (§3.2): `toEqual` becomes `deepStrictEqual`, with expected values tightened
+    where needed; each `not.toEqual` is checked by hand. No loose-equality helper.
+13. **S15** (stdout) is added only if the plan measures it necessary (§7, §9).
+14. **The ledger scan's Jest forms** are removed at the end, with their Jest-only fixtures
+    (§5).
+
+**Still open:** the seams S3, S4, S6, S7, S8 and S13 (§7) were not part of these decisions;
+each waits for the owner's approval before its commit.
 
 **This spec's own decisions**, for the review to check:
 

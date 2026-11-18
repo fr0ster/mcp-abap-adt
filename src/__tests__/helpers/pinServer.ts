@@ -211,6 +211,8 @@ export function pinServer(
   variant: SystemKind,
   stand: AdtStandIn,
   setup?: PinSetup,
+  /** What the server logs at `info` goes here; nothing else is logged. */
+  info?: (message: string) => void,
 ): Promise<PinServer> {
   return inProcessServer(
     variant,
@@ -224,6 +226,8 @@ export function pinServer(
       credential: new BasicAuthProvider(PIN_USER, 'pin-password'),
     },
     setup,
+    {},
+    info,
   );
 }
 
@@ -237,6 +241,8 @@ export async function inProcessServer(
   source: ServerSource,
   setup?: PinSetup,
   restriction: ServerRestriction = {},
+  /** What the server logs at `info` goes here; nothing else is logged. */
+  info?: (message: string) => void,
 ): Promise<PinServer> {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pin-server-'));
   const runtime = path.join(dir, 'runtime');
@@ -259,7 +265,10 @@ export async function inProcessServer(
   const runs = new PinBackgroundRuns();
   const server = new PinMcpServer({
     name: 'pin-server',
-    logger: silent,
+    logger:
+      info === undefined
+        ? silent
+        : { ...silent, info: (message: string) => info(message) },
     systemType: variant,
     systemContextResolver: defaultSystemContextResolver,
     batch: new InstanceBatch({ keepRawParts: false }),

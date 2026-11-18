@@ -68,7 +68,11 @@ import {
   type BatchAvailability,
   createBatchAvailability,
 } from '../lib/batch/availability.js';
-import { endsBatch, runsBesideBatch } from '../lib/batch/batchTools.js';
+import {
+  endsBatch,
+  isBatchTool,
+  runsBesideBatch,
+} from '../lib/batch/batchTools.js';
 import { eligible } from '../lib/batch/eligibility.js';
 import { batchRefusal, endWithFailure } from '../lib/batch/execute.js';
 import type {
@@ -98,6 +102,7 @@ import {
   isDebuggerOwnConnectionTool,
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
+import { watchRequests } from '../lib/firstRequest.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import type {
   HandlerEntry,
@@ -264,6 +269,25 @@ function worksOnOwnConnection(
     inBackground ||
     (isLongTool(tool) && isLongRead(tool, args)) ||
     isDebuggerOwnConnectionTool(tool)
+  );
+}
+
+/** The line a repeated call logs: the call ran once more on a new connection. */
+export const REPEATED_CALL_WORDS =
+  "SAP refused the call's first request for its session token in a new session, before anything ran: the call runs once more on a new connection";
+
+/**
+ * Whether a call of `tool` may run once more after SAP refused its first
+ * request for its token in a new session: every tool on the instance's
+ * connection but a batch or long-session tool (one recorded call never
+ * becomes two; a session's state is its own) and a debugger tool (its own
+ * lifecycle). The debugger tools are the `Debug…`, `Amdp…`,
+ * `HandlerDebug…` and `MemorySnapshot…` names.
+ */
+export function repeatsOnTokenRefusal(tool: string): boolean {
+  if (runsBesideBatch(tool) || isBatchTool(tool)) return false;
+  return !['Debug', 'Amdp', 'HandlerDebug', 'MemorySnapshot'].some((prefix) =>
+    tool.startsWith(prefix),
   );
 }
 
@@ -1950,15 +1974,19 @@ export abstract class BaseMcpServer extends McpServer {
               // the connection is ready, after the system lookup — never
               // reaches the tool.
               const holdsFlow = leaveFlow !== undefined;
-              const resolved = <T>(fn: () => Promise<T>) =>
-                this.inHeldFlow(holdsFlow, context.connection, () =>
+              const resolvedOn = <T>(
+                on: HandlerContext,
+                known: ResolvedSystemContext | undefined,
+                fn: () => Promise<T>,
+              ) =>
+                this.inHeldFlow(holdsFlow, on.connection, () =>
                   runWithRequestSignal(signal, () =>
                     withDestinationSystemContext(
-                      this.statedContextOf(context.connection),
+                      this.statedContextOf(on.connection),
                       () =>
                         // Asked before the tool (`systemBeforeTool`):
                         // nothing is sent here.
-                        withKnownSystemContext(system, () => {
+                        withKnownSystemContext(known, () => {
                           throwIfRequestAborted(signal);
                           // The call's own transport request, for the
                           // failure renderer's transport hint.
@@ -1967,6 +1995,8 @@ export abstract class BaseMcpServer extends McpServer {
                     ),
                   ),
                 );
+              const resolved = <T>(fn: () => Promise<T>) =>
+                resolvedOn(context, system, fn);
               // Batch mode (read inside the call's turn): an eligible call is
               // recorded, every other refused — before any handler is chosen.
               if (this.batchOpenFor(entry.toolDefinition.name)) {
@@ -2017,14 +2047,72 @@ export abstract class BaseMcpServer extends McpServer {
               } else {
                 // On the instance's connection, a handler's failure is read
                 // by the instance first (`readAdtFailure`).
-                handlerPromise = resolved(() =>
-                  holdsFlow
-                    ? runWithAdtFailureReader(
-                        (failed) => this.readAdtFailure(failed),
-                        () => entry.call(context, handlerArgs),
-                      )
-                    : entry.call(context, handlerArgs),
-                );
+                const runOn = (
+                  on: HandlerContext,
+                  known: ResolvedSystemContext | undefined,
+                ) =>
+                  resolvedOn(on, known, () =>
+                    holdsFlow
+                      ? runWithAdtFailureReader(
+                          (failed) => this.readAdtFailure(failed),
+                          () => entry.call(on, handlerArgs),
+                        )
+                      : entry.call(on, handlerArgs),
+                  );
+                // The one repeat (the owner's named exception to "no
+                // retries", 24.0.1): a call on the instance's connection
+                // whose first request SAP refused for its token in a session
+                // SAP replaced (`watchRequests`), with no request of it
+                // answered, ran nothing; it runs once more, on the
+                // connection `getConnection` gives after that loss — its
+                // gates as for any call. Never a batch tool, a debugger
+                // tool or a long-session tool; background runs and long
+                // reads are not on this path.
+                const watch =
+                  holdsFlow && repeatsOnTokenRefusal(entry.toolDefinition.name)
+                    ? watchRequests(context.connection)
+                    : undefined;
+                handlerPromise = (async () => {
+                  let first: ToolResultLike;
+                  try {
+                    first = await runOn(context, system);
+                  } catch (thrown) {
+                    watch?.end();
+                    throw thrown;
+                  }
+                  if (watch?.end().refusedBeforeAnyRan !== true) return first;
+                  this.logger.info(REPEATED_CALL_WORDS, {
+                    tool: entry.toolDefinition.name,
+                  });
+                  inUse = undefined;
+                  this.connectionReleased(context.connection);
+                  const fresh = await this.getConnection(signal);
+                  inUse = fresh;
+                  const again = await this.systemBeforeTool(
+                    fresh,
+                    holdsFlow,
+                    signal,
+                    (taken) => {
+                      inUse = taken;
+                    },
+                  );
+                  declareSystemKind(again.connection, this.systemType);
+                  const availability = this.batchAvailabilityOf(
+                    again.connection,
+                  );
+                  const { batchAvailability: _old, ...rest } = context;
+                  return runOn(
+                    {
+                      ...rest,
+                      connection: again.connection,
+                      adtHeaders: this.adtHeadersOf(again.connection),
+                      ...(availability !== undefined
+                        ? { batchAvailability: availability }
+                        : {}),
+                    },
+                    again.system,
+                  );
+                })();
               }
 
               const result = await handlerPromise;

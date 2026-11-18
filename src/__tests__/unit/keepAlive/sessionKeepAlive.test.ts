@@ -50,18 +50,26 @@ const touch: HandlerEntry = {
   toolDefinition: {
     name: 'Touch',
     description: 'sends one request on its connection',
-    inputSchema: z.object({ id: z.string() }),
+    inputSchema: z.object({ id: z.string(), stateful: z.boolean().optional() }),
   },
   call: (async (
     context: { connection: IAbapConnection },
-    args: { id: string },
+    args: { id: string; stateful?: boolean },
   ) => {
     touched = context.connection;
-    await context.connection.makeAdtRequest({
-      url: `${TOUCH_PATH}${args.id}`,
-      method: 'GET',
-      timeout: 0,
-    });
+    // `stateful`: in the stateful session, as a LOCK is, the mode put back.
+    if (args.stateful === true) context.connection.setSessionType('stateful');
+    try {
+      await context.connection.makeAdtRequest({
+        url: `${TOUCH_PATH}${args.id}`,
+        method: 'GET',
+        timeout: 0,
+      });
+    } finally {
+      if (args.stateful === true) {
+        context.connection.setSessionType('stateless');
+      }
+    }
     return { content: [{ type: 'text', text: args.id }] };
   }) as never,
 } as unknown as HandlerEntry;
@@ -103,12 +111,18 @@ const twice: HandlerEntry = {
     context: { connection: IAbapConnection },
     args: { id: string },
   ) => {
-    for (const n of [1, 2]) {
-      await context.connection.makeAdtRequest({
-        url: `${TOUCH_PATH}${args.id}-${n}`,
-        method: 'GET',
-        timeout: 0,
-      });
+    // In the stateful session, as a LOCK and its UNLOCK are.
+    context.connection.setSessionType('stateful');
+    try {
+      for (const n of [1, 2]) {
+        await context.connection.makeAdtRequest({
+          url: `${TOUCH_PATH}${args.id}-${n}`,
+          method: 'GET',
+          timeout: 0,
+        });
+      }
+    } finally {
+      context.connection.setSessionType('stateless');
     }
     return { content: [{ type: 'text', text: args.id }] };
   }) as never,
@@ -252,8 +266,8 @@ function countArms(): { count(): number } {
   return { count: () => arms };
 }
 
-async function call(s: Stand, id: string): Promise<void> {
-  const answer = await s.session.callTool('Touch', { id });
+async function call(s: Stand, id: string, stateful = false): Promise<void> {
+  const answer = await s.session.callTool('Touch', { id, stateful });
   assert.notEqual(answer.isError, true, `Touch ${id} failed`);
 }
 
@@ -298,15 +312,31 @@ describe('the session keep-alive', () => {
     }
   });
 
-  it('sends no ping when a request went out in the interval', async () => {
+  it('sends no ping when a request in the stateful session went out in the interval', async () => {
     const s = await stand();
     try {
       for (let i = 0; i < 6; i += 1) {
-        await call(s, `c${i}`);
+        await call(s, `c${i}`, true);
         mock.timers.tick(INTERVAL);
         await settle();
       }
       assert.equal(pings(s.standIn).length, 0);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('stateless requests every few minutes do not hold the ping back', async () => {
+    const s = await stand();
+    try {
+      await call(s, 'a');
+      for (let i = 0; i < 4; i += 1) {
+        mock.timers.tick(5 * MINUTE);
+        await call(s, `s${i}`);
+        await settle();
+      }
+      // Twenty minutes, two ticks, stateless traffic only: one ping.
+      await until(() => pings(s.standIn).length === 1);
     } finally {
       await s.close();
     }

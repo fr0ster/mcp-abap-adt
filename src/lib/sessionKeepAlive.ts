@@ -11,7 +11,8 @@
  * 2026-11-18): one `setTimeout` per server, `unref()`'d so it never keeps
  * the process alive, re-armed after each tick settled, cleared at the
  * server's close. Each connection the server builds carries a request mark
- * (`withRequestMark`), bumped by every request; a tick that finds the held
+ * (`withRequestMark`), bumped by every request in the stateful session; a
+ * tick that finds the held
  * connection's mark unchanged since the previous tick, and the connection
  * live, sends the ping through it in the main flow's turn. So the first
  * ping comes one to two intervals after the last request. The ping is one
@@ -101,23 +102,30 @@ export function sessionKeepAliveMsOf(value: number, name: string): number {
   return value;
 }
 
-/** Each wrapped connection's request mark: how many requests went through it. */
+/** Each wrapped connection's request mark: how many requests went through it in its stateful session. */
 const marks = new WeakMap<object, number>();
 
 /**
  * Gives `connection` a request mark: its `makeAdtRequest` is replaced, on
- * the connection itself, by a thin wrapper that counts each request as it
- * goes out and sends it as before — nothing else. The connection stays the
- * same object (every record keyed by it still finds it). The server's
- * keep-alive reads the mark (`requestMark`) on each tick: a mark unchanged
- * since the previous tick is a connection with no request for the whole
+ * the connection itself, by a thin wrapper that counts each request sent in
+ * the stateful session as it goes out — the connection set stateful, the
+ * condition the connection itself sends a request stateful by (a LOCK, an
+ * UNLOCK, the debugger's stateful sends, the ping) — and sends every
+ * request as before; nothing else. A stateless request is not counted: it
+ * runs in a session of its own and keeps the stateful one alive no more
+ * (the owner). The connection stays the same object (every record keyed by
+ * it still finds it). The server's keep-alive reads the mark
+ * (`requestMark`) on each tick: a mark unchanged since the previous tick is
+ * a connection with no request in its stateful session for the whole
  * interval. Answers `connection`.
  */
 export function withRequestMark(connection: IAbapConnection): IAbapConnection {
   const send = connection.makeAdtRequest;
   marks.set(connection, 0);
   connection.makeAdtRequest = (request) => {
-    marks.set(connection, (marks.get(connection) ?? 0) + 1);
+    if (connection.getSessionMode?.() === 'stateful') {
+      marks.set(connection, (marks.get(connection) ?? 0) + 1);
+    }
     return send.call(connection, request);
   };
   return connection;

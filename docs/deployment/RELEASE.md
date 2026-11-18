@@ -174,7 +174,8 @@ so that no package goes out on top of a dependency that is missing.
   24 — install with `npm ci --ignore-scripts`, Biome lint (root and each package's `lint:check`),
   build, test type-check, tests, the server-runtime, server, http, sse, background-runs-memory and
   responsible-rules test type-check; on Ubuntu / Node 22 also `npm audit --omit=dev --audit-level=moderate`
-  (production dependencies; the whole tree again once the tests leave Jest, #361), `npm pack` of all eighteen packages, an install of
+  (production dependencies; the picomatch advisory reaches the tree only through jest, jest-util and
+  lint-staged, all dev only; the whole tree again once the tests leave Jest, #361), `npm pack` of all eighteen packages, an install of
   the tarballs (`--ignore-scripts`) that runs each of the twelve bins' `--version` and `--help`,
   the twelve Docker images built from those tarballs and checked (`scripts/ci/check-images.mjs`),
   and the Glama reference images (`docker/Dockerfile.inspect.onprem`, `docker/Dockerfile.inspect.cloud`) once their pinned `core` is on npm.

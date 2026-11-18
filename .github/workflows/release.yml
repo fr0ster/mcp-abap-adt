@@ -39,7 +39,8 @@ jobs:
 
       # As in ci.yml: any known advisory of moderate severity or above in a
       # production dependency stops the release (dev dependencies again once
-      # the tests leave Jest, #361).
+      # the tests leave Jest, #361: the picomatch advisory reaches the tree
+      # only through jest, jest-util and lint-staged, all dev only).
       - name: Security audit (moderate+)
         run: npm audit --omit=dev --audit-level=moderate
 

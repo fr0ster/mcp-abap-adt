@@ -216,7 +216,8 @@ jobs:
       # ship (production dependencies) fails the run. Dev dependencies are
       # audited again once the tests leave Jest (#361): the picomatch advisory
       # GHSA-fc5q-39xc-vjpf has no fixed release and reaches the tree only
-      # through jest and lint-staged (owner, 2026-11-18).
+      # through dev dependencies — jest, jest-util and lint-staged (owner,
+      # 2026-11-18).
       - name: Security audit (moderate+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=moderate

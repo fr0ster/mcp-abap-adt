@@ -31,7 +31,7 @@ Every step gates the run; none is `continue-on-error`.
 - `npm audit --omit=dev --audit-level=moderate` — every known advisory of moderate severity or above
   in a production dependency fails the run; dev dependencies are gated again once the tests leave
   Jest (#361), since the picomatch advisory GHSA-fc5q-39xc-vjpf has no fixed release and comes in
-  only through jest and lint-staged
+  only through dev dependencies: jest, jest-util and lint-staged
 - `npm pack` of all eighteen packages (`lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`,
   `compact-modify`, `server-runtime`, `http`, `sse`, `core`, `compact`, `compact-http`, `compact-sse`, `core-ro`,
   `http-ro`, `sse-ro`, `compact-ro`, `compact-http-ro`, `compact-sse-ro`)

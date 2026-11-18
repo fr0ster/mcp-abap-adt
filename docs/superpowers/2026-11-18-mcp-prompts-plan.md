@@ -580,8 +580,11 @@ target.
   `move_objects` reads through `HandlerGet` `TRANSPORT`, with `background: false` where
   listed. A step picks the entry by `name`, its `OBJECT_DIRECTORY_TYPE` and `pgmid`
   `R3TR`.
-- **Sending entries:** `pgmid` is always carried, and a `null` position is named to the
-  user and not sent.
+- **Sending entries:** each sent entry argument is named `ENTRY_ARGUMENT[readField]`, and
+  its value is `{ from: 'step', step: <the read>, field: readField }`. This holds at the top
+  level for `remove_object` and per entry for `move_objects`; no step names a sent entry
+  field itself. `pgmid` is always carried, and a `null` position is named to the user and
+  not sent.
 - **`add_object`** sends no `pgmid`.
 - **Compact `create`:** `HandlerTransportCreate`, else `HandlerCreate`
   `object_type: "TRANSPORT"`.
@@ -733,12 +736,26 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
 `backgroundRuns` on and off, with `stateHandleArgument` on HTTP.
 
 - [ ] Test, for every prompt, every served type or action and every instruction step:
+  - give every step an answer before the later steps read it. A step that reads transport
+    entries (`ReadTransportObjects`, or `HandlerGet` with `object_type: "TRANSPORT"`)
+    answers the fixed fixture `ENTRY_FIXTURE`. It is shaped like `ReadTransportObjects`' terse
+    answer: `{ objects: [ENTRY] }`, where `ENTRY` is the `ReadTransportEntry`
+    `{ pgmid: "LIMU", type: "METH", name: "ZCL_X=>M", position: "000001" }`. Every other
+    step answers nothing the test reads;
   - build the arguments from the step data:
     - a `user` value is used as given;
-    - a `step` value, or a string `model` value, stands in as `"X1"`;
-    - the `entries` value is one entry, mapped through `ENTRY_ARGUMENT` from a
-      `ReadTransportEntry`
-      `{ pgmid: "LIMU", type: "METH", name: "ZCL_X=>M", position: "000001" }`;
+    - a `step` value whose step is an entry read is that fixture entry's field
+      (`{ from: 'step', step, field }` → `ENTRY[field]`);
+    - the `entries` value is `[ENTRY]` mapped through `ENTRY_ARGUMENT`;
+    - every other `step` value (a `lock_handle`, a `run_id`, a `state_handle`) and every
+      string `model` value stand in as `"X1"`. These have no earlier-step source in the
+      fixture.
+
+    This depends on the generator. A transport step that sends an entry builds each
+    argument name as `ENTRY_ARGUMENT[readField]`, with value
+    `{ from: 'step', step: <the read>, field: readField }`: top level for `remove_object`,
+    and inside `objects` for `move_objects` through `entries`. The generator never names a
+    sent entry field itself. Task 3.5 states this rule, and its tests assert it;
   - fill each name in the step's `stillToFill` from the property's JSON schema in the
     listed schema (`z.toJSONSchema`, `io: 'input'`), by one test helper,
     `placeholderFor(property)`:
@@ -759,9 +776,11 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
     included). `success` must be `true`, and a failure prints the step and zod's issues.
   - a step whose tool is in `LONG_TOOLS` passes `background: false` exactly when the
     listed schema has `background`.
-  - a step that sends transport entries carries each read field under its sent name, with
-    the read value: `object_name` `ZCL_X=>M`, `object_type` `METH`, `position` `000001`,
-    `pgmid` `LIMU`.
+  - a step that sends transport entries carries each `ENTRY` field under its sent name,
+    with the fixture's value: `object_name` `ZCL_X=>M`, `object_type` `METH`, `position`
+    `000001`, `pgmid` `LIMU`. These are the top-level arguments of core `remove_object`,
+    and `objects[0]` of `move_objects` (core and compact). On the unmutated code this
+    holds, and the baseline passes.
   - with no kind, each binary's served counts per prompt equal its `onprem` counts (spec
     §6). This turns the members-unread mutation red, where an empty served set would
     otherwise pass the test vacuously.

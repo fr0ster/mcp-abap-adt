@@ -39,12 +39,12 @@ export function sessionEndWords(
   switch (code) {
     case ADT_SESSION_ERROR.SESSION_REPLACED:
       return step === undefined
-        ? 'SAP ended the session during the call: the rest of the call did not run, and a lock taken in that session is released.'
-        : `SAP ended the session during the call, at its step ${step}: that step and the steps after it did not run, and a lock taken in that session is released.`;
+        ? 'SAP ended the session (an idle timeout, a logoff); this call did not run. Send it again: the next call opens a new session. A lock taken before, if any, is released.'
+        : `SAP ended the session during the call, at its step ${step} (an idle timeout, a logoff): that step and the steps after it did not run. Send the call again: the next call opens a new session. A lock taken in the ended session is released.`;
     case ADT_SESSION_ERROR.NOT_CONNECTED:
-      return 'The connection had no SAP session for this request; nothing was sent.';
+      return "The connection's SAP session had ended (an idle timeout, a logoff); this call did not run. Send it again: the next call opens a new session.";
     case ADT_SESSION_ERROR.RELEASE_PENDING:
-      return "The connection's previous SAP session is still being released; nothing was sent.";
+      return "The connection's previous SAP session is still being released; this call did not run. Send it again.";
   }
 }
 

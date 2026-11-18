@@ -18,7 +18,7 @@ import { wireValueOf } from './wireValue';
 
 /** What the consumer gets for such a refusal, in place of SAP's words. */
 export const CSRF_REFUSAL_WORDS =
-  "SAP refused the request's session token (HTTP 403); the request was not executed.";
+  'SAP ended the session (an idle timeout, a logoff) and refused the request (HTTP 403); this call did not run. Send it again: the next call opens a new session. A lock taken before, if any, is released.';
 
 /** A header's value as one text: a list's first entry, a string as it is; anything else none. */
 function headerText(value: unknown): string {

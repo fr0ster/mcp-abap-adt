@@ -6,7 +6,7 @@
  * with its type, text, object (`objDescr`), uri, position and code, and none
  * reports the ordinal as a line.
  */
-import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { analyseActivation, analyseCheck } from '@mcp-abap-adt/adt-strategies';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import { failurePayload } from '../../lib/answer';
@@ -213,6 +213,17 @@ describe('check runs: chkrun:uri carries the position', () => {
   it('terseCheck', () => {
     const terse = terseCheck(parseStructure(corpusBody(SYNTAX)));
     expect(terse?.messages).toEqual([SYNTAX_MESSAGE]);
+  });
+
+  it('a refused check', () => {
+    const verdict = analyseCheck(ADT_NO_FAILURE, {
+      data: corpusBody(SYNTAX),
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+    });
+    if (verdict === ADT_NO_FAILURE) throw new Error('not refused');
+    expect(failurePayload(verdict).messages).toEqual([SYNTAX_MESSAGE]);
   });
 
   it('parseCheckRunResponse', () => {

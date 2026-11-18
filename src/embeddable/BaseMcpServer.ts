@@ -842,22 +842,30 @@ export abstract class BaseMcpServer extends McpServer {
   /**
    * The ping, in its own turn of the main flow — the serialisation tool
    * calls use — so it never runs beside a call; sent only if, once the turn
-   * came, the connection is still the live one and not in the stateful
-   * mode (a lock held: its session is the lock's, and the ping is a
-   * stateless request). The close aborts the wait for the turn and for the
-   * answer; no deadline of the server's own.
+   * came, the connection is still the live one. It is a stateful request:
+   * it goes into the connection's own stateful session (HTTP: the stateful
+   * session header and its context; RFC: the persistent conversation),
+   * which is the session SAP would otherwise end — a stateless request gets
+   * a session of its own each time and keeps nothing alive. The
+   * connection's session mode is put back as it was. The close aborts the
+   * wait for the turn and for the answer; no deadline of the server's own.
    */
   private async pingInTurn(connection: IAbapConnection): Promise<void> {
     const signal = this.keepAliveClose.signal;
     const leave = await this.enterMainFlow(signal);
     try {
       if (this.liveBuilt() !== connection) return;
-      if (connection.getSessionMode?.() === 'stateful') return;
-      // Never rejects: a failure is its debug line.
-      await raceRequestSignal(
-        sendSessionKeepAlive(connection, this.logger),
-        signal,
-      );
+      const mode = connection.getSessionMode?.() ?? 'stateless';
+      connection.setSessionType('stateful');
+      try {
+        // Never rejects: a failure is its debug line.
+        await raceRequestSignal(
+          sendSessionKeepAlive(connection, this.logger),
+          signal,
+        );
+      } finally {
+        connection.setSessionType(mode);
+      }
     } finally {
       leave();
     }

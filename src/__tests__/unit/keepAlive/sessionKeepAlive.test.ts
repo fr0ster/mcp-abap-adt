@@ -348,7 +348,7 @@ describe('the session keep-alive', () => {
     }
   });
 
-  it('a ping due while a call runs waits for it in the main flow, and goes stateless', async () => {
+  it('a ping due while a call runs waits for it in the main flow, and goes stateful', async () => {
     const s = await stand();
     try {
       await call(s, 'a');
@@ -366,7 +366,11 @@ describe('the session keep-alive', () => {
       await running;
       await until(() => pings(s.standIn).length === 1);
       const ping = pings(s.standIn)[0];
-      assert.notEqual(ping?.sessionType, 'stateful');
+      // Into the connection's stateful session, its mode put back after.
+      assert.equal(ping?.sessionType, 'stateful');
+      assert.equal(ping?.session, touchOf(s.standIn, 'a')?.session);
+      await settle();
+      assert.equal(touched?.getSessionMode?.(), 'stateless');
       assert.ok(
         (ping === undefined ? -1 : s.standIn.requests.indexOf(ping)) >
           s.standIn.requests.findIndex((r) => r.url === `${TOUCH_PATH}long`),
@@ -376,15 +380,19 @@ describe('the session keep-alive', () => {
     }
   });
 
-  it('sends no ping while the connection is stateful (a lock held)', async () => {
+  it('a ping on a connection left stateful keeps it stateful', async () => {
     const s = await stand();
     try {
       await call(s, 'a');
       const answer = await s.session.callTool('Stateful', {});
       assert.notEqual(answer.isError, true);
-      mock.timers.tick(3 * INTERVAL);
+      mock.timers.tick(INTERVAL);
       await settle();
-      assert.equal(pings(s.standIn).length, 0);
+      mock.timers.tick(INTERVAL);
+      await until(() => pings(s.standIn).length === 1);
+      assert.equal(pings(s.standIn)[0]?.sessionType, 'stateful');
+      await settle();
+      assert.equal(touched?.getSessionMode?.(), 'stateful');
     } finally {
       await s.close();
     }

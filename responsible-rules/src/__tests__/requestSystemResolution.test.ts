@@ -6,65 +6,39 @@
  * connection so nothing leaks between users.
  */
 import assert from 'node:assert/strict';
-import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { format } from 'node:util';
-import type {
-  AdtClientCloud,
-  AdtClientOnPrem,
-} from '@mcp-abap-adt/adt-clients';
+import type { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
+import { mockModuleExports } from '../../../src/__tests__/helpers/moduleMock';
 
 type Options = ConstructorParameters<typeof AdtClientOnPrem>[2];
 
 /** The options of every client built, of either variant, in the order built. */
 const clientsBuilt: Options[] = [];
 
-/**
- * adt-clients' module that defines the two variants. Its package index
- * re-exports them by getter, and its `exports` map closes the file, so it is
- * reached by its path next to the index.
- */
-const variants: {
-  AdtClientOnPrem: typeof AdtClientOnPrem;
-  AdtClientCloud: typeof AdtClientCloud;
-} = require(
-  path.join(
-    path.dirname(require.resolve('@mcp-abap-adt/adt-clients')),
-    'clients',
-    'AdtClientVariants.js',
-  ),
-);
-
-// The variants replaced on that module before any module under test loads:
-// src/lib/clients binds them when it loads (`class … extends
-// AdtClientOnPrem`, read through the index's getter then). Each records its
-// options, as the Jest factory's jest.fn() did, in one list across both,
-// which is the order Jest's invocationCallOrder gave. (mock.module is not
-// used here: a module mocked by it leaves the resolve hook unreached for the
-// workspace packages this file loads after it, measured on Node 26.) The
-// factory's AdtClientLegacy named nothing adt-clients exports; it is gone.
-mock.method(
-  variants,
-  'AdtClientOnPrem',
-  function AdtClientOnPrem(
+// adt-clients replaced for this file before any module under test loads:
+// src/lib/clients binds the variants when it loads (`class … extends
+// AdtClientOnPrem`; node:test mock.module, helpers/moduleMock.ts; its other
+// exports stay the real ones). Each variant records its options, as the
+// Jest factory's jest.fn() did, in one list across both, which is the order
+// Jest's invocationCallOrder gave. The factory's AdtClientLegacy named
+// nothing adt-clients exports; it is gone.
+mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
+  AdtClientOnPrem: mock.fn(function AdtClientOnPrem(
     _connection: unknown,
     _logger: unknown,
     options: Options,
   ) {
     clientsBuilt.push(options);
-  },
-);
-mock.method(
-  variants,
-  'AdtClientCloud',
-  function AdtClientCloud(
+  }),
+  AdtClientCloud: mock.fn(function AdtClientCloud(
     _connection: unknown,
     _logger: unknown,
     options: Options,
   ) {
     clientsBuilt.push(options);
-  },
-);
+  }),
+});
 
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -931,6 +905,28 @@ describe('withResolvedSystemContext', () => {
     assertMatchObject(lastOptions(), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
+    });
+  });
+
+  it('lastOptions reads the last client built: two clients, two systems', async () => {
+    // Added in the node:test move: no other case builds two clients after
+    // its reset, so the order lastOptions relies on was unexercised.
+    const first = cloudConn();
+    await withResolvedSystemContext(first, () => {
+      createAdtClient(first);
+    });
+    lookup.mock.mockImplementation(async () => ({
+      user: 'SECOND_USER',
+      systemId: 'SND',
+    }));
+    const second = cloudConn();
+    await withResolvedSystemContext(second, () => {
+      createAdtClient(second);
+    });
+    assert.equal(clientsBuilt.length, 2);
+    assertMatchObject(lastOptions(), {
+      responsible: 'SECOND_USER',
+      masterSystem: 'SND',
     });
   });
 

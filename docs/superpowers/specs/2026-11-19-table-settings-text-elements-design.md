@@ -65,8 +65,9 @@ read on premise.
   objtype = cl_tabt_object_data=>co_sub_transport_type`, `co_sub_transport_type … VALUE 'TABT'`
   (`CL_TABT_OBJECT_DATA`; TS §2, §14 V3). Measured, both systems: with the table locked
   (`/ddic/tables/{t}?_action=LOCK` → 200) a settings LOCK → 200, and in the reverse order → 200; all
-  four UNLOCKs → 200 (`raw-v/{onprem,cloud}/04–11`). Limit: one user, one session; a clash between
-  two users is unverified (V12).
+  four UNLOCKs → 200 (`raw-v/{onprem,cloud}/04–11`). A clash between two users is SAP's enqueue
+  refusal, passed through to the model as SAP answers it, with no handling of its own; not measured
+  with two users (the tests run as one SAP user by rule).
 - **S3 The PUT writes every settings field from the document; a field left out is reset.** Code,
   both systems: `CL_TABT_WB_PERSIST->move_adt_to_ddv` (l. 215–238) sets `tabart`, `tabkat`,
   `bufallow` (blank → `'N'`), `pufferung`, `schfeldanz` (only `IF e_dd09l_wa-pufferung = 'G'`),
@@ -124,7 +125,8 @@ read on premise.
   selections … headings. when 'FUGR' or 'FUGS' or 'FUGX'. … symbols … selections … headings.`
   (`cls-sedx-res-textelement.abap:251-262`). Measured cloud: a function group's properties list the
   three parts (TT §13.2).
-- **T2 Own lock, `TEXT`.** Code onprem: `lcl_access_permission->modify`,
+- **T2 Own lock, `TEXT`.** A clash between two users is SAP's refusal, passed through as SAP answers
+  it; not measured with two users (one SAP user by rule). Code onprem: `lcl_access_permission->modify`,
   `cl_adt_lock_handle=>get_instance( 'TEXT' )` and `RS_ACCESS_PERMISSION … object_class = 'TEXT'`
   (`sedx-locals.abap:330-345`). Measured both: `POST /textelements/{kind}/{n}?_action=LOCK&accessMode=MODIFY`
   → 200 `IS_LOCAL=X`; UNLOCK → 200 (TT §8, §10 step 08, §13.3). Cloud's lock answers
@@ -182,9 +184,9 @@ read on premise.
   mode = swbm_c_op_modify … object_class = 'TEXT'`; `when 6 or 7 or 8.` → `cx_adt_res_no_authorization`,
   `when others.` → `cx_adt_res_no_access`), then `RS_EXTEND_CHECK … if extend_mod = abap_true. …
   message s533(eu) … raise exception type cx_adt_res_no_access`; cloud's `RS_ACCESS_PERMISSION` adds
-  `cl_eui_object_blocklist=>…is_access_restricted( … ) … MESSAGE e607` (TT §14 V10). Inference: a
-  delivered program is refused there; which check fires is unverified (V13). The cloud write schema
-  leaves `program` out on this ground.
+  `cl_eui_object_blocklist=>…is_access_restricted( … ) … MESSAGE e607` (TT §14 V10). Code only; never
+  measured on a delivered object, by rule (no write to SAP-delivered objects). The tool passes SAP's
+  refusal through; the cloud write schema leaves `program` out.
 - **T12 Not on 7.40.** Measured (recorded discovery): `system-description-basis-740--03-discovery`
   has no `/textelements` (TT §9; 0 occurrences, checked 2026-11-19).
 
@@ -309,7 +311,7 @@ type IAdtTableSettingsPatchOptions<E> = Omit<IAdtUpdateOptions<E>, 'source' | 'l
   failure.
 - **Served:** `HighLevelHandlersGroup`; `available_in: ['onprem', 'cloud']`. On cloud the schema
   takes `object_kind: 'class' | 'function_group'` (`byVariant`; T6, T10); `program` is left out on
-  cloud (T11: Code, V13).
+  cloud (T11).
 
 ### Compact
 
@@ -467,10 +469,7 @@ creates no function group, which was unverified and is contradicted by T10.
 ## To verify in SAP handlers
 
 Closed by the owner's answer or by measurement: V1 (Eclipse client check (owner); the server activates tables with SAP's default settings, Measured S6), V2 (W4), V3 (S2), V4 (S4), V5
-(S5), V6 (S8), V7 (T3), V8 (T6), V9 (T7), V11 (S10). Still open:
+(S5), V6 (S8), V7 (T3), V8 (T6), V9 (T7), V11 (S10). Closed by rule: V12 (a two-user lock clash is SAP's enqueue refusal, passed through; not measured
+with two users — S2, T2), V13 (Code only; never measured on a delivered object, by rule — T11).
+Nothing is open.
 
-- **V12** A settings lock held by one user against a table lock (or settings lock) of another user:
-  measure the clash; S2 was measured with one user and one session.
-- **V13** Which check refuses a cloud text write to a delivered program (`RS_CORR_CHECK`,
-  `RS_EXTEND_CHECK` EU 533, or the object blocklist e607), and the status the client gets: measure
-  only on an object the measurement may lock, or settle from the code (T11).

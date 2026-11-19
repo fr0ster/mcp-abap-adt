@@ -11,7 +11,7 @@
  * Config-driven: skips cleanly when no SAP connection / test case disabled /
  * wrong system type.
  *
- * Run: npm test -- --testPathPatterns=readOnly/function/FunctionIncludeReadOnly
+ * Run: npm run test:integration -- src/__tests__/integration/readOnly/function/FunctionIncludeReadOnlyHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

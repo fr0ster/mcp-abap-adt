@@ -707,9 +707,9 @@ describe('which tools take background', () => {
 
 describe('lib ships the contract only, no store', () => {
   const REPO = repositoryRoot(__dirname);
-  // Where the running code lives: the repository under Jest, .test-build/tree
-  // under node:test. A source module is required from there, by its path
-  // without the extension (Jest resolves the .ts, node the compiled .js).
+  // Where the running code lives: .test-build/tree. A source module is
+  // required from there, by its path without the extension (node resolves
+  // the compiled .js).
   const CODE_ROOT = path.resolve(__dirname, '../../../..');
   const manifest = JSON.parse(
     fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),

@@ -199,11 +199,8 @@ describe('tool error wire contract (#155)', () => {
 
 describe('BaseHandlerGroup registration path honours the same contract (#155)', () => {
   it('returns isError with unprefixed, uncollapsed content for all five cases', async () => {
-    // Note: BaseHandlerGroup/McpServer are imported statically at module scope
-    // above, not via dynamic import() — ts-jest's CommonJS transpilation of this
-    // project (see tsconfig.test.json, no "type": "module") does not support
-    // `await import()` without the `--experimental-vm-modules` Node flag, which
-    // this repo's jest setup does not enable. Static import carries the same
+    // Note: BaseHandlerGroup/McpServer are imported statically at module
+    // scope above, not via dynamic import(). Static import carries the same
     // module instances the runtime uses, so the test still exercises the real
     // registration path.
 

@@ -26,8 +26,8 @@ type Closable = {
  * connection's `flushGoodbye()` — no bound, so no timer; it never rejects —
  * waits until SAP answered it or its transport failed. Nothing reads the
  * answer. SAP ends a security session only once it received the logoff
- * whole; a test file that ends first (Jest's `--forceExit`) closes the
- * socket before that, and the session stays in SM05 until its timeout
+ * whole; a test file forced to end first (a force exit, as Jest's
+ * `--forceExit` was) closes the socket before that, and the session stays in SM05 until its timeout
  * (measured on premise 2026-10-19).
  */
 export async function endTestConnection(connection: unknown): Promise<void> {

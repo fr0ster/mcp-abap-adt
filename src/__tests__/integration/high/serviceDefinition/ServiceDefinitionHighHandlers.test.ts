@@ -14,7 +14,7 @@ import * as z from 'zod';
  *   DEBUG_ADT_LIBS=true      - Library logs
  *   DEBUG_CONNECTORS=true    - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/serviceDefinition
+ * Run: npm run test:integration -- src/__tests__/integration/high/serviceDefinition/ServiceDefinitionHighHandlers.test.ts
  */
 
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';

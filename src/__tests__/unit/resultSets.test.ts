@@ -143,8 +143,8 @@ describe('the slot table', () => {
     // alongside Task 9 — `classResults.source` goes back to typing as
     // `IResultStrategy<string>` (a function returning a bare `string`) and
     // the line below stops type-checking, because `verbatim` actually
-    // answers `AdtReading<string>`, not `string`. `tsc` catches that; jest's
-    // assertion runtime cannot, so the `expect` here only proves the two
+    // answers `AdtReading<string>`, not `string`. `tsc` catches that; the
+    // assertion at run time cannot, so the `expect` here only proves the two
     // functions are the same referenced value — the type pin is the
     // assignment itself.
     const classResults = resultsFor(classDocuments);

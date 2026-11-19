@@ -12,7 +12,7 @@
  *   - BDEF:  create_behavior_definition_low / full_workflow
  *   - BIMPL: create_behavior_implementation / builder_behavior_implementation
  *
- * Run: npm test -- --testPathPatterns=integration/behaviorDefinitionAndImplementation.*High
+ * Run: npm run test:integration -- src/__tests__/integration/high/behaviorDefinitionAndImplementation/BehaviorDefinitionAndImplementationHighHandlers.test.ts
  */
 
 import { after, afterEach, before, beforeEach, it } from 'node:test';

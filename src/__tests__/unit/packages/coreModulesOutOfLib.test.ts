@@ -14,9 +14,9 @@ import { format } from 'node:util';
 import { repositoryRoot } from '../../helpers/repoRoot';
 
 const ROOT = repositoryRoot(__dirname);
-// Where the running code lives: the repository under Jest, .test-build/tree
-// under node:test. A source module is required from there, by its path
-// without the extension (Jest resolves the .ts, node the compiled .js).
+// Where the running code lives: .test-build/tree. A source module is
+// required from there, by its path without the extension (node resolves the
+// compiled .js).
 const CODE_ROOT = path.resolve(__dirname, '../../../..');
 const runningModule = (source: string): string =>
   path.join(CODE_ROOT, path.relative(ROOT, source)).replace(/\.ts$/, '');

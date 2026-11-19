@@ -6,8 +6,6 @@ tsconfig.json
 tests/
 test-*.js
 test-*.txt
-jest.config.js
-jest.setup.js
 coverage/
 
 # Development tools

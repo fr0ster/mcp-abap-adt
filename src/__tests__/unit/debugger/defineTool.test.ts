@@ -1,7 +1,7 @@
 /**
  * `defineTool` pairs a definition with its handler under the compiler: a
  * handler whose arguments disagree with the definition's schema does not
- * compile (`npm run test:check`, and ts-jest's own type check).
+ * compile (`npm run test:check`, and the test build's own type check).
  */
 
 import assert from 'node:assert/strict';

@@ -11,7 +11,7 @@
  *   DEBUG_ADT_LIBS=true      - Library logs
  *   DEBUG_CONNECTORS=true    - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/table
+ * Run: npm run test:integration -- src/__tests__/integration/high/table/TableHighHandlers.test.ts
  */
 
 import { after, afterEach, before, beforeEach, it } from 'node:test';

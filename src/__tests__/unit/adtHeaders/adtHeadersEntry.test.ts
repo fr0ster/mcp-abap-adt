@@ -38,7 +38,7 @@ describe('@mcp-abap-adt/lib/adt-headers through the package exports', () => {
   t(
     'resolves to the built module and its types, and exports only the public names',
     () => {
-      // A consumer's Node, outside Jest's resolver: the package's own
+      // A consumer's Node, outside the tests' resolve hook: the package's own
       // exports map, a self-reference from the package root.
       const script = [
         "const resolved = require.resolve('@mcp-abap-adt/lib/adt-headers');",

@@ -33,9 +33,8 @@ import { BATCH_ENTRY_CASES, SAMPLE_CALLS } from '../../helpers/batchEntryCases';
 import { repositoryRoot } from '../../helpers/repoRoot';
 
 const REPO = repositoryRoot(__dirname);
-// Where the running code lives, and eligible() with it: the repository under
-// Jest, `.test-build/tree/` under node:test, the build placing
-// tools/batch-handlers.json beside the compiled code.
+// Where the running code lives, and eligible() with it: `.test-build/tree/`,
+// the build placing tools/batch-handlers.json beside the compiled code.
 const CODE_ROOT = path.resolve(__dirname, '../../../..');
 
 const listed = (): BatchEntry[] =>

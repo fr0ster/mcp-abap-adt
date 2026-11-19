@@ -4,8 +4,8 @@ node_modules/
 # Build output
 dist/
 build/
-# Jest's coverage output, at the repository root only: the coverage guard's
-# tests and the live coverage suites under src/ are sources.
+# Coverage output, at the repository root only: the coverage guard's tests
+# and the live coverage suites under src/ are sources.
 /coverage/
 .smithery/
 *.mcpb

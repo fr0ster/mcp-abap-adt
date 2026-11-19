@@ -1,7 +1,7 @@
 /**
  * The scenario side of `plainNode.ts`: records every unhandled rejection of
  * the plain-node process and writes the scenario's report as one JSON line
- * on stdout, then ends the process. No Jest here: this runs under node.
+ * on stdout, then ends the process. No test runner here: this runs under plain node.
  */
 
 const unhandled: string[] = [];

@@ -162,7 +162,7 @@ describe('a group activation waits for its run on long polling alone', () => {
   /**
    * A run answering `status` on every read, its reads counted: past
    * `READ_BOUND` the double refuses and records it, so a wait that does not
-   * end fails the case instead of running Jest out of memory. The bound is
+   * end fails the case instead of running the test out of memory. The bound is
    * this test's alone.
    */
   function answeringAlways(statusAttribute: string) {

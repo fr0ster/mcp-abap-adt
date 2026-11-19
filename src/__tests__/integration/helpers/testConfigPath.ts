@@ -6,7 +6,7 @@ import { repositoryRoot } from '../../helpers/repoRoot';
  * The config file `MCP_TEST_CONFIG` names, resolved against the repository
  * root when relative; `undefined` when the variable is not set.
  *
- * One place for every reader — `loadTestConfig`, Jest's `globalSetup` and the
+ * One place for every reader — `loadTestConfig`, the live run's setup and the
  * shared-deps check — because they live at different depths: resolved by hand
  * from `src/__tests__/integration/` with the helpers' `../../../..`, the same
  * name landed one directory above the repository, and global setup skipped the

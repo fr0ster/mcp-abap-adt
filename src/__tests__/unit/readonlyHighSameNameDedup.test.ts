@@ -9,7 +9,7 @@
  * injected: a strategy decides about differently named tools, and two tools
  * under one name cannot both be registered anyway.
  *
- * Run: npm test -- --testPathPatterns=unit/readonlyHighSameNameDedup
+ * Run: npm test -- src/__tests__/unit/readonlyHighSameNameDedup.test.ts
  */
 
 import assert from 'node:assert/strict';

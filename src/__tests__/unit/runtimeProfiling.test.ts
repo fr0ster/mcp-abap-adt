@@ -135,7 +135,7 @@ for (const [_n, handler, args] of handlers) {
     profiler = { list: async () => okResponse([]) };
     // One attempt and no delay. Under the recommended option this handler polls,
     // and the defaults are five attempts two seconds apart — eight seconds per
-    // parametrised case, against Jest's five-second timeout. This test is about
+    // parametrised case, in a unit run. This test is about
     // the id travelling, not about the search.
     await (handler as any)(context as any, {
       ...args,

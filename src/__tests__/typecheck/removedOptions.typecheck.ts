@@ -2,7 +2,7 @@
  * Options that did nothing are removed (D26 E1, E4, E5, E6): each line marked
  * `@ts-expect-error` fails `npm run test:check` the moment it compiles again.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 import type { ConnectionContext } from '../../embeddable/ConnectionContext';

@@ -13,7 +13,7 @@
  *   DEBUG_ADT_LIBS=true      - Library logs
  *   DEBUG_CONNECTORS=true    - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/function/
+ * Run: npm run test:integration -- src/__tests__/integration/high/function/FunctionHighHandlers.test.ts
  */
 
 import { after, before, it } from 'node:test';

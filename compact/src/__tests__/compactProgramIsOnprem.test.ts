@@ -109,19 +109,22 @@ describe('compact tools and PROGRAM on ABAP cloud', () => {
       .map(onCloud)
       .filter((stated) => stated !== undefined && stated.description !== '');
     assert.ok(read.length > 0);
-    // Every write tool served on cloud yields a cloud statement, variants
-    // or not, so the write rule below skips none of them.
-    const writesOnCloud = entries.filter(
-      (entry) =>
-        KIND_OF[entry.toolDefinition.name] === WRITES &&
-        entry.toolDefinition.available_in?.includes('cloud'),
-    );
-    assert.ok(writesOnCloud.length > 0);
+    // Every write tool of KIND_OF is served on cloud and yields a cloud
+    // statement there, variants or not, so the write rule below examines
+    // each of them: none is skipped as absent from cloud.
+    const writesOnCloud = entries
+      .filter(
+        (entry) =>
+          KIND_OF[entry.toolDefinition.name] === WRITES &&
+          onCloud(entry) !== undefined,
+      )
+      .map((entry) => entry.toolDefinition.name)
+      .sort();
     assert.deepStrictEqual(
-      writesOnCloud
-        .filter((entry) => onCloud(entry) === undefined)
-        .map((entry) => entry.toolDefinition.name),
-      [],
+      writesOnCloud,
+      Object.keys(KIND_OF)
+        .filter((name) => KIND_OF[name] === WRITES)
+        .sort(),
     );
   });
 

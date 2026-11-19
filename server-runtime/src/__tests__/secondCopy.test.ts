@@ -16,22 +16,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import type { LauncherEdges, LibInstance } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
-import { main as compactMain } from '../../../compact/src/launcher';
-import { main as compactHttpMain } from '../../../compact-http/src/launcher';
-import { main as compactHttpRoMain } from '../../../compact-http-ro/src/launcher';
-import { main as compactRoMain } from '../../../compact-ro/src/launcher';
-import { main as compactSseMain } from '../../../compact-sse/src/launcher';
-import { main as compactSseRoMain } from '../../../compact-sse-ro/src/launcher';
-import { main as coreRoMain } from '../../../core-ro/src/launcher';
-import { HTTP_PACKAGE } from '../../../http/src/httpVersion';
-import { main as oldHttpMain } from '../../../http/src/launcher';
-import { main as httpRoMain } from '../../../http-ro/src/launcher';
-import { CORE_PACKAGE } from '../../../server/src/coreVersion';
-import { main as oldCoreMain } from '../../../server/src/launcher';
 import { repositoryRoot } from '../../../src/__tests__/helpers/repoRoot';
-import { main as oldSseMain } from '../../../sse/src/launcher';
-import { SSE_PACKAGE } from '../../../sse/src/sseVersion';
-import { main as sseRoMain } from '../../../sse-ro/src/launcher';
 import { main as httpMain } from '../http/launcher';
 import { secondCopyLine } from '../secondCopy';
 import { main as sseMain } from '../sse/launcher';
@@ -176,6 +161,11 @@ for (const [name, main] of TRANSPORTS) {
  * Each binary names ITS package: the nine wrappers are called here; the
  * three plain bins (`server`, `http`, `sse`) pass their version module's
  * name, checked against their own manifest.
+ *
+ * The other packages' modules are required at run time: this package's
+ * checker (`server-runtime/tsconfig.test.json`) resolves none of their
+ * package names. The test build compiles each of them
+ * (`tsconfig.node-test.json`, `include`).
  */
 const ROOT = repositoryRoot(__dirname);
 const manifestName = (dir: string): string =>
@@ -185,15 +175,15 @@ describe('each binary passes its own package name', () => {
   const wrappers: ReadonlyArray<
     readonly [string, (edges: LauncherEdges) => Promise<unknown>]
   > = [
-    ['compact', compactMain],
-    ['compact-http', compactHttpMain],
-    ['compact-sse', compactSseMain],
-    ['core-ro', coreRoMain],
-    ['http-ro', httpRoMain],
-    ['sse-ro', sseRoMain],
-    ['compact-ro', compactRoMain],
-    ['compact-http-ro', compactHttpRoMain],
-    ['compact-sse-ro', compactSseRoMain],
+    ['compact', require('../../../compact/src/launcher').main],
+    ['compact-http', require('../../../compact-http/src/launcher').main],
+    ['compact-sse', require('../../../compact-sse/src/launcher').main],
+    ['core-ro', require('../../../core-ro/src/launcher').main],
+    ['http-ro', require('../../../http-ro/src/launcher').main],
+    ['sse-ro', require('../../../sse-ro/src/launcher').main],
+    ['compact-ro', require('../../../compact-ro/src/launcher').main],
+    ['compact-http-ro', require('../../../compact-http-ro/src/launcher').main],
+    ['compact-sse-ro', require('../../../compact-sse-ro/src/launcher').main],
   ];
 
   for (const [dir, main] of wrappers) {
@@ -207,13 +197,13 @@ describe('each binary passes its own package name', () => {
     });
   }
 
-  for (const [dir, constant] of [
-    ['server', CORE_PACKAGE],
-    ['http', HTTP_PACKAGE],
-    ['sse', SSE_PACKAGE],
+  for (const [dir, read] of [
+    ['server', () => require('../../../server/src/coreVersion').CORE_PACKAGE],
+    ['http', () => require('../../../http/src/httpVersion').HTTP_PACKAGE],
+    ['sse', () => require('../../../sse/src/sseVersion').SSE_PACKAGE],
   ] as const) {
     it(`${dir}'s version module names its manifest's package`, () => {
-      assert.equal(constant, manifestName(dir));
+      assert.equal(read(), manifestName(dir));
     });
   }
 
@@ -250,9 +240,21 @@ describe("the old launcher paths: 19.1.0's options, the path's own package", () 
       ) => Promise<unknown>,
     ]
   > = [
-    ['@mcp-abap-adt/core/launcher', 'server', oldCoreMain],
-    ['@mcp-abap-adt/http/launcher', 'http', oldHttpMain],
-    ['@mcp-abap-adt/sse/launcher', 'sse', oldSseMain],
+    [
+      '@mcp-abap-adt/core/launcher',
+      'server',
+      require('../../../server/src/launcher').main,
+    ],
+    [
+      '@mcp-abap-adt/http/launcher',
+      'http',
+      require('../../../http/src/launcher').main,
+    ],
+    [
+      '@mcp-abap-adt/sse/launcher',
+      'sse',
+      require('../../../sse/src/launcher').main,
+    ],
   ];
 
   for (const [modulePath, dir, main] of oldPaths) {

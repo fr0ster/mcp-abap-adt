@@ -31,11 +31,17 @@
   // Every handler is built, whether a test imports it or not: two suites
   // require handlers at run time by their source path
   // (`unit/sources/descriptionsFunctional.test.ts` walks every one,
-  // `index.test.ts` loads three, with `lib/utils` and `lib/logger`).
+  // `index.test.ts` loads three, with `lib/utils` and `lib/logger`). The
+  // launchers and version modules `server-runtime/src/__tests__/secondCopy.test.ts`
+  // requires at run time are built for the same reason.
   "include": [
     "src/handlers/**/*.ts",
     "src/lib/utils.ts",
     "src/lib/logger.ts",
+    "*/src/launcher.ts",
+    "server/src/coreVersion.ts",
+    "http/src/httpVersion.ts",
+    "sse/src/sseVersion.ts",
     "src/__tests__/unit/coverage/__fixtures__/report/*.ts",
     "src/__tests__/unit/coverage/__fixtures__/live/*.ts"
   ],

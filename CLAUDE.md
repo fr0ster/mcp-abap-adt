@@ -255,7 +255,11 @@ user does, in every layout and proves one `@mcp-abap-adt/lib` per process (19.1.
 loaded two when a wrapper and its base were installed in one command: a binary
 depended on another binary; none may now). Before a release, make sure `npm run test:install` ran
 (it runs both; CI runs it as its own step), and after publishing run
-`docs/deployment/RELEASE.md` step 9; when adding a bin, add it to both. And treat
+`npm run release:verify` (every package of the release visible on the registry, a
+clean install from it with a registry-only lockfile, each bin's `--version`
+answering the release version; exit 2 means "not visible yet", rerun it) and
+`docs/deployment/RELEASE.md` step 9 (the global wrapper-and-base install); when
+adding a bin, add it to both tests. And treat
 any `__dirname`-relative path in `server-runtime/` and in the binary packages'
 version modules as suspect: count the levels for both layouts.
 

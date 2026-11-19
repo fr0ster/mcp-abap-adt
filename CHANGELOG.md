@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-11-19
+
+### Added
+
+- **`npm run release:verify [-- <version>]` checks a release as it is published on npm** (`scripts/verify-registry.mjs`; [RELEASE.md](docs/deployment/RELEASE.md), step 7). The post-publish check was done by hand. For the eighteen packages of `scripts/publish-all.sh` at the version (default: the root `package.json`'s), it checks each with `npm view` — while any is not visible yet it says `not visible yet` with the count and exits `2`, and the caller runs it again (no wait or timer inside) —, installs them together into a fresh temporary directory outside the repository with `--ignore-scripts`, refuses a lockfile with a `"link": true` or a package not resolved from `https://registry.npmjs.org/`, reports the installed `adt-clients`, `adt-strategies` and `connection`, and runs every declared bin as `node <bin> --version`, which must answer exactly the version. Measured against the published 24.0.1: all eighteen installed, the twelve bins answer `24.0.1` (adt-clients 45.5.5, adt-strategies 0.23.5, connection 25.0.0). `src/__tests__/unit/release/verifyRegistry.test.ts` runs it against a fake npm, without the network.
+
 ## [24.0.1] - 2026-11-19
 
 ### Fixed

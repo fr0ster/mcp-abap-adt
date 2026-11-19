@@ -4,38 +4,29 @@
  * before any transport, and the startup summary's presence-only secrets.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
+import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
+import * as browsers from '@mcp-abap-adt/auth-providers/dist/authorization/presentation/browsers';
+import { assertRejects } from '../../../../src/__tests__/helpers/assertions';
 
 // The shipped browsers are stand-ins tagged with what they were built for:
-// the launcher's mapping is observed, and nothing is ever launched.
-jest.mock('@mcp-abap-adt/auth-providers', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/auth-providers');
-  const tagged = (factory: string) => (argument?: string) => ({
-    open: async () => {},
-    built: argument === undefined ? factory : `${factory}(${argument})`,
-  });
-  return {
-    ...actual,
-    linuxDefaultBrowser: tagged('linuxDefaultBrowser'),
-    linuxBrowser: tagged('linuxBrowser'),
-  };
+// the launcher's mapping is observed, and nothing is ever launched. They are
+// replaced on the module that defines them (the package index re-exports
+// them by getter) before the launcher's browser table loads, which takes
+// them when it loads; the table keeps them after any restore.
+const tagged = (factory: string) => (argument?: string) => ({
+  open: async () => {},
+  built: argument === undefined ? factory : `${factory}(${argument})`,
 });
-
-// Every broker the factory builds is counted; nothing else changes.
-jest.mock('@mcp-abap-adt/auth-broker', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/auth-broker');
-  return {
-    ...actual,
-    AuthBroker: jest.fn(
-      (config: unknown, logger: unknown) =>
-        new actual.AuthBroker(config, logger),
-    ),
-  };
-});
+mock.property(browsers, 'linuxDefaultBrowser', tagged('linuxDefaultBrowser'));
+mock.property(browsers, 'linuxBrowser', tagged('linuxBrowser'));
 
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import type {
@@ -55,6 +46,12 @@ import {
 } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
 
+/** A value the types leave optional, which the case requires: Jest read it untyped. */
+function present<T>(value: T | undefined): T {
+  assert.ok(value !== undefined);
+  return value;
+}
+
 /** The launcher's options as `mcp-abap-adt` passes them. */
 const TEST_OPTIONS = {
   toolSet: fullToolSet,
@@ -63,9 +60,16 @@ const TEST_OPTIONS = {
   packageName: '@mcp-abap-adt/core',
 };
 
-const constructed = (
-  jest.requireMock('@mcp-abap-adt/auth-broker') as { AuthBroker: jest.Mock }
-).AuthBroker;
+/**
+ * Every broker the factory builds is counted; nothing else changes:
+ * AuthBroker watched on the module that defines it (the index re-exports it
+ * by getter, read at call time), the real broker still constructed. Every
+ * case restores every mock after it, so it is watched afresh before each.
+ */
+function watchBrokers() {
+  return mock.method(authBrokerModule, 'AuthBroker');
+}
+let constructed: ReturnType<typeof watchBrokers>;
 
 const SYSTEM_URL = 'https://system.example.test';
 const REDIRECT = 'http://localhost:61001/callback';
@@ -78,7 +82,17 @@ const savedCwd = process.cwd();
 let root: string;
 let keysDir: string;
 let sessionsDir: string;
-let stdioStart: jest.SpyInstance;
+/** StdioServer.start replaced: it records the server it was called on. */
+function watchStarts() {
+  return mock.method(
+    StdioServer.prototype,
+    'start',
+    async function (this: StdioServer) {
+      started.push(this);
+    },
+  );
+}
+let stdioStart: ReturnType<typeof watchStarts>;
 /** The servers the launcher started, in order. */
 let started: StdioServer[] = [];
 
@@ -116,21 +130,17 @@ beforeEach(() => {
   // The system kind is required: the stand-in's is stated for every case
   // (a case about the type itself deletes or restates it).
   process.env.SAP_SYSTEM_TYPE = 'onprem';
-  constructed.mockClear();
+  constructed = watchBrokers();
   started = [];
-  stdioStart = jest
-    .spyOn(StdioServer.prototype, 'start')
-    .mockImplementation(async function (this: StdioServer) {
-      started.push(this);
-    });
+  stdioStart = watchStarts();
   // The connection at start is the launcher's own step: not made here.
-  jest
-    .spyOn(StdioServer.prototype, 'connectAtStart')
-    .mockResolvedValue({ session: 'logged_on' });
+  mock.method(StdioServer.prototype, 'connectAtStart', async () => ({
+    session: 'logged_on',
+  }));
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   process.argv = savedArgv;
   process.env = { ...savedEnv };
   process.chdir(savedCwd);
@@ -176,7 +186,7 @@ async function run(
   const processLike = Object.assign(new EventEmitter(), {
     stdin: new EventEmitter(),
   });
-  const stdout = jest.spyOn(process.stdout, 'write');
+  const stdout = mock.method(process.stdout, 'write');
   try {
     await launch(config, TEST_OPTIONS, {
       browserStrategy: browserStrategy ?? strategy.browserStrategy,
@@ -187,8 +197,13 @@ async function run(
     });
   } finally {
     // The launcher writes nothing to stdout (H3).
-    expect(stdout).not.toHaveBeenCalled();
-    stdout.mockRestore();
+    // The node:test runner reports through this process's stdout in
+    // serialized frames (Buffers); a text write is the program's.
+    assert.deepStrictEqual(
+      stdout.mock.calls.filter((c) => typeof c.arguments[0] === 'string'),
+      [],
+    );
+    stdout.mock.restore();
   }
   return { strategy, stderr, exits, processLike };
 }
@@ -231,17 +246,23 @@ const writeSession = (name: string, lines: string[]) =>
 async function browserOfTheLogin(
   strategy: ReturnType<typeof recordingStrategy>,
 ) {
-  expect(constructed).toHaveBeenCalledTimes(1);
-  const brokerConfig = constructed.mock.calls[0][0];
-  const login = brokerConfig.authorization('dest', 'authorization_code');
+  assert.equal(constructed.mock.callCount(), 1);
+  const brokerConfig = constructed.mock.calls[0]?.arguments[0];
+  const login = present(brokerConfig.authorization)(
+    'dest',
+    'authorization_code',
+  );
   await login.authorize({
     buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
   });
   // The broker composes a strategy per build of the provider — the startup
   // check's build among them — and each is built with the same options.
-  expect(strategy.calls.length).toBeGreaterThanOrEqual(1);
+  assert.ok(strategy.calls.length >= 1);
   const last = strategy.calls[strategy.calls.length - 1];
-  expect(strategy.calls.every((c) => c.browser === last.browser)).toBe(true);
+  assert.equal(
+    strategy.calls.every((c) => c.browser === last.browser),
+    true,
+  );
   const { browser, ...rest } = last;
   return {
     ...rest,
@@ -263,7 +284,8 @@ describe('the browser reaches the login strategy, mapped for the platform', () =
       `--auth-broker-path=${root}`,
       '--browser=firefox',
     ]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe(
+    assert.equal(
+      (await browserOfTheLogin(strategy)).browser,
       'linuxBrowser(firefox)',
     );
   });
@@ -272,7 +294,8 @@ describe('the browser reaches the login strategy, mapped for the platform', () =
     writeKey('dest', abapKey);
     process.env.MCP_BROWSER = 'edge';
     const { strategy } = await run([...stdio, `--auth-broker-path=${root}`]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe(
+    assert.equal(
+      (await browserOfTheLogin(strategy)).browser,
       'linuxBrowser(microsoft-edge)',
     );
   });
@@ -285,7 +308,8 @@ describe('the browser reaches the login strategy, mapped for the platform', () =
       `browser: chrome\nauth-broker-path: ${JSON.stringify(root)}\n`,
     );
     const { strategy } = await run([...stdio, `--config=${yamlFile}`]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe(
+    assert.equal(
+      (await browserOfTheLogin(strategy)).browser,
       'linuxBrowser(google-chrome)',
     );
   });
@@ -297,7 +321,8 @@ describe('the browser reaches the login strategy, mapped for the platform', () =
       `--auth-broker-path=${root}`,
       '--browser-program=my-browser',
     ]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe(
+    assert.equal(
+      (await browserOfTheLogin(strategy)).browser,
       'linuxBrowser(my-browser)',
     );
   });
@@ -309,8 +334,9 @@ describe('the browser reaches the login strategy, mapped for the platform', () =
       undefined,
       'freebsd',
     );
-    expect(exits).toEqual([]);
-    expect((await browserOfTheLogin(strategy)).browser).toBe(
+    assert.deepStrictEqual(exits, []);
+    assert.equal(
+      (await browserOfTheLogin(strategy)).browser,
       'linuxBrowser(my-browser)',
     );
   });
@@ -318,7 +344,7 @@ describe('the browser reaches the login strategy, mapped for the platform', () =
   it('none given: the system browser, and no port — the strategy keeps its own 61001', async () => {
     writeKey('dest', abapKey);
     const { strategy } = await run([...stdio, `--auth-broker-path=${root}`]);
-    expect(await browserOfTheLogin(strategy)).toEqual({
+    assert.deepStrictEqual(await browserOfTheLogin(strategy), {
       browser: 'linuxDefaultBrowser',
     });
   });
@@ -331,29 +357,34 @@ describe('the browser reaches the login strategy, mapped for the platform', () =
       '--browser=none',
       '--browser-auth-port=61005',
     ]);
-    expect(await browserOfTheLogin(strategy)).toEqual({ port: 61005 });
+    assert.deepStrictEqual(await browserOfTheLogin(strategy), { port: 61005 });
   });
 });
 
 describe('a browser that cannot be served stops the start', () => {
-  it.each([
+  for (const [args, words] of [
     [['--browser=opera'], '--browser=none'],
     [
       ['--browser=firefox', '--browser-program=x'],
       '--browser-program excludes --browser',
     ],
-  ])('%j: its words on stderr, exit 1, nothing read', async (args, words) => {
-    writeKey('dest', abapKey);
-    const { stderr, exits } = await run([
-      '--mcp=dest',
-      `--auth-broker-path=${root}`,
-      ...args,
-    ]);
-    expect(exits).toEqual([1]);
-    expect(stderr.join('\n')).toContain(words);
-    expect(constructed).not.toHaveBeenCalled();
-    expect(stdioStart).not.toHaveBeenCalled();
-  });
+  ] satisfies [string[], string][]) {
+    it(
+      format('%j: its words on stderr, exit 1, nothing read', args),
+      async () => {
+        writeKey('dest', abapKey);
+        const { stderr, exits } = await run([
+          '--mcp=dest',
+          `--auth-broker-path=${root}`,
+          ...args,
+        ]);
+        assert.deepStrictEqual(exits, [1]);
+        assert.ok(stderr.join('\n').includes(words));
+        assert.equal(constructed.mock.callCount(), 0);
+        assert.equal(stdioStart.mock.callCount(), 0);
+      },
+    );
+  }
 });
 
 /**
@@ -373,77 +404,96 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
       });
     });
 
-  it.each(['none', 'headless'])(
-    '--browser=%s: the URL and the callback on stderr, nothing on stdout',
-    async (browser) => {
-      expect(process.env.DEBUG_AUTH_LOG).not.toBe('true');
-      writeKey('dest', abapKey);
-      const port = await freePort();
-      const { stderr } = await run(
-        [
-          '--mcp=dest',
-          `--auth-broker-path=${root}`,
-          // A key states no wire: the start states it (decided first).
-          '--connection-type=http',
-          `--browser=${browser}`,
-          `--browser-auth-port=${port}`,
-        ],
-        browserCallbackStrategy,
-      );
-      // auth-providers 6 writes the authorization URL to stderr itself, never
-      // through a logger (it carries `state`); the prompt logger carries the
-      // rest — the "waiting on" line among it.
-      const written: string[] = [];
-      const direct = jest
-        .spyOn(process.stderr, 'write')
-        .mockImplementation((chunk: unknown) => {
-          written.push(String(chunk));
-          return true;
-        });
-      const stdout = jest.spyOn(process.stdout, 'write');
-      const broker = constructed.mock.results[0].value;
-      const login = broker.getToken('dest');
-      const failed = expect(login).rejects.toThrow();
-      const redirect = `http://localhost:${port}/callback`;
-      const said = () => [...written, ...stderr].join('\n');
-      for (
-        let i = 0;
-        i < 100 && !said().includes(encodeURIComponent(redirect));
-        i++
-      ) {
-        await new Promise((r) => setTimeout(r, 20));
-      }
-      try {
-        const text = said();
-        expect(text).toContain(
-          'https://uaa.example.test/oauth/authorize?client_id=client-id',
+  for (const browser of ['none', 'headless']) {
+    it(
+      format(
+        '--browser=%s: the URL and the callback on stderr, nothing on stdout',
+        browser,
+      ),
+      async (t) => {
+        assert.notEqual(process.env.DEBUG_AUTH_LOG, 'true');
+        writeKey('dest', abapKey);
+        const port = await freePort();
+        const { stderr } = await run(
+          [
+            '--mcp=dest',
+            `--auth-broker-path=${root}`,
+            // A key states no wire: the start states it (decided first).
+            '--connection-type=http',
+            `--browser=${browser}`,
+            `--browser-auth-port=${port}`,
+          ],
+          browserCallbackStrategy,
         );
-        expect(text).toContain(`redirect_uri=${encodeURIComponent(redirect)}`);
-        expect(stderr.join('\n')).toContain(
-          `Waiting for callback on ${redirect}`,
+        // auth-providers 6 writes the authorization URL to stderr itself, never
+        // through a logger (it carries `state`); the prompt logger carries the
+        // rest — the "waiting on" line among it.
+        const written: string[] = [];
+        const direct = t.mock.method(
+          process.stderr,
+          'write',
+          (chunk: unknown) => {
+            written.push(String(chunk));
+            return true;
+          },
         );
-        expect(text).not.toContain('client-secret');
-      } finally {
-        // End the login: the identity provider says no — with this attempt's
-        // state, so the callback is not ignored.
-        const shown = said();
-        const from = shown.indexOf('https://uaa.example.test/oauth/authorize?');
-        let to = from;
-        while (to >= 0 && to < shown.length && shown[to].trim() !== '') to++;
-        const state =
-          from < 0
-            ? ''
-            : (new URL(shown.slice(from, to)).searchParams.get('state') ?? '');
-        await fetch(`${redirect}?error=access_denied&state=${state}`).catch(
-          () => undefined,
-        );
-        await failed;
-        direct.mockRestore();
-        expect(stdout).not.toHaveBeenCalled();
-        stdout.mockRestore();
-      }
-    },
-  );
+        const stdout = t.mock.method(process.stdout, 'write');
+        const broker = present(constructed.mock.calls[0]?.result);
+        const login = broker.getToken('dest');
+        const failed = assertRejects(login);
+        const redirect = `http://localhost:${port}/callback`;
+        const said = () => [...written, ...stderr].join('\n');
+        for (
+          let i = 0;
+          i < 100 && !said().includes(encodeURIComponent(redirect));
+          i++
+        ) {
+          await new Promise((r) => setTimeout(r, 20));
+        }
+        try {
+          const text = said();
+          assert.ok(
+            text.includes(
+              'https://uaa.example.test/oauth/authorize?client_id=client-id',
+            ),
+          );
+          assert.ok(
+            text.includes(`redirect_uri=${encodeURIComponent(redirect)}`),
+          );
+          assert.ok(
+            stderr.join('\n').includes(`Waiting for callback on ${redirect}`),
+          );
+          assert.ok(!text.includes('client-secret'));
+        } finally {
+          // End the login: the identity provider says no — with this attempt's
+          // state, so the callback is not ignored.
+          const shown = said();
+          const from = shown.indexOf(
+            'https://uaa.example.test/oauth/authorize?',
+          );
+          let to = from;
+          while (to >= 0 && to < shown.length && shown[to].trim() !== '') to++;
+          const state =
+            from < 0
+              ? ''
+              : (new URL(shown.slice(from, to)).searchParams.get('state') ??
+                '');
+          await fetch(`${redirect}?error=access_denied&state=${state}`).catch(
+            () => undefined,
+          );
+          await failed;
+          direct.mock.restore();
+          // The node:test runner reports through this process's stdout in
+          // serialized frames (Buffers); a text write is the program's.
+          assert.deepStrictEqual(
+            stdout.mock.calls.filter((c) => typeof c.arguments[0] === 'string'),
+            [],
+          );
+          stdout.mock.restore();
+        }
+      },
+    );
+  }
 });
 
 describe('one destination per process', () => {
@@ -454,37 +504,52 @@ describe('one destination per process', () => {
     fs.writeFileSync(path.join(root, '.env'), basicLines().join('\n'));
     writeSession('default', basicLines());
     const { exits } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
-    expect(exits).toEqual([]);
-    expect(constructed).toHaveBeenCalledTimes(1);
-    expect(stdioStart).toHaveBeenCalledTimes(1);
-    expect(stdioStart).toHaveBeenCalledWith('dest');
+    assert.deepStrictEqual(exits, []);
+    assert.equal(constructed.mock.callCount(), 1);
+    assert.equal(stdioStart.mock.callCount(), 1);
+    assert.ok(
+      stdioStart.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['dest']),
+      ),
+    );
   });
 
   it('an --env-path file → the destination default, one broker', async () => {
     const file = path.join(root, 'conn.env');
     fs.writeFileSync(file, `${basicLines().join('\n')}\n`);
     const { exits, stderr } = await run([`--env-path=${file}`]);
-    expect(exits).toEqual([]);
-    expect(constructed).toHaveBeenCalledTimes(1);
-    expect(stdioStart).toHaveBeenCalledWith('default');
-    expect(stderr.join('\n')).toContain(`Source:        ${file}`);
+    assert.deepStrictEqual(exits, []);
+    assert.equal(constructed.mock.callCount(), 1);
+    assert.ok(
+      stdioStart.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['default']),
+      ),
+    );
+    assert.ok(stderr.join('\n').includes(`Source:        ${file}`));
   });
 
   it('the runtime session files live beside the sessions: <auth-broker-path>/runtime', async () => {
     writeSession('dest', basicLines());
     const { exits } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
-    expect(exits).toEqual([]);
-    const server = stdioStart.mock.instances[0] as unknown as {
+    assert.deepStrictEqual(exits, []);
+    const server = stdioStart.mock.calls[0]?.this as unknown as {
       leftoverSessions?: { directory: string };
     };
-    expect(server.leftoverSessions?.directory).toBe(path.join(root, 'runtime'));
+    assert.equal(
+      server.leftoverSessions?.directory,
+      path.join(root, 'runtime'),
+    );
   });
 
   it('neither: inspection-only, no broker', async () => {
     const { stderr } = await run([]);
-    expect(constructed).not.toHaveBeenCalled();
-    expect(stdioStart).toHaveBeenCalledWith(undefined);
-    expect(stderr[0]).toContain('inspection-only mode');
+    assert.equal(constructed.mock.callCount(), 0);
+    assert.ok(
+      stdioStart.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [undefined]),
+      ),
+    );
+    assert.ok(stderr[0].includes('inspection-only mode'));
   });
 
   // Inspection lists the declared variant's tool set (its ADT type table):
@@ -492,23 +557,29 @@ describe('one destination per process', () => {
   it('neither, and no system type stated: refused naming --system-type, exit 1, no transport', async () => {
     delete process.env.SAP_SYSTEM_TYPE;
     const { stderr, exits } = await run([]);
-    expect(exits).toEqual([1]);
-    expect(stdioStart).not.toHaveBeenCalled();
-    expect(constructed).not.toHaveBeenCalled();
-    expect(stderr).toContain(
-      `[MCP] ${startInspectionSystemTypeRequiredWords()}`,
+    assert.deepStrictEqual(exits, [1]);
+    assert.equal(stdioStart.mock.callCount(), 0);
+    assert.equal(constructed.mock.callCount(), 0);
+    assert.ok(
+      stderr.includes(`[MCP] ${startInspectionSystemTypeRequiredWords()}`),
     );
-    expect(startInspectionSystemTypeRequiredWords()).toContain('--system-type');
+    assert.ok(
+      startInspectionSystemTypeRequiredWords().includes('--system-type'),
+    );
   });
 
   it('neither, with --system-type=cloud: inspection-only, the cloud tool set', async () => {
     delete process.env.SAP_SYSTEM_TYPE;
     const { exits } = await run(['--system-type=cloud']);
-    expect(exits).toEqual([]);
-    expect(stdioStart).toHaveBeenCalledWith(undefined);
+    assert.deepStrictEqual(exits, []);
+    assert.ok(
+      stdioStart.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [undefined]),
+      ),
+    );
     // Passed to the server; the process environment is not written.
-    expect(startedSystemType()).toBe('cloud');
-    expect(process.env.SAP_SYSTEM_TYPE).toBeUndefined();
+    assert.equal(startedSystemType(), 'cloud');
+    assert.equal(process.env.SAP_SYSTEM_TYPE, undefined);
   });
 });
 
@@ -525,12 +596,12 @@ describe('a destination that cannot be served stops the start', () => {
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
-    expect(exits).toEqual([1]);
-    expect(stderr.join('\n')).toContain(
-      'Destination "dest" cannot be used: SAP_URL',
+    assert.deepStrictEqual(exits, [1]);
+    assert.ok(
+      stderr.join('\n').includes('Destination "dest" cannot be used: SAP_URL'),
     );
-    expect(stderr.join('\n')).not.toContain(PASSWORD);
-    expect(stdioStart).not.toHaveBeenCalled();
+    assert.ok(!stderr.join('\n').includes(PASSWORD));
+    assert.equal(stdioStart.mock.callCount(), 0);
   });
 
   it('a key that does not parse: its class, never a slice of the file (H4)', async () => {
@@ -543,16 +614,17 @@ describe('a destination that cannot be served stops the start', () => {
       `--auth-broker-path=${root}`,
       '--connection-type=http',
     ]);
-    expect(exits).toEqual([1]);
+    assert.deepStrictEqual(exits, [1]);
     const said = stderr.join('\n');
-    expect(said).toMatch(
+    assert.match(
+      said,
       /^\[MCP\] Destination "dest" cannot be read: [A-Za-z]*Error$/,
     );
     for (let i = 0; i + 4 <= 'PLACEHOLDERSECRET'.length; i++) {
-      expect(said).not.toContain('PLACEHOLDERSECRET'.slice(i, i + 4));
+      assert.ok(!said.includes('PLACEHOLDERSECRET'.slice(i, i + 4)));
     }
-    expect(said).not.toContain('clientsecret');
-    expect(stdioStart).not.toHaveBeenCalled();
+    assert.ok(!said.includes('clientsecret'));
+    assert.equal(stdioStart.mock.callCount(), 0);
   });
 
   it('an --env-path file that does not exist: the parameter and the path', async () => {
@@ -561,11 +633,11 @@ describe('a destination that cannot be served stops the start', () => {
       `--env-path=${missing}`,
       '--connection-type=http',
     ]);
-    expect(exits).toEqual([1]);
-    expect(stderr).toEqual([
+    assert.deepStrictEqual(exits, [1]);
+    assert.deepStrictEqual(stderr, [
       `[MCP] --env-path: the file does not exist: ${missing}`,
     ]);
-    expect(stdioStart).not.toHaveBeenCalled();
+    assert.equal(stdioStart.mock.callCount(), 0);
   });
 
   it('--mcp that is a path: refused naming --mcp, nothing read', async () => {
@@ -573,10 +645,10 @@ describe('a destination that cannot be served stops the start', () => {
       '--mcp=../outside',
       `--auth-broker-path=${root}`,
     ]);
-    expect(exits).toEqual([1]);
-    expect(stderr.join('\n')).toContain('--mcp');
-    expect(constructed).not.toHaveBeenCalled();
-    expect(stdioStart).not.toHaveBeenCalled();
+    assert.deepStrictEqual(exits, [1]);
+    assert.ok(stderr.join('\n').includes('--mcp'));
+    assert.equal(constructed.mock.callCount(), 0);
+    assert.equal(stdioStart.mock.callCount(), 0);
   });
 });
 
@@ -585,49 +657,51 @@ describe('the startup summary', () => {
     writeSession('dest', basicLines());
     const { stderr } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
     const summary = stderr.join('\n');
-    expect(summary).toContain(
-      `║  Source:        ${'service-key: dest'.padEnd(45)}║`,
+    assert.ok(
+      summary.includes(`║  Source:        ${'service-key: dest'.padEnd(45)}║`),
     );
-    expect(summary).toContain(`║  SAP URL:       ${SYSTEM_URL.padEnd(45)}║`);
-    expect(summary).toContain(`║  SAP Client:    ${'100'.padEnd(45)}║`);
-    expect(summary).toContain(`║  Auth Type:     ${'basic'.padEnd(45)}║`);
-    expect(summary).toContain(
-      `║  Username:      ${'placeholder-user'.padEnd(45)}║`,
+    assert.ok(summary.includes(`║  SAP URL:       ${SYSTEM_URL.padEnd(45)}║`));
+    assert.ok(summary.includes(`║  SAP Client:    ${'100'.padEnd(45)}║`));
+    assert.ok(summary.includes(`║  Auth Type:     ${'basic'.padEnd(45)}║`));
+    assert.ok(
+      summary.includes(`║  Username:      ${'placeholder-user'.padEnd(45)}║`),
     );
-    expect(summary).toContain(`║  Password:      ${'set'.padEnd(45)}║`);
-    expect(summary).not.toContain(PASSWORD);
+    assert.ok(summary.includes(`║  Password:      ${'set'.padEnd(45)}║`));
+    assert.ok(!summary.includes(PASSWORD));
   });
 });
 
 describe('--auth-debug', () => {
-  it('prints one start warning line and hands the factory authDebug', async () => {
+  it('prints one start warning line and hands the factory authDebug', async (t) => {
     writeSession('dest', basicLines());
     // The debug lines go through console.error: stderr in the program.
-    const lines = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const lines = t.mock.method(console, 'error', () => {});
     const { stderr } = await run([
       '--mcp=dest',
       `--auth-broker-path=${root}`,
       '--auth-debug',
     ]);
-    expect(lines).toHaveBeenCalled();
-    lines.mockRestore();
-    expect(stderr.filter((line) => line.includes('--auth-debug'))).toEqual([
-      AUTH_DEBUG_WARNING,
-    ]);
-    expect(
+    assert.ok(lines.mock.callCount() > 0);
+    lines.mock.restore();
+    assert.deepStrictEqual(
+      stderr.filter((line) => line.includes('--auth-debug')),
+      [AUTH_DEBUG_WARNING],
+    );
+    assert.equal(
       factoryConfigFrom(readCoreConfig(['--auth-debug'], {}), {
         browserStrategy: () => {
           throw new Error('not built');
         },
         promptLogger: { info() {}, warn() {}, error() {}, debug() {} },
       }).authDebug,
-    ).toBe(true);
+      true,
+    );
   });
 
   it('says nothing without it', async () => {
     writeSession('dest', basicLines());
     const { stderr } = await run(['--mcp=dest', `--auth-broker-path=${root}`]);
-    expect(stderr.join('\n')).not.toContain('--auth-debug');
+    assert.ok(!stderr.join('\n').includes('--auth-debug'));
   });
 });
 
@@ -638,12 +712,12 @@ describe('the shutdown is installed', () => {
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
-    expect(processLike.listenerCount('SIGTERM')).toBe(1);
-    expect(processLike.listenerCount('SIGINT')).toBe(1);
-    expect(processLike.stdin.listenerCount('end')).toBe(1);
+    assert.equal(processLike.listenerCount('SIGTERM'), 1);
+    assert.equal(processLike.listenerCount('SIGINT'), 1);
+    assert.equal(processLike.stdin.listenerCount('end'), 1);
     processLike.emit('SIGTERM');
     await new Promise((r) => setTimeout(r, 20));
-    expect(exits).toEqual([0]);
+    assert.deepStrictEqual(exits, [0]);
   });
 });
 
@@ -651,25 +725,27 @@ describe('factoryConfigFrom: the env file', () => {
   const browserStrategy = recordingStrategy().browserStrategy;
 
   it("envFilePath, CoreConfig's alias, is read too, naming the field", () => {
-    expect(
+    assert.deepStrictEqual(
       factoryConfigFrom(
         { envFilePath: '/x/conn.env' },
         { browserStrategy, promptLogger: silent },
       ).envFile,
-    ).toEqual({ path: '/x/conn.env', source: 'CoreConfig.envFilePath' });
+      { path: '/x/conn.env', source: 'CoreConfig.envFilePath' },
+    );
   });
 
   it('envFile by hand: named by its field', () => {
-    expect(
+    assert.deepStrictEqual(
       factoryConfigFrom(
         { envFile: '/x/conn.env' },
         { browserStrategy, promptLogger: silent },
       ).envFile,
-    ).toEqual({ path: '/x/conn.env', source: 'CoreConfig.envFile' });
+      { path: '/x/conn.env', source: 'CoreConfig.envFile' },
+    );
   });
 
   it('the source the parser stated wins', () => {
-    expect(
+    assert.deepStrictEqual(
       factoryConfigFrom(
         {
           envFile: '/x/conn.env',
@@ -678,7 +754,8 @@ describe('factoryConfigFrom: the env file', () => {
         },
         { browserStrategy, promptLogger: silent },
       ).envFile,
-    ).toEqual({ path: '/x/conn.env', source: 'MCP_ENV_PATH' });
+      { path: '/x/conn.env', source: 'MCP_ENV_PATH' },
+    );
   });
 
   it('a config with envFilePath alone serves the destination default', async () => {
@@ -693,8 +770,12 @@ describe('factoryConfigFrom: the env file', () => {
         stdin: new EventEmitter(),
       }),
     });
-    expect(exits).toEqual([]);
-    expect(stdioStart).toHaveBeenCalledWith('default');
+    assert.deepStrictEqual(exits, []);
+    assert.ok(
+      stdioStart.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['default']),
+      ),
+    );
   });
 });
 
@@ -705,11 +786,11 @@ describe('factoryConfigFrom: the env file', () => {
  */
 describe('SAP_CONNECTION_TYPE inside the env file', () => {
   async function settingsOf(argv: string[]) {
-    const settingsFor = jest.spyOn(AuthBrokerFactory.prototype, 'settingsFor');
+    const settingsFor = mock.method(AuthBrokerFactory.prototype, 'settingsFor');
     const result = await run(argv);
-    expect(result.exits).toEqual([]);
-    expect(settingsFor).toHaveBeenCalled();
-    return settingsFor.mock.results[0].value;
+    assert.deepStrictEqual(result.exits, []);
+    assert.ok(settingsFor.mock.callCount() > 0);
+    return present(await present(settingsFor.mock.calls[0]?.result));
   }
   const envFile = (lines: string[]) => {
     const file = path.join(root, 'conn.env');
@@ -720,7 +801,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   it('basic + rfc in the file: rfc', async () => {
     const file = envFile(basicLines(PASSWORD, 'rfc'));
     const settings = await settingsOf([`--env-path=${file}`]);
-    expect(settings.connectionType).toBe('rfc');
+    assert.equal(settings.connectionType, 'rfc');
   });
 
   it('snc + rfc in the file: not refused, rfc', async () => {
@@ -734,8 +815,8 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       'SAP_CONNECTION_TYPE=rfc',
     ]);
     const settings = await settingsOf([`--env-path=${file}`]);
-    expect(settings.authType).toBe('snc');
-    expect(settings.connectionType).toBe('rfc');
+    assert.equal(settings.authType, 'snc');
+    assert.equal(settings.connectionType, 'rfc');
   });
 
   it('--connection-type=http beats the file', async () => {
@@ -744,7 +825,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       `--env-path=${file}`,
       '--connection-type=http',
     ]);
-    expect(settings.connectionType).toBe('http');
+    assert.equal(settings.connectionType, 'http');
   });
 
   it('the file beats YAML connection-type', async () => {
@@ -755,14 +836,14 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       `--env-path=${file}`,
       `--config=${yamlFile}`,
     ]);
-    expect(settings.connectionType).toBe('rfc');
+    assert.equal(settings.connectionType, 'rfc');
   });
 
   it('the process environment beats the file', async () => {
     const file = envFile(rfcStatedBesideUrl());
     process.env.SAP_CONNECTION_TYPE = 'http';
     const settings = await settingsOf([`--env-path=${file}`]);
-    expect(settings.connectionType).toBe('http');
+    assert.equal(settings.connectionType, 'http');
   });
 
   it("--mcp=<name>: the destination's own <sessions>/<name>.env states it", async () => {
@@ -771,7 +852,7 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
-    expect(settings.connectionType).toBe('rfc');
+    assert.equal(settings.connectionType, 'rfc');
   });
 
   it('--mcp=<name> whose file states no connection type: refused, nothing started', async () => {
@@ -780,30 +861,30 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
       '--mcp=dest',
       `--auth-broker-path=${root}`,
     ]);
-    expect(exits).toEqual([1]);
-    expect(stderr.join('\n')).toContain(
-      startConnectionTypeRequiredWords('dest'),
+    assert.deepStrictEqual(exits, [1]);
+    assert.ok(
+      stderr.join('\n').includes(startConnectionTypeRequiredWords('dest')),
     );
-    expect(stdioStart).not.toHaveBeenCalled();
+    assert.equal(stdioStart.mock.callCount(), 0);
   });
 
   it('no connection type anywhere: refused naming the three places, nothing started', async () => {
     const file = envFile(basicLines(PASSWORD, null));
     const { exits, stderr } = await run([`--env-path=${file}`]);
-    expect(exits).toEqual([1]);
-    expect(stderr.join('\n')).toContain(
-      startConnectionTypeRequiredWords('default'),
+    assert.deepStrictEqual(exits, [1]);
+    assert.ok(
+      stderr.join('\n').includes(startConnectionTypeRequiredWords('default')),
     );
-    expect(stdioStart).not.toHaveBeenCalled();
+    assert.equal(stdioStart.mock.callCount(), 0);
   });
 
   it('a word that is not a connection type: refused naming the key, not quoting it', async () => {
     const file = envFile(basicLines(PASSWORD, 'carrier-pigeon'));
     const { exits, stderr } = await run([`--env-path=${file}`]);
-    expect(exits).toEqual([1]);
-    expect(stderr.join('\n')).toContain('SAP_CONNECTION_TYPE');
-    expect(stderr.join('\n')).not.toContain('carrier-pigeon');
-    expect(stdioStart).not.toHaveBeenCalled();
+    assert.deepStrictEqual(exits, [1]);
+    assert.ok(stderr.join('\n').includes('SAP_CONNECTION_TYPE'));
+    assert.ok(!stderr.join('\n').includes('carrier-pigeon'));
+    assert.equal(stdioStart.mock.callCount(), 0);
   });
 });
 
@@ -816,15 +897,23 @@ describe('the working directory .env is never the destination', () => {
   it('with no --env / --env-path / --mcp: no destination, inspection-only under stdio', async () => {
     fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
     const { exits } = await run([]);
-    expect(exits).toEqual([]);
-    expect(constructed).not.toHaveBeenCalled();
-    expect(stdioStart).toHaveBeenCalledWith(undefined);
+    assert.deepStrictEqual(exits, []);
+    assert.equal(constructed.mock.callCount(), 0);
+    assert.ok(
+      stdioStart.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [undefined]),
+      ),
+    );
   });
 
   it('named with --env-path=./.env, it is the destination default', async () => {
     fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
     await run(['--env-path=./.env']);
-    expect(stdioStart).toHaveBeenCalledWith('default');
+    assert.ok(
+      stdioStart.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['default']),
+      ),
+    );
   });
 });
 
@@ -852,52 +941,55 @@ describe('SAP_SYSTEM_TYPE inside the env file', () => {
   async function systemTypeOf(argv: string[]) {
     const before = { ...process.env };
     const result = await run([...argv]);
-    expect(result.exits).toEqual([]);
+    assert.deepStrictEqual(result.exits, []);
     // Passed to the server; the process environment is unchanged.
-    expect(process.env).toEqual(before);
+    assert.deepStrictEqual({ ...process.env }, before);
     return startedSystemType();
   }
 
   it('the file beats YAML system-type', async () => {
     const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=onprem']);
-    expect(
+    assert.equal(
       await systemTypeOf([
         `--env-path=${file}`,
         `--config=${yamlWith('system-type: cloud\n')}`,
       ]),
-    ).toBe('onprem');
+      'onprem',
+    );
   });
 
   it('--system-type=cloud beats the file', async () => {
     const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=onprem']);
-    expect(
+    assert.equal(
       await systemTypeOf([`--env-path=${file}`, '--system-type=cloud']),
-    ).toBe('cloud');
+      'cloud',
+    );
   });
 
   it('the process environment beats the file', async () => {
     const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=onprem']);
     process.env.SAP_SYSTEM_TYPE = 'legacy';
-    expect(await systemTypeOf([`--env-path=${file}`])).toBe('legacy');
+    assert.equal(await systemTypeOf([`--env-path=${file}`]), 'legacy');
   });
 
   it('YAML alone: the YAML value', async () => {
     const file = envFile(basicLines());
-    expect(
+    assert.equal(
       await systemTypeOf([
         `--env-path=${file}`,
         `--config=${yamlWith('system-type: cloud\n')}`,
       ]),
-    ).toBe('cloud');
+      'cloud',
+    );
   });
 
   it('a word that is not a system type: refused naming the key, not quoting it', async () => {
     const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=mainframe']);
     const { exits, stderr } = await run([`--env-path=${file}`]);
-    expect(exits).toEqual([1]);
-    expect(stderr).toEqual([
+    assert.deepStrictEqual(exits, [1]);
+    assert.deepStrictEqual(stderr, [
       '[MCP] SAP_SYSTEM_TYPE (environment or env file) must be onprem, cloud or legacy',
     ]);
-    expect(stdioStart).not.toHaveBeenCalled();
+    assert.equal(stdioStart.mock.callCount(), 0);
   });
 });

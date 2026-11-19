@@ -145,6 +145,7 @@
   "server-runtime/src/stdio/__tests__/deferredLogon.test.ts",
   "server-runtime/src/stdio/__tests__/destinationKeys.test.ts",
   "server-runtime/src/stdio/__tests__/discardedRefreshToken.test.ts",
+  "server-runtime/src/stdio/__tests__/launcherDestination.test.ts",
   "server-runtime/src/stdio/__tests__/launcherFailed.test.ts",
   "server-runtime/src/stdio/__tests__/leftoverSessions.test.ts",
   "server-runtime/src/stdio/__tests__/loginStandKind.test.ts",

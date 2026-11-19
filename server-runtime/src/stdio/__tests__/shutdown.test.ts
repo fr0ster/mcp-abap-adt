@@ -37,13 +37,16 @@ async function caseOf(...args: string[]): Promise<(key: string) => unknown> {
   // The diagnostics' stream carries no secret either: the one the cases
   // hold is a settle failure's message.
   assert.ok(!out.stderr.includes('a token'), 'stderr holds a secret');
-  const lines = out.stdout.split('\n').filter((line) => line !== '');
-  assert.equal(
-    lines.length,
-    1,
-    `stdout carried more than the case's record: ${lines.length} lines`,
+  // Its bytes are exactly the record line, so a stray byte or newline fails.
+  const end = out.stdout.indexOf('\n');
+  const record: unknown = JSON.parse(
+    end === -1 ? out.stdout : out.stdout.slice(0, end),
   );
-  const record: unknown = JSON.parse(lines[0] ?? '');
+  assert.equal(
+    out.stdout,
+    `${JSON.stringify(record)}\n`,
+    "stdout carried more than the case's record",
+  );
   return (key) =>
     typeof record === 'object' && record !== null && key in record
       ? Reflect.get(record, key)

@@ -60,14 +60,17 @@ async function run(
 ): Promise<{ seen: Seen; out: ScenarioOutput }> {
   const out = await runScenarioOutput(SCENARIO, [which]);
   assert.equal(out.code, 0, out.stderr);
-  const lines = out.stdout.split('\n').filter((line) => line !== '');
-  // stdout empty under stdio: the report is the only line on it.
-  assert.equal(
-    lines.length,
-    1,
-    `stdout carried more than the report: ${lines.length} lines`,
+  // stdout empty under stdio: its bytes are exactly the report line, so a
+  // stray byte or newline fails.
+  const end = out.stdout.indexOf('\n');
+  const parsed: unknown = JSON.parse(
+    end === -1 ? out.stdout : out.stdout.slice(0, end),
   );
-  const parsed: unknown = JSON.parse(lines[0] ?? '');
+  assert.equal(
+    out.stdout,
+    `${JSON.stringify(parsed)}\n`,
+    'stdout carried more than the report',
+  );
   const field = (key: string): unknown =>
     typeof parsed === 'object' && parsed !== null && key in parsed
       ? Reflect.get(parsed, key)

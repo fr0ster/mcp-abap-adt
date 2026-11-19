@@ -1,6 +1,10 @@
-import { createConnection } from '@mcp-abap-adt/connection';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
+import * as createConnectionModule from '@mcp-abap-adt/connection/dist/connection/createConnection.js';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../lib/credentialSources';
+import { assertMatchObject } from '../helpers/assertions';
 import { stateSystemKind } from '../helpers/systemKind';
 
 // The system kind is required: the stand-in's is stated for every case.
@@ -28,11 +32,15 @@ beforeEach(() => {
  * (connection 16), which constructs the `RfcTransport` from the spec's
  * `wireLogger` and `rfc` options: those are what is read here.
  */
-jest.mock('@mcp-abap-adt/connection', () => ({
-  ...jest.requireActual('@mcp-abap-adt/connection'),
-  // A connection object is all the factory keeps of what this returns.
-  createConnection: jest.fn(() => ({})),
-}));
+// connection's createConnection replaced on the module that defines it (the
+// package index re-exports it by getter, read at call time), as the Jest
+// factory did. A connection object is all the factory keeps of what this
+// returns.
+const create = mock.method(
+  createConnectionModule,
+  'createConnection',
+  (_spec: createConnectionModule.ConnectionSpec) => ({}),
+);
 
 const rfcConfig = {
   url: 'https://example.invalid',
@@ -49,8 +57,11 @@ const rfcConfig = {
 const credential = credentialFromSapConfig(rfcConfig as never);
 
 /** The last spec `createConnection` was given. */
-const lastSpec = () =>
-  (createConnection as unknown as jest.Mock).mock.calls.at(-1)?.[0];
+const lastSpec = () => {
+  const spec = create.mock.calls.at(-1)?.arguments[0];
+  // An RFC config: the RFC spec, whose `rfc` options are read here.
+  return spec?.transport === 'rfc' ? spec : undefined;
+};
 
 /** The RFC wire's options (`RfcTransport`'s third argument). */
 const optionsFromLastCall = () => lastSpec()?.rfc;
@@ -72,7 +83,7 @@ describe('the RFC wire logs only when asked', () => {
       if (value === undefined) delete process.env[name];
       else process.env[name] = value;
     }
-    (createConnection as unknown as jest.Mock).mockClear();
+    create.mock.resetCalls();
   });
 
   const connect = () =>
@@ -81,20 +92,22 @@ describe('the RFC wire logs only when asked', () => {
   it('stays off when nothing asked for it', () => {
     delete process.env.DEBUG_RFC_WIRE;
     connect();
-    expect(optionsFromLastCall()).toEqual({ logWire: false });
+    assert.deepStrictEqual(optionsFromLastCall(), { logWire: false });
   });
 
-  it.each(['true', '1'])('turns on for DEBUG_RFC_WIRE=%s', (value) => {
-    process.env.DEBUG_RFC_WIRE = value;
-    connect();
-    expect(optionsFromLastCall()).toMatchObject({ logWire: true });
-  });
+  for (const value of ['true', '1']) {
+    it(format('turns on for DEBUG_RFC_WIRE=%s', value), () => {
+      process.env.DEBUG_RFC_WIRE = value;
+      connect();
+      assertMatchObject(optionsFromLastCall(), { logWire: true });
+    });
+  }
 
   it('stays off for anything else, including "yes" and an empty value', () => {
     for (const value of ['yes', 'on', '', 'false', '0']) {
       process.env.DEBUG_RFC_WIRE = value;
       connect();
-      expect(optionsFromLastCall()).toEqual({ logWire: false });
+      assert.deepStrictEqual(optionsFromLastCall(), { logWire: false });
     }
   });
 
@@ -105,14 +118,14 @@ describe('the RFC wire logs only when asked', () => {
     connect();
     // Zero is a real answer — the size and none of the bytes — so it must not
     // be treated as "unset".
-    expect(optionsFromLastCall()).toEqual({
+    assert.deepStrictEqual(optionsFromLastCall(), {
       logWire: true,
       maxLoggedBodyChars: 0,
     });
 
     process.env.DEBUG_RFC_BODY_CHARS = 'Infinity';
     connect();
-    expect(optionsFromLastCall()).toEqual({
+    assert.deepStrictEqual(optionsFromLastCall(), {
       logWire: true,
       maxLoggedBodyChars: Number.POSITIVE_INFINITY,
     });
@@ -132,8 +145,8 @@ describe('the RFC wire logs only when asked', () => {
     process.env.DEBUG_RFC_BODY_CHARS = 'lots';
     connect();
     const options = optionsFromLastCall();
-    expect(options.logWire).toBe(true);
-    expect(Number.isNaN(options.maxLoggedBodyChars)).toBe(true);
+    assert.equal(options?.logWire, true);
+    assert.equal(Number.isNaN(options?.maxLoggedBodyChars), true);
   });
 
   /**
@@ -146,13 +159,13 @@ describe('the RFC wire logs only when asked', () => {
   it('brings a logger when the caller has none and the wire was asked for', () => {
     process.env.DEBUG_RFC_WIRE = 'true';
     createAbapConnection(rfcConfig as never, credential, undefined);
-    expect(loggerFromLastCall()).toBeDefined();
+    assert.notEqual(loggerFromLastCall(), undefined);
   });
 
   it('leaves the caller without one when the wire was not asked for', () => {
     delete process.env.DEBUG_RFC_WIRE;
     createAbapConnection(rfcConfig as never, credential, undefined);
-    expect(loggerFromLastCall()).toBeUndefined();
+    assert.equal(loggerFromLastCall(), undefined);
   });
 
   /**
@@ -163,7 +176,7 @@ describe('the RFC wire logs only when asked', () => {
    * debug switch that breaks the server being worse than one that prints
    * nothing, which is what this began as.
    */
-  it('writes to stderr, never to the stream JSON-RPC uses', () => {
+  it('writes to stderr, never to the stream JSON-RPC uses', (t) => {
     process.env.DEBUG_RFC_WIRE = 'true';
     createAbapConnection(rfcConfig as never, credential, undefined);
     const supplied = loggerFromLastCall() as {
@@ -173,36 +186,32 @@ describe('the RFC wire logs only when asked', () => {
 
     const out: string[] = [];
     const err: string[] = [];
-    const stdout = jest
-      .spyOn(process.stdout, 'write')
-      .mockImplementation((chunk: unknown) => {
-        out.push(String(chunk));
-        return true;
-      });
-    const stderr = jest
-      .spyOn(process.stderr, 'write')
-      .mockImplementation((chunk: unknown) => {
-        err.push(String(chunk));
-        return true;
-      });
+    const stdout = t.mock.method(process.stdout, 'write', (chunk: unknown) => {
+      out.push(String(chunk));
+      return true;
+    });
+    const stderr = t.mock.method(process.stderr, 'write', (chunk: unknown) => {
+      err.push(String(chunk));
+      return true;
+    });
     try {
       supplied.debug('RFC HEADERS: [{"NAME":"Accept"}]');
       supplied.info('something at info');
     } finally {
-      stdout.mockRestore();
-      stderr.mockRestore();
+      stdout.mock.restore();
+      stderr.mock.restore();
     }
 
-    expect(err.join('')).toContain('RFC HEADERS:');
-    expect(err.join('')).toContain('something at info');
-    expect(out).toEqual([]);
+    assert.ok(err.join('').includes('RFC HEADERS:'));
+    assert.ok(err.join('').includes('something at info'));
+    assert.deepStrictEqual(out, []);
   });
 
   it("never replaces the caller's own logger", () => {
     process.env.DEBUG_RFC_WIRE = 'true';
     const mine = { debug() {}, info() {}, warn() {}, error() {} };
     createAbapConnection(rfcConfig as never, credential, mine as never);
-    expect(loggerFromLastCall()).toBe(mine);
+    assert.equal(loggerFromLastCall(), mine);
   });
 
   it('says nothing about the ceiling when it was not set', () => {
@@ -211,6 +220,6 @@ describe('the RFC wire logs only when asked', () => {
     connect();
     // Not `undefined` in the object either: the package has its own default
     // and should be left to apply it.
-    expect(optionsFromLastCall()).toEqual({ logWire: true });
+    assert.deepStrictEqual(optionsFromLastCall(), { logWire: true });
   });
 });

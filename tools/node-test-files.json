@@ -682,6 +682,7 @@
   "src/__tests__/unit/sources/connectionAcquisition.test.ts",
   "src/__tests__/unit/sources/connectionEndsSources.test.ts",
   "src/__tests__/unit/sources/debuggerOwnConnection.test.ts",
+  "src/__tests__/unit/sources/descriptionsFunctional.test.ts",
   "src/__tests__/unit/sources/exactOptional.test.ts",
   "src/__tests__/unit/sources/freshConnectGap.test.ts",
   "src/__tests__/unit/sources/liveSkips.test.ts",

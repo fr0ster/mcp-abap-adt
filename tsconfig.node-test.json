@@ -28,7 +28,14 @@
   ],
   // Not the base configuration's `include`: the list adds the rest, and the
   // fixtures the machinery's tests run through `node --test` are built too.
+  // Every handler is built, whether a test imports it or not: two suites
+  // require handlers at run time by their source path
+  // (`unit/sources/descriptionsFunctional.test.ts` walks every one,
+  // `index.test.ts` loads three, with `lib/utils` and `lib/logger`).
   "include": [
+    "src/handlers/**/*.ts",
+    "src/lib/utils.ts",
+    "src/lib/logger.ts",
     "src/__tests__/unit/coverage/__fixtures__/report/*.ts",
     "src/__tests__/unit/coverage/__fixtures__/live/*.ts"
   ],

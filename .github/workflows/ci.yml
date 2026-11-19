@@ -212,16 +212,11 @@ jobs:
       - name: Type-check responsible-rules tests
         run: npm --prefix responsible-rules run test:check
 
-      # Any known advisory of moderate severity or above in what the packages
-      # ship (production dependencies) fails the run. Dev dependencies are
-      # audited again once the tests leave Jest (#361). The picomatch advisory
-      # GHSA-fc5q-39xc-vjpf was withdrawn on GitHub on 2026-11-18, but
-      # `npm audit` still reports it on this tree (npm advisory 1247710,
-      # measured 2026-11-18); it reaches the tree only through dev
-      # dependencies — jest, jest-util and lint-staged.
+      # Any known advisory of moderate severity or above in the whole tree —
+      # what the packages ship and every dev dependency — fails the run.
       - name: Security audit (moderate+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
-        run: npm audit --omit=dev --audit-level=moderate
+        run: npm audit --audit-level=moderate
 
       # All eighteen packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the

@@ -263,13 +263,11 @@ for (const file of WORKFLOWS) {
       );
     });
 
-    it('gates on every known advisory of moderate severity or above in a production dependency (dev again once #361 removes Jest)', () => {
+    it('gates on every known advisory of moderate severity or above in the whole tree', () => {
       const audit = step(lines, 'Security audit (moderate+)').map((line) =>
         line.trim(),
       );
-      assert.ok(
-        audit.includes('run: npm audit --omit=dev --audit-level=moderate'),
-      );
+      assert.ok(audit.includes('run: npm audit --audit-level=moderate'));
       assert.deepStrictEqual(
         lines.filter((line) => line.trim().startsWith('continue-on-error')),
         [],
@@ -307,6 +305,17 @@ it('no package script and no git hook calls npx', () => {
   const hook = readFileSync(join(ROOT, '.husky', 'pre-commit'), 'utf8');
   if (/\bnpx\b/.test(hook)) offenders.push('.husky/pre-commit');
   assert.deepStrictEqual(offenders, []);
+});
+
+it('the pre-commit hook checks the staged files then builds', () => {
+  const hook = readFileSync(join(ROOT, '.husky', 'pre-commit'), 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'));
+  assert.deepStrictEqual(hook, [
+    'biome check --staged --diagnostic-level=error',
+    'npm run build',
+  ]);
 });
 
 it('every dependency install script is decided, and the policy is strict', () => {

@@ -1,2 +1,2 @@
-lint-staged
+biome check --staged --diagnostic-level=error
 npm run build

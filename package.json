@@ -222,7 +222,6 @@
     "esbuild": "^0.28.2",
     "express": "^5.1.0",
     "husky": "^9.1.7",
-    "lint-staged": "^16.4.0",
     "postject": "^1.0.0-alpha.6",
     "tsx": "^4.23.15",
     "typescript": "^6.0.2"
@@ -269,11 +268,6 @@
     "CONTRIBUTORS.md",
     "CHANGELOG.md"
   ],
-  "lint-staged": {
-    "{src,scripts,*/src}/**/*.{ts,js,mjs,cjs}": [
-      "biome check --write"
-    ]
-  },
   "private": false,
   "allowScripts": {
     "esbuild": false,

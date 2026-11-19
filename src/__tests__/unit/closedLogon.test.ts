@@ -6,9 +6,19 @@
  * error and never a connection whose session is gone. One logoff.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
+import {
+  ClosedInstanceRefusal,
+  isClosedInstanceRefusal,
+} from '../../lib/auth/failures';
+import * as connectionFactory from '../../lib/connectionFactory';
+import { closeInstance } from '../../lib/instanceClose';
+import { rejectionOf } from '../helpers/assertions';
 
 interface Held extends IAbapConnection {
   connects: number;
@@ -19,41 +29,38 @@ interface Held extends IAbapConnection {
 
 const built: Held[] = [];
 let rejectNext = false;
-jest.mock('../../lib/connectionFactory', () => {
-  const actual = jest.requireActual('../../lib/connectionFactory');
-  return {
-    ...actual,
-    createAbapConnection: () => {
-      let release: () => void = () => {};
-      const gate = new Promise<void>((r) => {
-        release = r;
-      });
-      const connection = {
-        connects: 0,
-        disconnects: 0,
-        release: () => release(),
-        rejectAfter: rejectNext,
-        async connect() {
-          connection.connects += 1;
-          await gate;
-          if (connection.rejectAfter) throw new Error('connect abandoned');
-        },
-        async disconnect() {
-          connection.disconnects += 1;
-        },
-      } as unknown as Held;
-      built.push(connection);
-      return connection;
-    },
-  };
-});
 
-import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
-import {
-  ClosedInstanceRefusal,
-  isClosedInstanceRefusal,
-} from '../../lib/auth/failures';
-import { closeInstance } from '../../lib/instanceClose';
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+// Every case restores every mock after it: they are replaced before each.
+beforeEach(() => {
+  // The real exports, read before any is replaced.
+  const actual = { ...connectionFactory };
+
+  mock.method(connectionFactory, 'createAbapConnection', () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const connection = {
+      connects: 0,
+      disconnects: 0,
+      release: () => release(),
+      rejectAfter: rejectNext,
+      async connect() {
+        connection.connects += 1;
+        await gate;
+        if (connection.rejectAfter) throw new Error('connect abandoned');
+      },
+      async disconnect() {
+        connection.disconnects += 1;
+      },
+    } as unknown as Held;
+    built.push(connection);
+    return connection;
+  });
+});
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 const SETTINGS: SapConfig = {
@@ -100,20 +107,20 @@ const turns = async (n = 10) => {
 beforeEach(() => {
   built.splice(0);
   rejectNext = false;
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 it('the close lands while connect runs, and connect then resolves: refused, one logoff', async () => {
   const server = new Server();
   const logon = server.connection();
-  const refused = expect(logon).rejects.toBeInstanceOf(ClosedInstanceRefusal);
+  const refused = rejectionOf(logon);
   await turns();
-  expect(built[0]?.connects).toBe(1);
+  assert.equal(built[0]?.connects, 1);
   await closeInstance(server);
   built[0]?.release();
-  await refused;
-  expect(built[0]?.disconnects).toBe(1);
+  assert.ok((await refused) instanceof ClosedInstanceRefusal);
+  assert.equal(built[0]?.disconnects, 1);
 });
 
 it('the close lands while connect runs, and connect then rejects: the refusal, not the connect error; one logoff', async () => {
@@ -127,6 +134,6 @@ it('the close lands while connect runs, and connect then rejects: the refusal, n
   await closeInstance(server);
   built[0]?.release();
   await logon;
-  expect(isClosedInstanceRefusal(thrown)).toBe(true);
-  expect(built[0]?.disconnects).toBe(1);
+  assert.equal(isClosedInstanceRefusal(thrown), true);
+  assert.equal(built[0]?.disconnects, 1);
 });

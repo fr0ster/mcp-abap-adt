@@ -10,34 +10,52 @@
  * - an injected connection is the consumer's and is never disconnected.
  */
 
+import assert from 'node:assert/strict';
+import {
+  after,
+  afterEach,
+  before,
+  beforeEach,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import {
   type CreatedConnection,
   createConnection,
   type SapConfig,
 } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(),
-  siblingRecordOf: jest.fn(() => undefined),
-  // The connect's system lookup asks the kind: on-premise sends nothing.
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-  // The one kind agrees: the kind is mocked above.
-  admitOnKind: jest.fn(() => undefined),
-}));
-
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { ConnectionContext } from '../../../embeddable/ConnectionContext';
-import { createAbapConnection } from '../../../lib/connectionFactory';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import { own, ownedConnections } from '../../../lib/ownedConnections';
 import type { StatePart } from '../../../lib/state/InstanceState';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
+import { assertRejects } from '../../helpers/assertions';
 
-const build = createAbapConnection as jest.MockedFunction<
-  typeof createAbapConnection
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+// Every case restores every mock after it: they are replaced before each.
+let build: Mock<
+  typeof connectionFactory.createAbapConnection | (() => undefined)
 >;
+beforeEach(() => {
+  build = mock.method(
+    connectionFactory,
+    'createAbapConnection',
+    () => undefined,
+  );
+  mock.method(connectionFactory, 'siblingRecordOf', () => undefined);
+  // The connect's system lookup asks the kind: on-premise sends nothing.
+  mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
+  // A view over a connection keeps its kind: the kind is mocked above.
+  mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
+  // The one kind agrees: the kind is mocked above.
+  mock.method(connectionFactory, 'admitOnKind', () => undefined);
+});
+
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 interface Recorded {
@@ -47,11 +65,11 @@ interface Recorded {
 
 let stand: AdtStandIn;
 
-beforeAll(async () => {
+before(async () => {
   stand = await adtStandIn();
 });
 
-afterAll(async () => {
+after(async () => {
   await stand.close();
 });
 
@@ -67,8 +85,8 @@ function recorded(): Recorded {
     system: 'onprem',
     transport: 'http',
   });
-  jest.spyOn(connection, 'connect').mockImplementation(async () => {});
-  jest.spyOn(connection, 'disconnect').mockImplementation(async () => {
+  mock.method(connection, 'connect', async () => {});
+  mock.method(connection, 'disconnect', async () => {
     disconnects += 1;
     // connection 16: a second disconnect() rejects NOT_CONNECTED.
     if (disconnects > 1) throw new Error('ADT_NOT_CONNECTED');
@@ -131,7 +149,7 @@ function failingPart(failures: number) {
 
 function builtServer() {
   const own_ = recorded();
-  build.mockImplementation(() => own_.connection);
+  build.mock.mockImplementation(() => own_.connection);
   const server = new TestServer();
   const credential = provider();
   server.use({
@@ -142,11 +160,10 @@ function builtServer() {
 }
 
 beforeEach(() => {
-  build.mockReset();
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 it('dispose() undoes the state and closes no connection', async () => {
   const { server, built } = builtServer();
@@ -154,8 +171,8 @@ it('dispose() undoes the state and closes no connection', async () => {
   const { part } = failingPart(0);
   server.state.attach(part);
   await server.dispose();
-  expect(server.holdsState()).toBe(false);
-  expect(built.disconnects()).toBe(0);
+  assert.equal(server.holdsState(), false);
+  assert.equal(built.disconnects(), 0);
   await server.terminalClose();
 });
 
@@ -163,11 +180,11 @@ it('a second dispose() after a failed undo retries it', async () => {
   const { server } = builtServer();
   const { part, disposals } = failingPart(1);
   server.state.attach(part);
-  await expect(server.dispose()).rejects.toThrow(/stop refused/);
-  expect(server.holdsState()).toBe(true);
+  await assertRejects(server.dispose(), /stop refused/);
+  assert.equal(server.holdsState(), true);
   await server.dispose();
-  expect(disposals()).toBe(2);
-  expect(server.holdsState()).toBe(false);
+  assert.equal(disposals(), 2);
+  assert.equal(server.holdsState(), false);
 });
 
 it('the terminal close disconnects each connection the instance owns once — after a failed undo too — and a second one disconnects nothing', async () => {
@@ -179,17 +196,17 @@ it('the terminal close disconnects each connection the instance owns once — af
   const { part } = failingPart(Number.POSITIVE_INFINITY);
   server.state.attach(part);
 
-  await expect(server.dispose()).rejects.toThrow(/stop refused/);
-  expect(server.holdsState()).toBe(true);
+  await assertRejects(server.dispose(), /stop refused/);
+  assert.equal(server.holdsState(), true);
 
   await server.terminalClose();
-  expect(built.disconnects()).toBe(1);
-  expect(stateOwn.disconnects()).toBe(1);
-  expect(ownedConnections(server)).toEqual([]);
+  assert.equal(built.disconnects(), 1);
+  assert.equal(stateOwn.disconnects(), 1);
+  assert.deepStrictEqual(ownedConnections(server), []);
 
   await server.terminalClose();
-  expect(built.disconnects()).toBe(1);
-  expect(stateOwn.disconnects()).toBe(1);
+  assert.equal(built.disconnects(), 1);
+  assert.equal(stateOwn.disconnects(), 1);
 });
 
 it('an injected connection is the consumer’s: never disconnected', async () => {
@@ -199,9 +216,9 @@ it('an injected connection is the consumer’s: never disconnected', async () =>
     kind: 'injected',
     connection: injected.connection,
   });
-  expect(await server.connection()).toBe(injected.connection);
+  assert.equal(await server.connection(), injected.connection);
   await server.dispose();
   await server.terminalClose();
-  expect(injected.disconnects()).toBe(0);
-  expect(ownedConnections(server)).toEqual([]);
+  assert.equal(injected.disconnects(), 0);
+  assert.deepStrictEqual(ownedConnections(server), []);
 });

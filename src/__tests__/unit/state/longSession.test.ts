@@ -12,15 +12,10 @@
  *   control tools, it bypasses recording and its refusal of connectionless
  *   tools.
  */
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(() => {
-    throw new Error('no connection may be built here');
-  }),
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-}));
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import {
@@ -33,6 +28,7 @@ import * as z from 'zod';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
 import { LateBoundConnection } from '../../../lib/batch/lateBound';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import type { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import type {
   HandlerEntry,
@@ -52,6 +48,16 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+mock.method(connectionFactory, 'createAbapConnection', () => {
+  throw new Error('no connection may be built here');
+});
+mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
+// A view over a connection keeps its kind: the kind is mocked above.
+mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
@@ -138,7 +144,7 @@ const answerOf = (result: unknown) => {
 /** An open batch record whose connection sends nothing. */
 const openRecord = () => ({
   connection: {
-    execute: jest.fn(async () => undefined),
+    execute: mock.fn(async () => undefined),
   } as unknown as AdtBatchConnection,
   target: new LateBoundConnection(),
   recorded: [],
@@ -149,32 +155,37 @@ describe('the LongSession part', () => {
     const part = new LongSession();
     const changes: boolean[] = [];
     part.observe(() => changes.push(part.holdsState()));
-    expect(part.holdsState()).toBe(false);
+    assert.equal(part.holdsState(), false);
     part.open();
-    expect(part.holdsState()).toBe(true);
+    assert.equal(part.holdsState(), true);
     part.open(); // already open: nothing changes
-    expect(changes).toEqual([true]);
-    expect(part.pending()).toBe(false);
-    expect(part.failures()).toEqual([]);
+    assert.deepStrictEqual(changes, [true]);
+    assert.equal(part.pending(), false);
+    assert.deepStrictEqual(part.failures(), []);
     await part.dispose();
-    expect(part.holdsState()).toBe(false);
-    expect(changes).toEqual([true, false]);
+    assert.equal(part.holdsState(), false);
+    assert.deepStrictEqual(changes, [true, false]);
   });
 });
 
 describe('where the session tools are served', () => {
-  it.each(SETS)(
-    '%s: served on Streamable HTTP alone, marked read-only',
-    (_kind, set, tool) => {
-      const http = namesOf(set, 'http');
-      const open = http.find((d) => d.name === tool);
-      expect(open?.description.startsWith('[read-only] ')).toBe(true);
-      for (const transport of ['stdio', 'sse'] as const) {
-        const names = namesOf(set, transport).map((d) => d.name);
-        expect(names.filter((n) => SESSION_TOOLS.includes(n))).toEqual([]);
-      }
-    },
-  );
+  for (const [_kind, set, tool] of SETS) {
+    it(
+      format('%s: served on Streamable HTTP alone, marked read-only', _kind),
+      () => {
+        const http = namesOf(set, 'http');
+        const open = http.find((d) => d.name === tool);
+        assert.equal(open?.description.startsWith('[read-only] '), true);
+        for (const transport of ['stdio', 'sse'] as const) {
+          const names = namesOf(set, transport).map((d) => d.name);
+          assert.deepStrictEqual(
+            names.filter((n) => SESSION_TOOLS.includes(n)),
+            [],
+          );
+        }
+      },
+    );
+  }
 
   it('the compact HandlerSession takes action open and close', () => {
     const [, set] = SETS[2] ?? [];
@@ -183,8 +194,8 @@ describe('where the session tools are served', () => {
     );
     if (tool === undefined) throw new Error('no HandlerSession');
     const schema = listedJson(tool.inputSchema);
-    expect(jsonAt(schema, 'action').enum).toEqual(['open', 'close']);
-    expect(declaredRequired(tool.inputSchema)).toEqual(['action']);
+    assert.deepStrictEqual(jsonAt(schema, 'action').enum, ['open', 'close']);
+    assert.deepStrictEqual(declaredRequired(tool.inputSchema), ['action']);
   });
 });
 
@@ -197,13 +208,15 @@ describe('open on an instance', () => {
       batch: new InstanceBatch({ keepRawParts: false }),
       longSession,
     });
-    expect(server.holds()).toBe(false);
+    assert.equal(server.holds(), false);
     const answer = answerOf(
       await client.callTool({ name: 'SessionOpen', arguments: {} }),
     );
-    expect(answer.isError).toBe(false);
-    expect(JSON.parse(answer.text)).toEqual({ state_handle: server.handle });
-    expect(server.holds()).toBe(true);
+    assert.equal(answer.isError, false);
+    assert.deepStrictEqual(JSON.parse(answer.text), {
+      state_handle: server.handle,
+    });
+    assert.equal(server.holds(), true);
   });
 
   it('without the host part it is refused, holding nothing', async () => {
@@ -211,9 +224,9 @@ describe('open on an instance', () => {
     const answer = answerOf(
       await client.callTool({ name: 'SessionOpen', arguments: {} }),
     );
-    expect(answer.isError).toBe(true);
-    expect(answer.text).toContain('long_session_unavailable');
-    expect(server.holds()).toBe(false);
+    assert.equal(answer.isError, true);
+    assert.ok(answer.text.includes('long_session_unavailable'));
+    assert.equal(server.holds(), false);
   });
 });
 
@@ -234,50 +247,64 @@ describe('open while a batch is open', () => {
     ],
   ];
 
-  it.each(sets)(
-    '%s: in a communication batch it runs at once, is not recorded, and the batch stays open',
-    async (_label, set, tool, args) => {
-      const batch = new InstanceBatch({ keepRawParts: false });
-      const { server, client } = await served(
-        registryOf(set, 'http', { dataTools: false }),
-        {
-          batch,
-          longSession: new LongSession(),
-        },
-      );
-      batch.begin('communication', openRecord());
-      const answer = answerOf(
-        await client.callTool({ name: tool, arguments: args }),
-      );
-      expect(answer.isError).toBe(false);
-      expect(JSON.parse(answer.text)).toEqual({ state_handle: server.handle });
-      expect(batch.mode()).toBe('communication');
-      // Nothing recorded: the next number is still the first.
-      expect(batch.nextNumber()).toBe(1);
-    },
-  );
+  for (const [_label, set, tool, args] of sets) {
+    it(
+      format(
+        '%s: in a communication batch it runs at once, is not recorded, and the batch stays open',
+        _label,
+      ),
+      async () => {
+        const batch = new InstanceBatch({ keepRawParts: false });
+        const { server, client } = await served(
+          registryOf(set, 'http', { dataTools: false }),
+          {
+            batch,
+            longSession: new LongSession(),
+          },
+        );
+        batch.begin('communication', openRecord());
+        const answer = answerOf(
+          await client.callTool({ name: tool, arguments: args }),
+        );
+        assert.equal(answer.isError, false);
+        assert.deepStrictEqual(JSON.parse(answer.text), {
+          state_handle: server.handle,
+        });
+        assert.equal(batch.mode(), 'communication');
+        // Nothing recorded: the next number is still the first.
+        assert.equal(batch.nextNumber(), 1);
+      },
+    );
+  }
 
-  it.each(sets)(
-    '%s: in a debugger batch it runs at once, is not recorded, and the batch stays open',
-    async (_label, set, tool, args) => {
-      const batch = new InstanceBatch({ keepRawParts: false });
-      const { server, client } = await served(
-        registryOf(set, 'http', { dataTools: false }),
-        {
-          batch,
-          longSession: new LongSession(),
-        },
-      );
-      batch.begin('debugger', openRecord());
-      const answer = answerOf(
-        await client.callTool({ name: tool, arguments: args }),
-      );
-      expect(answer.isError).toBe(false);
-      expect(JSON.parse(answer.text)).toEqual({ state_handle: server.handle });
-      expect(batch.mode()).toBe('debugger');
-      expect(batch.nextNumber()).toBe(1);
-    },
-  );
+  for (const [_label, set, tool, args] of sets) {
+    it(
+      format(
+        '%s: in a debugger batch it runs at once, is not recorded, and the batch stays open',
+        _label,
+      ),
+      async () => {
+        const batch = new InstanceBatch({ keepRawParts: false });
+        const { server, client } = await served(
+          registryOf(set, 'http', { dataTools: false }),
+          {
+            batch,
+            longSession: new LongSession(),
+          },
+        );
+        batch.begin('debugger', openRecord());
+        const answer = answerOf(
+          await client.callTool({ name: tool, arguments: args }),
+        );
+        assert.equal(answer.isError, false);
+        assert.deepStrictEqual(JSON.parse(answer.text), {
+          state_handle: server.handle,
+        });
+        assert.equal(batch.mode(), 'debugger');
+        assert.equal(batch.nextNumber(), 1);
+      },
+    );
+  }
 });
 
 describe('the host declaration of state_handle', () => {
@@ -311,8 +338,8 @@ describe('the host declaration of state_handle', () => {
         arguments: { state_handle: 'H' },
       }),
     );
-    expect(answer.isError).toBe(false);
-    expect(JSON.parse(answer.text)).toEqual({ state_handle: 'H' });
+    assert.equal(answer.isError, false);
+    assert.deepStrictEqual(JSON.parse(answer.text), { state_handle: 'H' });
   });
 });
 
@@ -383,59 +410,64 @@ describe('close on an instance', () => {
     const taken = answerOf(
       await client.callTool({ name: 'TakeDebugger', arguments: {} }),
     );
-    expect(taken).toEqual({ text: 'taken', isError: false });
-    expect(server.holds()).toBe(true);
+    assert.deepStrictEqual(taken, { text: 'taken', isError: false });
+    assert.equal(server.holds(), true);
 
     const answer = answerOf(
       await client.callTool({ name: 'SessionClose', arguments: {} }),
     );
-    expect(answer.isError).toBe(false);
-    expect(JSON.parse(answer.text)).toEqual({
+    assert.equal(answer.isError, false);
+    assert.deepStrictEqual(JSON.parse(answer.text), {
       closed: true,
       held: { locks: 0, batch: false, debug_session: true },
     });
-    expect(server.closeAsked()).toBe(true);
+    assert.equal(server.closeAsked(), true);
   });
 
-  it.each([
+  for (const [_label, tool, args] of [
     ['full', 'SessionClose', {}],
     ['compact', 'HandlerSession', { action: 'close' }],
-  ] as const)(
-    '%s: in a debugger batch it runs at once, is not recorded, and the instance close drops the batch',
-    async (_label, tool, args) => {
-      const set =
-        tool === 'SessionClose'
-          ? fullToolSet
-          : compactToolSetOf({
-              readOnly: compactReadOnlyEntries,
-              data: compactDataEntries,
-              modify: compactModifyEntries,
-            });
-      const batch = new InstanceBatch({ keepRawParts: false });
-      const { server, client } = await served(
-        registryOf(set, 'http', { dataTools: false }),
-        {
-          batch,
-          longSession: new LongSession(),
-        },
-      );
-      batch.begin('debugger', openRecord());
-      const answer = answerOf(
-        await client.callTool({ name: tool, arguments: { ...args } }),
-      );
-      expect(answer.isError).toBe(false);
-      expect(JSON.parse(answer.text)).toEqual({
-        closed: true,
-        held: { locks: 0, batch: true, debug_session: false },
-      });
-      // Run at once, not recorded: the batch is still open, its first number unused.
-      expect(batch.mode()).toBe('debugger');
-      expect(batch.nextNumber()).toBe(1);
-      expect(server.closeAsked()).toBe(true);
-      // The host's close once the answer is written (the pool's `closeOut`).
-      await closeInstance(server);
-      expect(batch.mode()).toBe('off');
-      expect(batch.holdsState()).toBe(false);
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        '%s: in a debugger batch it runs at once, is not recorded, and the instance close drops the batch',
+        _label,
+      ),
+      async () => {
+        const set =
+          tool === 'SessionClose'
+            ? fullToolSet
+            : compactToolSetOf({
+                readOnly: compactReadOnlyEntries,
+                data: compactDataEntries,
+                modify: compactModifyEntries,
+              });
+        const batch = new InstanceBatch({ keepRawParts: false });
+        const { server, client } = await served(
+          registryOf(set, 'http', { dataTools: false }),
+          {
+            batch,
+            longSession: new LongSession(),
+          },
+        );
+        batch.begin('debugger', openRecord());
+        const answer = answerOf(
+          await client.callTool({ name: tool, arguments: { ...args } }),
+        );
+        assert.equal(answer.isError, false);
+        assert.deepStrictEqual(JSON.parse(answer.text), {
+          closed: true,
+          held: { locks: 0, batch: true, debug_session: false },
+        });
+        // Run at once, not recorded: the batch is still open, its first number unused.
+        assert.equal(batch.mode(), 'debugger');
+        assert.equal(batch.nextNumber(), 1);
+        assert.equal(server.closeAsked(), true);
+        // The host's close once the answer is written (the pool's `closeOut`).
+        await closeInstance(server);
+        assert.equal(batch.mode(), 'off');
+        assert.equal(batch.holdsState(), false);
+      },
+    );
+  }
 });

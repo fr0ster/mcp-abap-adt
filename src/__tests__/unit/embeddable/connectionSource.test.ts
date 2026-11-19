@@ -6,6 +6,16 @@
  * connector built.
  */
 
+import assert from 'node:assert/strict';
+import {
+  after,
+  before,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import {
   type AbapConnection,
   type CreatedConnection,
@@ -14,35 +24,37 @@ import {
 } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(),
-  // The connect's system lookup asks the kind: on-premise sends nothing.
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-  // The one kind agrees: the kind is mocked above.
-  admitOnKind: jest.fn(() => undefined),
-}));
-
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type {
   ConnectionContext,
   ConnectionSource,
 } from '../../../embeddable/ConnectionContext';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
-import { createAbapConnection } from '../../../lib/connectionFactory';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { presented } from '../../helpers/presented';
 import { stateSystemKind } from '../../helpers/systemKind';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+const build = mock.method(
+  connectionFactory,
+  'createAbapConnection',
+  () => undefined,
+);
+// The connect's system lookup asks the kind: on-premise sends nothing.
+mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
+// A view over a connection keeps its kind: the kind is mocked above.
+mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
+// The one kind agrees: the kind is mocked above.
+mock.method(connectionFactory, 'admitOnKind', () => undefined);
 
 // The system kind is required: the stand-in's is stated for every case.
 beforeEach(() => {
   stateSystemKind();
 });
 
-const build = createAbapConnection as jest.MockedFunction<
-  typeof createAbapConnection
->;
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
 class TestServer extends BaseMcpServer {
@@ -75,11 +87,11 @@ function provider(): IAuthProvider {
 
 let stand: AdtStandIn;
 
-beforeAll(async () => {
+before(async () => {
   stand = await adtStandIn();
 });
 
-afterAll(async () => {
+after(async () => {
   await stand.close();
 });
 
@@ -94,19 +106,19 @@ function quietConnection(): CreatedConnection {
     system: 'onprem',
     transport: 'http',
   });
-  jest.spyOn(connection, 'connect').mockImplementation(async () => {});
+  mock.method(connection, 'connect', async () => {});
   return connection;
 }
 
 beforeEach(() => {
-  build.mockReset();
-  build.mockImplementation(() => quietConnection());
+  build.mock.resetCalls();
+  build.mock.mockImplementation(() => quietConnection());
 });
 
 describe("'built': the source resolves, the connection is built from its answer", () => {
   it('calls resolve with the signal the caller passes', async () => {
     const credential = provider();
-    const resolve = jest.fn(async (_signal: AbortSignal) => ({
+    const resolve = mock.fn(async (_signal: AbortSignal) => ({
       settings: SETTINGS,
       credential,
     }));
@@ -117,34 +129,37 @@ describe("'built': the source resolves, the connection is built from its answer"
     const signal = new AbortController().signal;
     const connection = await server.connection(signal);
 
-    expect(resolve).toHaveBeenCalledTimes(1);
-    expect(resolve.mock.calls[0][0]).toBe(signal);
-    expect(build).toHaveBeenCalledTimes(1);
-    expect(build.mock.calls[0][0]).toEqual(SETTINGS);
-    expect(presented(build.mock.calls[0][1])).toBe(credential);
-    expect(connection).toBe(build.mock.results[0].value);
-    expect(
-      (connection as unknown as { connect: jest.Mock }).connect,
-    ).toHaveBeenCalledTimes(1);
+    assert.equal(resolve.mock.callCount(), 1);
+    assert.equal(resolve.mock.calls[0]?.arguments[0], signal);
+    assert.equal(build.mock.callCount(), 1);
+    assert.deepStrictEqual(build.mock.calls[0]?.arguments[0], SETTINGS);
+    assert.equal(presented(build.mock.calls[0]?.arguments[1]), credential);
+    assert.equal(connection, build.mock.calls[0]?.result);
+    assert.equal(
+      (
+        connection as unknown as { connect: Mock<() => Promise<void>> }
+      ).connect.mock.callCount(),
+      1,
+    );
   });
 });
 
 describe("'injected': the connection is used as given", () => {
   it('the same object, never connected, never wrapped, no connector built', async () => {
-    const connect = jest.fn(async () => {});
+    const connect = mock.fn(async () => {});
     const injected = { connect } as unknown as AbapConnection;
     const server = new TestServer();
     server.use({ kind: 'injected', connection: injected });
 
     const signal = new AbortController().signal;
-    expect(await server.connection(signal)).toBe(injected);
-    expect(await server.connection(signal)).toBe(injected);
-    expect(connect).not.toHaveBeenCalled();
-    expect(build).not.toHaveBeenCalled();
+    assert.equal(await server.connection(signal), injected);
+    assert.equal(await server.connection(signal), injected);
+    assert.equal(connect.mock.callCount(), 0);
+    assert.equal(build.mock.callCount(), 0);
   });
 
   it("EmbeddableMcpServer's connection option is an injected source", async () => {
-    const connect = jest.fn(async () => {});
+    const connect = mock.fn(async () => {});
     const injected = { connect } as unknown as AbapConnection;
     const server = new EmbeddableMcpServer({
       connection: injected,
@@ -154,10 +169,11 @@ describe("'injected': the connection is used as given", () => {
     const reach = server as unknown as {
       getConnection(signal: AbortSignal): Promise<AbapConnection>;
     };
-    expect(await reach.getConnection(new AbortController().signal)).toBe(
+    assert.equal(
+      await reach.getConnection(new AbortController().signal),
       injected,
     );
-    expect(connect).not.toHaveBeenCalled();
-    expect(build).not.toHaveBeenCalled();
+    assert.equal(connect.mock.callCount(), 0);
+    assert.equal(build.mock.callCount(), 0);
   });
 });

@@ -13,35 +13,15 @@
  * caller cancelled in `server-runtime/src/stdio/__tests__/cancel/lateConnect.test.ts`.
  */
 
+/** The connections the factory built, each recorded. */
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-
-/** The connections the factory built, each recorded. */
-const built: Closable[] = [];
-const records = new WeakMap<
-  object,
-  { settings: SapConfig; credential?: IAuthProvider | undefined }
->();
-jest.mock('../../lib/connectionFactory', () => {
-  const actual = jest.requireActual('../../lib/connectionFactory');
-  return {
-    ...actual,
-    createAbapConnection: (settings: SapConfig, credential?: IAuthProvider) => {
-      const connection = closable(settings.connectionType === 'rfc');
-      records.set(connection, { settings, credential });
-      built.push(connection);
-      return connection;
-    },
-    siblingRecordOf: (connection: object) => {
-      const record = records.get(connection);
-      return record ? { settings: record.settings, credential: {} } : undefined;
-    },
-  };
-});
-
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 import type { ConnectionContext } from '../../embeddable/ConnectionContext';
+import * as connectionFactory from '../../lib/connectionFactory';
 import { LOGOFF_NOT_WRITTEN, liveDebugPorts } from '../../lib/debugger/ports';
 import {
   closeOwnedConnections,
@@ -67,6 +47,37 @@ import {
   setConfigOverride,
   setConnectionOverride,
 } from '../../lib/utils';
+import { assertRejects } from '../helpers/assertions';
+
+const built: Closable[] = [];
+const records = new WeakMap<
+  object,
+  { settings: SapConfig; credential?: IAuthProvider | undefined }
+>();
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+// Every case restores every mock after it: they are replaced before each.
+beforeEach(() => {
+  // The real exports, read before any is replaced.
+  const actual = { ...connectionFactory };
+
+  mock.method(
+    connectionFactory,
+    'createAbapConnection',
+    (settings: SapConfig, credential?: IAuthProvider) => {
+      const connection = closable(settings.connectionType === 'rfc');
+      records.set(connection, { settings, credential });
+      built.push(connection);
+      return connection;
+    },
+  );
+  mock.method(connectionFactory, 'siblingRecordOf', (connection: object) => {
+    const record = records.get(connection);
+    return record ? { settings: record.settings, credential: {} } : undefined;
+  });
+});
 
 interface Closable extends IAbapConnection {
   disconnects: number;
@@ -151,7 +162,7 @@ async function authorizeOn(connection: unknown): Promise<void> {
     header: () => ({ ok: true }),
     cookies: () => ({ ok: true }),
   } as never);
-  expect(outcome.ok).toBe(true);
+  assert.equal(outcome.ok, true);
 }
 
 class Server extends BaseMcpServer {
@@ -189,10 +200,10 @@ const turns = async (n = 10) => {
 
 beforeEach(() => {
   built.splice(0);
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 describe("BaseMcpServer.getConnection: the instance's own connection", () => {
   function serve(credentials: IAuthProvider[]) {
@@ -217,30 +228,32 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     await server.connection();
     await server.terminalClose();
     await server.terminalClose();
-    expect(built.map((c) => c.disconnects)).toEqual([1]);
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1],
+    );
   });
 
-  it('a failed connect ends at once, and the next call connects afresh', async () => {
+  it('a failed connect ends at once, and the next call connects afresh', async (t) => {
     const server = serve([provider()]);
     const failing = closable();
     failing.failConnect = true;
-    const real = jest.requireMock('../../lib/connectionFactory') as {
+    const real = connectionFactory as unknown as {
       createAbapConnection: (s: SapConfig) => Closable;
     };
-    const spy = jest
-      .spyOn(real, 'createAbapConnection')
-      .mockImplementationOnce(() => {
-        built.push(failing);
-        return failing;
-      });
-    await expect(server.connection()).rejects.toThrow('connect refused');
-    expect(failing.disconnects).toBe(1);
-    spy.mockRestore();
+    const spy = t.mock.method(real, 'createAbapConnection');
+    spy.mock.mockImplementationOnce(() => {
+      built.push(failing);
+      return failing;
+    }, 0);
+    await assertRejects(server.connection(), 'connect refused');
+    assert.equal(failing.disconnects, 1);
+    spy.mock.restore();
     await server.connection();
-    expect(built).toHaveLength(2);
+    assert.equal(built.length, 2);
     await server.terminalClose();
-    expect(failing.disconnects).toBe(1);
-    expect(built[1]?.disconnects).toBe(1);
+    assert.equal(failing.disconnects, 1);
+    assert.equal(built[1]?.disconnects, 1);
   });
 
   it('a new credential after the last call was released: the same connection, presenting the new credential; nothing logged off before the terminal close', async () => {
@@ -251,46 +264,52 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     await authorizeOn(first);
     server.done(first);
     const second = await server.connection();
-    expect(second).toBe(first);
-    expect(built).toHaveLength(1);
-    expect(built[0]?.disconnects).toBe(0);
+    assert.equal(second, first);
+    assert.equal(built.length, 1);
+    assert.equal(built[0]?.disconnects, 0);
     await authorizeOn(second);
-    expect(before.authorized).toBe(1);
-    expect(renewed.authorized).toBe(1);
+    assert.equal(before.authorized, 1);
+    assert.equal(renewed.authorized, 1);
     server.done(second);
     await server.terminalClose();
-    expect(built.map((c) => c.disconnects)).toEqual([1]);
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1],
+    );
   });
 
   it('a new credential while a call works on the connection: the same connection for both, nothing logged off under either', async () => {
     const server = serve([provider(), provider()]);
     const first = await server.connection(); // a call in flight on it
     const second = await server.connection(); // another credential
-    expect(second).toBe(first);
+    assert.equal(second, first);
     await turns();
-    expect(built[0]?.disconnects).toBe(0);
+    assert.equal(built[0]?.disconnects, 0);
     server.done(first);
     await turns();
-    expect(built[0]?.disconnects).toBe(0);
+    assert.equal(built[0]?.disconnects, 0);
     server.done(second);
     await server.terminalClose();
-    expect(built.map((c) => c.disconnects)).toEqual([1]);
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1],
+    );
   });
 
-  it('a new credential while the connect is still running: the call waits for the same connect, nothing logged off', async () => {
+  it('a new credential while the connect is still running: the call waits for the same connect, nothing logged off', async (t) => {
     const connecting = gate();
-    const real = jest.requireMock('../../lib/connectionFactory') as {
+    const real = connectionFactory as unknown as {
       createAbapConnection: (s: SapConfig, c?: IAuthProvider) => Closable;
     };
     const held = closable(true);
     held.connectGate = connecting.promise;
-    jest
-      .spyOn(real, 'createAbapConnection')
-      .mockImplementationOnce((settings, credential) => {
+    t.mock
+      .method(real, 'createAbapConnection')
+      .mock.mockImplementationOnce((settings, credential) => {
         records.set(held, { settings, credential });
         built.push(held);
         return held;
-      });
+      }, 0);
     const before = provider();
     const renewed = provider();
     const server = serve([before, renewed]);
@@ -298,18 +317,18 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     await turns();
     const b = server.connection(); // another credential: the same connect
     connecting.open();
-    expect(await a).toBe(held);
-    expect(await b).toBe(held);
-    expect(built).toHaveLength(1);
+    assert.equal(await a, held);
+    assert.equal(await b, held);
+    assert.equal(built.length, 1);
     await authorizeOn(held);
-    expect(before.authorized).toBe(0);
-    expect(renewed.authorized).toBe(1);
+    assert.equal(before.authorized, 0);
+    assert.equal(renewed.authorized, 1);
     await turns();
-    expect(held.disconnects).toBe(0);
+    assert.equal(held.disconnects, 0);
     server.done(held);
     server.done(held);
     await server.terminalClose();
-    expect(held.disconnects).toBe(1);
+    assert.equal(held.disconnects, 1);
   });
 
   it('a session SAP lost: a new connection instance for the next call; the spent one ends once, after the call on it', async () => {
@@ -318,16 +337,19 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     const first = (await server.connection()) as unknown as Closable;
     first.live = false; // connection 16: the session was lost, the instance spent
     const second = await server.connection();
-    expect(second).not.toBe(first);
-    expect(built).toHaveLength(2);
+    assert.notEqual(second, first);
+    assert.equal(built.length, 2);
     await turns();
-    expect(first.disconnects).toBe(0);
+    assert.equal(first.disconnects, 0);
     server.done(first);
     await turns();
-    expect(first.disconnects).toBe(1);
+    assert.equal(first.disconnects, 1);
     server.done(second);
     await server.terminalClose();
-    expect(built.map((c) => c.disconnects)).toEqual([1, 1]);
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1, 1],
+    );
   });
 
   it('an injected connection is the consumer’s: never disconnected', async () => {
@@ -340,30 +362,31 @@ describe("BaseMcpServer.getConnection: the instance's own connection", () => {
     await server.connection();
     await server.terminalClose();
     await forceClose();
-    expect(injected.disconnects).toBe(0);
+    assert.equal(injected.disconnects, 0);
   });
 });
 
 describe('the fresh connections', () => {
-  it('openFreshConnection, a sibling: its caller ends it once; a failed connect ends it once', async () => {
+  it('openFreshConnection, a sibling: its caller ends it once; a failed connect ends it once', async (t) => {
     const base = closable();
     records.set(base, { settings: SETTINGS });
     const fresh = (await openFreshConnection(base, undefined)) as Closable;
     await closeQuietly(fresh, undefined, 'test');
-    expect(fresh.disconnects).toBe(1);
+    assert.equal(fresh.disconnects, 1);
 
-    const real = jest.requireMock('../../lib/connectionFactory') as {
+    const real = connectionFactory as unknown as {
       createAbapConnection: (s: SapConfig) => Closable;
     };
     const failing = closable();
     failing.failConnect = true;
-    jest
-      .spyOn(real, 'createAbapConnection')
-      .mockImplementationOnce(() => failing);
-    await expect(openFreshConnection(base, undefined)).rejects.toThrow(
+    t.mock
+      .method(real, 'createAbapConnection')
+      .mock.mockImplementationOnce(() => failing, 0);
+    await assertRejects(
+      openFreshConnection(base, undefined),
       'connect refused',
     );
-    expect(failing.disconnects).toBe(1);
+    assert.equal(failing.disconnects, 1);
   });
 
   it("a consumer's freshConnection result is the server's: ended once on success and on failure", async () => {
@@ -375,26 +398,34 @@ describe('the fresh connections', () => {
       return c;
     });
     await inOwnSessionOverRfc(injected, undefined, 'test', async () => 'ok');
-    await expect(
+    await assertRejects(
       inOwnSessionOverRfc(injected, undefined, 'test', async () => {
         throw new Error('the operation failed');
       }),
-    ).rejects.toThrow('the operation failed');
-    expect(given.map((c) => c.disconnects)).toEqual([1, 1]);
-    expect(injected.disconnects).toBe(0);
+      'the operation failed',
+    );
+    assert.deepStrictEqual(
+      given.map((c) => c.disconnects),
+      [1, 1],
+    );
+    assert.equal(injected.disconnects, 0);
   });
 
   it('inOwnSessionOverRfc, a sibling: ended once on success and on failure', async () => {
     const base = closable(true);
     records.set(base, { settings: SETTINGS });
     await inOwnSessionOverRfc(base, undefined, 'test', async () => 'ok');
-    await expect(
+    await assertRejects(
       inOwnSessionOverRfc(base, undefined, 'test', async () => {
         throw new Error('failed');
       }),
-    ).rejects.toThrow('failed');
-    expect(built.map((c) => c.disconnects)).toEqual([1, 1]);
-    expect(base.disconnects).toBe(0);
+      'failed',
+    );
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1, 1],
+    );
+    assert.equal(base.disconnects, 0);
   });
 });
 
@@ -404,7 +435,10 @@ describe('package lock sessions', () => {
     records.set(base, { settings: SETTINGS });
     const lockOn = await connectionForPackageLock(base, undefined);
     await lockOn.drop();
-    expect(built.map((c) => c.disconnects)).toEqual([1]);
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1],
+    );
   });
 
   it('held under its handle: the unlock ends it once', async () => {
@@ -414,7 +448,10 @@ describe('package lock sessions', () => {
     lockOn.keep('H1');
     await releasePackageLockSession('H1', undefined);
     await releasePackageLockSession('H1', undefined);
-    expect(built.map((c) => c.disconnects)).toEqual([1]);
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1],
+    );
   });
 
   it("still held at the instance's terminal close: ended once, and its handle forgotten", async () => {
@@ -425,12 +462,18 @@ describe('package lock sessions', () => {
       connectionForPackageLock(base, undefined),
     );
     lockOn.keep('H2');
-    expect(connectionHoldingPackageLock(base, 'H2')).toBe(lockOn.connection);
+    assert.equal(connectionHoldingPackageLock(base, 'H2'), lockOn.connection);
     await closeOwnedConnections(owner);
-    expect(built.map((c) => c.disconnects)).toEqual([1]);
-    expect(connectionHoldingPackageLock(base, 'H2')).toBe(base);
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1],
+    );
+    assert.equal(connectionHoldingPackageLock(base, 'H2'), base);
     await releasePackageLockSession('H2', undefined);
-    expect(built.map((c) => c.disconnects)).toEqual([1]);
+    assert.deepStrictEqual(
+      built.map((c) => c.disconnects),
+      [1],
+    );
   });
 });
 
@@ -445,8 +488,8 @@ describe("the debugger's own connections", () => {
     await ports.closeConnection(closed);
     ports.dropConnection(dropped);
     await closeOwnedConnections(owner);
-    expect(closed.disconnects).toBe(1);
-    expect(dropped.disconnects).toBe(1);
+    assert.equal(closed.disconnects, 1);
+    assert.equal(dropped.disconnects, 1);
   });
 
   it("one whose close was never asked: the instance's terminal close ends it, once", async () => {
@@ -455,7 +498,7 @@ describe("the debugger's own connections", () => {
     own(state, { owner, role: 'state' });
     await closeOwnedConnections(owner, ['state']);
     await closeOwnedConnections(owner);
-    expect(state.disconnects).toBe(1);
+    assert.equal(state.disconnects, 1);
   });
 });
 
@@ -468,10 +511,10 @@ describe('the forced close', () => {
     const running = endConnection(a);
     await forceClose();
     await running;
-    expect(a.disconnects).toBe(1);
-    expect(b.disconnects).toBe(1);
-    expect(isEnded(a) && isEnded(b)).toBe(true);
-    expect(ownedConnections()).toEqual([]);
+    assert.equal(a.disconnects, 1);
+    assert.equal(b.disconnects, 1);
+    assert.equal(isEnded(a) && isEnded(b), true);
+    assert.deepStrictEqual(ownedConnections(), []);
   });
 
   it('awaits a logoff an orderly end began and has not written yet: joined, disconnect() once', async () => {
@@ -485,12 +528,12 @@ describe('the forced close', () => {
       forced = true;
     });
     await turns();
-    expect(forced).toBe(false);
+    assert.equal(forced, false);
     write.open();
     await forcing;
     await orderly;
-    expect(c.written).toBe(true);
-    expect(c.disconnects).toBe(1);
+    assert.equal(c.written, true);
+    assert.equal(c.disconnects, 1);
   });
 
   it("a site's own end after the forced close joins it: disconnect() once, no failure reported", async () => {
@@ -503,8 +546,8 @@ describe('the forced close', () => {
       { warn: (m: string) => warned.push(m) } as never,
       'test',
     );
-    expect(c.disconnects).toBe(1);
-    expect(warned).toEqual([]);
+    assert.equal(c.disconnects, 1);
+    assert.deepStrictEqual(warned, []);
   });
 });
 
@@ -518,9 +561,9 @@ describe("the debugger's close failure goes back to its session", () => {
         throw new Error('a secret-looking socket error');
       };
     own(c, { role: 'state' });
-    await expect(ports.closeConnection(c)).rejects.toThrow(LOGOFF_NOT_WRITTEN);
-    await expect(ports.closeConnection(c)).resolves.toBeUndefined();
-    expect(c.disconnects).toBe(1);
+    await assertRejects(ports.closeConnection(c), LOGOFF_NOT_WRITTEN);
+    assert.equal(await ports.closeConnection(c), undefined);
+    assert.equal(c.disconnects, 1);
   });
 });
 
@@ -530,13 +573,13 @@ describe('the ./utils process cache', () => {
   it('a managed connection replaced by a new config, and one dropped by cleanup(), each end once; a connection handed in is the caller’s', async () => {
     setConfigOverride({ ...SETTINGS, ashost: 'one.invalid' }, 'onprem');
     const firstOverride = built[0];
-    expect(getManagedConnection()).toBe(firstOverride);
+    assert.equal(getManagedConnection(), firstOverride);
     setConfigOverride({ ...SETTINGS, ashost: 'two.invalid' }, 'onprem');
-    expect(firstOverride?.disconnects).toBe(1);
+    assert.equal(firstOverride?.disconnects, 1);
     const given = closable();
     setConnectionOverride(given);
-    expect(built[1]?.disconnects).toBe(1);
+    assert.equal(built[1]?.disconnects, 1);
     cleanup();
-    expect(given.disconnects).toBe(0);
+    assert.equal(given.disconnects, 0);
   });
 });

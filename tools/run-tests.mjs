@@ -1,19 +1,21 @@
-// The node:test runner (D27): runs `node --test` over the compiled files of
-// the node:test list, on every platform the repository supports.
+// The test runner (D27): runs `node --test` over the compiled files of the
+// test selection, on every platform the repository supports.
 //
 //   node tools/run-tests.mjs --concurrency <N> [--root <dir>]... [--repo <dir>]
 //     [--env NAME=VALUE]... [--list] [node --test options]... [files]...
 //
-// - With no file, it runs the compiled file of every source on the list
-//   (`tools/node-test-files.json`), under `.test-build/tree/` (`npm run
-//   test:build` makes it). `--root <dir>` keeps the sources under that
-//   directory (repeatable; the sub-packages' `--roots` reach it through
-//   `tools/npm-test.mjs`). A selection with no file is refused: `node --test`
-//   given no file looks for files of its own, and a broken list would pass.
+// - With no file, it runs the compiled file, under `.test-build/tree/` (`npm
+//   run test:build` makes it), of every test the selection walks
+//   (`walkSources`, `tools/node-test-list.mjs`: each `….test.ts` under a
+//   `__tests__` directory of the test roots). `--root <dir>` keeps the
+//   sources under that directory (repeatable; each sub-package's `test`
+//   script passes its own `src`). A selection with no file is refused:
+//   `node --test` given no file looks for files of its own, and a broken
+//   walk would pass.
 // - A file named is run as named and must exist: a `….test.ts` source is run
 //   as its compiled file, which must exist too; a `….test.js` file as it is.
-//   With `--root`, a named file outside every root is not run (as Jest's
-//   `--roots` does), and a selection left empty is refused.
+//   With `--root`, a named file outside every root is not run, and a
+//   selection left empty is refused.
 // - `--concurrency <N>` is how many files run at once; without it, the
 //   variable `TEST_CONCURRENCY` gives it (the last `--concurrency` wins over
 //   the variable). With neither, the run is refused: there is no default — the
@@ -27,8 +29,8 @@
 //   (`NAME=1 npm …`) does not work on Windows. No shell runs anything here.
 // - `--list` prints the source paths of the selection, one per line, and runs
 //   nothing (an empty selection prints nothing and is no error).
-// - `--repo <dir>` reads another repository's list and build (the runner's
-//   own tests use fixture repositories); the preload is always this
+// - `--repo <dir>` walks another repository's tests and reads its build (the
+//   runner's own tests use fixture repositories); the preload is always this
 //   repository's.
 //
 // - The live suites (`src/__tests__/integration/`, `src/__tests__/admin/`)
@@ -78,9 +80,9 @@ import {
   buildDir,
   compiledFile,
   OWN_REPO,
-  readList,
   separateSources,
   sourceFile,
+  walkSources,
 } from './node-test-list.mjs';
 
 const CONCURRENCY_VARIABLE = 'TEST_CONCURRENCY';
@@ -187,13 +189,13 @@ function liveScriptRunning() {
 }
 
 /**
- * The sources of the list under the roots asked for, or all of them but the
- * live suites' when no root is asked for.
+ * The walked sources under the roots asked for, or all of them but the live
+ * suites' when no root is asked for; never a run of its own's.
  */
 function selectedSources() {
   const dirs = rootDirs();
   const separate = separateSources(repo);
-  return readList(repo).filter(
+  return walkSources(repo).filter(
     (source) =>
       inRoots(dirs, sourceFile(repo, source)) &&
       (dirs.length > 0 || !isLiveSource(source)) &&
@@ -201,10 +203,7 @@ function selectedSources() {
   );
 }
 
-/**
- * The named files under the roots asked for: a named file outside every
- * root is not run, as Jest does with its `--roots`.
- */
+/** The named files under the roots asked for: one outside every root is not run. */
 function selectedNamed() {
   const dirs = rootDirs();
   return named.filter((arg) => inRoots(dirs, resolve(arg)));
@@ -271,8 +270,8 @@ if (named.length > 0) {
   if (sources.length === 0) {
     fail(
       roots.length === 0
-        ? 'the node:test list is empty: no test file to run'
-        : `no file of the node:test list under ${roots.join(', ')}: no test file to run`,
+        ? 'no test file found: no test file to run'
+        : `no test file under ${roots.join(', ')}: no test file to run`,
     );
   }
   if (!existsSync(buildDir(repo))) {

@@ -12,10 +12,10 @@
  *   its `liveSuite` names, and each problem of its place.
  * - `checkLedger`: the ledger against the required keys and the scans.
  *
- * The test functions are Jest's globals or node:test's, recognised by their
- * import from `node:test` (`test`, `it`, `describe`, `suite`, `before`,
- * `after`, `beforeEach`, `afterEach`); their `.skip`, `.todo` and `.only`
- * are read alike. node:test's other ways to skip, focus or run a case at
+ * The test functions are node:test's, recognised by their import from
+ * `node:test` (`test`, `it`, `describe`, `suite`, `before`, `after`,
+ * `beforeEach`, `afterEach`), and the live helpers' `liveSuite`; their
+ * `.skip`, `.todo` and `.only` are read alike. node:test's other ways to skip, focus or run a case at
  * once with others — an options object carrying `skip`, `todo`, `only` or
  * `concurrency`, a call of `skip` or `todo` on a test context, and a
  * node:test function imported under another name — are each a problem of
@@ -49,8 +49,6 @@ export type Problem =
   | 'not-executable'
   | 'skipped'
   | 'only'
-  | 'failing'
-  | 'concurrent'
   // node:test's forms
   | 'skip-option'
   | 'todo-option'
@@ -157,24 +155,13 @@ const isSystemKind = (value: string | undefined): value is SystemKind =>
   value === 'onprem' || value === 'cloud';
 
 // ---------------------------------------------------------------------------
-// Jest scope
+// Test scope
 
-type JestBase = 'describe' | 'test' | 'hook' | 'suite';
-type Modifier = 'skip' | 'only' | 'todo' | 'failing' | 'concurrent' | undefined;
+type TestBase = 'describe' | 'test' | 'hook' | 'suite';
+type Modifier = 'skip' | 'only' | 'todo' | undefined;
 
-const BASES: Readonly<Record<string, readonly [JestBase, Modifier]>> = {
-  describe: ['describe', undefined],
-  xdescribe: ['describe', 'skip'],
-  fdescribe: ['describe', 'only'],
-  it: ['test', undefined],
-  test: ['test', undefined],
-  xit: ['test', 'skip'],
-  xtest: ['test', 'skip'],
-  fit: ['test', 'only'],
-  beforeAll: ['hook', undefined],
-  beforeEach: ['hook', undefined],
-  afterAll: ['hook', undefined],
-  afterEach: ['hook', undefined],
+/** The test functions every file has without an import: the live helpers' suite. */
+const BASES: Readonly<Record<string, readonly [TestBase, Modifier]>> = {
   liveSuite: ['suite', undefined],
 };
 
@@ -182,14 +169,10 @@ const MODIFIERS: Readonly<Record<string, Modifier>> = {
   skip: 'skip',
   only: 'only',
   todo: 'todo',
-  // Neither is a plain test: a failing test passes when its body fails, and
-  // a concurrent one shares its hooks with others running at once.
-  concurrent: 'concurrent',
-  failing: 'failing',
 };
 
 /** node:test's test functions, by the name `node:test` exports them under. */
-const NODE_BASES: Readonly<Record<string, JestBase>> = {
+const NODE_BASES: Readonly<Record<string, TestBase>> = {
   test: 'test',
   it: 'test',
   describe: 'describe',
@@ -200,9 +183,9 @@ const NODE_BASES: Readonly<Record<string, JestBase>> = {
   afterEach: 'hook',
 };
 
-/** A file's test functions: Jest's globals and what it imports from `node:test`. */
+/** A file's test functions: `liveSuite` and what it imports from `node:test`. */
 interface Runner {
-  readonly bases: Readonly<Record<string, readonly [JestBase, Modifier]>>;
+  readonly bases: Readonly<Record<string, readonly [TestBase, Modifier]>>;
   /** A node:test function imported under another name (or as a namespace). */
   readonly renamed: boolean;
 }
@@ -213,7 +196,7 @@ const runners = new WeakMap<ts.SourceFile, Runner>();
 function runnerOf(file: ts.SourceFile): Runner {
   const known = runners.get(file);
   if (known !== undefined) return known;
-  const bases: Record<string, readonly [JestBase, Modifier]> = { ...BASES };
+  const bases: Record<string, readonly [TestBase, Modifier]> = { ...BASES };
   let renamed = false;
   for (const statement of file.statements) {
     if (
@@ -249,9 +232,9 @@ function runnerOf(file: ts.SourceFile): Runner {
 }
 
 /** What test call `call` is: its base and modifier; `undefined` for any other call. */
-function jestCall(
+function testCall(
   call: ts.CallExpression,
-): { base: JestBase; modifier: Modifier } | undefined {
+): { base: TestBase; modifier: Modifier } | undefined {
   const callee = call.expression;
   const BASES = runnerOf(call.getSourceFile()).bases;
   if (ts.isIdentifier(callee)) {
@@ -288,7 +271,7 @@ function bodyOwner(statement: ts.Node): ts.FunctionLikeDeclaration | undefined {
 }
 
 /**
- * Whether `call` runs when Jest collects the file: a statement of the
+ * Whether `call` runs when node:test loads the file: a statement of the
  * module's top level, or of a `describe` (or `liveSuite`) callback that is
  * itself collected.
  */
@@ -305,7 +288,7 @@ function collected(call: ts.CallExpression): boolean {
   const outer = owner.parent;
   if (outer === undefined || !ts.isCallExpression(outer)) return false;
   if (!isArgumentOf(owner, outer)) return false;
-  const kind = jestCall(outer);
+  const kind = testCall(outer);
   if (
     kind === undefined ||
     (kind.base !== 'describe' && kind.base !== 'suite')
@@ -315,29 +298,29 @@ function collected(call: ts.CallExpression): boolean {
   return collected(outer);
 }
 
-/** Whether any Jest call around `node` carries `modifiers`. */
+/** Whether any test call around `node` carries `modifiers`. */
 function modifiedAround(
   node: ts.Node,
   modifiers: readonly Modifier[],
 ): boolean {
   for (let at = node.parent; at !== undefined; at = at.parent) {
     if (ts.isCallExpression(at)) {
-      const kind = jestCall(at);
+      const kind = testCall(at);
       if (kind !== undefined && modifiers.includes(kind.modifier)) return true;
     }
   }
   return false;
 }
 
-/** Whether any Jest call around `node` is skipped (`skip`, `x…`, `todo`). */
+/** Whether any test call around `node` is skipped (`skip`, `todo`). */
 const skippedAround = (node: ts.Node): boolean =>
   modifiedAround(node, ['skip', 'todo']);
 
-/** Whether the file holds any `.only` (or `fit`, `fdescribe`). */
+/** Whether the file holds any `.only`. */
 function hasOnly(file: ts.SourceFile): boolean {
   let found = false;
   const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && jestCall(node)?.modifier === 'only') {
+    if (ts.isCallExpression(node) && testCall(node)?.modifier === 'only') {
       found = true;
     }
     if (!found) ts.forEachChild(node, visit);
@@ -379,7 +362,7 @@ function optionProblems(node: ts.Node): Problem[] {
   const found: Problem[] = [];
   for (let at = node.parent; at !== undefined; at = at.parent) {
     if (!ts.isCallExpression(at)) continue;
-    const kind = jestCall(at);
+    const kind = testCall(at);
     if (kind?.base !== 'test' && kind?.base !== 'describe') continue;
     for (const argument of at.arguments) {
       if (!ts.isObjectLiteralExpression(argument)) continue;
@@ -435,7 +418,7 @@ function contextProblems(callback: ts.Node): Problem[] {
 function fileContextProblems(file: ts.SourceFile): Problem[] {
   const found: Problem[] = [];
   const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && jestCall(node)?.base === 'test') {
+    if (ts.isCallExpression(node) && testCall(node)?.base === 'test') {
       for (const argument of node.arguments) {
         for (const problem of contextProblems(argument)) {
           if (!found.includes(problem)) found.push(problem);
@@ -452,8 +435,6 @@ function fileContextProblems(file: ts.SourceFile): Problem[] {
 function placeProblems(call: ts.CallExpression, only: boolean): Problem[] {
   const problems: Problem[] = [];
   if (skippedAround(call)) problems.push('skipped');
-  if (modifiedAround(call, ['failing'])) problems.push('failing');
-  if (modifiedAround(call, ['concurrent'])) problems.push('concurrent');
   if (only) problems.push('only');
   problems.push(...optionProblems(call));
   if (runnerOf(call.getSourceFile()).renamed) problems.push('runner-renamed');
@@ -823,7 +804,7 @@ function liveRef(
     ts.isCallExpression(test) &&
     owner !== undefined &&
     isArgumentOf(owner, test)
-      ? jestCall(test)
+      ? testCall(test)
       : undefined;
   if (kind?.base === 'hook') {
     problems.push('live-in-hook');
@@ -932,7 +913,7 @@ export interface CheckInput {
   readonly listed: unknown;
   /** `coverage-ledger.json`, as the file states it. */
   readonly ledger: unknown;
-  /** The repository paths of the test files `npm test` runs (Jest's own discovery). */
+  /** The repository paths of the test files `npm test` runs (the runner's selection). */
   readonly discovered: ReadonlySet<string>;
   /** The repository paths scanned for orphans and problems, beside the ledger's files. */
   readonly scanned: readonly string[];

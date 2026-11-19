@@ -1,4 +1,4 @@
-import { describe as group } from 'node:test';
+import { describe, it as check } from 'node:test';
 import { pinCases } from '../../../../../helpers/pinCases';
 
 describe('thing pins', () => {

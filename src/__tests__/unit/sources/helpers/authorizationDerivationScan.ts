@@ -250,7 +250,7 @@ export function createDerivationProgram(files: readonly string[]): ts.Program {
       esModuleInterop: true,
       allowJs: true,
       checkJs: false,
-      types: ['node', 'jest'],
+      types: ['node'],
       typeRoots: [path.join(REPO, 'node_modules/@types')],
     },
   });

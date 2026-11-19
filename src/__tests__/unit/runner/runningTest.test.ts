@@ -35,7 +35,7 @@ const OWN_RUNNING_TEST = path.join(
 describe('a skip through skipRunningTest', () => {
   it('marks the running case skipped with its reason; in a hook it throws', () => {
     const file = 'src/__tests__/skips.test.ts';
-    const repo = fixtureRepo(path.join(scratch.dir, 'skips'), [file], {
+    const repo = fixtureRepo(path.join(scratch.dir, 'skips'), {
       [file]: [
         "import { appendFileSync } from 'node:fs';",
         "import { before, describe, it } from 'node:test';",

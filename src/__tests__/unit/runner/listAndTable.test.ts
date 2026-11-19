@@ -1,167 +1,23 @@
 /**
- * One list, one name table (D27, plan step 3).
- *
- * `tools/node-test-files.json` is the one list of the test files that run on
- * node:test; `tsconfig.paths.json` the one table of this repository's package
- * names and their source entries. Jest's configuration (`jest.config.js`)
- * builds its `moduleNameMapper` from the table and ignores every listed path;
- * the node:test resolve hook answers the table's names and nothing else.
- * That every test configuration takes its `paths` from the table is checked
- * under node:test (`build.test.ts`).
- * Jest's configuration is read as Jest loads it, by running Jest in a child
- * process (`--showConfig`, `--listTests`), never by importing it.
+ * One name table (D27, plan step 3): `tsconfig.paths.json` is the one table
+ * of this repository's package names and their source entries; the test
+ * resolve hook answers the table's names and nothing else. That every test
+ * configuration takes its `paths` from the table is checked in
+ * `build.test.ts`.
  */
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import type { ResolveFnOutput, ResolveHookContext } from 'node:module';
-import * as os from 'node:os';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
 import { pathToFileURL } from 'node:url';
-import { readNameTable } from '../../helpers/nameTable';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import { tableResolve } from '../../helpers/resolveHook';
 
 const REPO = repositoryRoot(__dirname);
-const JEST = require.resolve('jest/bin/jest');
-/** Jest's own rule: a relative `./x.js` import is the `./x.ts` source. */
-const RELATIVE_JS: [string, string] = ['^(\\.{1,2}/.*)\\.js$', '$1'];
 
-/** Runs Jest in a child process, from the repository root, and returns stdout. */
-function jest(args: readonly string[]): string {
-  const run = spawnSync(process.execPath, [JEST, ...args], {
-    cwd: REPO,
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
-  if (run.status !== 0) {
-    throw new Error(
-      `jest ${args.join(' ')} exited ${run.status}: ${run.stderr}`,
-    );
-  }
-  return run.stdout;
-}
-
-interface LoadedConfig {
-  moduleNameMapper: Array<[string, string]>;
-  testPathIgnorePatterns: string[];
-}
-
-function isStringPair(value: unknown): value is [string, string] {
-  return (
-    Array.isArray(value) &&
-    value.length === 2 &&
-    typeof value[0] === 'string' &&
-    typeof value[1] === 'string'
-  );
-}
-
-/** The project configuration of `jest --showConfig`: data from a child process. */
-function loadedConfig(args: readonly string[] = []): LoadedConfig {
-  const shown: unknown = JSON.parse(jest([...args, '--showConfig']));
-  if (
-    typeof shown !== 'object' ||
-    shown === null ||
-    !('configs' in shown) ||
-    !Array.isArray(shown.configs) ||
-    shown.configs.length !== 1
-  ) {
-    throw new Error('jest --showConfig: not one project configuration');
-  }
-  const [config] = shown.configs;
-  if (
-    typeof config !== 'object' ||
-    config === null ||
-    !('moduleNameMapper' in config) ||
-    !('testPathIgnorePatterns' in config)
-  ) {
-    throw new Error('jest --showConfig: no moduleNameMapper or ignores');
-  }
-  const mapper: unknown = config.moduleNameMapper;
-  const ignores: unknown = config.testPathIgnorePatterns;
-  if (!Array.isArray(mapper) || !mapper.every(isStringPair)) {
-    throw new Error('jest --showConfig: moduleNameMapper is not pairs');
-  }
-  if (
-    !Array.isArray(ignores) ||
-    !ignores.every((p): p is string => typeof p === 'string')
-  ) {
-    throw new Error('jest --showConfig: testPathIgnorePatterns is not strings');
-  }
-  return { moduleNameMapper: mapper, testPathIgnorePatterns: ignores };
-}
-
-/** The test files `jest --listTests --json` finds: data from a child process. */
-function listedTests(args: readonly string[] = []): string[] {
-  const listed: unknown = JSON.parse(jest([...args, '--listTests', '--json']));
-  if (
-    !Array.isArray(listed) ||
-    !listed.every((p): p is string => typeof p === 'string')
-  ) {
-    throw new Error('jest --listTests --json: not a list of paths');
-  }
-  return listed;
-}
-
-describe('one list, one name table', () => {
-  it("Jest's mapper is the table", () => {
-    const expected: Array<[string, string]> = [
-      ...[...readNameTable(REPO)].map(([name, target]): [string, string] => [
-        `^${name}$`,
-        path.join(REPO, target),
-      ]),
-      RELATIVE_JS,
-    ];
-    assert.deepStrictEqual(loadedConfig().moduleNameMapper, expected);
-  });
-
-  it('Jest ignores every listed path', () => {
-    const listedFile = path.join(
-      REPO,
-      'src',
-      '__tests__',
-      'unit',
-      'ci',
-      'ipsSummary.test.ts',
-    );
-    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'node-test-list-'));
-    try {
-      const list = path.join(dir, 'list.json');
-      fs.writeFileSync(
-        list,
-        JSON.stringify(['src/__tests__/unit/ci/ipsSummary.test.ts']),
-      );
-      const empty = path.join(dir, 'empty.json');
-      fs.writeFileSync(empty, JSON.stringify([]));
-      // A configuration over `listFile`: compared with one over an empty
-      // list, since the repository's own list is not empty.
-      const configWith = (name: string, listFile: string): string[] => {
-        const config = path.join(dir, name);
-        fs.writeFileSync(
-          config,
-          `module.exports = require(${JSON.stringify(
-            path.join(REPO, 'jest.config.js'),
-          )}).jestConfig(${JSON.stringify(listFile)});\n`,
-        );
-        return ['--config', config];
-      };
-      const withList = configWith('jest.config.js', list);
-      const withEmpty = configWith('empty.config.js', empty);
-      // The list's one path, and nothing else since the live ignores went
-      // (D27 step 11: the live suites are on the list).
-      assert.equal(loadedConfig(withList).testPathIgnorePatterns.length, 1);
-      const found = listedTests(withList);
-      const foundWithout = listedTests(withEmpty);
-      assert.ok(foundWithout.includes(listedFile));
-      assert.ok(!found.includes(listedFile));
-      assert.equal(found.length, foundWithout.length - 1);
-    } finally {
-      fs.rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
+describe('one name table', () => {
   it("the hook answers only the table's names", () => {
     const buildDir = path.join(REPO, '.test-build', 'tree');
     const hook = tableResolve(
@@ -210,7 +66,7 @@ describe('one list, one name table', () => {
     ]);
   });
 
-  it('nothing reads package.json jest', () => {
+  it('the manifest holds no test runner configuration of its own', () => {
     const manifest: unknown = JSON.parse(
       fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
     );

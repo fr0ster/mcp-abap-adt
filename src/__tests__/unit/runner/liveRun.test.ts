@@ -6,9 +6,6 @@
  * tracked, after the file's own hooks. Each case runs the runner over a
  * fixture repository whose files sit where the live suites do. The setup
  * reads an empty test config, so nothing logs on and nothing is sent.
- *
- * Beside them, the hook guard (P6): no Jest file calls a function that
- * registers a tracked connection without closing what it tracked.
  */
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -18,10 +15,8 @@ import * as ts from 'typescript';
 import {
   environment,
   fixtureRepo,
-  JEST,
   REPO,
   recorded,
-  runNode,
   runTool,
   temporaryDir,
   writeAt,
@@ -60,7 +55,7 @@ function liveSource(body: readonly string[]): string {
 
 /** The fixture repository, built. */
 function liveRepo(name: string, body: readonly string[]): string {
-  const repo = fixtureRepo(path.join(scratch.dir, name), [LIVE], {
+  const repo = fixtureRepo(path.join(scratch.dir, name), {
     [LIVE]: liveSource(body),
   });
   const built = runTool('build-node-tests.mjs', ['--repo', repo]);
@@ -102,7 +97,7 @@ describe('the live run', () => {
       environment({ RECORD: record }, ['npm_lifecycle_event']),
     );
     assert.equal(unit.status, 1);
-    assert.ok(unit.stderr.includes('the node:test list is empty'), unit.stderr);
+    assert.ok(unit.stderr.includes('no test file found'), unit.stderr);
     assert.deepEqual(recorded(record), []);
   });
 
@@ -152,7 +147,7 @@ describe('the per-file close', () => {
       'helpers',
       'openConnections.js',
     );
-    const repo = fixtureRepo(path.join(scratch.dir, 'close'), [LIVE], {
+    const repo = fixtureRepo(path.join(scratch.dir, 'close'), {
       [LIVE]: [
         "import { appendFileSync } from 'node:fs';",
         "import { after, describe, it } from 'node:test';",
@@ -194,87 +189,37 @@ describe('the per-file close', () => {
     // The preload's root `after` runs before any root-level `after` the file
     // registers itself (node:test runs root hooks in the order they were
     // registered; measured on Node 22, 24, 26), so none may exist.
+    // The live files as the runner selects them (`--list` under the two
+    // live roots), never a walk of this test's own.
+    const listed = runTool('run-tests.mjs', [
+      '--list',
+      '--root',
+      path.join(REPO, 'src', '__tests__', 'integration'),
+      '--root',
+      path.join(REPO, 'src', '__tests__', 'admin'),
+    ]);
+    assert.equal(listed.status, 0, listed.stderr);
+    const files = listed.stdout.split('\n').filter((line) => line !== '');
+    assert.ok(files.length > 0, 'the runner listed no live file');
     const found: string[] = [];
-    for (const root of ['src/__tests__/integration', 'src/__tests__/admin']) {
-      for (const entry of fs.readdirSync(path.join(REPO, root), {
-        withFileTypes: true,
-        recursive: true,
-      })) {
-        if (!entry.isFile() || !entry.name.endsWith('.test.ts')) continue;
-        const file = path.join(entry.parentPath, entry.name);
-        const source = ts.createSourceFile(
-          file,
-          fs.readFileSync(file, 'utf8'),
-          ts.ScriptTarget.Latest,
-        );
-        for (const statement of source.statements) {
-          if (
-            ts.isExpressionStatement(statement) &&
-            ts.isCallExpression(statement.expression) &&
-            ts.isIdentifier(statement.expression.expression) &&
-            ['after', 'afterAll'].includes(statement.expression.expression.text)
-          ) {
-            found.push(path.relative(REPO, file));
-          }
+    for (const source of files) {
+      const file = path.join(REPO, ...source.split('/'));
+      const parsed = ts.createSourceFile(
+        file,
+        fs.readFileSync(file, 'utf8'),
+        ts.ScriptTarget.Latest,
+      );
+      for (const statement of parsed.statements) {
+        if (
+          ts.isExpressionStatement(statement) &&
+          ts.isCallExpression(statement.expression) &&
+          ts.isIdentifier(statement.expression.expression) &&
+          statement.expression.expression.text === 'after'
+        ) {
+          found.push(source);
         }
       }
     }
     assert.deepEqual(found, []);
-  });
-});
-
-/** The functions whose call registers a tracked connection, read from the helpers. */
-const REGISTERING = [
-  'trackConnection',
-  'createTestConnectionAndSession',
-  'testConnectionLogOn',
-];
-
-/**
- * The Jest files (`jest --listTests --json`, a child process) that call a
- * registering function and never `closeTrackedConnections`: calls, not
- * imports (P6).
- */
-function filesLeavingConnections(): string[] {
-  const run = runNode(JEST, ['--listTests', '--json']);
-  assert.equal(run.status, 0, run.stderr);
-  const listed: unknown = JSON.parse(run.stdout);
-  assert.ok(Array.isArray(listed));
-  const leaving: string[] = [];
-  for (const file of listed) {
-    if (typeof file !== 'string') continue;
-    const source = ts.createSourceFile(
-      file,
-      fs.readFileSync(file, 'utf8'),
-      ts.ScriptTarget.Latest,
-    );
-    const called = new Set<string>();
-    const visit = (node: ts.Node): void => {
-      if (ts.isCallExpression(node)) {
-        const callee = node.expression;
-        const name = ts.isIdentifier(callee)
-          ? callee.text
-          : ts.isPropertyAccessExpression(callee) &&
-              ts.isIdentifier(callee.name)
-            ? callee.name.text
-            : undefined;
-        if (name !== undefined) called.add(name);
-      }
-      ts.forEachChild(node, visit);
-    };
-    visit(source);
-    if (
-      REGISTERING.some((name) => called.has(name)) &&
-      !called.has('closeTrackedConnections')
-    ) {
-      leaving.push(path.relative(REPO, file).split(path.sep).join('/'));
-    }
-  }
-  return leaving;
-}
-
-describe('the hook guard', () => {
-  it('no Jest file leaves a tracked connection to a hook', () => {
-    assert.deepEqual(filesLeavingConnections(), []);
   });
 });

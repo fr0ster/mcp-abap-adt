@@ -12,11 +12,11 @@
  *
  * The served list is read as a client reads it (`servedTools()`), and is
  * first compared with `listed-schemas.json`: an empty or partial list cannot
- * make the guard pass. The unit files `npm test` runs come from Jest's own
- * discovery of the root configuration (`jest --listTests --json`, a child
- * process) and the runner's list but its live suites: no
- * pattern of ours is evaluated. Files are read with the TypeScript compiler
- * API (`ledgerScan.ts`).
+ * make the guard pass. The unit files `npm test` runs, and the live files
+ * scanned beside them, come from the runner's own selection
+ * (`tools/run-tests.mjs --list`, a child process): no pattern of ours is
+ * evaluated. Files are read with the TypeScript compiler API
+ * (`ledgerScan.ts`).
  *
  * Each check is load-bearing: one fixture per refusal under
  * `__fixtures__/coverage/` is refused by its own check alone, and `clean`
@@ -37,7 +37,7 @@ import { repositoryRoot } from '../../helpers/repoRoot';
 import { type ServedTool, servedTools } from '../../helpers/servedTools';
 import { toolAnswer } from '../../helpers/toolAnswer';
 import { assertEquals } from '../../integration/helpers/liveAssert';
-import { JEST, runNode } from '../runner/toolRuns';
+import { runTool } from '../runner/toolRuns';
 import {
   INCLUDE_PARTS,
   LISTED_SCHEMAS,
@@ -84,93 +84,21 @@ function member(value: unknown, key: string): unknown {
 const repoPath = (full: string): string =>
   path.relative(REPO, full).split(path.sep).join('/');
 
-/** The repository source paths of the runner's list (`tools/node-test-files.json`). */
-function runnerList(): string[] {
-  const listed = readJson(path.join(REPO, 'tools', 'node-test-files.json'));
-  if (
-    !Array.isArray(listed) ||
-    !listed.every((each): each is string => typeof each === 'string')
-  ) {
-    throw new Error('tools/node-test-files.json: not a list of strings');
-  }
-  return listed;
-}
-
-/** The live suites' directories, which the unit run leaves out. */
-const isLive = (file: string): boolean =>
-  file.startsWith('src/__tests__/integration/') ||
-  file.startsWith('src/__tests__/admin/');
-
-/**
- * The test files `npm test` runs: Jest's own discovery of the root
- * configuration (`jest --listTests --json` in a child process; D27, P5) and
- * the runner's list but its live suites.
- */
-function unitDiscovery(): Set<string> {
-  const run = runNode(JEST, ['--listTests', '--json']);
+/** The source paths the runner selects with `args` (`run-tests.mjs --list`). */
+function runnerSelection(args: readonly string[]): string[] {
+  const run = runTool('run-tests.mjs', ['--list', ...args]);
   if (run.status !== 0) {
-    throw new Error(`jest --listTests exited ${run.status}: ${run.stderr}`);
+    throw new Error(`run-tests.mjs --list exited ${run.status}: ${run.stderr}`);
   }
-  const listed: unknown = JSON.parse(run.stdout);
-  if (!Array.isArray(listed)) throw new Error('Jest listed no test paths');
-  return new Set([
-    ...listed
-      .filter((each): each is string => typeof each === 'string')
-      .map(repoPath),
-    ...runnerList().filter((file) => !isLive(file)),
-  ]);
+  return run.stdout.split('\n').filter((line) => line !== '');
 }
 
-/** Every `*.test.ts` under `dir`, as repository paths. */
-function testFilesUnder(dir: string, out: string[] = []): string[] {
-  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) testFilesUnder(full, out);
-    else if (entry.name.endsWith('.test.ts')) out.push(repoPath(full));
-  }
-  return out;
-}
+/** The test files `npm test` runs: the runner's unit selection. */
+const unitDiscovery = (): Set<string> => new Set(runnerSelection([]));
 
-/**
- * The guard's computed key → pin and key → live maps (spec §6, §8 "Pins"),
- * for `npm run test:parity -- pins <out.json>`: every counted `pinCases` row
- * of every scanned file as `<file> <variant>`, and every `liveCall` of the
- * integration tree as `<file> <systems>`, sorted, keys sorted. No line
- * numbers: a file that moves runners keeps its map when its rows stay.
- */
-function ledgerMaps(input: CheckInput): {
-  pins: Record<string, string[]>;
-  live: Record<string, string[]>;
-} {
-  const pins = new Map<string, string[]>();
-  const live = new Map<string, string[]>();
-  const add = (map: Map<string, string[]>, key: string, entry: string) => {
-    map.set(key, [...(map.get(key) ?? []), entry]);
-  };
-  for (const file of [...new Set(input.scanned)].sort()) {
-    const text = input.read(file);
-    if (text === undefined) continue;
-    for (const ref of scanUnitText(file, text)) {
-      if (ref.key !== undefined && ref.counts) {
-        add(pins, ref.key, `${file} ${ref.variant ?? '-'}`);
-      }
-    }
-    if (file.startsWith('src/__tests__/integration/')) {
-      for (const ref of scanLiveText(file, text)) {
-        if (ref.key !== undefined) {
-          add(live, ref.key, `${file} ${[...ref.systems].sort().join(',')}`);
-        }
-      }
-    }
-  }
-  const sorted = (map: Map<string, string[]>): Record<string, string[]> =>
-    Object.fromEntries(
-      [...map.keys()]
-        .sort()
-        .map((key) => [key, [...(map.get(key) ?? [])].sort()]),
-    );
-  return { pins: sorted(pins), live: sorted(live) };
-}
+/** The live suites' test files: the runner's selection under the integration tree. */
+const integrationFiles = (): string[] =>
+  runnerSelection(['--root', INTEGRATION]);
 
 const codes = (findings: readonly Finding[]): Check[] =>
   findings.map((finding) => finding.check);
@@ -196,19 +124,11 @@ describe('the coverage ledger guard', () => {
       listed: member(readJson(LISTED_SCHEMAS), 'schemas'),
       ledger: readJson(LEDGER),
       discovered,
-      scanned: [...discovered, ...testFilesUnder(INTEGRATION)],
+      scanned: [...discovered, ...integrationFiles()],
       read: repoReader(REPO),
     };
     findings = checkLedger(input);
     debtFindings = checkDebt(input, readJson(DEBT));
-    // `npm run test:parity -- pins <out.json>` sets it; nothing is written otherwise.
-    const mapOut = process.env.LEDGER_MAP_OUT;
-    if (mapOut !== undefined && mapOut !== '') {
-      fs.writeFileSync(
-        mapOut,
-        `${JSON.stringify(ledgerMaps(input), null, 2)}\n`,
-      );
-    }
   });
 
   after(() => {
@@ -224,7 +144,7 @@ describe('the coverage ledger guard', () => {
     assertEquals(of(findings, 'served-mismatch'), []);
   });
 
-  it("the unit run's files: Jest's discovery and the runner's list, no integration or admin file", () => {
+  it("the unit run's files: the runner's selection, no integration or admin file", () => {
     assert.equal(
       discovered.has('src/__tests__/unit/coverage/coverageLedger.test.ts'),
       true,
@@ -354,17 +274,7 @@ describe('the coverage ledger guard', () => {
   });
 
   it('no registration is skipped', () => {
-    assertEquals(
-      of(
-        findings,
-        'not-executable',
-        'skipped',
-        'only',
-        'failing',
-        'concurrent',
-      ),
-      [],
-    );
+    assertEquals(of(findings, 'not-executable', 'skipped', 'only'), []);
   });
 
   it('every finding is one of the checks above', () => {
@@ -407,8 +317,6 @@ describe('the coverage ledger guard', () => {
       'not-executable',
       'skipped',
       'only',
-      'failing',
-      'concurrent',
     ]);
     assertEquals(
       codes(findings).filter((check) => !named.has(check)),
@@ -499,8 +407,6 @@ function checkNamed(name: string): Check {
     'not-executable',
     'skipped',
     'only',
-    'failing',
-    'concurrent',
     'skip-option',
     'todo-option',
     'only-option',

@@ -40,7 +40,7 @@ function recordingFixture(name: string, tests: readonly string[]): string {
 
 describe('the node:test runner', () => {
   it('the runner refuses an empty run', () => {
-    const repo = fixtureRepo(path.join(scratch.dir, 'empty'), [], {});
+    const repo = fixtureRepo(path.join(scratch.dir, 'empty'), {});
     fs.mkdirSync(path.join(repo, '.test-build', 'tree'), { recursive: true });
     const run = runTool('run-tests.mjs', [
       '--repo',
@@ -50,7 +50,7 @@ describe('the node:test runner', () => {
     ]);
     assert.equal(run.status, 1);
     assert.ok(
-      run.stderr.includes('the node:test list is empty: no test file to run'),
+      run.stderr.includes('no test file found: no test file to run'),
       run.stderr,
     );
   });
@@ -62,7 +62,7 @@ describe('the node:test runner', () => {
     assert.ok(run.stderr.includes(`${missing} does not exist`), run.stderr);
 
     // A source is run as its compiled file, which must exist too.
-    const repo = fixtureRepo(path.join(scratch.dir, 'uncompiled'), [], {
+    const repo = fixtureRepo(path.join(scratch.dir, 'uncompiled'), {
       'src/__tests__/a.test.ts': 'export {};\n',
     });
     const source = path.join(repo, 'src', '__tests__', 'a.test.ts');

@@ -40,7 +40,7 @@ const FAKE_NPM = [
   '}',
   "if (args[0] === 'install') {",
   "  const packages = { '': { name: 'x' } };",
-  "  for (const spec of args.filter((arg) => !arg.startsWith('--'))) {",
+  "  for (const spec of args.slice(1).filter((arg) => !arg.startsWith('--'))) {",
   '    const [name, version] = split(spec);',
   "    const dir = path.join('node_modules', ...name.split('/'));",
   "    fs.mkdirSync(path.join(dir, 'bin'), { recursive: true });",
@@ -133,6 +133,16 @@ function verify(
   return { ...result, calls };
 }
 
+/** Whether `dir` lies inside `root`, by the script's own segment rule. */
+function inside(root: string, dir: string): boolean {
+  const relative = path.relative(root, dir);
+  return (
+    relative !== '' &&
+    !path.isAbsolute(relative) &&
+    relative.split(path.sep)[0] !== '..'
+  );
+}
+
 const installs = (calls: readonly Call[]) =>
   calls.filter((call) => call.args[0] === 'install');
 
@@ -151,8 +161,9 @@ describe('npm run release:verify', () => {
     assert.ok(
       views.some(
         (call) =>
-          call.args.join(' ') ===
-          `view --registry=${REGISTRY} --json=false @mcp-abap-adt/lib@${VERSION} version`,
+          call.args[0] === 'view' &&
+          call.args.slice(6).join(' ') ===
+            `--json=false @mcp-abap-adt/lib@${VERSION} version`,
       ),
     );
     const [install, ...more] = installs(run.calls);
@@ -164,8 +175,28 @@ describe('npm run release:verify', () => {
       install.args.filter((arg) => arg.endsWith(`@${VERSION}`)).length,
       18,
     );
-    assert.ok(path.relative(REPO, install.cwd).startsWith('..'));
+    assert.equal(inside(REPO, install.cwd), false);
     assert.equal(fs.existsSync(install.cwd), false, 'the directory is removed');
+  });
+
+  it('runs every npm call from the temporary directory, reading no configuration of the user', () => {
+    const run = verify({});
+    assert.equal(run.status, 0, run.stderr);
+    const [install] = installs(run.calls);
+    assert.ok(install);
+    const work = install.cwd;
+    assert.equal(run.calls.length, 19);
+    for (const call of run.calls) {
+      assert.equal(call.cwd, work, call.args.join(' '));
+      const settings = call.args.slice(1, 6);
+      assert.deepEqual(settings, [
+        `--userconfig=${path.join(work, 'user.npmrc')}`,
+        `--globalconfig=${path.join(work, 'global.npmrc')}`,
+        `--registry=${REGISTRY}`,
+        '--offline=false',
+        '--prefer-online',
+      ]);
+    }
   });
 
   it('takes the root package.json version when none is given', () => {

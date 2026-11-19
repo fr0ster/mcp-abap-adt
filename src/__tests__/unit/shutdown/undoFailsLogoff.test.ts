@@ -11,10 +11,18 @@
  *   or a lock, open.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { httpStand } from '../../../../server-runtime/src/http/__tests__/shutdown/harness';
 import { sseStand } from '../../../../server-runtime/src/sse/__tests__/shutdown/harness';
 import { stand as coreStand } from '../../../../server-runtime/src/stdio/__tests__/helpers/loginStand';
 import { ownedConnections } from '../../../lib/ownedConnections';
+import { assertMatchObject } from '../../helpers/assertions';
+import {
+  advanceWithRealTime,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
 import { stopUrl } from '../../helpers/shutdownTools';
 import { stateSystemKind } from '../../helpers/systemKind';
 
@@ -22,8 +30,6 @@ import { stateSystemKind } from '../../helpers/systemKind';
 beforeEach(() => {
   stateSystemKind();
 });
-
-jest.setTimeout(30_000);
 
 async function until(done: () => boolean, limitMs = 10_000) {
   const end = Date.now() + limitMs;
@@ -45,28 +51,28 @@ const connectsOf = (requests: Array<{ url: string }>) =>
   requests.filter((r) => r.url.startsWith('/sap/bc/adt/core/discovery')).length;
 
 beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
 });
 
 afterEach(() => {
-  jest.useRealTimers();
-  jest.restoreAllMocks();
+  useRealTimers();
+  mock.restoreAll();
 });
 
 it('core, at shutdown: no undo sent, every connection logged off, exit 0', async () => {
   const s = await coreStand({ kind: 'onprem', shutdown: {} });
   try {
-    expect(await s.callTool('HoldState', { id: 'S' })).toMatchObject({
+    assertMatchObject(await s.callTool('HoldState', { id: 'S' }), {
       isError: false,
     });
     refusesStop(s.adt);
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
-    expect(s.shutdownLines).toEqual([]);
-    expect(ownedConnections()).toEqual([]);
+    assert.equal(await s.exited, 0);
+    assert.deepStrictEqual(s.shutdownLines, []);
+    assert.deepStrictEqual(ownedConnections(), []);
     await until(() => s.adt.logoffs() === connectsOf(s.adt.requests));
-    expect(s.adt.logoffs()).toBe(2);
-    expect(stopSent(s.adt.requests)).toBe(false);
+    assert.equal(s.adt.logoffs(), 2);
+    assert.equal(stopSent(s.adt.requests), false);
   } finally {
     await s.close();
   }
@@ -78,11 +84,11 @@ it('http, at shutdown: no undo sent, every connection logged off, exit 0', async
     await s.call('HoldState', { id: 'S' });
     refusesStop(s.standIn);
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
-    expect(s.stderr).toEqual([]);
-    expect(ownedConnections()).toEqual([]);
+    assert.equal(await s.exited, 0);
+    assert.deepStrictEqual(s.stderr, []);
+    assert.deepStrictEqual(ownedConnections(), []);
     await until(() => s.standIn.logoffs() === connectsOf(s.standIn.requests));
-    expect(stopSent(s.standIn.requests)).toBe(false);
+    assert.equal(stopSent(s.standIn.requests), false);
   } finally {
     await s.close();
   }
@@ -95,15 +101,15 @@ it('http, a failed undo when the pool would let the instance go: kept for a retr
     refusesStop(s.standIn);
     // Its stop tool: the undo fails, so the instance has not left the pool.
     const stopped = await s.call('StopState', { state_handle: held.text });
-    expect(stopped.isError).toBe(true);
+    assert.equal(stopped.isError, true);
     await new Promise((r) => setTimeout(r, 50));
-    expect(ownedConnections().length).toBeGreaterThan(0);
+    assert.ok(ownedConnections().length > 0);
     const before = s.standIn.logoffs();
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
-    expect(ownedConnections()).toEqual([]);
+    assert.equal(await s.exited, 0);
+    assert.deepStrictEqual(ownedConnections(), []);
     await until(() => s.standIn.logoffs() === connectsOf(s.standIn.requests));
-    expect(s.standIn.logoffs()).toBeGreaterThan(before);
+    assert.ok(s.standIn.logoffs() > before);
   } finally {
     await s.close();
   }
@@ -112,16 +118,23 @@ it('http, a failed undo when the pool would let the instance go: kept for a retr
 it("http, at the idle bound's stop: a state-logger line, every connection logged off", async () => {
   const s = await httpStand({ stateIdleMinutes: 30 });
   try {
-    jest.useFakeTimers({
-      advanceTimers: true,
-      doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
-    });
-    await s.call('HoldState', { id: 'S' });
+    // Jest's `advanceTimers: true` with setImmediate left real: the call runs
+    // over the real HTTP stand while fake time follows it, 1 fake ms per real
+    // turn, up to a horizon of the idle bound's 30 minutes plus one minute of
+    // margin — past it, an unsettled call fails naming the horizon.
+    useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
+    await advanceWithRealTime(
+      s.call('HoldState', { id: 'S' }),
+      30 * 60_000 + 60_000,
+      1,
+    );
     refusesStop(s.standIn);
-    jest.advanceTimersByTime(30 * 60_000);
-    jest.useRealTimers();
+    mock.timers.tick(30 * 60_000);
+    useRealTimers();
     await until(() => s.stateErrors.length > 0);
-    expect(s.stateErrors.join('\n')).toContain('the debugger stop was refused');
+    assert.ok(
+      s.stateErrors.join('\n').includes('the debugger stop was refused'),
+    );
     await until(() => ownedConnections().length === 0);
     await until(() => s.standIn.logoffs() === connectsOf(s.standIn.requests));
   } finally {
@@ -137,12 +150,12 @@ it('sse, at shutdown: no undo sent, every connection logged off, exit 0', async 
     await connection.answer(1);
     refusesStop(s.standIn);
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
-    expect(s.stderr).toEqual([]);
-    expect(ownedConnections()).toEqual([]);
+    assert.equal(await s.exited, 0);
+    assert.deepStrictEqual(s.stderr, []);
+    assert.deepStrictEqual(ownedConnections(), []);
     await until(() => s.standIn.logoffs() === s.connects());
-    expect(s.standIn.logoffs()).toBe(2);
-    expect(stopSent(s.standIn.requests)).toBe(false);
+    assert.equal(s.standIn.logoffs(), 2);
+    assert.equal(stopSent(s.standIn.requests), false);
   } finally {
     await s.close();
   }
@@ -158,10 +171,10 @@ it('sse, at an SSE close: no undo sent, every connection logged off, no line', a
     connection.close();
     await until(() => ownedConnections().length === 0);
     await until(() => s.standIn.logoffs() === s.connects());
-    expect(s.standIn.logoffs()).toBe(2);
+    assert.equal(s.standIn.logoffs(), 2);
     await new Promise((r) => setTimeout(r, 50));
-    expect(s.stateErrors).toEqual([]);
-    expect(stopSent(s.standIn.requests)).toBe(false);
+    assert.deepStrictEqual(s.stateErrors, []);
+    assert.equal(stopSent(s.standIn.requests), false);
   } finally {
     await s.close();
   }

@@ -134,7 +134,11 @@ the tests needs Node 22.15 or later (CI takes the latest 22 and 24).
   `<dir>`'s tests, so a fixture's run reaches nothing of this repository's suite.
 - **One guard.** `src/__tests__/unit/runner/selection.test.ts` holds the walk to git: the unit
   selection, the live files and the runs of their own together equal `git ls-files '*.test.ts'`,
-  and no tracked test lies outside a root's `__tests__`.
+  and no tracked test lies outside a root's `__tests__`. So a new test file fails `npm test`
+  until it is tracked: `git add` it before the run.
+- **The pre-commit hook** (`.husky/pre-commit`) checks the staged files with Biome, then builds.
+  It fixes nothing, and Biome reads each staged file as it is on disk, so a partly staged file is
+  judged with its unstaged changes too.
 
 ### The helpers a test uses
 

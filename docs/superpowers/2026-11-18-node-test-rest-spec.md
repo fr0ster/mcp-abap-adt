@@ -579,6 +579,20 @@ such seam's commit carries a test that the guard still refuses through the defau
 with no responsible is refused before anything is sent) and, for S4, through a supplied base
 class too.
 
+**Superseded by the owner, 2026-11-19: no seam is added — no production change for tests.**
+«Зміни в проді завжди ризик. Розглянь варіант без змін тільки для тестів.» Every suite the
+table names moves with a test-only mechanism (measured in the plan's workspace,
+`task-5-no-seams.md`): by default `mock.method` / `mock.property` on the export object of the
+module that defines the name (the compiled CommonJS reads an import at call time; the
+module defining the name, never a barrel's re-export getter); for `@mcp-abap-adt/adt-clients`
+(S3, S4, S5's `getSystemInformation`), whose `exports` map closes its internal paths,
+node:test `mock.module` with `--experimental-test-module-mocks` passed by
+`tools/run-tests.mjs`, through one helper for Node 22's `namedExports` and 24+'s `exports`
+(owner, 2026-11-19); a replacement a module binds at load (S4, S7, S10's
+`compactSearchData`) is installed before that module loads. The table below stays as the
+record of what each suite mocks; its "Status" column no longer authorizes a production
+change.
+
 **Nothing below is added before the owner approves it, item by item.** The owner's
 decisions of 2026-11-18 (§10) approve S1 (option B), S2, S2b, S2c, S3, S4, S5 (both
 halves), S6, S7, S8, S9, S10, S11, S12, S13 and S14; S15 is approved only if the plan's

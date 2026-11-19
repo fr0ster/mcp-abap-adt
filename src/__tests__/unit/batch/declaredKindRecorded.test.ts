@@ -5,14 +5,18 @@
  * as on an HTTP/SSE server or in an embedder. Only `createAbapConnection`
  * is a fake here; `systemKindOf` is the real one.
  */
-jest.mock('../../../lib/connectionFactory', () => ({
-  ...jest.requireActual('../../../lib/connectionFactory'),
-  createAbapConnection: jest.fn(),
-}));
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import type { InnerRequest, PartAnswer } from '../../helpers/batchEnvelope';
 import { batchStand } from '../../helpers/batchStand';
 import { withinTurns } from '../../helpers/withinTurns';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+mock.method(connectionFactory, 'createAbapConnection', () => undefined);
 
 function sap(inner: InnerRequest): PartAnswer {
   return {
@@ -45,12 +49,12 @@ it('a recorded read runs on the kind the server states, not SAP_SYSTEM_TYPE', as
         program_name: 'PROG_A',
       }),
     );
-    expect(recorded.isError).toBeFalsy();
+    assert.ok(!recorded.isError);
     const { summary } = await withinTurns(stand.end());
-    expect(summary).toEqual({ received: 1, recorded: 1, sent: 1 });
+    assert.deepStrictEqual(summary, { received: 1, recorded: 1, sent: 1 });
     const [entry] = await withinTurns(stand.answers([1]));
-    expect(JSON.stringify(entry)).toContain('source of');
-    expect(JSON.stringify(entry)).not.toContain('system_type_required');
+    assert.ok(JSON.stringify(entry).includes('source of'));
+    assert.ok(!JSON.stringify(entry).includes('system_type_required'));
   } finally {
     await stand.close();
   }

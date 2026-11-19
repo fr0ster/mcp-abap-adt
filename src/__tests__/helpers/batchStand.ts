@@ -10,15 +10,18 @@
  * answered part by part by the stand's `part` rule, a request outside a batch
  * by the same rule; nothing reaches a system.
  *
- * The test file must mock `lib/connectionFactory` so `createAbapConnection`
- * is the jest mock this helper drives:
+ * Each stand builds its connections through `createAbapConnection`, which it
+ * replaces on `lib/connectionFactory`'s export object (`mock.method`, the
+ * module that defines it; `BaseMcpServer` reads it at call time). The test
+ * file replaces the names the stand leaves real, as its Jest factory did:
  *
- *   jest.mock('../../../lib/connectionFactory', () => ({
- *     createAbapConnection: jest.fn(),
- *     systemKindOf: jest.fn(() => 'onprem'),
- *     withSystemKindOf: jest.fn((view: object) => view),
- *   }));
+ *   mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
+ *   mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
+ *
+ * A file that calls `mock.restoreAll()` after each case takes the stand's
+ * replacement back with the rest.
  */
+import { type Mock, mock } from 'node:test';
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapRequestOptions,
@@ -38,7 +41,7 @@ import type { AnswerEntry } from '../../lib/batch/answers';
 import { InstanceBatch } from '../../lib/batch/InstanceBatch';
 import { communicationBatch } from '../../lib/batch/tools';
 import { CompactBatchHandlersGroup } from '../../lib/compact/batch/group';
-import { createAbapConnection } from '../../lib/connectionFactory';
+import * as connectionFactory from '../../lib/connectionFactory';
 import {
   DataHandlersGroup,
   HighLevelHandlersGroup,
@@ -191,7 +194,7 @@ export interface Stand {
   /** The batch connection of the batch opened last. */
   batch(): AdtBatchConnection;
   /** Every `execute()` of every batch opened here. */
-  executes: jest.Mock;
+  executes: Mock<() => void>;
   /** Opens a communication batch, as HandlerBatch begin does, counting its `execute()`. */
   begin(): void;
   /** SAP ended the session of the connection built last: the next call replaces it. */
@@ -222,16 +225,15 @@ export interface StandOptions {
 }
 
 /**
- * `build` is the `createAbapConnection` jest mock of the test file.
+ * A stand: `createAbapConnection` replaced so every connection the server
+ * builds is a fake answered by `options`.
  */
 export async function batchStand(options: StandOptions): Promise<Stand> {
-  const build = createAbapConnection as unknown as jest.Mock;
   const owner = new InstanceBatch({
     keepRawParts: options.keepRawParts ?? false,
   });
   const built: Fake[] = [];
-  build.mockReset();
-  build.mockImplementation(() => {
+  mock.method(connectionFactory, 'createAbapConnection', () => {
     const fake = envelopeConnection(
       options.envelope ?? partByPart(options.part),
       directBy(options.part),
@@ -268,7 +270,7 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
   const client = new Client({ name: 'batch-stand', version: '1.0.0' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
   let last: AdtBatchConnection | undefined;
-  const executes = jest.fn();
+  const executes = mock.fn<() => void>();
   const call = (name: string, args: Record<string, unknown> = {}) =>
     client
       .callTool({ name, arguments: args })

@@ -1,23 +1,39 @@
 /**
  * Runs a scenario under plain node, where an unhandled rejection is seen.
  *
- * Inside Jest a test's `process.on('unhandledRejection', …)` is never told
- * of one (the test runs in a sandbox; measured: a bare `Promise.reject()`
- * reaches no listener there), so "no unhandled rejection" cannot be asserted
- * in-process. A scenario is a TypeScript file run by `process.execPath`
+ * Inside a test runner an unhandled rejection is the runner's, not the
+ * test's (Jest's sandbox told no listener of a test; node:test fails the
+ * file on one), so "no unhandled rejection" cannot be asserted in-process. A scenario is a TypeScript file run by `process.execPath`
  * through tsx (`--import tsx`); it records with `plainNodeRecorder.ts` and
  * writes its report as the last line of its stdout. Nothing else is started:
  * the child is node itself, and the scenario talks to no system.
  *
  * No child outlives its test: every child still running when a test ends
- * is killed (`SIGKILL`) and awaited in an `afterEach` this module registers,
- * and a `signal` given kills it when it aborts — so a scenario that hangs
- * past Jest's timeout is never orphaned.
+ * is killed (`SIGKILL`) and awaited in a node:test `afterEach` this module
+ * registers for the file that imports it, and a `signal` given kills it when
+ * it aborts — so a scenario that hangs is never orphaned.
+ *
+ * The child runs with tsx pointed at the test configuration (its
+ * package-name aliases) and without `NODE_TEST_CONTEXT`, which node:test sets
+ * in a test file's process and which would make the child report to the
+ * runner (as `scenarioOutput.ts`).
  */
 import { type ChildProcess, execFile } from 'node:child_process';
 import * as path from 'node:path';
+import { afterEach } from 'node:test';
+import { repositoryRoot } from './repoRoot';
 
-const ROOT = path.resolve(__dirname, '..', '..', '..');
+const ROOT = repositoryRoot(__dirname);
+
+/** The child's environment: this process's, tsx's configuration, no test context. */
+function childEnvironment(): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    TSX_TSCONFIG_PATH: path.join(ROOT, 'tsconfig.test.json'),
+  };
+  delete env.NODE_TEST_CONTEXT;
+  return env;
+}
 
 /** The report a scenario wrote (`report()`), with the unhandled rejections it saw. */
 export type ScenarioReport = { unhandled: string[] } & Record<string, unknown>;
@@ -53,9 +69,7 @@ export async function killPlainNodeChildren(): Promise<void> {
   );
 }
 
-if (typeof afterEach === 'function') {
-  afterEach(() => killPlainNodeChildren());
-}
+afterEach(() => killPlainNodeChildren());
 
 /** Runs `scenario` (a path under the repository) with `args`; answers its report. */
 export function runPlainNode(
@@ -77,6 +91,7 @@ export function runPlainNode(
       ['--import', 'tsx', path.resolve(ROOT, scenario), ...args],
       {
         cwd: ROOT,
+        env: childEnvironment(),
         encoding: 'utf8',
         maxBuffer: 16 * 1024 * 1024,
         killSignal: 'SIGKILL',

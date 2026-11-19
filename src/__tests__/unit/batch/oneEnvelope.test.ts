@@ -1,5 +1,3 @@
-import * as z from 'zod';
-
 /**
  * Every batch end sends one envelope (spec §4.1): a batch is homogeneous by
  * session kind — the first recorded call decides LOCK, UNLOCK or stateless,
@@ -11,20 +9,15 @@ import * as z from 'zod';
  * connection is a fake that answers envelopes part by part (`batchStand`).
  * Batch mode is the compact sets': a batch ends with `HandlerBatch`.
  */
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(),
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A long read outside a batch opens a connection of its own: a sibling
-  // of the stand's, built by the mock below.
-  siblingRecordOf: jest.fn(() => ({
-    settings: {},
-    credential: {},
-    kind: 'onprem',
-  })),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-}));
 
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+// Every case restores every mock after it: they are replaced before each.
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import * as z from 'zod';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import type {
   HandlerContext,
   IHandlerGroup,
@@ -38,6 +31,20 @@ import {
   type Stand,
 } from '../../helpers/batchStand';
 import { holding } from '../../helpers/heldLocks';
+
+beforeEach(() => {
+  mock.method(connectionFactory, 'createAbapConnection', () => undefined);
+  mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
+  // A long read outside a batch opens a connection of its own: a sibling
+  // of the stand's, built by the mock below.
+  mock.method(connectionFactory, 'siblingRecordOf', () => ({
+    settings: {},
+    credential: {},
+    kind: 'onprem',
+  }));
+  // A view over a connection keeps its kind: the kind is mocked above.
+  mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
+});
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -88,8 +95,8 @@ function refusedOtherKind(
   kind: string,
   holds: string,
 ) {
-  expect(answer.isError).toBe(true);
-  expect(payloadOf(answer)).toEqual({
+  assert.equal(answer.isError, true);
+  assert.deepStrictEqual(payloadOf(answer), {
     error: 'batch_other_kind',
     message: `${tool} is a ${kind} request; this batch holds ${holds} requests — record it in the next batch`,
   });
@@ -107,186 +114,227 @@ const SETS = [
   },
 ] as const;
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
-describe.each(SETS)('every batch end sends one envelope ($set)', (set) => {
-  it('a LOCK batch: the first call decides LOCK; a read and an UNLOCK are refused batch_other_kind, nothing recorded, no number; one stateful envelope', async () => {
-    const s = await batchStand({
-      heldLocks: holding(LOCK_HANDLE_OF_XML),
-      tools: TOOLS,
-      part: sap,
-    });
-    await set.begin(s);
-    expect(s.owner.kind()).toBeUndefined();
-    expect(await s.call('HandlerLock', lock('CLAS_A'))).toEqual({
-      content: [],
-    });
-    expect(s.owner.kind()).toBe('lock');
-    refusedOtherKind(
-      await s.call('HandlerGet', {
-        object_type: 'PROGRAM',
-        program_name: 'PROG_A',
-      }),
-      'HandlerGet',
-      'stateless',
-      'LOCK',
-    );
-    refusedOtherKind(
-      await s.call('HandlerUnlock', unlock('CLAS_A')),
-      'HandlerUnlock',
-      'UNLOCK',
-      'LOCK',
-    );
-    // The refused calls took no number: the next lock is 2.
-    expect(await s.call('HandlerLock', lock('CLAS_B'))).toEqual({
-      content: [],
-    });
-    expect(await set.end(s)).toEqual({ recorded: 2, sent: 2, received: 2 });
-    expect(envelopes(s)).toEqual([
+for (const set of SETS) {
+  describe(`every batch end sends one envelope (${set.set})`, () => {
+    it('a LOCK batch: the first call decides LOCK; a read and an UNLOCK are refused batch_other_kind, nothing recorded, no number; one stateful envelope', async () => {
+      const s = await batchStand({
+        heldLocks: holding(LOCK_HANDLE_OF_XML),
+        tools: TOOLS,
+        part: sap,
+      });
+      await set.begin(s);
+      assert.equal(s.owner.kind(), undefined);
+      assert.deepStrictEqual(await s.call('HandlerLock', lock('CLAS_A')), {
+        content: [],
+      });
+      assert.equal(s.owner.kind(), 'lock');
+      refusedOtherKind(
+        await s.call('HandlerGet', {
+          object_type: 'PROGRAM',
+          program_name: 'PROG_A',
+        }),
+        'HandlerGet',
+        'stateless',
+        'LOCK',
+      );
+      refusedOtherKind(
+        await s.call('HandlerUnlock', unlock('CLAS_A')),
+        'HandlerUnlock',
+        'UNLOCK',
+        'LOCK',
+      );
+      // The refused calls took no number: the next lock is 2.
+      assert.deepStrictEqual(await s.call('HandlerLock', lock('CLAS_B')), {
+        content: [],
+      });
+      assert.deepStrictEqual(await set.end(s), {
+        recorded: 2,
+        sent: 2,
+        received: 2,
+      });
       {
-        session: 'stateful',
-        parts: [
-          expect.stringMatching(/^POST .*clas_a\?_action=LOCK/),
-          expect.stringMatching(/^POST .*clas_b\?_action=LOCK/),
-        ],
-      },
-    ]);
-    const entries = await set.answers(s, [1, 2, 3]);
-    expect((entries as Array<{ number: number }>).map((e) => e.number)).toEqual(
-      [1, 2, 3],
-    );
-    expect(payloadOf(entries[0] as never).lock_handle).toBe(LOCK_HANDLE_OF_XML);
-    expect(entries[2]).toEqual({
-      number: 3,
-      error: 'no_answer',
-      message: 'no answer with that number',
+        // Each part matched by its pattern, then the envelopes compared whole.
+        const sent = envelopes(s);
+        const parts = sent[0]?.parts ?? [];
+        assert.match(parts[0] ?? '', /^POST .*clas_a\?_action=LOCK/);
+        assert.match(parts[1] ?? '', /^POST .*clas_b\?_action=LOCK/);
+        assert.deepStrictEqual(sent, [
+          { session: 'stateful', parts: [parts[0], parts[1]] },
+        ]);
+      }
+      const entries = await set.answers(s, [1, 2, 3]);
+      assert.deepStrictEqual(
+        (entries as Array<{ number: number }>).map((e) => e.number),
+        [1, 2, 3],
+      );
+      assert.equal(
+        payloadOf(entries[0] as never).lock_handle,
+        LOCK_HANDLE_OF_XML,
+      );
+      assert.deepStrictEqual(entries[2], {
+        number: 3,
+        error: 'no_answer',
+        message: 'no answer with that number',
+      });
+      await s.close();
     });
-    await s.close();
-  });
 
-  it('a stateless batch: the first read decides stateless; a LOCK and an UNLOCK are refused, no number; one stateless envelope', async () => {
-    const s = await batchStand({
-      heldLocks: holding(LOCK_HANDLE_OF_XML),
-      tools: TOOLS,
-      part: sap,
+    it('a stateless batch: the first read decides stateless; a LOCK and an UNLOCK are refused, no number; one stateless envelope', async () => {
+      const s = await batchStand({
+        heldLocks: holding(LOCK_HANDLE_OF_XML),
+        tools: TOOLS,
+        part: sap,
+      });
+      await set.begin(s);
+      assert.deepStrictEqual(
+        await s.call('HandlerGet', {
+          object_type: 'PROGRAM',
+          program_name: 'PROG_A',
+        }),
+        {
+          content: [],
+        },
+      );
+      assert.equal(s.owner.kind(), 'stateless');
+      refusedOtherKind(
+        await s.call('HandlerLock', lock('CLAS_A')),
+        'HandlerLock',
+        'LOCK',
+        'stateless',
+      );
+      refusedOtherKind(
+        await s.call('HandlerUnlock', unlock('CLAS_A')),
+        'HandlerUnlock',
+        'UNLOCK',
+        'stateless',
+      );
+      // A stateless read: one number.
+      assert.deepStrictEqual(
+        await s.call('HandlerGet', {
+          object_type: 'CLASS',
+          class_name: 'CLAS_A',
+        }),
+        {
+          content: [],
+        },
+      );
+      assert.deepStrictEqual(await set.end(s), {
+        recorded: 2,
+        sent: 2,
+        received: 2,
+      });
+      const sent = envelopes(s);
+      assert.equal(sent.length, 1);
+      assert.equal(sent[0]?.session, 'stateless');
+      assert.equal(sent[0]?.parts.length, 2);
+      // The refused calls left no session switch behind: no part is stateful.
+      assert.equal(
+        sent[0]?.parts.some((p) => p.includes('_action=')),
+        false,
+      );
+      await s.close();
     });
-    await set.begin(s);
-    expect(
-      await s.call('HandlerGet', {
-        object_type: 'PROGRAM',
-        program_name: 'PROG_A',
-      }),
-    ).toEqual({
-      content: [],
-    });
-    expect(s.owner.kind()).toBe('stateless');
-    refusedOtherKind(
-      await s.call('HandlerLock', lock('CLAS_A')),
-      'HandlerLock',
-      'LOCK',
-      'stateless',
-    );
-    refusedOtherKind(
-      await s.call('HandlerUnlock', unlock('CLAS_A')),
-      'HandlerUnlock',
-      'UNLOCK',
-      'stateless',
-    );
-    // A stateless read: one number.
-    expect(
-      await s.call('HandlerGet', {
-        object_type: 'CLASS',
-        class_name: 'CLAS_A',
-      }),
-    ).toEqual({
-      content: [],
-    });
-    expect(await set.end(s)).toEqual({ recorded: 2, sent: 2, received: 2 });
-    const sent = envelopes(s);
-    expect(sent).toHaveLength(1);
-    expect(sent[0]?.session).toBe('stateless');
-    expect(sent[0]?.parts).toHaveLength(2);
-    // The refused calls left no session switch behind: no part is stateful.
-    expect(sent[0]?.parts.some((p) => p.includes('_action='))).toBe(false);
-    await s.close();
-  });
 
-  it('an UNLOCK batch: the first call decides UNLOCK; a LOCK and a read are refused, no number; one stateful envelope', async () => {
-    const s = await batchStand({
-      heldLocks: holding(LOCK_HANDLE_OF_XML),
-      tools: TOOLS,
-      part: sap,
-    });
-    await set.begin(s);
-    expect(await s.call('HandlerUnlock', unlock('CLAS_A'))).toEqual({
-      content: [],
-    });
-    expect(s.owner.kind()).toBe('unlock');
-    refusedOtherKind(
-      await s.call('HandlerLock', lock('CLAS_B')),
-      'HandlerLock',
-      'LOCK',
-      'UNLOCK',
-    );
-    refusedOtherKind(
-      await s.call('HandlerGet', {
-        object_type: 'CLASS',
-        class_name: 'CLAS_A',
-      }),
-      'HandlerGet',
-      'stateless',
-      'UNLOCK',
-    );
-    expect(await s.call('HandlerUnlock', unlock('CLAS_B'))).toEqual({
-      content: [],
-    });
-    expect(await set.end(s)).toEqual({ recorded: 2, sent: 2, received: 2 });
-    expect(envelopes(s)).toEqual([
+    it('an UNLOCK batch: the first call decides UNLOCK; a LOCK and a read are refused, no number; one stateful envelope', async () => {
+      const s = await batchStand({
+        heldLocks: holding(LOCK_HANDLE_OF_XML),
+        tools: TOOLS,
+        part: sap,
+      });
+      await set.begin(s);
+      assert.deepStrictEqual(await s.call('HandlerUnlock', unlock('CLAS_A')), {
+        content: [],
+      });
+      assert.equal(s.owner.kind(), 'unlock');
+      refusedOtherKind(
+        await s.call('HandlerLock', lock('CLAS_B')),
+        'HandlerLock',
+        'LOCK',
+        'UNLOCK',
+      );
+      refusedOtherKind(
+        await s.call('HandlerGet', {
+          object_type: 'CLASS',
+          class_name: 'CLAS_A',
+        }),
+        'HandlerGet',
+        'stateless',
+        'UNLOCK',
+      );
+      assert.deepStrictEqual(await s.call('HandlerUnlock', unlock('CLAS_B')), {
+        content: [],
+      });
+      assert.deepStrictEqual(await set.end(s), {
+        recorded: 2,
+        sent: 2,
+        received: 2,
+      });
       {
-        session: 'stateful',
-        parts: [
-          expect.stringMatching(/^POST .*clas_a\?_action=UNLOCK/),
-          expect.stringMatching(/^POST .*clas_b\?_action=UNLOCK/),
-        ],
-      },
-    ]);
-    await s.close();
-  });
+        // Each part matched by its pattern, then the envelopes compared whole.
+        const sent = envelopes(s);
+        const parts = sent[0]?.parts ?? [];
+        assert.match(parts[0] ?? '', /^POST .*clas_a\?_action=UNLOCK/);
+        assert.match(parts[1] ?? '', /^POST .*clas_b\?_action=UNLOCK/);
+        assert.deepStrictEqual(sent, [
+          { session: 'stateful', parts: [parts[0], parts[1]] },
+        ]);
+      }
+      await s.close();
+    });
 
-  it('the next batch decides its kind anew: each phase its own batch, one envelope each', async () => {
-    const s = await batchStand({
-      heldLocks: holding(LOCK_HANDLE_OF_XML),
-      tools: TOOLS,
-      part: sap,
+    it('the next batch decides its kind anew: each phase its own batch, one envelope each', async () => {
+      const s = await batchStand({
+        heldLocks: holding(LOCK_HANDLE_OF_XML),
+        tools: TOOLS,
+        part: sap,
+      });
+      await set.begin(s);
+      await s.call('HandlerLock', lock('CLAS_A'));
+      assert.deepStrictEqual(await set.end(s), {
+        recorded: 1,
+        sent: 1,
+        received: 1,
+      });
+      assert.equal(s.owner.kind(), undefined);
+      await set.begin(s);
+      assert.deepStrictEqual(
+        await s.call('HandlerGet', {
+          object_type: 'PROGRAM',
+          program_name: 'PROG_A',
+        }),
+        {
+          content: [],
+        },
+      );
+      assert.equal(s.owner.kind(), 'stateless');
+      assert.deepStrictEqual(await set.end(s), {
+        recorded: 1,
+        sent: 1,
+        received: 1,
+      });
+      await set.begin(s);
+      assert.deepStrictEqual(await s.call('HandlerUnlock', unlock('CLAS_A')), {
+        content: [],
+      });
+      assert.deepStrictEqual(await set.end(s), {
+        recorded: 1,
+        sent: 1,
+        received: 1,
+      });
+      assert.deepStrictEqual(
+        envelopes(s).map((e) => [e.session, e.parts.length]),
+        [
+          ['stateful', 1],
+          ['stateless', 1],
+          ['stateful', 1],
+        ],
+      );
+      await s.close();
     });
-    await set.begin(s);
-    await s.call('HandlerLock', lock('CLAS_A'));
-    expect(await set.end(s)).toEqual({ recorded: 1, sent: 1, received: 1 });
-    expect(s.owner.kind()).toBeUndefined();
-    await set.begin(s);
-    expect(
-      await s.call('HandlerGet', {
-        object_type: 'PROGRAM',
-        program_name: 'PROG_A',
-      }),
-    ).toEqual({
-      content: [],
-    });
-    expect(s.owner.kind()).toBe('stateless');
-    expect(await set.end(s)).toEqual({ recorded: 1, sent: 1, received: 1 });
-    await set.begin(s);
-    expect(await s.call('HandlerUnlock', unlock('CLAS_A'))).toEqual({
-      content: [],
-    });
-    expect(await set.end(s)).toEqual({ recorded: 1, sent: 1, received: 1 });
-    expect(envelopes(s).map((e) => [e.session, e.parts.length])).toEqual([
-      ['stateful', 1],
-      ['stateless', 1],
-      ['stateful', 1],
-    ]);
-    await s.close();
   });
-});
+}
 
 type Step = 'lock' | 'read' | 'stateful';
 
@@ -347,14 +395,15 @@ describe('a call with a part of another kind', () => {
       groups: [memberOf(['lock', 'read'])],
     });
     s.begin();
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerGet', {
         object_type: 'CLASS',
         class_name: 'CLAS_A',
       }),
-    ).toEqual({
-      content: [],
-    });
+      {
+        content: [],
+      },
+    );
     refusedOtherKind(
       await s.call('HandlerProfileList', { program_name: 'PROG_A' }),
       'HandlerProfileList',
@@ -362,23 +411,27 @@ describe('a call with a part of another kind', () => {
       'stateless',
     );
     // No number for it: the next call is 2.
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerGet', {
         object_type: 'CLASS',
         class_name: 'CLAS_B',
       }),
-    ).toEqual({
-      content: [],
-    });
-    expect((await s.end()).summary).toEqual({
+      {
+        content: [],
+      },
+    );
+    assert.deepStrictEqual((await s.end()).summary, {
       recorded: 2,
       sent: 2,
       received: 2,
     });
     const sent = envelopes(s);
-    expect(sent).toHaveLength(1);
-    expect(sent[0]?.session).toBe('stateless');
-    expect(sent[0]?.parts.some((p) => p.includes('prog_a'))).toBe(false);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0]?.session, 'stateless');
+    assert.equal(
+      sent[0]?.parts.some((p) => p.includes('prog_a')),
+      false,
+    );
     await s.close();
   });
 
@@ -395,26 +448,29 @@ describe('a call with a part of another kind', () => {
     });
     const words =
       'HandlerProfileList is a LOCK request; this batch holds stateless requests — record it in the next batch. An earlier part of this call was recorded, under number 1, and will be sent at the batch end; its answer under that number is this refusal';
-    expect(answer.isError).toBe(true);
-    expect(payloadOf(answer)).toEqual({
+    assert.equal(answer.isError, true);
+    assert.deepStrictEqual(payloadOf(answer), {
       error: 'batch_other_kind',
       message: words,
     });
-    expect(s.owner.kind()).toBe('stateless');
-    expect((await s.end()).summary).toEqual({
+    assert.equal(s.owner.kind(), 'stateless');
+    assert.deepStrictEqual((await s.end()).summary, {
       recorded: 1,
       sent: 1,
       received: 1,
     });
     // The earlier part went; nothing after the refused one, nothing stateful.
-    expect(envelopes(s)).toEqual([
-      {
-        session: 'stateless',
-        parts: [expect.stringMatching(/^GET .*prog_a\/source\/main$/)],
-      },
-    ]);
+    {
+      // The part matched by its pattern, then the envelopes compared whole.
+      const sent = envelopes(s);
+      const parts = sent[0]?.parts ?? [];
+      assert.match(parts[0] ?? '', /^GET .*prog_a\/source\/main$/);
+      assert.deepStrictEqual(sent, [
+        { session: 'stateless', parts: [parts[0]] },
+      ]);
+    }
     const [first] = await s.answers([1]);
-    expect(payloadOf(first as never)).toEqual({
+    assert.deepStrictEqual(payloadOf(first as never), {
       error: 'batch_other_kind',
       message: words,
     });
@@ -429,37 +485,39 @@ describe('a call with a part of another kind', () => {
       groups: [memberOf(['stateful'])],
     });
     s.begin();
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerGet', {
         object_type: 'CLASS',
         class_name: 'CLAS_A',
       }),
-    ).toEqual({
-      content: [],
-    });
+      {
+        content: [],
+      },
+    );
     refusedOtherKind(
       await s.call('HandlerProfileList', { program_name: 'PROG_A' }),
       'HandlerProfileList',
       'LOCK',
       'stateless',
     );
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerGet', {
         object_type: 'CLASS',
         class_name: 'CLAS_B',
       }),
-    ).toEqual({
-      content: [],
-    });
-    expect((await s.end()).summary).toEqual({
+      {
+        content: [],
+      },
+    );
+    assert.deepStrictEqual((await s.end()).summary, {
       recorded: 2,
       sent: 2,
       received: 2,
     });
     const sent = envelopes(s);
-    expect(sent).toHaveLength(1);
-    expect(sent[0]?.session).toBe('stateless');
-    expect(sent[0]?.parts).toHaveLength(2);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0]?.session, 'stateless');
+    assert.equal(sent[0]?.parts.length, 2);
     await s.close();
   });
 });

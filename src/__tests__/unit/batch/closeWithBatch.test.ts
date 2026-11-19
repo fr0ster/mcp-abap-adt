@@ -14,27 +14,37 @@
  *   `batch_mode_off`, `HandlerBatch` answers "no answer with that number" for the
  *   last executed batch's numbers too.
  */
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(),
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A long read outside a batch opens a connection of its own: a sibling
-  // of the stand's, built by the mock below.
-  siblingRecordOf: jest.fn(() => ({
-    settings: {},
-    credential: {},
-    kind: 'onprem',
-  })),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-}));
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { BATCH_MODE_OFF_WORDS } from '../../../lib/auth/serverRefusal';
 import { NO_ANSWER_WORDS } from '../../../lib/batch/answers';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import { closeInstance } from '../../../lib/instanceClose';
 import type { InnerRequest, PartAnswer } from '../../helpers/batchEnvelope';
 import { batchStand, payloadOf } from '../../helpers/batchStand';
+import { useFakeTimers, useRealTimers } from '../../helpers/fakeTime';
 import { HandlerLedger } from '../../helpers/handlerLedger';
 import { runPlainNode } from '../../helpers/plainNode';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+// Every case restores every mock after it: they are replaced before each.
+beforeEach(() => {
+  mock.method(connectionFactory, 'createAbapConnection', () => undefined);
+  mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
+  // A long read outside a batch opens a connection of its own: a sibling
+  // of the stand's, built by the mock below.
+  mock.method(connectionFactory, 'siblingRecordOf', () => ({
+    settings: {},
+    credential: {},
+    kind: 'onprem',
+  }));
+  // A view over a connection keeps its kind: the kind is mocked above.
+  mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
+});
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -65,8 +75,8 @@ async function settled(ledger: HandlerLedger): Promise<boolean> {
 }
 
 afterEach(() => {
-  jest.useRealTimers();
-  jest.restoreAllMocks();
+  useRealTimers();
+  mock.restoreAll();
 });
 
 describe('the instance close with a batch open', () => {
@@ -74,61 +84,71 @@ describe('the instance close with a batch open', () => {
     const ledger = new HandlerLedger();
     const s = await batchStand({ tools: TOOLS, part: sap, ledger });
     s.begin();
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerGet', {
         object_type: 'PROGRAM',
         program_name: 'PROG_A',
       }),
-    ).toEqual({
-      content: [],
-    });
-    expect(
+      {
+        content: [],
+      },
+    );
+    assert.deepStrictEqual(
       await s.call('HandlerGet', { object_type: 'CLASS', class_name: 'CL_A' }),
-    ).toEqual({
-      content: [],
-    });
+      {
+        content: [],
+      },
+    );
     const open = s.owner.opened();
     const recorded = [...(open?.recorded ?? [])];
-    expect(recorded.map((call) => call.number)).toEqual([1, 2]);
+    assert.deepStrictEqual(
+      recorded.map((call) => call.number),
+      [1, 2],
+    );
     const signal = s.owner.signal();
 
     const closing = closeInstance(s.server);
     // Dropped in the tick the close begins.
-    expect(s.owner.mode()).toBe('off');
-    expect(s.owner.opened()).toBeUndefined();
-    expect(signal.aborted).toBe(true);
+    assert.equal(s.owner.mode(), 'off');
+    assert.equal(s.owner.opened(), undefined);
+    assert.equal(signal.aborted, true);
     await closing;
 
-    expect(await settled(ledger)).toBe(true);
-    expect(s.executes).not.toHaveBeenCalled();
-    for (const fake of s.built) expect(fake.envelopes).toEqual([]);
-    expect(s.owner.holdsState()).toBe(false);
+    assert.equal(await settled(ledger), true);
+    assert.equal(s.executes.mock.callCount(), 0);
+    for (const fake of s.built) assert.deepStrictEqual(fake.envelopes, []);
+    assert.equal(s.owner.holdsState(), false);
     await s.close();
   });
 
-  it.each(['close', 'dispose'])(
-    'plain node, %s with a batch open: nothing sent, every recorded handler settled, no unhandled rejection',
-    async (how) => {
-      const report = await runPlainNode(SCENARIO, [how]);
-      expect(report).toEqual({
-        callAnswers: [[], []],
-        numbers: [1, 2],
-        mode: 'off',
-        holdsState: false,
-        signalAborted: true,
-        executes: 0,
-        direct: [],
-        settled: true,
-        unhandled: [],
-      });
-    },
-  );
+  for (const how of ['close', 'dispose']) {
+    it(
+      format(
+        'plain node, %s with a batch open: nothing sent, every recorded handler settled, no unhandled rejection',
+        how,
+      ),
+      async () => {
+        const report = await runPlainNode(SCENARIO, [how]);
+        assert.deepStrictEqual(report, {
+          callAnswers: [[], []],
+          numbers: [1, 2],
+          mode: 'off',
+          holdsState: false,
+          signalAborted: true,
+          executes: 0,
+          direct: [],
+          settled: true,
+          unhandled: [],
+        });
+      },
+    );
+  }
 });
 
 describe('the instance close while HandlerBatch end executes', () => {
   it('plain node: nothing more sent after the drop, no answers afterwards, no unhandled rejection', async () => {
     const report = await runPlainNode(DURING_END);
-    expect(report).toEqual({
+    assert.deepStrictEqual(report, {
       numbers: [1, 2],
       // The batch's one envelope, both parts, was on the wire at the drop;
       // nothing went after it.
@@ -148,10 +168,10 @@ describe('the instance close while HandlerBatch end executes', () => {
 
 describe('the idle bound with a batch open (Review Focus 4)', () => {
   it('nothing sent; recorded handlers released; HandlerBatch end then batch_mode_off; HandlerBatch answers no answer with that number', async () => {
-    jest.useFakeTimers({
-      advanceTimers: true,
-      doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
-    });
+    // Jest's doNotFake left setImmediate (and the microtask queues) real;
+    // its advanceTimers is not needed: the in-memory transport moves on real
+    // turns, and the bound is reached by the explicit advance below (§3.7).
+    useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
     const ledger = new HandlerLedger();
     const s = await batchStand({ tools: TOOLS, part: sap, ledger });
     // A batch executed: its answer 1 is kept.
@@ -160,12 +180,12 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
       object_type: 'PROGRAM',
       program_name: 'PROG_A',
     });
-    expect((await s.end()).summary).toEqual({
+    assert.deepStrictEqual((await s.end()).summary, {
       recorded: 1,
       sent: 1,
       received: 1,
     });
-    expect(s.owner.answer(1)).toBeDefined();
+    assert.notEqual(s.owner.answer(1), undefined);
     const sentBefore = s.built.map((fake) => fake.envelopes.length);
 
     // The next batch open, two calls recorded, then no call for the bound.
@@ -176,52 +196,61 @@ describe('the idle bound with a batch open (Review Focus 4)', () => {
     });
     await s.call('HandlerGet', { object_type: 'CLASS', class_name: 'CL_B' });
     const recorded = [...(s.owner.opened()?.recorded ?? [])];
-    expect(recorded.map((call) => call.number)).toEqual([1, 2]);
+    assert.deepStrictEqual(
+      recorded.map((call) => call.number),
+      [1, 2],
+    );
     const signal = s.owner.signal();
 
-    jest.advanceTimersByTime(30 * 60_000);
-    jest.useRealTimers();
+    mock.timers.tick(30 * 60_000);
+    useRealTimers();
     await turns();
 
-    expect(s.owner.mode()).toBe('off');
-    expect(signal.aborted).toBe(true);
-    expect(await settled(ledger)).toBe(true);
-    expect(s.executes).toHaveBeenCalledTimes(1); // the first batch's only
-    expect(s.built.map((fake) => fake.envelopes.length)).toEqual(
+    assert.equal(s.owner.mode(), 'off');
+    assert.equal(signal.aborted, true);
+    assert.equal(await settled(ledger), true);
+    assert.equal(s.executes.mock.callCount(), 1); // the first batch's only
+    assert.deepStrictEqual(
+      s.built.map((fake) => fake.envelopes.length),
       sentBefore.concat(new Array(s.built.length - sentBefore.length).fill(0)),
     );
 
     const ended = await s.call('HandlerBatch', { action: 'end' });
-    expect(ended.isError).toBe(true);
-    expect(payloadOf(ended)).toEqual({
+    assert.equal(ended.isError, true);
+    assert.deepStrictEqual(payloadOf(ended), {
       error: 'batch_mode_off',
       message: BATCH_MODE_OFF_WORDS,
     });
-    expect(await s.answers([1, 2])).toEqual([
+    assert.deepStrictEqual(await s.answers([1, 2]), [
       { number: 1, error: 'no_answer', message: NO_ANSWER_WORDS },
       { number: 2, error: 'no_answer', message: NO_ANSWER_WORDS },
     ]);
-    expect(s.executes).toHaveBeenCalledTimes(1);
+    assert.equal(s.executes.mock.callCount(), 1);
     await s.close();
   });
 });
 
 describe('numbers never read (spec §6)', () => {
-  it.each(['replace', 'close'])(
-    'plain node, the map %s: a handler never read was waiting, awaited by nothing, and is let go with no unhandled rejection',
-    async (how) => {
-      const report = await runPlainNode(UNREAD, [how]);
-      expect(report).toEqual({
-        numbers: [1, 2],
-        summary: { recorded: 2, sent: 3, received: 3 },
-        read: [[1, [{ type: 'text', text: 'a' }]]],
-        // The batch's one envelope; the replacing batch was empty.
-        envelopes: [3],
-        settledBefore: false,
-        settled: true,
-        holdsState: false,
-        unhandled: [],
-      });
-    },
-  );
+  for (const how of ['replace', 'close']) {
+    it(
+      format(
+        'plain node, the map %s: a handler never read was waiting, awaited by nothing, and is let go with no unhandled rejection',
+        how,
+      ),
+      async () => {
+        const report = await runPlainNode(UNREAD, [how]);
+        assert.deepStrictEqual(report, {
+          numbers: [1, 2],
+          summary: { recorded: 2, sent: 3, received: 3 },
+          read: [[1, [{ type: 'text', text: 'a' }]]],
+          // The batch's one envelope; the replacing batch was empty.
+          envelopes: [3],
+          settledBefore: false,
+          settled: true,
+          holdsState: false,
+          unhandled: [],
+        });
+      },
+    );
+  }
 });

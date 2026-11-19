@@ -3,20 +3,9 @@
  * in the order asked — each number's handler resumed when first read;
  * nothing sent; served while a batch is open.
  */
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(),
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A long read outside a batch opens a connection of its own: a sibling
-  // of the stand's, built by the mock below.
-  siblingRecordOf: jest.fn(() => ({
-    settings: {},
-    credential: {},
-    kind: 'onprem',
-  })),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-}));
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import {
   ANSWERS_ASK_WORDS,
   ANSWERS_NUMBER_WORDS,
@@ -29,7 +18,24 @@ import {
   type OpenBatch,
 } from '../../../lib/batch/InstanceBatch';
 import { LateBoundConnection } from '../../../lib/batch/lateBound';
+import * as connectionFactory from '../../../lib/connectionFactory';
+import { assertThrows } from '../../helpers/assertions';
 import { batchStand } from '../../helpers/batchStand';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+mock.method(connectionFactory, 'createAbapConnection', () => undefined);
+mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
+// A long read outside a batch opens a connection of its own: a sibling
+// of the stand's, built by the mock below.
+mock.method(connectionFactory, 'siblingRecordOf', () => ({
+  settings: {},
+  credential: {},
+  kind: 'onprem',
+}));
+// A view over a connection keeps its kind: the kind is mocked above.
+mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -66,8 +72,10 @@ const none = (number: number) => ({
 describe('HandlerBatch answers', () => {
   it('number and numbers, in the order asked', async () => {
     const owner = answered();
-    expect(await readAnswers(owner, { number: 2 })).toEqual([answerOf(2)]);
-    expect(await readAnswers(owner, { numbers: [3, 1, 2] })).toEqual([
+    assert.deepStrictEqual(await readAnswers(owner, { number: 2 }), [
+      answerOf(2),
+    ]);
+    assert.deepStrictEqual(await readAnswers(owner, { numbers: [3, 1, 2] }), [
       answerOf(3),
       answerOf(1),
       answerOf(2),
@@ -76,43 +84,44 @@ describe('HandlerBatch answers', () => {
 
   it('both or neither refused', () => {
     const owner = answered();
-    expect(() => readAnswers(owner, { number: 1, numbers: [2] })).toThrow(
+    assertThrows(
+      () => readAnswers(owner, { number: 1, numbers: [2] }),
       ANSWERS_ASK_WORDS,
     );
-    expect(() => readAnswers(owner, {})).toThrow(ANSWERS_ASK_WORDS);
-    expect(() => readAnswers(owner, { numbers: [] })).toThrow(
-      ANSWERS_ASK_WORDS,
-    );
+    assertThrows(() => readAnswers(owner, {}), ANSWERS_ASK_WORDS);
+    assertThrows(() => readAnswers(owner, { numbers: [] }), ANSWERS_ASK_WORDS);
   });
 
   it('0, -1, 1.5 refused before anything runs; duplicates answered per occurrence', async () => {
     const owner = answered();
-    const asked = jest.spyOn(owner, 'answer');
+    const asked = mock.method(owner, 'answer');
     // A string is ruled out by the ask's type (the schema parses numbers).
     for (const bad of [0, -1, 1.5, Number.NaN]) {
-      expect(() => readAnswers(owner, { number: bad })).toThrow(
+      assertThrows(
+        () => readAnswers(owner, { number: bad }),
         ANSWERS_NUMBER_WORDS,
       );
-      expect(() => readAnswers(owner, { numbers: [1, bad] })).toThrow(
+      assertThrows(
+        () => readAnswers(owner, { numbers: [1, bad] }),
         ANSWERS_NUMBER_WORDS,
       );
     }
-    expect(asked).not.toHaveBeenCalled();
-    expect(await readAnswers(owner, { numbers: [2, 2, 9, 2] })).toEqual([
-      answerOf(2),
-      answerOf(2),
-      none(9),
-      answerOf(2),
-    ]);
+    assert.equal(asked.mock.callCount(), 0);
+    assert.deepStrictEqual(
+      await readAnswers(owner, { numbers: [2, 2, 9, 2] }),
+      [answerOf(2), answerOf(2), none(9), answerOf(2)],
+    );
   });
 
   it('before any batch and an unknown number: no answer with that number', async () => {
     const fresh = new InstanceBatch({ keepRawParts: false });
-    expect(await readAnswers(fresh, { numbers: [1, 2] })).toEqual([
+    assert.deepStrictEqual(await readAnswers(fresh, { numbers: [1, 2] }), [
       none(1),
       none(2),
     ]);
-    expect(await readAnswers(answered(), { number: 4 })).toEqual([none(4)]);
+    assert.deepStrictEqual(await readAnswers(answered(), { number: 4 }), [
+      none(4),
+    ]);
   });
 
   it("served while a batch is open: the last batch's answers, nothing sent, nothing recorded", async () => {
@@ -133,17 +142,20 @@ describe('HandlerBatch answers', () => {
       object_type: 'PROGRAM',
       program_name: 'PROG_B',
     });
-    expect(await s.answers([1, 2])).toEqual([first, none(2)]);
-    expect(s.owner.opened()?.recorded.map((r) => r.number)).toEqual([1]);
-    expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(1);
+    assert.deepStrictEqual(await s.answers([1, 2]), [first, none(2)]);
+    assert.deepStrictEqual(
+      s.owner.opened()?.recorded.map((r) => r.number),
+      [1],
+    );
+    assert.equal(s.built.flatMap((b) => b.envelopes).length, 1);
     // A refused ask, through the tool: the words, nothing read.
     const refused = await s.call('HandlerBatch', {
       action: 'answers',
       number: 1,
       numbers: [1],
     });
-    expect(refused.isError).toBe(true);
-    expect(refused.content?.[0]?.text).toBe(ANSWERS_ASK_WORDS);
+    assert.equal(refused.isError, true);
+    assert.equal(refused.content?.[0]?.text, ANSWERS_ASK_WORDS);
     await s.close();
   });
 });

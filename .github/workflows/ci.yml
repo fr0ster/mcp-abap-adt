@@ -157,10 +157,9 @@ jobs:
           # established), so Windows is not covered by it in CI.
           SKIP_INSTALL_MATRIX: ${{ (matrix.os == 'ubuntu-latest' && matrix.node-version == 22) && 'false' || 'true' }}
 
-      # **macOS + Node 24: `npm test` died on SIGSEGV now and then** — exit 139,
-      # at a different test file each time (seen from 2026-10-03, while Jest's
-      # workers ran the suites), and a rerun passed. Every file now runs in a
-      # `node --test` process of its own, and a process that dies says
+      # **macOS + Node 24: a test process may die on SIGSEGV** — exit 139, at
+      # a different test file each time, and a rerun passes. Every file runs in
+      # a `node --test` process of its own, and a process that dies says
       # nothing, so the only record is the system's crash report. These two
       # steps put its summary (process, parent, signal, faulting thread) in the
       # log and keep the full reports as an artifact.

@@ -17,51 +17,58 @@
  * shape being mocked is.
  */
 
-import { okResponse, reading } from '../helpers/fakeClient';
-
 // Scope offers these searchable types (real attr order: isDefault isSelected name).
-const SCOPE_XML = `<?xml version="1.0"?><usagereferences:usageScopeResult xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:objectTypes><usagereferences:type isDefault="true" isSelected="true" name="CLAS/OC"/><usagereferences:type isDefault="true" isSelected="true" name="INTF/OI"/><usagereferences:type isDefault="false" isSelected="false" name="TABL/DS"/><usagereferences:type isDefault="false" isSelected="false" name="TABL/DT"/></usagereferences:objectTypes></usagereferences:usageScopeResult>`;
-
-const mockGetWhereUsedScope = jest
-  .fn()
-  .mockResolvedValue(okResponse(reading(SCOPE_XML)));
-const mockModifyWhereUsedScope = jest.fn().mockReturnValue('<scope-modified/>');
-const mockGetWhereUsed = jest.fn().mockResolvedValue(okResponse(reading({})));
-
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => ({
-    getUtils: () => ({
-      getWhereUsedScope: mockGetWhereUsedScope,
-      modifyWhereUsedScope: mockModifyWhereUsedScope,
-      getWhereUsed: mockGetWhereUsed,
-    }),
-  }),
-}));
-
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import {
   handleGetWhereUsed,
   TOOL_DEFINITION,
 } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import * as clients from '../../lib/clients';
+import { okResponse, reading } from '../helpers/fakeClient';
 import { jsonAt, listedJson } from '../helpers/listedJson';
+import { stateSystemKind } from '../helpers/systemKind';
+
+const SCOPE_XML = `<?xml version="1.0"?><usagereferences:usageScopeResult xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:objectTypes><usagereferences:type isDefault="true" isSelected="true" name="CLAS/OC"/><usagereferences:type isDefault="true" isSelected="true" name="INTF/OI"/><usagereferences:type isDefault="false" isSelected="false" name="TABL/DS"/><usagereferences:type isDefault="false" isSelected="false" name="TABL/DT"/></usagereferences:objectTypes></usagereferences:usageScopeResult>`;
+
+const mockGetWhereUsedScope = mock.fn<(...args: any[]) => any>(async () =>
+  okResponse(reading(SCOPE_XML)),
+);
+const mockModifyWhereUsedScope = mock.fn<(...args: any[]) => any>(
+  () => '<scope-modified/>',
+);
+const mockGetWhereUsed = mock.fn<(...args: any[]) => any>(async () =>
+  okResponse(reading({})),
+);
+
+// The declared variant the boundary checks a type argument against.
+// The declared variant: the kind stated, read by the real variantOf.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => ({
+  getUtils: () => ({
+    getWhereUsedScope: mockGetWhereUsedScope,
+    modifyWhereUsedScope: mockModifyWhereUsedScope,
+    getWhereUsed: mockGetWhereUsed,
+  }),
+}));
 
 const ctx = { connection: {}, logger: undefined } as any;
 
 describe('GetWhereUsed type-filter params', () => {
   beforeEach(() => {
-    mockGetWhereUsedScope.mockClear();
-    mockModifyWhereUsedScope.mockClear();
-    mockGetWhereUsed.mockClear();
+    mockGetWhereUsedScope.mock.resetCalls();
+    mockModifyWhereUsedScope.mock.resetCalls();
+    mockGetWhereUsed.mock.resetCalls();
   });
 
   it('exposes enable_only_types and disable_types as string arrays in the input schema', () => {
     const schema = listedJson(TOOL_DEFINITION.inputSchema);
-    expect(jsonAt(schema, 'enable_only_types').type).toBe('array');
-    expect(jsonAt(schema, 'enable_only_types', '[]').type).toBe('string');
-    expect(jsonAt(schema, 'disable_types').type).toBe('array');
-    expect(jsonAt(schema, 'disable_types', '[]').type).toBe('string');
+    assert.equal(jsonAt(schema, 'enable_only_types').type, 'array');
+    assert.equal(jsonAt(schema, 'enable_only_types', '[]').type, 'string');
+    assert.equal(jsonAt(schema, 'disable_types').type, 'array');
+    assert.equal(jsonAt(schema, 'disable_types', '[]').type, 'string');
   });
 
   it('forwards in-scope enable_only_types/disable_types to getWhereUsed, scoped', async () => {
@@ -72,22 +79,27 @@ describe('GetWhereUsed type-filter params', () => {
       disable_types: ['CLAS/OC'],
     } as any);
 
-    expect(result.isError).toBe(false);
-    expect(mockModifyWhereUsedScope).toHaveBeenCalledWith(
-      SCOPE_XML,
-      expect.objectContaining({
-        enableOnly: ['TABL/DS', 'TABL/DT'],
-        disable: ['CLAS/OC'],
-      }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockModifyWhereUsedScope.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], SCOPE_XML) &&
+          isDeepStrictEqual(a[1]?.enableOnly, ['TABL/DS', 'TABL/DT']) &&
+          isDeepStrictEqual(a[1]?.disable, ['CLAS/OC']),
+      ),
     );
-    expect(mockGetWhereUsed).toHaveBeenCalledWith(
-      expect.objectContaining({
-        object_name: 'ZT',
-        // `table` is sent as the code of the tables it names.
-        object_type: 'TABL/DT',
-        scopeXml: '<scope-modified/>',
-      }),
-      { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'] },
+    assert.ok(
+      mockGetWhereUsed.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0]?.object_name, 'ZT') &&
+          isDeepStrictEqual(a[0]?.object_type, 'TABL/DT') &&
+          isDeepStrictEqual(a[0]?.scopeXml, '<scope-modified/>') &&
+          isDeepStrictEqual(a[1], {
+            headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'],
+          }),
+      ),
     );
   });
 
@@ -98,12 +110,12 @@ describe('GetWhereUsed type-filter params', () => {
       enable_only_types: ['TABL/DS', 'BOGUS/XX'],
     } as any);
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const text =
       (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
-    expect(text).toContain('BOGUS/XX');
+    assert.ok(text.includes('BOGUS/XX'));
     // Crucially: never fall through to a default-scope search.
-    expect(mockGetWhereUsed).not.toHaveBeenCalled();
+    assert.equal(mockGetWhereUsed.mock.callCount(), 0);
   });
 
   it('skips scope validation and the scope round trip when no enable_only_types given', async () => {
@@ -112,8 +124,8 @@ describe('GetWhereUsed type-filter params', () => {
       object_type: 'table',
     } as any);
 
-    expect(mockGetWhereUsedScope).not.toHaveBeenCalled();
-    const arg = mockGetWhereUsed.mock.calls[0][0];
-    expect(arg.scopeXml).toBeUndefined();
+    assert.equal(mockGetWhereUsedScope.mock.callCount(), 0);
+    const arg = mockGetWhereUsed.mock.calls[0]?.arguments[0];
+    assert.equal(arg.scopeXml, undefined);
   });
 });

@@ -19,29 +19,31 @@
  * being mocked is.
  */
 
-import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
-
-const mockStructRead = jest.fn();
-const mockTableRead = jest.fn();
-const mockGetWhereUsedScope = jest.fn();
-const mockModifyWhereUsedScope = jest.fn();
-const mockGetWhereUsed = jest.fn();
-
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => ({
-    getStructure: () => ({ read: mockStructRead }),
-    getTable: () => ({ read: mockTableRead }),
-    getUtils: () => ({
-      getWhereUsedScope: mockGetWhereUsedScope,
-      modifyWhereUsedScope: mockModifyWhereUsedScope,
-      getWhereUsed: mockGetWhereUsed,
-    }),
-  }),
-}));
-
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
+import * as clients from '../../lib/clients';
+import { assertMatchObject } from '../helpers/assertions';
+import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
+
+const mockStructRead = mock.fn<(...args: any[]) => any>();
+const mockTableRead = mock.fn<(...args: any[]) => any>();
+const mockGetWhereUsedScope = mock.fn<(...args: any[]) => any>();
+const mockModifyWhereUsedScope = mock.fn<(...args: any[]) => any>();
+const mockGetWhereUsed = mock.fn<(...args: any[]) => any>();
+
+mock.method(clients, 'createAdtClient', () => ({
+  getStructure: () => ({ read: mockStructRead }),
+  getTable: () => ({ read: mockTableRead }),
+  getUtils: () => ({
+    getWhereUsedScope: mockGetWhereUsedScope,
+    modifyWhereUsedScope: mockModifyWhereUsedScope,
+    getWhereUsed: mockGetWhereUsed,
+  }),
+}));
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -56,49 +58,75 @@ const emptyWhereUsed = () => okResponse(reading({}));
 
 describe('GetStructuresList append handling (#128)', () => {
   beforeEach(() => {
-    mockStructRead.mockReset();
-    mockTableRead.mockReset();
-    mockGetWhereUsedScope.mockReset();
-    mockModifyWhereUsedScope.mockReset();
-    mockGetWhereUsed.mockReset();
+    mockStructRead.mock.resetCalls();
+    mockStructRead.mock.mockImplementation(() => undefined);
+    mockTableRead.mock.resetCalls();
+    mockTableRead.mock.mockImplementation(() => undefined);
+    mockGetWhereUsedScope.mock.resetCalls();
+    mockGetWhereUsedScope.mock.mockImplementation(() => undefined);
+    mockModifyWhereUsedScope.mock.resetCalls();
+    mockModifyWhereUsedScope.mock.mockImplementation(() => undefined);
+    mockGetWhereUsed.mock.resetCalls();
+    mockGetWhereUsed.mock.mockImplementation(() => undefined);
     // Root reads as a structure with no embedded includes. `getStructure()`
     // is called bare (no `resultsFor`), so its default `source` reading is a
     // plain string — the real `IAdtResponse<string>` shape, not the pre-19
     // `{ data }` envelope this mock used to answer with, which only ever
     // worked because `extractSource` had the matching pre-19 bug.
-    mockStructRead.mockResolvedValue(okResponse('define structure zs { }'));
-    mockTableRead.mockResolvedValue(refusedResponse('not a table'));
-    mockModifyWhereUsedScope.mockReturnValue('<scope-modified/>');
+    mockStructRead.mock.mockImplementation(async () =>
+      okResponse('define structure zs { }'),
+    );
+    mockTableRead.mock.mockImplementation(async () =>
+      refusedResponse('not a table'),
+    );
+    mockModifyWhereUsedScope.mock.mockImplementation(() => '<scope-modified/>');
   });
 
   it('scopes the append search to TABL/DS and tries object_type "structure" first', async () => {
-    mockGetWhereUsedScope.mockResolvedValue(okResponse(reading('<scope/>')));
-    mockGetWhereUsed.mockResolvedValue(emptyWhereUsed());
+    mockGetWhereUsedScope.mock.mockImplementation(async () =>
+      okResponse(reading('<scope/>')),
+    );
+    mockGetWhereUsed.mock.mockImplementation(async () => emptyWhereUsed());
 
     const result = await handleGetStructuresList(ctx, { structure_name: 'ZS' });
 
-    expect(result.isError).toBe(false);
-    expect(mockGetWhereUsedScope).toHaveBeenCalledWith(
-      expect.objectContaining({ object_name: 'ZS', object_type: 'TABL/DS' }),
-      { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsedScope'] },
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockGetWhereUsedScope.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0]?.object_name, 'ZS') &&
+          isDeepStrictEqual(a[0]?.object_type, 'TABL/DS') &&
+          isDeepStrictEqual(a[1], {
+            headers: DEFAULT_ADT_HEADERS['utils.getWhereUsedScope'],
+          }),
+      ),
     );
-    expect(mockModifyWhereUsedScope).toHaveBeenCalledWith(
-      '<scope/>',
-      expect.objectContaining({ enableOnly: ['TABL/DS'] }),
+    assert.ok(
+      mockModifyWhereUsedScope.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], '<scope/>') &&
+          isDeepStrictEqual(a[1]?.enableOnly, ['TABL/DS']),
+      ),
     );
-    expect(mockGetWhereUsed).toHaveBeenCalledWith(
-      expect.objectContaining({
-        object_name: 'ZS',
-        object_type: 'TABL/DS',
-        scopeXml: '<scope-modified/>',
-      }),
-      { headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'] },
+    assert.ok(
+      mockGetWhereUsed.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0]?.object_name, 'ZS') &&
+          isDeepStrictEqual(a[0]?.object_type, 'TABL/DS') &&
+          isDeepStrictEqual(a[0]?.scopeXml, '<scope-modified/>') &&
+          isDeepStrictEqual(a[1], {
+            headers: DEFAULT_ADT_HEADERS['utils.getWhereUsed'],
+          }),
+      ),
     );
-    expect(payload(result).appends_unavailable).toBeUndefined();
+    assert.equal(payload(result).appends_unavailable, undefined);
   });
 
   it('falls back to object_type "table" when the structure URI 404s', async () => {
-    mockGetWhereUsedScope.mockImplementation((p: any) => {
+    mockGetWhereUsedScope.mock.mockImplementation((p: any) => {
       if (p.object_type === 'TABL/DS') {
         return Promise.resolve(
           refusedResponse('Request failed with status code 404'),
@@ -106,33 +134,35 @@ describe('GetStructuresList append handling (#128)', () => {
       }
       return Promise.resolve(okResponse(reading('<scope/>')));
     });
-    mockGetWhereUsed.mockResolvedValue(emptyWhereUsed());
+    mockGetWhereUsed.mock.mockImplementation(async () => emptyWhereUsed());
 
     const result = await handleGetStructuresList(ctx, {
       structure_name: 'VBAK',
     });
 
-    expect(result.isError).toBe(false);
-    const types = mockGetWhereUsedScope.mock.calls.map((c) => c[0].object_type);
-    expect(types).toEqual(['TABL/DS', 'TABL/DT']);
-    expect(payload(result).appends_unavailable).toBeUndefined();
+    assert.equal(result.isError, false);
+    const types = mockGetWhereUsedScope.mock.calls.map(
+      (c) => c.arguments[0].object_type,
+    );
+    assert.deepStrictEqual(types, ['TABL/DS', 'TABL/DT']);
+    assert.equal(payload(result).appends_unavailable, undefined);
   });
 
   it('flags appends_unavailable when where-used fails for every object_type', async () => {
-    mockGetWhereUsedScope.mockResolvedValue(
+    mockGetWhereUsedScope.mock.mockImplementation(async () =>
       refusedResponse('Request failed with status code 404'),
     );
 
     const result = await handleGetStructuresList(ctx, { structure_name: 'ZS' });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const data = payload(result);
-    expect(data.success).toBe(true);
-    expect(data.appends_unavailable).toBe(true);
+    assert.equal(data.success, true);
+    assert.equal(data.appends_unavailable, true);
   });
 
   it('a 401 in the where-used lookup ends the call as it came, no second object_type', async () => {
-    mockGetWhereUsedScope.mockResolvedValue(
+    mockGetWhereUsedScope.mock.mockImplementation(async () =>
       refusedResponse('Unauthorized', {
         response: { status: 401, data: '' },
       } as any),
@@ -148,16 +178,16 @@ describe('GetStructuresList append handling (#128)', () => {
       { structure_name: 'ZS' },
     );
 
-    expect(result.isError).toBe(true);
-    expect(payload(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(payload(result), {
       status: 401,
       message: 'Unauthorized',
     });
-    expect(mockGetWhereUsedScope).toHaveBeenCalledTimes(1);
+    assert.equal(mockGetWhereUsedScope.mock.callCount(), 1);
   });
 
   it('a 403 in the where-used lookup stays appends_unavailable', async () => {
-    mockGetWhereUsedScope.mockResolvedValue(
+    mockGetWhereUsedScope.mock.mockImplementation(async () =>
       refusedResponse('No authorization', {
         response: { status: 403, data: '' },
       } as any),
@@ -165,9 +195,9 @@ describe('GetStructuresList append handling (#128)', () => {
 
     const result = await handleGetStructuresList(ctx, { structure_name: 'ZS' });
 
-    expect(result.isError).toBe(false);
-    expect(payload(result).appends_unavailable).toBe(true);
-    expect(mockGetWhereUsedScope).toHaveBeenCalledTimes(2);
+    assert.equal(result.isError, false);
+    assert.equal(payload(result).appends_unavailable, true);
+    assert.equal(mockGetWhereUsedScope.mock.callCount(), 2);
   });
 
   it('does not run where-used (or flag) when include_extensions is false', async () => {
@@ -176,9 +206,9 @@ describe('GetStructuresList append handling (#128)', () => {
       include_extensions: false,
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockGetWhereUsedScope).not.toHaveBeenCalled();
-    expect(mockGetWhereUsed).not.toHaveBeenCalled();
-    expect(payload(result).appends_unavailable).toBeUndefined();
+    assert.equal(result.isError, false);
+    assert.equal(mockGetWhereUsedScope.mock.callCount(), 0);
+    assert.equal(mockGetWhereUsed.mock.callCount(), 0);
+    assert.equal(payload(result).appends_unavailable, undefined);
   });
 });

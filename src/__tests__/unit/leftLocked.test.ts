@@ -7,6 +7,10 @@
  * had. And a save SAP refused with `CTS_WBO_API` 019 or 020 ("already locked in
  * request …") names that request as a hint; nothing is resent.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
 import { handleUpdateLocalTestClass } from '../../handlers/class/high/handleUpdateLocalTestClass';
@@ -18,8 +22,10 @@ import {
   TRANSPORT_HINT_WORDS_020,
   transportHint,
 } from '../../lib/answer';
+import * as clients from '../../lib/clients';
 import { safeCleanup, thrownCleanup } from '../../lib/strategies/safeFields';
 import { leftLockedWarning } from '../../lib/strategies/withLock';
+import { assertMatchObject } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
@@ -28,8 +34,9 @@ import {
 } from '../helpers/fakeClient';
 import { holding } from '../helpers/heldLocks';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 const payloadOf = (result: any) => JSON.parse(result.content[0].text);
 
@@ -86,9 +93,9 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
       },
     });
     const result: any = await handleUpdateLocalTestClass(context as any, ARGS);
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const { cleanup } = payloadOf(result);
-    expect(cleanup).toEqual({
+    assert.deepStrictEqual(cleanup, {
       error: 'client_threw',
       message: 'socket hang up',
       failures: [
@@ -109,7 +116,7 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
     });
     const result: any = await handleUpdateLocalTestClass(context as any, ARGS);
     const { cleanup } = payloadOf(result);
-    expect(cleanup).toMatchObject({
+    assertMatchObject(cleanup, {
       message: 'Unlock refused',
       origin: 'refusal',
       left_locked: true,
@@ -117,7 +124,7 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
       object: { type: 'CLASS', name: 'ZCL_OBJ' },
       warning: leftLockedWarning('Unlock refused'),
     });
-    expect(cleanup.failures).toHaveLength(1);
+    assert.equal(cleanup.failures.length, 1);
   });
 
   it('a REFUSED unlock after a landed save: the success stands, and says the object may be left locked', async () => {
@@ -127,8 +134,8 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
       unlock: async () => refusedResponse('Unlock refused'),
     });
     const result: any = await handleUpdateLocalTestClass(context as any, ARGS);
-    expect(result.isError).toBe(false);
-    expect(payloadOf(result).cleanup).toMatchObject({
+    assert.equal(result.isError, false);
+    assertMatchObject(payloadOf(result).cleanup, {
       left_locked: true,
       lock_handle: 'handle-1',
       object: { type: 'CLASS', name: 'ZCL_OBJ' },
@@ -142,10 +149,10 @@ describe('a cleanup unlock that fails says the object may be left locked', () =>
       unlock: async () => okResponse(undefined),
     });
     const result: any = await handleUpdateLocalTestClass(context as any, ARGS);
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = payloadOf(result);
-    expect(payload.cleanup).toBeUndefined();
-    expect(JSON.stringify(payload)).not.toContain('left_locked');
+    assert.equal(payload.cleanup, undefined);
+    assert.ok(!JSON.stringify(payload).includes('left_locked'));
   });
 });
 
@@ -153,7 +160,7 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
   const base = { message: 'socket hang up', error: 'client_threw' };
 
   it('copies each well-typed field', () => {
-    expect(
+    assert.deepStrictEqual(
       safeCleanup({
         ...base,
         left_locked: true,
@@ -161,17 +168,18 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
         object: { type: 'CLASS', name: 'OBJ' },
         warning: WARNING_HANG_UP,
       }),
-    ).toEqual({
-      ...base,
-      left_locked: true,
-      lock_handle: 'handle-1',
-      object: { type: 'CLASS', name: 'OBJ' },
-      warning: WARNING_HANG_UP,
-    });
+      {
+        ...base,
+        left_locked: true,
+        lock_handle: 'handle-1',
+        object: { type: 'CLASS', name: 'OBJ' },
+        warning: WARNING_HANG_UP,
+      },
+    );
   });
 
   it('a thrown carrier: drops each field of the wrong type, and everything the object carries beyond its two strings', () => {
-    expect(
+    assert.deepStrictEqual(
       thrownCleanup({
         ...base,
         left_locked: 'true',
@@ -180,18 +188,21 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
         warning: { text: 'x' },
         cookies: 'sap-contextid=secret',
       }),
-    ).toEqual({ ...base, object: { type: 'CLASS', name: 'OBJ' } });
+      { ...base, object: { type: 'CLASS', name: 'OBJ' } },
+    );
   });
 
-  it.each([
+  for (const [_label, object] of [
     ['a missing name', { type: 'CLASS' }],
     ['an empty type', { type: '', name: 'OBJ' }],
     ['a numeric name', { type: 'CLASS', name: 7 }],
     ['a string', 'CLASS OBJ'],
     ['null', null],
-  ])('a thrown carrier: drops an object with %s', (_label, object) => {
-    expect(thrownCleanup({ ...base, object })).toEqual(base);
-  });
+  ] as const) {
+    it(format('a thrown carrier: drops an object with %s', _label), () => {
+      assert.deepStrictEqual(thrownCleanup({ ...base, object }), base);
+    });
+  }
 
   it('drops an object with an empty name, and everything the object carries beyond its two strings', () => {
     const object = {
@@ -199,40 +210,42 @@ describe('safeCleanup passes the left-locked fields by their own types only', ()
       name: 'OBJ',
       headers: { authorization: 'x' },
     };
-    expect(safeCleanup({ ...base, object })).toEqual({
+    assert.deepStrictEqual(safeCleanup({ ...base, object }), {
       ...base,
       object: { type: 'CLASS', name: 'OBJ' },
     });
-    expect(safeCleanup({ ...base, object: { type: '', name: 'OBJ' } })).toEqual(
+    assert.deepStrictEqual(
+      safeCleanup({ ...base, object: { type: '', name: 'OBJ' } }),
       base,
     );
   });
 
   it('drops an empty handle; a thrown carrier also left_locked false', () => {
-    expect(safeCleanup({ ...base, lock_handle: '' })).toEqual(base);
-    expect(
+    assert.deepStrictEqual(safeCleanup({ ...base, lock_handle: '' }), base);
+    assert.deepStrictEqual(
       thrownCleanup({ ...base, left_locked: false, lock_handle: '' }),
-    ).toEqual(base);
+      base,
+    );
   });
 });
 
 describe('a save refused with CTS_WBO_API 019 names the request to pass', () => {
   it('UpdateLocalTestClass: hint { transport_request, text } beside the messages, nothing resent', async () => {
-    const update = jest.fn(async () => saveRefused([ALREADY_LOCKED]));
+    const update = mock.fn(async () => saveRefused([ALREADY_LOCKED]));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       update,
       unlock: async () => okResponse(undefined),
     });
     const result: any = await handleUpdateLocalTestClass(context as any, ARGS);
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = payloadOf(result);
-    expect(payload.hint).toEqual({
+    assert.deepStrictEqual(payload.hint, {
       transport_request: 'SIDK900001',
       text: TRANSPORT_HINT_WORDS,
     });
-    expect(payload.messages).toHaveLength(1);
-    expect(update).toHaveBeenCalledTimes(1);
+    assert.equal(payload.messages.length, 1);
+    assert.equal(update.mock.callCount(), 1);
   });
 
   it('the compact update under a held lock answers the same hint', async () => {
@@ -249,8 +262,8 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
         test_class_code: 'x',
       },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).hint).toEqual({
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(payloadOf(result).hint, {
       transport_request: 'SIDK900001',
       text: TRANSPORT_HINT_WORDS,
     });
@@ -270,27 +283,30 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
       unlock: async () => okResponse(undefined),
     });
     const result: any = await handleUpdateLocalTestClass(context as any, ARGS);
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).hint).toBeUndefined();
+    assert.equal(result.isError, true);
+    assert.equal(payloadOf(result).hint, undefined);
   });
 
-  it.each([
+  for (const [_label, key] of [
     ['another message class', { id: 'SADT_RESOURCE', no: '019' }],
     ['another number', { id: 'CTS_WBO_API', no: '018' }],
     ['the number after 020', { id: 'CTS_WBO_API', no: '021' }],
-  ])('transportHint: none for %s', (_label, key) => {
-    expect(
-      transportHint([
-        {
-          type: 'E',
-          text: 'x',
-          t100: { ...key, values: ['SIDK900001'] },
-        },
-      ]),
-    ).toBeUndefined();
-  });
+  ] as const) {
+    it(format('transportHint: none for %s', _label), () => {
+      assert.equal(
+        transportHint([
+          {
+            type: 'E',
+            text: 'x',
+            t100: { ...key, values: ['SIDK900001'] },
+          },
+        ]),
+        undefined,
+      );
+    });
+  }
 
-  it.each([
+  for (const [_label, values] of [
     ['no values', undefined],
     ['no value shaped as a request', ['LIMU CINC OBJ', 'SAPUSER01']],
     ['a task-length value', ['SIDK90000']],
@@ -298,24 +314,27 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
     ['a lower-case system id', ['sidK900001']],
     ['no K after the system id', ['SIDX900001']],
     ['a letter among the digits', ['SIDK90000A']],
-  ])('transportHint: none with %s', (_label, values) => {
-    expect(
-      transportHint([
-        {
-          type: 'E',
-          text: 'x',
-          t100: {
-            id: 'CTS_WBO_API',
-            no: '019',
-            ...(values ? { values } : {}),
+  ] as const) {
+    it(format('transportHint: none with %s', _label), () => {
+      assert.equal(
+        transportHint([
+          {
+            type: 'E',
+            text: 'x',
+            t100: {
+              id: 'CTS_WBO_API',
+              no: '019',
+              ...(values ? { values } : {}),
+            },
           },
-        },
-      ]),
-    ).toBeUndefined();
-  });
+        ]),
+        undefined,
+      );
+    });
+  }
 
   it('transportHint: the request wherever it stands among the values', () => {
-    expect(
+    assert.equal(
       transportHint([
         {
           type: 'E',
@@ -327,7 +346,8 @@ describe('a save refused with CTS_WBO_API 019 names the request to pass', () => 
           },
         },
       ])?.transport_request,
-    ).toBe('SIDK900002');
+      'SIDK900002',
+    );
   });
 });
 
@@ -352,8 +372,8 @@ describe('a save refused with CTS_WBO_API 020 (a task passed) names the request 
       ...ARGS,
       transport_request: 'SIDK900004',
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).hint).toEqual({
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(payloadOf(result).hint, {
       transport_request: 'SIDK900003',
       text: TRANSPORT_HINT_WORDS_020,
     });
@@ -371,32 +391,35 @@ describe('a save refused with CTS_WBO_API 020 (a task passed) names the request 
         },
       },
     ]);
-    expect(hint).toEqual({
+    assert.deepStrictEqual(hint, {
       transport_request: 'SIDK900005',
       text: TRANSPORT_HINT_WORDS_020,
     });
-    expect(TRANSPORT_HINT_WORDS_020).not.toBe(TRANSPORT_HINT_WORDS);
+    assert.notEqual(TRANSPORT_HINT_WORDS_020, TRANSPORT_HINT_WORDS);
   });
 
-  it.each([
+  for (const [_label, values] of [
     ['no values', undefined],
     ['no value shaped as a request', ['R3TR PROG OBJ', 'SAPUSER01']],
     ['a task-length value', ['SIDK90000']],
-  ])('transportHint: none with %s', (_label, values) => {
-    expect(
-      transportHint([
-        {
-          type: 'E',
-          text: 'x',
-          t100: {
-            id: 'CTS_WBO_API',
-            no: '020',
-            ...(values ? { values } : {}),
+  ] as const) {
+    it(format('transportHint: none with %s', _label), () => {
+      assert.equal(
+        transportHint([
+          {
+            type: 'E',
+            text: 'x',
+            t100: {
+              id: 'CTS_WBO_API',
+              no: '020',
+              ...(values ? { values } : {}),
+            },
           },
-        },
-      ]),
-    ).toBeUndefined();
-  });
+        ]),
+        undefined,
+      );
+    });
+  }
 });
 
 describe('the hint offers only a request the call did not send', () => {
@@ -420,7 +443,7 @@ describe('the hint offers only a request the call did not send', () => {
 
   it('none sent: the request SAP names, to pass', async () => {
     const result: any = await update([lockedIn('019', 'SIDK900001')]);
-    expect(payloadOf(result).hint).toEqual({
+    assert.deepStrictEqual(payloadOf(result).hint, {
       transport_request: 'SIDK900001',
       text: TRANSPORT_HINT_WORDS,
     });
@@ -431,31 +454,36 @@ describe('the hint offers only a request the call did not send', () => {
       [lockedIn('019', 'SIDK900001')],
       'SIDK900009',
     );
-    expect(payloadOf(result).hint).toEqual({
+    assert.deepStrictEqual(payloadOf(result).hint, {
       transport_request: 'SIDK900001',
       text: TRANSPORT_HINT_WORDS,
     });
   });
 
-  it.each(['019', '020'])(
-    '%s naming the request sent: the entry-held words, no transport_request',
-    async (no) => {
-      const result: any = await update(
-        [lockedIn(no, 'SIDK900001')],
-        'SIDK900001',
-      );
-      const { hint } = payloadOf(result);
-      expect(hint).toEqual({ text: TRANSPORT_ENTRY_HELD_WORDS });
-      expect(hint).not.toHaveProperty('transport_request');
-    },
-  );
+  for (const no of ['019', '020']) {
+    it(
+      format(
+        '%s naming the request sent: the entry-held words, no transport_request',
+        no,
+      ),
+      async () => {
+        const result: any = await update(
+          [lockedIn(no, 'SIDK900001')],
+          'SIDK900001',
+        );
+        const { hint } = payloadOf(result);
+        assert.deepStrictEqual(hint, { text: TRANSPORT_ENTRY_HELD_WORDS });
+        assert.ok(!('transport_request' in Object(hint)));
+      },
+    );
+  }
 
   it('the request sent in lower case is the same request', async () => {
     const result: any = await update(
       [lockedIn('019', 'SIDK900001')],
       'sidk900001',
     );
-    expect(payloadOf(result).hint).toEqual({
+    assert.deepStrictEqual(payloadOf(result).hint, {
       text: TRANSPORT_ENTRY_HELD_WORDS,
     });
   });
@@ -466,7 +494,7 @@ describe('the hint offers only a request the call did not send', () => {
    * `CTS_WBO_API` 019 even when that same request is passed.
    */
   it('re-creating a deleted object with the request that still holds its entry: no retry offered', async () => {
-    const create = jest.fn(async (config: unknown) =>
+    const create = mock.fn(async (config: unknown) =>
       refusedResponse('Create failed', {
         response: { status: 400, data: '<exc/>' },
         request: {
@@ -492,14 +520,14 @@ describe('the hint offers only a request the call did not send', () => {
       package_name: 'PKG',
       transport_request: 'SIDK900001',
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).hint).toEqual({
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(payloadOf(result).hint, {
       text: TRANSPORT_ENTRY_HELD_WORDS,
     });
-    expect(create).toHaveBeenCalledTimes(1);
+    assert.equal(create.mock.callCount(), 1);
   });
 
-  it.each([
+  for (const [_label, request, expected] of [
     ['no request', undefined, undefined],
     ['a URL with no query', { url: '/sap/bc/adt/oo/classes' }, undefined],
     ['a URL with no corrNr', { url: '/x?lockHandle=h' }, undefined],
@@ -512,7 +540,9 @@ describe('the hint offers only a request the call did not send', () => {
       undefined,
     ],
     ['an empty corrNr', { url: '/x?corrNr=' }, undefined],
-  ])('attemptedRequest: %s', (_label, request, expected) => {
-    expect(attemptedRequest(request)).toBe(expected);
-  });
+  ] as const) {
+    it(format('attemptedRequest: %s', _label), () => {
+      assert.equal(attemptedRequest(request), expected);
+    });
+  }
 });

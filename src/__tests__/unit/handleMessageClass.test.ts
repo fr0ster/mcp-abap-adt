@@ -8,36 +8,44 @@
  * SAP-free via a mocked AdtClient.
  */
 
-const mockMc = {
-  create: jest.fn(),
-  read: jest.fn(),
-  readMetadata: jest.fn(),
-  update: jest.fn(),
-  checkDeletion: jest.fn(),
-  delete: jest.fn(),
-};
-const mockMsg = {
-  create: jest.fn(),
-  read: jest.fn(),
-  update: jest.fn(),
-  delete: jest.fn(),
-};
-
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => ({
-    getMessageClass: () => mockMc,
-    getMessageClassMessage: () => mockMsg,
-  }),
-}));
-
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { handleCreateMessageClass } from '../../handlers/message_class/high/handleCreateMessageClass';
 import { handleCreateMessageClassMessage } from '../../handlers/message_class/high/handleCreateMessageClassMessage';
 import { handleDeleteMessageClass } from '../../handlers/message_class/high/handleDeleteMessageClass';
 import { handleGetMessageClass } from '../../handlers/message_class/high/handleGetMessageClass';
 import { handleGetMessageClassMessage } from '../../handlers/message_class/high/handleGetMessageClassMessage';
 import { handleUpdateMessageClassMessage } from '../../handlers/message_class/high/handleUpdateMessageClassMessage';
+import * as clients from '../../lib/clients';
 import { parseStructure } from '../../lib/strategies/reading';
+import { assertMatchObject } from '../helpers/assertions';
 import { okResponse, reading } from '../helpers/fakeClient';
+
+const mockMc = {
+  create: mock.fn<(...args: any[]) => any>(),
+  read: mock.fn<(...args: any[]) => any>(),
+  readMetadata: mock.fn<(...args: any[]) => any>(),
+  update: mock.fn<(...args: any[]) => any>(),
+  checkDeletion: mock.fn<(...args: any[]) => any>(),
+  delete: mock.fn<(...args: any[]) => any>(),
+};
+const mockMsg = {
+  create: mock.fn<(...args: any[]) => any>(),
+  read: mock.fn<(...args: any[]) => any>(),
+  update: mock.fn<(...args: any[]) => any>(),
+  delete: mock.fn<(...args: any[]) => any>(),
+};
+
+// Read untyped, as jest.requireActual answered them: the cases hand the
+// strategy a bare { status, data }.
+const { analyseMessageClassMessage } = require('@mcp-abap-adt/adt-strategies');
+const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');
+
+mock.method(clients, 'createAdtClient', () => ({
+  getMessageClass: () => mockMc,
+  getMessageClassMessage: () => mockMsg,
+}));
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -50,7 +58,10 @@ function payload(result: any) {
 describe('Message Class (MSAG) CRUD tools', () => {
   beforeEach(() => {
     for (const m of [mockMc, mockMsg]) {
-      for (const fn of Object.values(m)) (fn as jest.Mock).mockReset();
+      for (const fn of Object.values(m)) {
+        fn.mock.resetCalls();
+        fn.mock.mockImplementation(() => undefined);
+      }
     }
   });
 
@@ -61,18 +72,24 @@ describe('Message Class (MSAG) CRUD tools', () => {
   it('GetMessageClass answers the class document via readMetadata', async () => {
     const metadata =
       '<msag:messageClass adtcore:name="ZMY_MSGS">...</msag:messageClass>';
-    mockMc.readMetadata.mockResolvedValue(okResponse(reading(metadata)));
+    mockMc.readMetadata.mock.mockImplementation(async () =>
+      okResponse(reading(metadata)),
+    );
 
     const result = await handleGetMessageClass(ctx, {
       message_class_name: 'zmy_msgs',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockMc.readMetadata).toHaveBeenCalledWith(
-      { name: 'ZMY_MSGS' },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockMc.readMetadata.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], { name: 'ZMY_MSGS' }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
-    expect(payload(result).metadata).toBe(metadata);
+    assert.equal(payload(result).metadata, metadata);
   });
 
   // GetMessageClass calls readMetadata, not read (task 18: `.read()` does
@@ -83,18 +100,20 @@ describe('Message Class (MSAG) CRUD tools', () => {
   // a structured "not found" — still `isError: true`, for a different
   // reason than this test's name once assumed.
   it('GetMessageClass surfaces an error when readMetadata returns undefined', async () => {
-    mockMc.readMetadata.mockResolvedValue(undefined);
+    mockMc.readMetadata.mock.mockImplementation(async () => undefined);
     const result = await handleGetMessageClass(ctx, {
       message_class_name: 'ZNOPE',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
   });
 
   // Task 20: `create()` is one request now (adt-clients 18's fat workflow —
   // validate/create/check — is gone), answered through `answer()`/
   // `IAdtResponse`, not the old `{ createResult }` state bag.
   it('CreateMessageClass dispatches create() with camelCase config', async () => {
-    mockMc.create.mockResolvedValue(okResponse(reading(undefined, '', 201)));
+    mockMc.create.mock.mockImplementation(async () =>
+      okResponse(reading(undefined, '', 201)),
+    );
 
     const result = await handleCreateMessageClass(ctx, {
       message_class_name: 'zmy_msgs',
@@ -103,16 +122,20 @@ describe('Message Class (MSAG) CRUD tools', () => {
       master_language: 'EN',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockMc.create).toHaveBeenCalledWith(
-      {
-        name: 'ZMY_MSGS',
-        description: 'My messages',
-        packageName: '$TMP',
-        transportRequest: undefined,
-        masterLanguage: 'EN',
-      },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockMc.create.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            name: 'ZMY_MSGS',
+            description: 'My messages',
+            packageName: '$TMP',
+            transportRequest: undefined,
+            masterLanguage: 'EN',
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
   });
 
@@ -132,10 +155,10 @@ describe('Message Class (MSAG) CRUD tools', () => {
       'xmlns:adtcore="http://www.sap.com/adt/core">' +
       '<del:object del:isDeletable="true" adtcore:name="ZMY_MSGS"/>' +
       '</del:checkResponse>';
-    mockMc.checkDeletion.mockResolvedValue(
+    mockMc.checkDeletion.mock.mockImplementation(async () =>
       okResponse(reading(parseStructure(checkDoc), checkDoc, 200)),
     );
-    mockMc.delete.mockResolvedValue(
+    mockMc.delete.mock.mockImplementation(async () =>
       okResponse(reading(parseStructure(deletionDoc), deletionDoc, 200)),
     );
 
@@ -144,16 +167,30 @@ describe('Message Class (MSAG) CRUD tools', () => {
       transport_request: 'SIDK900001',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockMc.checkDeletion).toHaveBeenCalledWith(
-      { name: 'ZMY_MSGS', transportRequest: 'SIDK900001' },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockMc.checkDeletion.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            name: 'ZMY_MSGS',
+            transportRequest: 'SIDK900001',
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
-    expect(mockMc.delete).toHaveBeenCalledWith(
-      { name: 'ZMY_MSGS', transportRequest: 'SIDK900001' },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.ok(
+      mockMc.delete.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            name: 'ZMY_MSGS',
+            transportRequest: 'SIDK900001',
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
-    expect(payload(result)).toMatchObject({
+    assertMatchObject(payload(result), {
       deleted: true,
       object: 'ZMY_MSGS',
     });
@@ -166,7 +203,9 @@ describe('Message Class (MSAG) CRUD tools', () => {
   // against it — see `CreateMessageClassMessage.ts`'s own comment) and the
   // write carries `{ analyse }` as a second argument.
   it('CreateMessageClassMessage dispatches to getMessageClassMessage().create', async () => {
-    mockMsg.create.mockResolvedValue(okResponse(reading(undefined, '', 200)));
+    mockMsg.create.mock.mockImplementation(async () =>
+      okResponse(reading(undefined, '', 200)),
+    );
 
     const result = await handleCreateMessageClassMessage(ctx, {
       message_class_name: 'zmy_msgs',
@@ -176,17 +215,21 @@ describe('Message Class (MSAG) CRUD tools', () => {
       transport_request: 'SIDK900001',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockMsg.create).toHaveBeenCalledWith(
-      {
-        className: 'ZMY_MSGS',
-        msgno: '001',
-        msgtext: 'Hello &1',
-        selfExplanatory: true,
-        description: undefined,
-        transportRequest: 'SIDK900001',
-      },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockMsg.create.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            className: 'ZMY_MSGS',
+            msgno: '001',
+            msgtext: 'Hello &1',
+            selfExplanatory: true,
+            description: undefined,
+            transportRequest: 'SIDK900001',
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
   });
 
@@ -194,7 +237,9 @@ describe('Message Class (MSAG) CRUD tools', () => {
   // and unlocks itself internally — so there is no `lock_handle` parameter
   // here at all, and `options` carries only `analyse`.
   it('UpdateMessageClassMessage dispatches update() with the new text', async () => {
-    mockMsg.update.mockResolvedValue(okResponse(reading(undefined, '', 200)));
+    mockMsg.update.mock.mockImplementation(async () =>
+      okResponse(reading(undefined, '', 200)),
+    );
 
     const result = await handleUpdateMessageClassMessage(ctx, {
       message_class_name: 'ZMY_MSGS',
@@ -202,17 +247,21 @@ describe('Message Class (MSAG) CRUD tools', () => {
       msgtext: 'Updated &1',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockMsg.update).toHaveBeenCalledWith(
-      {
-        className: 'ZMY_MSGS',
-        msgno: '001',
-        msgtext: 'Updated &1',
-        selfExplanatory: undefined,
-        description: undefined,
-        transportRequest: undefined,
-      },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockMsg.update.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            className: 'ZMY_MSGS',
+            msgno: '001',
+            msgtext: 'Updated &1',
+            selfExplanatory: undefined,
+            description: undefined,
+            transportRequest: undefined,
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
   });
 
@@ -233,7 +282,7 @@ describe('Message Class (MSAG) CRUD tools', () => {
     '</mc:messageClass>';
 
   const readMessage = async (detail?: string) => {
-    mockMsg.read.mockResolvedValue(okResponse(classDocument));
+    mockMsg.read.mock.mockImplementation(async () => okResponse(classDocument));
     return handleGetMessageClassMessage(ctx, {
       message_class_name: 'zmy_msgs',
       msgno: '001',
@@ -244,13 +293,20 @@ describe('Message Class (MSAG) CRUD tools', () => {
   it('GetMessageClassMessage answers the one message, read from the class document', async () => {
     const result = await readMessage();
 
-    expect(result.isError).toBe(false);
-    expect(mockMsg.read).toHaveBeenCalledWith(
-      { className: 'ZMY_MSGS', msgno: '001' },
-      'active',
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockMsg.read.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 3 &&
+          isDeepStrictEqual(a[0], {
+            className: 'ZMY_MSGS',
+            msgno: '001',
+          }) &&
+          isDeepStrictEqual(a[1], 'active') &&
+          typeof a[2]?.analyse === 'function',
+      ),
     );
-    expect(payload(result)).toEqual({
+    assert.deepStrictEqual(payload(result), {
       success: true,
       message_class_name: 'ZMY_MSGS',
       msgno: '001',
@@ -266,23 +322,25 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
     // Nothing of the other messages, and not the document.
     const text = result.content[0].text;
-    expect(text).not.toContain('First');
-    expect(text).not.toContain('Third');
-    expect(text).not.toContain('mc:messageClass');
+    assert.ok(!text.includes('First'));
+    assert.ok(!text.includes('Third'));
+    assert.ok(!text.includes('mc:messageClass'));
   });
 
   it('GetMessageClassMessage full adds the element as parsed, its links included', async () => {
     const answered = payload(await readMessage('full'));
-    expect(answered.message.msgno).toBe('001');
-    expect(answered.element['@']['mc:msgno']).toBe('001');
-    expect(JSON.stringify(answered.element)).toContain('messages/001/longtext');
-    expect(JSON.stringify(answered)).not.toContain('Third');
+    assert.equal(answered.message.msgno, '001');
+    assert.equal(answered.element['@']['mc:msgno'], '001');
+    assert.ok(
+      JSON.stringify(answered.element).includes('messages/001/longtext'),
+    );
+    assert.ok(!JSON.stringify(answered).includes('Third'));
   });
 
   it('GetMessageClassMessage raw answers the class document as SAP sent it', async () => {
     const result = await readMessage('raw');
-    expect(result.isError).toBe(false);
-    expect(result.content[0].text).toBe(classDocument);
+    assert.equal(result.isError, false);
+    assert.equal(result.content[0].text, classDocument);
   });
 
   it('GetMessageClassMessage reads the message whatever the prefix, one message or many', async () => {
@@ -291,25 +349,20 @@ describe('Message Class (MSAG) CRUD tools', () => {
     const single =
       '<m:messageClass xmlns:m="http://www.sap.com/adt/MessageClass" xmlns:a="http://www.sap.com/adt/core" a:name="ZMY_MSGS">' +
       '<m:messages m:msgno="001" m:msgtext="Only" m:selfexplainatory="false" a:name="ZMY_MSGS001"/></m:messageClass>';
-    const { analyseMessageClassMessage } = jest.requireActual(
-      '@mcp-abap-adt/adt-strategies',
-    );
-    const { ADT_NO_FAILURE } = jest.requireActual(
-      '@mcp-abap-adt/interfaces-adt',
-    );
-    expect(
+    assert.equal(
       analyseMessageClassMessage('001')(ADT_NO_FAILURE, {
         status: 200,
         data: single,
       }),
-    ).toBe(ADT_NO_FAILURE);
-    mockMsg.read.mockResolvedValue(okResponse(single));
+      ADT_NO_FAILURE,
+    );
+    mockMsg.read.mock.mockImplementation(async () => okResponse(single));
     const result = await handleGetMessageClassMessage(ctx, {
       message_class_name: 'zmy_msgs',
       msgno: '001',
     });
-    expect(result.isError).toBe(false);
-    expect(payload(result).message).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(payload(result).message, {
       msgno: '001',
       msgtext: 'Only',
       selfexplainatory: 'false',
@@ -317,56 +370,50 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
   });
 
-  it.each([
+  for (const [_what, body] of [
     ['an empty body', ''],
     ['a body that is not XML', 'not a document'],
     ['another document', '<other:root xmlns:other="urn:x"/>'],
-  ])(
-    'GetMessageClassMessage: the strategy refuses %s, the handler decides nothing',
-    async (_what, body) => {
-      const { analyseMessageClassMessage } = jest.requireActual(
-        '@mcp-abap-adt/adt-strategies',
-      );
-      const { ADT_NO_FAILURE } = jest.requireActual(
-        '@mcp-abap-adt/interfaces-adt',
-      );
-      const verdict = analyseMessageClassMessage('001')(ADT_NO_FAILURE, {
-        status: 200,
-        data: body,
-      });
-      expect(verdict).not.toBe(ADT_NO_FAILURE);
-      expect(verdict.code).toBe('ADT_OBJECT_NOT_FOUND');
-      // A strategy that clears it is the consumer's choice: the handler
-      // answers what it read, without a failure of its own.
-      mockMsg.read.mockResolvedValue(okResponse(body));
-      const result = await handleGetMessageClassMessage(ctx, {
-        message_class_name: 'zmy_msgs',
-        msgno: '001',
-      });
-      expect(result.isError).toBe(false);
-      expect(payload(result).message).toBeUndefined();
-    },
-  );
+  ]) {
+    it(
+      format(
+        'GetMessageClassMessage: the strategy refuses %s, the handler decides nothing',
+        _what,
+      ),
+      async () => {
+        const verdict = analyseMessageClassMessage('001')(ADT_NO_FAILURE, {
+          status: 200,
+          data: body,
+        });
+        assert.notEqual(verdict, ADT_NO_FAILURE);
+        assert.equal(verdict.code, 'ADT_OBJECT_NOT_FOUND');
+        // A strategy that clears it is the consumer's choice: the handler
+        // answers what it read, without a failure of its own.
+        mockMsg.read.mock.mockImplementation(async () => okResponse(body));
+        const result = await handleGetMessageClassMessage(ctx, {
+          message_class_name: 'zmy_msgs',
+          msgno: '001',
+        });
+        assert.equal(result.isError, false);
+        assert.equal(payload(result).message, undefined);
+      },
+    );
+  }
 
   it('GetMessageClassMessage refuses a number the class does not hold', async () => {
     // The real strategy over the real document: `analyseMessageClassMessage`
     // is what refuses, before any projection.
-    const { analyseMessageClassMessage } = jest.requireActual(
-      '@mcp-abap-adt/adt-strategies',
-    );
-    const { ADT_NO_FAILURE } = jest.requireActual(
-      '@mcp-abap-adt/interfaces-adt',
-    );
     const verdict = analyseMessageClassMessage('999')(ADT_NO_FAILURE, {
       status: 200,
       data: classDocument,
     });
-    expect(verdict).not.toBe(ADT_NO_FAILURE);
-    expect(
+    assert.notEqual(verdict, ADT_NO_FAILURE);
+    assert.equal(
       analyseMessageClassMessage('001')(ADT_NO_FAILURE, {
         status: 200,
         data: classDocument,
       }),
-    ).toBe(ADT_NO_FAILURE);
+      ADT_NO_FAILURE,
+    );
   });
 });

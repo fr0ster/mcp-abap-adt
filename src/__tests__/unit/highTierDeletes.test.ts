@@ -31,6 +31,9 @@
  * `analyseDeletion`) are proven the same way, for the same reason.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
@@ -71,9 +74,11 @@ import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
 import { handleCheckTableType } from '../../handlers/table_type/high/handleCheckTableType';
 import { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType';
 import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
+import * as clients from '../../lib/clients';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { parseStructure } from '../../lib/strategies/reading';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
@@ -81,6 +86,9 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
+
+mock.method(clients, 'createAdtClient', () => fakeClient);
+mock.method(clients, 'createOnPremAdtClient', () => fakeClient);
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -100,10 +108,6 @@ function moduleGroupRead(
     ? { readMetadata: readsModuleIn(group) }
     : {};
 }
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => fakeClient,
-  createOnPremAdtClient: () => fakeClient,
-}));
 
 const context = {
   connection: { getSessionId: () => null } as any,
@@ -115,7 +119,7 @@ describe('a refused deletion, masked as a 200 by ADT itself', () => {
     const document = corpusBody('refusal-delete-refused--01-deletion-delete');
     fakeClient = fakeClientOf({
       delete: async (_c: unknown, o: any) => {
-        expect(o.analyse).toBe(analyseDeletion);
+        assert.equal(o.analyse, analyseDeletion);
         return refusedResponse(
           (o.analyse('adt:no-failure', { data: document, status: 200 }) as any)
             .message,
@@ -125,24 +129,24 @@ describe('a refused deletion, masked as a 200 by ADT itself', () => {
     const result: any = await handleDeleteClass(context as any, {
       class_name: 'ZCL_X',
     });
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
-    expect(result.content[0].text).not.toContain('"success": true');
+    assert.equal(result.isError, true);
+    assert.equal(JSON.parse(result.content[0].text).origin, 'refusal');
+    assert.ok(!result.content[0].text.includes('"success": true'));
   });
 
   it('never acquires a lock, because a held lock is what makes a deletion refuse', async () => {
-    const lock = jest.fn();
+    const lock = mock.fn<(...args: any[]) => any>();
     fakeClient = fakeClientOf({
       delete: async () => okResponse(reading({})),
       lock,
     });
     await handleDeleteClass(context as any, { class_name: 'ZCL_X' });
-    expect(lock).not.toHaveBeenCalled();
+    assert.equal(lock.mock.callCount(), 0);
   });
 });
 
 describe('the nineteen deletion-service deletes: analyseDeletion, and terseDeletion fields', () => {
-  it.each([
+  for (const [_n, handler, args] of [
     [
       'DeleteBehaviorDefinition',
       handleDeleteBehaviorDefinition,
@@ -202,73 +206,80 @@ describe('the nineteen deletion-service deletes: analyseDeletion, and terseDelet
       handleDeleteCdsUnitTest,
       { class_name: 'ZCL_CDS_TEST' },
     ],
-  ])(
-    '%s takes analyseDeletion and projects the deletion result',
-    async (_n, handler, args) => {
-      const document = corpusBody('delete-success--01-deletion-delete');
-      const seen: unknown[] = [];
-      const lock = jest.fn();
-      fakeClient = fakeClientOf({
-        ...moduleGroupRead(args),
-        delete: async (_c: unknown, o: any) => {
-          seen.push(o.analyse);
-          return okResponse(reading(parseStructure(document), document, 200));
-        },
-        lock,
-      });
-      const result: any = await (handler as any)(context as any, args);
-      expect(seen).toEqual([analyseDeletion]);
-      expect(lock).not.toHaveBeenCalled();
-      // terseDeletion's own fields (`deleted`, `object`), so a projection
-      // swapped for terseCheck/terseWrite fails here.
-      expect(JSON.parse(result.content[0].text)).toMatchObject({
-        deleted: true,
-        object: 'ZMCP_BLD_ANSCH01',
-      });
-    },
-  );
+  ] as [string, any, Record<string, unknown>][]) {
+    it(
+      format('%s takes analyseDeletion and projects the deletion result', _n),
+      async () => {
+        const document = corpusBody('delete-success--01-deletion-delete');
+        const seen: unknown[] = [];
+        const lock = mock.fn<(...args: any[]) => any>();
+        fakeClient = fakeClientOf({
+          ...moduleGroupRead(args),
+          delete: async (_c: unknown, o: any) => {
+            seen.push(o.analyse);
+            return okResponse(reading(parseStructure(document), document, 200));
+          },
+          lock,
+        });
+        const result: any = await (handler as any)(context as any, args);
+        assert.deepStrictEqual(seen, [analyseDeletion]);
+        assert.equal(lock.mock.callCount(), 0);
+        // terseDeletion's own fields (`deleted`, `object`), so a projection
+        // swapped for terseCheck/terseWrite fails here.
+        assertMatchObject(JSON.parse(result.content[0].text), {
+          deleted: true,
+          object: 'ZMCP_BLD_ANSCH01',
+        });
+      },
+    );
+  }
 });
 
 describe('the six not-deletion-service exceptions: analyseException, never analyseDeletion', () => {
-  it.each([
+  for (const [_n, handler] of [
     ['DeleteLocalDefinitions', handleDeleteLocalDefinitions],
     ['DeleteLocalMacros', handleDeleteLocalMacros],
     ['DeleteLocalTypes', handleDeleteLocalTypes],
     ['DeleteLocalTestClass', handleDeleteLocalTestClass],
-  ])(
-    '%s empties the include under the class lock, with analyseException — not analyseDeletion',
-    async (_n, handler) => {
-      const order: string[] = [];
-      const seenSourceCode: unknown[] = [];
-      const seenAnalyse: unknown[] = [];
-      fakeClient = fakeClientOf({
-        lock: async () => {
-          order.push('lock');
-          return okResponse('handle-1');
-        },
-        update: async (_c: unknown, o: any) => {
-          order.push('update');
-          seenSourceCode.push(o.source);
-          seenAnalyse.push(o.analyse);
-          return okResponse(reading(undefined, '', 200));
-        },
-        unlock: async () => {
-          order.push('unlock');
-          return okResponse(undefined);
-        },
-      });
-      const result: any = await (handler as any)(context as any, {
-        class_name: 'ZCL_X',
-      });
-      expect(result.isError).toBe(false);
-      expect(order).toEqual(['lock', 'update', 'unlock']);
-      expect(seenSourceCode).toEqual(['']);
-      expect(seenAnalyse).toEqual([analyseException]);
-    },
-  );
+  ]) {
+    it(
+      format(
+        '%s empties the include under the class lock, with analyseException — not analyseDeletion',
+        _n,
+      ),
+      async () => {
+        const order: string[] = [];
+        const seenSourceCode: unknown[] = [];
+        const seenAnalyse: unknown[] = [];
+        fakeClient = fakeClientOf({
+          lock: async () => {
+            order.push('lock');
+            return okResponse('handle-1');
+          },
+          update: async (_c: unknown, o: any) => {
+            order.push('update');
+            seenSourceCode.push(o.source);
+            seenAnalyse.push(o.analyse);
+            return okResponse(reading(undefined, '', 200));
+          },
+          unlock: async () => {
+            order.push('unlock');
+            return okResponse(undefined);
+          },
+        });
+        const result: any = await (handler as any)(context as any, {
+          class_name: 'ZCL_X',
+        });
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(order, ['lock', 'update', 'unlock']);
+        assert.deepStrictEqual(seenSourceCode, ['']);
+        assert.deepStrictEqual(seenAnalyse, [analyseException]);
+      },
+    );
+  }
 
   it('DeleteMessageClassMessage calls delete with analyseException, no lock available to take', async () => {
-    const lock = jest.fn();
+    const lock = mock.fn<(...args: any[]) => any>();
     let seenAnalyse: unknown;
     fakeClient = fakeClientOf({
       delete: async (_c: unknown, o: any) => {
@@ -281,9 +292,9 @@ describe('the six not-deletion-service exceptions: analyseException, never analy
       message_class_name: 'ZMSG',
       msgno: '001',
     });
-    expect(result.isError).toBe(false);
-    expect(seenAnalyse).toBe(analyseException);
-    expect(lock).not.toHaveBeenCalled();
+    assert.equal(result.isError, false);
+    assert.equal(seenAnalyse, analyseException);
+    assert.equal(lock.mock.callCount(), 0);
   });
 
   it('DeleteMetadataExtension calls delete with analyseException and projects terseWrite (status-derived)', async () => {
@@ -297,16 +308,16 @@ describe('the six not-deletion-service exceptions: analyseException, never analy
     const result: any = await handleDeleteMetadataExtension(context as any, {
       metadata_extension_name: 'Z_DDLX',
     });
-    expect(result.isError).toBe(false);
-    expect(seenAnalyse).toBe(analyseException);
+    assert.equal(result.isError, false);
+    assert.equal(seenAnalyse, analyseException);
     // terseWrite's own shape: a bare string, not a `deleted`/`object` JSON
     // object — a projection swapped back to terseDeletion fails here.
-    expect(result.content[0].text).toBe('SUCCESS');
+    assert.equal(result.content[0].text, 'SUCCESS');
   });
 });
 
 describe('the thirteen checks: analyseException, and terseCheck fields', () => {
-  it.each([
+  for (const [_n, handler, args] of [
     [
       'CheckBehaviorDefinition',
       handleCheckBehaviorDefinition,
@@ -341,23 +352,25 @@ describe('the thirteen checks: analyseException, and terseCheck fields', () => {
     ['CheckStructure', handleCheckStructure, { structure_name: 'ZST' }],
     ['CheckTable', handleCheckTable, { table_name: 'ZTAB' }],
     ['CheckTableType', handleCheckTableType, { table_type_name: 'ZTT_X' }],
-  ])(
-    '%s takes analyseException and projects the check report',
-    async (_n, handler, args) => {
-      const document = corpusBody('check-success-verdict--01-checkrun');
-      const seen: unknown[] = [];
-      fakeClient = fakeClientOf({
-        ...moduleGroupRead(args),
-        check: async (_c: unknown, _status: unknown, o: any) => {
-          seen.push(o.analyse);
-          return okResponse(reading(parseStructure(document), document, 200));
-        },
-      });
-      const result: any = await (handler as any)(context as any, args);
-      expect(seen).toEqual([analyseException]);
-      // terseCheck's own fields, so a projection swapped for terseDeletion fails
-      // here rather than passing as "some JSON came back".
-      expect(JSON.parse(result.content[0].text)).toMatchObject({ ran: true });
-    },
-  );
+  ] as [string, any, Record<string, unknown>][]) {
+    it(
+      format('%s takes analyseException and projects the check report', _n),
+      async () => {
+        const document = corpusBody('check-success-verdict--01-checkrun');
+        const seen: unknown[] = [];
+        fakeClient = fakeClientOf({
+          ...moduleGroupRead(args),
+          check: async (_c: unknown, _status: unknown, o: any) => {
+            seen.push(o.analyse);
+            return okResponse(reading(parseStructure(document), document, 200));
+          },
+        });
+        const result: any = await (handler as any)(context as any, args);
+        assert.deepStrictEqual(seen, [analyseException]);
+        // terseCheck's own fields, so a projection swapped for terseDeletion fails
+        // here rather than passing as "some JSON came back".
+        assertMatchObject(JSON.parse(result.content[0].text), { ran: true });
+      },
+    );
+  }
 });

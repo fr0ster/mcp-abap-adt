@@ -46,23 +46,7 @@ import {
   systemContextFromConfiguration,
 } from '../../lib/systemContext';
 import { MISSING_RESPONSIBLE } from '../../lib/systemContextGuard';
-import * as systemInformation from '../../lib/systemInformation';
 import { recordingConnection } from '../helpers/recordingConnection';
-
-/**
- * readSystemInformation replaced on the module that defines it (its callers
- * read it at call time), a fresh mock before each case and restored after
- * it, as Jest's mockReset left it: answering undefined until a case says
- * otherwise, with no implementation left over from an earlier case.
- */
-function stubLookup() {
-  return mock.method(
-    systemInformation,
-    'readSystemInformation',
-    () => undefined,
-  );
-}
-let lookup: ReturnType<typeof stubLookup>;
 
 const KEYS = [
   'SAP_MASTER_SYSTEM',
@@ -78,10 +62,8 @@ beforeEach(() => {
     delete process.env[key];
   }
   resetSystemContextCache();
-  lookup = stubLookup();
 });
 afterEach(() => {
-  lookup.mock.restore();
   for (const key of KEYS) {
     if (saved[key] === undefined) delete process.env[key];
     else process.env[key] = saved[key];

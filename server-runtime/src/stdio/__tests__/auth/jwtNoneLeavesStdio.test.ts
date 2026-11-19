@@ -159,7 +159,12 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
   // No broker, no provider, nothing sent; the token in no line.
   assert.equal(constructed.mock.callCount(), 0);
   assert.deepStrictEqual(standIn.requests, []);
-  assert.equal(stdout.mock.callCount(), 0);
+  // The node:test runner reports through this process's stdout in
+  // serialized frames (Buffers); a text write is the program's.
+  assert.deepStrictEqual(
+    stdout.mock.calls.filter((c) => typeof c.arguments[0] === 'string'),
+    [],
+  );
   for (const line of [...stderr, JSON.stringify(read)]) {
     assert.ok(!line.includes('held-token'));
     assert.ok(!line.includes('PLACEHOLDER'));

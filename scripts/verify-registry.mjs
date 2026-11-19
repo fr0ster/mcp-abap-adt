@@ -12,7 +12,10 @@
 //    minutes behind a publish, and the caller runs the script again. There is
 //    no waiting loop or timer here.
 // 2. All of them are installed together into a fresh directory outside the
-//    repository (`npm install --ignore-scripts`), from the registry alone.
+//    repository (`npm install --ignore-scripts`), from the registry alone:
+//    every npm call names `--registry=https://registry.npmjs.org/`, so no
+//    mirror of a user's .npmrc stands in, and `npm view` runs with
+//    `--json=false`, so its answer is the bare version.
 // 3. The installed lockfile holds no `"link": true`, and every package in it
 //    is resolved from https://registry.npmjs.org/. The installed versions of
 //    adt-clients, adt-strategies and connection are reported.
@@ -108,7 +111,16 @@ async function notVisible(names, version) {
   const answers = await Promise.all(
     names.map(async (name) => ({
       name,
-      answer: await npmRun(['view', `${name}@${version}`, 'version'], repo),
+      answer: await npmRun(
+        [
+          'view',
+          `--registry=${REGISTRY}`,
+          '--json=false',
+          `${name}@${version}`,
+          'version',
+        ],
+        repo,
+      ),
     })),
   );
   const missing = [];
@@ -205,6 +217,7 @@ try {
   const install = await npmRun(
     [
       'install',
+      `--registry=${REGISTRY}`,
       '--ignore-scripts',
       '--prefer-online',
       '--no-audit',

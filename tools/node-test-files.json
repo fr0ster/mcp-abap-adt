@@ -122,6 +122,7 @@
   "server-runtime/src/stdio/__tests__/config/loginTimeout.test.ts",
   "server-runtime/src/stdio/__tests__/config/platformPaths.test.ts",
   "server-runtime/src/stdio/__tests__/config/yamlShapes.test.ts",
+  "server-runtime/src/stdio/__tests__/debug/noSecretsOut.test.ts",
   "server-runtime/src/stdio/__tests__/debug/summary.test.ts",
   "server-runtime/src/stdio/__tests__/deferredLogon.test.ts",
   "server-runtime/src/stdio/__tests__/destinationKeys.test.ts",

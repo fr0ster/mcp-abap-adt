@@ -11,17 +11,18 @@
  * answer. Every call goes over real HTTP to the ADT stand-in.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 import { CompactBatchHandlersGroup } from '../../../../src/lib/compact/batch/group';
 import { CompactLongSessionHandlersGroup } from '../../../../src/lib/compact/longSession/group';
 import { LongSessionHandlersGroup } from '../../../../src/lib/handlers/groups/LongSessionHandlersGroup';
 import { isClosing } from '../../../../src/lib/instanceClose';
 import { type HttpStand, httpStand, turns, until } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const placeholder = { connection: undefined } as unknown as HandlerContext;
 const NOT_AVAILABLE = 'state is not available';
@@ -45,7 +46,7 @@ const envelopes = () =>
 
 beforeEach(async () => {
   errorLines = [];
-  jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+  mock.method(console, 'error', (...args: unknown[]) => {
     errorLines.push(args.map(String).join(' '));
   });
   s = await httpStand({
@@ -62,7 +63,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await turns(20);
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const handleOf = (text: string): string =>
@@ -70,7 +71,7 @@ const handleOf = (text: string): string =>
 
 async function openSession(): Promise<string> {
   const opened = await s.call('SessionOpen', {});
-  expect(opened.isError).toBe(false);
+  assert.equal(opened.isError, false);
   return handleOf(opened.text);
 }
 
@@ -97,21 +98,21 @@ function watchUnindexing(): Array<{ closing: boolean }> {
 it('SessionClose answers that the session is closed and names what it held; the instance is unindexed and closed in that tick; every SAP session logged off once', async () => {
   const handle = await openSession();
   const locked = await s.call('HandlerLock', { ...LOCK, state_handle: handle });
-  expect(locked.isError).toBe(false);
+  assert.equal(locked.isError, false);
   const probed = await s.call('ProbeAdt', { id: 'one', state_handle: handle });
-  expect(probed.isError).toBe(false);
-  expect(s.standIn.logoffs()).toBe(0);
+  assert.equal(probed.isError, false);
+  assert.equal(s.standIn.logoffs(), 0);
   const unindexed = watchUnindexing();
 
   const closed = await s.call('SessionClose', { state_handle: handle });
-  expect(closed.isError).toBe(false);
-  expect(JSON.parse(closed.text)).toEqual({
+  assert.equal(closed.isError, false);
+  assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
     held: { locks: 1, batch: false, debug_session: false },
   });
 
   await until(() => poolSize() === 0);
-  expect(unindexed).toEqual([{ closing: true }]);
+  assert.deepStrictEqual(unindexed, [{ closing: true }]);
   await until(() => s.standIn.logoffs() > 0);
   await turns(20);
   const sessions = [
@@ -119,7 +120,7 @@ it('SessionClose answers that the session is closed and names what it held; the 
       s.standIn.requests.filter((r) => !isLogoff(r.url)).map((r) => r.session),
     ),
   ];
-  expect(s.standIn.loggedOff().sort()).toEqual(sessions.sort());
+  assert.deepStrictEqual(s.standIn.loggedOff().sort(), sessions.sort());
 });
 
 it('a later call carrying the closed handle answers state is not available; nothing is created or sent', async () => {
@@ -130,12 +131,20 @@ it('a later call carrying the closed handle answers state is not available; noth
   const sent = s.standIn.requests.length;
 
   const after = await s.call('ProbeAdt', { id: 'two', state_handle: handle });
-  expect(after).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(after, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
   const again = await s.call('SessionClose', { state_handle: handle });
-  expect(again).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(again, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
   await turns(20);
-  expect(s.standIn.requests).toHaveLength(sent);
-  expect(poolSize()).toBe(0);
+  assert.equal(s.standIn.requests.length, sent);
+  assert.equal(poolSize(), 0);
 });
 
 it('the compact HandlerSession close closes the session as SessionClose does', async () => {
@@ -146,22 +155,26 @@ it('the compact HandlerSession close closes the session as SessionClose does', a
     action: 'close',
     state_handle: handle,
   });
-  expect(closed.isError).toBe(false);
-  expect(JSON.parse(closed.text)).toEqual({
+  assert.equal(closed.isError, false);
+  assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
     held: { locks: 0, batch: false, debug_session: false },
   });
   await until(() => s.standIn.logoffs() === 1);
-  expect(poolSize()).toBe(0);
+  assert.equal(poolSize(), 0);
   const after = await s.call('ProbeAdt', { id: 'two', state_handle: handle });
-  expect(after.text).toBe(NOT_AVAILABLE);
+  assert.equal(after.text, NOT_AVAILABLE);
 });
 
 it('close without a handle, or with an unknown one, answers state is not available and sends nothing', async () => {
   const bare = await s.call('SessionClose', {});
-  expect(bare).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(bare, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
   const compactBare = await s.call('HandlerSession', { action: 'close' });
-  expect(compactBare).toEqual({
+  assert.deepStrictEqual(compactBare, {
     status: 200,
     text: NOT_AVAILABLE,
     isError: true,
@@ -169,10 +182,14 @@ it('close without a handle, or with an unknown one, answers state is not availab
   const unknown = await s.call('SessionClose', {
     state_handle: '0123456789ABCDEF0123456789ABCDEF',
   });
-  expect(unknown).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(unknown, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
   await turns(20);
-  expect(s.standIn.requests).toEqual([]);
-  expect(poolSize()).toBe(0);
+  assert.deepStrictEqual(s.standIn.requests, []);
+  assert.equal(poolSize(), 0);
 });
 
 it('close runs at once while a batch is open: the batch and its recorded call are dropped with nothing sent', async () => {
@@ -182,24 +199,25 @@ it('close runs at once while a batch is open: the batch and its recorded call ar
     action: 'begin',
     state_handle: handle,
   });
-  expect(begun.isError).toBe(false);
-  expect(handleOf(begun.text)).toBe(handle);
+  assert.equal(begun.isError, false);
+  assert.equal(handleOf(begun.text), handle);
   const recorded = await s.call('HandlerLock', {
     ...LOCK,
     state_handle: handle,
   });
-  expect(recorded.isError).toBe(false);
+  assert.equal(recorded.isError, false);
 
   const closed = await s.call('SessionClose', { state_handle: handle });
-  expect(closed.isError).toBe(false);
-  expect(JSON.parse(closed.text)).toEqual({
+  assert.equal(closed.isError, false);
+  assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
     held: { locks: 0, batch: true, debug_session: false },
   });
   await until(() => s.standIn.logoffs() === 1);
   await turns(20);
-  expect(envelopes()).toEqual([]);
-  expect(s.standIn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
+  assert.deepStrictEqual(envelopes(), []);
+  assert.equal(
+    s.standIn.requests.some((r) => r.url.includes('_action=LOCK')),
     false,
   );
   const answers = await s.call('HandlerBatch', {
@@ -207,7 +225,7 @@ it('close runs at once while a batch is open: the batch and its recorded call ar
     number: 1,
     state_handle: handle,
   });
-  expect(answers.text).toBe(NOT_AVAILABLE);
+  assert.equal(answers.text, NOT_AVAILABLE);
 });
 
 it('a call queued on the instance behind close is refused: state is not available, nothing sent', async () => {
@@ -229,15 +247,18 @@ it('a call queued on the instance behind close is refused: state is not availabl
   await turns(5);
   held.release();
 
-  expect((await first).isError).toBe(false);
-  expect(JSON.parse((await closing).text)).toMatchObject({ closed: true });
-  expect(await queued).toEqual({
+  assert.equal((await first).isError, false);
+  assertMatchObject(JSON.parse((await closing).text), { closed: true });
+  assert.deepStrictEqual(await queued, {
     status: 200,
     text: NOT_AVAILABLE,
     isError: true,
   });
   await until(() => s.standIn.logoffs() === 1);
-  expect(probes().map((r) => r.url)).toEqual(['/sap/bc/adt/probe/first']);
+  assert.deepStrictEqual(
+    probes().map((r) => r.url),
+    ['/sap/bc/adt/probe/first'],
+  );
 });
 
 it('with the logoff written but never answered, the handle is refused at once and the shutdown awaits that close', async () => {
@@ -246,12 +267,16 @@ it('with the logoff written but never answered, the handle is refused at once an
   const logoff = s.standIn.hold((r) => isLogoff(r.url));
 
   const closed = await s.call('SessionClose', { state_handle: handle });
-  expect(closed.isError).toBe(false);
+  assert.equal(closed.isError, false);
   await logoff.arrived;
 
   const after = await s.call('ProbeAdt', { id: 'two', state_handle: handle });
-  expect(after).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
-  expect(poolSize()).toBe(0);
+  assert.deepStrictEqual(after, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
+  assert.equal(poolSize(), 0);
 
   let exited = false;
   void s.exited.then(() => {
@@ -259,11 +284,11 @@ it('with the logoff written but never answered, the handle is refused at once an
   });
   s.processLike.emit('SIGTERM');
   await turns(50);
-  expect(exited).toBe(false);
+  assert.equal(exited, false);
 
   logoff.release();
-  expect(await s.exited).toBe(0);
-  expect(s.standIn.logoffs()).toBe(1);
+  assert.equal(await s.exited, 0);
+  assert.equal(s.standIn.logoffs(), 1);
 });
 
 it('an embedder stop awaits a running instance close whose logoff is not answered yet', async () => {
@@ -278,24 +303,24 @@ it('an embedder stop awaits a running instance close whose logoff is not answere
     stopped = true;
   });
   await turns(50);
-  expect(stopped).toBe(false);
+  assert.equal(stopped, false);
 
   logoff.release();
   await stopping;
-  expect(stopped).toBe(true);
+  assert.equal(stopped, true);
 });
 
 it('close ends any held state: a lock taken without SessionOpen, closed by its handle, is logged off and the handle refused', async () => {
   const locked = await s.call('HandlerLock', LOCK);
-  expect(locked.isError).toBe(false);
+  assert.equal(locked.isError, false);
   const { state_handle: handle } = JSON.parse(locked.text) as {
     state_handle: string;
   };
-  expect(poolSize()).toBe(1);
+  assert.equal(poolSize(), 1);
 
   const closed = await s.call('SessionClose', { state_handle: handle });
-  expect(closed.isError).toBe(false);
-  expect(JSON.parse(closed.text)).toEqual({
+  assert.equal(closed.isError, false);
+  assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
     held: { locks: 1, batch: false, debug_session: false },
   });
@@ -303,30 +328,34 @@ it('close ends any held state: a lock taken without SessionOpen, closed by its h
   const lockSession = s.standIn.requests.find((r) =>
     r.url.includes('_action=LOCK'),
   )?.session;
-  expect(s.standIn.loggedOff()).toEqual([lockSession]);
-  expect(poolSize()).toBe(0);
+  assert.deepStrictEqual(s.standIn.loggedOff(), [lockSession]);
+  assert.equal(poolSize(), 0);
 
   const after = await s.call('HandlerSession', {
     action: 'close',
     state_handle: handle,
   });
-  expect(after).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(after, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
 });
 
-it('a close whose batch was the only thing held: the state empties, and the pool runs no disposal on the closed instance', async () => {
+it('a close whose batch was the only thing held: the state empties, and the pool runs no disposal on the closed instance', async (t) => {
   const begun = await s.call('HandlerBatch', { action: 'begin' });
-  expect(begun.isError).toBe(false);
+  assert.equal(begun.isError, false);
   const handle = handleOf(begun.text);
-  expect(poolSize()).toBe(1);
-  const dispose = jest.spyOn(BaseMcpServer.prototype, 'dispose');
+  assert.equal(poolSize(), 1);
+  const dispose = t.mock.method(BaseMcpServer.prototype, 'dispose');
 
   const closed = await s.call('SessionClose', { state_handle: handle });
-  expect(JSON.parse(closed.text)).toEqual({
+  assert.deepStrictEqual(JSON.parse(closed.text), {
     closed: true,
     held: { locks: 0, batch: true, debug_session: false },
   });
   await until(() => poolSize() === 0);
   await turns(20);
-  expect(dispose).not.toHaveBeenCalled();
-  expect(envelopes()).toEqual([]);
+  assert.equal(dispose.mock.callCount(), 0);
+  assert.deepStrictEqual(envelopes(), []);
 });

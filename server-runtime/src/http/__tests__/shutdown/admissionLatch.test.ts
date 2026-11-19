@@ -9,6 +9,8 @@
  * parity suite.)
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import {
   isLockOf,
   isUnlockOf,
@@ -24,19 +26,17 @@ import {
   until,
 } from './harness';
 
-jest.setTimeout(30_000);
-
 let s: HttpStand;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 beforeEach(async () => {
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
   s = await httpStand();
 });
 
 afterEach(async () => {
   await s.close();
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
 it('a POST whose body completes after SIGTERM reaches no tool; the earlier tool is not awaited; exit 0', async () => {
@@ -55,19 +55,20 @@ it('a POST whose body completes after SIGTERM reaches no tool; the earlier tool 
   await new Promise((r) => setTimeout(r, 100));
   s.processLike.emit('SIGTERM');
   const finished = late.finish();
-  expect(await s.exited).toBe(0);
+  assert.equal(await s.exited, 0);
   const answered = await finished;
-  expect(answered.status).toBe(503);
-  expect(answered.body).toBe(POOL_CLOSED_WORDS);
+  assert.equal(answered.status, 503);
+  assert.equal(answered.body, POOL_CLOSED_WORDS);
   await until(() => s.standIn.logoffs() === 1);
 
   hold.release();
   await turns(20);
   // The update was held when the logoff went out: the UNLOCK never lands.
-  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
+  assert.equal(s.indexOf(isUnlockOf('A')), -1);
   // Nothing of the late request reached the system: no lock, no connection.
-  expect(s.indexOf(isLockOf('LATE'))).toBe(-1);
-  expect(
+  assert.equal(s.indexOf(isLockOf('LATE')), -1);
+  assert.equal(
     s.standIn.requests.filter((r) => r.url.includes('discovery')).length,
-  ).toBe(connections);
+    connections,
+  );
 });

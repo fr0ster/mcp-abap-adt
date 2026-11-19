@@ -1,4 +1,7 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import * as z from 'zod';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 
 /**
  * Batch mode over Streamable HTTP (spec §2, "How each transport reaches
@@ -29,8 +32,6 @@ import {
   turns,
   until,
 } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const placeholder = { connection: undefined } as unknown as HandlerContext;
 
@@ -65,8 +66,10 @@ const partOf = (program: string) =>
 const poolSize = () =>
   (s.mcp as unknown as { pool: { size(): number } }).pool.size();
 
+let consoleError: Mock<typeof console.error>;
+
 beforeEach(async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  consoleError = mock.method(console, 'error', () => {});
   s = await httpStand({
     server: { batch: { keepRawParts: false } },
     groups: [
@@ -106,7 +109,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 /** The basic connection's headers, with the handle in `x-mcp-state-handle`. */
@@ -117,86 +120,89 @@ const withHeader = (handle: string) => ({
 
 async function begin(): Promise<string> {
   const begun = await s.call('HandlerBatch', { action: 'begin' });
-  expect(begun.status).toBe(200);
-  expect(begun.isError).toBe(false);
+  assert.equal(begun.status, 200);
+  assert.equal(begun.isError, false);
   const answer = JSON.parse(begun.text) as {
     batch: string;
     state_handle: string;
   };
-  expect(answer.batch).toBe('on');
-  expect(typeof answer.state_handle).toBe('string');
+  assert.equal(answer.batch, 'on');
+  assert.equal(typeof answer.state_handle, 'string');
   return answer.state_handle;
 }
 
 it('the header routes to the pooled instance, ahead of the tools/call argument', async () => {
   const a = (await s.call('HoldState', { id: 'A' })).text;
   const b = (await s.call('HoldState', { id: 'B' })).text;
-  expect(a).not.toBe(b);
-  expect(poolSize()).toBe(2);
+  assert.notEqual(a, b);
+  assert.equal(poolSize(), 2);
 
   // The header alone.
-  expect((await s.call('EchoHandle', {}, withHeader(a))).text).toBe(a);
+  assert.equal((await s.call('EchoHandle', {}, withHeader(a))).text, a);
   // Both: the header wins over the argument.
-  expect(
+  assert.equal(
     (await s.call('EchoHandle', { state_handle: b }, withHeader(a))).text,
-  ).toBe(a);
+    a,
+  );
   // A header the pool does not know: a new instance, whatever the argument.
   const fresh = (
     await s.call('EchoHandle', { state_handle: b }, withHeader('unknown'))
   ).text;
-  expect([a, b]).not.toContain(fresh);
-  expect(poolSize()).toBe(2);
+  assert.ok(![a, b].includes(fresh));
+  assert.equal(poolSize(), 2);
 });
 
 it("a debugger tool's argument still routes", async () => {
   const a = (await s.call('HoldState', { id: 'A' })).text;
   // No header: the `state_handle` argument, as the debugger tools send it.
-  expect((await s.call('EchoHandle', { state_handle: a })).text).toBe(a);
+  assert.equal((await s.call('EchoHandle', { state_handle: a })).text, a);
   // The state's own tool, by its argument: the complete stop reaches it.
   const stopped = await s.call('StopState', { state_handle: a });
-  expect(stopped.isError).toBe(false);
+  assert.equal(stopped.isError, false);
   await until(() => poolSize() === 0);
 });
 
 it('HandlerBatch begin holds state and answers the handle; a later call with the header is recorded there', async () => {
   const handle = await begin();
   // It holds state: the instance stays in the pool between requests.
-  expect(poolSize()).toBe(1);
+  assert.equal(poolSize(), 1);
 
   const recorded = await s.call(
     'HandlerGet',
     { object_type: 'PROGRAM', program_name: 'PROG_A' },
     withHeader(handle),
   );
-  expect(recorded).toEqual({ status: 200, text: '', isError: false });
+  assert.deepStrictEqual(recorded, { status: 200, text: '', isError: false });
   // Recorded, not sent.
-  expect(programReads()).toEqual([]);
-  expect(envelopes()).toEqual([]);
+  assert.deepStrictEqual(programReads(), []);
+  assert.deepStrictEqual(envelopes(), []);
 
   const ended = await s.call(
     'HandlerBatch',
     { action: 'end' },
     withHeader(handle),
   );
-  expect(ended.isError).toBe(false);
-  expect(JSON.parse(ended.text)).toMatchObject({
+  assert.equal(ended.isError, false);
+  assertMatchObject(JSON.parse(ended.text), {
     recorded: 1,
     sent: 1,
     received: 1,
   });
-  expect(envelopes().filter((r) => r.method === 'POST')).toHaveLength(1);
+  assert.equal(envelopes().filter((r) => r.method === 'POST').length, 1);
 
   const answers = await s.call(
     'HandlerBatch',
     { action: 'answers', number: 1 },
     withHeader(handle),
   );
-  expect(answers.isError).toBe(false);
-  expect(answers.text).toContain(partOf('PROG_A'));
+  assert.equal(answers.isError, false);
+  assert.ok(answers.text.includes(partOf('PROG_A')));
   // The handle is a bearer value: no log line names it.
-  const logged = (console.error as jest.Mock).mock.calls.flat().map(String);
-  expect(logged.join('\n')).not.toContain(handle);
-  expect(s.stderr.join('\n')).not.toContain(handle);
+  const logged = consoleError.mock.calls
+    .flatMap((call) => call.arguments)
+    .map(String);
+  assert.ok(!logged.join('\n').includes(handle));
+  assert.ok(!s.stderr.join('\n').includes(handle));
 });
 
 it('no header → a fresh instance: HandlerBatch answers no answer with that number', async () => {
@@ -211,22 +217,22 @@ it('no header → a fresh instance: HandlerBatch answers no answer with that num
     { action: 'end' },
     withHeader(handle),
   );
-  expect(JSON.parse(ended.text)).toMatchObject({ recorded: 1 });
+  assertMatchObject(JSON.parse(ended.text), { recorded: 1 });
   // With the header, the answer is there.
-  expect(
+  assert.ok(
     (
       await s.call(
         'HandlerBatch',
         { action: 'answers', number: 1 },
         withHeader(handle),
       )
-    ).text,
-  ).toContain(partOf('PROG_A'));
+    ).text.includes(partOf('PROG_A')),
+  );
 
   // Without it, a new instance, where no batch ran.
   const lost = await s.call('HandlerBatch', { action: 'answers', number: 1 });
-  expect(lost.text).toContain('no answer with that number');
-  expect(lost.text).not.toContain(partOf('PROG_A'));
+  assert.ok(lost.text.includes('no answer with that number'));
+  assert.ok(!lost.text.includes(partOf('PROG_A')));
 });
 
 it('a call without the header while a batch is open is not recorded there', async () => {
@@ -235,17 +241,19 @@ it('a call without the header while a batch is open is not recorded there', asyn
     object_type: 'PROGRAM',
     program_name: 'PROG_D',
   });
-  expect(direct.status).toBe(200);
+  assert.equal(direct.status, 200);
   // Sent at once, on a new instance.
-  expect(programReads().map((r) => r.url)).toEqual([
-    expect.stringContaining('/prog_d/'),
-  ]);
+  {
+    const urls = programReads().map((r) => r.url);
+    assert.equal(urls.length, 1);
+    assert.ok(urls[0]?.includes('/prog_d/'));
+  }
   const ended = await s.call(
     'HandlerBatch',
     { action: 'end' },
     withHeader(handle),
   );
-  expect(JSON.parse(ended.text)).toMatchObject({
+  assertMatchObject(JSON.parse(ended.text), {
     recorded: 0,
     sent: 0,
     received: 0,
@@ -279,7 +287,7 @@ it('a dropped HandlerBatch end request keeps its answers', async () => {
   }).catch(() => 'dropped');
   await held.arrived;
   client.abort();
-  expect(await dropped).toBe('dropped');
+  assert.equal(await dropped, 'dropped');
   await turns(20);
 
   // The next call with the header waits for the batch end's lease, then reads
@@ -292,12 +300,12 @@ it('a dropped HandlerBatch end request keeps its answers', async () => {
   await turns(20);
   held.release();
   const answers = await reading;
-  expect(answers.isError).toBe(false);
-  expect(answers.text).toContain(partOf('PROG_A'));
-  expect(envelopes().filter((r) => r.method === 'POST')).toHaveLength(1);
+  assert.equal(answers.isError, false);
+  assert.ok(answers.text.includes(partOf('PROG_A')));
+  assert.equal(envelopes().filter((r) => r.method === 'POST').length, 1);
 });
 
-it('two requests with the same header at once: both recorded, numbered in arrival order', async () => {
+it('two requests with the same header at once: both recorded, numbered in arrival order', async (t) => {
   const handle = await begin();
 
   // The first request holds the instance's lease until told to go on.
@@ -311,25 +319,31 @@ it('two requests with the same header at once: both recorded, numbered in arriva
   });
   const connect = BaseMcpServer.prototype.connect;
   let connects = 0;
-  jest
-    .spyOn(BaseMcpServer.prototype, 'connect')
-    .mockImplementation(async function (this: BaseMcpServer, ...args) {
+  t.mock.method(
+    BaseMcpServer.prototype,
+    'connect',
+    async function (
+      this: BaseMcpServer,
+      ...args: Parameters<BaseMcpServer['connect']>
+    ) {
       connects += 1;
       if (connects === 1) {
         entered();
         await released;
       }
       return connect.apply(this, args);
-    });
+    },
+  );
   const serve = InstancePool.prototype.serve;
   let served = 0;
-  jest.spyOn(InstancePool.prototype, 'serve').mockImplementation(function (
-    this: InstancePool<never>,
-    ...args
-  ) {
-    served += 1;
-    return serve.apply(this, args);
-  });
+  t.mock.method(
+    InstancePool.prototype,
+    'serve',
+    function (this: InstancePool<never>, ...args: Parameters<typeof serve>) {
+      served += 1;
+      return serve.apply(this, args);
+    },
+  );
 
   const first = s.call(
     'HandlerGet',
@@ -345,19 +359,27 @@ it('two requests with the same header at once: both recorded, numbered in arriva
   // Both are at the pool; the second waits for the lease.
   await until(() => served === 2);
   await turns(20);
-  expect(connects).toBe(1);
+  assert.equal(connects, 1);
 
   goOn();
-  expect(await first).toEqual({ status: 200, text: '', isError: false });
-  expect(await second).toEqual({ status: 200, text: '', isError: false });
-  expect(programReads()).toEqual([]);
+  assert.deepStrictEqual(await first, {
+    status: 200,
+    text: '',
+    isError: false,
+  });
+  assert.deepStrictEqual(await second, {
+    status: 200,
+    text: '',
+    isError: false,
+  });
+  assert.deepStrictEqual(programReads(), []);
 
   const ended = await s.call(
     'HandlerBatch',
     { action: 'end' },
     withHeader(handle),
   );
-  expect(JSON.parse(ended.text)).toMatchObject({
+  assertMatchObject(JSON.parse(ended.text), {
     recorded: 2,
     sent: 2,
     received: 2,
@@ -372,8 +394,8 @@ it('two requests with the same header at once: both recorded, numbered in arriva
     { action: 'answers', number: 2 },
     withHeader(handle),
   );
-  expect(one.text).toContain(partOf('PROG_A'));
-  expect(one.text).not.toContain(partOf('PROG_B'));
-  expect(two.text).toContain(partOf('PROG_B'));
-  expect(two.text).not.toContain(partOf('PROG_A'));
+  assert.ok(one.text.includes(partOf('PROG_A')));
+  assert.ok(!one.text.includes(partOf('PROG_B')));
+  assert.ok(two.text.includes(partOf('PROG_B')));
+  assert.ok(!two.text.includes(partOf('PROG_A')));
 });

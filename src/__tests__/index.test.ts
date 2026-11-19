@@ -2,10 +2,6 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 describe('MCP ABAP ADT Server', () => {
-  it('should be a valid test suite', () => {
-    assert.equal(true, true);
-  });
-
   describe('Module Imports', () => {
     it('should require handler modules without errors', () => {
       require('../handlers/program/high/handleGetProgram');

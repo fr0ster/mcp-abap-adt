@@ -80,14 +80,10 @@ for (const op of ['create', 'update', 'delete'] as const) {
   describe(`compact ${op} facade description only advertises schema-backed args`, () => {
     const props = Object.keys(listedJson(SCHEMA[op]).properties ?? {});
     const advertised = parseDescriptionArgs(FACADE[op].description);
-    if (advertised.length === 0) {
-      it('(no advertised required args)', () => assert.equal(true, true));
-    } else {
-      for (const [_type, arg] of advertised) {
-        it(format('%s(%s*) is backed by schema', _type, arg), () => {
-          assert.ok(props.includes(arg));
-        });
-      }
+    for (const [_type, arg] of advertised) {
+      it(format('%s(%s*) is backed by schema', _type, arg), () => {
+        assert.ok(props.includes(arg));
+      });
     }
   });
 }

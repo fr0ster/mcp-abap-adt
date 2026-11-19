@@ -217,12 +217,13 @@ console.log(
   `release:verify: all ${names.length} packages at ${version} are on the registry`,
 );
 
-const work = fs.realpathSync(
-  fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-abap-adt-verify-')),
-);
+// Created before the `try`, and nothing between: whatever fails after it,
+// the `finally` removes it.
+const created = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-abap-adt-verify-'));
 const failures = [];
 let summary = '';
 try {
+  const work = fs.realpathSync(created);
   if (inside(fs.realpathSync(repo), work)) {
     throw new Error(`the temporary directory ${work} is inside the repository`);
   }
@@ -292,7 +293,7 @@ try {
 } catch (error) {
   failures.push(String(error));
 } finally {
-  fs.rmSync(work, { recursive: true, force: true });
+  fs.rmSync(created, { recursive: true, force: true });
 }
 
 if (failures.length > 0) fail(['FAILED:', ...failures.map((f) => `  ${f}`)]);

@@ -1,5 +1,50 @@
 # Table technical settings and text elements as tools — design
 
+## Changes since approval (2026-11-20, for the owner's approval)
+
+Read from the published contract: interfaces-adt 30.1.0 (`IAdtTableSettings.ts`), adt-clients 46.1.0
+(README, CHANGELOG at tag `adt-clients-v46.1.0`, MIGRATION-46), adt-strategies 0.26.0.
+
+1. **Versions:** `interfaces-adt ^30.1.0`, `adt-clients ^46.1.0`, `adt-strategies ^0.26.0`;
+   `adt-clients-legacy` (0.11.1) stays out.
+2. **`isWritableByAMDP` per variant, by type:** required in a cloud write, forbidden on premise
+   (`ITableSettingsOf<V>`, `ITableSettingsChangesOf<V>`). The tool's `is_writable_by_amdp` stays
+   optional on cloud (the patch keeps the value read) and absent on premise.
+3. **The cloud guard follows the client instance.** The server's cloud client
+   (`GuardedAdtClientCloud extends AdtClientCloud`, `src/lib/clients.ts`) already constructs the
+   handler with `variant: 'cloud'`. The two settings handlers take `adtClientOf(connection)`, narrow
+   on `variant`, and read with `cloudTableSettings` on cloud and `tableSettings` on premise. Neither
+   takes the variant-generic `createAdtClient`.
+4. **The patch's `translation` takes `value` only.** The tool gains an optional `translation: string`
+   (the translation value). The other three attributes are kept as read.
+5. **`area_key_fields` only with buffering type `G`.** It is allowed beside `type: 'G'`, or with no
+   type given (the type is kept). The zod schema refuses it beside another type, mirroring
+   `ITableBufferingChange`. A kept type that is not `G` is the library's refusal before the PUT,
+   passed through.
+6. **Patch headers:** `{ accept: TABLE_SETTINGS_MEDIA_TYPE }` only. The library sets the content type
+   (`contentType?: never`), so the call does not use the `withAdtHeaders` pair.
+7. **`patchMetadata` refusals before the PUT** are answered as the library's failure, passed through
+   unchanged: a read without an ETag, a document missing a required setting (a count past the safe
+   integers included), an `areaKeyFields` change whose merged type is not `G`, and on cloud a read
+   without the flag. Empty changes do not compile, and the zod boundary refuses them in the model's
+   arguments.
+8. **DT 771 (cloud).** A table writable by AMDP must have buffering `N`, logging off and no
+   replacement object, or its activation is refused (Code, cloud: `CL_DDACT_TABL_CHECK_TCHSET_CL` →
+   `chk_writable_amdp_usage` → `RADTTCHK` FORM `chk_writable_amdp_usage`, only with
+   `allowed_for_amdp_write = 'X'`; Measured, cloud, in the 46.1.0 live run: 200 with an `E`
+   message, the table left inactive; on premise there is no such check, Code; adt-clients 46.1.0
+   CHANGELOG, "SAP's rule, documented"). UpdateTableSettings answers that refusal as SAP's
+   (`analyseActivation` refuses any `E` message). **Decision for approval:** the cloud description of
+   `is_writable_by_amdp` states the rule, because it changes whether this call's activation succeeds.
+9. **Function groups on cloud** are measured and served (T10). The adt-clients live case runs on
+   both systems.
+10. **The class-pool inactive entry needs no handling.** `still_inactive` already carries `uri` and
+    `parent_uri` (`src/lib/answer.ts`), and the server matches the run's references by uri
+    (`stillInactiveAmong`, `activationRun.ts`). The `PROG/PX {CLASS}====CP` entry is therefore found
+    by its uri, with no name matching and no description line of its own.
+11. **The `patchMetadata` contract is the published one** (below). It replaces the earlier "to be
+    built there" sketch.
+
 ## Intent
 
 Expose two ADT sub-resources the server cannot reach today, in one change:
@@ -101,9 +146,10 @@ read on premise.
 - **S7 `isWritableByAMDP` is cloud's, and the cloud PUT writes it.** Measured: present in every cloud
   read, absent on premise (`raw/cloud-trial2.txt`); Code: in the cloud `SDDIC_ADT_TTAB` and
   `move_adt_to_ddv` (l. 238, S3), not in the on-premise ones (TS §14). Leaving it out of a cloud PUT
-  resets it to `false` (Measured, S3). So every settings write carries it: interfaces-adt 30.1.0
-  (fr0ster/mcp-abap-adt-interfaces#194) makes it writable (30.0.0 typed it `?: never`), and
-  `patchMetadata` keeps the value read unless the caller changes it.
+  resets it to `false` (Measured, S3). So a cloud write carries it: interfaces-adt 30.1.0 types it
+  required in a cloud write and forbidden on premise (`ITableSettingsOf<V>`), and `patchMetadata`
+  keeps the value read unless the change names it. The guard holds through `AdtClientCloud` (the
+  server's cloud client), whose handler refuses a cloud read without the flag (adt-clients 46.1.0).
 - **S8 The data class is not limited to the value help; activation judges it.** Code, both systems:
   `CL_TABT_DATA_CLASS_VH->get_named_items` selects `dartt JOIN ddart … WHERE ( b~ddclass = 'STD' )`
   — standard classes only. Measured, both systems: `…/settings/dataClass/values` → APPL0, APPL1,
@@ -158,7 +204,8 @@ read on premise.
   both leave the list (`raw-v/onprem/56–64, 73`). Code, both systems:
   `CL_SEDX_ADT_SRC_UTIL=>get_type_and_name_from_uri`, `when 'classes'. … objtype_tr = 'CLAS'.
   subtype_wb = swbm_c_type_cls_textelement. e_rept_name = cl_oo_classname_service=>get_classpool_name(
-  … )` (TT §14 V8). So a `still_inactive` entry `PROG/PX {CLASS}====CP` is the class's text elements.
+  … )` (TT §14 V8). The inactive list carries the entry's `uri` (`/textelements/classes/{c}`) and
+  `parentUri`, so it is matched by uri (adt-clients 46.1.0 recorded answer).
   `ActivateObjects [{PROG/P}]` alone after a text write → "no activation ran; still inactive PROG/P
   and PROG/PX" (Measured onprem, TT §8).
 - **T7 Refusals on the write, the same on both systems.** Measured onprem and cloud, with the Code
@@ -222,6 +269,8 @@ Names follow the full set's verbs; every update tool does lock → write → unl
 - **Returns:** `{ table_name, version, description, data_class, size_category, buffering: { allowed,
   type, area_key_fields }, storage_type, sharing_type, load_unit, translation: { value, is_visible,
   is_editable, granularity }, logging_enabled, is_writable_by_amdp? }` — the last on cloud (S7).
+  Read through `adtClientOf(connection)`, narrowed on `variant`: `cloudTableSettings` on cloud (the
+  flag a `boolean`; a cloud read without it is refused) and `tableSettings` on premise.
 - **Served:** `ReadOnlyHandlersGroup` (every full binary, `-ro` included); `available_in:
   ['onprem', 'cloud']` (S1; 7.40 S9).
 
@@ -233,7 +282,11 @@ Names follow the full set's verbs; every update tool does lock → write → unl
 - **Parameters:** `table_name: string` (required); each optional — `data_class: string`,
   `size_category: string`, `buffering: { allowed?: string, type?: string, area_key_fields?:
   number }`, `storage_type: string`, `sharing_type: string`, `load_unit: string`,
-  `logging_enabled: boolean`, on cloud also `is_writable_by_amdp: boolean` (S7);
+  `logging_enabled: boolean`, `translation: string` (the translation value; its other three
+  attributes are kept as read), on cloud also `is_writable_by_amdp: boolean` (S7; its description
+  states DT 771: a table writable by AMDP is activated with buffering `N`, logging off and no
+  replacement object). `buffering.area_key_fields` goes beside `type: 'G'` or with no `type`
+  (`ITableBufferingChange`);
   `transport_request?: string` ("not a task");
   `activate: boolean` (required); `...DETAIL_SHAPE`. At least one setting is required
   (schema refinement). The value help's data classes and size categories
@@ -243,41 +296,35 @@ Names follow the full set's verbs; every update tool does lock → write → unl
 - **Returns:** the settings as written (the PUT's answer, `terseWrite` by default), plus the
   activation's messages when activated.
 - **Served:** `HighLevelHandlersGroup`; `available_in: ['onprem', 'cloud']`.
-- **How it writes:** lock (`getTableSettings().lock`) → `patchMetadata` (adt-clients 46.1.0, below)
-  with the given fields → unlock → activate the table when `activate` is true. The read, the
-  overlay and the guarded PUT are the library's; the server holds no merge of its own.
+- **How it writes:** `adtClientOf(connection)`, narrowed on `variant` (the cloud client on cloud,
+  so the cloud guard holds), then lock (`getTableSettings().lock`) → `patchMetadata` with the given
+  fields and `headers: { accept: TABLE_SETTINGS_MEDIA_TYPE }` → unlock → activate the table when
+  `activate` is true. The read, the overlay and the guarded PUT are the library's; the server holds
+  no merge of its own.
 
-#### adt-clients 46.1.0: `patchMetadata` on `getTableSettings()` (to be built there)
+#### `patchMetadata` (published: interfaces-adt 30.1.0, adt-clients 46.1.0)
 
 ```ts
 patchMetadata(
-  config: ITableSettingsPatchConfig,
-  options: { headers: IAdtHeaders } & IAdtTableSettingsPatchOptions<E> & { analyse?: IAnalyse<E> },
+  config: ITableSettingsPatchConfig<V>,   // { tableName, transportRequest?, changes: ITableSettingsChangesOf<V> }
+  options: { headers: IAdtTableSettingsPatchHeaders } // { accept: TABLE_SETTINGS_MEDIA_TYPE; contentType?: never }
+    & IAdtTableSettingsPatchOptions<E>    // lockHandle required; source, ifMatch: never
+    & { analyse?: IAnalyse<E> },
 ): Promise<IAdtResponse<TMetadataUpdated, E>>;
-
-interface ITableSettingsPatchConfig {
-  tableName: string;
-  transportRequest?: string | undefined;
-  /** The settings to change; every field optional, `buffering` and `translation` field by field. */
-  changes: ITableSettingsChanges; // at least one setting, field by field; isWritableByAMDP among them (S7)
-}
-type IAdtTableSettingsPatchOptions<E> = Omit<IAdtUpdateOptions<E>, 'source' | 'lockHandle' | 'ifMatch'>
-  & { source?: never; ifMatch?: never; lockHandle: string };
 ```
 
-- Under the caller's `lockHandle` (required; empty throws before any request), in one call:
-  `readMetadata(version: 'inactive')` — the working area, with its ETag (S1); overlay `changes` on the
-  typed settings read (a field given replaces, a field not given keeps the value read; `buffering`
-  and `translation` per field; every field is written back because a left-out one is reset, S3);
-  `description` written back as read (S4); `translation` written with all four attributes as read
-  (S5); `isWritableByAMDP` kept as read unless `changes` names it (S7); then `updateMetadata`
-  of the whole document with `ifMatch` = the read's ETag, the content type without charset (S10).
-- `changes` with no setting does not compile (`ITableSettingsChanges` is "at least one setting",
-  interfaces-adt 30.1.0); no runtime check stands in for it. A read that answers no ETag is a refusal
-  (nothing written). A refused read or PUT is answered as SAP answered it, under the caller's
-  `analyse`; nothing is retried.
-- Its interfaces (`ITableSettingsPatchConfig`, `ITableSettingsChanges`,
-  `IAdtTableSettingsPatchable`) go into interfaces-adt 30.1.0 first, then adt-clients 46.1.0.
+- `ITableSettingsChangesOf<V>` takes at least one of `dataClassCategory`, `sizeCategory`,
+  `buffering` (`ITableBufferingChange`: `areaKeyFields` only beside `type: 'G'` or with no type),
+  `storageType`, `sharingType`, `loadUnit`, `translation: { value }`, `loggingEnabled`, and on cloud
+  `isWritableByAMDP`. `{}` does not compile.
+- Under the caller's lock it sends one GET (`?version=inactive`, with its ETag) and one PUT of the
+  whole document. The PUT carries the named changes overlaid, every other setting and the
+  description as read, `isWritableByAMDP` as read unless named, `If-Match`, and the media type
+  without a charset (S3, S4, S7, S10).
+- Thrown before any request: an empty lock handle, or a change set whose top-level fields are all
+  absent. Answered as a failure carrying the read, before the PUT: a read without an ETag, a
+  document without every setting the write needs, a non-`G` merged type beside an `areaKeyFields`
+  change, and on a declared cloud handler a read without the flag. Nothing is retried.
 
 ### GetTextElements (full; read-only build too)
 
@@ -356,7 +403,7 @@ builds no `AdtClientLegacy` today, so the dependency is dropped.
 | option | what it does | for | against |
 |---|---|---|---|
 | **A. Automatic pairing** | every `PROG/P`, `FUGR/F`, `CLAS/OC` in the request also sends its text elements' reference | the model names only the object; matches "activate together" literally | changes the wire of every program, function group and class activation (single activation becomes a group one); a reference to text elements with nothing inactive is unmeasured; on cloud every class activation grows |
-| **B. Explicit codes** (decided) | `objects[].type` takes `PROG/PX` and `CLAS/OCX` (the library lists them as activation codes, and the server's projection must list them anyway); `PROG/PX` with `parentName` is a function group's text elements (address `/textelements/functiongroups/{parentName}`; T6, T10); `still_inactive` names them, so the next call names both; the update tools' `activate: true` pairs them themselves (`textElementsActivationReferences`); a `still_inactive` `PROG/PX {CLASS}====CP` is read as the class's text elements (T6) | explicit, measured (the pair, and the text elements alone, both activated: T6), no change to any existing activation | the model names two objects after a text write by `ActivateObjects` |
+| **B. Explicit codes** (decided) | `objects[].type` takes `PROG/PX` and `CLAS/OCX` (the library lists them as activation codes, and the server's projection must list them anyway); `PROG/PX` with `parentName` is a function group's text elements (address `/textelements/functiongroups/{parentName}`; T6, T10); `still_inactive` names them, so the next call names both; the update tools' `activate: true` pairs them themselves (`textElementsActivationReferences`); the class-pool `PROG/PX {CLASS}====CP` entry of `still_inactive` carries its `uri`/`parent_uri` and is matched by uri like every other (T6) | explicit, measured (the pair, and the text elements alone, both activated: T6), no change to any existing activation | the model names two objects after a text write by `ActivateObjects` |
 | **C. Pair from the inactive list** | before activating, read the inactive objects and add the text elements of the objects named | automatic only where needed | one extra request per activation; a second read deciding what is sent |
 
 Decided: **B**. HandlerActivate gets the same through the three text-element compact types.
@@ -434,12 +481,13 @@ released by its own handle):
 - The test config gains the sections these suites read (`testConfigSections.test.ts` checks the
   template).
 
-## What the 46.0.0 install breaks
+## What the 46.x install breaks
 
 Installed from the registry (`adt-clients` 46.0.0, `adt-strategies` 0.25.0, `adt-clients-legacy`
 0.11.0, `interfaces-adt` 30.0.0); the lockfile holds no `"link": true`, and every entry resolves
 from the registry; one copy of interfaces-adt. `npm run build` stops at the root `tsc`;
-`test:check` (all packages) finds the same 12 plus one:
+`test:check` (all packages) finds the same 12 plus one, on 46.0.0 and again on 46.1.0 /
+interfaces-adt 30.1.0 / adt-strategies 0.26.0 (re-run 2026-11-20):
 
 1. `WHERE_USED_CODES` (onprem, cloud): missing `TABL/DTT`, `PROG/PX` (`Complete`). Fix: add `PROG/PX`;
    `TABL/DTT` excluded by type (`Exclude<WhereUsedCode<V>, 'TABL/DTT'>` in the projection): not
@@ -458,15 +506,10 @@ with the root. `adt-clients-legacy` is removed from the install. The install is 
 
 ## Dependency
 
-`UpdateTableSettings` and `HandlerUpdate TABLE_SETTINGS` need adt-clients **46.1.0** (`patchMetadata`,
-above) published on the registry, on **interfaces-adt 30.1.0** carrying its types. Order:
-interfaces-adt 30.1.0 → adt-clients 46.1.0 → this server takes `^46.1.0` and `^30.1.0`. The two also
-carry the fixes the measurements found: `isWritableByAMDP` written on cloud (S7), the
-`ts:translation` wording (S5), the CLAS/OCX inactive entry under the class pool name (T6). Everything else here builds
-on 46.0.0; the server never builds against an unpublished release.
-
-adt-clients 46.1.0 also corrects its test skip for function groups on cloud: it assumed cloud
-creates no function group, which was unverified and is contradicted by T10.
+Published and installed from the registry: interfaces-adt 30.1.0, adt-clients 46.1.0 and
+adt-strategies 0.26.0. The lockfile has no `"link": true` and every entry resolves from the registry.
+adt-clients 46.1.0 also corrects its test skip for function groups on cloud, which was unverified
+and is contradicted by T10.
 
 ## To verify in SAP handlers
 

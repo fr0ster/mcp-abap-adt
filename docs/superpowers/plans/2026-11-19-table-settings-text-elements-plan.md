@@ -4,6 +4,38 @@ Design: [`../specs/2026-11-19-table-settings-text-elements-design.md`](../specs/
 (approved). The plan breaks it into steps and records the decisions. It holds no code. References like
 S3, T6 and W4 point at the design's labelled facts.
 
+## Changes since approval (2026-11-20, for the owner's approval)
+
+These follow the design's "Changes since approval" (items 1–11), read from the published
+interfaces-adt 30.1.0, adt-clients 46.1.0 and adt-strategies 0.26.0.
+
+1. **(a) is met.** The libraries are on the registry. (b) installs `adt-strategies ^0.26.0` by name.
+   The install was re-run, and `test:check` shows the same 13 breaks.
+2. **c1 and c2 build the client per variant.** They take `adtClientOf(connection)` and narrow on
+   `variant`. Cloud reads use `cloudTableSettings`, on-premise reads `tableSettings`. New unit
+   assertion: on cloud the handler's client is the server's cloud client. Mutation: build it with
+   the variant-generic `createAdtClient`.
+3. **c2 gains `translation: string`** (the value only), and the zod schema mirrors
+   `ITableBufferingChange` (`area_key_fields` beside `type: 'G'` or with no type). New assertions:
+   - `area_key_fields` with `type: 'P'` is refused at the schema. Mutation: drop the rule.
+   - `translation` reaches the patch as `{ value }`. Mutation: send the four attributes.
+4. **c2 sends `headers: { accept: TABLE_SETTINGS_MEDIA_TYPE }` only.** New assertion: the patch's
+   headers carry no `contentType`. Mutation: pass the `withAdtHeaders` pair.
+5. **c2 passes `patchMetadata`'s pre-PUT failures through.** New assertion: a stand-in read without
+   an ETag gives the library's failure, no PUT recorded, and an UNLOCK still sent. Mutation: retry
+   the read.
+6. **c2 surfaces DT 771 (cloud).** The cloud `is_writable_by_amdp` description states the rule
+   (design item 8, for approval). New assertions:
+   - unit: a recorded activation answer with `activationExecuted="true"` and the DT 771 `E` message
+     is an error carrying SAP's message. Mutation: judge by `activationExecuted`.
+   - live, cloud: setting the flag with logging on answers the activation's `E` message; setting
+     it with buffering `N` and logging off activates.
+7. **(e) drops the class-pool special case.** `still_inactive` already carries `uri`/`parent_uri`
+   and is matched by uri. New assertion: a recorded inactive list holding `PROG/PX {CLASS}====CP`
+   with its `/textelements/classes/{c}` uri is matched to the `CLAS/OCX` reference. Mutation: match
+   by name.
+8. **c3, c4 and (d):** function groups are served on cloud. No skip of their own.
+
 ## Global constraints
 
 Copied from the design, from CLAUDE.md and from the owner's rules. They bind every task.
@@ -51,9 +83,8 @@ Copied from the design, from CLAUDE.md and from the owner's rules. They bind eve
 
 ### (a) Wait for the libraries
 
-- **Gate:** `@mcp-abap-adt/interfaces-adt` 30.1.0 (fr0ster/mcp-abap-adt-interfaces#194) and
-  `@mcp-abap-adt/adt-clients` 46.1.0 (`patchMetadata`) are visible on the registry, with
-  `adt-strategies` at the version 46.1.0 pairs with.
+- **Gate (met 2026-11-20):** `@mcp-abap-adt/interfaces-adt` 30.1.0, `@mcp-abap-adt/adt-clients`
+  46.1.0 (`patchMetadata`) and `@mcp-abap-adt/adt-strategies` 0.26.0 are on the registry.
 - **Decision:** nothing in (b)–(h) starts before the gate. "Not visible yet" is a wait, not a
   failure.
 
@@ -64,7 +95,7 @@ Copied from the design, from CLAUDE.md and from the owner's rules. They bind eve
   `src/handlers/system/readonly/handleGetWhereUsed.ts`, `src/lib/adtTypeCode.ts` (main-type
   resolution), `src/__tests__/typecheck/adtBoundary.typecheck.ts`.
 - **Steps:**
-  1. Install from the registry: `adt-clients ^46.1.0`, `adt-strategies` (its pair),
+  1. Install from the registry: `adt-clients ^46.1.0`, `adt-strategies ^0.26.0`,
      `interfaces-adt ^30.1.0` in the root and both sub-packages. Leave out `adt-clients-legacy`.
      Check the lockfile. Commit the install alone.
   2. `ACTIVATION_CODES` and `TABLE_CODES` list `PROG/PX`, `CLAS/OCX` and `TABL/DTT`.
@@ -101,9 +132,10 @@ uses them, with answers from adt-clients' recorded corpus where one exists.
 
 - **Files:** `src/handlers/table/readonly/handleGetTableSettings.ts`.
 - **Interface:** `table_name: string`, `version?: 'active' | 'inactive' | 'workingArea'`
-  (`READ_VERSION_FIELD`). It answers the design's `GetTableSettings` shape:
-  `is_writable_by_amdp` appears where SAP returns it (S7). It goes through
-  `getTableSettings({ ...tableSettingsDocuments, metadata: tableSettings }).readMetadata`.
+  (`READ_VERSION_FIELD`). It answers the design's `GetTableSettings` shape, with
+  `is_writable_by_amdp` on cloud (S7). It goes through `adtClientOf(connection)`, narrowed on
+  `variant`, then `getTableSettings({ ...tableSettingsDocuments, metadata })`, where `metadata` is
+  `cloudTableSettings` on cloud and `tableSettings` on premise, then `.readMetadata`.
 - **Unit test** `src/__tests__/unit/tableSettings/getTableSettings.test.ts`:
   - one GET to `/sap/bc/adt/ddic/db/settings/{name}`, with the v2 Accept (S1) and the version
     asked. Mutation: send v1, and the assertion on the Accept fails.
@@ -111,6 +143,8 @@ uses them, with answers from adt-clients' recorded corpus where one exists.
     Mutation: drop a field from the projection.
   - a 404 is passed through as SAP's answer. Mutation: map the 404 to success.
   - the tool is in the read-only build's list. Mutation: register it in the high group only.
+  - on cloud the read uses the cloud client and `cloudTableSettings`. Mutation: read through the
+    generic client.
 - **Live** `src/__tests__/integration/readOnly/table/TableSettingsRead.test.ts`,
   `liveSuite(['onprem','cloud'])`: on the suite's own table, the read after create answers
   `version` `new`/`inactive` with the defaults (S6).
@@ -121,12 +155,15 @@ uses them, with answers from adt-clients' recorded corpus where one exists.
 - **Interface:**
   - `table_name`;
   - any of `data_class`, `size_category`, `buffering{allowed?,type?,area_key_fields?}`,
-    `storage_type`, `sharing_type`, `load_unit`, `logging_enabled`, and on cloud
-    `is_writable_by_amdp` (`byVariant`; S7);
+    `storage_type`, `sharing_type`, `load_unit`, `logging_enabled`, `translation` (the value), and
+    on cloud `is_writable_by_amdp` (`byVariant`; S7; its description states DT 771);
+  - `area_key_fields` beside `type: 'G'` or with no `type` (`ITableBufferingChange`);
   - `transport_request?`, `activate: boolean` (required), `...DETAIL_SHAPE`.
   - The zod refinement requires at least one setting at the boundary. The value then goes to
-    `patchMetadata` typed as `ITableSettingsChanges`.
-- **Flow:** `withLock(getTableSettings().lock, patchMetadata, unlock)`, then
+    `patchMetadata` typed as `ITableSettingsChangesOf<V>` for the narrowed variant.
+- **Flow:** `adtClientOf(connection)` narrowed on `variant`, then
+  `withLock(getTableSettings().lock, patchMetadata({ accept: TABLE_SETTINGS_MEDIA_TYPE }), unlock)`,
+  then
   `getTable().activate` with `analyseActivation` (`carryCleanup`) when `activate` is true.
 - **Unit test** `src/__tests__/unit/tableSettings/updateTableSettings.test.ts`:
   - order: LOCK (stateful) → the patch's read and PUT (stateless) → UNLOCK. Mutation: unlock
@@ -142,11 +179,22 @@ uses them, with answers from adt-clients' recorded corpus where one exists.
   - the cloud schema takes `is_writable_by_amdp` and the onprem schema refuses it. Mutation: put
     the field in both schemas.
   - the schema refuses a call with no setting. Mutation: drop the refinement.
+  - `area_key_fields` beside a non-`G` type is refused at the schema. Mutation: drop the rule.
+  - `translation` reaches the patch as `{ value }`. Mutation: send the four attributes.
+  - the patch's headers are `{ accept: TABLE_SETTINGS_MEDIA_TYPE }`, with no content type.
+    Mutation: pass the `withAdtHeaders` pair.
+  - a read without an ETag ends in the library's failure: no PUT is recorded and the UNLOCK is
+    still sent. Mutation: skip the unlock.
+  - on cloud the handler's client is the server's cloud client. Mutation: use the generic
+    `createAdtClient`.
+  - a recorded activation with DT 771's `E` message is an error carrying SAP's message.
+    Mutation: judge by `activationExecuted`.
 - **Live** `src/__tests__/integration/high/table/TableSettingsHandlers.test.ts`,
   `liveSuite(['onprem','cloud'])`:
   - create a table, write non-default `data_class` and `size_category` with `activate: true`, and
     read `active`: the values are written and the other fields kept (S3);
-  - on cloud, `is_writable_by_amdp` is kept as read, then set;
+  - on cloud, `is_writable_by_amdp` is kept as read; set with buffering `N` and logging off, it
+    activates; set with logging on, the activation answers SAP's DT 771 `E` message;
   - a non-standard data class is stored, and its activation is answered as an error (S8);
   - delete the table.
 
@@ -231,13 +279,15 @@ uses them, with answers from adt-clients' recorded corpus where one exists.
     group's text elements, at `/textelements/functiongroups/{parentName}`, through the reference's
     `uri`.
   - Nothing is added to other activations.
-  - A `still_inactive` entry `PROG/PX {CLASS}====CP` is answered as it comes. The description says
-    it is the class's text elements (T6).
+  - The class-pool entry `PROG/PX {CLASS}====CP` carries `uri`/`parent_uri` and is matched by uri,
+    like every other entry. It gets no special case and no description line (T6).
 - **Unit test** `src/__tests__/unit/activation/textElementReferences.test.ts`:
   - `PROG/PX` alone is sent at `/textelements/programs/{n}`; with `parentName` at
     `functiongroups/{parentName}`. Mutation: ignore `parentName`.
   - `CLAS/OCX` is sent at `/textelements/classes/{n}`. Mutation: send its class URI.
   - an activation of `CLAS/OC` alone sends one reference. Mutation: pair automatically.
+  - a recorded inactive list with `PROG/PX {CLASS}====CP` at `/textelements/classes/{c}` is
+    matched to the `CLAS/OCX` reference. Mutation: match by name.
 - **Live:**
   - `src/__tests__/integration/coverage/activateObjectsRefusal.live.test.ts` (existing, node:test):
     after a text write, `[PROG/P]` alone names `PROG/PX` in `still_inactive`;
@@ -287,8 +337,9 @@ A failure leaves its SAP text in the log and is fixed before the tag.
 
 - Every SAP statement in code comments, descriptions and tests cites a design fact (S/T/W). There
   are no new unlabelled claims.
-- `UpdateTableSettings` holds no merge of its own and calls `patchMetadata` under the `TABT` lock.
-  `is_writable_by_amdp` is cloud-only and kept as read.
+- `UpdateTableSettings` holds no merge of its own and calls `patchMetadata` under the `TABT` lock,
+  through the cloud client on cloud. `is_writable_by_amdp` is cloud-only and kept as read. DT 771
+  is SAP's answer, passed through.
 - `activate` is required on both update tools, and nothing activates implicitly.
 - The cloud schemas: UpdateTextElements has no `program`; function groups are served (T10).
 - Main-type resolution: `CLAS` and cloud `PROG` keep their meaning.

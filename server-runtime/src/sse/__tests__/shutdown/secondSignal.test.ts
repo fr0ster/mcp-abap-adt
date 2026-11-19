@@ -7,42 +7,45 @@
  * transport-shutdown suite.)
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, it, type Mock, mock } from 'node:test';
+import { format } from 'node:util';
 import { isUnlockOf } from '../../../../../src/__tests__/helpers/shutdownTools';
 import { type SseStand, sseStand, turns, until } from './harness';
 
-jest.setTimeout(30_000);
-
 let s: SseStand;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 afterEach(async () => {
   await s.close();
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
-it.each([
+for (const [_name, shutdownTimeoutMs] of [
   ['a second SIGTERM', undefined],
   ['--shutdown-timeout=1', 1_000],
-])(
-  '%s after the logoffs: one exit 0, one logoff',
-  async (_name, shutdownTimeoutMs) => {
-    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    s = await sseStand(
-      shutdownTimeoutMs === undefined ? {} : { shutdownTimeoutMs },
-    );
-    const connection = await s.open();
-    const hold = s.standIn.hold((r) => isUnlockOf('A')(r.url));
-    await connection.call('LockedUpdate', { id: 'A' }, 1);
-    await hold.arrived;
-    s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
-    if (shutdownTimeoutMs === undefined) s.processLike.emit('SIGTERM');
-    else await new Promise((r) => setTimeout(r, 1_200));
-    await turns(20);
-    expect(s.exits).toEqual([0]);
-    await until(() => s.standIn.logoffs() === 1);
-    await turns(20);
-    expect(s.standIn.logoffs()).toBe(1);
-    hold.release();
-  },
-);
+] satisfies [string, number | undefined][]) {
+  it(
+    format('%s after the logoffs: one exit 0, one logoff', _name),
+    async (t) => {
+      errorSpy = t.mock.method(console, 'error', () => {});
+      s = await sseStand(
+        shutdownTimeoutMs === undefined ? {} : { shutdownTimeoutMs },
+      );
+      const connection = await s.open();
+      const hold = s.standIn.hold((r) => isUnlockOf('A')(r.url));
+      await connection.call('LockedUpdate', { id: 'A' }, 1);
+      await hold.arrived;
+      s.processLike.emit('SIGTERM');
+      assert.equal(await s.exited, 0);
+      if (shutdownTimeoutMs === undefined) s.processLike.emit('SIGTERM');
+      else await new Promise((r) => setTimeout(r, 1_200));
+      await turns(20);
+      assert.deepStrictEqual(s.exits, [0]);
+      await until(() => s.standIn.logoffs() === 1);
+      await turns(20);
+      assert.equal(s.standIn.logoffs(), 1);
+      hold.release();
+    },
+  );
+}

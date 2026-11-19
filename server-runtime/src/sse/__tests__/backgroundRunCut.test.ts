@@ -9,6 +9,8 @@
  * and it ends with SAP's answer as ever.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import {
   isLogoff,
@@ -20,8 +22,6 @@ import { RuntimeRunHandlersGroup } from '../../../../src/lib/handlers/groups/Run
 import { SystemHandlersGroup } from '../../../../src/lib/handlers/groups/SystemHandlersGroup';
 import type { HandlerContext } from '../../../../src/lib/handlers/interfaces';
 import { type SseStand, sseStand, until } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const placeholder = {
   connection: undefined as never,
@@ -39,7 +39,7 @@ let s: SseStand;
 let strategy: InMemoryBackgroundRuns;
 
 beforeEach(async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
   strategy = new InMemoryBackgroundRuns();
   s = await sseStand({
     server: { backgroundRuns: strategy },
@@ -53,7 +53,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const sessionOf = (match: (r: StandInRequest) => boolean) =>
@@ -108,16 +108,16 @@ it('the stream closes: the run it started is logged off at once and ends in the 
   closing.close();
   // Logged off at once, under the run's request SAP still holds.
   await until(() => loggedOff(runA));
-  expect(loggedOff(runB)).toBe(false);
-  expect((await strategy.get(handleB, caller))?.state).toBe('running');
+  assert.equal(loggedOff(runB), false);
+  assert.equal((await strategy.get(handleB, caller))?.state, 'running');
 
   // The cut run ends in the store by its own end, once its request settled.
   holdA.release();
   await finished(handleA, caller);
 
   // The other stream's run: still running, its session not logged off.
-  expect(loggedOff(runB)).toBe(false);
-  expect((await strategy.get(handleB, caller))?.state).toBe('running');
+  assert.equal(loggedOff(runB), false);
+  assert.equal((await strategy.get(handleB, caller))?.state, 'running');
   holdB.release();
   await finished(handleB, caller);
 });

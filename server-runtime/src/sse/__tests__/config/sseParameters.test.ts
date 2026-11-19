@@ -5,9 +5,12 @@
  * and its YAML template and validation come from it.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
@@ -17,6 +20,10 @@ import {
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { load } from 'js-yaml';
+import {
+  assertMatchObject,
+  assertThrows,
+} from '../../../../../src/__tests__/helpers/assertions';
 import { readSseConfig, SSE_PARAMETERS } from '../../config/sseParameters';
 import { main, sseHelp } from '../../launcher';
 import { SseServer } from '../../SseServer';
@@ -48,7 +55,7 @@ function cleanEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 }
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   process.argv = savedArgv;
   process.env = savedEnv;
 });
@@ -59,17 +66,19 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
   process.env = cleanEnv(env);
   const written: string[] = [];
   const exits: number[] = [];
-  jest.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+  mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
     written.push(String(chunk));
     return true;
   });
-  jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+  mock.method(process, 'exit', ((code?: number) => {
     exits.push(code ?? 0);
   }) as never);
   // A start that is not stopped serves nothing here: no socket, no stdin.
-  const served = jest
-    .spyOn(SseServer.prototype, 'start')
-    .mockResolvedValue(undefined);
+  const served = mock.method(
+    SseServer.prototype,
+    'start',
+    async () => undefined,
+  );
   await main({
     toolSet: fullToolSet,
     program: 'mcp-abap-adt-sse',
@@ -102,7 +111,7 @@ const SSE_OPTIONS = [
 describe("sse's help", () => {
   const help = sseHelp();
 
-  it.each([
+  for (const name of [
     '--transport',
     '--mcp',
     '--env',
@@ -122,11 +131,13 @@ describe("sse's help", () => {
     '--path',
     '--http-',
     'MCP_HTTP_',
-  ])('lists no %s', (name) => {
-    expect(help).not.toContain(name);
-  });
+  ]) {
+    it(format('lists no %s', name), () => {
+      assert.ok(!help.includes(name));
+    });
+  }
 
-  it.each([
+  for (const name of [
     ...SSE_OPTIONS,
     '--tls-cert',
     '--tls-key',
@@ -142,14 +153,16 @@ describe("sse's help", () => {
     'x-sap-debug-ide-id',
     // Named as the environment that is not read (D26 D2: headers only).
     'SAP_DEBUG_* of the',
-  ])('lists %s', (name) => {
-    expect(help).toContain(name);
-  });
+  ]) {
+    it(format('lists %s', name), () => {
+      assert.ok(help.includes(name));
+    });
+  }
 });
 
 describe('every SSE option of today is read under its name', () => {
   it('the CLI forms', () => {
-    expect(
+    assertMatchObject(
       readSseConfig(
         [
           '--sse-host=0.0.0.0',
@@ -162,19 +175,20 @@ describe('every SSE option of today is read under its name', () => {
         ],
         {},
       ),
-    ).toMatchObject({
-      host: '0.0.0.0',
-      port: 3005,
-      ssePath: '/events',
-      postPath: '/msgs',
-      allowedHosts: ['localhost:3005'],
-      allowedOrigins: ['https://a.com', 'https://b.com'],
-      enableDnsRebindingProtection: true,
-    });
+      {
+        host: '0.0.0.0',
+        port: 3005,
+        ssePath: '/events',
+        postPath: '/msgs',
+        allowedHosts: ['localhost:3005'],
+        allowedOrigins: ['https://a.com', 'https://b.com'],
+        enableDnsRebindingProtection: true,
+      },
+    );
   });
 
   it('the env forms', () => {
-    expect(
+    assertMatchObject(
       readSseConfig([], {
         MCP_SSE_HOST: '0.0.0.0',
         MCP_SSE_PORT: '3006',
@@ -182,17 +196,18 @@ describe('every SSE option of today is read under its name', () => {
         MCP_SSE_ALLOWED_ORIGINS: 'https://a.com',
         MCP_SSE_ENABLE_DNS_PROTECTION: 'true',
       }),
-    ).toMatchObject({
-      host: '0.0.0.0',
-      port: 3006,
-      allowedHosts: ['localhost:3006'],
-      allowedOrigins: ['https://a.com'],
-      enableDnsRebindingProtection: true,
-    });
+      {
+        host: '0.0.0.0',
+        port: 3006,
+        allowedHosts: ['localhost:3006'],
+        allowedOrigins: ['https://a.com'],
+        enableDnsRebindingProtection: true,
+      },
+    );
   });
 
   it('the YAML forms under sse, and the defaults', () => {
-    expect(
+    assertMatchObject(
       readSseConfig(
         [],
         {},
@@ -205,13 +220,14 @@ describe('every SSE option of today is read under its name', () => {
           },
         },
       ),
-    ).toMatchObject({
-      host: '127.0.0.1',
-      port: 3007,
-      allowedHosts: ['localhost:3007'],
-      tls: { cert: '/c', key: '/k' },
-    });
-    expect(readSseConfig([], {})).toMatchObject({
+      {
+        host: '127.0.0.1',
+        port: 3007,
+        allowedHosts: ['localhost:3007'],
+        tls: { cert: '/c', key: '/k' },
+      },
+    );
+    assertMatchObject(readSseConfig([], {}), {
       host: '127.0.0.1',
       port: 3001,
       enableDnsRebindingProtection: false,
@@ -221,50 +237,62 @@ describe('every SSE option of today is read under its name', () => {
 
 describe('--shutdown-timeout is a row of sse', () => {
   it('no default: absent unless given', () => {
-    expect(readSseConfig([], {}).shutdownTimeout).toBeUndefined();
+    assert.equal(readSseConfig([], {}).shutdownTimeout, undefined);
   });
 
   it('CLI, env and YAML reach the config, in seconds', () => {
-    expect(readSseConfig(['--shutdown-timeout=5'], {}).shutdownTimeout).toBe(5);
-    expect(
+    assert.equal(
+      readSseConfig(['--shutdown-timeout=5'], {}).shutdownTimeout,
+      5,
+    );
+    assert.equal(
       readSseConfig([], { MCP_SHUTDOWN_TIMEOUT: '7' }).shutdownTimeout,
-    ).toBe(7);
-    expect(
+      7,
+    );
+    assert.equal(
       readSseConfig([], {}, { 'shutdown-timeout': 9 }).shutdownTimeout,
-    ).toBe(9);
+      9,
+    );
   });
 
-  it.each(['0', '1.5', 'abc', '86401'])('%s stops the start', async (value) => {
-    const { stderr, exits, served } = await start([
-      `--shutdown-timeout=${value}`,
-    ]);
-    expect(stderr).toContain('Invalid --shutdown-timeout');
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  for (const value of ['0', '1.5', 'abc', '86401']) {
+    it(format('%s stops the start', value), async () => {
+      const { stderr, exits, served } = await start([
+        `--shutdown-timeout=${value}`,
+      ]);
+      assert.ok(stderr.includes('Invalid --shutdown-timeout'));
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 });
 
 describe('--state-idle-minutes is a row of sse', () => {
   it("29 stops the start with main's words", async () => {
     const { stderr, exits, served } = await start(['--state-idle-minutes=29']);
-    expect(stderr).toContain(
-      'Invalid --state-idle-minutes: "29". Must be a whole number of minutes, at least 30',
+    assert.ok(
+      stderr.includes(
+        'Invalid --state-idle-minutes: "29". Must be a whole number of minutes, at least 30',
+      ),
     );
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
+    assert.deepStrictEqual(exits, [1]);
+    assert.equal(served, 0);
   });
 
   it('CLI, env and YAML reach the config; 30 by default', () => {
-    expect(readSseConfig([], {}).stateIdleMinutes).toBe(30);
-    expect(
+    assert.equal(readSseConfig([], {}).stateIdleMinutes, 30);
+    assert.equal(
       readSseConfig(['--state-idle-minutes=45'], {}).stateIdleMinutes,
-    ).toBe(45);
-    expect(
+      45,
+    );
+    assert.equal(
       readSseConfig([], { MCP_STATE_IDLE_MINUTES: '40' }).stateIdleMinutes,
-    ).toBe(40);
-    expect(
+      40,
+    );
+    assert.equal(
       readSseConfig([], {}, { 'state-idle-minutes': 35 }).stateIdleMinutes,
-    ).toBe(35);
+      35,
+    );
   });
 });
 
@@ -272,14 +300,14 @@ describe('--state-idle-minutes is a row of sse', () => {
 // each word answered with the binary of this transport that serves it.
 describe('--exposition is gone', () => {
   it('the flag stops the start, naming the binary its words ask for', () => {
-    expect(() => readSseConfig(['--exposition=readonly'], {})).toThrow(
+    assertThrows(
+      () => readSseConfig(['--exposition=readonly'], {}),
       new ParameterRefusal(
         '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`)',
       ),
     );
-    expect(() =>
-      readSseConfig(['--exposition', 'readonly,high,debug'], {}),
-    ).toThrow(
+    assertThrows(
+      () => readSseConfig(['--exposition', 'readonly,high,debug'], {}),
       new ParameterRefusal(
         '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the high tools are served, beside the readonly ones, by `mcp-abap-adt-sse` (`@mcp-abap-adt/sse`)',
       ),
@@ -287,7 +315,8 @@ describe('--exposition is gone', () => {
   });
 
   it('in the config file too, and the help lists no such option', () => {
-    expect(() => readSseConfig([], {}, { exposition: 'readonly' })).toThrow(
+    assertThrows(
+      () => readSseConfig([], {}, { exposition: 'readonly' }),
       new ParameterRefusal(
         'exposition (config file) is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-sse-ro` (`@mcp-abap-adt/sse-ro`)',
       ),
@@ -296,28 +325,31 @@ describe('--exposition is gone', () => {
 });
 
 describe('--transport, with any value, stops the start with the sentence of the binary that serves it', () => {
-  it.each([
+  for (const [argv, env] of [
     [['--transport=sse'], {}],
     [['--transport=http'], {}],
     [['--transport=stdio'], {}],
     [['--transport', 'sse'], {}],
     [[], { MCP_TRANSPORT: 'sse' }],
-  ] as const)('%j %j', async (argv, env) => {
-    const { stderr, exits, served } = await start([...argv], { ...env });
-    expect(stderr).toBe(`[MCP] ${SSE_SENTENCE}\n`);
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  ] as const) {
+    it(format('%j %j', argv, env), async () => {
+      const { stderr, exits, served } = await start([...argv], { ...env });
+      assert.equal(stderr, `[MCP] ${SSE_SENTENCE}\n`);
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 
   it('in the config file too', () => {
-    expect(() => readSseConfig([], {}, { transport: 'sse' })).toThrow(
+    assertThrows(
+      () => readSseConfig([], {}, { transport: 'sse' }),
       SSE_SENTENCE,
     );
   });
 });
 
 describe('every removed parameter stops sse with its words', () => {
-  it.each([
+  for (const [arg, form, words] of [
     ['--mcp=TRIAL', '--mcp', DESTINATION_WORDS],
     ['--env=trial', '--env', DESTINATION_WORDS],
     ['--env-path=./.env', '--env-path', DESTINATION_WORDS],
@@ -358,14 +390,16 @@ describe('every removed parameter stops sse with its words', () => {
       '--http-enable-dns-protection',
       HTTP_WORDS,
     ],
-  ])('%s', async (arg, form, words) => {
-    const { stderr, exits, served } = await start([arg]);
-    expect(stderr).toBe(`[MCP] ${form}: ${words}\n`);
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  ]) {
+    it(format('%s', arg), async () => {
+      const { stderr, exits, served } = await start([arg]);
+      assert.equal(stderr, `[MCP] ${form}: ${words}\n`);
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 
-  it.each([
+  for (const [_family, env] of [
     [
       'MCP_HTTP_*',
       {
@@ -389,36 +423,44 @@ describe('every removed parameter stops sse with its words', () => {
     ['MCP_RENEWAL', { MCP_RENEWAL: 'refresh-only' }],
     ['AUTH_BROKER_PATH', { AUTH_BROKER_PATH: '/x' }],
     ['SAP_CONNECTION_TYPE', { SAP_CONNECTION_TYPE: 'rfc' }],
-  ] as const)(
-    "another binary's %s is not read: the start proceeds and the value is not used",
-    (_family, env) => {
-      const lines: string[] = [];
-      const exits: number[] = [];
-      const config = readStartupConfig(
-        SSE_PARAMETERS,
-        [],
-        { ...env },
-        {
-          stderr: (line) => lines.push(line),
-          exit: (code) => exits.push(code),
-        },
-        readSseConfig,
-      );
-      expect(lines).toEqual([]);
-      expect(exits).toEqual([]);
-      expect(config).toEqual(readSseConfig([], {}));
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        "another binary's %s is not read: the start proceeds and the value is not used",
+        _family,
+      ),
+      () => {
+        const lines: string[] = [];
+        const exits: number[] = [];
+        const config = readStartupConfig(
+          SSE_PARAMETERS,
+          [],
+          { ...env },
+          {
+            stderr: (line) => lines.push(line),
+            exit: (code) => exits.push(code),
+          },
+          readSseConfig,
+        );
+        assert.deepStrictEqual(lines, []);
+        assert.deepStrictEqual(exits, []);
+        assert.deepStrictEqual(config, readSseConfig([], {}));
+      },
+    );
+  }
 
-  it.each([
+  for (const [key, words] of [
     ['mcp', DESTINATION_WORDS],
     ['renewal', DESTINATION_WORDS],
     ['http', HTTP_WORDS],
-  ])('YAML %s', (key, words) => {
-    expect(() => readSseConfig([], {}, { [key]: 'x' })).toThrow(
-      `${key} (config file): ${words}`,
-    );
-  });
+  ]) {
+    it(format('YAML %s', key), () => {
+      assertThrows(
+        () => readSseConfig([], {}, { [key]: 'x' }),
+        `${key} (config file): ${words}`,
+      );
+    });
+  }
 });
 
 describe('the YAML template and validation come from the table', () => {
@@ -426,8 +468,11 @@ describe('the YAML template and validation come from the table', () => {
   const parsed = load(template) as YamlConfig;
 
   it('the template is valid and sets only defaults', () => {
-    expect(validateYamlConfig(SSE_PARAMETERS, parsed).errors).toEqual([]);
-    expect(readSseConfig([], {}, parsed)).toMatchObject({
+    assert.deepStrictEqual(
+      validateYamlConfig(SSE_PARAMETERS, parsed).errors,
+      [],
+    );
+    assertMatchObject(readSseConfig([], {}, parsed), {
       host: '127.0.0.1',
       port: 3001,
       stateIdleMinutes: 30,
@@ -435,7 +480,8 @@ describe('the YAML template and validation come from the table', () => {
   });
 
   it('holds sse rows under sse, and no other binary keys', () => {
-    expect(Object.keys(parsed).sort()).toEqual(
+    assert.deepStrictEqual(
+      Object.keys(parsed).sort(),
       [
         'batch',
         'enable-data-tools',
@@ -447,8 +493,9 @@ describe('the YAML template and validation come from the table', () => {
         'system-type',
       ].sort(),
     );
-    expect(parsed.batch).toEqual({ keepRawParts: false });
-    expect(Object.keys(parsed.sse as object).sort()).toEqual(
+    assert.deepStrictEqual(parsed.batch, { keepRawParts: false });
+    assert.deepStrictEqual(
+      Object.keys(parsed.sse as object).sort(),
       [
         'allowed-hosts',
         'allowed-origins',
@@ -466,7 +513,7 @@ describe('the YAML template and validation come from the table', () => {
       mcp: 'TRIAL',
       http: { port: 3000 },
     });
-    expect(errors).toEqual([
+    assert.deepStrictEqual(errors, [
       SSE_SENTENCE,
       `mcp (config file): ${DESTINATION_WORDS}`,
       `http (config file): ${HTTP_WORDS}`,
@@ -485,18 +532,18 @@ describe('the YAML template and validation come from the table', () => {
     it('a missing file gets the template and the start ends 0', async () => {
       const file = path.join(dir, 'conf.yaml');
       const { exits, served } = await start([`--conf=${file}`]);
-      expect(exits).toEqual([0]);
-      expect(served).toBe(0);
-      expect(fs.readFileSync(file, 'utf8')).toBe(template);
+      assert.deepStrictEqual(exits, [0]);
+      assert.equal(served, 0);
+      assert.equal(fs.readFileSync(file, 'utf8'), template);
     });
 
     it('a file with a Streamable HTTP key stops the start with its words', async () => {
       const file = path.join(dir, 'conf.yaml');
       fs.writeFileSync(file, 'http:\n  port: 3000\n');
       const { stderr, exits, served } = await start([`--conf=${file}`]);
-      expect(stderr).toContain(`http (config file): ${HTTP_WORDS}`);
-      expect(exits).toEqual([1]);
-      expect(served).toBe(0);
+      assert.ok(stderr.includes(`http (config file): ${HTTP_WORDS}`));
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
     });
   });
 });

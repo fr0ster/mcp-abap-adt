@@ -6,27 +6,27 @@
  * waiting for the tool.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import { isUpdateOf } from '../../../../../src/__tests__/helpers/shutdownTools';
 import { activeTools } from '../../../../../src/lib/activeTools';
 import { type SseStand, sseStand, turns, until } from './harness';
 
-jest.setTimeout(30_000);
-
 let s: SseStand;
 
 beforeEach(async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
   s = await sseStand();
 });
 
 afterEach(async () => {
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
-it('the closing connection is joined: one logoff, one let-go, exit 0 without the tool', async () => {
-  const letGo = jest.spyOn(BaseMcpServer.prototype, 'letGoOfState');
+it('the closing connection is joined: one logoff, one let-go, exit 0 without the tool', async (t) => {
+  const letGo = t.mock.method(BaseMcpServer.prototype, 'letGoOfState');
   const connection = await s.open();
   const hold = s.standIn.hold((r) => isUpdateOf('A')(r.url));
   await connection.call('LockedUpdate', { id: 'A' }, 1);
@@ -34,11 +34,14 @@ it('the closing connection is joined: one logoff, one let-go, exit 0 without the
   connection.close();
   await until(() => s.standIn.logoffs() === 1);
   s.processLike.emit('SIGTERM');
-  expect(await s.exited).toBe(0);
-  expect(activeTools().map((t) => t.name)).toEqual(['LockedUpdate']);
+  assert.equal(await s.exited, 0);
+  assert.deepStrictEqual(
+    activeTools().map((t) => t.name),
+    ['LockedUpdate'],
+  );
   await turns(20);
-  expect(s.standIn.logoffs()).toBe(1);
-  expect(letGo).toHaveBeenCalledTimes(1);
+  assert.equal(s.standIn.logoffs(), 1);
+  assert.equal(letGo.mock.callCount(), 1);
   hold.release();
   await until(() => activeTools().length === 0);
 });

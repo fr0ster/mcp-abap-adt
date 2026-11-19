@@ -246,11 +246,14 @@ function selectedNamed() {
 function namedFile(arg) {
   const file = resolve(arg);
   if (!existsSync(file)) fail(`${arg} does not exist`);
+  // A regular file only: node would expand a directory named ….test.ts
+  // itself, past the live check.
+  if (!statSync(file).isFile()) fail(`${arg} is not a file`);
   if (arg.endsWith('.test.js')) return file;
   if (!isUnder(repo, file)) fail(`${arg} is not a source of ${repo}`);
   const source = relative(repo, file).split(sep).join('/');
   const compiled = compiledFile(repo, source);
-  if (!existsSync(compiled)) {
+  if (!existsSync(compiled) || !statSync(compiled).isFile()) {
     fail(`${arg} has no compiled file — run the test build first`);
   }
   return compiled;

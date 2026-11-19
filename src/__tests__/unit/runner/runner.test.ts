@@ -118,6 +118,31 @@ describe('the node:test runner', () => {
     }
   });
 
+  it('a directory named like a test file is refused, not expanded', () => {
+    const record = path.join(scratch.dir, 'box.record');
+    // Inside it, a file node --test would run if handed the directory.
+    writeAt(
+      scratch.dir,
+      'box.test.js/inner.test.js',
+      [
+        "const { appendFileSync } = require('node:fs');",
+        "require('node:test').test('inner', () => { appendFileSync(process.env.RECORD, 'inner\\n'); });",
+        '',
+      ].join('\n'),
+    );
+    const box = path.join(scratch.dir, 'box.test.js');
+    const run = runTool('run-tests.mjs', [
+      '--concurrency',
+      '1',
+      '--env',
+      `RECORD=${record}`,
+      box,
+    ]);
+    assert.equal(run.status, 1, run.stdout + run.stderr);
+    assert.ok(run.stderr.includes(`${box} is not a file`), run.stderr);
+    assert.deepEqual(recorded(record), []);
+  });
+
   it('an unknown positional argument or option is refused before anything runs', () => {
     const file = recordingFixture('unknown', ['ran']);
     const record = path.join(scratch.dir, 'unknown.record');

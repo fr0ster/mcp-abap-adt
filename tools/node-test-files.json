@@ -646,6 +646,7 @@
   "src/__tests__/unit/testConfigSections.test.ts",
   "src/__tests__/unit/testHelpers/assertions.test.ts",
   "src/__tests__/unit/testHelpers/fakeTime.test.ts",
+  "src/__tests__/unit/testHelpers/moduleMock.test.ts",
   "src/__tests__/unit/testHelpers/noTimersImport.test.ts",
   "src/__tests__/unit/thrownReaders.test.ts",
   "src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts",

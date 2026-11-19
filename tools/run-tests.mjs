@@ -54,6 +54,9 @@
 //   it ends the process tree of every file still running. Either way the
 //   run fails, and under a live script the teardown still runs.
 //
+// Every file's process may mock a module (`--experimental-test-module-mocks`,
+// node:test's `mock.module`; `src/__tests__/helpers/moduleMock.ts`).
+//
 // Every file's process preloads the compiled resolve hook
 // (`src/__tests__/helpers/resolvePreload.ts`), which answers this
 // repository's package names with their compiled files, and the per-file
@@ -382,6 +385,9 @@ function runFile(file) {
     const child = spawn(
       process.execPath,
       [
+        // node:test's `mock.module` (helpers/moduleMock.ts): a file may
+        // replace a module whose exports map closes its internal files.
+        '--experimental-test-module-mocks',
         '--require',
         preload,
         '--require',

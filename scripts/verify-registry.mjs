@@ -168,6 +168,18 @@ function readLockfile(file) {
   return { findings, versions };
 }
 
+// Whether `dir` lies inside `root`: a relative path from `root` that is not
+// empty, not absolute, and whose first segment is not `..` (a segment, so a
+// directory named `..scratch` is inside).
+function inside(root, dir) {
+  const relative = path.relative(root, dir);
+  return (
+    relative !== '' &&
+    !path.isAbsolute(relative) &&
+    relative.split(path.sep)[0] !== '..'
+  );
+}
+
 // Every bin an installed package declares: [bin name, absolute path].
 function binsOf(packageDir, name) {
   const { bin } = manifest(packageDir);
@@ -211,7 +223,7 @@ const work = fs.realpathSync(
 const failures = [];
 let summary = '';
 try {
-  if (!path.relative(repo, work).startsWith('..')) {
+  if (inside(fs.realpathSync(repo), work)) {
     throw new Error(`the temporary directory ${work} is inside the repository`);
   }
   fs.writeFileSync(path.join(work, 'package.json'), '{"private":true}\n');

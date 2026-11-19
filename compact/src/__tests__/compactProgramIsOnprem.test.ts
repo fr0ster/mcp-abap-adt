@@ -76,8 +76,11 @@ describe('compact tools and PROGRAM on ABAP cloud', () => {
 
   /** The tool's cloud statement: its description and the members it offers. */
   const onCloud = (entry: (typeof entries)[number]) => {
-    const stated = entry.toolDefinition.variants?.cloud;
-    if (stated === undefined) return undefined;
+    const definition = entry.toolDefinition;
+    if (!definition.available_in?.includes('cloud')) return undefined;
+    // A tool with no variants states one definition for every system it is
+    // served on: on cloud, that one.
+    const stated = definition.variants?.cloud ?? definition;
     const schema = listedJson(stated.inputSchema);
     const members = [
       ...(jsonFind(schema, 'object_type')?.enum ?? []),
@@ -106,9 +109,19 @@ describe('compact tools and PROGRAM on ABAP cloud', () => {
       .map(onCloud)
       .filter((stated) => stated !== undefined && stated.description !== '');
     assert.ok(read.length > 0);
-    assert.ok(
-      entries.filter((entry) => KIND_OF[entry.toolDefinition.name] === WRITES)
-        .length > 0,
+    // Every write tool served on cloud yields a cloud statement, variants
+    // or not, so the write rule below skips none of them.
+    const writesOnCloud = entries.filter(
+      (entry) =>
+        KIND_OF[entry.toolDefinition.name] === WRITES &&
+        entry.toolDefinition.available_in?.includes('cloud'),
+    );
+    assert.ok(writesOnCloud.length > 0);
+    assert.deepStrictEqual(
+      writesOnCloud
+        .filter((entry) => onCloud(entry) === undefined)
+        .map((entry) => entry.toolDefinition.name),
+      [],
     );
   });
 

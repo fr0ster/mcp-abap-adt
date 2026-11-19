@@ -101,6 +101,28 @@ describe('the live run', () => {
     assert.deepEqual(recorded(record), []);
   });
 
+  it('a compiled live suite named by its .test.js is refused outside a live script', () => {
+    const repo = liveRepo('compiled', []);
+    const record = path.join(scratch.dir, 'compiled.record');
+    const compiled = path.join(
+      repo,
+      '.test-build',
+      'tree',
+      ...LIVE.slice(0, -'.ts'.length).split('/'),
+    );
+    const refused = runTool(
+      'run-tests.mjs',
+      ['--repo', repo, '--concurrency', '1', `${compiled}.js`],
+      environment({ RECORD: record, npm_lifecycle_event: 'test' }),
+    );
+    assert.equal(refused.status, 1, refused.stdout + refused.stderr);
+    assert.ok(
+      refused.stderr.includes('a live suite runs only under a live npm script'),
+      refused.stderr,
+    );
+    assert.deepEqual(recorded(record), []);
+  });
+
   it('teardown runs when the run failed', () => {
     const repo = liveRepo('fails', ["throw new Error('the case failed');"]);
     const record = path.join(scratch.dir, 'fails.record');

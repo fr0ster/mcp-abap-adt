@@ -97,6 +97,27 @@ describe('the node:test runner', () => {
     assert.deepEqual(recorded(record), ['keep']);
   });
 
+  it('an option or its value is never a file, whatever it ends with', () => {
+    const file = recordingFixture('pattern', ['run.test.ts', 'other']);
+    for (const pattern of [
+      ['--test-name-pattern=run.test.ts'],
+      ['--test-name-pattern', 'run.test.ts'],
+    ]) {
+      const record = path.join(scratch.dir, `pattern-${pattern.length}.record`);
+      const run = runTool('run-tests.mjs', [
+        '--concurrency',
+        '1',
+        '--env',
+        `RECORD=${record}`,
+        ...pattern,
+        file,
+      ]);
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      // The pattern reached node --test: only the matching test ran.
+      assert.deepEqual(recorded(record), ['run.test.ts'], pattern.join(' '));
+    }
+  });
+
   it('--env sets a variable without a shell', () => {
     const file = writeAt(
       scratch.dir,

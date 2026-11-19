@@ -23,6 +23,8 @@
 //   given directly is refused for the same reason, and `--test-isolation`
 //   because every file runs in a process of its own, node:test's default,
 //   never overridden.
+// - An argument starting with `-` is an option, never a file, and so is the
+//   value after an option that takes one (`--test-name-pattern <x>`, …).
 // - Options go to `node --test` before the files: after a file, `node --test`
 //   ignores them.
 // - `--env NAME=VALUE` sets a variable for the run; a shell prefix
@@ -101,6 +103,19 @@ let repo = OWN_REPO;
 let concurrency;
 let listOnly = false;
 
+/**
+ * The `node --test` options that take their value as the next argument: that
+ * argument is the option's value, never a file.
+ */
+const VALUE_OPTIONS = [
+  '--test-name-pattern',
+  '--test-skip-pattern',
+  '--test-reporter',
+  '--test-reporter-destination',
+  '--test-shard',
+  '--test-global-setup',
+];
+
 /** The value after option `args[i]`, or the run is refused. */
 function optionValue(args, i) {
   if (i + 1 >= args.length) fail(`${args[i]} takes a value`);
@@ -133,7 +148,14 @@ for (let i = 0; i < args.length; i += 1) {
     );
   } else if (arg.startsWith('--test-isolation')) {
     fail(`${arg}: every file runs in a process of its own`);
-  } else if (arg.endsWith('.test.ts') || arg.endsWith('.test.js')) {
+  } else if (VALUE_OPTIONS.includes(arg)) {
+    // `--opt value`: both are node's, the value never a file.
+    options.push(arg, optionValue(args, i));
+    i += 1;
+  } else if (
+    !arg.startsWith('-') &&
+    (arg.endsWith('.test.ts') || arg.endsWith('.test.js'))
+  ) {
     named.push(arg);
   } else {
     options.push(arg);
@@ -246,9 +268,17 @@ if (
   fail(`concurrency "${concurrency}" is not a positive integer`);
 }
 
-/** A repository source path of `file`, when it is one of `repo`'s. */
+/**
+ * A repository source path of `file`, when it is one of `repo`'s: a compiled
+ * file under the build (`.test-build/tree/…test.js`) is its source
+ * (`…test.ts`), so the live refusal reads a compiled live suite as one.
+ */
 function repoSource(file) {
   const absolute = resolve(file);
+  if (isUnder(buildDir(repo), absolute) && absolute.endsWith('.test.js')) {
+    const compiled = relative(buildDir(repo), absolute).split(sep).join('/');
+    return `${compiled.slice(0, -'.js'.length)}.ts`;
+  }
   return isUnder(repo, absolute)
     ? relative(repo, absolute).split(sep).join('/')
     : undefined;

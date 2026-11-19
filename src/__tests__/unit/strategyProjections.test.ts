@@ -63,6 +63,10 @@ describe('activation', () => {
     expect(terse.messages[0]).toEqual({
       type: 'E',
       text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
+      object: 'Class ZMCP_BLD_ANSCH01, Method SAY_HELLO',
+      uri: '/sap/bc/adt/oo/classes/zmcp_bld_ansch01/source/main',
+      position: { line: 15, column: 24, end: { line: 15, column: 50 } },
+      code: 'MESSAGE(GTH)',
     });
   });
 

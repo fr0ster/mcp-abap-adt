@@ -13,6 +13,9 @@
  * 3. `GOOD_C` is written inactive again with a changed, valid source, and
  *    `ActivateObjects` with `GOOD_C` and `BROKEN` is an error: its `origin`
  *    is `refusal`, and the broken class is named in the answer;
+ *    `ActivateClass` of `BROKEN` alone is SAP's refusal, an error message
+ *    standing on source line 7 (`uri` the class's `/source/main`, `position`
+ *    `{ line, column }`, `line` its deprecated text; #351);
  * 4. `GetClass` of a name nobody created is SAP's `404`, answered as a tool
  *    answer.
  *
@@ -20,7 +23,7 @@
  * and only in the build package on the cloud: the configured package is
  * checked to be one of them before anything is created.
  *
- * Every call goes through `livePrepare`: ActivateObjects and GetClass are not
+ * Every call goes through `livePrepare`: ActivateObjects, ActivateClass and GetClass are not
  * coverage keys (`tests/fixtures/tools/coverage-ledger.json`).
  */
 import assert from 'node:assert/strict';
@@ -205,6 +208,43 @@ liveSuite(
         refused.text.includes(BROKEN),
         `the refusal names ${BROKEN}: ${refused.text}`,
       );
+
+      // 3b. The broken class alone: SAP's refusal, each message saying where
+      // it stands (#351) — its source uri and position, and `line` the source
+      // line, never the message's ordinal. `DAAT` stands on source line 7.
+      const alone = await livePrepare('ActivateClass', { class_name: BROKEN });
+      console.log(`[activateObjectsRefusal] broken class alone: ${alone.text}`);
+      assert.equal(alone.isError, true);
+      const messages = fieldOf(payloadOf(alone), 'messages');
+      assert.ok(Array.isArray(messages), `messages: ${alone.text}`);
+      const placed = messages.filter((message) => {
+        const uri = fieldOf(message, 'uri');
+        const position = fieldOf(message, 'position');
+        return (
+          fieldOf(message, 'type') === 'E' &&
+          typeof uri === 'string' &&
+          uri.endsWith('/source/main') &&
+          !uri.includes('#') &&
+          typeof fieldOf(position, 'line') === 'number' &&
+          typeof fieldOf(position, 'column') === 'number'
+        );
+      });
+      assert.ok(
+        placed.some(
+          (message) => fieldOf(fieldOf(message, 'position'), 'line') === 7,
+        ),
+        `an error message at source line 7: ${alone.text}`,
+      );
+      // `line` is kept, deprecated: the source line of the position.
+      for (const message of messages) {
+        const position = fieldOf(message, 'position');
+        assert.equal(
+          fieldOf(message, 'line'),
+          position === undefined
+            ? undefined
+            : String(fieldOf(position, 'line')),
+        );
+      }
 
       // 4. SAP's "not found" is a tool answer, not a throw.
       const missing = await livePrepare('GetClass', {

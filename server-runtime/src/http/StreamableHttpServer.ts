@@ -17,6 +17,7 @@ import {
   InstanceBatch,
   type LineMatchStrategy,
   type SapAnswerStrategy,
+  sessionKeepAliveMsOf,
 } from '@mcp-abap-adt/lib/embeddable';
 import type {
   IHandlersRegistry,
@@ -76,6 +77,13 @@ export interface StreamableHttpServerOptions {
    * after this long without a tool call. At least 30; default 30.
    */
   stateIdleMinutes?: number | undefined;
+  /**
+   * The session keep-alive's interval in milliseconds, for each instance
+   * (`--session-keep-alive-minutes` × 60 000): its built connection is
+   * pinged once no request went over it for that long. `0`: off. Absent:
+   * the base's default, 10 minutes.
+   */
+  sessionKeepAliveMs?: number | undefined;
   /** Where the state's lifecycle lines go; default stderr, always on. */
   stateLogger?: StateLogger | undefined;
   /**
@@ -241,6 +249,8 @@ export class StreamableHttpServer extends BaseMcpServer {
   /** The instances that hold state between requests (spec D9). */
   private readonly pool = new InstancePool<PerRequestServerApi>();
   private readonly stateIdleMinutes?: number | undefined;
+  /** Each pooled instance's keep-alive interval (`sessionKeepAliveMs`). */
+  private readonly sessionKeepAliveMs?: number | undefined;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRunsStore: IBackgroundRuns | undefined;
   private readonly instanceAccessChecks: IAccessChecks | undefined;
@@ -259,6 +269,9 @@ export class StreamableHttpServer extends BaseMcpServer {
       systemType: opts?.systemType,
       // Validated by the base: a misconfiguration stops the start.
       stateIdleMinutes: opts?.stateIdleMinutes,
+      // The routing server builds no connection of its own: nothing to keep
+      // alive. Each pooled instance keeps its own (`createPerRequestServer`).
+      sessionKeepAliveMs: 0,
       // From the options as given: the silent default above is never the state's.
       stateLogger: stateLoggerOf(opts ?? {}),
       // The responsible rules, once per connection, when it is created.
@@ -266,6 +279,11 @@ export class StreamableHttpServer extends BaseMcpServer {
       systemContextRules: responsibleRules,
     });
     this.stateIdleMinutes = opts?.stateIdleMinutes;
+    // Refused here, at startup, rather than at a pooled instance's birth.
+    this.sessionKeepAliveMs =
+      opts?.sessionKeepAliveMs === undefined
+        ? undefined
+        : sessionKeepAliveMsOf(opts.sessionKeepAliveMs, 'sessionKeepAliveMs');
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRunsStore = opts?.backgroundRuns;
     this.instanceAccessChecks = opts?.accessChecks;
@@ -607,6 +625,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           systemType?: SapEnvironment | undefined;
           systemTypeFromEnvironment?: false;
           stateIdleMinutes?: number | undefined;
+          sessionKeepAliveMs?: number | undefined;
           stateLogger?: StateLogger;
           isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;
@@ -671,6 +690,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         // The server's one kind, fixed at its construction: never re-read.
         systemTypeFromEnvironment: false,
         stateIdleMinutes: this.stateIdleMinutes,
+        // A kept instance's connection stays alive until its state ends; an
+        // instance that holds nothing leaves the pool after its request.
+        sessionKeepAliveMs: this.sessionKeepAliveMs,
         stateLogger: this.stateLogger,
         // A handle the pool already files is drawn again.
         isStateHandleTaken: this.pool.isHandleTaken,

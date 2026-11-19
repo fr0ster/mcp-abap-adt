@@ -263,11 +263,13 @@ for (const file of WORKFLOWS) {
       );
     });
 
-    it('gates on every known advisory of moderate severity or above', () => {
+    it('gates on every known advisory of moderate severity or above in a production dependency (dev again once #361 removes Jest)', () => {
       const audit = step(lines, 'Security audit (moderate+)').map((line) =>
         line.trim(),
       );
-      assert.ok(audit.includes('run: npm audit --audit-level=moderate'));
+      assert.ok(
+        audit.includes('run: npm audit --omit=dev --audit-level=moderate'),
+      );
       assert.deepStrictEqual(
         lines.filter((line) => line.trim().startsWith('continue-on-error')),
         [],

@@ -173,7 +173,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
     description:
-      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type. Answers whether SAP activated them, with its messages; an error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.',
+      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.',
     inputSchema: activateObjectSchema(variant),
   })),
 } as const;

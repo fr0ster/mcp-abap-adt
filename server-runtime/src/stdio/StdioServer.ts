@@ -98,6 +98,13 @@ export interface StdioServerOptions {
    * takes up the destination's one leftover session. Absent: `false`.
    */
   restoreAtFirstBirth?: boolean;
+  /**
+   * The session keep-alive's interval in milliseconds, for each instance
+   * (`--session-keep-alive-minutes` × 60 000): its built connection is
+   * pinged once no request went over it for that long. `0`: off. Absent:
+   * the base's default, 10 minutes.
+   */
+  sessionKeepAliveMs?: number | undefined;
 }
 
 /**
@@ -155,6 +162,9 @@ export class StdioServer extends BaseMcpServer {
       // --deferred-logon --restore-session: the first call's birth takes up
       // the destination's leftover session.
       restoreAtFirstBirth: opts?.restoreAtFirstBirth === true,
+      ...(opts?.sessionKeepAliveMs !== undefined && {
+        sessionKeepAliveMs: opts.sessionKeepAliveMs,
+      }),
       // The locks the instance took: a write, a delete or an unlock under a
       // lock_handle is sent only under one it holds.
       heldLocks: new HeldLocks(),

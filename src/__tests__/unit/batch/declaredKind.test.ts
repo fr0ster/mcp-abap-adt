@@ -1,9 +1,11 @@
 /**
  * A batch view keeps the system kind of the connection it is built over
- * (plan C2a, measured on premise: `ListTransports` on a connection whose
- * kind was only declared was refused `system_type_required` — its reads go
- * on a phase's item view, which carried no kind and fell back to
- * `SAP_SYSTEM_TYPE`). `SAP_SYSTEM_TYPE` is unset in every case here: the
+ * (plan C2a, measured on premise: `ListTransports`, then read in envelopes,
+ * on a connection whose kind was only declared was refused
+ * `system_type_required` — its reads went on a phase's item view, which
+ * carried no kind and fell back to `SAP_SYSTEM_TYPE`). A phase's item view
+ * is asserted directly; `ListTransports`, one direct read now, answers on
+ * such a connection too. `SAP_SYSTEM_TYPE` is unset in every case here: the
  * kind comes from the declaration alone, as on an HTTP/SSE server or in an
  * embedder.
  */
@@ -38,30 +40,19 @@ import {
 } from '../../helpers/batchEnvelope';
 import { endTestConnection } from '../../integration/helpers/openConnections';
 
-const CONFIGURATIONS =
-  '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations';
 const BATCH_URL = '/sap/bc/adt/communication/batch';
 
 const xml = { 'content-type': 'application/xml' };
 
-/** The system: one search configuration, one modifiable request of OWNER_A. */
+/** The listing: one modifiable request of OWNER_A. */
+const LISTING =
+  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:workbench tm:category="Workbench"><tm:modifiable><tm:request tm:number="K900001" tm:owner="OWNER_A" tm:desc="one" tm:type="K" tm:status="D"/></tm:modifiable></tm:workbench></tm:root>';
+
+/** The system: the listing, and nothing else. */
 function transportPart(inner: InnerRequest): PartAnswer {
   const path = new URL(inner.url, 'https://system.invalid').pathname;
-  if (path === CONFIGURATIONS) {
-    return {
-      status: 200,
-      statusText: 'OK',
-      headers: xml,
-      body: `<?xml version="1.0" encoding="utf-8"?><configurations:configurations xmlns:configurations="http://www.sap.com/adt/configurations"><configuration:configuration client="000" xmlns:configuration="http://www.sap.com/adt/configuration"><atom:link href="${CONFIGURATIONS}/CFG1" rel="http://www.sap.com/adt/categories/configurations" type="application/vnd.sap.adt.configuration.v1+xml" etag="1" xmlns:atom="http://www.w3.org/2005/Atom"/></configuration:configuration></configurations:configurations>`,
-    };
-  }
   if (path === '/sap/bc/adt/cts/transportrequests') {
-    return {
-      status: 200,
-      statusText: 'OK',
-      headers: xml,
-      body: '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:workbench tm:category="Workbench"><tm:modifiable><tm:request tm:number="K900001" tm:owner="OWNER_A" tm:desc="one" tm:type="K" tm:status="D"/></tm:modifiable></tm:workbench></tm:root>',
-    };
+    return { status: 200, statusText: 'OK', headers: xml, body: LISTING };
   }
   return { status: 404, statusText: 'Not Found', body: '' };
 }
@@ -153,7 +144,11 @@ describe('a batch view keeps the connection’s system kind', () => {
     assert.deepStrictEqual(results, [{ ok: true, value: 'onprem' }]);
   });
 
-  it('ListTransports in envelopes answers on a connection whose kind is only declared', async () => {
+  it('ListTransports answers on a connection whose kind is only declared', async () => {
+    stand.respond(
+      (request) => request.url.startsWith('/sap/bc/adt/cts/transportrequests?'),
+      () => ({ status: 200, headers: xml, text: LISTING }),
+    );
     const connection = plainOver(inner);
     declareSystemKind(connection, 'onprem');
     const context: HandlerContext = { connection };
@@ -162,8 +157,13 @@ describe('a batch view keeps the connection’s system kind', () => {
     const text = answer.content.map((part) => part.text).join('\n');
     assert.equal(answer.isError, false);
     assert.ok(text.includes('K900001'));
-    assert.ok(envelopes > 0);
-    assert.deepStrictEqual(directs(from), []);
+    assert.equal(envelopes, 0);
+    assert.deepStrictEqual(
+      directs(from).map((request) => request.url),
+      [
+        '/sap/bc/adt/cts/transportrequests?user=OWNER_A&requestStatus=D&requestType=KWT',
+      ],
+    );
   });
 
   it('a feed’s round connection has the kind of the connection it is over', () => {

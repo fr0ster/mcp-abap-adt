@@ -414,6 +414,7 @@ describe('the YAML template and validation come from the table', () => {
         'restore-session',
         'restrictions',
         'saprouter',
+        'session-keep-alive-minutes',
         'shutdown-timeout',
         'sysid',
         'sysnr',

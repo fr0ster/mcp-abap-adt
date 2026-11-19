@@ -57,7 +57,7 @@
     "tool": "ListTransports",
     "set": "full",
     "handler": "src/handlers/transport/readonly/handleListTransports.ts#handleListTransports",
-    "sends": "in ADT batch envelopes (POST /sap/bc/adt/communication/batch): GET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations, then GET /sap/bc/adt/cts/transportrequests?configUri=… of every saved configuration, up to 5, in one envelope; sequential reads where the system has no communication batch"
+    "sends": "GET /sap/bc/adt/cts/transportrequests?user=…&requestStatus=D (DR with modifiable_only false)&requestType=KWT, one request"
   },
   {
     "tool": "GetSqlQuery",

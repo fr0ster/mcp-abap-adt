@@ -41,7 +41,8 @@ const stopSent = (requests: Array<{ url: string }>) =>
   requests.some((r) => r.url.includes(stopUrl('')));
 
 const connectsOf = (requests: Array<{ url: string }>) =>
-  requests.filter((r) => r.url.includes('discovery')).length;
+  // The connect's own request, not the keep-alive's discovery ping.
+  requests.filter((r) => r.url.startsWith('/sap/bc/adt/core/discovery')).length;
 
 beforeEach(() => {
   jest.spyOn(console, 'error').mockImplementation(() => {});

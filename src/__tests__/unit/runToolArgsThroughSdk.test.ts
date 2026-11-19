@@ -27,6 +27,7 @@ import {
   type WaitArgs,
 } from '../../handlers/unit_test/shared/runner';
 import { child } from '../../lib/thrownValue';
+import { assertNoProperty } from '../helpers/assertions';
 
 /** The runner and the wait a handler received, read as the SDK handed them. */
 function runArgs(given: unknown): RunnerArgs & WaitArgs {
@@ -79,7 +80,7 @@ for (const { tool, args } of RUNNER_TOOLS) {
   describe(`${tool.name} through the MCP SDK`, () => {
     it('a sync run without wait reaches the handler without wait, and is not refused', async () => {
       const given = await received(tool, { ...args, runner: 'sync' });
-      assert.ok(!('wait' in Object(given)));
+      assertNoProperty(given, 'wait');
       assert.equal(runnerOf(runArgs(given)), 'sync');
       assert.ok(!(runnerWaitOf(runArgs(given), 'sync') instanceof Error));
     });

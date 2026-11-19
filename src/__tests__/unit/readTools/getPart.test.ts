@@ -32,7 +32,7 @@ import {
   fullToolSet,
   type ToolSet,
 } from '../../../lib/toolSet';
-import { assertMatchObject } from '../../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../../helpers/assertions';
 import { type Mode, runCase, servedTools } from '../../helpers/batchHarness';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
 import { silentLogger } from '../../helpers/lowToCompact';
@@ -173,7 +173,7 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
               const payload = payloadOf(ran.answer?.content?.[0]?.text);
               assert.ok('source' in Object(payload));
               assert.equal(payload.part, 'source');
-              assert.ok(!('metadata' in Object(payload)));
+              assertNoProperty(payload, 'metadata');
             }
             if (mode === 'not-found') assert.equal(ran.answer?.isError, true);
           },
@@ -198,7 +198,7 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
               assert.equal(ran.answer?.isError, false);
               const payload = payloadOf(ran.answer?.content?.[0]?.text);
               assert.ok('metadata' in Object(payload));
-              assert.ok(!('source' in Object(payload)));
+              assertNoProperty(payload, 'source');
             }
             if (mode === 'not-found') assert.equal(ran.answer?.isError, true);
           },
@@ -214,7 +214,7 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
         const payload = payloadOf(ran.answer?.content?.[0]?.text);
         assert.ok('source' in Object(payload));
         assert.equal(payload.part, 'source');
-        assert.ok(!('metadata' in Object(payload)));
+        assertNoProperty(payload, 'metadata');
       });
     });
   }
@@ -286,7 +286,7 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
           const payload = payloadOf(answered.answer?.content?.[0]?.text);
           assert.ok('source' in Object(payload));
           assert.equal(payload.part, 'source');
-          assert.ok(!('metadata' in Object(payload)));
+          assertNoProperty(payload, 'metadata');
 
           const refused = await run(
             'GetFunctionModule',
@@ -328,7 +328,7 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
             assert.equal(ran.answer?.isError, false);
             const payload = payloadOf(ran.answer?.content?.[0]?.text);
             assert.ok('metadata' in Object(payload));
-            assert.ok(!('source' in Object(payload)));
+            assertNoProperty(payload, 'source');
           }
           if (mode === 'not-found') assert.equal(ran.answer?.isError, true);
         },
@@ -347,7 +347,7 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
         if (entry === undefined) throw new Error(`no served tool ${tool}`);
         const schema = listedJson(entry.toolDefinition.inputSchema);
         assert.notEqual(schema.properties, undefined);
-        assert.ok(!('part' in Object(schema.properties)));
+        assertNoProperty(schema.properties, 'part');
         for (const mode of MODES) {
           const ran = await run(tool, args, mode);
           assert.equal(ran.sent.length, 1);
@@ -367,7 +367,7 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
       const payload = payloadOf(ran.answer?.content?.[0]?.text);
       assert.equal(payload.part, 'metadata');
       assert.ok('metadata' in Object(payload));
-      assert.ok(!('source' in Object(payload)));
+      assertNoProperty(payload, 'source');
     });
   }
 });
@@ -455,7 +455,7 @@ describe('GetInclude: the source as text, the metadata as GetProgram answers it'
       'inactive',
       'workingArea',
     ]);
-    assert.ok(!('default' in Object(jsonAt(schema, 'version'))));
+    assertNoProperty(jsonAt(schema, 'version'), 'default');
   });
 
   for (const [_label, part] of [

@@ -25,7 +25,7 @@ import {
 import * as clients from '../../lib/clients';
 import { safeCleanup, thrownCleanup } from '../../lib/strategies/safeFields';
 import { leftLockedWarning } from '../../lib/strategies/withLock';
-import { assertMatchObject } from '../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
@@ -473,7 +473,7 @@ describe('the hint offers only a request the call did not send', () => {
         );
         const { hint } = payloadOf(result);
         assert.deepStrictEqual(hint, { text: TRANSPORT_ENTRY_HELD_WORDS });
-        assert.ok(!('transport_request' in Object(hint)));
+        assertNoProperty(hint, 'transport_request');
       },
     );
   }

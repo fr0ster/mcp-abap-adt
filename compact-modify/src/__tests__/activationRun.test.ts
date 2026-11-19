@@ -21,6 +21,7 @@ import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleHandlerGet } from '../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
+import { assertNoProperty } from '../../../src/__tests__/helpers/assertions';
 import {
   type Answer,
   countingConnection,
@@ -192,7 +193,7 @@ describe('compact HandlerActivate: an activation run is started in one request',
         const failed = jsonOf(answer);
         assert.equal(failed.message, RUN_START_WITHOUT_ID);
         assert.equal(failed.step, 'start activation run');
-        assert.ok(!('run_id' in Object(failed)));
+        assertNoProperty(failed, 'run_id');
       });
 
       it('no poll, no timer', async (t) => {
@@ -232,7 +233,7 @@ describe('compact HandlerActivate: an activation run is started in one request',
     assert.deepStrictEqual(documented.sent, held.sent);
     assert.deepStrictEqual(refused.sent, held.sent);
     assert.notEqual(documented.answer?.isError, true);
-    assert.ok(!('run_id' in Object(jsonOf(documented.answer))));
+    assertNoProperty(jsonOf(documented.answer), 'run_id');
   });
 });
 

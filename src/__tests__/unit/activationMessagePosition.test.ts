@@ -22,6 +22,7 @@ import { declareSystemKind } from '../../lib/systemKind';
 import { parseActivationResponse } from '../../lib/utils';
 import { MEASURED_RUNS } from '../helpers/activationRunsByType';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertNoProperty } from '../helpers/assertions';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -201,7 +202,7 @@ describe('an href with no fragment, and an empty href', () => {
     for (const run of MEASURED_RUNS) {
       const terse = terseActivation(parseStructure(run.results));
       for (const message of terse?.messages ?? []) {
-        assert.ok(!('line' in Object(message)));
+        assertNoProperty(message, 'line');
       }
     }
   });

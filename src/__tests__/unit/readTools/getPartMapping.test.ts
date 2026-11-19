@@ -70,7 +70,7 @@ import {
   defineTool,
   type ToolDefinition,
 } from '../../../lib/handlers/interfaces';
-import { assertRejects } from '../../helpers/assertions';
+import { assertNoProperty, assertRejects } from '../../helpers/assertions';
 import {
   okResponse,
   reading,
@@ -218,7 +218,7 @@ for (const [_name, row] of rows.map((r) => [r.name, r] as const)) {
       const payload = JSON.parse(result.content[0].text);
       assert.equal(payload.source, SOURCE);
       assert.equal(payload.part, 'source');
-      assert.ok(!('metadata' in Object(payload)));
+      assertNoProperty(payload, 'metadata');
       for (const [field, value] of Object.entries(row.identity)) {
         assert.equal(payload[field], value);
       }
@@ -243,7 +243,7 @@ for (const [_name, row] of rows.map((r) => [r.name, r] as const)) {
       const payload = JSON.parse(result.content[0].text);
       assert.equal(payload.metadata, metadataOf(row));
       assert.equal(payload.part, 'metadata');
-      assert.ok(!('source' in Object(payload)));
+      assertNoProperty(payload, 'source');
       for (const [field, value] of Object.entries(row.identity)) {
         assert.equal(payload[field], value);
       }

@@ -7,7 +7,7 @@ import {
   readTableTypeDefinition,
 } from '../../lib/strategies/tableTypeStored';
 import { corpusBody } from '../helpers/adtCorpus';
-import { assertMatchObject } from '../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../helpers/assertions';
 
 /**
  * The document SAP answers for STRING_TABLE, byte for byte (the corpus
@@ -57,7 +57,7 @@ describe('reading the definition a table type document states', () => {
     );
     const read = readTableTypeDefinition(without);
     assert.notEqual(read, undefined);
-    assert.ok(!('access_type' in Object(read)));
+    assertNoProperty(read, 'access_type');
     assert.equal(read?.key_kind, 'nonUnique');
   });
 

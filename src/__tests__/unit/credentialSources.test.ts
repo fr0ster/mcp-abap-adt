@@ -16,7 +16,7 @@ import {
   credentialFromHeaders,
   credentialFromSapConfig,
 } from '../../lib/credentialSources';
-import { assertThrows } from '../helpers/assertions';
+import { assertNoProperty, assertThrows } from '../helpers/assertions';
 
 describe('credentialFromHeaders', () => {
   it('gives a token provider and jwt settings for a JWT header', () => {
@@ -52,8 +52,8 @@ describe('credentialFromHeaders', () => {
       const text = JSON.stringify(settings);
       assert.ok(!text.includes('a-token'));
       assert.ok(!text.includes('secret'));
-      assert.ok(!('password' in Object(settings)));
-      assert.ok(!('jwtToken' in Object(settings)));
+      assertNoProperty(settings, 'password');
+      assertNoProperty(settings, 'jwtToken');
     }
   });
 

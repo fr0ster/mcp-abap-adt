@@ -7,7 +7,7 @@ import {
   parseAtcResultList,
 } from '../../lib/strategies/atcResults';
 import { corpusBody } from '../helpers/adtCorpus';
-import { assertMatchObject } from '../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../helpers/assertions';
 
 /**
  * The ATC results, read against the documents SAP answered (the cloud trial,
@@ -47,7 +47,7 @@ describe('the ATC result list, against the captured document', () => {
 
   it('leaves out a run series SAP sent empty', () => {
     const { results } = parseAtcResultList(LIST);
-    for (const result of results) assert.ok(!('run_series' in Object(result)));
+    for (const result of results) assertNoProperty(result, 'run_series');
   });
 
   it('keeps a run series SAP named', () => {

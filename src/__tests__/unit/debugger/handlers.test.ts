@@ -30,7 +30,7 @@ import {
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import { InstanceState } from '../../../lib/state/InstanceState';
 import { corpusBody } from '../../helpers/adtCorpus';
-import { assertMatchObject } from '../../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../../helpers/assertions';
 import { okResponse } from '../../helpers/fakeClient';
 import { useFakeTimers, useRealTimers } from '../../helpers/fakeTime';
 import {
@@ -149,7 +149,7 @@ describe('debugger handlers', () => {
     });
     assert.equal(waited.at.include, 'ZCL_CV_DBG_MEASURE============CM002');
     assert.ok(waited.frames.length > 5);
-    assert.ok(!('stack_depth' in Object(waited)));
+    assertNoProperty(waited, 'stack_depth');
     assert.ok(
       (
         await handleDebugGetStack(context as any, {
@@ -531,7 +531,7 @@ describe('debugger handlers', () => {
       terminal_id: IDS.terminalId,
       ide_id: IDS.ideId,
     });
-    assert.ok(!('request_user' in Object(json(r))));
+    assertNoProperty(json(r), 'request_user');
   });
 
   describe('every tool reaches its port', () => {

@@ -36,7 +36,11 @@ import {
   compactToolSetOf,
 } from '../../../lib/toolSet';
 import { corpusBody } from '../../helpers/adtCorpus';
-import { assertMatchObject, assertThrows } from '../../helpers/assertions';
+import {
+  assertMatchObject,
+  assertNoProperty,
+  assertThrows,
+} from '../../helpers/assertions';
 import {
   advanceTimersByTimeAsync,
   useFakeTimers,
@@ -1183,7 +1187,7 @@ describe("the chain is the consumer's", () => {
           );
           assert.notEqual(answer.isError, true);
           assertMatchObject(jsonOf(answer), { ended: true, logoffs });
-          assert.ok(!('state_handle' in Object(jsonOf(answer))));
+          assertNoProperty(jsonOf(answer), 'state_handle');
           assert.deepStrictEqual(t.wire.sent, []);
           assert.equal(t.wire.closed, logoffs);
           assert.equal(t.state.holdsState(), false);

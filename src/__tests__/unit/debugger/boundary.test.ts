@@ -22,7 +22,7 @@ import { TOOL_DEFINITION as VirtualFolders } from '../../../handlers/system/low/
 import { TOOL_DEFINITION as CompactSession } from '../../../lib/compact/debug/handleHandlerDebugSession';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
-import { assertMatchObject } from '../../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../../helpers/assertions';
 import { withSystemInformation } from '../../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 
@@ -183,9 +183,9 @@ describe('the MCP boundary validates debug tool arguments', () => {
       string,
       unknown
     >;
-    assert.ok(!('request_user' in Object(received)));
-    assert.ok(!('debugging_mode' in Object(received)));
-    assert.ok(!('settings' in Object(received)));
+    assertNoProperty(received, 'request_user');
+    assertNoProperty(received, 'debugging_mode');
+    assertNoProperty(received, 'settings');
     await client.close();
   });
 
@@ -201,9 +201,9 @@ describe('the MCP boundary validates debug tool arguments', () => {
       string,
       unknown
     >;
-    assert.ok(!('request_user' in Object(received)));
-    assert.ok(!('debugging_mode' in Object(received)));
-    assert.ok(!('settings' in Object(received)));
+    assertNoProperty(received, 'request_user');
+    assertNoProperty(received, 'debugging_mode');
+    assertNoProperty(received, 'settings');
     await client.close();
   });
 
@@ -240,7 +240,7 @@ describe('the MCP boundary validates debug tool arguments', () => {
       unknown
     >;
     assert.deepStrictEqual(received.preselection, preselection);
-    assert.ok(!('unknown_top' in Object(received)));
+    assertNoProperty(received, 'unknown_top');
     await client.close();
   });
 

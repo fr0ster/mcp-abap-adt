@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import { format } from 'node:util';
 import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { assertNoProperty } from '../../../src/__tests__/helpers/assertions';
 import {
   type Answer,
   countingConnection,
@@ -131,7 +132,7 @@ describe('HandlerDumpList reads one page', () => {
 
   it('a feed without a next link answers none', async () => {
     const { answer } = await runWith('document', {}, FEED_END);
-    assert.ok(!('next_to' in Object(jsonOf(answer))));
+    assertNoProperty(jsonOf(answer), 'next_to');
   });
 
   it('a given to reaches the one request', async () => {

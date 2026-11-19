@@ -10,7 +10,7 @@ import {
   packageSummary,
 } from '../../lib/strategies/packageSummary';
 import { corpusBody } from '../helpers/adtCorpus';
-import { assertMatchObject } from '../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../helpers/assertions';
 
 const WITH_SUB_PACKAGES = `<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZPARENT" adtcore:description="Parent"><pak:attributes pak:packageType="structure"/><pak:subPackages><pak:packageRef adtcore:name="ZCHILD_A" adtcore:description="Child A"/><pak:packageRef adtcore:name="ZCHILD_B" adtcore:description="Child B"/></pak:subPackages></pak:package>`;
 
@@ -33,7 +33,7 @@ describe('packageSummary', () => {
   it('counts the sub-packages and lists none of them', () => {
     const summary = packageSummary(WITH_SUB_PACKAGES);
     assert.equal(summary.sub_package_count, 2);
-    assert.ok(!('sub_packages' in Object(summary)));
+    assertNoProperty(summary, 'sub_packages');
   });
 });
 

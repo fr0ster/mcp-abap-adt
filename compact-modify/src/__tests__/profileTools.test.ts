@@ -17,6 +17,7 @@ import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { assertNoProperty } from '../../../src/__tests__/helpers/assertions';
 import {
   type Answer,
   countingConnection,
@@ -156,7 +157,7 @@ describe('compact HandlerProfileSchedule', () => {
     const failed = jsonOf(answer);
     assert.equal(failed.message, SCHEDULE_WITHOUT_ID);
     assert.equal(failed.step, 'schedule trace');
-    assert.ok(!('profiler_id' in Object(failed)));
+    assertNoProperty(failed, 'profiler_id');
   });
 });
 
@@ -202,7 +203,7 @@ describe('compact HandlerProfileRun', () => {
         const answered = jsonOf(documented.answer);
         assert.equal(answered.success, true);
         assert.equal(answered[nameKey], String(args[nameKey]).toUpperCase());
-        assert.ok(!('profile' in Object(answered)));
+        assertNoProperty(answered, 'profile');
 
         assert.equal(refused.answer?.isError, true);
         assert.equal(jsonOf(refused.answer).status, 404);

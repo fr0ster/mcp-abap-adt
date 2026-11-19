@@ -34,6 +34,7 @@ import type { HandlerContext } from '../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertNoProperty } from '../helpers/assertions';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { LOCK_SUCCESS_XML } from '../helpers/recordingConnection';
 
@@ -146,7 +147,7 @@ describe('ActivateClassLow', () => {
         }),
       ),
     );
-    assert.ok(!('activation_not_stated' in Object(payload)));
+    assertNoProperty(payload, 'activation_not_stated');
   });
 });
 
@@ -209,7 +210,7 @@ describe('ActivateObjects, a warned checklist (#360)', () => {
       objects: [{ name: 'ZCL_AI_ACT_PROBE', type: 'CLAS/OC' }],
     });
     assert.equal(isError(result), false);
-    assert.ok(!('still_inactive' in Object(payloadOf(result))));
+    assertNoProperty(payloadOf(result), 'still_inactive');
     assert.ok(requests.includes('GET /sap/bc/adt/activation/inactiveobjects'));
   });
 });

@@ -27,7 +27,7 @@ import { closeInstance } from '../../../lib/instanceClose';
 import { forceClose } from '../../../lib/ownedConnections';
 import { logOffAtOnce } from '../../../lib/shutdownSequence';
 import { isLogoff } from '../../helpers/adtStandIn';
-import { assertMatchObject } from '../../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../../helpers/assertions';
 import {
   type BackgroundStand,
   backgroundStand,
@@ -251,7 +251,7 @@ describe('whose run', () => {
         object: 'PLACEHOLDER_CLASS',
         state: 'finished',
       });
-      assert.ok(!('answer' in Object(runs[0])));
+      assertNoProperty(runs[0], 'answer');
       assert.equal(mine.content.length, 1);
 
       assert.deepStrictEqual((await b.call('ListBackgroundRuns')).payload, {

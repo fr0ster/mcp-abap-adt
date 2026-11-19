@@ -55,7 +55,7 @@ import {
 } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { defineTool } from '../../lib/handlers/interfaces';
 import { corpusBody } from '../helpers/adtCorpus';
-import { assertRejects } from '../helpers/assertions';
+import { assertNoProperty, assertRejects } from '../helpers/assertions';
 import { declaredRequired, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
@@ -530,7 +530,7 @@ describe('the schema', () => {
             'A long run under a client with a request time limit is started with false.',
           ),
       );
-      assert.ok(!('max_status_polls' in Object(properties)));
+      assertNoProperty(properties, 'max_status_polls');
       assert.ok(!declaredRequired(tool.inputSchema).includes('wait'));
       assert.ok(tool.description.includes('with wait true (default)'));
       assert.ok(
@@ -554,8 +554,8 @@ describe('the schema', () => {
   it('GetUnitTestResult declares no wait and no max_status_polls', () => {
     const properties =
       listedJson(GetUnitTestResult_Tool.inputSchema).properties ?? {};
-    assert.ok(!('wait' in Object(properties)));
-    assert.ok(!('max_status_polls' in Object(properties)));
+    assertNoProperty(properties, 'wait');
+    assertNoProperty(properties, 'max_status_polls');
   });
 
   it('GetUnitTestResult says what it answers for a run SAP answers unfinished', () => {

@@ -13,7 +13,10 @@ import {
 } from '@mcp-abap-adt/lib/config';
 import { SYSTEM_TYPE_ROW } from '@mcp-abap-adt/responsible-rules';
 import { load } from 'js-yaml';
-import { assertThrows } from '../../../../../src/__tests__/helpers/assertions';
+import {
+  assertNoProperty,
+  assertThrows,
+} from '../../../../../src/__tests__/helpers/assertions';
 import {
   CORE_PARAMETERS,
   CORE_ROWS,
@@ -192,7 +195,7 @@ describe('the table', () => {
       it('absent everywhere is absent', () => {
         // The keys are flat names (coreParameters.ts), so Jest's path walk
         // is one step.
-        assert.ok(!(p.key in Object(readAuthParameters([], {}, {}))));
+        assertNoProperty(readAuthParameters([], {}, {}), p.key);
       });
 
       it('is named in the --config template and in the help', () => {

@@ -33,6 +33,7 @@ import {
 import * as systemInformation from '../../../lib/systemInformation';
 import {
   assertMatchObject,
+  assertNoProperty,
   assertRejects,
   rejectionOf,
 } from '../../helpers/assertions';
@@ -269,7 +270,7 @@ describe('getConnection(signal)', () => {
     assert.equal(presented(credential), provider);
     assert.deepStrictEqual(settings, SETTINGS);
     for (const field of SECRET_FIELDS) {
-      assert.equal(field in settings, false);
+      assertNoProperty(settings, field);
     }
     assert.equal((connection as any).connect.mock.callCount(), 1);
   });
@@ -427,7 +428,7 @@ describe('headerContext(headers): the x-sap-* headers as the source', () => {
     assert.deepStrictEqual(settings, answered.settings);
     assert.equal(settings.authType, 'jwt');
     for (const field of SECRET_FIELDS) {
-      assert.equal(field in settings, false);
+      assertNoProperty(settings, field);
     }
   });
 

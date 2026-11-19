@@ -9,7 +9,7 @@ import { beforeEach, describe, it, mock } from 'node:test';
 import { handleSearchSource } from '../../handlers/system/readonly/handleSearchSource';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import * as orchestrator from '../../lib/search-source/orchestrator';
-import { assertMatchObject } from '../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../helpers/assertions';
 
 // runSearchSourceWithContext replaced on the module that defines it (the
 // handler reads it at call time); the Jest factory hid the module's other
@@ -35,10 +35,7 @@ describe('SearchSource concurrency by connection', () => {
 
   it("over HTTP the sequential version's own default applies", async () => {
     await handleSearchSource({ connection: connectionOf('http') } as any, args);
-    // Jest's not.toHaveProperty refused an undefined or null value.
-    const options = run.mock.calls[0]?.arguments[1];
-    assert.ok(options !== undefined && options !== null);
-    assert.ok(!('concurrency' in options));
+    assertNoProperty(run.mock.calls[0]?.arguments[1], 'concurrency');
   });
 
   it('the handler wires the shipped strategy', async () => {

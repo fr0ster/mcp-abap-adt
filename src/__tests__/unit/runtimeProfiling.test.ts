@@ -52,6 +52,7 @@ mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
 
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { handleRuntimeRunClass } from '../../handlers/system/high/handleRuntimeRunClass';
+import { assertNoProperty } from '../helpers/assertions';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 const context = { connection: {} as any, logger: undefined };
@@ -535,7 +536,7 @@ for (const [_n, handler, args] of handlers) {
         .filter(([, value]) => value === undefined)
         .map(([key]) => key);
       assert.deepStrictEqual(undefinedKeys, []);
-      assert.ok(!('maxSizeForTraceFile' in Object(options)));
+      assertNoProperty(options, 'maxSizeForTraceFile');
     },
   );
 }

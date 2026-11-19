@@ -55,7 +55,11 @@ import {
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { corpusBody } from '../../helpers/adtCorpus';
-import { assertMatchObject, assertRejects } from '../../helpers/assertions';
+import {
+  assertMatchObject,
+  assertNoProperty,
+  assertRejects,
+} from '../../helpers/assertions';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
 import { setSystemContext } from '../../helpers/processSystemContext';
 import {
@@ -878,8 +882,8 @@ describe('the definition SAP stored, read at a stated version', () => {
       `POST ${UNLOCK_URL}`,
     ]);
     const answered = answerOf(result);
-    assert.ok(!('stored_definition' in Object(answered)));
-    assert.ok(!('stored_version' in Object(answered)));
+    assertNoProperty(answered, 'stored_definition');
+    assertNoProperty(answered, 'stored_version');
   });
 
   it('the descriptions say which version each answers, per tool', () => {
@@ -912,9 +916,9 @@ describe('the definition SAP stored, read at a stated version', () => {
     assert.equal(connection.requests.length, 4);
     const answered = answerOf(result);
     assert.equal(answered.message, 'refused');
-    assert.ok(!('stored_definition' in Object(answered)));
-    assert.ok(!('stored_definition_not_read' in Object(answered)));
-    assert.ok(!('stored_version' in Object(answered)));
+    assertNoProperty(answered, 'stored_definition');
+    assertNoProperty(answered, 'stored_definition_not_read');
+    assertNoProperty(answered, 'stored_version');
   });
 
   it("says the stored definition was not read when the read after the activation is refused, with SAP's answer", async () => {

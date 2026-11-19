@@ -38,7 +38,7 @@ import type {
   IHandlerGroup,
 } from '../../../lib/handlers/interfaces';
 import { HeldLocks } from '../../../lib/state/heldLocks';
-import { assertMatchObject } from '../../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../../helpers/assertions';
 import type { InnerRequest, PartAnswer } from '../../helpers/batchEnvelope';
 import { envelopeResponse, statusError } from '../../helpers/batchEnvelope';
 import {
@@ -479,7 +479,7 @@ describe('BatchEnd', () => {
     });
     await s.end();
     assertMatchObject((await s.answers([1]))[0], { number: 1 });
-    assert.ok(!('error' in Object((await s.answers([1]))[0])));
+    assertNoProperty((await s.answers([1]))[0], 'error');
     s.begin();
     const { summary } = await s.end();
     assert.deepStrictEqual(summary, { recorded: 0, sent: 0, received: 0 });
@@ -608,7 +608,7 @@ describe('BatchEnd', () => {
     off.begin();
     await off.call('HandlerGet', DRAFT_ARGS);
     await off.end();
-    assert.ok(!('raw' in Object((await off.answers([1]))[0])));
+    assertNoProperty((await off.answers([1]))[0], 'raw');
     await off.close();
 
     const on = await batchStand({
@@ -1082,7 +1082,7 @@ describe("BatchEnd's error, no map", () => {
       program_name: 'PROG_B',
     });
     await s.end();
-    assert.ok(!('error' in Object((await s.answers([2]))[0])));
+    assertNoProperty((await s.answers([2]))[0], 'error');
     fail = true;
     s.begin();
     await s.call('HandlerGet', {

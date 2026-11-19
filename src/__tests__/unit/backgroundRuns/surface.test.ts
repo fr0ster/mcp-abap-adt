@@ -65,7 +65,7 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { adtStandIn } from '../../helpers/adtStandIn';
-import { assertMatchObject } from '../../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../../helpers/assertions';
 import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import { stateSystemKind } from '../../helpers/systemKind';
@@ -687,7 +687,7 @@ describe('which tools take background', () => {
     for (const definition of definitions.filter(declares)) {
       const schema = listedJson(definition.inputSchema);
       assert.equal(jsonAt(schema, 'background').type, 'boolean');
-      assert.ok(!('default' in Object(jsonAt(schema, 'background'))));
+      assertNoProperty(jsonAt(schema, 'background'), 'default');
       assert.ok(
         !declaredRequired(definition.inputSchema).includes('background'),
       );

@@ -16,6 +16,7 @@ import { describe, it, mock } from 'node:test';
 import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
+import { assertNoProperty } from '../../../src/__tests__/helpers/assertions';
 import {
   type Answer,
   countingConnection,
@@ -155,7 +156,7 @@ describe('compact unit-test results are read once', () => {
           assert.notEqual(documented.answer?.isError, true);
           const answered = jsonOf(documented.answer);
           assert.equal(answered.run_id, 'RUN_A');
-          assert.ok(!('finished' in Object(answered)));
+          assertNoProperty(answered, 'finished');
           assert.ok(
             JSON.stringify(answered.run_result).includes('executionTime'),
           );
@@ -180,8 +181,8 @@ describe('compact unit-test results are read once', () => {
         const answered = jsonOf(answer);
         assert.equal(answered.run_id, 'RUN_A');
         assert.ok('run_result' in Object(answered));
-        assert.ok(!('finished' in Object(answered)));
-        assert.ok(!('run_status' in Object(answered)));
+        assertNoProperty(answered, 'finished');
+        assertNoProperty(answered, 'run_status');
         assert.ok(
           !JSON.stringify(answered.run_result).includes('executionTime'),
         );

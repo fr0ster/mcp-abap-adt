@@ -11,6 +11,7 @@ import {
 import * as answerModule from '../../lib/answer';
 import * as clients from '../../lib/clients';
 import * as packageSessions from '../../lib/packageSessions';
+import { assertNoProperty } from '../helpers/assertions';
 import { listedJson } from '../helpers/listedJson';
 
 // The names the Jest factories gave, replaced on the modules that define
@@ -45,7 +46,7 @@ mock.method(
 describe('DeletePackage input', () => {
   it('has no connection_config, and still has force_new_connection', () => {
     const properties = listedJson(TOOL_DEFINITION.inputSchema).properties;
-    assert.ok(!('connection_config' in Object(properties)));
+    assertNoProperty(properties, 'connection_config');
     assert.ok('force_new_connection' in Object(properties));
   });
 

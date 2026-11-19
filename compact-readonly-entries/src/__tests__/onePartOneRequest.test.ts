@@ -27,7 +27,10 @@ import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetServiceBindingPreviewUrl } from '@mcp-abap-adt/lib/handlers/read';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
-import { assertMatchObject } from '../../../src/__tests__/helpers/assertions';
+import {
+  assertMatchObject,
+  assertNoProperty,
+} from '../../../src/__tests__/helpers/assertions';
 import {
   type Answer,
   countingConnection,
@@ -152,7 +155,7 @@ describe('compact HandlerGet: one part, one request', () => {
         const body = jsonOf(answer);
         assert.equal(body.part, 'source');
         assert.ok('source' in Object(body));
-        assert.ok(!('metadata' in Object(body)));
+        assertNoProperty(body, 'metadata');
       });
     });
   }
@@ -182,7 +185,7 @@ describe('compact HandlerGet: one part, one request', () => {
         const body = jsonOf(answer);
         assert.equal(body.part, 'metadata');
         assert.ok('metadata' in Object(body));
-        assert.ok(!('source' in Object(body)));
+        assertNoProperty(body, 'source');
       });
     });
   }
@@ -297,7 +300,7 @@ describe('compact HandlerGet: one part, one request', () => {
       const body = jsonOf(documented.answer);
       assert.equal(body.part, 'metadata');
       assert.ok('metadata' in Object(body));
-      assert.ok(!('source' in Object(body)));
+      assertNoProperty(body, 'source');
     });
 
     it("a caller's own isError argument is sent on as an argument, the read answered", async () => {
@@ -549,7 +552,7 @@ describe('compact HandlerGet: one part, one request', () => {
       const { sent, answer } = await run('document', args, listing);
       assert.equal(sent.length, 1);
       const body = jsonOf(answer);
-      assert.ok(!('blank' in Object(body)));
+      assertNoProperty(body, 'blank');
       assert.ok(
         (body.objects as unknown[]).length +
           (body.childNodes as unknown[]).length >

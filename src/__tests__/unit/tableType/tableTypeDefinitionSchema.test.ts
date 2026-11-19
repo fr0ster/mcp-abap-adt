@@ -18,6 +18,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type * as z from 'zod';
 import { TOOL_DEFINITION as CreateTableType } from '../../../handlers/table_type/high/handleCreateTableType';
 import { TOOL_DEFINITION as UpdateTableType } from '../../../handlers/table_type/high/handleUpdateTableType';
+import { assertNoProperty } from '../../helpers/assertions';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
 
 const TOOLS = [
@@ -117,20 +118,20 @@ for (const { tool, args } of TOOLS) {
         'length',
         'decimals',
       ]) {
-        assert.ok(!(property in Object(seen)));
+        assertNoProperty(seen, property);
       }
     });
 
     it('declares no default for a definition property', () => {
       const properties = listedJson(tool.inputSchema).properties ?? {};
-      assert.ok(!('default' in Object(properties.row_type_kind)));
-      assert.ok(!('default' in Object(properties.row_type_name)));
-      assert.ok(!('default' in Object(properties.data_type)));
-      assert.ok(!('default' in Object(properties.length)));
-      assert.ok(!('default' in Object(properties.decimals)));
-      assert.ok(!('default' in Object(properties.access_type)));
-      assert.ok(!('default' in Object(properties.key_definition)));
-      assert.ok(!('default' in Object(properties.key_kind)));
+      assertNoProperty(properties.row_type_kind, 'default');
+      assertNoProperty(properties.row_type_name, 'default');
+      assertNoProperty(properties.data_type, 'default');
+      assertNoProperty(properties.length, 'default');
+      assertNoProperty(properties.decimals, 'default');
+      assertNoProperty(properties.access_type, 'default');
+      assertNoProperty(properties.key_definition, 'default');
+      assertNoProperty(properties.key_kind, 'default');
     });
 
     it('lists exactly the measured values', () => {

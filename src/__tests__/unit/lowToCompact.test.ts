@@ -46,6 +46,7 @@ import type {
   HandlerEntry,
 } from '../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../lib/systemContext';
+import { assertNoProperty } from '../helpers/assertions';
 import { holdingLockOf } from '../helpers/heldLocks';
 import { listedJson } from '../helpers/listedJson';
 import {
@@ -259,7 +260,7 @@ describe('the low set → compact mapping table', () => {
     for (const row of TABLE.rows) {
       assert.ok(row.compact.length > 0);
       assert.ok((row.low_requests?.length ?? 0) > 0);
-      assert.ok(!('finding' in Object(row)));
+      assertNoProperty(row, 'finding');
     }
   });
 

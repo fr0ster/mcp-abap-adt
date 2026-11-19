@@ -15,6 +15,7 @@ import { answerFailure } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { assertNoProperty } from '../../../../../src/__tests__/helpers/assertions';
 import { stateSystemKind } from '../../../../../src/__tests__/helpers/systemKind';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import {
@@ -114,7 +115,7 @@ describe('a DestinationConfigError', () => {
       answer.hint,
       [carried.hint, KNOWN.grantType].filter(Boolean).join('\n'),
     );
-    assert.ok(!('kind' in Object(answer)));
+    assertNoProperty(answer, 'kind');
   });
 
   it('carries no value read from a store', () => {

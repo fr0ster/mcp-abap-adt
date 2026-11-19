@@ -17,7 +17,7 @@ import {
   terseVariables,
 } from '../../../lib/debugger/readings';
 import { corpusBody } from '../../helpers/adtCorpus';
-import { assertMatchObject } from '../../helpers/assertions';
+import { assertMatchObject, assertNoProperty } from '../../helpers/assertions';
 import { settingsXml } from './fakes';
 
 describe('a blank document reads as an empty one', () => {
@@ -155,7 +155,7 @@ describe('readings of the debugger documents (recorded answers)', () => {
     });
     assert.equal(t.frames.length, stack.frames.length);
     assert.ok(t.frames.length > 5);
-    assert.ok(!('stack_depth' in Object(t)));
+    assertNoProperty(t, 'stack_depth');
     assert.deepStrictEqual(t.frames[1].address, {
       object_type: 'CLAS',
       object_name: 'CL_OO_ADT_RES_CLASSRUN',

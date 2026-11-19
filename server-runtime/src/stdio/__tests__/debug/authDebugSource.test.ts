@@ -4,20 +4,12 @@
  * broker is built with it exactly as stated.
  */
 
-jest.mock('@mcp-abap-adt/auth-broker', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/auth-broker');
-  return {
-    ...actual,
-    AuthBroker: jest.fn(
-      (config: unknown, logger: unknown) =>
-        new actual.AuthBroker(config, logger),
-    ),
-  };
-});
-
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AuthBroker as AuthBrokerCtor } from '@mcp-abap-adt/auth-broker';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
+import { repositoryRoot } from '../../../../../src/__tests__/helpers/repoRoot';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { AUTH_DEBUG_ROW, readCoreConfig } from '../../config/coreParameters';
 import { factoryConfigFrom } from '../../launcher';
@@ -29,7 +21,11 @@ import {
   silentLogger,
 } from '../helpers/factoryFixture';
 
-const constructed = AuthBrokerCtor as unknown as jest.Mock;
+// Every broker the factory constructs, recorded: AuthBroker watched on the
+// module that defines it (the package index re-exports it by getter, read at
+// call time); the real broker is still constructed, as the Jest factory's
+// passthrough did.
+const constructed = mock.method(authBrokerModule, 'AuthBroker');
 
 const ENVIRONMENT = {
   MCP_AUTH_DEBUG: 'true',
@@ -44,25 +40,28 @@ const ENVIRONMENT = {
 
 describe('--auth-debug is read from the command line and the YAML only', () => {
   it('has no environment form', () => {
-    expect(AUTH_DEBUG_ROW.cli).toBe('--auth-debug');
-    expect(AUTH_DEBUG_ROW.yaml).toBe('auth-debug');
-    expect(AUTH_DEBUG_ROW.env).toBeUndefined();
+    assert.equal(AUTH_DEBUG_ROW.cli, '--auth-debug');
+    assert.equal(AUTH_DEBUG_ROW.yaml, 'auth-debug');
+    assert.equal(AUTH_DEBUG_ROW.env, undefined);
   });
 
   it('is off with nothing stated', () => {
-    expect(readCoreConfig([], {}, null).authDebug).toBe(false);
+    assert.equal(readCoreConfig([], {}, null).authDebug, false);
   });
 
   it('is off whatever DEBUG_* and MCP_AUTH_DEBUG say', () => {
-    expect(readCoreConfig([], ENVIRONMENT, null).authDebug).toBe(false);
+    assert.equal(readCoreConfig([], ENVIRONMENT, null).authDebug, false);
   });
 
   it('is on by --auth-debug', () => {
-    expect(readCoreConfig(['--auth-debug'], {}, null).authDebug).toBe(true);
+    assert.equal(readCoreConfig(['--auth-debug'], {}, null).authDebug, true);
   });
 
   it('is on by the YAML key', () => {
-    expect(readCoreConfig([], {}, { 'auth-debug': true }).authDebug).toBe(true);
+    assert.equal(
+      readCoreConfig([], {}, { 'auth-debug': true }).authDebug,
+      true,
+    );
   });
 });
 
@@ -70,7 +69,7 @@ describe('the broker is built with it', () => {
   let base: BrokerBase;
   beforeEach(() => {
     base = brokerBase('auth-debug-source');
-    constructed.mockClear();
+    constructed.mock.resetCalls();
   });
   afterEach(() => base.remove());
 
@@ -87,15 +86,15 @@ describe('the broker is built with it', () => {
       promptLogger: silentLogger,
     });
     await new AuthBrokerFactory(config).getBroker('dest');
-    return constructed.mock.calls[0][0].authDebug;
+    return constructed.mock.calls[0]?.arguments[0].authDebug;
   };
 
   it('false without the flag, whatever the environment says', async () => {
-    expect(await brokerAuthDebug([], ENVIRONMENT)).toBe(false);
+    assert.equal(await brokerAuthDebug([], ENVIRONMENT), false);
   });
 
   it('true under --auth-debug', async () => {
-    expect(await brokerAuthDebug(['--auth-debug'], {})).toBe(true);
+    assert.equal(await brokerAuthDebug(['--auth-debug'], {}), true);
   });
 });
 
@@ -111,8 +110,8 @@ describe('no source reads an environment variable for it', () => {
 
   it('server/src and the shared parameter table never name an AUTH_DEBUG variable', () => {
     const roots = [
-      path.resolve(__dirname, '../..'),
-      path.resolve(__dirname, '../../../../../src/lib/config'),
+      path.resolve(repositoryRoot(__dirname), 'server-runtime', 'src', 'stdio'),
+      path.resolve(repositoryRoot(__dirname), 'src', 'lib', 'config'),
     ];
     const naming = roots.flatMap(sourcesOf).filter((file) => {
       const text = fs.readFileSync(file, 'utf8');
@@ -120,6 +119,6 @@ describe('no source reads an environment variable for it', () => {
         text.includes(name),
       );
     });
-    expect(naming).toEqual([]);
+    assert.deepStrictEqual(naming, []);
   });
 });

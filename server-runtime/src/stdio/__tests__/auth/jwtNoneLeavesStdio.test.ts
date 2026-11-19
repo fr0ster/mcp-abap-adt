@@ -9,21 +9,12 @@
  * token appears in no line.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 
 // Every broker the factory builds is counted; nothing else changes.
-jest.mock('@mcp-abap-adt/auth-broker', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/auth-broker');
-  return {
-    ...actual,
-    AuthBroker: jest.fn(
-      (config: unknown, logger: unknown) =>
-        new actual.AuthBroker(config, logger),
-    ),
-  };
-});
-
-import { AuthBroker } from '@mcp-abap-adt/auth-broker';
+import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import {
   type AdtStandIn,
@@ -52,7 +43,16 @@ const TEST_OPTIONS = {
 };
 
 const TOKEN = 'held-token-PLACEHOLDER.payload.signature';
-const constructed = AuthBroker as unknown as jest.Mock;
+/**
+ * AuthBroker watched on the module that defines it (the package index
+ * re-exports it by getter, read at call time); the real broker is still
+ * constructed, as the Jest factory's passthrough did. Every case restores
+ * every mock after it, so it is watched afresh before each.
+ */
+function watchBrokers() {
+  return mock.method(authBrokerModule, 'AuthBroker');
+}
+let constructed: ReturnType<typeof watchBrokers>;
 
 const savedArgv = process.argv;
 const savedEnv = { ...process.env };
@@ -60,9 +60,9 @@ const savedCwd = process.cwd();
 
 let base: BrokerBase;
 let standIn: AdtStandIn;
-let stdioStart: jest.SpyInstance;
-let settingsFor: jest.SpyInstance;
-let getProvider: jest.SpyInstance;
+let stdioStart: Mock<StdioServer['start']>;
+let settingsFor: Mock<AuthBrokerFactory['settingsFor']>;
+let getProvider: Mock<AuthBrokerFactory['getProvider']>;
 
 beforeEach(async () => {
   base = brokerBase('jwt-none');
@@ -81,20 +81,22 @@ beforeEach(async () => {
     delete process.env[name];
   }
   standIn = await adtStandIn();
-  constructed.mockClear();
-  stdioStart = jest
-    .spyOn(StdioServer.prototype, 'start')
-    .mockResolvedValue(undefined);
+  constructed = watchBrokers();
+  stdioStart = mock.method(
+    StdioServer.prototype,
+    'start',
+    async () => undefined,
+  );
   // The connection at start is the launcher's own step: not made here.
-  jest
-    .spyOn(StdioServer.prototype, 'connectAtStart')
-    .mockResolvedValue({ session: 'logged_on' });
-  settingsFor = jest.spyOn(AuthBrokerFactory.prototype, 'settingsFor');
-  getProvider = jest.spyOn(AuthBrokerFactory.prototype, 'getProvider');
+  mock.method(StdioServer.prototype, 'connectAtStart', async () => ({
+    session: 'logged_on',
+  }));
+  settingsFor = mock.method(AuthBrokerFactory.prototype, 'settingsFor');
+  getProvider = mock.method(AuthBrokerFactory.prototype, 'getProvider');
 });
 
 afterEach(async () => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   process.argv = savedArgv;
   process.env = { ...savedEnv };
   process.chdir(savedCwd);
@@ -102,7 +104,7 @@ afterEach(async () => {
   await standIn.close();
 });
 
-it('a jwt / none --env file stops the start: destination_refused, its words and where the token goes', async () => {
+it('a jwt / none --env file stops the start: destination_refused, its words and where the token goes', async (t) => {
   const file = base.writeFile('conn.env', [
     `SAP_URL=${standIn.url}`,
     'SAP_CLIENT=100',
@@ -117,7 +119,7 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
   const config = readCoreConfig(process.argv.slice(2), process.env);
   const stderr: string[] = [];
   const exits: number[] = [];
-  const stdout = jest.spyOn(process.stdout, 'write');
+  const stdout = t.mock.method(process.stdout, 'write');
   await launch(config, TEST_OPTIONS, {
     browserStrategy: recordingLogins().browserStrategy,
     stderr: (line) => stderr.push(line),
@@ -128,27 +130,26 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
     platform: 'linux',
   });
 
-  expect(exits).toEqual([1]);
-  expect(stdioStart).not.toHaveBeenCalled();
-  expect(stderr).toEqual([
+  assert.deepStrictEqual(exits, [1]);
+  assert.equal(stdioStart.mock.callCount(), 0);
+  assert.deepStrictEqual(stderr, [
     `[MCP] Destination "default" uses jwt / none, which this server does not support\n${JWT_NONE_HINT}`,
   ]);
-  expect(JWT_NONE_HINT).toBe(
+  assert.equal(
+    JWT_NONE_HINT,
     'a token you hold is sent in the x-sap-jwt-token header to mcp-abap-adt-http or mcp-abap-adt-sse; for stdio, create the session with mcp-auth',
   );
 
   // The check's read of the destination was refused, as destination_refused,
   // before any provider was asked for.
-  expect(settingsFor).toHaveBeenCalledTimes(1);
-  expect(getProvider).not.toHaveBeenCalled();
+  assert.equal(settingsFor.mock.callCount(), 1);
+  assert.equal(getProvider.mock.callCount(), 0);
   let thrown: unknown;
-  await (settingsFor.mock.results[0].value as Promise<unknown>).catch(
-    (error: unknown) => {
-      thrown = error;
-    },
-  );
+  await settingsFor.mock.calls[0]?.result?.catch((error: unknown) => {
+    thrown = error;
+  });
   const read = destinationFailureOf(thrown);
-  expect(read).toEqual({
+  assert.deepStrictEqual(read, {
     error: 'destination_refused',
     message:
       'Destination "default" uses jwt / none, which this server does not support',
@@ -156,11 +157,11 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
   });
 
   // No broker, no provider, nothing sent; the token in no line.
-  expect(constructed).not.toHaveBeenCalled();
-  expect(standIn.requests).toEqual([]);
-  expect(stdout).not.toHaveBeenCalled();
+  assert.equal(constructed.mock.callCount(), 0);
+  assert.deepStrictEqual(standIn.requests, []);
+  assert.equal(stdout.mock.callCount(), 0);
   for (const line of [...stderr, JSON.stringify(read)]) {
-    expect(line).not.toContain('held-token');
-    expect(line).not.toContain('PLACEHOLDER');
+    assert.ok(!line.includes('held-token'));
+    assert.ok(!line.includes('PLACEHOLDER'));
   }
 });

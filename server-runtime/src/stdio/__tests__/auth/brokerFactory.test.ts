@@ -1,25 +1,16 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
-
-jest.mock('@mcp-abap-adt/auth-broker', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/auth-broker');
-  return {
-    ...actual,
-    AuthBroker: jest.fn(
-      (config: unknown, logger: unknown) =>
-        new actual.AuthBroker(config, logger),
-    ),
-  };
-});
-
+import { afterEach, before, beforeEach, describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import {
   type AuthBroker,
-  AuthBroker as AuthBrokerCtor,
   DestinationConfigError,
 } from '@mcp-abap-adt/auth-broker';
+import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
 import { classify } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthOutcome,
@@ -29,6 +20,16 @@ import type {
   IAuthRejection,
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
+import {
+  assertMatchObject,
+  assertRejects,
+  rejectionOf,
+} from '../../../../../src/__tests__/helpers/assertions';
+import {
+  getTimerCount,
+  useFakeTimers,
+  useRealTimers,
+} from '../../../../../src/__tests__/helpers/fakeTime';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { SHUTDOWN_REFUSAL } from '../../auth/countedProvider';
 import {
@@ -41,9 +42,26 @@ import type {
   LoginStrategyOptions,
 } from '../../auth/IAuthBrokerFactoryConfig';
 
-const constructed = AuthBrokerCtor as unknown as jest.Mock;
+/**
+ * Every broker the factory constructs, recorded: AuthBroker watched on the
+ * module that defines it (the package index re-exports it by getter, read
+ * at call time); the real broker is still constructed, as the Jest
+ * factory's passthrough did. Every case restores every mock after it, so it
+ * is watched afresh before each.
+ */
+function watchBrokers() {
+  return mock.method(authBrokerModule, 'AuthBroker');
+}
+let constructed: ReturnType<typeof watchBrokers>;
 /** The fs module itself: `import * as` yields a copy whose getters cannot be spied. */
-const nodeFs: typeof fs = jest.requireActual('node:fs');
+// The real module, not an import copy: the spies below go on it.
+import nodeFs = require('node:fs');
+
+/** A member the config type leaves optional, which the case requires: Jest read it untyped. */
+function present<T>(value: T | undefined): T {
+  assert.ok(value !== undefined);
+  return value;
+}
 
 const SYSTEM_URL = 'https://system.example.test';
 const XSUAA_SYSTEM_URL = 'https://xsuaa-system.example.test';
@@ -123,10 +141,10 @@ describe('AuthBrokerFactory', () => {
     fs.mkdirSync(keysDir);
     fs.mkdirSync(sessionsDir);
     strategies = strategyFactory();
-    constructed.mockClear();
+    constructed = watchBrokers();
   });
   afterEach(() => {
-    jest.restoreAllMocks();
+    mock.restoreAll();
     fs.rmSync(root, { recursive: true, force: true });
   });
 
@@ -186,8 +204,8 @@ describe('AuthBrokerFactory', () => {
       const f = factory();
       const a = await f.getBroker('dest');
       const b = await f.getBroker('dest');
-      expect(a).toBe(b);
-      expect(constructed).toHaveBeenCalledTimes(1);
+      assert.equal(a, b);
+      assert.equal(constructed.mock.callCount(), 1);
     });
 
     it('two concurrent first calls build one broker', async () => {
@@ -197,46 +215,52 @@ describe('AuthBrokerFactory', () => {
         f.getBroker('dest'),
         f.getBroker('dest'),
       ]);
-      expect(a).toBe(b);
-      expect(constructed).toHaveBeenCalledTimes(1);
+      assert.equal(a, b);
+      assert.equal(constructed.mock.callCount(), 1);
     });
 
-    it.each(['../../etc/x', 'a/b', '.hidden', ''])(
-      'refuses the name %j before any file is touched, naming "destination"',
-      async (name) => {
-        const read = jest.spyOn(nodeFs, 'readFileSync');
-        const exists = jest.spyOn(nodeFs, 'existsSync');
-        const f = factory();
-        const err = await caught(f.getBroker(name));
-        expect((err as Error).message).toMatch(/^destination: /);
-        expect(read).not.toHaveBeenCalled();
-        expect(exists).not.toHaveBeenCalled();
-        expect(constructed).not.toHaveBeenCalled();
-        await expect(f.getProvider(name)).rejects.toThrow(/^destination: /);
-        await expect(f.settingsFor(name)).rejects.toThrow(/^destination: /);
-      },
-    );
+    for (const name of ['../../etc/x', 'a/b', '.hidden', '']) {
+      it(
+        format(
+          'refuses the name %j before any file is touched, naming "destination"',
+          name,
+        ),
+        async (t) => {
+          const read = t.mock.method(nodeFs, 'readFileSync');
+          const exists = t.mock.method(nodeFs, 'existsSync');
+          const f = factory();
+          const err = await caught(f.getBroker(name));
+          assert.match((err as Error).message, /^destination: /);
+          assert.equal(read.mock.callCount(), 0);
+          assert.equal(exists.mock.callCount(), 0);
+          assert.equal(constructed.mock.callCount(), 0);
+          await assertRejects(f.getProvider(name), /^destination: /);
+          await assertRejects(f.settingsFor(name), /^destination: /);
+        },
+      );
+    }
 
-    it('(control) a valid name does read through the spied fs', async () => {
+    it('(control) a valid name does read through the spied fs', async (t) => {
       basic('dest');
-      const read = jest.spyOn(nodeFs, 'readFileSync');
+      const read = t.mock.method(nodeFs, 'readFileSync');
       await factory().getBroker('dest');
-      expect(read).toHaveBeenCalled();
+      assert.ok(read.mock.callCount() > 0);
     });
 
     it('a failed build is not cached: fixing the file lets the next call build', async () => {
       writeSession('dest', [`SAP_URL=${SYSTEM_URL}`]);
       const f = factory();
-      await expect(f.getBroker('dest')).rejects.toBeInstanceOf(
-        DestinationConfigError,
+      assert.ok(
+        (await rejectionOf(f.getBroker('dest'))) instanceof
+          DestinationConfigError,
       );
       basic('dest');
-      await expect(f.getBroker('dest')).resolves.toBeDefined();
+      assert.notEqual(await f.getBroker('dest'), undefined);
     });
   });
 
   describe('the three steps', () => {
-    it.each([
+    for (const [_l, lines, field] of [
       ['authType absent', [`SAP_URL=${SYSTEM_URL}`], 'authType'],
       [
         'authType unknown',
@@ -262,62 +286,78 @@ describe('AuthBrokerFactory', () => {
         ],
         'grantType',
       ],
-    ])('1. %s: DestinationConfigError, no broker', async (_l, lines, field) => {
-      writeSession('dest', lines);
-      const err = await caught(factory().getBroker('dest'));
-      expect(err).toBeInstanceOf(DestinationConfigError);
-      expect((err as DestinationConfigError).missingFields).toEqual([field]);
-      expect((err as Error).message).not.toContain('made-up');
-      expect(constructed).not.toHaveBeenCalled();
-    });
+    ] satisfies [string, string[], string][]) {
+      it(format('1. %s: DestinationConfigError, no broker', _l), async () => {
+        writeSession('dest', lines);
+        const err = await caught(factory().getBroker('dest'));
+        assert.ok(err instanceof DestinationConfigError);
+        assert.deepStrictEqual((err as DestinationConfigError).missingFields, [
+          field,
+        ]);
+        assert.ok(!(err as Error).message.includes('made-up'));
+        assert.equal(constructed.mock.callCount(), 0);
+      });
+    }
 
-    it.each([
+    for (const [authType, grantType] of [
       ['jwt', 'client_credentials'],
       ['jwt', 'passcode'],
       ['jwt', 'none'],
       ['saml', 'saml2_bearer'],
-    ])(
-      '2. %s / %s: UnsupportedAuthenticationError, no broker, no provider',
-      async (authType, grantType) => {
-        writeSession('dest', [
-          `SAP_URL=${SYSTEM_URL}`,
-          `SAP_AUTH_TYPE=${authType}`,
-          `SAP_GRANT_TYPE=${grantType}`,
-        ]);
-        const f = factory();
-        const err = await caught(f.getBroker('dest'));
-        expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
-        expect(err).toMatchObject({ destination: 'dest', authType, grantType });
-        await expect(f.getProvider('dest')).rejects.toBeInstanceOf(
-          UnsupportedAuthenticationError,
-        );
-        expect(constructed).not.toHaveBeenCalled();
-      },
-    );
+    ]) {
+      it(
+        format(
+          '2. %s / %s: UnsupportedAuthenticationError, no broker, no provider',
+          authType,
+          grantType,
+        ),
+        async () => {
+          writeSession('dest', [
+            `SAP_URL=${SYSTEM_URL}`,
+            `SAP_AUTH_TYPE=${authType}`,
+            `SAP_GRANT_TYPE=${grantType}`,
+          ]);
+          const f = factory();
+          const err = await caught(f.getBroker('dest'));
+          assert.ok(err instanceof UnsupportedAuthenticationError);
+          assertMatchObject(err, { destination: 'dest', authType, grantType });
+          assert.ok(
+            (await rejectionOf(f.getProvider('dest'))) instanceof
+              UnsupportedAuthenticationError,
+          );
+          assert.equal(constructed.mock.callCount(), 0);
+        },
+      );
+    }
 
-    it.each(['certificate', 'kerberos'])(
-      '2b. %s .env: UnsupportedAuthenticationError naming it, no broker, no value',
-      async (authType) => {
-        writeSession('dest', [
-          `SAP_URL=${SYSTEM_URL}`,
-          `SAP_AUTH_TYPE=${authType}`,
-          'SAP_CERT_PATH=/made-up/secret-path',
-        ]);
-        const err = await caught(factory().getBroker('dest'));
-        expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
-        expect(err).toMatchObject({ destination: 'dest', authType });
-        expect((err as Error).message).toContain(authType);
-        expect((err as Error).message).not.toContain('secret-path');
-        expect(constructed).not.toHaveBeenCalled();
-      },
-    );
+    for (const authType of ['certificate', 'kerberos']) {
+      it(
+        format(
+          '2b. %s .env: UnsupportedAuthenticationError naming it, no broker, no value',
+          authType,
+        ),
+        async () => {
+          writeSession('dest', [
+            `SAP_URL=${SYSTEM_URL}`,
+            `SAP_AUTH_TYPE=${authType}`,
+            'SAP_CERT_PATH=/made-up/secret-path',
+          ]);
+          const err = await caught(factory().getBroker('dest'));
+          assert.ok(err instanceof UnsupportedAuthenticationError);
+          assertMatchObject(err, { destination: 'dest', authType });
+          assert.ok((err as Error).message.includes(authType));
+          assert.ok(!(err as Error).message.includes('secret-path'));
+          assert.equal(constructed.mock.callCount(), 0);
+        },
+      );
+    }
 
     it("3. basic: the broker gets the stores and the server's options, no handler option", async () => {
       basic('dest');
       await factory().getBroker('dest');
-      expect(constructed).toHaveBeenCalledTimes(1);
-      const config = constructed.mock.calls[0][0];
-      expect(Object.keys(config).sort()).toEqual([
+      assert.equal(constructed.mock.callCount(), 1);
+      const config = constructed.mock.calls[0]?.arguments[0];
+      assert.deepStrictEqual(Object.keys(config).sort(), [
         'authDebug',
         'onWriteFailure',
         'renewal',
@@ -325,10 +365,12 @@ describe('AuthBrokerFactory', () => {
         'sessionStore',
       ]);
       // the destination's own stores, observed through their answers
-      expect(
-        (await config.serviceKeyStore.getConnectionConfig('dest'))?.authType,
-      ).toBe('basic');
-      expect(await config.sessionStore.loadSession('dest')).toBeNull();
+      assert.equal(
+        (await present(config.serviceKeyStore).getConnectionConfig('dest'))
+          ?.authType,
+        'basic',
+      );
+      assert.equal(await config.sessionStore.loadSession('dest'), null);
     });
 
     it('3. jwt / none: a token you hold is refused at the handler table, with the hint where it went', async () => {
@@ -347,11 +389,12 @@ describe('AuthBrokerFactory', () => {
           'default',
         ),
       );
-      expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
-      expect(destinationFailureWords(err, 'default')).toBe(
+      assert.ok(err instanceof UnsupportedAuthenticationError);
+      assert.equal(
+        destinationFailureWords(err, 'default'),
         `Destination "default" uses jwt / none, which this server does not support\n${JWT_NONE_HINT}`,
       );
-      expect(constructed).not.toHaveBeenCalled();
+      assert.equal(constructed.mock.callCount(), 0);
     });
 
     it('3. jwt / authorization_code: the stores, the options and the login strategy in serverLogin', async () => {
@@ -359,8 +402,8 @@ describe('AuthBrokerFactory', () => {
       await factory({ browser: BROWSER, browserAuthPort: 61005 }).getBroker(
         'dest',
       );
-      const config = constructed.mock.calls[0][0];
-      expect(Object.keys(config).sort()).toEqual([
+      const config = constructed.mock.calls[0]?.arguments[0];
+      assert.deepStrictEqual(Object.keys(config).sort(), [
         'authDebug',
         'authorization',
         'onWriteFailure',
@@ -368,15 +411,22 @@ describe('AuthBrokerFactory', () => {
         'serviceKeyStore',
         'sessionStore',
       ]);
-      const strategy = config.authorization('dest', 'authorization_code');
+      const strategy = present(config.authorization)(
+        'dest',
+        'authorization_code',
+      );
       const outcome = await strategy.authorize({
         buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
       });
-      expect(outcome.payload).toBe('code-1');
-      expect(strategies.calls).toEqual([{ browser: BROWSER, port: 61005 }]);
-      expect(
-        (await config.serviceKeyStore.getConnectionConfig('dest'))?.grantType,
-      ).toBe('authorization_code');
+      assert.equal(outcome.payload, 'code-1');
+      assert.deepStrictEqual(strategies.calls, [
+        { browser: BROWSER, port: 61005 },
+      ]);
+      assert.equal(
+        (await present(config.serviceKeyStore).getConnectionConfig('dest'))
+          ?.grantType,
+        'authorization_code',
+      );
     });
   });
 
@@ -384,13 +434,13 @@ describe('AuthBrokerFactory', () => {
     it('answers url, client, auth type and connection type — no secret', async () => {
       basic('dest');
       const settings = await factory().settingsFor('dest');
-      expect(settings).toEqual({
+      assert.deepStrictEqual(settings, {
         url: SYSTEM_URL,
         client: '100',
         authType: 'basic',
         connectionType: 'http',
       });
-      expect(JSON.stringify(settings)).not.toContain('placeholder-password');
+      assert.ok(!JSON.stringify(settings).includes('placeholder-password'));
     });
 
     it('no token or refresh token of a stored jwt session', async () => {
@@ -413,7 +463,7 @@ describe('AuthBrokerFactory', () => {
       const settings = await factory({
         envFile: { path: file, source: '--env' },
       }).settingsFor('default');
-      expect(settings).toEqual({
+      assert.deepStrictEqual(settings, {
         url: SYSTEM_URL,
         authType: 'jwt',
         connectionType: 'http',
@@ -431,9 +481,9 @@ describe('AuthBrokerFactory', () => {
         'SAP_USERNAME=placeholder-user',
         'SAP_PASSWORD=placeholder-password',
       ]);
-      expect(await f.settingsFor('dest')).toEqual(first);
-      expect(first.url).toBe(SYSTEM_URL);
-      expect(first.client).toBe('100');
+      assert.deepStrictEqual(await f.settingsFor('dest'), first);
+      assert.equal(first.url, SYSTEM_URL);
+      assert.equal(first.client, '100');
     });
 
     it('XSUAA_MCP_URL is read once too', async () => {
@@ -442,24 +492,25 @@ describe('AuthBrokerFactory', () => {
       const f = factory();
       await f.settingsFor('dest');
       writeSession('dest', ['XSUAA_MCP_URL=https://changed.example.test']);
-      expect((await f.settingsFor('dest')).url).toBe(XSUAA_SYSTEM_URL);
+      assert.equal((await f.settingsFor('dest')).url, XSUAA_SYSTEM_URL);
     });
 
     it('a failed read is not cached: fixing the file lets the next call answer', async () => {
       writeKey('dest', xsuaaKey('https://tenant.example.test'));
       const f = factory();
-      await expect(f.settingsFor('dest')).rejects.toBeInstanceOf(
-        DestinationConfigError,
+      assert.ok(
+        (await rejectionOf(f.settingsFor('dest'))) instanceof
+          DestinationConfigError,
       );
       writeSession('dest', [`XSUAA_MCP_URL=${XSUAA_SYSTEM_URL}`]);
-      expect((await f.settingsFor('dest')).url).toBe(XSUAA_SYSTEM_URL);
+      assert.equal((await f.settingsFor('dest')).url, XSUAA_SYSTEM_URL);
     });
 
     it('no URL: DestinationConfigError naming SAP_URL', async () => {
       writeSession('dest', ['SAP_AUTH_TYPE=basic', 'SAP_USERNAME=u']);
       const err = await caught(factory().settingsFor('dest'));
-      expect(err).toBeInstanceOf(DestinationConfigError);
-      expect((err as DestinationConfigError).missingFields).toEqual([
+      assert.ok(err instanceof DestinationConfigError);
+      assert.deepStrictEqual((err as DestinationConfigError).missingFields, [
         'SAP_URL',
       ]);
     });
@@ -469,40 +520,54 @@ describe('AuthBrokerFactory', () => {
       ['a url without "authentication"', 'https://tenant.example.test'],
     ] as const;
 
-    it.each(keyUrls)(
-      'XSUAA key with %s: the URL is XSUAA_MCP_URL',
-      async (_l, keyUrl) => {
-        writeKey('dest', xsuaaKey(keyUrl));
-        writeSession('dest', [`XSUAA_MCP_URL=${XSUAA_SYSTEM_URL}`]);
-        const settings = await factory().settingsFor('dest');
-        expect(settings.url).toBe(XSUAA_SYSTEM_URL);
-        expect(settings.authType).toBe('jwt');
-      },
-    );
+    for (const [_l, keyUrl] of keyUrls) {
+      it(
+        format('XSUAA key with %s: the URL is XSUAA_MCP_URL', _l),
+        async () => {
+          writeKey('dest', xsuaaKey(keyUrl));
+          writeSession('dest', [`XSUAA_MCP_URL=${XSUAA_SYSTEM_URL}`]);
+          const settings = await factory().settingsFor('dest');
+          assert.equal(settings.url, XSUAA_SYSTEM_URL);
+          assert.equal(settings.authType, 'jwt');
+        },
+      );
+    }
 
-    it.each(keyUrls)(
-      'XSUAA key with %s and SAP_URL instead: refused naming XSUAA_MCP_URL',
-      async (_l, keyUrl) => {
-        writeKey('dest', xsuaaKey(keyUrl));
-        writeSession('dest', [`SAP_URL=${SYSTEM_URL}`]);
-        const err = await caught(factory().settingsFor('dest'));
-        expect(err).toBeInstanceOf(DestinationConfigError);
-        expect((err as DestinationConfigError).missingFields).toEqual([
-          'XSUAA_MCP_URL',
-        ]);
-      },
-    );
+    for (const [_l, keyUrl] of keyUrls) {
+      it(
+        format(
+          'XSUAA key with %s and SAP_URL instead: refused naming XSUAA_MCP_URL',
+          _l,
+        ),
+        async () => {
+          writeKey('dest', xsuaaKey(keyUrl));
+          writeSession('dest', [`SAP_URL=${SYSTEM_URL}`]);
+          const err = await caught(factory().settingsFor('dest'));
+          assert.ok(err instanceof DestinationConfigError);
+          assert.deepStrictEqual(
+            (err as DestinationConfigError).missingFields,
+            ['XSUAA_MCP_URL'],
+          );
+        },
+      );
+    }
 
-    it.each(keyUrls)(
-      'XSUAA key with %s and no session file: refused naming XSUAA_MCP_URL',
-      async (_l, keyUrl) => {
-        writeKey('dest', xsuaaKey(keyUrl));
-        const err = await caught(factory().settingsFor('dest'));
-        expect((err as DestinationConfigError).missingFields).toEqual([
-          'XSUAA_MCP_URL',
-        ]);
-      },
-    );
+    for (const [_l, keyUrl] of keyUrls) {
+      it(
+        format(
+          'XSUAA key with %s and no session file: refused naming XSUAA_MCP_URL',
+          _l,
+        ),
+        async () => {
+          writeKey('dest', xsuaaKey(keyUrl));
+          const err = await caught(factory().settingsFor('dest'));
+          assert.deepStrictEqual(
+            (err as DestinationConfigError).missingFields,
+            ['XSUAA_MCP_URL'],
+          );
+        },
+      );
+    }
 
     const snc = () =>
       writeSession('dest', [
@@ -516,8 +581,8 @@ describe('AuthBrokerFactory', () => {
       const err = await caught(
         factory({ connectionType: 'http' }).settingsFor('dest'),
       );
-      expect(err).toBeInstanceOf(DestinationConfigError);
-      expect((err as DestinationConfigError).missingFields).toEqual([
+      assert.ok(err instanceof DestinationConfigError);
+      assert.deepStrictEqual((err as DestinationConfigError).missingFields, [
         'connection-type',
       ]);
     });
@@ -531,16 +596,17 @@ describe('AuthBrokerFactory', () => {
         'SAP_CLIENT=100',
         'SAP_LANGUAGE=EN',
       ]);
-      await expect(
-        factory({ connectionType: 'rfc' }).settingsFor('dest'),
-      ).resolves.toEqual({
-        authType: 'snc',
-        connectionType: 'rfc',
-        client: '100',
-        language: 'EN',
-        ashost: 'system.example.test',
-        sysnr: '00',
-      });
+      assert.deepStrictEqual(
+        await factory({ connectionType: 'rfc' }).settingsFor('dest'),
+        {
+          authType: 'snc',
+          connectionType: 'rfc',
+          client: '100',
+          language: 'EN',
+          ashost: 'system.example.test',
+          sysnr: '00',
+        },
+      );
     });
   });
 
@@ -557,14 +623,14 @@ describe('AuthBrokerFactory', () => {
       ]);
       basic('other', ['SAP_MASTER_SYSTEM=system-of-other']);
       const f = factory();
-      await expect(f.systemContextFor('dest')).resolves.toEqual({
+      assert.deepStrictEqual(await f.systemContextFor('dest'), {
         responsible: 'responsible-of-dest',
         login: 'placeholder-user',
         masterSystem: 'system-of-dest',
       });
       // SAP_RESPONSIBLE unset: no responsible; the login is a fallback the
       // request resolves after every SAP_RESPONSIBLE (process included).
-      await expect(f.systemContextFor('other')).resolves.toEqual({
+      assert.deepStrictEqual(await f.systemContextFor('other'), {
         login: 'placeholder-user',
         masterSystem: 'system-of-other',
       });
@@ -583,14 +649,15 @@ describe('AuthBrokerFactory', () => {
           'SAP_MASTER_SYSTEM=system-of-file',
         ].join('\n'),
       );
-      await expect(
-        factory({
+      assert.deepStrictEqual(
+        await factory({
           envFile: { path: file, source: '--env' },
         }).systemContextFor('default'),
-      ).resolves.toEqual({
-        login: 'placeholder-user',
-        masterSystem: 'system-of-file',
-      });
+        {
+          login: 'placeholder-user',
+          masterSystem: 'system-of-file',
+        },
+      );
     });
 
     it('a destination that states neither answers nothing — the process environment is not read here', async () => {
@@ -598,7 +665,7 @@ describe('AuthBrokerFactory', () => {
       process.env.SAP_MASTER_SYSTEM = 'system-of-process';
       try {
         writeKey('dest', abapKey);
-        await expect(factory().systemContextFor('dest')).resolves.toEqual({});
+        assert.deepStrictEqual(await factory().systemContextFor('dest'), {});
       } finally {
         if (saved === undefined) delete process.env.SAP_MASTER_SYSTEM;
         else process.env.SAP_MASTER_SYSTEM = saved;
@@ -606,9 +673,7 @@ describe('AuthBrokerFactory', () => {
     });
 
     it('a name that is a path is refused before any file is read', async () => {
-      await expect(factory().systemContextFor('../x')).rejects.toThrow(
-        /^destination: /,
-      );
+      await assertRejects(factory().systemContextFor('../x'), /^destination: /);
     });
   });
 
@@ -621,12 +686,13 @@ describe('AuthBrokerFactory', () => {
         'SAP_JWT_TOKEN=placeholder-token',
       ]);
       const err = await caught(factory({ unsafe: false }).getProvider('dest'));
-      expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
+      assert.ok(err instanceof UnsupportedAuthenticationError);
       const text = destinationFailureWords(err, 'dest');
-      expect(text).toBe(
+      assert.equal(
+        text,
         `Destination "dest" uses jwt / none, which this server does not support\n${JWT_NONE_HINT}`,
       );
-      expect(text).not.toContain('placeholder-token');
+      assert.ok(!text.includes('placeholder-token'));
     });
 
     it('the same counted object for every call on a destination (the broker answers one provider)', async () => {
@@ -637,11 +703,11 @@ describe('AuthBrokerFactory', () => {
         f.getProvider('dest'),
       ]);
       const c = await f.getProvider('dest');
-      expect(a).toBe(b);
-      expect(a).toBe(c);
+      assert.equal(a, b);
+      assert.equal(a, c);
       const inner = await (await f.getBroker('dest')).getProvider('dest');
-      expect(a).not.toBe(inner);
-      expect(a.kind).toBe(inner.kind);
+      assert.notEqual(a, inner);
+      assert.equal(a.kind, inner.kind);
     });
   });
 
@@ -649,7 +715,7 @@ describe('AuthBrokerFactory', () => {
     async function withHeld(f: AuthBrokerFactory, name: string) {
       const broker = await f.getBroker(name);
       const held = heldInner();
-      jest.spyOn(broker, 'getProvider').mockResolvedValue(held.inner);
+      mock.method(broker, 'getProvider', async () => held.inner);
       return { broker, ...held };
     }
 
@@ -662,29 +728,31 @@ describe('AuthBrokerFactory', () => {
       const running = p.rejected(REJECTION_401);
       const settling = f.settle();
       const later = await f.getProvider('other');
-      await expect(later.prepare()).resolves.toEqual(SHUTDOWN_REFUSAL);
-      await expect(p.authorize({} as never)).resolves.toEqual(SHUTDOWN_REFUSAL);
-      expect(calls).toEqual(['rejected']);
+      assert.deepStrictEqual(await later.prepare(), SHUTDOWN_REFUSAL);
+      assert.deepStrictEqual(await p.authorize({} as never), SHUTDOWN_REFUSAL);
+      assert.deepStrictEqual(calls, ['rejected']);
       release();
       await running;
-      await expect(settling).resolves.toEqual({ notStored: [] });
+      assert.deepStrictEqual(await settling, { notStored: [] });
     });
 
-    it('waits for a held call, then flushes every broker built, once each', async () => {
+    it('waits for a held call, then flushes every broker built, once each', async (t) => {
       basic('dest');
       basic('other');
       const f = factory();
       const events: string[] = [];
       const { broker, release } = await withHeld(f, 'dest');
       const other = await f.getBroker('other');
-      for (const [name, b] of [
-        ['dest', broker],
-        ['other', other],
-      ] as Array<[string, AuthBroker]>) {
-        jest.spyOn(b, 'flush').mockImplementation(async () => {
+      const [destFlush, otherFlush] = (
+        [
+          ['dest', broker],
+          ['other', other],
+        ] as Array<[string, AuthBroker]>
+      ).map(([name, b]) =>
+        t.mock.method(b, 'flush', async () => {
           events.push(`flush ${name}`);
-        });
-      }
+        }),
+      );
       const p = await f.getProvider('dest');
       const running = p.rejected(REJECTION_401).then((o) => {
         events.push('answered');
@@ -693,23 +761,29 @@ describe('AuthBrokerFactory', () => {
       const settling = f.settle();
       await tick();
       await tick();
-      expect(events).toEqual([]);
+      assert.deepStrictEqual(events, []);
       release();
       await running;
-      await expect(settling).resolves.toEqual({ notStored: [] });
-      expect(events[0]).toBe('answered');
-      expect(events.slice(1).sort()).toEqual(['flush dest', 'flush other']);
-      expect(broker.flush).toHaveBeenCalledTimes(1);
-      expect(other.flush).toHaveBeenCalledTimes(1);
+      assert.deepStrictEqual(await settling, { notStored: [] });
+      assert.equal(events[0], 'answered');
+      assert.deepStrictEqual(events.slice(1).sort(), [
+        'flush dest',
+        'flush other',
+      ]);
+      assert.equal(destFlush?.mock.callCount(), 1);
+      assert.equal(otherFlush?.mock.callCount(), 1);
     });
 
-    it('has no deadline: a held call keeps settle() waiting until it answers', async () => {
-      jest.useFakeTimers();
+    it('has no deadline: a held call keeps settle() waiting until it answers', async (t) => {
+      // Jest's default fakes.
+      useFakeTimers({
+        apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+      });
       try {
         basic('dest');
         const f = factory();
         const { broker, release } = await withHeld(f, 'dest');
-        const flush = jest.spyOn(broker, 'flush');
+        const flush = t.mock.method(broker, 'flush');
         const p = await f.getProvider('dest');
         const running = p.prepare();
         let done = false;
@@ -719,79 +793,85 @@ describe('AuthBrokerFactory', () => {
         });
         for (let i = 0; i < 10; i += 1) await Promise.resolve();
         // No timer of the server's: nothing to advance to.
-        expect(jest.getTimerCount()).toBe(0);
-        jest.advanceTimersByTime(60 * 60_000);
+        assert.equal(getTimerCount(), 0);
+        mock.timers.tick(60 * 60_000);
         for (let i = 0; i < 10; i += 1) await Promise.resolve();
-        expect(done).toBe(false);
-        expect(flush).not.toHaveBeenCalled();
+        assert.equal(done, false);
+        assert.equal(flush.mock.callCount(), 0);
         release();
         await running;
-        await expect(settling).resolves.toEqual({ notStored: [] });
-        expect(flush).toHaveBeenCalledTimes(1);
+        assert.deepStrictEqual(await settling, { notStored: [] });
+        assert.equal(flush.mock.callCount(), 1);
       } finally {
-        jest.useRealTimers();
+        useRealTimers();
       }
     });
 
-    it("the shutdown's signal releases the drain and reaches flush()", async () => {
+    it("the shutdown's signal releases the drain and reaches flush()", async (t) => {
       basic('dest');
       const f = factory();
       const { broker, release } = await withHeld(f, 'dest');
-      const flush = jest.spyOn(broker, 'flush').mockResolvedValue(undefined);
+      const flush = t.mock.method(broker, 'flush', async () => undefined);
       const p = await f.getProvider('dest');
       const running = p.prepare();
       const forced = new AbortController();
       const settling = f.settle({ signal: forced.signal });
       forced.abort();
-      await expect(settling).resolves.toEqual({ notStored: [] });
-      expect(flush).toHaveBeenCalledWith({ signal: forced.signal });
+      assert.deepStrictEqual(await settling, { notStored: [] });
+      assert.ok(
+        flush.mock.calls.some((c) =>
+          isDeepStrictEqual(c.arguments, [{ signal: forced.signal }]),
+        ),
+      );
       release();
       await running;
     });
 
-    it('reports a rejecting flush() as destination and classified reason only', async () => {
+    it('reports a rejecting flush() as destination and classified reason only', async (t) => {
       basic('dest');
       basic('other');
       const f = factory();
       const a = await f.getBroker('dest');
       const b = await f.getBroker('other');
       const storeError = new Error('"dest": StorageError placeholder-secret');
-      jest
-        .spyOn(a, 'flush')
-        .mockRejectedValue(
-          new AggregateError(
-            [storeError],
-            'Session writes still failing for "dest" placeholder-secret',
-          ),
+      t.mock.method(a, 'flush', async () => {
+        throw new AggregateError(
+          [storeError],
+          'Session writes still failing for "dest" placeholder-secret',
         );
+      });
       class OddStoreFailure extends Error {}
       const odd = new OddStoreFailure('placeholder-secret');
-      jest.spyOn(b, 'flush').mockRejectedValue(odd);
+      t.mock.method(b, 'flush', async () => {
+        throw odd;
+      });
       const report = await f.settle();
-      expect(report.notStored.sort()).toEqual([
+      assert.deepStrictEqual(report.notStored.sort(), [
         `"dest": ${classify(storeError, 'persisting-tokens').reason}`,
         `"other": ${classify(odd, 'persisting-tokens').reason}`,
       ]);
-      expect(JSON.stringify(report)).not.toContain('placeholder-secret');
-      expect(JSON.stringify(report)).not.toContain('OddStoreFailure');
+      assert.ok(!JSON.stringify(report).includes('placeholder-secret'));
+      assert.ok(!JSON.stringify(report).includes('OddStoreFailure'));
     });
   });
 
   describe('defaultDestination', () => {
     it('--mcp=X → X', () => {
-      expect(factory({ mcpDestination: 'dest' }).defaultDestination).toBe(
+      assert.equal(
+        factory({ mcpDestination: 'dest' }).defaultDestination,
         'dest',
       );
     });
     it('an env file → default', () => {
-      expect(
+      assert.equal(
         factory({
           envFile: { path: path.join(root, 'conn.env'), source: '--env' },
         }).defaultDestination,
-      ).toBe('default');
+        'default',
+      );
     });
     it('neither → undefined', () => {
-      expect(factory().defaultDestination).toBeUndefined();
+      assert.equal(factory().defaultDestination, undefined);
     });
   });
 
@@ -803,7 +883,8 @@ describe('AuthBrokerFactory', () => {
           envFile: { path: missing, source: '--env-path' },
         }).getBroker('default'),
       );
-      expect((err as Error).message).toBe(
+      assert.equal(
+        (err as Error).message,
         `--env-path: the file does not exist: ${missing}`,
       );
     });
@@ -813,8 +894,8 @@ describe('AuthBrokerFactory', () => {
       fs.writeFileSync(file, `SAP_URL=${SYSTEM_URL}\nSAP_AUTH_TYPE=basic\n`);
       basic('dest');
       const f = factory({ envFile: { path: file, source: '--env' } });
-      expect((await f.settingsFor('dest')).client).toBe('100');
-      expect((await f.settingsFor('default')).client).toBeUndefined();
+      assert.equal((await f.settingsFor('dest')).client, '100');
+      assert.equal((await f.settingsFor('default')).client, undefined);
     });
   });
 
@@ -844,7 +925,7 @@ describe('AuthBrokerFactory', () => {
     const ACCESS_1 = jwt('placeholder-access-1');
     const ACCESS_2 = jwt('placeholder-access-2');
 
-    beforeAll(() => {
+    before(() => {
       process.env.NO_PROXY = '127.0.0.1,localhost';
       process.env.no_proxy = '127.0.0.1,localhost';
     });
@@ -908,8 +989,8 @@ describe('AuthBrokerFactory', () => {
     /** Logs in (unheld), then starts a refresh the endpoint holds. */
     async function refreshing(f: AuthBrokerFactory) {
       const provider = await f.getProvider('default');
-      await expect(provider.prepare()).resolves.toEqual(OK);
-      expect(fs.readFileSync(envFile, 'utf8')).toContain(ACCESS_1);
+      assert.deepStrictEqual(await provider.prepare(), OK);
+      assert.ok(fs.readFileSync(envFile, 'utf8').includes(ACCESS_1));
       const answered = provider.rejected(REJECTION_401);
       await refreshArrived.promise;
       return { provider, answered };
@@ -925,23 +1006,26 @@ describe('AuthBrokerFactory', () => {
       });
       await tick();
       await tick();
-      expect(settled).toBe(false);
+      assert.equal(settled, false);
       releaseRefresh();
-      await expect(answered).resolves.toEqual(OK);
-      await expect(settling).resolves.toEqual({ notStored: [] });
+      assert.deepStrictEqual(await answered, OK);
+      assert.deepStrictEqual(await settling, { notStored: [] });
       const stored = fs.readFileSync(envFile, 'utf8');
-      expect(stored).toContain(`SAP_JWT_TOKEN=${ACCESS_2}`);
-      expect(stored).toContain('SAP_REFRESH_TOKEN=placeholder-refresh-2');
-      expect(tokenRequests).toEqual(['authorization_code', 'refresh_token']);
+      assert.ok(stored.includes(`SAP_JWT_TOKEN=${ACCESS_2}`));
+      assert.ok(stored.includes('SAP_REFRESH_TOKEN=placeholder-refresh-2'));
+      assert.deepStrictEqual(tokenRequests, [
+        'authorization_code',
+        'refresh_token',
+      ]);
     });
 
-    it('a 401 after settle began: the shutdown refusal, the inner provider never called, nothing written after the flush', async () => {
+    it('a 401 after settle began: the shutdown refusal, the inner provider never called, nothing written after the flush', async (t) => {
       const f = factory({ envFile: { path: envFile, source: '--env' } });
       const { provider, answered } = await refreshing(f);
       const broker = await f.getBroker('default');
       const inner = await broker.getProvider('default');
-      const innerRejected = jest.spyOn(inner, 'rejected');
-      const flush = jest.spyOn(broker, 'flush');
+      const innerRejected = t.mock.method(inner, 'rejected');
+      const flush = t.mock.method(broker, 'flush');
 
       const settling = f.settle();
       // A request on the wire comes back 401 while settle waits. Raced
@@ -950,23 +1034,27 @@ describe('AuthBrokerFactory', () => {
         provider.rejected(REJECTION_401),
         new Promise((r) => setTimeout(() => r('still waiting'), 1_000)),
       ]);
-      expect(verdict).toEqual(SHUTDOWN_REFUSAL);
-      expect(innerRejected).not.toHaveBeenCalled();
+      assert.deepStrictEqual(verdict, SHUTDOWN_REFUSAL);
+      assert.equal(innerRejected.mock.callCount(), 0);
 
       releaseRefresh();
       await answered;
       await settling;
-      expect(flush).toHaveBeenCalledTimes(1);
+      assert.equal(flush.mock.callCount(), 1);
       const afterFlush = fs.readFileSync(envFile, 'utf8');
 
       // And after settle: still refused, still not forwarded.
-      await expect(provider.rejected(REJECTION_401)).resolves.toEqual(
+      assert.deepStrictEqual(
+        await provider.rejected(REJECTION_401),
         SHUTDOWN_REFUSAL,
       );
       await new Promise((r) => setTimeout(r, 100));
-      expect(innerRejected).not.toHaveBeenCalled();
-      expect(tokenRequests).toEqual(['authorization_code', 'refresh_token']);
-      expect(fs.readFileSync(envFile, 'utf8')).toBe(afterFlush);
+      assert.equal(innerRejected.mock.callCount(), 0);
+      assert.deepStrictEqual(tokenRequests, [
+        'authorization_code',
+        'refresh_token',
+      ]);
+      assert.equal(fs.readFileSync(envFile, 'utf8'), afterFlush);
     });
   });
 });

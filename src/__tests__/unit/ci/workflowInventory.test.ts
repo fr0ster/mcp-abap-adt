@@ -313,7 +313,7 @@ it('the pre-commit hook checks the staged files then builds', () => {
     .map((line) => line.trim())
     .filter((line) => line !== '' && !line.startsWith('#'));
   assert.deepStrictEqual(hook, [
-    'biome check --staged --diagnostic-level=error',
+    'biome check --staged --diagnostic-level=error --no-errors-on-unmatched',
     'npm run build',
   ]);
 });

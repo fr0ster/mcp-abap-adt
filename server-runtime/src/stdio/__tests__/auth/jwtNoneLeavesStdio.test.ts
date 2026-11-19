@@ -19,6 +19,7 @@ import {
 } from '../../../../../src/__tests__/helpers/adtStandIn';
 // Every broker the factory builds is counted; nothing else changes.
 import { authBroker as authBrokerModule } from '../../../../../src/__tests__/helpers/packageFiles';
+import { killScenarioChildren } from '../../../../../src/__tests__/helpers/scenarioOutput';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import {
   destinationFailureOf,
@@ -32,6 +33,7 @@ import {
   brokerBase,
   recordingLogins,
 } from '../helpers/factoryFixture';
+import { childStart } from '../helpers/launcherStdout';
 
 /** The launcher's options as `mcp-abap-adt` passes them. */
 const TEST_OPTIONS = {
@@ -95,6 +97,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await killScenarioChildren();
   mock.restoreAll();
   process.argv = savedArgv;
   process.env = { ...savedEnv };
@@ -103,7 +106,7 @@ afterEach(async () => {
   await standIn.close();
 });
 
-it('a jwt / none --env file stops the start: destination_refused, its words and where the token goes', async (t) => {
+it('a jwt / none --env file stops the start: destination_refused, its words and where the token goes', async () => {
   const file = base.writeFile('conn.env', [
     `SAP_URL=${standIn.url}`,
     'SAP_CLIENT=100',
@@ -118,7 +121,6 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
   const config = readCoreConfig(process.argv.slice(2), process.env);
   const stderr: string[] = [];
   const exits: number[] = [];
-  const stdout = t.mock.method(process.stdout, 'write');
   await launch(config, TEST_OPTIONS, {
     browserStrategy: recordingLogins().browserStrategy,
     stderr: (line) => stderr.push(line),
@@ -158,12 +160,10 @@ it('a jwt / none --env file stops the start: destination_refused, its words and 
   // No broker, no provider, nothing sent; the token in no line.
   assert.equal(constructed.mock.callCount(), 0);
   assert.deepStrictEqual(standIn.requests, []);
-  // The node:test runner reports through this process's stdout in
-  // serialized frames (Buffers); a text write is the program's.
-  assert.deepStrictEqual(
-    stdout.mock.calls.filter((c) => typeof c.arguments[0] === 'string'),
-    [],
-  );
+  // Nothing on stdout: the same start in a process of its own, whose stdout
+  // this test reads as its client; it stops the same way.
+  const child = await childStart('launch', 'linux', [`--env-path=${file}`]);
+  assert.deepStrictEqual(child.exits, [1]);
   for (const line of [...stderr, JSON.stringify(read)]) {
     assert.ok(!line.includes('held-token'));
     assert.ok(!line.includes('PLACEHOLDER'));

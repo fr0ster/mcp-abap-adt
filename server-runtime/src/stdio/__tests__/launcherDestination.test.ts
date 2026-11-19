@@ -17,6 +17,7 @@ import {
   authBroker as authBrokerModule,
   authProviderBrowsers as browsers,
 } from '../../../../src/__tests__/helpers/packageFiles';
+import { killScenarioChildren } from '../../../../src/__tests__/helpers/scenarioOutput';
 
 // The shipped browsers are stand-ins tagged with what they were built for:
 // the launcher's mapping is observed, and nothing is ever launched. They are
@@ -47,6 +48,7 @@ import {
   startInspectionSystemTypeRequiredWords,
 } from '../launcher.js';
 import { StdioServer } from '../StdioServer.js';
+import { childStart } from './helpers/launcherStdout';
 
 /** A value the types leave optional, which the case requires: Jest read it untyped. */
 function present<T>(value: T | undefined): T {
@@ -141,7 +143,8 @@ beforeEach(() => {
   }));
 });
 
-afterEach(() => {
+afterEach(async () => {
+  await killScenarioChildren();
   mock.restoreAll();
   process.argv = savedArgv;
   process.env = { ...savedEnv };
@@ -188,25 +191,17 @@ async function run(
   const processLike = Object.assign(new EventEmitter(), {
     stdin: new EventEmitter(),
   });
-  const stdout = mock.method(process.stdout, 'write');
-  try {
-    await launch(config, TEST_OPTIONS, {
-      browserStrategy: browserStrategy ?? strategy.browserStrategy,
-      stderr: (line) => stderr.push(line),
-      exit: (code) => exits.push(code),
-      processLike,
-      platform,
-    });
-  } finally {
-    // The launcher writes nothing to stdout (H3).
-    // The node:test runner reports through this process's stdout in
-    // serialized frames (Buffers); a text write is the program's.
-    assert.deepStrictEqual(
-      stdout.mock.calls.filter((c) => typeof c.arguments[0] === 'string'),
-      [],
-    );
-    stdout.mock.restore();
-  }
+  await launch(config, TEST_OPTIONS, {
+    browserStrategy: browserStrategy ?? strategy.browserStrategy,
+    stderr: (line) => stderr.push(line),
+    exit: (code) => exits.push(code),
+    processLike,
+    platform,
+  });
+  // The launcher writes nothing to stdout (H3): the same start, run again
+  // in a process of its own, whose stdout this test reads as its client.
+  const child = await childStart('launch', platform, argv);
+  assert.deepStrictEqual(child.exits, exits);
   return { strategy, stderr, exits, processLike };
 }
 
@@ -439,7 +434,6 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
             return true;
           },
         );
-        const stdout = t.mock.method(process.stdout, 'write');
         const broker = present(constructed.mock.calls[0]?.result);
         const login = broker.getToken('dest');
         const failed = assertRejects(login);
@@ -485,14 +479,18 @@ describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => 
           );
           await failed;
           direct.mock.restore();
-          // The node:test runner reports through this process's stdout in
-          // serialized frames (Buffers); a text write is the program's.
-          assert.deepStrictEqual(
-            stdout.mock.calls.filter((c) => typeof c.arguments[0] === 'string'),
-            [],
-          );
-          stdout.mock.restore();
         }
+        // Nothing on stdout: the same start and login, in a process of its
+        // own (its own free port), whose stdout this test reads.
+        const childPort = await freePort();
+        const child = await childStart('login', 'linux', [
+          '--mcp=dest',
+          `--auth-broker-path=${root}`,
+          '--connection-type=http',
+          `--browser=${browser}`,
+          `--browser-auth-port=${childPort}`,
+        ]);
+        assert.equal(child.loginEnded, true);
       },
     );
   }

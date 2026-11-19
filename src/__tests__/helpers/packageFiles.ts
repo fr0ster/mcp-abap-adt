@@ -15,3 +15,15 @@ export * as certificateAuthProvider from '@mcp-abap-adt/auth-providers/dist/cred
 export * as samlAuthProvider from '@mcp-abap-adt/auth-providers/dist/credentials/SamlAuthProvider';
 export * as tokenAuthProvider from '@mcp-abap-adt/auth-providers/dist/credentials/TokenAuthProvider';
 export * as connectionCreate from '@mcp-abap-adt/connection/dist/connection/createConnection.js';
+
+/**
+ * The same files by specifier, for a scenario process run through tsx:
+ * there an `import * as` of a compiled package file is an ESM namespace
+ * whose members cannot be redefined, so the scenario takes the module object
+ * with `require(PACKAGE_FILES.…)`, typed by the export above.
+ */
+export const PACKAGE_FILES = {
+  authBroker: '@mcp-abap-adt/auth-broker/dist/AuthBroker',
+  authProviderBrowsers:
+    '@mcp-abap-adt/auth-providers/dist/authorization/presentation/browsers',
+} as const;

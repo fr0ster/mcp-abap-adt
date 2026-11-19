@@ -3,6 +3,9 @@
  * handler whose arguments disagree with the definition's schema does not
  * compile (`npm run test:check`, and ts-jest's own type check).
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   handleDebugSetVariable,
   TOOL_DEFINITION as SetVariable,
@@ -14,13 +17,14 @@ import {
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { defineTool } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
+import { assertRejects } from '../../helpers/assertions';
 
 const RAN = { content: [{ type: 'text', text: 'ran' }] };
 
 describe('defineTool', () => {
   it('answers the definition and the handler as an entry', () => {
     const entry = defineTool(Wait, handleDebugWait);
-    expect(entry.toolDefinition).toBe(Wait);
+    assert.equal(entry.toolDefinition, Wait);
   });
 
   it("calls the handler with the arguments as the definition's schema parses them", async () => {
@@ -29,10 +33,11 @@ describe('defineTool', () => {
       seen.push(args);
       return RAN;
     });
-    await expect(
-      entry.call(noConnectionContext(), { state_handle: 'h', extra: 1 }),
-    ).resolves.toBe(RAN);
-    expect(seen).toEqual([
+    assert.equal(
+      await entry.call(noConnectionContext(), { state_handle: 'h', extra: 1 }),
+      RAN,
+    );
+    assert.deepStrictEqual(seen, [
       { state_handle: 'h', hold_seconds: 10, detail: 'terse' },
     ]);
   });
@@ -43,12 +48,11 @@ describe('defineTool', () => {
       seen.push(args);
       return RAN;
     });
-    await expect(
+    await assertRejects(
       entry.call(noConnectionContext(), { hold_seconds: 'long' }),
-    ).rejects.toThrow(
       'Input validation error: Invalid arguments for tool DebugWait',
     );
-    expect(seen).toEqual([]);
+    assert.deepStrictEqual(seen, []);
   });
 
   it('refuses, at compile time, a handler that takes other arguments', () => {
@@ -63,13 +67,13 @@ describe('defineTool', () => {
 
     // The right pairing compiles.
     defineTool(SetVariable, handleDebugSetVariable);
-    expect(true).toBe(true);
+    assert.equal(true, true);
   });
 
   it('refuses, at compile time, a handler whose answer is not a tool result', () => {
     // @ts-expect-error a handler answers a tool result, not a bare value
     defineTool(Wait, async () => 'ran');
     defineTool(Wait, async () => RAN);
-    expect(true).toBe(true);
+    assert.equal(true, true);
   });
 });

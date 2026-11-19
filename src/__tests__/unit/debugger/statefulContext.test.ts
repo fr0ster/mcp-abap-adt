@@ -13,8 +13,12 @@
  * a new one; the first stateful request of a security session gets a
  * context cookie. Nothing reaches a system.
  */
+
+import assert from 'node:assert/strict';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { HandlerContext } from '../../../handlers/interfaces';
@@ -123,41 +127,54 @@ describe('a stateful debugger connection stays in one ABAP session', () => {
   const send = (c: IAbapConnection, url: string) =>
     c.makeAdtRequest({ url, method: 'GET', timeout: 0 } as never);
 
-  it.each([
+  for (const [_name, portsOf] of [
     ['the AMDP ports', () => liveAmdpPorts()],
     ['the ABAP ports', () => liveDebugPorts()],
-  ])(
-    '%s: every request in the same session and context, the logoff ending that session',
-    async (_name, portsOf) => {
-      const ports = portsOf();
-      const connection = await ports.openConnection(context);
-      for (let i = 0; i < 3; i++)
-        await send(connection, `/sap/bc/adt/amdp/debugger/main/M${i}`);
-      await ports.closeConnection(connection);
+  ] satisfies [
+    string,
+    () => ReturnType<typeof liveAmdpPorts> | ReturnType<typeof liveDebugPorts>,
+  ][]) {
+    it(
+      format(
+        '%s: every request in the same session and context, the logoff ending that session',
+        _name,
+      ),
+      async () => {
+        const ports = portsOf();
+        const connection = await ports.openConnection(context);
+        for (let i = 0; i < 3; i++)
+          await send(connection, `/sap/bc/adt/amdp/debugger/main/M${i}`);
+        await ports.closeConnection(connection);
 
-      const requests = icf.seen.filter((s) => s.url.includes('/debugger/'));
-      expect(requests).toHaveLength(3);
-      const security = requests[0]?.security;
-      expect(security).toBeDefined();
-      const ctx = icf.contextOf.get(security as string);
-      expect(ctx).toBeDefined();
-      // The first stateful request opened the context; every one after carries it.
-      expect(requests.map((r) => r.stateful)).toEqual([true, true, true]);
-      expect(requests.map((r) => r.security)).toEqual([
-        security,
-        security,
-        security,
-      ]);
-      expect(requests.slice(1).map((r) => r.context)).toEqual([ctx, ctx]);
-      // Nothing of this connection opened a second security session or context.
-      expect(icf.contextOf.size).toBe(1);
+        const requests = icf.seen.filter((s) => s.url.includes('/debugger/'));
+        assert.equal(requests.length, 3);
+        const security = requests[0]?.security;
+        assert.notEqual(security, undefined);
+        const ctx = icf.contextOf.get(security as string);
+        assert.notEqual(ctx, undefined);
+        // The first stateful request opened the context; every one after carries it.
+        assert.deepStrictEqual(
+          requests.map((r) => r.stateful),
+          [true, true, true],
+        );
+        assert.deepStrictEqual(
+          requests.map((r) => r.security),
+          [security, security, security],
+        );
+        assert.deepStrictEqual(
+          requests.slice(1).map((r) => r.context),
+          [ctx, ctx],
+        );
+        // Nothing of this connection opened a second security session or context.
+        assert.equal(icf.contextOf.size, 1);
 
-      const logoffs = await arrived(icf.seen, 1);
-      expect(logoffs).toHaveLength(1);
-      expect(logoffs[0]?.security).toBe(security);
-      expect(logoffs[0]?.context).toBeUndefined();
-    },
-  );
+        const logoffs = await arrived(icf.seen, 1);
+        assert.equal(logoffs.length, 1);
+        assert.equal(logoffs[0]?.security, security);
+        assert.equal(logoffs[0]?.context, undefined);
+      },
+    );
+  }
 
   it("a run's connection: no stateful session, no context; its logoff ends its security session", async () => {
     const ports = liveAmdpPorts();
@@ -166,11 +183,17 @@ describe('a stateful debugger connection stays in one ABAP session', () => {
     await send(connection, '/sap/bc/adt/oo/classrun/ZCL_A');
     await ports.closeConnection(connection);
     const runs = icf.seen.filter((s) => s.url.includes('/classrun/'));
-    expect(runs.map((r) => r.stateful)).toEqual([false, false]);
-    expect(runs.map((r) => r.context)).toEqual([undefined, undefined]);
-    expect(icf.contextOf.size).toBe(0);
+    assert.deepStrictEqual(
+      runs.map((r) => r.stateful),
+      [false, false],
+    );
+    assert.deepStrictEqual(
+      runs.map((r) => r.context),
+      [undefined, undefined],
+    );
+    assert.equal(icf.contextOf.size, 0);
     const logoffs = await arrived(icf.seen, 1);
-    expect(logoffs).toHaveLength(1);
-    expect(logoffs[0]?.security).toBe(runs[0]?.security);
+    assert.equal(logoffs.length, 1);
+    assert.equal(logoffs[0]?.security, runs[0]?.security);
   });
 });

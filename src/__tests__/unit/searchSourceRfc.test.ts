@@ -4,13 +4,21 @@
  * call at a time, and parallel fetches lost sources without an error (on
  * premise, 2026-09-26: 4 of 13 read at concurrency 8, all 13 at 1).
  */
-const run = jest.fn(async () => ({ results: [] }));
-jest.mock('../../lib/search-source/orchestrator', () => ({
-  runSearchSourceWithContext: (...args: unknown[]) => (run as any)(...args),
-}));
-
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
 import { handleSearchSource } from '../../handlers/system/readonly/handleSearchSource';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
+import * as orchestrator from '../../lib/search-source/orchestrator';
+import { assertMatchObject } from '../helpers/assertions';
+
+// runSearchSourceWithContext replaced on the module that defines it (the
+// handler reads it at call time); the Jest factory hid the module's other
+// names, which now stay real.
+const run = mock.method(
+  orchestrator,
+  'runSearchSourceWithContext',
+  async () => ({ results: [] }),
+);
 
 const connectionOf = (connectionType: string) => ({
   getConfig: () => ({ connectionType }),
@@ -18,20 +26,26 @@ const connectionOf = (connectionType: string) => ({
 const args = { query: 'Echo:', packages: ['ZPKG'] } as any;
 
 describe('SearchSource concurrency by connection', () => {
-  beforeEach(() => run.mockClear());
+  beforeEach(() => run.mock.resetCalls());
 
   it('runs one fetch at a time over RFC, whatever was asked', async () => {
     await handleSearchSource({ connection: connectionOf('rfc') } as any, args);
-    expect((run.mock.calls[0] as any[])[1]).toMatchObject({ concurrency: 1 });
+    assertMatchObject(run.mock.calls[0]?.arguments[1], { concurrency: 1 });
   });
 
   it("over HTTP the sequential version's own default applies", async () => {
     await handleSearchSource({ connection: connectionOf('http') } as any, args);
-    expect((run.mock.calls[0] as any[])[1]).not.toHaveProperty('concurrency');
+    // Jest's not.toHaveProperty refused an undefined or null value.
+    const options = run.mock.calls[0]?.arguments[1];
+    assert.ok(options !== undefined && options !== null);
+    assert.ok(!('concurrency' in options));
   });
 
   it('the handler wires the shipped strategy', async () => {
     await handleSearchSource({ connection: connectionOf('http') } as any, args);
-    expect((run.mock.calls[0] as any[])[2].lineMatch).toBe(substringLineMatch);
+    assert.equal(
+      run.mock.calls[0]?.arguments[2]?.lineMatch,
+      substringLineMatch,
+    );
   });
 });

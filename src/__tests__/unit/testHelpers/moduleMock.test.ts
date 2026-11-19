@@ -6,6 +6,7 @@
  * developer's machine may run neither.
  */
 import assert from 'node:assert/strict';
+import * as path from 'node:path';
 import { describe, it, mock } from 'node:test';
 import {
   type ModuleLoader,
@@ -35,6 +36,28 @@ describe('on the running line', () => {
     const after: typeof import('@mcp-abap-adt/adt-clients') =
       require(ADT_CLIENTS);
     assert.equal(after.getSystemInformation, real.getSystemInformation);
+  });
+
+  it('a workspace package required after the mock still loads through the name table', () => {
+    // Not required before in this file: its first load comes after the mock,
+    // through node:test's own loader (the helper's header).
+    const name = '@mcp-abap-adt/background-runs-memory';
+    const context = mockModuleExports(ADT_CLIENTS, {
+      getSystemInformation: async () => undefined,
+    });
+    try {
+      const loaded: unknown = require(name);
+      assert.equal(typeof loaded, 'object');
+      assert.ok(
+        Object.keys(require.cache).some((file) =>
+          file.includes(
+            `${path.sep}background-runs-memory${path.sep}src${path.sep}`,
+          ),
+        ),
+      );
+    } finally {
+      context.restore();
+    }
   });
 
   it('refuses an empty replacement', () => {

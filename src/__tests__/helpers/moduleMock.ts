@@ -18,8 +18,27 @@
  *
  * Proven by `unit/testHelpers/moduleMock.test.ts`, the Node 22 path through
  * an injected `mock.module` that ignores `exports` as Node 22 does.
+ *
+ * Workspace names after a mock (measured, Node 26). The first `mock.module`
+ * of a process replaces CommonJS `Module._load` with node:test's own loader,
+ * which resolves every later `require` with the plain resolver bound when
+ * node:test's mock module loaded, never through the hooks of
+ * `module.registerHooks`. So the repository's resolve hook
+ * (`resolvePreload.ts`, the name table) is no longer reached, and a later
+ * `require('@mcp-abap-adt/background-runs-memory')` fails MODULE_NOT_FOUND.
+ * After the mock, this helper puts one router in front of that loader:
+ * a name of the table is handed on as its compiled file's path, which the
+ * plain resolver finds and the hook would have answered; every other
+ * request goes on unchanged. The router reads `Module._load`, the property
+ * node:test itself replaces, and is installed once per process.
  */
+import Module = require('node:module');
+
+import * as path from 'node:path';
 import { mock } from 'node:test';
+import { readNameTable } from './nameTable';
+import { repositoryRoot } from './repoRoot';
+import { compiledFile } from './resolveHook';
 
 /** `mock.module`'s options with Node 24's `exports`, absent from Node 22's types. */
 export interface ModuleMockOptions {
@@ -54,6 +73,38 @@ const nodeMocker: ModuleMocker = (specifier, options) =>
 
 const nodeLoader: ModuleLoader = (specifier) => require(specifier);
 
+/** Marks the router, so it is put in front of the loader once. */
+const ROUTER = Symbol('moduleMock: workspace names routed');
+
+/**
+ * Puts the router in front of the CommonJS loader that `mock.module`
+ * installed (see the header): a name of the repository's table goes on as
+ * its compiled file's path.
+ */
+function routeWorkspaceNames(): void {
+  const loader: unknown = Reflect.get(Module, '_load');
+  if (typeof loader !== 'function') {
+    throw new Error('moduleMock: Module._load is not a function');
+  }
+  if (Reflect.get(loader, ROUTER) === true) return;
+  const root = repositoryRoot(__dirname);
+  const buildDir = path.join(root, '.test-build', 'tree');
+  const files = new Map<string, string>();
+  for (const [name, target] of readNameTable(root)) {
+    files.set(name, compiledFile(buildDir, target));
+  }
+  const router = function (
+    this: unknown,
+    request: unknown,
+    ...rest: unknown[]
+  ): unknown {
+    const file = typeof request === 'string' ? files.get(request) : undefined;
+    return Reflect.apply(loader, this, [file ?? request, ...rest]);
+  };
+  Reflect.set(router, ROUTER, true);
+  Reflect.set(Module, '_load', router);
+}
+
 /**
  * Replaces the module at `resolved` (an absolute path, `require.resolve`'s
  * answer) with its real exports and `replacements` over them, for every later
@@ -74,6 +125,7 @@ export function mockModuleExports(
   }
   const replaced = { ...real, ...replacements };
   const viaExports = mocker(resolved, { exports: replaced });
+  if (mocker === nodeMocker) routeWorkspaceNames();
   if (carries(load(resolved), replacements)) return viaExports;
   viaExports.restore();
   const viaNamed = mocker(resolved, { namedExports: replaced });

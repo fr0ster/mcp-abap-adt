@@ -247,7 +247,7 @@ describe('release metadata names the version npm will carry', () => {
   // are those of the variant's ADT type table. `--` ends mcp-proxy's own
   // options, so the flag reaches the server.
   for (const variant of ['onprem', 'cloud']) {
-    // jest-each formats with the row alone: the second %s stays as written.
+    // The title formats the row alone: the second %s stays as written.
     it(
       format(
         'the Glama image of %s starts the inspection with --system-type=%s',

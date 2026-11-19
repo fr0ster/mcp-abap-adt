@@ -49,7 +49,7 @@ const NOT_COMPLETE =
   'the cleanup of this debug session is not complete: DebugStop it, then start again';
 
 describe('the cleanup', () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],

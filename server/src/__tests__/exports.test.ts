@@ -20,7 +20,7 @@ import { format } from 'node:util';
 import * as runtimeVersion from '../../../server-runtime/src/runtimeVersion';
 
 // server-runtime's RUNTIME_VERSION replaced on its module before the servers
-// load (they read it when constructed), as the Jest factory did: the entry's
+// load (they read it when constructed): the entry's
 // own version must win over it.
 mock.property(runtimeVersion, 'RUNTIME_VERSION', '0.0.0-runtime');
 

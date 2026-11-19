@@ -23,8 +23,7 @@ import {
 
 // Every broker the factory constructs, recorded: AuthBroker watched on the
 // module that defines it (the package index re-exports it by getter, read at
-// call time); the real broker is still constructed, as the Jest factory's
-// passthrough did.
+// call time); the real broker is still constructed.
 const constructed = mock.method(authBrokerModule, 'AuthBroker');
 
 const ENVIRONMENT = {

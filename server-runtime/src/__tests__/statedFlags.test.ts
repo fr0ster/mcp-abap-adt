@@ -68,7 +68,7 @@ const LAUNCHERS: readonly Launcher[] = [
 /** The start's lines and exits, for `argv` and an optional config file. */
 /**
  * The value at `keyPath` (dot-separated) under `value`, each step present —
- * the walk Jest's `toHaveProperty(path, value)` makes.
+ * a walk of the path, one key at a time.
  */
 function propertyAt(value: unknown, keyPath: string): unknown {
   let node = value;

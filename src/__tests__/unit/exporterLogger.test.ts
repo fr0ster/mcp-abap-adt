@@ -31,7 +31,7 @@ const probe = {
 
 beforeEach(() => {
   seen = undefined;
-  // One list, made when the spy is told it, as Jest's mockReturnValue.
+  // One list, made when the spy is told it.
   const handlers = [probe];
   mock.method(ReadOnlyHandlersGroup.prototype, 'getHandlers', () => handlers);
 });

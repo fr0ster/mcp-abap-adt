@@ -47,7 +47,7 @@ const TOKEN = 'held-token-PLACEHOLDER.payload.signature';
 /**
  * AuthBroker watched on the module that defines it (the package index
  * re-exports it by getter, read at call time); the real broker is still
- * constructed, as the Jest factory's passthrough did. Every case restores
+ * constructed. Every case restores
  * every mock after it, so it is watched afresh before each.
  */
 function watchBrokers() {

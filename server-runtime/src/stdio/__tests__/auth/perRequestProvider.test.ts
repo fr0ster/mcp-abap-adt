@@ -92,7 +92,7 @@ describe('getProvider(destination, { signal })', () => {
     const broker = await f.getBroker('dest');
     const refusal = new Error('refused');
     // The first call refuses, the second answers one provider made now
-    // (Jest's mockResolvedValueOnce argument is evaluated here); any later
+    // (the provider is made here, when the answer is queued); any later
     // call the original.
     const asked = t.mock.method(broker, 'getProvider');
     const answered = innerProvider('a');

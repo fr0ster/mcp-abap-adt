@@ -77,7 +77,7 @@ async function startedListening(
 }
 
 describe('debugger handlers', () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],

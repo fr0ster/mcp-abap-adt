@@ -1,12 +1,11 @@
 /**
- * The two comparisons the live suites made with Jest's `toEqual` and
- * `toMatchObject`, kept as they were when the suites moved to
- * `node:assert/strict` (D27): a moved test asserts what it asserted before.
+ * The two comparisons the live suites make beside `node:assert/strict`
+ * (D27):
  *
- * - `assertEquals(actual, expected)` — Jest's `toEqual`: recursive
+ * - `assertEquals(actual, expected)` — recursive
  *   equality, a property whose value is `undefined` counts as absent, and an
  *   object's class is not compared.
- * - `assertMatches(actual, expected)` — Jest's `toMatchObject`: every
+ * - `assertMatches(actual, expected)` — a subset match: every
  *   property `expected` names is equal in `actual` (objects compared the
  *   same way, recursively; an array element by element, its length too), and
  *   `actual` may hold more.
@@ -57,7 +56,7 @@ function equals(actual: unknown, expected: unknown, subset: boolean): boolean {
   );
 }
 
-/** `actual` equals `expected` as Jest's `toEqual` compared them. */
+/** `actual` equals `expected`, an `undefined` property counted as absent. */
 export function assertEquals(
   actual: unknown,
   expected: unknown,
@@ -70,7 +69,7 @@ export function assertEquals(
   }
 }
 
-/** `actual` holds `expected` as Jest's `toMatchObject` compared them. */
+/** `actual` holds every property `expected` names. */
 export function assertMatches(actual: unknown, expected: unknown): void {
   if (!equals(actual, expected, true)) {
     assert.fail(

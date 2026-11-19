@@ -24,7 +24,7 @@ import { assertRejects } from '../helpers/assertions';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 import { stateSystemKind } from '../helpers/systemKind';
 
-// Made afresh before each case (Jest's mockReset): no one-off answer a case
+// Made afresh before each case: no one-off answer a case
 // left unconsumed reaches the next one.
 let mockClassGetVersionSource = mock.fn<(...args: any[]) => any>();
 let mockGetClass = mock.fn<(...args: any[]) => any>();

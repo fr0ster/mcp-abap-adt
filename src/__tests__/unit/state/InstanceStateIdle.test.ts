@@ -328,7 +328,7 @@ describe('InstanceState — no bound (stdio)', () => {
 });
 
 describe('InstanceState — the bound refuses a misconfiguration', () => {
-  // Jest's %p of a number is its String(): 29, 0, -1, 30.5, NaN, Infinity.
+  // A number's title is its String(): 29, 0, -1, 30.5, NaN, Infinity.
   for (const v of [29, 0, -1, 30.5, Number.NaN, Number.POSITIVE_INFINITY]) {
     it(`idleMinutes ${String(v)} is refused`, () => {
       assertThrows(() => new InstanceState({ idleMinutes: v }), /at least 30/);

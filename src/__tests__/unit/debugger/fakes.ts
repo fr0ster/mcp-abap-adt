@@ -19,7 +19,7 @@ export function stringOf(value: AnswerValue | undefined): string {
 }
 
 /**
- * Jest's `{ message: expect.stringContaining(words) }` over an answer's
+ * `{ message: <a string holding words> }` over an answer's
  * field: an object whose one key is `message`, a string holding `words`.
  */
 export function assertMessageHolding(

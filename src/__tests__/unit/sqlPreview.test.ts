@@ -235,7 +235,7 @@ describe('detail over a data preview', () => {
           okResponse(sqlPreview({ data: PREVIEW, status: 200 } as any)),
       }),
     };
-    // The raw arguments, as the Jest file's untyped require handed them.
+    // The raw arguments, untyped.
     const result: any = await handleGetTableContents(
       context as any,
       {

@@ -86,7 +86,7 @@ const realCreateAbapConnection = connectionFactory.createAbapConnection;
 // The four provider classes replaced on the auth-providers modules that
 // define them (the package index re-exports them by getter, read at call
 // time), and lib/connectionFactory's createAbapConnection on its own module,
-// as the Jest factories did; every other name stays real. Every case
+// every other name stays real. Every case
 // restores every mock after it: they are replaced before each.
 function watchConstructions(): void {
   mock.property(

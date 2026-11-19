@@ -46,7 +46,7 @@ function mockReset(): void {
 }
 
 // credentialFromHeaders replaced on the module that defines it (its
-// callers read it at call time), as the Jest factory did: the real one's
+// callers read it at call time): the real one's
 // answer, its credential held at the gate. Every other name stays real.
 const realCredentialFromHeaders = credentialSources.credentialFromHeaders;
 /** The headers' provider, its renewal and (when set) its authorize held at the gate. */

@@ -1,6 +1,5 @@
 /**
- * Fake time over node:test's `mock.timers` (spec §3.7, §3.8): what the
- * node:test move puts in place of Jest's fake timers, with what
+ * Fake time over node:test's `mock.timers` (spec §3.7, §3.8), with what
  * `mock.timers` lacks — a count of pending timers (`getTimerCount`), an
  * async advance that lets promise chains run between steps
  * (`advanceTimersByTimeAsync`), a bounded run-all, an advance that follows
@@ -83,7 +82,7 @@ function countPair(
 }
 
 /**
- * Jest's `useFakeTimers`: `mock.timers.enable({ apis, now })`, then the faked
+ * Fake time on: `mock.timers.enable({ apis, now })`, then the faked
  * timer globals wrapped for the count.
  */
 export function useFakeTimers(options: {
@@ -121,7 +120,7 @@ export function reset(): void {
   mock.timers.reset();
 }
 
-/** Jest's `useRealTimers`: `reset()`. */
+/** Fake time off: `reset()`. */
 export function useRealTimers(): void {
   reset();
 }
@@ -133,13 +132,13 @@ function live(): Set<unknown> {
   return pending;
 }
 
-/** Jest's `getTimerCount`: timers scheduled through the faked globals, not yet fired or cleared. */
+/** The timers scheduled through the faked globals, not yet fired or cleared. */
 export function getTimerCount(): number {
   return live().size;
 }
 
 /**
- * Jest's `advanceTimersByTimeAsync`: a real turn, then fake time stepped by
+ * A real turn, then fake time stepped by
  * 1 ms up to `ms`, a real turn after each step, then the timers due at the
  * end fired and a last turn — so a timer scheduled by a promise chain, or
  * by a firing timer, still fires within `ms` when it is due by then.
@@ -155,11 +154,11 @@ export async function advanceTimersByTimeAsync(ms: number): Promise<void> {
   await realTurn();
 }
 
-/** Jest's loop limit for running all timers. */
+/** The most timers `runAllTimersAsync` fires before it fails. */
 const LOOP_LIMIT = 100_000;
 
 /**
- * Jest's `runAllTimersAsync`: real turns and `runAll()` until no counted
+ * Real turns and `runAll()` until no counted
  * timer is pending; fails after 100 000 timers instead of looping forever.
  */
 export async function runAllTimersAsync(): Promise<void> {

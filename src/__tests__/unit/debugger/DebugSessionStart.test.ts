@@ -29,7 +29,7 @@ const LINE: IDebuggerBreakpoint = {
 const HELD = { breakpointConflict: 'refuse-if-held' as const };
 
 describe('the start', () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],

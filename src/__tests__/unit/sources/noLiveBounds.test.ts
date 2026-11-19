@@ -1,7 +1,7 @@
 /**
  * No bound, no delay and no poll limit in a live test (D27, step 13; spec §3
- * "No bound on a live test"; P3, P7). Leaving Jest is leaving its timeouts,
- * and nothing replaces them: each step of a live test goes on the answer of
+ * "No bound on a live test"; P3, P7). The runner sets no timeout, and
+ * nothing stands in for one: each step of a live test goes on the answer of
  * the one before it, and a wait that does not end is ended by the person
  * with the runner's interrupt.
  *

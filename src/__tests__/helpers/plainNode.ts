@@ -2,8 +2,7 @@
  * Runs a scenario under plain node, where an unhandled rejection is seen.
  *
  * Inside a test runner an unhandled rejection is the runner's, not the
- * test's (Jest's sandbox told no listener of a test; node:test fails the
- * file on one), so "no unhandled rejection" cannot be asserted in-process. A scenario is a TypeScript file run by `process.execPath`
+ * test's (node:test fails the file on one), so "no unhandled rejection" cannot be asserted in-process. A scenario is a TypeScript file run by `process.execPath`
  * through tsx (`--import tsx`); it records with `plainNodeRecorder.ts` and
  * writes its report as the last line of its stdout. Nothing else is started:
  * the child is node itself, and the scenario talks to no system.

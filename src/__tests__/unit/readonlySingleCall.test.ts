@@ -112,8 +112,7 @@ let fakeClient: any;
 // The unit-test Get* functions take their runner from `AdtExecutor` (adt-clients
 // 24), not from `createAdtClient`: route that door to the same double.
 // The unit-test runner from the fake client: `testRunner` on the module that
-// defines it (its call inside runTests.ts itself stays the real one, as under
-// Jest's requireActual).
+// defines it (its call inside runTests.ts itself stays the real one).
 mock.method(runTests, 'testRunner', () => fakeClient.getClassTestRunner());
 
 const context = { connection: {} as any, logger: undefined };

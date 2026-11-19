@@ -110,7 +110,7 @@ function idleAbap() {
 }
 
 describe('AmdpSession', () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
@@ -584,7 +584,7 @@ describe('AmdpSession', () => {
     assert.equal(refusedClears, 1);
     // The clear's failure is let go a turn after the close: with nextTick and
     // queueMicrotask real (node:test cannot fake them, spec §3.7) it is
-    // still held when the close is seen, where Jest's faked ones had run it.
+    // still held when the close is seen.
     // What is proven: the session comes to hold nothing, within until's bound.
     await until(() => !w.session.holdsState());
     await w.session.stop();

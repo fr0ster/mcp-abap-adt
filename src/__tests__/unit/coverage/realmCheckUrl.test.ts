@@ -33,7 +33,7 @@ const realRealmCheck = realmCheckModule.realmCheck;
 /**
  * realmCheck replaced on the module that defines it (the live run's setup
  * reads it at call time): it records the URL it is asked about and runs the
- * real check unless a case stubs it, as the Jest factory did. Every case
+ * real check unless a case stubs it. Every case
  * restores every mock after it, so it is replaced before each.
  */
 function recordRealmChecks(): void {

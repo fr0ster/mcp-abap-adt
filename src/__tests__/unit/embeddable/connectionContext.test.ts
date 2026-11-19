@@ -45,9 +45,9 @@ import { setSystemContext } from '../../helpers/processSystemContext';
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 /**
- * The names the Jest factories replaced, on the modules that define them
+ * The names replaced on the modules that define them
  * (their callers read them at call time), a fresh mock each before each
- * case (Jest's mockReset) and restored after it; every other name stays
+ * case and restored after it; every other name stays
  * real.
  */
 function stubs() {

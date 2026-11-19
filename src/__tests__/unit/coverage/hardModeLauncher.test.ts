@@ -5,8 +5,8 @@
  * `initialize` answer over stdio, the listening line over Streamable HTTP —
  * raced against its exit; stopping is `SIGTERM` and its exit event. A fake
  * is told to go on by a line on its stdin (`{"go":true}`), which every OS
- * carries — no POSIX-only signal. Jest's
- * fake timers count the timers left pending: a poll or a deadline of the
+ * carries — no POSIX-only signal. The fake
+ * timers count the timers left pending: a poll or a deadline of the
  * launcher's would leave one.
  */
 

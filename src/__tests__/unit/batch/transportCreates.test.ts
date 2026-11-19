@@ -17,8 +17,7 @@ import * as connectionFactory from '../../../lib/connectionFactory';
 import { batchStand, payloadOf } from '../../helpers/batchStand';
 
 // lib/connectionFactory's names replaced on the module that defines them
-// (mock.method; their callers read them at call time), as the Jest factory
-// did; the names it left out stay real.
+// (mock.method; their callers read them at call time); the names not replaced stay real.
 // Every case restores every mock after it: they are replaced before each.
 beforeEach(() => {
   mock.method(connectionFactory, 'createAbapConnection', () => undefined);

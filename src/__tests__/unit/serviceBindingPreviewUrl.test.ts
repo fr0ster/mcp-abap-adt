@@ -19,7 +19,7 @@ import { mockModuleExports } from '../helpers/moduleMock';
 // file before the handler loads (node:test mock.module,
 // helpers/moduleMock.ts; its other exports stay the real ones). No case
 // queues a one-off answer, so resetting its calls and implementation before
-// each case is all Jest's mockReset did here.
+// each case is all a reset needs here.
 const systemInfo = mock.fn<(...args: any[]) => any>(
   function getSystemInformation() {},
 );
@@ -96,8 +96,7 @@ const clientFor = (parts: {
 
 let fakeClient: unknown;
 // lib/clients' createAdtClient replaced on its own module (the handler reads
-// it at call time); the Jest factory hid the module's other names, which now
-// stay real.
+// it at call time); the module's other names stay real.
 mock.method(clients, 'createAdtClient', () => fakeClient);
 
 const context = {

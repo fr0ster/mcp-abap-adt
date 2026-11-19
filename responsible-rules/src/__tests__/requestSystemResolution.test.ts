@@ -19,10 +19,8 @@ const clientsBuilt: Options[] = [];
 // adt-clients replaced for this file before any module under test loads:
 // src/lib/clients binds the variants when it loads (`class … extends
 // AdtClientOnPrem`; node:test mock.module, helpers/moduleMock.ts; its other
-// exports stay the real ones). Each variant records its options, as the
-// Jest factory's jest.fn() did, in one list across both, which is the order
-// Jest's invocationCallOrder gave. The factory's AdtClientLegacy named
-// nothing adt-clients exports; it is gone.
+// exports stay the real ones). Each variant records its options in one list
+// across both, in the order the variants were constructed.
 mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
   AdtClientOnPrem: mock.fn(function AdtClientOnPrem(
     _connection: unknown,
@@ -84,7 +82,7 @@ import {
 /**
  * readSystemInformation replaced on the module that defines it (its callers
  * read it at call time), a fresh mock before each case and restored after
- * it (Jest's mockReset: nothing left over from an earlier case), answering
+ * it (nothing left over from an earlier case), answering
  * a cloud system's user unless a case says otherwise.
  */
 function stubLookup() {

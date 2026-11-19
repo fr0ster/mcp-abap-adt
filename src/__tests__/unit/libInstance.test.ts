@@ -44,7 +44,7 @@ function resetRegistry(): void {
 function loadIsolated(modulePath: string): unknown {
   // Every compiled src module but the tests' out of the module cache first,
   // so this load runs the module and everything of lib it loads again — the
-  // fresh module graph jest.isolateModules gave.
+  // fresh module graph.
   const tests = `${path.sep}__tests__${path.sep}`;
   for (const cached of Object.keys(require.cache)) {
     if (cached.startsWith(BUILT_SRC + path.sep) && !cached.includes(tests)) {

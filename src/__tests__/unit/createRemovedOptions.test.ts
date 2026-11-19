@@ -87,7 +87,7 @@ const GIVEN = [
   },
 ] as const;
 
-/** `args` as Jest rendered it in the `$args` title: keys sorted, `"key": value`. */
+/** `args` as its title shows it: keys sorted, `"key": value`. */
 const shownArgs = (args: Readonly<Record<string, string | boolean>>) =>
   `{${Object.keys(args)
     .sort()

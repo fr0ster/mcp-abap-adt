@@ -118,7 +118,7 @@ it('http, a failed undo when the pool would let the instance go: kept for a retr
 it("http, at the idle bound's stop: a state-logger line, every connection logged off", async () => {
   const s = await httpStand({ stateIdleMinutes: 30 });
   try {
-    // Jest's `advanceTimers: true` with setImmediate left real: the call runs
+    // Fake time follows the real turns, with setImmediate left real: the call runs
     // over the real HTTP stand while fake time follows it, 1 fake ms per real
     // turn, up to a horizon of the idle bound's 30 minutes plus one minute of
     // margin — past it, an unsettled call fails naming the horizon.

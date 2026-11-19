@@ -33,7 +33,7 @@ let sent: unknown;
 let planned: unknown;
 // The activate route arrives through lib's write barrel, whose getters read
 // the module that defines both names: they are replaced there (HandlerActivate
-// reads them at call time), as the Jest factory on the barrel did; every
+// reads them at call time); every
 // other name stays real.
 mock.method(
   activateObject,

@@ -45,8 +45,7 @@ import type {
 /**
  * Every broker the factory constructs, recorded: AuthBroker watched on the
  * module that defines it (the package index re-exports it by getter, read
- * at call time); the real broker is still constructed, as the Jest
- * factory's passthrough did. Every case restores every mock after it, so it
+ * at call time); the real broker is still constructed. Every case restores every mock after it, so it
  * is watched afresh before each.
  */
 function watchBrokers() {
@@ -57,7 +56,7 @@ let constructed: ReturnType<typeof watchBrokers>;
 // The real module, not an import copy: the spies below go on it.
 import nodeFs = require('node:fs');
 
-/** A member the config type leaves optional, which the case requires: Jest read it untyped. */
+/** A member the config type leaves optional, which the case requires. */
 function present<T>(value: T | undefined): T {
   assert.ok(value !== undefined);
   return value;
@@ -775,7 +774,7 @@ describe('AuthBrokerFactory', () => {
     });
 
     it('has no deadline: a held call keeps settle() waiting until it answers', async (t) => {
-      // Jest's default fakes.
+      // setTimeout, setInterval, setImmediate and Date faked.
       useFakeTimers({
         apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
       });

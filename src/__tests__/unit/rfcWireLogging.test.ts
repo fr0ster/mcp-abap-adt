@@ -33,8 +33,7 @@ beforeEach(() => {
  * `wireLogger` and `rfc` options: those are what is read here.
  */
 // connection's createConnection replaced on the module that defines it (the
-// package index re-exports it by getter, read at call time), as the Jest
-// factory did. A connection object is all the factory keeps of what this
+// package index re-exports it by getter, read at call time). A connection object is all the factory keeps of what this
 // returns.
 const create = mock.method(
   createConnectionModule,

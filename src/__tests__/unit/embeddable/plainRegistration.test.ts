@@ -191,7 +191,7 @@ for (const [label, registeredFor] of Object.entries(REGISTRIES)) {
       const cloud = await plainListing(registryFor('cloud'));
       const onprem = await plainListing(registryFor('onprem'));
       // Compared as JSON data: a key present as `undefined`, or a prototype,
-      // is no difference here, as for Jest's not.toEqual.
+      // is no difference here.
       assert.notDeepStrictEqual(
         JSON.parse(JSON.stringify(cloud)),
         JSON.parse(JSON.stringify(onprem)),

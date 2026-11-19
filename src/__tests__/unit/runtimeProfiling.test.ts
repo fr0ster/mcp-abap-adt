@@ -304,7 +304,7 @@ for (const [_n, handler, args] of handlers) {
       // to see the delay actually asked for travel from the argument to the
       // wait: `newTraceAfter`'s default `sleep` is a real `setTimeout`, and
       // nothing observes it unless time itself is under the test's control.
-      // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+      // setTimeout, setInterval, setImmediate and Date faked.
       useFakeTimers({
         apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
       });

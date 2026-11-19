@@ -80,7 +80,7 @@ describe('readSourceUnits', () => {
         lines: ['PROG:Z_PROG', 'line2'],
         source: '/sap/bc/adt/programs/programs/z_prog/source/main|active',
         // Stated as the unit carries it: a `member` key, present as undefined
-        // (Jest's toEqual read the `module: undefined` written here as absent).
+        // (a strict comparison tells it from an absent key).
         member: undefined,
         last: true,
       },

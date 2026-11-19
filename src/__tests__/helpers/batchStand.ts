@@ -13,7 +13,7 @@
  * Each stand builds its connections through `createAbapConnection`, which it
  * replaces on `lib/connectionFactory`'s export object (`mock.method`, the
  * module that defines it; `BaseMcpServer` reads it at call time). The test
- * file replaces the names the stand leaves real, as its Jest factory did:
+ * file replaces the names the stand leaves real, as it needs:
  *
  *   mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
  *   mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);

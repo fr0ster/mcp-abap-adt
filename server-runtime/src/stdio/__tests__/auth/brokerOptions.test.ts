@@ -20,7 +20,7 @@ import {
   recordingLogins,
 } from '../helpers/factoryFixture';
 
-/** A member the config type leaves optional, which the case requires: Jest read it untyped. */
+/** A member the config type leaves optional, which the case requires. */
 function present<T>(value: T | undefined): T {
   assert.ok(value !== undefined);
   return value;
@@ -28,8 +28,7 @@ function present<T>(value: T | undefined): T {
 
 // Every broker the factory constructs, recorded: AuthBroker watched on the
 // module that defines it (the package index re-exports it by getter, read at
-// call time); the real broker is still constructed, as the Jest factory's
-// passthrough did.
+// call time); the real broker is still constructed.
 const constructed = mock.method(authBrokerModule, 'AuthBroker');
 
 /** What the strategy decides with nothing to refresh: login, or stop. */

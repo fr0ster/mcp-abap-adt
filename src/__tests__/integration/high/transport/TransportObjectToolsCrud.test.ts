@@ -306,7 +306,7 @@ systemsDescribe(['onprem'], SUITE, () => {
     // **A skip that reads as a pass is the failure this block is about.**
     //
     // This warned and returned for a missing transport, package or user, and
-    // jest printed `1 passed` for a run that had done nothing. Measured on a
+    // the runner reported `1 passed` for a run that had done nothing. Measured on a
     // cloud session, where the suite is structurally unable to run at all —
     // step 2 creates a PROGRAM and ABAP Cloud has none — it reported green.
     //

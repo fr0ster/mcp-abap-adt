@@ -51,8 +51,7 @@ import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 
 // lib/connectionFactory's createAbapConnection replaced on the module that
 // defines it (its callers read it at call time): a guard, nothing here may
-// build a connection. The Jest factory's systemKindOf / withSystemKindOf
-// were not load-bearing under node:test and are gone.
+// build a connection.
 mock.method(connectionFactory, 'createAbapConnection', () => {
   throw new Error('no connection may be built here');
 });

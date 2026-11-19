@@ -32,7 +32,7 @@ import {
 } from './fakes';
 
 describe('stateful sessions of a debug run', () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],

@@ -4,8 +4,8 @@
  * connections and the debugger cases' `logOffLeft` follow every logoff with
  * the connection's `flushGoodbye()` (no bound: no timer; never rejects) until
  * SAP answered it or its transport failed. Nothing reads the answer. SAP ends
- * a security session only once it received the logoff whole; Jest's
- * `--forceExit` would otherwise close the socket first (measured on premise
+ * a security session only once it received the logoff whole; a forced
+ * exit would otherwise close the socket first (measured on premise
  * 2026-10-19: the test's own connection stayed in SM05).
  */
 

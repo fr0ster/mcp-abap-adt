@@ -48,7 +48,7 @@ import { EmbeddableMcpServer } from './helpers/withRules';
 /**
  * readSystemInformation replaced on the module that defines it (its callers
  * read it at call time), a fresh mock before each case and restored after
- * it, as Jest's mockReset left it: answering undefined until a case says
+ * it: answering undefined until a case says
  * otherwise, with no implementation left over from an earlier case.
  */
 function stubLookup() {

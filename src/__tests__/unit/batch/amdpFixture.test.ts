@@ -49,8 +49,8 @@ function verdict(over: {
 }
 
 /**
- * `actual` holds `words` in its string field `key` (Jest's
- * `expect.stringContaining`), and equals `rest` in every other field.
+ * `actual` holds `words` in its string field `key`, and equals `rest` in
+ * every other field.
  */
 function assertWithWords(
   actual: object,

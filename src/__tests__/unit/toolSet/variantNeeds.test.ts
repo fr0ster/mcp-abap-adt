@@ -86,7 +86,7 @@ describe('the needs against the tables', () => {
 
   it('a need a table does not list is not served there', () => {
     // ADT_TYPES_CLOUD lists a program's read, never its create or run.
-    // Widened to strings: Jest's toContain took any value.
+    // Widened to strings, so includes() takes any value.
     const operations: readonly string[] =
       ADT_TYPES_CLOUD.program.codes['PROG/P'].operations;
     assert.ok(!operations.includes('create'));

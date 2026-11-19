@@ -58,7 +58,8 @@ for (const [_name, trigger] of triggers) {
       assert.equal(ownedConnections().length, 1);
 
       trigger(s);
-      // The test's own bound: a hang reads as `hung`, not as a Jest timeout.
+      // The test's own bound: no runner timeout exists, so without it a hang
+      // would simply hang; with it, a hang reads as `hung`.
       let bound: ReturnType<typeof setTimeout> | undefined;
       const outcome = await Promise.race([
         s.exited,

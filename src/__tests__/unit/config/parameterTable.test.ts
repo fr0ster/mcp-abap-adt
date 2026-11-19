@@ -156,7 +156,7 @@ describe("a row's own reader", () => {
     );
   });
 
-  // The title shows each value as Jest's %p rendered it (pretty-format).
+  // The title shows each value as written: a string quoted.
   for (const [thrown, shown] of [
     [
       new Error('foreign text that must not reach the refusal'),

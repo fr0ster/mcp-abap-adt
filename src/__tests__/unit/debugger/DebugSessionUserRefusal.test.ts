@@ -53,7 +53,7 @@ function refuseStop(world: ReturnType<typeof fakeWorld>, refusal: () => any) {
 }
 
 describe("the system's refusal of a request user", () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],

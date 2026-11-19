@@ -751,7 +751,7 @@ describe('each call is exactly one request (held / document / 404)', () => {
 
 describe("the chain is the consumer's", () => {
   it('no background listen loop: nothing is sent between calls', async () => {
-    // Jest's doNotFake setImmediate, nextTick, queueMicrotask: setImmediate
+    // setImmediate, nextTick and queueMicrotask real: setImmediate
     // left out of the faked APIs (the other two are never faked here).
     useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
     try {
@@ -1029,7 +1029,7 @@ describe("the chain is the consumer's", () => {
   }
 
   it('AMDP: no background event read, nothing is sent between calls', async () => {
-    // Jest's doNotFake setImmediate, nextTick, queueMicrotask: setImmediate
+    // setImmediate, nextTick and queueMicrotask real: setImmediate
     // left out of the faked APIs (the other two are never faked here).
     useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
     try {

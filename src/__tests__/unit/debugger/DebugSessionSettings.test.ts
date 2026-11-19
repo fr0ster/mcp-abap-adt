@@ -23,7 +23,7 @@ const sent = (world: ReturnType<typeof fakeWorld>) =>
   world.calls.filter((c) => c.startsWith('settings:'));
 
 describe('the debugger settings', () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],

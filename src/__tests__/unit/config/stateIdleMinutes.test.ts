@@ -58,7 +58,7 @@ describe('stateIdleMinutes — CLI, env, YAML', () => {
     );
   });
 
-  // The title shows each value as Jest's %p rendered it: a string quoted.
+  // The title shows each value as written: a string quoted.
   for (const v of ['29', '0', '-1', '30.5', 'abc']) {
     it(`${JSON.stringify(v)} is refused at startup, named in the form it was given`, () => {
       assertThrows(

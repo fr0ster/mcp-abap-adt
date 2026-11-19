@@ -7,7 +7,8 @@
  *   tick the close begins; no envelope goes out, and every recorded handler
  *   settles (the batch's signal ends its wait for parts that will never
  *   come) with no unhandled rejection — proven under plain node
- *   (`plainNode.ts`: inside Jest no `unhandledRejection` listener is told),
+ *   (`plainNode.ts`: inside the node:test runner an unhandled rejection
+ *   fails the file instead),
  *   with handlers that do not guard their parts.
  * - The idle bound ending held state with a batch open (Review Focus 4):
  *   nothing sent, the recorded handlers released, `HandlerBatch` end then refused
@@ -29,8 +30,7 @@ import { HandlerLedger } from '../../helpers/handlerLedger';
 import { runPlainNode } from '../../helpers/plainNode';
 
 // lib/connectionFactory's names replaced on the module that defines them
-// (mock.method; their callers read them at call time), as the Jest factory
-// did; the names it left out stay real.
+// (mock.method; their callers read them at call time); the names not replaced stay real.
 // Every case restores every mock after it: they are replaced before each.
 beforeEach(() => {
   mock.method(connectionFactory, 'createAbapConnection', () => undefined);
@@ -158,8 +158,8 @@ describe('the instance close while HandlerBatch end executes', () => {
 
 describe('the idle bound with a batch open (Review Focus 4)', () => {
   it('nothing sent; recorded handlers released; HandlerBatch end then batch_mode_off; HandlerBatch answers no answer with that number', async () => {
-    // Jest's doNotFake left setImmediate (and the microtask queues) real;
-    // its advanceTimers is not needed: the in-memory transport moves on real
+    // setImmediate (and the microtask queues) left real; no automatic
+    // advance is needed: the in-memory transport moves on real
     // turns, and the bound is reached by the explicit advance below (§3.7).
     useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
     const ledger = new HandlerLedger();

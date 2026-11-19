@@ -66,7 +66,7 @@ describe('batch.keepRawParts — CLI, env, YAML', () => {
     );
   });
 
-  // The title shows each value as Jest's %p rendered it (pretty-format).
+  // The title shows each value as written: a string quoted.
   for (const [value, shown] of [
     [5, '5'],
     ['yes', '"yes"'],

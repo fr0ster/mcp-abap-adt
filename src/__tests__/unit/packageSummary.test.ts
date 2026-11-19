@@ -45,8 +45,7 @@ describe('packageDetails', () => {
       package_type: 'structure',
       sub_package_count: 2,
     });
-    // Jest's objectContaining compared each named property with full
-    // equality: the sub-packages exactly, not as a subset match.
+    // Each named property compared with full equality: the sub-packages exactly, not as a subset match.
     assert.deepStrictEqual(details.sub_packages, [
       { name: 'ZCHILD_A', description: 'Child A' },
       { name: 'ZCHILD_B', description: 'Child B' },

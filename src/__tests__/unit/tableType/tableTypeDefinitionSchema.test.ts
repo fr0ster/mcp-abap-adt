@@ -85,7 +85,7 @@ for (const { tool, args, property, value } of CASES) {
         [property]: value,
       });
       assert.equal(refused, false);
-      // The properties are flat names: Jest's path walk is one step.
+      // The properties are flat names: the path is one step.
       assert.ok(property in Object(seen));
       assert.deepStrictEqual(Reflect.get(Object(seen), property), value);
     });

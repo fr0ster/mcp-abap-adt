@@ -17,8 +17,7 @@ let contentsAnswer: unknown;
 // The three readers replaced on the modules that define them, before the
 // facades load: HandlerGetData and the compact part routes bind them when
 // they load (`defineTool(…)` at module level), through lib's read barrel,
-// whose getters read these modules. As the Jest factory on the barrel did;
-// every other name stays real.
+// whose getters read these modules. Every other name stays real.
 const record =
   (tool: string, answer?: () => unknown) =>
   async (_context: unknown, args: unknown) => {

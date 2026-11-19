@@ -1,12 +1,12 @@
 /**
- * Jest's object and throw matchers on `node:assert` (spec §3.8): what the
- * node:test move puts in place of `toMatchObject`, `toThrow`,
- * `.rejects.toThrow` and a bare `.rejects`. Runner-neutral: it imports only
- * `node:assert` and `node:util`, and a failure is an `AssertionError`.
+ * Object and throw assertions on `node:assert` (spec §3.8): a subset match
+ * (`assertMatchObject`), a throw checked against an expectation
+ * (`assertThrows`), a rejection checked the same way (`assertRejects`) and a
+ * rejection's reason whatever it is (`rejectionOf`). Runner-neutral: it
+ * imports only `node:assert` and `node:util`, and a failure is an
+ * `AssertionError`.
  *
- * Each clause follows Jest 30.5.2's own code (`expect`'s `toThrowMatchers`:
- * `getThrown`, `toThrowExpectedObject`, `createMessageAndCause`; and
- * `toMatchObject`'s subset equality) and is proven by a case of its own in
+ * Each clause is proven by a case of its own in
  * `unit/testHelpers/assertions.test.ts`. A thrown value or a rejection
  * reason comes from outside the type system, so it is `unknown` here and
  * read at run time.
@@ -14,7 +14,7 @@
 import assert from 'node:assert/strict';
 import { inspect, isDeepStrictEqual } from 'node:util';
 
-/** What a thrown value is checked against: Jest's `toThrow` argument. */
+/** What a thrown value is checked against. */
 export type ThrowExpectation =
   | string
   | RegExp
@@ -36,9 +36,8 @@ function fail(
 }
 
 /**
- * Jest's `expect(value).not.toHaveProperty(key)` for a one-segment key
- * (`@jest/expect-utils` `getPath`).
- * - An undefined or null value is refused outright, as Jest refuses it, so
+ * `value` does not have the one-segment property `key`.
+ * - An undefined or null value is refused outright, so
  *   an absent value never passes.
  * - Otherwise the value has the key when `value[key]` is not undefined, or,
  *   for a non-primitive value, when `key in value`. Inherited members count,
@@ -69,7 +68,7 @@ export function assertNoProperty(value: unknown, key: string): void {
 }
 
 /**
- * The message of a thrown value, as Jest reads it (`getThrown`): its
+ * The message of a thrown value: its
  * `message` when that is a string — an own or an inherited one —, else
  * `String(value)`.
  */
@@ -182,7 +181,7 @@ function matchAt(path: string, actual: unknown, expected: unknown): void {
 }
 
 /**
- * Jest's `toMatchObject`: every own enumerable key of a plain `expected` is
+ * A subset match: every own enumerable key of a plain `expected` is
  * present in `actual` (`in`, the prototype chain included) and matches
  * recursively, other keys of `actual` ignored; an array matches an array of
  * the same length element by element; a `Date` or a `RegExp` by value; any
@@ -196,7 +195,7 @@ export function assertMatchObject(actual: unknown, expected: unknown): void {
 // ---------------------------------------------------------------------------
 // assertThrows / assertRejects / rejectionOf
 
-/** Jest's `getThrown(…).isError`: a string `message`, `name` and `stack`. */
+/** Whether a thrown value reads as an error: a string `message`, `name` and `stack`. */
 function looksLikeError(value: unknown): boolean {
   return (
     typeof value === 'object' &&
@@ -213,7 +212,7 @@ function looksLikeError(value: unknown): boolean {
 const isObject = (value: unknown): value is object =>
   value !== null && value !== undefined && typeof value === 'object';
 
-/** Jest's `buildSerializeError`. */
+/** An error's own properties as plain data, `cause` included, for comparison. */
 function serializeError(error: unknown): unknown {
   if (!isObject(error)) return error;
   const result: Record<string, unknown> = {};
@@ -228,7 +227,7 @@ function serializeError(error: unknown): unknown {
 }
 
 /**
- * Jest's `createMessageAndCause`: with a truthy `cause`, the error's own
+ * What an error is compared by: with a truthy `cause`, the error's own
  * properties sorted (`stack`, `fileName`, `lineNumber` left out), `cause`
  * the same way, a circular reference dropped, a `bigint` or `undefined` as
  * its string; without one, its `message`.
@@ -293,7 +292,7 @@ function checkThrown(
     }
     return;
   }
-  // An Error: what Jest's `toThrowExpectedObject` compares, all three.
+  // An Error expectation: message, message and cause, constructor — all three.
   if (message !== expected.message) {
     fail(
       `${what} the message ${shown(message)}, expected ${shown(expected.message)}`,
@@ -328,7 +327,7 @@ function checkThrown(
 }
 
 /**
- * Jest's `toThrow`: calls `fn`, fails when it does not throw, checks the
+ * Calls `fn`, fails when it does not throw, checks the
  * thrown value against `expected` and returns it. `expected` absent — any
  * throw; a string — the message includes it; a RegExp — it matches the
  * message (never `String(error)`); a class — `instanceof`; an `Error` —
@@ -354,8 +353,8 @@ export function assertThrows(
   return thrown;
 }
 
-/** Jest's `isError` (`@jest/expect-utils`): what `.rejects.toThrow` accepts. */
-function isJestError(value: unknown): value is Error {
+/** Whether a rejection reason is an error, by its tag or its prototype chain. */
+function isErrorValue(value: unknown): value is Error {
   switch (Object.prototype.toString.call(value)) {
     case '[object Error]':
     case '[object Exception]':
@@ -380,7 +379,7 @@ async function outcomeOf(
 }
 
 /**
- * Jest's bare `.rejects`: the rejection reason, whatever it is; a
+ * The rejection reason, whatever it is; a
  * fulfilment fails.
  */
 export async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
@@ -397,7 +396,7 @@ export async function rejectionOf(promise: Promise<unknown>): Promise<unknown> {
 }
 
 /**
- * Jest's `.rejects.toThrow`: a fulfilment fails, a reason that is not an
+ * A fulfilment fails, a reason that is not an
  * `Error` fails (whatever its text), and the reason is checked as
  * `assertThrows` checks a thrown value; returns the reason.
  */
@@ -406,7 +405,7 @@ export async function assertRejects(
   expected?: ThrowExpectation,
 ): Promise<Error> {
   const reason = await rejectionOf(promise);
-  if (!isJestError(reason)) {
+  if (!isErrorValue(reason)) {
     fail(
       `the promise rejected with ${shown(reason)}, not an Error`,
       reason,

@@ -7,7 +7,6 @@
  */
 
 import assert from 'node:assert/strict';
-import * as fs from 'node:fs';
 import type { ResolveFnOutput, ResolveHookContext } from 'node:module';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
@@ -64,15 +63,5 @@ describe('one name table', () => {
       '@mcp-abap-adt/adt-clients',
       './index.js',
     ]);
-  });
-
-  it('the manifest holds no test runner configuration of its own', () => {
-    const manifest: unknown = JSON.parse(
-      fs.readFileSync(path.join(REPO, 'package.json'), 'utf8'),
-    );
-    assert.equal(
-      typeof manifest === 'object' && manifest !== null && 'jest' in manifest,
-      false,
-    );
   });
 });

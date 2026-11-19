@@ -14,9 +14,8 @@ import * as packageSessions from '../../lib/packageSessions';
 import { assertNoProperty } from '../helpers/assertions';
 import { listedJson } from '../helpers/listedJson';
 
-// The names the Jest factories gave, replaced on the modules that define
-// them (the handler reads them at call time); the factories hid every other
-// name of those modules, which now stay real.
+// The names replaced on the modules that define them (the handler reads them
+// at call time); every other name of those modules stays real.
 const openFreshConnection = mock.method(
   packageSessions,
   'openFreshConnection',

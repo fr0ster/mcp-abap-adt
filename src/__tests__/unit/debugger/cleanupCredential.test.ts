@@ -48,7 +48,7 @@ const payloadOf = (error: unknown) =>
   JSON.parse((return_error(error) as any).content[0].text);
 
 describe('a debugger cleanup that meets a credential failure', () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],

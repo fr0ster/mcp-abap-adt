@@ -60,7 +60,7 @@ const context = { connection: {} as any, logger: undefined };
 declareSystemKind(context.connection, 'onprem');
 const payload = (result: any) => JSON.parse(result.content[0].text);
 
-/** A table row as Jest's `%p` rendered it in a title (pretty-format: an
+/** A table row as its title shows it (an
  * object's keys sorted, strings quoted; a number as itself). */
 function pretty(value: unknown): string {
   if (typeof value !== 'object' || value === null) return String(value);

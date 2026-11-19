@@ -35,8 +35,7 @@ import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { assertRejects } from '../../helpers/assertions';
 
 // lib/connectionFactory's names replaced on the module that defines them
-// (mock.method; their callers read them at call time), as the Jest factory
-// did; the names it left out stay real.
+// (mock.method; their callers read them at call time); the names not replaced stay real.
 // Every case restores every mock after it: they are replaced before each.
 let build: Mock<
   typeof connectionFactory.createAbapConnection | (() => undefined)

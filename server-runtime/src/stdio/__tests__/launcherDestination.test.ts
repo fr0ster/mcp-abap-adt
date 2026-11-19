@@ -50,7 +50,7 @@ import {
 import { StdioServer } from '../StdioServer.js';
 import { childStart } from './helpers/launcherStdout';
 
-/** A value the types leave optional, which the case requires: Jest read it untyped. */
+/** A value the types leave optional, which the case requires. */
 function present<T>(value: T | undefined): T {
   assert.ok(value !== undefined);
   return value;

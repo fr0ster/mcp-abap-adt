@@ -112,7 +112,7 @@ describe('installShutdown (core)', () => {
 
   it('refuses a birth startBirth() did not make, before any trigger is installed', async () => {
     const fact = await caseOf('foreign birth');
-    // Jest's toThrow(string): it throws, and its message holds the words.
+    // It throws, and its message holds the words.
     assert.equal(fact('threw'), true);
     const message = fact('message');
     assert.ok(

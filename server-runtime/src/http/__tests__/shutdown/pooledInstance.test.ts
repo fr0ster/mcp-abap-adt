@@ -115,7 +115,7 @@ it('an instance emptied by its stop tool leaves the pool with its connections di
 describe('the idle bound (fake time)', () => {
   it('an instance evicted by the idle bound has its connections disconnected and leaves the pool: its handle reaches it no more', async () => {
     s = await httpStand({ stateIdleMinutes: 30 });
-    // Jest's `advanceTimers: true` with setImmediate left real: the call runs
+    // Fake time follows the real turns, with setImmediate left real: the call runs
     // over the real HTTP stand while fake time follows it, 1 fake ms per real
     // turn, up to IDLE_HORIZON — past it, an unsettled call fails naming it.
     useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });

@@ -11,7 +11,7 @@
  *   when its type may carry a `timeout` property, an object held in a
  *   variable included;
  * - `--test-force-exit` in an npm script (node:test's force exit);
- * - `--forceExit` in an npm script (Jest's): none is allowed since the live
+ * - `--forceExit` in an npm script: none is allowed since the live
  *   scripts moved to node:test (`ALLOWED_FORCE_EXIT` is empty, D27 step 11).
  *
  * The test files are every one the runner selects (`tools/run-tests.mjs

@@ -1294,7 +1294,7 @@ describe('the table-type version tools', () => {
         variant,
       ),
       () => {
-        // Widened to strings: Jest's toContain took any value.
+        // Widened to strings, so includes() takes any value.
         const versioned: readonly string[] = VERSIONED_KINDS[variant];
         const sourced: readonly string[] = VERSION_SOURCE_KINDS[variant];
         assert.ok(versioned.includes('table_type'));

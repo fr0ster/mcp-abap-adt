@@ -25,7 +25,7 @@ import { main } from '../launcher';
 
 const seen: HandlerContext[] = [];
 // handleSearchSource replaced on the module that defines it (the search
-// group reads it at call time), as the Jest factory did; its other names
+// group reads it at call time); its other names
 // stay real.
 mock.method(
   searchSourceHandler,

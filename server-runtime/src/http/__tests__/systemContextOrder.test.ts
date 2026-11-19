@@ -44,8 +44,7 @@ import {
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 // lib/connectionFactory's names replaced on the module that defines them
-// (mock.method; their callers read them at call time), as the Jest factory
-// did; the names it left out stay real.
+// (mock.method; their callers read them at call time); the names not replaced stay real.
 mock.method(connectionFactory, 'createAbapConnection', () => ({
   connect: async () => {},
   makeAdtRequest: async () => {

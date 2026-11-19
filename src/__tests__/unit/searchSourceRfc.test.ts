@@ -12,8 +12,7 @@ import * as orchestrator from '../../lib/search-source/orchestrator';
 import { assertMatchObject, assertNoProperty } from '../helpers/assertions';
 
 // runSearchSourceWithContext replaced on the module that defines it (the
-// handler reads it at call time); the Jest factory hid the module's other
-// names, which now stay real.
+// handler reads it at call time); the module's other names stay real.
 const run = mock.method(
   orchestrator,
   'runSearchSourceWithContext',

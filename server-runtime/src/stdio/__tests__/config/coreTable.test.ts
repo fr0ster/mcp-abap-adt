@@ -193,8 +193,8 @@ describe('the table', () => {
       });
 
       it('absent everywhere is absent', () => {
-        // The keys are flat names (coreParameters.ts), so Jest's path walk
-        // is one step.
+        // The keys are flat names (coreParameters.ts), so the path is one
+        // step.
         assertNoProperty(readAuthParameters([], {}, {}), p.key);
       });
 

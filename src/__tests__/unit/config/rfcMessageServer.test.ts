@@ -22,7 +22,7 @@ import { connectionCreate as createConnectionModule } from '../../helpers/packag
 
 // connection's createConnection watched on the module that defines it (the
 // package index re-exports it by getter, read at call time): every call
-// still reaches the real one, as the Jest factory's passthrough did.
+// still reaches the real one.
 const create = mock.method(createConnectionModule, 'createConnection');
 
 const saved = process.env.SAP_SYSTEM_TYPE;

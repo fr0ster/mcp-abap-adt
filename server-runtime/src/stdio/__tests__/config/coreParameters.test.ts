@@ -205,7 +205,7 @@ describe('--state-idle-minutes is gone from core', () => {
   const GONE =
     'was removed from `mcp-abap-adt` in 20.1.1: stdio has no idle bound — held state ends by its stop tool, the client closing stdin, the backend or the shutdown; remove it from the configuration (the HTTP and SSE binaries keep it)';
 
-  // Jest's %p titles (pretty-format), written per row.
+  // Each row's title, written as shown.
   for (const [shown, argv, env, form] of [
     [
       '["--state-idle-minutes=45"] {}',

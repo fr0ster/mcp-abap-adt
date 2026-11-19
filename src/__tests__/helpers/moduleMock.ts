@@ -1,7 +1,7 @@
 /**
  * A module replaced for the rest of a test file (node:test `mock.module`,
- * under the runner's `--experimental-test-module-mocks`): what a Jest
- * factory with `...jest.requireActual(p)` was.
+ * under the runner's `--experimental-test-module-mocks`): the real module's
+ * exports, with the names given replaced.
  *
  * Used only where `mock.method` on the defining module cannot reach the name:
  * `@mcp-abap-adt/adt-clients`, whose `exports` map closes its internal files

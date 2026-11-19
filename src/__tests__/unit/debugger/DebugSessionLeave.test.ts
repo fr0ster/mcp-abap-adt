@@ -25,7 +25,7 @@ const A = {
 const idOf = (c: unknown) => (c as { id: number }).id;
 
 describe('leaving a debuggee running', () => {
-  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  // setTimeout, setInterval, setImmediate and Date faked.
   beforeEach(() =>
     useFakeTimers({
       apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],

@@ -37,7 +37,7 @@ const mockMsg = {
   delete: mock.fn<(...args: any[]) => any>(),
 };
 
-// Read untyped, as jest.requireActual answered them: the cases hand the
+// Read untyped: the cases hand the
 // strategy a bare { status, data }.
 const { analyseMessageClassMessage } = require('@mcp-abap-adt/adt-strategies');
 const { ADT_NO_FAILURE } = require('@mcp-abap-adt/interfaces-adt');

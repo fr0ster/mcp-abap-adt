@@ -132,7 +132,7 @@ describe('HandlerExporter.registerOnServer lists', () => {
   it('cloud and onprem differently (the comparison is not vacuous)', async () => {
     const connection = countingConnection('document', undefined).connection;
     // Compared as JSON data: a key present as `undefined`, or a prototype,
-    // is no difference here, as for Jest's not.toEqual.
+    // is no difference here.
     assert.notDeepStrictEqual(
       JSON.parse(
         JSON.stringify(await listedOn(registeredOn(() => connection, 'cloud'))),

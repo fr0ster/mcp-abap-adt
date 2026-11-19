@@ -209,7 +209,7 @@ describe('assertThrows', () => {
     );
   });
 
-  it("an Error expectation: message and cause serialised as Jest's createMessageAndCause", () => {
+  it('an Error expectation: message and cause serialised and compared', () => {
     // Same message, causes that differ: refused on the cause.
     refuses(
       () =>
@@ -279,7 +279,7 @@ describe('assertThrows', () => {
     const foreign: unknown = vm.runInNewContext("new Error('m')");
     assertThrows(thrower(foreign), new Error('m'));
     // A thrown value that is not error-like (no name, no stack) is not held
-    // to the constructor, as Jest's isError reading leaves it.
+    // to the constructor, as the error reading leaves it.
     assertThrows(thrower({ message: 'm' }), new Custom('m'));
   });
 
@@ -345,11 +345,11 @@ describe('assertNoProperty', () => {
     assertNoProperty({ a: 1 }, 'b');
   });
 
-  it('fails for an undefined value, as Jest does', () => {
+  it('fails for an undefined value', () => {
     refuses(() => assertNoProperty(undefined, 'b'), 'undefined');
   });
 
-  it('fails for a null value, as Jest does', () => {
+  it('fails for a null value', () => {
     refuses(() => assertNoProperty(null, 'b'), 'null');
   });
 
@@ -366,7 +366,7 @@ describe('assertNoProperty', () => {
     refuses(() => assertNoProperty({}, 'toString'), "'toString'");
   });
 
-  it("reads a primitive's members by bracket access, as Jest does", () => {
+  it("reads a primitive's members by bracket access", () => {
     refuses(() => assertNoProperty('abc', 'length'), "'length'");
     assertNoProperty('abc', 'b');
   });

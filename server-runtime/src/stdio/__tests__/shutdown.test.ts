@@ -5,148 +5,125 @@
  * awaited), the MCP server's close, then the factory's settle (gate,
  * logins, drain, flush), then the exit code — once, and nothing of it
  * reaches stdout.
+ *
+ * Each case runs in a process of its own (`shutdown/scenarios/
+ * core.scenario.ts`), and this file is the client that owns that process's
+ * stdout: the case's record is the one line on it, and nothing of the
+ * shutdown is (H3). A spy on this process's stdout would sit between
+ * node:test's runner and its report (Task 3.1, measured).
  */
 
-import { isLatched } from '../../../../src/lib/activeTools';
-import { installShutdown } from '../shutdown.js';
+import assert from 'node:assert/strict';
+import { afterEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
-  deferred,
-  fakeProcess,
-  runningTool,
-  setup,
-  turns,
-} from './shutdown/harness';
+  killScenarioChildren,
+  runScenarioOutput,
+} from '../../../../src/__tests__/helpers/scenarioOutput';
+
+const SCENARIO =
+  'server-runtime/src/stdio/__tests__/shutdown/scenarios/core.scenario.ts';
+
+afterEach(() => killScenarioChildren());
+
+/**
+ * One case as the child's client: it exits 0, and its stdout is its one
+ * record line — nothing of the shutdown reaches stdout, in any case (H3).
+ * Answers a reader of the record's fields (data from outside the types).
+ */
+async function caseOf(...args: string[]): Promise<(key: string) => unknown> {
+  const out = await runScenarioOutput(SCENARIO, args);
+  assert.equal(out.code, 0, out.stderr);
+  // The diagnostics' stream carries no secret either: the one the cases
+  // hold is a settle failure's message.
+  assert.ok(!out.stderr.includes('a token'), 'stderr holds a secret');
+  const lines = out.stdout.split('\n').filter((line) => line !== '');
+  assert.equal(
+    lines.length,
+    1,
+    `stdout carried more than the case's record: ${lines.length} lines`,
+  );
+  const record: unknown = JSON.parse(lines[0] ?? '');
+  return (key) =>
+    typeof record === 'object' && record !== null && key in record
+      ? Reflect.get(record, key)
+      : undefined;
+}
 
 describe('installShutdown (core)', () => {
-  let stdout: jest.SpyInstance;
-  beforeEach(() => {
-    stdout = jest.spyOn(process.stdout, 'write');
-  });
-  afterEach(() => {
-    // Nothing of the shutdown reaches stdout, in any case (H3).
-    expect(stdout).not.toHaveBeenCalled();
-    stdout.mockRestore();
-  });
-
-  it.each([
-    ['SIGTERM', (p: ReturnType<typeof fakeProcess>) => p.emit('SIGTERM')],
-    ['SIGINT', (p: ReturnType<typeof fakeProcess>) => p.emit('SIGINT')],
-    ['stdin end', (p: ReturnType<typeof fakeProcess>) => p.stdin.emit('end')],
-    [
-      'stdin close',
-      (p: ReturnType<typeof fakeProcess>) => p.stdin.emit('close'),
-    ],
-  ])(
-    '%s runs the sequence: latch and begin in its tick, the MCP server closed, then settle, exit 0',
-    async (_name, trigger) => {
-      const s = setup();
-      trigger(s.processLike);
-      // In the trigger's tick: the latch and the factory's begin.
-      expect(isLatched()).toBe(true);
-      expect(s.order).toEqual(['begin']);
-      await turns();
-      expect(s.order).toEqual([
-        'begin',
-        'mcp close',
-        'settle',
-        'settled',
-        'exit(0)',
-      ]);
-      expect(s.stderr).toEqual([]);
-    },
-  );
+  for (const trigger of ['SIGTERM', 'SIGINT', 'stdin end', 'stdin close']) {
+    it(
+      format(
+        '%s runs the sequence: latch and begin in its tick, the MCP server closed, then settle, exit 0',
+        trigger,
+      ),
+      async () => {
+        const fact = await caseOf('sequence', trigger);
+        // In the trigger's tick: the latch and the factory's begin.
+        assert.equal(fact('latchedInTick'), true);
+        assert.deepStrictEqual(fact('orderInTick'), ['begin']);
+        assert.deepStrictEqual(fact('order'), [
+          'begin',
+          'mcp close',
+          'settle',
+          'settled',
+          'exit(0)',
+        ]);
+        assert.deepStrictEqual(fact('stderr'), []);
+      },
+    );
+  }
 
   it('stdin end is not a trigger when not asked for', async () => {
-    const s = setup({ onStdinEnd: false });
-    s.processLike.stdin.emit('end');
-    await turns();
-    expect(s.order).toEqual([]);
+    const fact = await caseOf('stdin end not asked for');
+    assert.deepStrictEqual(fact('order'), []);
   });
 
   it('a running tool is interrupted in the trigger’s tick and not awaited: the sequence runs to its exit without it', async () => {
-    const s = setup();
-    const tool = runningTool();
-    s.processLike.emit('SIGTERM');
-    expect(tool.signal.aborted).toBe(true);
-    await turns();
-    expect(s.order).toEqual([
+    const fact = await caseOf('running tool');
+    assert.equal(fact('abortedInTick'), true);
+    assert.deepStrictEqual(fact('order'), [
       'begin',
       'mcp close',
       'settle',
       'settled',
       'exit(0)',
     ]);
-    tool.end();
   });
 
   it('notStored: one stderr line per destination, exit 1', async () => {
-    const s = setup({
-      settle: async () => ({
-        notStored: ['"X": StorageError', '"Y": StorageError'],
-      }),
-    });
-    await s.run();
-    expect(s.stderr).toEqual([
+    const fact = await caseOf('not stored');
+    assert.deepStrictEqual(fact('stderr'), [
       '[MCP] Session secrets not stored: "X": StorageError',
       '[MCP] Session secrets not stored: "Y": StorageError',
     ]);
-    expect(s.exits).toEqual([1]);
+    assert.deepStrictEqual(fact('exits'), [1]);
   });
 
   it('a settle that throws: its class on stderr, exit 1', async () => {
-    const stderr: string[] = [];
-    const exits: number[] = [];
-    class FlushTrouble extends Error {}
-    const run = installShutdown({
-      factory: {
-        beginShutdown: () => {},
-        endLogins: async () => {},
-        settle: async () => {
-          throw new FlushTrouble('a token, perhaps');
-        },
-      },
-      instance: { close: async () => {} },
-      exit: (code) => exits.push(code),
-      stderr: (line) => stderr.push(line),
-      processLike: fakeProcess(),
-    });
-    await run();
-    expect(stderr).toEqual(['[MCP] Shutdown did not settle: FlushTrouble']);
-    expect(stderr.join('\n')).not.toContain('a token');
-    expect(exits).toEqual([1]);
+    const fact = await caseOf('settle throws');
+    const stderr = fact('stderr');
+    assert.deepStrictEqual(stderr, [
+      '[MCP] Shutdown did not settle: FlushTrouble',
+    ]);
+    assert.ok(Array.isArray(stderr) && !stderr.join('\n').includes('a token'));
+    assert.deepStrictEqual(fact('exits'), [1]);
   });
 
-  it('refuses a birth startBirth() did not make, before any trigger is installed', () => {
-    const processLike = fakeProcess();
-    expect(() =>
-      installShutdown({
-        factory: {
-          beginShutdown: () => {},
-          endLogins: async () => {},
-          settle: async () => ({ notStored: [] }),
-        },
-        instance: { close: async () => {} },
-        exit: () => {},
-        stderr: () => {},
-        processLike,
-        birth: {
-          shutdownBegan: () => false,
-          joining: (birth) => birth,
-          open: () => true,
-        },
-      }),
-    ).toThrow('installShutdown takes a birth made by startBirth()');
+  it('refuses a birth startBirth() did not make, before any trigger is installed', async () => {
+    const fact = await caseOf('foreign birth');
+    // Jest's toThrow(string): it throws, and its message holds the words.
+    assert.equal(fact('threw'), true);
+    const message = fact('message');
+    assert.ok(
+      typeof message === 'string' &&
+        message.includes('installShutdown takes a birth made by startBirth()'),
+    );
   });
 
   it('two calls of run() answer the same run', async () => {
-    const held = deferred<{ notStored: string[] }>();
-    const s = setup({ settle: () => held.promise });
-    const first = s.run();
-    const second = s.run();
-    await turns();
-    held.resolve({ notStored: [] });
-    await Promise.all([first, second]);
-    expect(s.order.filter((o) => o === 'settle')).toHaveLength(1);
-    expect(s.exits).toEqual([0]);
+    const fact = await caseOf('run twice');
+    assert.equal(fact('settles'), 1);
+    assert.deepStrictEqual(fact('exits'), [0]);
   });
 });

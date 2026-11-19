@@ -134,6 +134,7 @@
   "server-runtime/src/stdio/__tests__/rfcMessageServerParameters.test.ts",
   "server-runtime/src/stdio/__tests__/sessionReplaced.test.ts",
   "server-runtime/src/stdio/__tests__/sessionWrites.test.ts",
+  "server-runtime/src/stdio/__tests__/shutdown.test.ts",
   "server-runtime/src/stdio/__tests__/shutdown/admissionLatch.test.ts",
   "server-runtime/src/stdio/__tests__/shutdown/afterStartBrowserLogin.test.ts",
   "server-runtime/src/stdio/__tests__/shutdown/crash.test.ts",

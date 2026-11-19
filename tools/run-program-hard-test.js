@@ -39,6 +39,13 @@ function parseArgs(argv) {
     else if (key === 'env-path' && value) args.envPath = value;
     else if (key === 'suffix' && value) args.suffix = value;
     else if (key === 'file' && value) args.file = value;
+    else if (key === 'pattern') {
+      // Retired with Jest's path patterns: refused before anything runs.
+      console.error(
+        'run-program-hard-test: --pattern is gone; name the suite with --file=src/__tests__/integration/high/<area>/<Suite>.test.ts',
+      );
+      process.exit(1);
+    }
   }
 
   return args;

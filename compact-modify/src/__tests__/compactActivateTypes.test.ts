@@ -1,6 +1,11 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { defineTool } from '@mcp-abap-adt/lib/handlers';
+import { assertRejects } from '../../../src/__tests__/helpers/assertions';
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
+import * as activateObject from '../../../src/handlers/common/low/handleActivateObject';
 import { declareSystemKind } from '../../../src/lib/systemKind';
 import {
   handleHandlerActivate,
@@ -26,24 +31,28 @@ import {
 
 let sent: unknown;
 let planned: unknown;
-// The activate route arrives through lib's write barrel now, so that is the module
-// to intercept: this package imports the handler by package name, not by path.
-jest.mock('@mcp-abap-adt/lib/handlers/write', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/lib/handlers/write');
-  return {
-    ...actual,
-    handleActivateObjectOnce: (_context: unknown, args: unknown) => {
-      sent = args;
-      return Promise.resolve({ content: [{ type: 'text', text: '{}' }] });
-    },
-    // object_type is checked at HandlerActivate's boundary and handed on as
-    // a decided activation.
-    activatePlanOnce: (_context: unknown, plan: unknown) => {
-      planned = plan;
-      return Promise.resolve({ content: [{ type: 'text', text: '{}' }] });
-    },
-  };
-});
+// The activate route arrives through lib's write barrel, whose getters read
+// the module that defines both names: they are replaced there (HandlerActivate
+// reads them at call time), as the Jest factory on the barrel did; every
+// other name stays real.
+mock.method(
+  activateObject,
+  'handleActivateObjectOnce',
+  (_context: unknown, args: unknown) => {
+    sent = args;
+    return Promise.resolve({ content: [{ type: 'text', text: '{}' }] });
+  },
+);
+// object_type is checked at HandlerActivate's boundary and handed on as
+// a decided activation.
+mock.method(
+  activateObject,
+  'activatePlanOnce',
+  (_context: unknown, plan: unknown) => {
+    planned = plan;
+    return Promise.resolve({ content: [{ type: 'text', text: '{}' }] });
+  },
+);
 
 // The refusal lists what the declared variant activates from object_type
 // alone (`COMPACT_ACTIVATE`), so the connection states its variant.
@@ -64,7 +73,9 @@ describe('HandlerActivate and the type it was given', () => {
       object_type: 'CLASS',
     });
 
-    expect(planned).toEqual({ single: { api: 'class', name: 'ZCL_X' } });
+    assert.deepStrictEqual(planned, {
+      single: { api: 'class', name: 'ZCL_X' },
+    });
   });
 
   it('activates any other type in a group activation, by its code', async () => {
@@ -75,7 +86,7 @@ describe('HandlerActivate and the type it was given', () => {
 
     // `DEVC/K`, the code `COMPACT_ACTIVATE_ROUTES` gives it.
     // The group is typed by the declared variant.
-    expect(planned).toEqual({
+    assert.deepStrictEqual(planned, {
       group: {
         variant: 'onprem',
         references: [{ name: 'ZMCP_PKG', type: 'DEVC/K' }],
@@ -83,22 +94,27 @@ describe('HandlerActivate and the type it was given', () => {
     });
   });
 
-  it.each([
+  for (const [object_type, object_name, type] of [
     ['INCLUDE', 'ZINCL_X', 'PROG/I'],
     ['TABLE_TYPE', 'ZTTYP_X', 'TTYP/DA'],
-  ] as const)(
-    'activates %s alone in a group activation, by its code',
-    async (object_type, object_name, type) => {
-      await handleHandlerActivate(context, { object_name, object_type });
+  ] as const) {
+    it(
+      format(
+        'activates %s alone in a group activation, by its code',
+        object_type,
+      ),
+      async () => {
+        await handleHandlerActivate(context, { object_name, object_type });
 
-      expect(planned).toEqual({
-        group: {
-          variant: 'onprem',
-          references: [{ name: object_name, type }],
-        },
-      });
-    },
-  );
+        assert.deepStrictEqual(planned, {
+          group: {
+            variant: 'onprem',
+            references: [{ name: object_name, type }],
+          },
+        });
+      },
+    );
+  }
 
   it('activates a table type on ABAP cloud, and refuses an include there', async () => {
     declareSystemKind(connection, 'cloud');
@@ -107,20 +123,21 @@ describe('HandlerActivate and the type it was given', () => {
         object_name: 'ZTTYP_X',
         object_type: 'TABLE_TYPE',
       });
-      expect(planned).toEqual({
+      assert.deepStrictEqual(planned, {
         group: {
           variant: 'cloud',
           references: [{ name: 'ZTTYP_X', type: 'TTYP/DA' }],
         },
       });
       planned = undefined;
-      await expect(
+      await assertRejects(
         handleHandlerActivate(context, {
           object_name: 'ZINCL_X',
           object_type: 'INCLUDE',
         }),
-      ).rejects.toThrow('object_adt_type');
-      expect(planned).toBeUndefined();
+        'object_adt_type',
+      );
+      assert.equal(planned, undefined);
     } finally {
       declareSystemKind(connection, 'onprem');
     }
@@ -133,7 +150,7 @@ describe('HandlerActivate and the type it was given', () => {
       object_adt_type: 'CLAS/OC',
     });
 
-    expect(typeSent()).toBe('CLAS/OC');
+    assert.equal(typeSent(), 'CLAS/OC');
   });
 
   /**
@@ -146,31 +163,30 @@ describe('HandlerActivate and the type it was given', () => {
     sent = undefined;
     const entry = defineTool(TOOL_DEFINITION, handleHandlerActivate);
 
-    const refused = expect(
+    const refused = assertRejects(
       entry.call(context, { object_name: 'ZCL_X', object_type: 'UNIT_TEST' }),
-    ).rejects.toThrow(
       'Invalid arguments for tool HandlerActivate: Invalid option',
     );
     await refused;
 
     // And nothing was sent: the refusal is here, not at SAP.
-    expect(sent).toBeUndefined();
+    assert.equal(sent, undefined);
   });
 
   it('names the field that settles it, and what it knows without it', async () => {
     const entry = defineTool(TOOL_DEFINITION, handleHandlerActivate);
     // TRANSPORT is no member of the schema: refused at the boundary.
-    const outside = expect(
+    const outside = assertRejects(
       entry.call(context, { object_name: 'ZCL_X', object_type: 'TRANSPORT' }),
-    ).rejects.toThrow('Invalid arguments for tool HandlerActivate');
+      'Invalid arguments for tool HandlerActivate',
+    );
     await outside;
     // A member the cloud variant does not list is refused by the cloud
     // schema, the call's own variant's, naming what it lists.
     declareSystemKind(connection, 'cloud');
     try {
-      const unnamed = expect(
+      const unnamed = assertRejects(
         entry.call(context, { object_name: 'ZCL_X', object_type: 'PROGRAM' }),
-      ).rejects.toThrow(
         /Invalid arguments for tool HandlerActivate: .*"CLASS"\|"INTERFACE".* at object_type/,
       );
       await unnamed;
@@ -196,11 +212,13 @@ describe('HandlerActivate and the type it was given', () => {
       object_type: 'FUNCTION_MODULE',
     });
 
-    expect(JSON.stringify(answered)).toContain(
-      'FUNCTION_MODULE is named GROUP|MODULE in object_name, or with function_group_name',
+    assert.ok(
+      JSON.stringify(answered).includes(
+        'FUNCTION_MODULE is named GROUP|MODULE in object_name, or with function_group_name',
+      ),
     );
-    expect(sent).toBeUndefined();
-    expect(planned).toBeUndefined();
+    assert.equal(sent, undefined);
+    assert.equal(planned, undefined);
   });
 
   it('activates a function module under its group: GROUP|MODULE or function_group_name', async () => {
@@ -208,7 +226,7 @@ describe('HandlerActivate and the type it was given', () => {
       object_name: 'zac_fgr01|z_ac_fm01',
       object_type: 'FUNCTION_MODULE',
     });
-    expect(planned).toEqual({
+    assert.deepStrictEqual(planned, {
       group: {
         variant: 'onprem',
         references: [
@@ -222,7 +240,7 @@ describe('HandlerActivate and the type it was given', () => {
       function_group_name: 'ZAC_FGR01',
       object_type: 'FUNCTION_MODULE',
     });
-    expect(planned).toEqual({
+    assert.deepStrictEqual(planned, {
       group: {
         variant: 'onprem',
         references: [
@@ -238,7 +256,9 @@ describe('HandlerActivate and the type it was given', () => {
       object_type: 'BEHAVIOR_IMPLEMENTATION',
     });
 
-    expect(planned).toEqual({ single: { api: 'class', name: 'ZBP_X' } });
+    assert.deepStrictEqual(planned, {
+      single: { api: 'class', name: 'ZBP_X' },
+    });
   });
 
   /**
@@ -254,9 +274,9 @@ describe('HandlerActivate and the type it was given', () => {
       ],
     });
 
-    expect(typeSent()).toBe('FUGR/FF');
-    expect(nameSent()).toBe('Z_AC_FM01');
-    expect(parentSent()).toBe('ZAC_FGR01');
+    assert.equal(typeSent(), 'FUGR/FF');
+    assert.equal(nameSent(), 'Z_AC_FM01');
+    assert.equal(parentSent(), 'ZAC_FGR01');
   });
 
   it('still takes objects[] untouched', async () => {
@@ -264,6 +284,6 @@ describe('HandlerActivate and the type it was given', () => {
       objects: [{ name: 'ZCL_X', type: 'CLAS/OC' }],
     });
 
-    expect(typeSent()).toBe('CLAS/OC');
+    assert.equal(typeSent(), 'CLAS/OC');
   });
 });

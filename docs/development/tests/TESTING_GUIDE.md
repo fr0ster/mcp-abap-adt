@@ -72,41 +72,43 @@ npm run test:integration -- src/__tests__/integration/high/class/ClassHighHandle
 The live scripts run one file at a time; `npm test` never runs a live suite. How a run is
 interrupted, and what the live scripts check: `src/__tests__/integration/README.md`.
 
-### One Jest configuration for every package
+### One runner for every package
 
-The root `jest.config.js` holds the repository's only Jest configuration: its `roots` name the root `src` and every
-package's `src` (`server-runtime`, `server`, `http`, `sse`, `background-runs-memory`, `responsible-rules`, the compact packages and
-the six `-ro` packages), and its `moduleNameMapper` resolves every sibling package to its sources. The mapper is built
-from the package-name table, `tsconfig.paths.json` (each name and its source entry), which `tsconfig.test.json` also
-extends for the type checker; the table is the only list of those names. Jest ignores every file listed in
-`tools/node-test-files.json`, the test files that run on node:test instead. The root
-`npm test` runs every package's suites once. A package's own `npm test` runs that same configuration for its folder
-only (`npm --prefix .. test -- --roots <package>/src`), so it works from inside the package:
+Every test runs on Node's own runner, `node:test`, through `tools/run-tests.mjs`. Its selection
+is a directory walk (`walkSources`, `tools/node-test-list.mjs`, plain string code, no glob):
+every `….test.ts` under a `__tests__` directory of the test roots — the root `src` and every
+package's `src` (`server-runtime`, `server`, `http`, `sse`, `background-runs-memory`,
+`responsible-rules`, the compact packages and the six `-ro` packages) — skipping
+`node_modules`, `dist`, `.test-build` and `__fixtures__`. Sibling packages resolve to their
+compiled sources through the package-name table, `tsconfig.paths.json` (each name and its source
+entry), which `tsconfig.test.json` and `tsconfig.node-test.json` extend and the resolve hook
+(`src/__tests__/helpers/resolveHook.ts`) reads; the table is the only list of those names.
+
+The root `npm test` builds the tests and runs every package's suites once. A package's own
+`npm test` runs the same runner for its folder only (`npm --prefix .. test -- --root <package>/src`),
+so it works from inside the package:
 
 ```bash
 cd server-runtime && npm test   # the runtime's suites alone (the three transports' launchers and servers)
 npm --prefix http test          # http's own suites (its exports), from the repository root
 ```
 
-A package's `test:check` still type-checks its tests against its own `tsconfig.test.json`.
+A package's `test:check` type-checks its tests against its own `tsconfig.test.json`.
 
-**Node for the tests: 22.15 or later.** The files on node:test load the same names through a
+**Node for the tests: 22.15 or later.** The tests load the repository's package names through a
 resolve hook registered with `module.registerHooks`, which Node has since 22.15. The package's
 `engines` (`>=22.0.0`) is what the server needs to run and is unchanged; developing and running
 the tests needs Node 22.15 or later (CI takes the latest 22 and 24).
 
-### Two runners: Jest and node:test
+### The run
 
-The tests are moving from Jest to Node's own runner, `node:test`. Until the last one moves,
-`npm test` (`tools/npm-test.mjs`) runs both: Jest over its files, then the node:test build and
-`tools/run-tests.mjs` over the files of `tools/node-test-files.json`. Both run even when the
-first fails, and `npm test` fails when either does.
-
-- **The build.** `npm run test:build` removes `.test-build/` and compiles the listed files, with
-  what they import, into `.test-build/tree/` (one level down, so the repository root holds no
-  package-shaped directory when the build places the root manifest), with the options of `tsconfig.node-test.json` (`types` is `node`
-  alone, so a listed file that reaches a Jest global does not compile; `noEmitOnError`, so a
-  failed compile emits nothing). `npm test` runs it after Jest.
+- **The build.** `npm run test:build` removes `.test-build/` and compiles every walked test, with
+  what it imports, into `.test-build/tree/` (one level down, so the repository root holds no
+  package-shaped directory when the build places the root manifest), with the options of
+  `tsconfig.node-test.json` (`types` is `node` alone, so a test that reaches a global node's
+  types do not declare does not compile; `noEmitOnError`, so a failed compile emits nothing).
+  `npm test` runs it first. `tools/node-test-placed.json` names the files production code reads
+  beside itself, which the build places in the tree.
 - **One process per file.** node:test's default; the runner refuses `--test-isolation`.
 - **Concurrency is a setting, with no default.** The runner takes `--concurrency <N>`, or the
   variable `TEST_CONCURRENCY` when no option is given; with neither it refuses to run. The
@@ -116,37 +118,43 @@ first fails, and `npm test` fails when either does.
   kind, from `ci.yml`'s matrix, and `2` in `release.yml`. The figures are below.
 - **Variables without a shell.** `--env NAME=VALUE` sets a variable for the run on every
   platform.
-- **Selecting files.** `npm test -- <path>.test.ts` sends a listed file to the runner; every other
-  positional argument (a file or a pattern) goes to Jest — as exact paths (`--runTestsByPath`)
-  when every one of them is an existing file, else all as Jest's patterns, as before (Jest reads
-  all its positional arguments one way). A runner, or Jest, given none of the named files is
-  skipped. By path, Jest's `--roots`, `testMatch` and `testPathIgnorePatterns` still apply: a
-  named file outside every root, under an ignored live directory or on the node:test list does
-  not run under Jest. `--roots <dir>` (the sub-packages' `npm test`) selects that root on both
-  runners; a root with no listed file runs Jest alone, with a line saying the runner was skipped.
-  With `--roots`, a named file outside every root runs on neither runner.
-- **Jest's options.** Other arguments are Jest's, read by Jest's own parser (`jest-cli`'s
-  `buildArgv`, the function `jest` reads its command line with), and handed to Jest as given:
-  the files and patterns are the positional arguments it reads. An option's value is never taken
-  for a file or a pattern (`-t <name>`, `--config <file>`, `--testNamePattern=<x>`, `-it=<x>`);
-  a boolean option takes a following `true` / `false`, its `--no-` form none, as yargs reads
-  them (`--cache false x` is `cache: false` and a pattern `x`; `--no-cache false x` is
-  `cache: false` and two patterns, `false` and `x`); an array option
-  (`--reporters`, `--testPathIgnorePatterns`, …) takes every argument after it up to the next
-  option — so name files and patterns before such an option. The tool's own options (`--roots`,
-  `--concurrency`, `--repo`, `--list`) end such an option as any option does, though Jest never
-  sees them. What Jest refuses (an option it does not know, a failed check of its own) is refused
-  before anything runs, in Jest's words. A named node:test file reaches Jest too, which ignores
-  every file of the list. `--help` and `--version` print Jest's answer and end the run, with
-  `--list` too (no JSON).
-- **Fixture repositories.** `--repo <dir>` (the runner's own tests) builds and runs `<dir>`'s
-  node:test list and gives Jest `<dir>/jest.config.js` as its configuration (unless `--config` is
-  given), so a fixture's run reaches nothing of this repository's suite; a fixture without its
-  own configuration fails.
-- **One list, one guard.** A file is on the list or found by Jest, never both and never neither
-  (`src/__tests__/unit/runner/partition.test.ts`, which reads Jest's discovery by
-  `jest --listTests --json` over its configuration without the live suites' ignores, until
-  those move to node:test too).
+- **Selecting files.** `npm test -- <path>.test.ts …` runs the named files, by their source
+  paths; each must exist and have a compiled file. `--root <dir>` (repeatable) keeps the walked
+  files under that directory; with `--root`, a named file outside every root is not run.
+  `--test-name-pattern=<x>` and every other node:test option go to `node --test` before the
+  files: `npm test -- --test-name-pattern="reads a class" src/__tests__/unit/….test.ts`.
+  `--list` prints the selection and runs nothing.
+- **The live suites** (`src/__tests__/integration/`, `src/__tests__/admin/`) run only under a
+  live npm script (`npm run test:integration`, `test:high`, …): `npm test` leaves them out, and a
+  root or a named file reaching them outside a live script is refused.
+- **Runs of their own.** `tools/separate-runs.json` names the suites that reach a service outside
+  the repository (`test:install`, `test:retrieval`); the runner leaves them out of every
+  selection that does not name them.
+- **Fixture repositories.** `--repo <dir>` (the runner's own tests) walks, builds and runs
+  `<dir>`'s tests, so a fixture's run reaches nothing of this repository's suite.
+- **One guard.** `src/__tests__/unit/runner/selection.test.ts` holds the walk to git: the unit
+  selection, the live files and the runs of their own together equal `git ls-files '*.test.ts'`,
+  and no tracked test lies outside a root's `__tests__`.
+
+### The helpers a test uses
+
+The assertions are `node:assert/strict`; the helpers under `src/__tests__/helpers/` state their
+contracts in their own headers:
+
+- `assertions.ts` — `assertMatchObject` (a recursive subset match), `assertThrows` /
+  `assertRejects` (a thrown value checked against a message fragment, a class or an error),
+  `rejectionOf` (a rejection's reason, whatever it is), `messageOf`, `assertNoProperty`;
+- `fakeTime.ts` — `useFakeTimers({ apis, now? })` / `useRealTimers()` over node:test's
+  `mock.timers`, the timer count and the async advance;
+- `moduleMock.ts` — a module replaced through node:test's `mock.module` (the runner passes
+  `--experimental-test-module-mocks`), the real module's exports kept beside the replaced names;
+- `plainNode.ts` / `scenarioOutput.ts` — a scenario run in a child node process, its stdout read
+  as a client reads it;
+- `packageFiles.ts` — the package files a mock replaces names on, in one place;
+- `repoRoot.ts` — the repository root, found by the name table, never by a count of `..`.
+
+Spies are node:test's `mock.fn` / `mock.method`, restored with `mock.restoreAll()` in an
+`afterEach` where a file replaces a method it does not own.
 
 ### The node:test run's concurrency (measured)
 
@@ -188,11 +196,11 @@ file process.
 | | | 4 | 71.1 / 73.2 / 88.7 | 3051 / 3086 / 3130 | 1262 |
 
 On the developer machine at C=1, the TypeScript-program scans each take 0.3–1.4 GB
-(`noRegexOverInput` the most, 1420 MB). `npmTest.test.ts` takes 31 s and starts 324 processes,
-1.1 GB as a tree.
+(`noRegexOverInput` the most, 1420 MB). `npmTest.test.ts` (the test of the two-runner wrapper,
+since removed) took 31 s and started 324 processes, 1.1 GB as a tree.
 
 **What the figures support: 2, everywhere.**
-- From 2 on, `npmTest.test.ts`, the longest file at every setting, bounds the wall time.
+- From 2 on, the longest file at every setting (that day `npmTest.test.ts`) bounds the wall time.
 - 1 is 1.5–2× slower on every machine.
 - 4 costs 0.9–1.4 GB more than 2 (medians) for at most 2 s, and on the developer machine
   nothing beyond the noise.
@@ -200,61 +208,15 @@ On the developer machine at C=1, the TypeScript-program scans each take 0.3–1.
   on Node 24, 3 is within the noise of 2 and 4 is slower.
 - At 2 the whole run peaks at 1.6–2.3 GB, safe on every runner kind.
 
-The figures belong to this list: when files are added to it, measure again and update the
-setting.
-
-### Jest's workers (measured)
-
-The files still on Jest run with **4 workers, each restarted once it is idle above 512 MB**
-(`jest.config.js`: `maxWorkers: 4`, `workerIdleMemoryLimit: '512MB'`). It is one setting for a
-developer machine and every CI runner kind: no npm script and no workflow overrides it
-(`unit/runner/jestWorkers.test.ts` holds both settings and the absence of an override).
-
-**Measured 2026-11-10** (D27), over that day's Jest set (542 suites, 14049 tests; every run
-passed). Measured with a hand-run probe as above: every node process of the run sampled its RSS
-every 20 ms, a worker that Jest restarted included; the whole-run peak is the highest sum of the
-live processes' RSS, the probe's own cost per process (about 20 MB) subtracted. One run each,
-Jest's own time (`npm test -- --maxWorkers=W [--workerIdleMemoryLimit=L] .`, the runner left
-out); in each cell Jest's seconds, then the whole-run peak.
-
-A developer machine (16 CPUs, 31 GB, Node 26.7.0):
-
-| Workers | Idle limit | Jest, s | Peak |
-|---|---|---|---|
-| 1 | none | 160 | 4.1 GB |
-| 2 | 512 MB | 86 | 1.7 GB |
-| 4 | 512 MB | 64 | 3.1 GB |
-| 4 | none | 62–72 | 7.6–7.9 GB |
-
-The whole `npm test` on the setting (Jest, then the node:test build and run; 542 suites and
-521 node:test tests passed): **169 s, a whole-run peak of 3.0 GB** — Jest 51 s with a peak of
-2.9 GB (26 worker processes, the restarts included), the node:test runner 109 s with 2.4 GB.
-
-Every CI runner kind (GitHub Actions run 42804707071, a throwaway probe branch removed after it;
-ubuntu-latest and windows-latest 4 CPUs, 16 GB; macos-latest 3 CPUs, 7 GB):
-
-| Runner, Node | 1 | 2 | 2, 512 MB | 2, 1 GB | 4 | 4, 512 MB | 4, 1 GB |
-|---|---|---|---|---|---|---|---|
-| ubuntu-latest, 22 | 262 s, 1.9 GB | 114 s, 2.9 GB | 91 s, 1.6 GB | 99 s, 2.5 GB | 84 s, 4.5 GB | 79 s, 2.9 GB | 86 s, 4.4 GB |
-| ubuntu-latest, 24 | 211 s, 4.2 GB | 121 s, 7.0 GB | 131 s, 1.9 GB | 116 s, 2.8 GB | 99 s, 7.5 GB | 108 s, 2.9 GB | 100 s, 4.7 GB |
-| windows-latest, 22 | 486 s, 1.6 GB | 203 s, 2.6 GB | 177 s, 1.3 GB | 202 s, 2.4 GB | 142 s, 4.2 GB | 138 s, 2.5 GB | 141 s, 3.8 GB |
-| windows-latest, 24 | 220 s, 4.0 GB | 132 s, 6.7 GB | 140 s, 1.7 GB | 124 s, 2.5 GB | 102 s, 8.9 GB | 110 s, 2.8 GB | 101 s, 4.6 GB |
-| macos-latest, 22 | 487 s, 1.9 GB | 275 s, 2.5 GB | 189 s, 2.2 GB | 260 s, 2.5 GB | 270 s, 3.1 GB | 111 s, 2.9 GB | 183 s, 3.2 GB |
-| macos-latest, 24 | 366 s, 2.3 GB | 272 s, 3.5 GB | 152 s, 2.0 GB | 157 s, 2.8 GB | 345 s, 3.9 GB | 152 s, 3.5 GB | 160 s, 4.1 GB |
-
-The order Jest runs the files in (the largest first, or the slowest first from its cache)
-changed the figures little; the slowest-first ones are shown. Without a limit a worker grows to
-2–3.5 GB on Node 24, and 2 or 4 such workers reach 6.7–8.9 GB on the 16 GB runners; with the
-512 MB limit every runner kind stays at or under 3.5 GB, and 4 workers are the fastest or within
-about 10% of it. The figures belong to this Jest set: when files move to node:test, measure again
-and update the setting.
+The figures belong to that day's set: the whole suite runs on node:test now, so measure again
+before changing the setting.
 
 ### The install suites: `npm run test:install` (`SKIP_INSTALL_MATRIX`)
 
 The suites that pack and install the release — `installMatrix.test.ts` and `binSmoke.test.ts` —
 are a run of their own, not part of `npm test`: `npm run test:install` runs them, one file at a
-time. `tools/separate-runs.json` names them, and `unit/runner/separateRuns.test.ts` holds both
-runners' unit sets to it, so the unit run reaches no outside service.
+time. `tools/separate-runs.json` names them, and `unit/runner/separateRuns.test.ts` holds the
+runner's unit selection to it, so the unit run reaches no outside service.
 
 
 `src/__tests__/unit/installMatrix.test.ts` proves that every server process loads one copy of

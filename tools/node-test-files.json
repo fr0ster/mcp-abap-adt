@@ -68,6 +68,7 @@
   "server-runtime/src/http/__tests__/shutdown/forcedClose.test.ts",
   "server-runtime/src/http/__tests__/shutdown/pooledInstance.test.ts",
   "server-runtime/src/http/__tests__/shutdown/releaseBeforeExit.test.ts",
+  "server-runtime/src/http/__tests__/shutdown/secondSignal.test.ts",
   "server-runtime/src/http/__tests__/stateLogger.test.ts",
   "server-runtime/src/http/__tests__/streamableHttpPool.test.ts",
   "server-runtime/src/http/__tests__/systemInformation.test.ts",

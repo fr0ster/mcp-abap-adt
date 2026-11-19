@@ -15,9 +15,9 @@
  *    `unitTestTools.test.ts`.
  *  - SHAPE 2 — the two `lib/search-source` files, tested at the module
  *    boundary they actually have (no MCP result).
- *  - SHAPE 3 — the two program-profiling handlers: `new AdtExecutor(...)
- *    .getProgramExecutor()`, not `createAdtClient`, so they need the
- *    `AdtExecutor` mock door instead of `../../lib/clients`.
+ *  - SHAPE 3 — the program-profiling handler: the on-premise executor's
+ *    `getProgramExecutor()` (`createOnPremExecutor`), not `createAdtClient`,
+ *    so it needs that door of `../../lib/clients`.
  *  - SHAPE 4 — `UpdateServiceBinding` and `CreateServiceBinding`, each its
  *    own shape:
  *      - `updateServiceBinding` has **no successor of the same shape**.
@@ -36,23 +36,7 @@
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import { format } from 'node:util';
-import { mockModuleExports } from '../helpers/moduleMock';
 
-// adt-clients replaced for this file before any module under test loads: the
-// handlers and src/lib/clients bind it when they load (node:test mock.module,
-// helpers/moduleMock.ts; its other exports stay the real ones).
-const AdtExecutorMock = mock.fn<(...args: any[]) => any>(
-  function AdtExecutor() {
-    return {
-      getProgramExecutor: () => programExecutor,
-    };
-  },
-);
-mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
-  AdtExecutor: AdtExecutorMock,
-});
-
-import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   analysePublication,
@@ -89,11 +73,6 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 let fakeClient: any;
 let programExecutor: Record<string, unknown>;
-
-// The class executors still come from `new AdtExecutor(connection, logger)`
-// directly, so the `../../lib/clients` swap above does nothing for them: the
-// AdtExecutor replacement is made at the top of this file, before the
-// handlers load and bind adt-clients.
 
 const context = { connection: {} as any, logger: undefined };
 

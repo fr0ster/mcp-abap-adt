@@ -36,6 +36,7 @@ import Module = require('node:module');
 
 import * as path from 'node:path';
 import { mock } from 'node:test';
+import { pathToFileURL } from 'node:url';
 import { readNameTable } from './nameTable';
 import { repositoryRoot } from './repoRoot';
 import { compiledFile } from './resolveHook';
@@ -68,8 +69,17 @@ function carries(loaded: unknown, replacements: object): boolean {
   );
 }
 
+/**
+ * node:test's `mock.module`, given an absolute path as its file URL: Node 22
+ * reads a bare Windows path (`D:\\…`) as a URL of scheme `d:` and replaces
+ * nothing (CI, windows-latest + Node 22); a file URL names the same module on
+ * every platform and Node version.
+ */
 const nodeMocker: ModuleMocker = (specifier, options) =>
-  mock.module(specifier, options);
+  mock.module(
+    path.isAbsolute(specifier) ? pathToFileURL(specifier).href : specifier,
+    options,
+  );
 
 const nodeLoader: ModuleLoader = (specifier) => require(specifier);
 

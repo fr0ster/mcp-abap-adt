@@ -1,9 +1,18 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import {
   InstanceState,
   type StatePart,
   StateUnavailableError,
 } from '../../../lib/state/InstanceState';
 import { NO_IDLE_BOUND } from '../../../lib/state/idleBound';
+import { assertThrows } from '../../helpers/assertions';
+import {
+  getTimerCount,
+  reset,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
 
 const MINUTE = 60_000;
 
@@ -12,7 +21,7 @@ const part = (opts: { failDispose?: string } = {}) => {
   let held = false;
   let failures: string[] = [];
   let tell: () => void = () => {};
-  const dispose = jest.fn(async () => {
+  const dispose = mock.fn(async () => {
     if (opts.failDispose) {
       failures = [opts.failDispose];
       throw new Error(opts.failDispose);
@@ -59,10 +68,19 @@ const flush = async () => {
   for (let i = 0; i < 5; i++) await Promise.resolve();
 };
 
-beforeEach(() => jest.useFakeTimers());
+beforeEach(() =>
+  useFakeTimers({
+    apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+  }),
+);
 afterEach(() => {
-  jest.clearAllTimers();
-  jest.useRealTimers();
+  // clearAllTimers() -> reset(), then enabled again with the same options
+  // (spec §3.7); the useRealTimers after it, as before.
+  reset();
+  useFakeTimers({
+    apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+  });
+  useRealTimers();
 });
 
 describe('InstanceState — the idle bound on waiting for the user', () => {
@@ -71,29 +89,29 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     const s = new InstanceState({ logger: l.logger });
     const a = part();
     s.attach(a.p);
-    const emptied = jest.fn();
+    const emptied = mock.fn();
     s.onEmpty(emptied);
     s.callStarted();
     a.hold();
     s.callEnded();
     const handle = s.handle;
 
-    jest.advanceTimersByTime(30 * MINUTE - 1);
+    mock.timers.tick(30 * MINUTE - 1);
     await flush();
-    expect(a.dispose).not.toHaveBeenCalled();
+    assert.equal(a.dispose.mock.callCount(), 0);
 
-    jest.advanceTimersByTime(1);
+    mock.timers.tick(1);
     await flush();
-    expect(a.dispose).toHaveBeenCalledTimes(1);
-    expect(s.holdsState()).toBe(false);
-    expect(emptied).toHaveBeenCalledTimes(1);
-    expect(s.handle).not.toBe(handle);
-    expect(() => s.check(handle)).toThrow(StateUnavailableError);
-    expect(l.info).toHaveLength(1);
-    expect(l.info[0]).toContain(
-      'ended by the idle bound (30 minutes without a call)',
+    assert.equal(a.dispose.mock.callCount(), 1);
+    assert.equal(s.holdsState(), false);
+    assert.equal(emptied.mock.callCount(), 1);
+    assert.notEqual(s.handle, handle);
+    assertThrows(() => s.check(handle), StateUnavailableError);
+    assert.equal(l.info.length, 1);
+    assert.ok(
+      l.info[0].includes('ended by the idle bound (30 minutes without a call)'),
     );
-    expect(l.info[0]).not.toContain(handle);
+    assert.ok(!l.info[0].includes(handle));
   });
 
   it('a call in flight across the mark ends nothing; the bound restarts from its end', async () => {
@@ -104,19 +122,19 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     a.hold();
     s.callEnded();
 
-    jest.advanceTimersByTime(20 * MINUTE);
+    mock.timers.tick(20 * MINUTE);
     s.callStarted(); // a Wait holding on the server
-    jest.advanceTimersByTime(40 * MINUTE); // past the mark while waiting
+    mock.timers.tick(40 * MINUTE); // past the mark while waiting
     await flush();
-    expect(a.dispose).not.toHaveBeenCalled();
+    assert.equal(a.dispose.mock.callCount(), 0);
     s.callEnded();
 
-    jest.advanceTimersByTime(30 * MINUTE - 1);
+    mock.timers.tick(30 * MINUTE - 1);
     await flush();
-    expect(a.dispose).not.toHaveBeenCalled();
-    jest.advanceTimersByTime(1);
+    assert.equal(a.dispose.mock.callCount(), 0);
+    mock.timers.tick(1);
     await flush();
-    expect(a.dispose).toHaveBeenCalledTimes(1);
+    assert.equal(a.dispose.mock.callCount(), 1);
   });
 
   it('two calls overlap: the bound runs only once both have ended', async () => {
@@ -127,13 +145,13 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     a.hold();
     s.callStarted();
     s.callEnded();
-    jest.advanceTimersByTime(60 * MINUTE);
+    mock.timers.tick(60 * MINUTE);
     await flush();
-    expect(a.dispose).not.toHaveBeenCalled();
+    assert.equal(a.dispose.mock.callCount(), 0);
     s.callEnded();
-    jest.advanceTimersByTime(30 * MINUTE);
+    mock.timers.tick(30 * MINUTE);
     await flush();
-    expect(a.dispose).toHaveBeenCalledTimes(1);
+    assert.equal(a.dispose.mock.callCount(), 1);
   });
 
   it("a listener's background re-poll is not user activity: the bound is not reset", async () => {
@@ -143,12 +161,12 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     s.callStarted();
     a.hold();
     s.callEnded();
-    jest.advanceTimersByTime(29 * MINUTE);
+    mock.timers.tick(29 * MINUTE);
     a.repoll();
     a.repoll();
-    jest.advanceTimersByTime(1 * MINUTE);
+    mock.timers.tick(1 * MINUTE);
     await flush();
-    expect(a.dispose).toHaveBeenCalledTimes(1);
+    assert.equal(a.dispose.mock.callCount(), 1);
   });
 
   it('nothing held: no timer; held again: armed; emptied by a stop: disarmed', () => {
@@ -157,13 +175,13 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     s.attach(a.p);
     s.callStarted();
     s.callEnded();
-    expect(jest.getTimerCount()).toBe(0);
+    assert.equal(getTimerCount(), 0);
     a.hold();
-    expect(jest.getTimerCount()).toBe(1);
+    assert.equal(getTimerCount(), 1);
     s.callStarted();
-    expect(jest.getTimerCount()).toBe(0); // paused while a call runs
+    assert.equal(getTimerCount(), 0); // paused while a call runs
     s.callEnded();
-    expect(jest.getTimerCount()).toBe(1);
+    assert.equal(getTimerCount(), 1);
   });
 
   it('the bound is a setting: 45 minutes', async () => {
@@ -171,12 +189,12 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     const a = part();
     s.attach(a.p);
     a.hold();
-    jest.advanceTimersByTime(30 * MINUTE);
+    mock.timers.tick(30 * MINUTE);
     await flush();
-    expect(a.dispose).not.toHaveBeenCalled();
-    jest.advanceTimersByTime(15 * MINUTE);
+    assert.equal(a.dispose.mock.callCount(), 0);
+    mock.timers.tick(15 * MINUTE);
     await flush();
-    expect(a.dispose).toHaveBeenCalledTimes(1);
+    assert.equal(a.dispose.mock.callCount(), 1);
   });
 
   it('dispose clears the timer; shutdown clears it for good', async () => {
@@ -184,22 +202,22 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     const a = part();
     s.attach(a.p);
     a.hold();
-    expect(jest.getTimerCount()).toBe(1);
+    assert.equal(getTimerCount(), 1);
     await s.dispose();
-    expect(jest.getTimerCount()).toBe(0);
+    assert.equal(getTimerCount(), 0);
 
     a.hold();
-    expect(jest.getTimerCount()).toBe(1);
+    assert.equal(getTimerCount(), 1);
     await s.shutdown();
-    expect(jest.getTimerCount()).toBe(0);
+    assert.equal(getTimerCount(), 0);
     a.hold(); // something held after the host let the instance go: no timer any more
-    expect(jest.getTimerCount()).toBe(0);
+    assert.equal(getTimerCount(), 0);
   });
 
-  it('the timer never keeps the process alive: unref is called', () => {
+  it('the timer never keeps the process alive: unref is called', (t) => {
     const real = global.setTimeout;
-    const unref = jest.fn();
-    const spy = jest.spyOn(global, 'setTimeout').mockImplementation(((
+    const unref = mock.fn();
+    const spy = t.mock.method(global, 'setTimeout', ((
       fn: () => void,
       ms?: number,
     ) => {
@@ -216,9 +234,9 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
       const a = part();
       s.attach(a.p);
       a.hold();
-      expect(unref).toHaveBeenCalledTimes(1);
+      assert.equal(unref.mock.callCount(), 1);
     } finally {
-      spy.mockRestore();
+      spy.mock.restore();
     }
   });
 
@@ -227,25 +245,26 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
     const s = new InstanceState({ logger: l.logger });
     const a = part({ failDispose: 'release debuggee: refused' });
     s.attach(a.p);
-    const emptied = jest.fn();
+    const emptied = mock.fn();
     s.onEmpty(emptied);
     a.hold();
     const handle = s.handle;
 
-    jest.advanceTimersByTime(30 * MINUTE);
+    mock.timers.tick(30 * MINUTE);
     await flush();
-    expect(a.dispose).toHaveBeenCalledTimes(1);
-    expect(s.holdsState()).toBe(true);
-    expect(s.failures()).toEqual(['release debuggee: refused']);
-    expect(emptied).not.toHaveBeenCalled();
-    expect(l.error.some((e) => e.includes('release debuggee: refused'))).toBe(
+    assert.equal(a.dispose.mock.callCount(), 1);
+    assert.equal(s.holdsState(), true);
+    assert.deepStrictEqual(s.failures(), ['release debuggee: refused']);
+    assert.equal(emptied.mock.callCount(), 0);
+    assert.equal(
+      l.error.some((e) => e.includes('release debuggee: refused')),
       true,
     );
-    expect(l.error.join('\n')).not.toContain(handle);
+    assert.ok(!l.error.join('\n').includes(handle));
     // kept for a retry: the handle still serves a stop that may succeed
-    expect(() => s.check(handle)).not.toThrow();
+    s.check(handle);
     // and the bound is armed again, so a forgotten state is retried
-    expect(jest.getTimerCount()).toBe(1);
+    assert.equal(getTimerCount(), 1);
   });
 
   it('an expiry that empties after a later retry still invalidates the handle (the end request stands)', async () => {
@@ -267,13 +286,13 @@ describe('InstanceState — the idle bound on waiting for the user', () => {
       },
     });
     const handle = s.handle;
-    jest.advanceTimersByTime(30 * MINUTE);
+    mock.timers.tick(30 * MINUTE);
     await flush();
-    expect(() => s.check(handle)).not.toThrow();
+    s.check(handle);
     fail = false;
     await s.dispose(); // e.g. the host, or a stop the user sent
-    expect(() => s.check(handle)).toThrow(StateUnavailableError);
-    expect(s.handle).not.toBe(handle);
+    assertThrows(() => s.check(handle), StateUnavailableError);
+    assert.notEqual(s.handle, handle);
   });
 });
 
@@ -284,7 +303,7 @@ describe('InstanceState — no bound (stdio)', () => {
       logger: l.logger,
       idleMinutes: NO_IDLE_BOUND,
     });
-    expect(s.idleMinutes).toBe(NO_IDLE_BOUND);
+    assert.equal(s.idleMinutes, NO_IDLE_BOUND);
     const a = part();
     s.attach(a.p);
     s.callStarted();
@@ -292,31 +311,29 @@ describe('InstanceState — no bound (stdio)', () => {
     s.callEnded();
     a.repoll();
     const handle = s.handle;
-    expect(jest.getTimerCount()).toBe(0);
-    jest.advanceTimersByTime(24 * 60 * MINUTE);
+    assert.equal(getTimerCount(), 0);
+    mock.timers.tick(24 * 60 * MINUTE);
     await flush();
-    expect(jest.getTimerCount()).toBe(0);
-    expect(a.dispose).not.toHaveBeenCalled();
-    expect(s.holdsState()).toBe(true);
-    expect(() => s.check(handle)).not.toThrow();
-    expect(l.info).toEqual([]);
-    expect(l.error).toEqual([]);
+    assert.equal(getTimerCount(), 0);
+    assert.equal(a.dispose.mock.callCount(), 0);
+    assert.equal(s.holdsState(), true);
+    s.check(handle);
+    assert.deepStrictEqual(l.info, []);
+    assert.deepStrictEqual(l.error, []);
   });
 
   it('absent is the default bound, 30 minutes: an embedder that passes nothing keeps it', () => {
-    expect(new InstanceState({ logger: logs().logger }).idleMinutes).toBe(30);
+    assert.equal(new InstanceState({ logger: logs().logger }).idleMinutes, 30);
   });
 });
 
 describe('InstanceState — the bound refuses a misconfiguration', () => {
-  it.each([29, 0, -1, 30.5, Number.NaN, Number.POSITIVE_INFINITY])(
-    'idleMinutes %p is refused',
-    (v) => {
-      expect(() => new InstanceState({ idleMinutes: v })).toThrow(
-        /at least 30/,
-      );
-    },
-  );
+  // Jest's %p of a number is its String(): 29, 0, -1, 30.5, NaN, Infinity.
+  for (const v of [29, 0, -1, 30.5, Number.NaN, Number.POSITIVE_INFINITY]) {
+    it(`idleMinutes ${String(v)} is refused`, () => {
+      assertThrows(() => new InstanceState({ idleMinutes: v }), /at least 30/);
+    });
+  }
 });
 
 describe('InstanceState — while a complete stop is disposing', () => {
@@ -342,14 +359,14 @@ describe('InstanceState — while a complete stop is disposing', () => {
       },
     });
     const handle = s.handle;
-    expect(() => s.check(handle)).not.toThrow();
-    jest.advanceTimersByTime(30 * MINUTE);
+    s.check(handle);
+    mock.timers.tick(30 * MINUTE);
     await flush();
-    expect(s.holdsState()).toBe(true); // still disposing
-    expect(() => s.check(handle)).toThrow(StateUnavailableError);
+    assert.equal(s.holdsState(), true); // still disposing
+    assertThrows(() => s.check(handle), StateUnavailableError);
     release();
     await flush();
-    expect(() => s.check(handle)).toThrow(StateUnavailableError);
+    assertThrows(() => s.check(handle), StateUnavailableError);
   });
 
   it('a plain dispose (no end requested) does not refuse the handle meanwhile', async () => {
@@ -366,7 +383,7 @@ describe('InstanceState — while a complete stop is disposing', () => {
       dispose: () => gate,
     });
     const disposing = s.dispose();
-    expect(() => s.check(s.handle)).not.toThrow();
+    s.check(s.handle);
     release();
     await disposing;
   });
@@ -390,16 +407,17 @@ describe('InstanceState — an expiry whose cleanup is still finishing', () => {
         finishing = true; // AMDP: the last event batch is still to come
       },
     });
-    jest.advanceTimersByTime(30 * MINUTE);
+    mock.timers.tick(30 * MINUTE);
     await flush();
-    expect(l.info).toHaveLength(1);
-    expect(l.info[0]).toMatch(/still finishing/);
-    expect(l.info[0]).not.toMatch(/\bended\b/);
+    assert.equal(l.info.length, 1);
+    assert.match(l.info[0], /still finishing/);
+    assert.doesNotMatch(l.info[0], /\bended\b/);
     finishing = false;
     held = false;
     tell(); // the last batch arrived
-    expect(l.info).toHaveLength(2);
-    expect(l.info[1]).toMatch(
+    assert.equal(l.info.length, 2);
+    assert.match(
+      l.info[1],
       /ended by the idle bound \(30 minutes without a call\)/,
     );
   });

@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthOutcome,
@@ -6,6 +9,12 @@ import type {
   ILogonTarget,
   IRequestTarget,
 } from '@mcp-abap-adt/interfaces-auth';
+import { rejectionOf } from '../../../../../src/__tests__/helpers/assertions';
+import {
+  getTimerCount,
+  useFakeTimers,
+  useRealTimers,
+} from '../../../../../src/__tests__/helpers/fakeTime';
 import {
   countedProvider,
   ProviderGate,
@@ -79,39 +88,46 @@ function fakeInner(answer: (m: Method) => Promise<AuthOutcome>) {
 }
 
 describe('countedProvider', () => {
-  it.each(METHODS)(
-    '%s is forwarded with its argument; Ok and Oops come back unchanged',
-    async (m) => {
-      for (const answer of [OK, OOPS]) {
-        const { inner, calls } = fakeInner(async () => answer);
-        const p = countedProvider(inner, new ProviderGate());
-        await expect(call(p, m)).resolves.toBe(answer);
-        expect(calls).toHaveLength(1);
-        expect(calls[0].method).toBe(m);
-        if (m === 'prepare') expect(calls[0].args).toEqual([]);
-        else expect(calls[0].args[0]).toBe(ARG[m]);
-      }
-    },
-  );
+  for (const m of METHODS) {
+    it(
+      format(
+        '%s is forwarded with its argument; Ok and Oops come back unchanged',
+        m,
+      ),
+      async () => {
+        for (const answer of [OK, OOPS]) {
+          const { inner, calls } = fakeInner(async () => answer);
+          const p = countedProvider(inner, new ProviderGate());
+          assert.equal(await call(p, m), answer);
+          assert.equal(calls.length, 1);
+          assert.equal(calls[0].method, m);
+          if (m === 'prepare') assert.deepStrictEqual(calls[0].args, []);
+          else assert.equal(calls[0].args[0], ARG[m]);
+        }
+      },
+    );
+  }
 
   it('keeps the inner provider kind', () => {
     const { inner } = fakeInner(async () => OK);
-    expect(countedProvider(inner, new ProviderGate()).kind).toBe('fake');
+    assert.equal(countedProvider(inner, new ProviderGate()).kind, 'fake');
   });
 
-  it.each(METHODS)(
-    '%s: a throw from the inner provider passes through unaltered',
-    async (m) => {
-      const boom = new Error('inner bug');
-      const { inner } = fakeInner(async () => {
-        throw boom;
-      });
-      const gate = new ProviderGate();
-      const p = countedProvider(inner, gate);
-      await expect(call(p, m)).rejects.toBe(boom);
-      expect(gate.inFlight).toBe(0);
-    },
-  );
+  for (const m of METHODS) {
+    it(
+      format('%s: a throw from the inner provider passes through unaltered', m),
+      async () => {
+        const boom = new Error('inner bug');
+        const { inner } = fakeInner(async () => {
+          throw boom;
+        });
+        const gate = new ProviderGate();
+        const p = countedProvider(inner, gate);
+        assert.equal(await rejectionOf(call(p, m)), boom);
+        assert.equal(gate.inFlight, 0);
+      },
+    );
+  }
 
   it('counts a held call while it runs and counts it down when it answers', async () => {
     const held = deferred<AuthOutcome>();
@@ -120,30 +136,35 @@ describe('countedProvider', () => {
     const p = countedProvider(inner, gate);
     const a = p.rejected(rejection);
     const b = p.authorize(request);
-    expect(gate.inFlight).toBe(2);
+    assert.equal(gate.inFlight, 2);
     held.resolve(OK);
     await Promise.all([a, b]);
-    expect(gate.inFlight).toBe(0);
+    assert.equal(gate.inFlight, 0);
   });
 
-  it.each(METHODS)(
-    '%s behind a closed gate answers the shutdown refusal, never calls inner, never throws',
-    async (m) => {
-      const { inner, calls } = fakeInner(async () => OK);
-      const gate = new ProviderGate();
-      const p = countedProvider(inner, gate);
-      gate.close();
-      expect(gate.closed).toBe(true);
-      const outcome = await call(p, m);
-      expect(outcome).toEqual({
-        ok: false,
-        refusal: authError['interactive-login']({ outcome: 'aborted' }),
-      });
-      expect(outcome).toEqual(SHUTDOWN_REFUSAL);
-      expect(calls).toHaveLength(0);
-      expect(gate.inFlight).toBe(0);
-    },
-  );
+  for (const m of METHODS) {
+    it(
+      format(
+        '%s behind a closed gate answers the shutdown refusal, never calls inner, never throws',
+        m,
+      ),
+      async () => {
+        const { inner, calls } = fakeInner(async () => OK);
+        const gate = new ProviderGate();
+        const p = countedProvider(inner, gate);
+        gate.close();
+        assert.equal(gate.closed, true);
+        const outcome = await call(p, m);
+        assert.deepStrictEqual(outcome, {
+          ok: false,
+          refusal: authError['interactive-login']({ outcome: 'aborted' }),
+        });
+        assert.deepStrictEqual(outcome, SHUTDOWN_REFUSAL);
+        assert.equal(calls.length, 0);
+        assert.equal(gate.inFlight, 0);
+      },
+    );
+  }
 
   it('a call admitted before close() completes and is counted down', async () => {
     const held = deferred<AuthOutcome>();
@@ -152,17 +173,17 @@ describe('countedProvider', () => {
     const p = countedProvider(inner, gate);
     const admitted = p.prepare();
     gate.close();
-    expect(gate.inFlight).toBe(1);
+    assert.equal(gate.inFlight, 1);
     held.resolve(OK);
-    await expect(admitted).resolves.toBe(OK);
-    expect(calls).toHaveLength(1);
-    expect(gate.inFlight).toBe(0);
+    assert.equal(await admitted, OK);
+    assert.equal(calls.length, 1);
+    assert.equal(gate.inFlight, 0);
   });
 });
 
 describe('ProviderGate.drained', () => {
   it('resolves at once when nothing runs', async () => {
-    await expect(new ProviderGate().drained()).resolves.toBeUndefined();
+    assert.equal(await new ProviderGate().drained(), undefined);
   });
 
   it('resolves when the count reaches zero — no deadline, no timer', async () => {
@@ -176,15 +197,17 @@ describe('ProviderGate.drained', () => {
       settled = true;
     });
     await new Promise((r) => setImmediate(r));
-    expect(settled).toBe(false);
+    assert.equal(settled, false);
     held.resolve(OK);
     await running;
     await drained;
-    expect(settled).toBe(true);
+    assert.equal(settled, true);
   });
 
   it('holds no timer while it waits', async () => {
-    jest.useFakeTimers();
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    });
     try {
       const held = deferred<AuthOutcome>();
       const { inner } = fakeInner(() => held.promise);
@@ -192,11 +215,11 @@ describe('ProviderGate.drained', () => {
       const p = countedProvider(inner, gate);
       const running = p.prepare();
       void gate.drained();
-      expect(jest.getTimerCount()).toBe(0);
+      assert.equal(getTimerCount(), 0);
       held.resolve(OK);
       await running;
     } finally {
-      jest.useRealTimers();
+      useRealTimers();
     }
   });
 
@@ -210,7 +233,7 @@ describe('ProviderGate.drained', () => {
     const drained = gate.drained(forced.signal);
     forced.abort();
     await drained;
-    expect(gate.inFlight).toBe(1);
+    assert.equal(gate.inFlight, 1);
     held.resolve(OK);
     await running;
   });

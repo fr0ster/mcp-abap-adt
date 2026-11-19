@@ -12,10 +12,13 @@
 //    minutes behind a publish, and the caller runs the script again. There is
 //    no waiting loop or timer here.
 // 2. All of them are installed together into a fresh directory outside the
-//    repository (`npm install --ignore-scripts`), from the registry alone:
-//    every npm call names `--registry=https://registry.npmjs.org/`, so no
-//    mirror of a user's .npmrc stands in, and `npm view` runs with
-//    `--json=false`, so its answer is the bare version.
+//    repository (`npm install --ignore-scripts`), from the registry alone.
+//    Every npm call (`view` too) runs from that directory, so no project
+//    `.npmrc` applies, with an empty file each as `--userconfig`
+//    and `--globalconfig`, so no user or global setting is read (a mirror, a
+//    scoped `@scope:registry`, `offline`), and with
+//    `--registry=https://registry.npmjs.org/ --offline=false --prefer-online`;
+//    `npm view` adds `--json=false`, so its answer is the bare version.
 // 3. The installed lockfile holds no `"link": true`, and every package in it
 //    is resolved from https://registry.npmjs.org/. The installed versions of
 //    adt-clients, adt-strategies and connection are reported.
@@ -86,11 +89,27 @@ function releaseDirs() {
 const manifest = (dir) =>
   JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
 
-// `npm <args>` from `cwd`: its exit status and output, never a throw.
-async function npmRun(args, cwd) {
+// The settings every npm call states, so no configuration of the user's is
+// read: an empty file each as the user and the global configuration (npm
+// refuses one file for both) (no
+// `registry`, scoped `@scope:registry`, `offline`, …), the registry itself,
+// and online. The calls run from the temporary directory, outside the
+// repository, so no project `.npmrc` applies either.
+const isolated = (work) => [
+  `--userconfig=${path.join(work, 'user.npmrc')}`,
+  `--globalconfig=${path.join(work, 'global.npmrc')}`,
+  `--registry=${REGISTRY}`,
+  '--offline=false',
+  '--prefer-online',
+];
+
+// `npm <command> <isolated settings> <args>` from `work`: its exit status and
+// output, never a throw.
+async function npmRun(work, command, args) {
   try {
-    const { stdout, stderr } = await run(npm.cmd, [...npm.args, ...args], {
-      cwd,
+    const all = [...npm.args, command, ...isolated(work), ...args];
+    const { stdout, stderr } = await run(npm.cmd, all, {
+      cwd: work,
       env,
       encoding: 'utf8',
       maxBuffer: 64 * 1024 * 1024,
@@ -105,37 +124,33 @@ async function npmRun(args, cwd) {
   }
 }
 
-// Each name whose `<name>@<version>` the registry does not answer yet; a
-// failure that is not npm's E404 stops the run.
-async function notVisible(names, version) {
+// Each name whose `<name>@<version>` the registry does not answer yet, and
+// the failures that are not npm's E404 (they stop the run).
+async function notVisible(work, names, version) {
   const answers = await Promise.all(
     names.map(async (name) => ({
       name,
-      answer: await npmRun(
-        [
-          'view',
-          `--registry=${REGISTRY}`,
-          '--json=false',
-          `${name}@${version}`,
-          'version',
-        ],
-        repo,
-      ),
+      answer: await npmRun(work, 'view', [
+        '--json=false',
+        `${name}@${version}`,
+        'version',
+      ]),
     })),
   );
   const missing = [];
+  const failed = [];
   for (const { name, answer } of answers) {
     if (answer.status === 0 && answer.stdout.trim() === version) continue;
     if (answer.status === 0 || answer.stderr.includes('E404')) {
       missing.push(name);
       continue;
     }
-    fail([
+    failed.push(
       `npm view ${name}@${version} failed (exit ${answer.status}):`,
       answer.stderr.trim(),
-    ]);
+    );
   }
-  return missing;
+  return { missing, failed };
 }
 
 // What the installed lockfile says against a registry-only install, and the
@@ -203,7 +218,39 @@ if (version === '' || version[0] < '0' || version[0] > '9') {
 }
 
 const names = releaseDirs().map((dir) => manifest(path.join(repo, dir)).name);
-const missing = await notVisible(names, version);
+
+// Created before the `try`, and nothing between: whatever fails after it,
+// the `finally` removes it.
+const created = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-abap-adt-verify-'));
+const failures = [];
+let missing = [];
+let summary = '';
+try {
+  const work = fs.realpathSync(created);
+  if (inside(fs.realpathSync(repo), work)) {
+    throw new Error(`the temporary directory ${work} is inside the repository`);
+  }
+  fs.writeFileSync(path.join(work, 'user.npmrc'), '');
+  fs.writeFileSync(path.join(work, 'global.npmrc'), '');
+  fs.writeFileSync(path.join(work, 'package.json'), '{"private":true}\n');
+  const view = await notVisible(work, names, version);
+  missing = view.missing;
+  failures.push(...view.failed);
+  if (failures.length > 0 || missing.length > 0) {
+    // Nothing installed: the registry first.
+  } else {
+    console.log(
+      `release:verify: all ${names.length} packages at ${version} are on the registry`,
+    );
+    await verifyInstalled(work);
+  }
+} catch (error) {
+  failures.push(String(error));
+} finally {
+  fs.rmSync(created, { recursive: true, force: true });
+}
+
+if (failures.length > 0) fail(['FAILED:', ...failures.map((f) => `  ${f}`)]);
 if (missing.length > 0) {
   fail(
     [
@@ -213,33 +260,16 @@ if (missing.length > 0) {
     2,
   );
 }
-console.log(
-  `release:verify: all ${names.length} packages at ${version} are on the registry`,
-);
+console.log(summary);
 
-// Created before the `try`, and nothing between: whatever fails after it,
-// the `finally` removes it.
-const created = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-abap-adt-verify-'));
-const failures = [];
-let summary = '';
-try {
-  const work = fs.realpathSync(created);
-  if (inside(fs.realpathSync(repo), work)) {
-    throw new Error(`the temporary directory ${work} is inside the repository`);
-  }
-  fs.writeFileSync(path.join(work, 'package.json'), '{"private":true}\n');
-  const install = await npmRun(
-    [
-      'install',
-      `--registry=${REGISTRY}`,
-      '--ignore-scripts',
-      '--prefer-online',
-      '--no-audit',
-      '--no-fund',
-      ...names.map((name) => `${name}@${version}`),
-    ],
-    work,
-  );
+// The clean install from the registry, its lockfile and every bin.
+async function verifyInstalled(work) {
+  const install = await npmRun(work, 'install', [
+    '--ignore-scripts',
+    '--no-audit',
+    '--no-fund',
+    ...names.map((name) => `${name}@${version}`),
+  ]);
   if (install.status !== 0) {
     failures.push(
       `npm install failed (exit ${install.status}):`,
@@ -290,11 +320,4 @@ try {
       failures.push('no package of the release declares a bin');
     summary = `OK: ${names.length} packages at ${version} installed from the registry, lockfile registry-only, ${binCount} bins answer ${version} (${reported})`;
   }
-} catch (error) {
-  failures.push(String(error));
-} finally {
-  fs.rmSync(created, { recursive: true, force: true });
 }
-
-if (failures.length > 0) fail(['FAILED:', ...failures.map((f) => `  ${f}`)]);
-console.log(summary);

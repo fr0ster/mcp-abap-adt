@@ -311,6 +311,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       systemContextResolver: options.systemContextResolver,
       systemContextRules: options.systemContextRules,
       stateIdleMinutes: options.stateIdleMinutes,
+      // The connection is the host's (injected): the keep-alive pings only a
+      // connection the server built, so this instance arms no timer.
+      sessionKeepAliveMs: 0,
       stateLogger: options.stateLogger,
       ...(options.transportCloseEndsSession !== undefined && {
         transportCloseEndsSession: options.transportCloseEndsSession,

@@ -17,6 +17,7 @@ import {
   BaseMcpServer,
   closeInstance,
   InstanceBatch,
+  sessionKeepAliveMsOf,
 } from '@mcp-abap-adt/lib/embeddable';
 import {
   type IHandlersRegistry,
@@ -68,6 +69,13 @@ export interface SseServerOptions {
    * after this long without a tool call. At least 30; default 30.
    */
   stateIdleMinutes?: number | undefined;
+  /**
+   * The session keep-alive's interval in milliseconds, for each instance
+   * (`--session-keep-alive-minutes` × 60 000): its built connection is
+   * pinged once no request went over it for that long. `0`: off. Absent:
+   * the base's default, 10 minutes.
+   */
+  sessionKeepAliveMs?: number | undefined;
   /** Where the state's lifecycle lines go; default stderr, always on. */
   stateLogger?: StateLogger | undefined;
   /**
@@ -197,6 +205,8 @@ export class SseServer {
   private readonly allowedOrigins?: string[] | undefined;
   private readonly enableDnsRebindingProtection?: boolean | undefined;
   private readonly stateIdleMinutes?: number | undefined;
+  /** Each stream's instance's keep-alive interval (`sessionKeepAliveMs`). */
+  private readonly sessionKeepAliveMs?: number | undefined;
   private readonly stateLogger: StateLogger;
   private readonly backgroundRuns: IBackgroundRuns | undefined;
   private readonly accessChecks: IAccessChecks | undefined;
@@ -238,6 +248,11 @@ export class SseServer {
       opts?.stateIdleMinutes === undefined
         ? undefined
         : stateIdleMinutesOf(opts.stateIdleMinutes, 'stateIdleMinutes');
+    // Refused here, at startup, rather than at a stream's first connection.
+    this.sessionKeepAliveMs =
+      opts?.sessionKeepAliveMs === undefined
+        ? undefined
+        : sessionKeepAliveMsOf(opts.sessionKeepAliveMs, 'sessionKeepAliveMs');
     // From the options as given: the silent default of `this.logger` is never the state's.
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRuns = opts?.backgroundRuns;
@@ -436,6 +451,7 @@ export class SseServer {
           systemType?: SapEnvironment | undefined;
           systemTypeFromEnvironment?: false;
           stateIdleMinutes?: number | undefined;
+          sessionKeepAliveMs?: number | undefined;
           stateLogger?: StateLogger;
           backgroundRuns?: IBackgroundRuns;
           accessChecks?: IAccessChecks;
@@ -475,6 +491,8 @@ export class SseServer {
         // The server's one kind, fixed at its construction: never re-read.
         systemTypeFromEnvironment: false,
         stateIdleMinutes: this.stateIdleMinutes,
+        // The stream's held connection is kept alive while the stream is open.
+        sessionKeepAliveMs: this.sessionKeepAliveMs,
         stateLogger: this.stateLogger,
         ...(this.sapAnswerStrategy !== undefined && {
           sapAnswerStrategy: this.sapAnswerStrategy,

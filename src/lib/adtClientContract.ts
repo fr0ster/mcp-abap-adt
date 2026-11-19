@@ -49,14 +49,12 @@ import type {
   IAdtObjectProperties,
   IAdtOperationOptions,
   IAdtRepositoryStructure,
-  IAdtRequest,
   IAdtResponse,
   IAdtSearchObjectsParamsOf,
   IAdtServiceBindingTypes,
   IAdtServiceGroupReadable,
   IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
-  IAdtTransportSearchConfigurations,
   IAdtTransportSortAndCompress,
   IAdtTypeCatalogue,
   IAdtTypedGroupLifecycle,
@@ -1047,6 +1045,40 @@ export type EnhancementApi<
 > = StatedReadable<IEnhancementConfig, ReturnType<R['source']>> &
   StatedMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>;
 
+/** A request status the listing selects: `D` modifiable, `R` released. */
+export type TransportListStatus = 'D' | 'R';
+
+/** A request type the listing selects: `K` workbench, `W` customizing, `T` transport of copies. */
+export type TransportListType = 'K' | 'W' | 'T';
+
+/**
+ * The transport listing by user, with no saved search configuration: the
+ * query SAP's handler reads — `user` (it matches the request owner or a
+ * task owner), `requestStatus`, `requestType`, and `releasedFromDate` /
+ * `releasedToDate` (`YYYYMMDD`, released requests only; SAP's default is
+ * the last 14 days). Each is sent only when given. adt-clients 45.5.3
+ * serves it (`IListTransportsQuery`); interfaces-adt 27.4's `IAdtRequest`
+ * names the saved search alone, so the server states the form it calls.
+ */
+export type TransportListQuery = {
+  readonly user: string;
+  readonly requestStatus: readonly [
+    TransportListStatus,
+    ...TransportListStatus[],
+  ];
+  readonly requestType?: readonly [TransportListType, ...TransportListType[]];
+  readonly releasedFromDate?: string;
+  readonly releasedToDate?: string;
+};
+
+/** The listing the server calls: one request, the query by user. */
+export interface TransportListing<TList> {
+  list<E extends IAdtError>(
+    options: TransportListQuery &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<TList, E>>;
+}
+
 /** What the server calls on `getRequest()`'s answer. */
 export type RequestApi<
   R extends ITransportResults,
@@ -1070,7 +1102,7 @@ export type RequestApi<
       'delete'
     >
   > &
-  IAdtRequest<ReturnType<R['list']>> &
+  TransportListing<ReturnType<R['list']>> &
   PerformedOn<
     V,
     'request',
@@ -1181,15 +1213,6 @@ export type RequestApi<
     'request',
     'moveObjects',
     Pick<IAdtTransportMoveObjects<ReturnType<R['movedObjects']>>, 'moveObjects'>
-  > &
-  PerformedOn<
-    V,
-    'request',
-    'searchConfigurations',
-    Pick<
-      IAdtTransportSearchConfigurations<ReturnType<R['searchConfigurations']>>,
-      'searchConfigurations'
-    >
   >;
 
 /** What the server calls on `getLocalTestClass()`'s answer. */

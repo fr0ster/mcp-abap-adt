@@ -22,6 +22,11 @@
 
 import { isJsonObject, type JsonValue, jsonAt } from '../json';
 import {
+  DEFAULT_SESSION_KEEP_ALIVE_MINUTES,
+  MAX_SESSION_KEEP_ALIVE_MINUTES,
+  parseSessionKeepAliveMinutes,
+} from '../sessionKeepAlive';
+import {
   DEFAULT_STATE_IDLE_MINUTES,
   MAX_STATE_IDLE_MINUTES,
   parseStateIdleMinutes,
@@ -1011,6 +1016,40 @@ export const ENABLE_DATA_TOOLS_ROW: Parameter = {
   default: false,
   section: 'DATA TOOLS',
   help: "Serves the tools that read business data: GetSqlQuery and GetTableContents (compact: HandlerGetData). true or false; off by default (an empty value counts as not given). SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems. Whether to turn this on is the customer's decision.",
+};
+
+export const SESSION_KEEP_ALIVE_CLI = '--session-keep-alive-minutes';
+export const SESSION_KEEP_ALIVE_ENV = 'MCP_SESSION_KEEP_ALIVE_MINUTES';
+export const SESSION_KEEP_ALIVE_YAML = 'session-keep-alive-minutes';
+
+/**
+ * `--session-keep-alive-minutes` / `MCP_SESSION_KEEP_ALIVE_MINUTES` / YAML
+ * `session-keep-alive-minutes`: the session keep-alive's interval
+ * (`sessionKeepAlive.ts`), a whole number of minutes from 0 (off) to
+ * 35 791, default 10; an empty value or YAML null is not given, anything
+ * else is refused at startup. In every binary's table; the launchers hand
+ * it to their servers in milliseconds.
+ */
+export const SESSION_KEEP_ALIVE_ROW: Parameter = {
+  key: 'sessionKeepAliveMinutes',
+  cli: SESSION_KEEP_ALIVE_CLI,
+  env: SESSION_KEEP_ALIVE_ENV,
+  yaml: SESSION_KEEP_ALIVE_YAML,
+  kind: 'custom',
+  parse: (raw, name) => {
+    try {
+      return parseSessionKeepAliveMinutes(raw, name);
+    } catch (error) {
+      const failure = thrownAs(error, Error);
+      throw new ParameterRefusal(
+        failure !== undefined ? failure.message : `Invalid ${name}`,
+      );
+    }
+  },
+  default: DEFAULT_SESSION_KEEP_ALIVE_MINUTES,
+  valueHint: '=<minutes>',
+  section: 'SESSION',
+  help: `The session keep-alive of the server's own connection to SAP (HTTP or RFC): a tick every this many minutes sends one stateful discovery request in the server's own session when no request in the stateful session went out since the previous tick (fresh connections for background runs and long reads are not pinged), so SAP does not end the idle ABAP session (the first call after a long pause would otherwise fail); the first ping comes one to two intervals after the last request in the stateful session. Default: 10; 0 turns it off; at most ${MAX_SESSION_KEEP_ALIVE_MINUTES}; a whole number. It starts at the connection's logon and stops at its logoff or end; it never opens a connection, and a connection the host injected is never pinged.`,
 };
 
 /** The longest `--shutdown-timeout`: a day. */

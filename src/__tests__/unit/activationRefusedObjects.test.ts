@@ -80,12 +80,46 @@ const DAAT =
   'The statement "DAAT" is not expected. A correct similar statement is "DATA".';
 const LV = 'Field "LV" is unknown.';
 
-/** The error messages as read: each about the broken class. */
-const READ_BROKEN = [
-  { type: 'E', text: DAAT, objectName: BROKEN, uri: BROKEN_URI },
-  { type: 'E', text: LV, objectName: BROKEN, uri: BROKEN_URI },
-  { type: 'E', text: LV, objectName: BROKEN, uri: BROKEN_URI },
+/**
+ * Where each error message stands, as its `objDescr`, `href` and `code`
+ * state it: the source position is the href's `#start=`, never the `line`
+ * attribute (the message's ordinal, fr0ster/mcp-abap-adt#351).
+ */
+const SOURCE = `${BROKEN_URI}/source/main`;
+const STANDS = [
+  {
+    object: `Class ${BROKEN}, Method M`,
+    source_uri: SOURCE,
+    position: { line: 7, column: 4, end: { line: 7, column: 8 } },
+    code: 'MESSAGE(G13)',
+  },
+  {
+    object: `Class ${BROKEN}, Method M`,
+    source_uri: SOURCE,
+    position: { line: 8, column: 4, end: { line: 8, column: 6 } },
+    code: 'MESSAGE(GTU)',
+  },
+  {
+    object: `Class ${BROKEN}, Method M`,
+    source_uri: SOURCE,
+    position: { line: 9, column: 8, end: { line: 9, column: 10 } },
+    code: 'MESSAGE(GTU)',
+  },
+] as const;
+
+/** The error messages as read, with no run object to name. */
+const READ_ALONE = [
+  { type: 'E', text: DAAT, ...STANDS[0] },
+  { type: 'E', text: LV, ...STANDS[1] },
+  { type: 'E', text: LV, ...STANDS[2] },
 ];
+
+/** The error messages as read: each about the broken class. */
+const READ_BROKEN = READ_ALONE.map((message) => ({
+  ...message,
+  objectName: BROKEN,
+  uri: BROKEN_URI,
+}));
 
 const RUN_ID = 'RUN0002';
 
@@ -273,9 +307,7 @@ describe('the measured results of a run with one broken class', () => {
   });
 
   it('read with no references (a run read by its id), no message names an object', () => {
-    expect(activationMessagesOf(kept(CLOUD), [])).toEqual(
-      READ_BROKEN.map(({ type, text }) => ({ type, text })),
-    );
+    expect(activationMessagesOf(kept(CLOUD), [])).toEqual(READ_ALONE);
   });
 });
 
@@ -321,7 +353,15 @@ describe('ActivateObjects answers the measured refusal', () => {
       `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
     );
     expect(payload.messages).toEqual([
-      { type: 'E', text: DAAT, objectName: BROKEN, uri: BROKEN_URI },
+      {
+        type: 'E',
+        text: DAAT,
+        objectName: BROKEN,
+        uri: BROKEN_URI,
+        source_uri: SOURCE,
+        position: { line: 7, column: 4 },
+        line: '7',
+      },
       { type: 'E', text: LV, objectName: BROKEN, uri: BROKEN_URI },
     ]);
   });
@@ -345,7 +385,14 @@ describe('ActivateObjects answers the measured refusal', () => {
         'its results say activationExecuted="false": none of the 2 object(s) was activated',
       );
       expect(payload.message).toContain(`${BROKEN}: ${DAAT}`);
-      expect(payload.messages).toEqual(messages);
+      // A refusal answers each message's deprecated `line`: its position's.
+      expect(payload.messages).toEqual(
+        messages.map((message) =>
+          'position' in message
+            ? { ...message, line: String(message.position.line) }
+            : message,
+        ),
+      );
     },
   );
 });

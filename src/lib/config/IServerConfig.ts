@@ -69,6 +69,13 @@ export interface IServerConfig {
   stateIdleMinutes?: number | undefined;
 
   /**
+   * The session keep-alive's interval in minutes
+   * (`--session-keep-alive-minutes`, `MCP_SESSION_KEEP_ALIVE_MINUTES`,
+   * `session-keep-alive-minutes`): a whole number, 0 off; default 10.
+   */
+  sessionKeepAliveMinutes?: number | undefined;
+
+  /**
    * Whether a batch's answers keep the raw part each came in
    * (`--batch-keep-raw-parts`, `MCP_BATCH_KEEP_RAW_PARTS`,
    * `batch.keepRawParts`). Default `false`.

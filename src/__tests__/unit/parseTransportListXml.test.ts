@@ -1,7 +1,4 @@
-import {
-  isModifiableStatus,
-  parseTransportListXml,
-} from '../../handlers/transport/readonly/handleListTransports';
+import { parseTransportListXml } from '../../handlers/transport/readonly/handleListTransports';
 import { corpusBody } from '../helpers/adtCorpus';
 
 /**
@@ -189,23 +186,5 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
 
     expect(parsed).toHaveLength(1);
     expect(parsed[0].description).toBe('Once');
-  });
-});
-
-describe('isModifiableStatus', () => {
-  it('treats D and L as modifiable', () => {
-    expect(isModifiableStatus('D')).toBe(true);
-    expect(isModifiableStatus('L')).toBe(true);
-  });
-
-  it('treats released statuses as not modifiable', () => {
-    expect(isModifiableStatus('R')).toBe(false);
-    expect(isModifiableStatus('N')).toBe(false);
-    expect(isModifiableStatus('O')).toBe(false);
-  });
-
-  it('keeps a request whose status could not be determined', () => {
-    expect(isModifiableStatus('')).toBe(true);
-    expect(isModifiableStatus(undefined)).toBe(true);
   });
 });

@@ -159,10 +159,14 @@ scripts and steal npm and GitHub tokens. So:
   images, the portable build and any install outside this checkout use
   `npm ci --ignore-scripts` / `npm install --ignore-scripts`. Our own `prepare` (husky)
   is run explicitly where it is wanted.
-- `npm audit --audit-level=moderate` gates CI and the release, the whole tree. An
-  advisory with no fixed release is answered with an `overrides` entry whose reason
-  is in the CHANGELOG (today: `argparse` 2 under `js-yaml` 3), or by dropping the
-  package — never by making the audit non-gating.
+- `npm audit --omit=dev --audit-level=moderate` gates CI and the release: the
+  production dependencies. Dev dependencies are left out of the gate until the tests
+  leave Jest (#361): the picomatch advisory GHSA-fc5q-39xc-vjpf has no fixed release
+  and reaches the tree only through jest and lint-staged. Once #361 lands, the gate
+  returns to the whole tree. An advisory in a shipped dependency with no fixed release
+  is answered with an `overrides` entry whose reason is in the CHANGELOG (today:
+  `argparse` 2 under `js-yaml` 3), or by dropping the package — never by making the
+  audit non-gating.
 - Never `npx`: scripts call the package's own bin (`biome`, `tsc`, `lint-staged`), a
   test spawns `process.execPath` with the resolved CLI.
 

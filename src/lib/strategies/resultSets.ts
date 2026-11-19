@@ -131,14 +131,9 @@ export const READING_BY_SLOT = {
   odata: structured,
   bindingTypes: structured,
   list: structured,
-  // Arrived with adt-clients 19.1.0, on `AdtRequest.searchConfigurations()`.
-  // `structured` is the default any call site gets: the document parsed into
-  // named structure, like its neighbour `list`. `ListTransports` is the one
-  // caller that wants something else and keeps the shipped reading instead
-  // (`resultsFor(transportDocuments, ['searchConfigurations'])`), because
-  // what it needs is the addressable list — `uri`, `etag`, attributes — that
-  // the package already parses, and a `configUri` is not something to dig
-  // back out of a generic parse.
+  // `AdtRequest.searchConfigurations()`'s slot: no tool reads the saved
+  // transport searches (`ListTransports` lists by user, adt-clients 45.5.3),
+  // and the slot keeps a reading because the table declares one per slot.
   searchConfigurations: structured,
   search: structured,
   whereUsed: structured,
@@ -171,8 +166,7 @@ export const READING_BY_SLOT = {
   addedObject: structured,
   createdTask: structured,
   actionLog: structured,
-  // `objects` is the one a call site keeps rather than stamps, like
-  // `searchConfigurations` above: the package parses the entries and, with
+  // `objects` is the one a call site keeps rather than stamps: the package parses the entries and, with
   // them, the `tm:position` that `removeObject` requires. Stamped with
   // `structured` it would hand back a parsed document and leave a caller
   // digging a position out of it — which is the work `readObjects` exists to

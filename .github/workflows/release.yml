@@ -37,10 +37,14 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # As in ci.yml: any known advisory of moderate severity or above stops
-      # the release, dev dependencies included.
+      # As in ci.yml: any known advisory of moderate severity or above in a
+      # production dependency stops the release (dev dependencies again once
+      # the tests leave Jest, #361). GHSA-fc5q-39xc-vjpf (picomatch) was
+      # withdrawn on GitHub on 2026-11-18 and is still reported by
+      # `npm audit` (npm advisory 1247710); it reaches the tree only through
+      # jest, jest-util and lint-staged, all dev only.
       - name: Security audit (moderate+)
-        run: npm audit --audit-level=moderate
+        run: npm audit --omit=dev --audit-level=moderate
 
       - name: Run Biome lint
         run: npm run lint:check -- --diagnostic-level=error

@@ -76,7 +76,14 @@ export interface Answer {
   isError?: boolean;
 }
 
-type Fake = ReturnType<typeof envelopeConnection>;
+type Built = ReturnType<typeof envelopeConnection>;
+
+/**
+ * A built connection, and its request mock as it was built: the server
+ * replaces the connection's `makeAdtRequest` by its request mark (the
+ * session keep-alive's), which calls this mock.
+ */
+type Fake = Built & { requests: Built['connection']['makeAdtRequest'] };
 
 /** A credential object: what the source answers. */
 export function credential(): IAuthProvider {
@@ -236,7 +243,7 @@ export async function batchStand(options: StandOptions): Promise<Stand> {
       options.envelope ?? partByPart(options.part),
       directBy(options.part),
     );
-    built.push(fake);
+    built.push({ ...fake, requests: fake.connection.makeAdtRequest });
     return fake.connection;
   });
   const current = credential();

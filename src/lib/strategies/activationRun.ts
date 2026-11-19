@@ -38,6 +38,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { asciiLower, asciiUpper } from '../plainText';
+import type { SourcePosition } from '../sourceHref';
 import { child, entries, listOf, text, type XmlRead } from '../xml/tree';
 import {
   type AdtReading,
@@ -45,6 +46,7 @@ import {
   membersNamed,
   parseStructure,
 } from './reading';
+import { messageLocation } from './sourceMessages';
 import { withStep } from './step';
 
 /** What a run answered, once it stopped running. */
@@ -87,6 +89,14 @@ export interface ActivationMessage {
   objectName?: string;
   /** The uri of the object of the run the message is about (`runObjectOf`). */
   uri?: string;
+  /** `objDescr`: the object, and its part, as SAP describes it. */
+  object?: string;
+  /** The source the message's `href` names, its fragment left out. */
+  source_uri?: string;
+  /** The `href`'s `#start=` (and `end=`) in `source_uri`: line from 1, column from 0. */
+  position?: SourcePosition;
+  /** SAP's message code (`MESSAGE(GTH)`, `D0(408)`). */
+  code?: string;
 }
 
 /** An object a run was started with: its name, its type code and its ADT uri. */
@@ -295,6 +305,11 @@ function wordsOf(msg: XmlRead): string {
  * A run's results name the object only by `href` (measured on premise and
  * on the cloud, 2026-11-15); a message with an empty `href` ("Activation was
  * cancelled.") is about none.
+ *
+ * Where a message stands, from what it states (`messageLocation`): `object`
+ * its `objDescr`, `source_uri` and `position` its `href`'s source and
+ * `#start=`, `code` its code. Its `line` attribute is the message's ordinal,
+ * not a source line, and is not read.
  */
 export function activationMessagesOf(
   value: AdtReading<XmlRead>,
@@ -303,14 +318,22 @@ export function activationMessagesOf(
   for (const document of documentsOf(value)) {
     const messages = membersNamed(document, 'msg').map(
       ({ node: msg }): ActivationMessage => {
+        const href = attributeOf(msg, 'href');
+        const { uri: sourceUri, ...location } = messageLocation({
+          href,
+          object: attributeOf(msg, 'objDescr'),
+          code: attributeOf(msg, 'code'),
+        });
         const words = {
           type: attributeOf(msg, 'type') ?? 'info',
           text: wordsOf(msg),
+          ...location,
+          ...(sourceUri !== undefined ? { source_uri: sourceUri } : {}),
         };
         const objectName =
           attributeOf(msg, 'objName') ?? attributeOf(msg, 'adtcore:name');
         const sent =
-          runObjectOf(attributeOf(msg, 'href'), references) ??
+          runObjectOf(href, references) ??
           namedRunObject(
             objectName,
             attributeOf(msg, 'adtcore:type'),

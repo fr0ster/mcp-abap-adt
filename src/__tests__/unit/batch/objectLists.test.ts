@@ -1,6 +1,6 @@
 /**
- * The object lists on internal batches (spec §11, rows `ListTransports`,
- * `DescribeByList`): each phase's independent reads
+ * The object lists on internal batches (spec §11, row `DescribeByList`):
+ * each phase's independent reads
  * go in one envelope; the answer is the sequential version's; a part's
  * failure is its item's; a credential refusal ends the call as it came; a
  * destination with no communication batch runs the sequential reads.
@@ -20,7 +20,6 @@ import {
   TOOL_DEFINITION as DESCRIBE_BY_LIST,
   handleDescribeByList,
 } from '../../../handlers/system/readonly/handleDescribeByList';
-import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import {
   envelopeConnection,
@@ -41,13 +40,8 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 // The model, by request label
 // ---------------------------------------------------------------------------
 
-const CONFIGURATIONS_PATH =
-  '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations';
-
 /**
- * A request's label: `configs` (the search configurations), `list:<config>`
- * (a transport search by its configuration's last segment),
- * `qs:<query>:<type>` (a quickSearch; no type: empty), `src:class|intf:<name>`.
+ * A request's label: `qs:<query>:<type>` (a quickSearch; no type: empty), `src:class|intf:<name>`.
  * A quickSearch's type is the search name the object's code stands for
  * (`CLAS/OC` → `CLAS`, `PROG/I` → `INCL`; `searchTypes.ts`).
  */
@@ -60,10 +54,6 @@ function labelOf(method: string, url: string, params?: unknown): string {
     if (v !== undefined) query.set(k, String(v));
   }
   const path = decodeURIComponent(parsed.pathname);
-  if (path === CONFIGURATIONS_PATH) return 'configs';
-  if (path === '/sap/bc/adt/cts/transportrequests') {
-    return `list:${(query.get('configUri') ?? '').split('/').pop()}`;
-  }
   if (path === '/sap/bc/adt/repository/informationsystem/search') {
     return `qs:${query.get('query')}:${query.get('objectType') ?? ''}`;
   }
@@ -93,24 +83,6 @@ const ok = (body: string, headers = xml): PartAnswer => ({
   headers,
   body,
 });
-
-const configurationsXml = (ids: string[]) =>
-  `<?xml version="1.0" encoding="utf-8"?><configurations:configurations xmlns:configurations="http://www.sap.com/adt/configurations">${ids
-    .map(
-      (id) =>
-        `<configuration:configuration client="000" xmlns:configuration="http://www.sap.com/adt/configuration"><atom:link href="${CONFIGURATIONS_PATH}/${id}" rel="http://www.sap.com/adt/categories/configurations" type="application/vnd.sap.adt.configuration.v1+xml" etag="1" xmlns:atom="http://www.w3.org/2005/Atom"/></configuration:configuration>`,
-    )
-    .join('')}</configurations:configurations>`;
-
-const transportsXml = (
-  requests: Array<{ number: string; owner: string; status: string }>,
-) =>
-  `<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:workbench tm:category="Workbench"><tm:modifiable>${requests
-    .map(
-      (r) =>
-        `<tm:request tm:number="${r.number}" tm:owner="${r.owner}" tm:desc="request ${r.number}" tm:type="K" tm:status="${r.status}"/>`,
-    )
-    .join('')}</tm:modifiable></tm:workbench></tm:root>`;
 
 const hitsXml = (
   hits: Array<{ name: string; type: string; description: string }>,
@@ -145,24 +117,6 @@ const UNAUTHORIZED: PartAnswer = {
 
 /** The system: one answer per label; anything else is `404`. */
 const REPOSITORY: Record<string, PartAnswer> = {
-  configs: ok(configurationsXml(['CFG1', 'CFG2'])),
-  'list:CFG1': ok(
-    transportsXml([
-      { number: 'ZREQ000001', owner: 'OWNER_A', status: 'D' },
-      { number: 'ZREQ000002', owner: 'OWNER_B', status: 'R' },
-    ]),
-  ),
-  'list:CFG2': ok(
-    transportsXml([
-      { number: 'ZREQ000003', owner: 'OWNER_A', status: 'D' },
-      { number: 'ZREQ000001', owner: 'OWNER_A', status: 'D' },
-    ]),
-  ),
-  'list:CFG3': ok(transportsXml([])),
-  'list:CFG4': ok(transportsXml([])),
-  'list:CFG5': ok(transportsXml([])),
-  'list:CFG6': ok(transportsXml([])),
-
   // Searches: a typed hit; a type the search refuses, found without it; an
   // untyped name.
   'qs:ZCL_A:CLAS': ok(
@@ -405,163 +359,6 @@ async function noCommunicationBatch(handler: Handler, args: object) {
   );
   return { fake, context, result, expected, reference };
 }
-
-// ---------------------------------------------------------------------------
-// ListTransports
-// ---------------------------------------------------------------------------
-
-const SIX = ok(
-  configurationsXml(['CFG1', 'CFG2', 'CFG3', 'CFG4', 'CFG5', 'CFG6']),
-);
-
-describe('ListTransports', () => {
-  it.each<[Record<string, unknown>, Model]>([
-    [{ user: 'owner_a' }, {}],
-    [{ user: 'OWNER_B', modifiable_only: false }, {}],
-    [{ modifiable_only: false, detail: 'full' }, {}],
-    [{ user: 'owner_a', detail: 'raw' }, {}],
-    [
-      { user: 'owner_a' },
-      { answers: { configs: ok(configurationsXml(['CFG1'])) } },
-    ],
-    [{ user: 'owner_a' }, { answers: { configs: SIX } }],
-  ])('same answer as the sequential version: %j', async (args, model) => {
-    const { a, b, batched, sequential } = await bothWays(
-      handleListTransports,
-      args,
-      model,
-    );
-    expect(textOf(a)).toBe(textOf(b));
-    expect((a as { isError?: boolean }).isError).toBe(false);
-    expect(batched.directs).toHaveLength(0);
-    expect(batched.envelopes.length).toBeGreaterThan(0);
-    expect(sequential.envelopes).toHaveLength(0);
-  });
-
-  it('phases: the configurations, then every configuration’s search in one envelope', async () => {
-    const fake = system();
-    const result = await withinTurns(
-      handleListTransports(contextOn(fake), { user: 'owner_a' }),
-      TURNS,
-    );
-    expect(phasesOf(fake)).toEqual([['configs'], ['list:CFG1', 'list:CFG2']]);
-    expect(payloadOf(result)).toMatchObject({
-      count: 2,
-      searched_configurations: [
-        `${CONFIGURATIONS_PATH}/CFG1`,
-        `${CONFIGURATIONS_PATH}/CFG2`,
-      ],
-    });
-  });
-
-  it('up to five configurations are searched, in the one envelope', async () => {
-    const fake = system({ answers: { configs: SIX } });
-    const result = await withinTurns(
-      handleListTransports(contextOn(fake), {}),
-      TURNS,
-    );
-    expect(phasesOf(fake)).toEqual([
-      ['configs'],
-      ['list:CFG1', 'list:CFG2', 'list:CFG3', 'list:CFG4', 'list:CFG5'],
-    ]);
-    expect(payloadOf(result).configurations_capped).toBe(5);
-  });
-
-  it.each<[string, Model, number]>([
-    [
-      'no configuration',
-      { answers: { configs: ok(configurationsXml([])) } },
-      1,
-    ],
-    ['the configurations refused', { answers: { configs: FORBIDDEN } }, 1],
-    ['a search refused', { answers: { 'list:CFG1': FORBIDDEN } }, 2],
-    ['the second search refused', { answers: { 'list:CFG2': FORBIDDEN } }, 2],
-  ])(
-    '%s: the sequential answer; no envelope after the one that answered it',
-    async (_case, model, envelopes) => {
-      const { a, b, batched } = await bothWays(handleListTransports, {}, model);
-      expect(textOf(a)).toBe(textOf(b));
-      expect((a as { isError?: boolean }).isError).toBe(true);
-      expect(batched.envelopes).toHaveLength(envelopes);
-    },
-  );
-
-  it('a search refused: both searches were sent together, where the sequential version stops at the first', async () => {
-    const { batched, sequential } = await bothWays(
-      handleListTransports,
-      {},
-      { answers: { 'list:CFG1': FORBIDDEN } },
-    );
-    expect(phasesOf(batched)[1]).toEqual(['list:CFG1', 'list:CFG2']);
-    expect(directsOf(sequential)).toEqual(['configs', 'list:CFG1']);
-  });
-
-  it('a 401 SAP answered to a search ends the call as it came', async () => {
-    const { a, b } = await bothWays(
-      handleListTransports,
-      {},
-      { answers: { 'list:CFG2': UNAUTHORIZED } },
-    );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401, step: 'list' });
-  });
-
-  it('a 401 SAP answered to the configurations ends the call; no search is sent', async () => {
-    const { a, b, batched } = await bothWays(
-      handleListTransports,
-      {},
-      { answers: { configs: UNAUTHORIZED } },
-    );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
-    expect(batched.envelopes).toHaveLength(1);
-  });
-
-  it("the connection's credential refusal ends the call as it came", async () => {
-    for (const failing of [1, 2]) {
-      const fake = system({}, (parts, index) => {
-        if (index === failing) throw credential();
-        return envelopeResponse(
-          parts.map((p) => answerOf({}, labelOf(p.method, p.url))),
-        );
-      });
-      const result = await withinTurns(
-        handleListTransports(contextOn(fake), {}),
-        TURNS,
-      );
-      expect(payloadOf(result).error).toBe('authentication_failed');
-      expect(fake.envelopes).toHaveLength(failing);
-    }
-  });
-
-  it("an envelope that fails is every search's failure; the answer is the sequential one's first failure", async () => {
-    const fake = failingEnvelope(2);
-    const result = await withinTurns(
-      handleListTransports(contextOn(fake), {}),
-      TURNS,
-    );
-    const expected = await sequentialWithFailed(
-      handleListTransports,
-      {},
-      phasesOf(fake)[1] as string[],
-    );
-    expectEnvelopeFailure(result, expected, 1);
-    expect(payloadOf(result)).toMatchObject({ status: 500, step: 'list' });
-    expect(fake.envelopes).toHaveLength(2);
-    expect(fake.directs).toHaveLength(0);
-  });
-
-  it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
-    const { fake, context, result, expected } = await noCommunicationBatch(
-      handleListTransports,
-      { user: 'owner_a' },
-    );
-    expect(textOf(result)).toBe(textOf(expected));
-    expect(fake.envelopes).toHaveLength(1);
-    expect(directsOf(fake)).toEqual(['configs', 'list:CFG1', 'list:CFG2']);
-    expect(context.batchAvailability?.available()).toBe(false);
-  });
-});
 
 // ---------------------------------------------------------------------------
 // DescribeByList

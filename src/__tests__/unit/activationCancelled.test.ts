@@ -146,18 +146,20 @@ const FULL_FORMS: readonly (readonly [string, Activate, readonly string[]])[] =
   ];
 
 /**
- * A message about the view `name`, as answered: the sent object's uri beside
- * its name where the form sent it (`activationMessagesOf` resolves the
- * message's `objName` to it), the name alone where it did not.
+ * A message about the view `name`, as answered: its `objDescr` as `object`,
+ * and the sent object's uri beside its name where the form sent it
+ * (`activationMessagesOf` resolves the message's `objName` to it), the name
+ * alone where it did not.
  */
 function aboutView(
   message: { type: string; text: string },
   name: string,
   sent: readonly string[],
 ) {
+  const described = { ...message, object: `View ${name}` };
   return sent.includes(name)
-    ? { ...message, uri: buildObjectUri(name, 'VIEW/DV'), objectName: name }
-    : { ...message, objectName: name };
+    ? { ...described, uri: buildObjectUri(name, 'VIEW/DV'), objectName: name }
+    : { ...described, objectName: name };
 }
 
 describe('activation answers follow SAP’s verdict', () => {
@@ -348,7 +350,14 @@ describe('a run document kept as text, read through the XML parser', () => {
 
   it('the recorded refusal: its message, type and words — tests/fixtures/adt/refusal-activation-fails--01-activation.body.xml', () => {
     expect(activationMessagesOf(kept(FAILED), [])).toEqual([
-      { type: 'E', text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.' },
+      {
+        type: 'E',
+        text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
+        object: 'Class ZMCP_BLD_ANSCH01, Method SAY_HELLO',
+        source_uri: '/sap/bc/adt/oo/classes/zmcp_bld_ansch01/source/main',
+        position: { line: 15, column: 24, end: { line: 15, column: 50 } },
+        code: 'MESSAGE(GTH)',
+      },
     ]);
     expect(activationExecutedOf(kept(FAILED))).toBe(false);
   });

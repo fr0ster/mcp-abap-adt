@@ -41,7 +41,10 @@ afterEach(async () => {
 });
 
 const connects = () =>
-  s.standIn.requests.filter((r) => r.url.includes('discovery')).length;
+  // The connect's own request, not the keep-alive's discovery ping.
+  s.standIn.requests.filter((r) =>
+    r.url.startsWith('/sap/bc/adt/core/discovery'),
+  ).length;
 /** How many instances the server's pool holds. */
 const poolSize = () =>
   (s.mcp as unknown as { pool: { size(): number } }).pool.size();

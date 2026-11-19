@@ -28,6 +28,7 @@ import {
   type JsonValue,
   parseJson,
 } from './json';
+import type { SourcePosition } from './sourceHref';
 import type { AnswerDetail } from './strategies/projections';
 import {
   type FailedRequest,
@@ -162,11 +163,30 @@ interface MessageCarrier {
     text: string;
     code?: string;
     t100?: { id: string; no: string; values?: ReadonlyArray<string> };
-    line?: string;
     uri?: string;
     /** The object an activation run's message is about (`objName`). */
     objectName?: string;
+    /** `objDescr`: the object, and its part, as SAP describes it. */
+    object?: string;
+    /** Where the message stands in its source (`#start=` of its href). */
+    position?: SourcePosition;
+    /** The source an activation run's message's href names. */
+    source_uri?: string;
+    /** A strategy's deprecated `line`: not read — the answer's comes from `position`. */
+    line?: string;
   }>;
+}
+
+/** A message's position, rebuilt field by field as the message is. */
+function positionValue(position: SourcePosition): AnswerValue {
+  const out: { [key: string]: AnswerValue } = {
+    line: position.line,
+    column: position.column,
+  };
+  if (position.end !== undefined) {
+    out.end = { line: position.end.line, column: position.end.column };
+  }
+  return out;
 }
 
 /** The fixed words of the hint beside `CTS_WBO_API` 019. */
@@ -312,15 +332,29 @@ export function failurePayload(
   // substituted into the sentence are the only thing in the corpus a caller can
   // match on without reading English, and `no` stays the zero-padded string SAP
   // sent — SADT_RESOURCE/26 is a key no system knows.
+  //
+  // Where each message stands is the message's own: the strategy states its
+  // `object` (`objDescr`), `uri` and `position` (its href's `#start=`), and
+  // an activation run's message its `source_uri` (adt-strategies 0.23.2,
+  // `activationMessagesOf`). `line` is answered deprecated as the source
+  // line of `position` (`String(position.line)`), absent without one; a
+  // strategy's own `line` is not read.
   if (error.messages !== undefined) {
     payload.messages = error.messages.map((m) => {
       const out: { [key: string]: AnswerValue } = {
         type: m.type,
         text: m.text,
       };
-      if (m.code !== undefined) out.code = m.code;
-      if (m.line !== undefined) out.line = m.line;
+      if (m.object !== undefined) out.object = m.object;
       if (m.uri !== undefined) out.uri = m.uri;
+      if (m.source_uri !== undefined) out.source_uri = m.source_uri;
+      if (m.position !== undefined) {
+        out.position = positionValue(m.position);
+        // Deprecated (24.0.1): the source line as text, kept for a reader
+        // of `line`; `position.line` is the field to read.
+        out.line = String(m.position.line);
+      }
+      if (m.code !== undefined) out.code = m.code;
       if (m.objectName !== undefined) out.objectName = m.objectName;
       if (m.t100 !== undefined) {
         const t100: { [key: string]: AnswerValue } = {

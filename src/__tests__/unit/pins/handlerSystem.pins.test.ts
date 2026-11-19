@@ -10,8 +10,8 @@
  *   SAP's answers the corpus documents (in their envelope where the read is
  *   enveloped): `search_object` the quick search, `where_used` the usage
  *   references of a domain, `package_tree` the package's metadata and root
- *   node structure in one envelope, `transports` the saved search
- *   configurations and then the listing, `atc_findings` the worklist,
+ *   node structure in one envelope, `transports` one GET of the listing
+ *   by user, `atc_findings` the worklist,
  *   `atc_results` the result list, `atc_result` one result.
  *
  * `background` is not among the rows: the entry drops it (the server
@@ -50,32 +50,16 @@ const PACKAGE_ROOT = envelopeResponse([
   },
 ]);
 
-/** The saved search configurations, then the listing of the one used. */
+/** The listing by user, as SAP answered it. */
 const LISTING = [
-  envelopeResponse([
-    {
-      status: 200,
-      headers: {
-        'Content-Type':
-          'application/vnd.sap.adt.configurations.v1+xml; charset=utf-8',
-      },
-      body: corpusBody(
-        'read-transport-search-configurations--01-searchconfiguration-configurations',
-      ),
+  {
+    status: 200,
+    headers: {
+      'Content-Type':
+        'application/vnd.sap.adt.transportorganizertree.v1+xml; charset=utf-8',
     },
-  ]),
-  envelopeResponse([
-    {
-      status: 200,
-      headers: {
-        'Content-Type':
-          'application/vnd.sap.adt.transportorganizertree.v1+xml; charset=utf-8',
-      },
-      body: corpusBody(
-        'read-transport-list-structure--01-cts-transportrequests',
-      ),
-    },
-  ]),
+    data: corpusBody('read-transport-list-structure--01-cts-transportrequests'),
+  },
 ];
 
 const WORKLIST = document(
@@ -202,24 +186,12 @@ describe('onprem', () => {
       answers: LISTING,
       expected: [
         {
-          method: 'POST',
-          url: '/sap/bc/adt/communication/batch',
+          method: 'GET',
+          url: '/sap/bc/adt/cts/transportrequests?user=PIN_USER&requestStatus=D&requestType=KWT',
           headers: {
-            'Content-Type':
-              'multipart/mixed; boundary=batch_23834b60-b3ba-481b-aaa0-9aaf356625b2',
-            Accept: 'multipart/mixed',
+            Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
           },
-          body: '--batch_23834b60-b3ba-481b-aaa0-9aaf356625b2\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations HTTP/1.1\r\nAccept: application/vnd.sap.adt.configurations.v1+xml\r\n\r\n\r\n\r\n--batch_23834b60-b3ba-481b-aaa0-9aaf356625b2--\r\n',
-        },
-        {
-          method: 'POST',
-          url: '/sap/bc/adt/communication/batch',
-          headers: {
-            'Content-Type':
-              'multipart/mixed; boundary=batch_2eba6535-4c65-40c1-af52-cc96f701bc3b',
-            Accept: 'multipart/mixed',
-          },
-          body: '--batch_2eba6535-4c65-40c1-af52-cc96f701bc3b\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/cts/transportrequests?configUri=%2Fsap%2Fbc%2Fadt%2Fcts%2Ftransportrequests%2Fsearchconfiguration%2Fconfigurations%2F22D2111643541FE1A5AA03DC2D3DE702 HTTP/1.1\r\nAccept: application/vnd.sap.adt.transportorganizertree.v1+xml\r\n\r\n\r\n\r\n--batch_2eba6535-4c65-40c1-af52-cc96f701bc3b--\r\n',
+          body: undefined,
         },
       ],
     },
@@ -391,24 +363,12 @@ describe('cloud', () => {
       answers: LISTING,
       expected: [
         {
-          method: 'POST',
-          url: '/sap/bc/adt/communication/batch',
+          method: 'GET',
+          url: '/sap/bc/adt/cts/transportrequests?user=PIN_USER&requestStatus=D&requestType=KWT',
           headers: {
-            'Content-Type':
-              'multipart/mixed; boundary=batch_53110bcc-c2b6-4e0b-af83-dfa2c9bac1b2',
-            Accept: 'multipart/mixed',
+            Accept: 'application/vnd.sap.adt.transportorganizertree.v1+xml',
           },
-          body: '--batch_53110bcc-c2b6-4e0b-af83-dfa2c9bac1b2\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/cts/transportrequests/searchconfiguration/configurations HTTP/1.1\r\nAccept: application/vnd.sap.adt.configurations.v1+xml\r\n\r\n\r\n\r\n--batch_53110bcc-c2b6-4e0b-af83-dfa2c9bac1b2--\r\n',
-        },
-        {
-          method: 'POST',
-          url: '/sap/bc/adt/communication/batch',
-          headers: {
-            'Content-Type':
-              'multipart/mixed; boundary=batch_b68c92f1-a2fa-4080-ade4-1c855bec0458',
-            Accept: 'multipart/mixed',
-          },
-          body: '--batch_b68c92f1-a2fa-4080-ade4-1c855bec0458\r\nContent-Type: application/http\r\ncontent-transfer-encoding: binary\r\n\r\nGET /sap/bc/adt/cts/transportrequests?configUri=%2Fsap%2Fbc%2Fadt%2Fcts%2Ftransportrequests%2Fsearchconfiguration%2Fconfigurations%2F22D2111643541FE1A5AA03DC2D3DE702 HTTP/1.1\r\nAccept: application/vnd.sap.adt.transportorganizertree.v1+xml\r\n\r\n\r\n\r\n--batch_b68c92f1-a2fa-4080-ade4-1c855bec0458--\r\n',
+          body: undefined,
         },
       ],
     },

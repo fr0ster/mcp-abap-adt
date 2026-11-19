@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { IDebuggerBreakpoint } from '@mcp-abap-adt/interfaces-adt';
 import {
   DebugConflictError,
@@ -7,7 +10,9 @@ import {
   type DebugStartOptions,
   FIRST_POLL_HOLD_SECONDS,
 } from '../../../lib/debugger/DebugSession';
+import { assertRejects } from '../../helpers/assertions';
 import { refusedResponse } from '../../helpers/fakeClient';
+import { useFakeTimers, useRealTimers } from '../../helpers/fakeTime';
 import {
   CONFLICT_409,
   fakeWorld,
@@ -24,8 +29,13 @@ const LINE: IDebuggerBreakpoint = {
 const HELD = { breakpointConflict: 'refuse-if-held' as const };
 
 describe('the start', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   async function listening(
     world = fakeWorld(),
@@ -45,28 +55,29 @@ describe('the start', () => {
   // The user's decision (2026-10-11): a start arms at least one breakpoint. A model
   // that forgets them learns it before anything is sent, not from a listener that
   // can catch nothing of its own.
-  it.each([
+  for (const [_, start] of [
     ['no breakpoints', {}],
     ['an empty breakpoint list', { breakpoints: [] }],
-  ])(
-    'a start with %s is refused before the wire, holding nothing',
-    async (_, start) => {
-      for (const conflict of ['refuse', 'takeOver'] as const) {
-        const world = fakeWorld();
-        const session = new DebugSession(world.ports, IDS).bind('origin');
-        // The type requires the list; an untyped caller can still leave it out.
-        await expect(
-          session.start(conflict, start as DebugStartOptions),
-        ).rejects.toThrow(
-          new DebugRefusedError('a start needs at least one breakpoint'),
-        );
-        expect(world.log).toEqual([]);
-        expect(world.opened).toEqual([]);
-        expect(session.currentIdentity()).toBeUndefined();
-        expect(session.holdsState()).toBe(false);
-      }
-    },
-  );
+  ]) {
+    it(
+      format('a start with %s is refused before the wire, holding nothing', _),
+      async () => {
+        for (const conflict of ['refuse', 'takeOver'] as const) {
+          const world = fakeWorld();
+          const session = new DebugSession(world.ports, IDS).bind('origin');
+          // The type requires the list; an untyped caller can still leave it out.
+          await assertRejects(
+            session.start(conflict, start as DebugStartOptions),
+            new DebugRefusedError('a start needs at least one breakpoint'),
+          );
+          assert.deepStrictEqual(world.log, []);
+          assert.deepStrictEqual(world.opened, []);
+          assert.equal(session.currentIdentity(), undefined);
+          assert.equal(session.holdsState(), false);
+        }
+      },
+    );
+  }
 
   describe('identity by mode', () => {
     it('terminal mode needs no configured terminal id: random ids are accepted', async () => {
@@ -79,7 +90,7 @@ describe('the start', () => {
           debuggingMode: 'terminal',
         },
       );
-      expect(session.currentIdentity()).toEqual({
+      assert.deepStrictEqual(session.currentIdentity(), {
         debuggingMode: 'terminal',
         terminalId: IDS.terminalId,
         ideId: IDS.ideId,
@@ -89,39 +100,50 @@ describe('the start', () => {
     it('request_user with terminal mode is refused before the wire', async () => {
       const world = fakeWorld();
       const session = new DebugSession(world.ports, IDS).bind('origin');
-      await expect(
+      await assertRejects(
         session.start('refuse', {
           ...START,
           debuggingMode: 'terminal',
           requestUser: 'SAPUSER02',
         }),
-      ).rejects.toThrow(DebugRefusedError);
-      expect(world.log).toEqual([]);
-      expect(world.opened).toEqual([]);
+        DebugRefusedError,
+      );
+      assert.deepStrictEqual(world.log, []);
+      assert.deepStrictEqual(world.opened, []);
     });
 
-    it.each([
+    for (const [_, mode] of [
       ['user', {}],
       ['terminal', { debuggingMode: 'terminal' as const }],
-    ])(
-      'a blank request_user in %s mode is refused before the wire, not read as omitted',
-      async (_, mode) => {
-        for (const blank of ['', '   ']) {
-          const world = fakeWorld();
-          const session = new DebugSession(world.ports, IDS).bind('origin');
-          await expect(
-            session.start('refuse', { ...START, ...mode, requestUser: blank }),
-          ).rejects.toThrow(new DebugRefusedError('request_user is empty'));
-          expect(world.log).toEqual([]);
-          expect(world.opened).toEqual([]);
-          expect(session.holdsState()).toBe(false);
-        }
-      },
-    );
+    ] satisfies [string, { debuggingMode?: 'terminal' }][]) {
+      it(
+        format(
+          'a blank request_user in %s mode is refused before the wire, not read as omitted',
+          _,
+        ),
+        async () => {
+          for (const blank of ['', '   ']) {
+            const world = fakeWorld();
+            const session = new DebugSession(world.ports, IDS).bind('origin');
+            await assertRejects(
+              session.start('refuse', {
+                ...START,
+                ...mode,
+                requestUser: blank,
+              }),
+              new DebugRefusedError('request_user is empty'),
+            );
+            assert.deepStrictEqual(world.log, []);
+            assert.deepStrictEqual(world.opened, []);
+            assert.equal(session.holdsState(), false);
+          }
+        },
+      );
+    }
 
     it("terminal mode keys on the session's terminal id and asks for no request user", async () => {
       const world = fakeWorld();
-      const asked = jest.spyOn(world.ports, 'requestUser');
+      const asked = mock.method(world.ports, 'requestUser');
       const { session } = await listening(
         world,
         IDS,
@@ -129,32 +151,35 @@ describe('the start', () => {
         { debuggingMode: 'terminal' },
       );
       const listen = world.log.find((c) => c.call === 'listen')!;
-      expect(listen.args[0]).toEqual({
+      assert.deepStrictEqual(listen.args[0], {
         debuggingMode: 'terminal',
         terminalId: IDS.terminalId,
         ideId: IDS.ideId,
       });
-      expect(asked).not.toHaveBeenCalled();
-      expect(session.currentIdentity()).toEqual(listen.args[0]);
+      assert.equal(asked.mock.callCount(), 0);
+      assert.deepStrictEqual(session.currentIdentity(), listen.args[0]);
     });
 
     it("user mode for another user names that user, upper case, without asking the connection's", async () => {
       const world = fakeWorld();
-      const asked = jest.spyOn(world.ports, 'requestUser');
+      const asked = mock.method(world.ports, 'requestUser');
       await listening(world, IDS, {}, { requestUser: 'sapuser02' });
-      expect(world.log.find((c) => c.call === 'listen')!.args[0]).toEqual({
-        debuggingMode: 'user',
-        requestUser: 'SAPUSER02',
-        terminalId: IDS.terminalId,
-        ideId: IDS.ideId,
-      });
-      expect(asked).not.toHaveBeenCalled();
+      assert.deepStrictEqual(
+        world.log.find((c) => c.call === 'listen')!.args[0],
+        {
+          debuggingMode: 'user',
+          requestUser: 'SAPUSER02',
+          terminalId: IDS.terminalId,
+          ideId: IDS.ideId,
+        },
+      );
+      assert.equal(asked.mock.callCount(), 0);
     });
 
     it('a condition on a non-line breakpoint is refused before the wire, naming it', async () => {
       const world = fakeWorld();
       const session = new DebugSession(world.ports, IDS).bind('origin');
-      await expect(
+      await assertRejects(
         session.start('refuse', {
           breakpoints: [
             LINE,
@@ -165,10 +190,9 @@ describe('the start', () => {
             } as unknown as IDebuggerBreakpoint,
           ],
         }),
-      ).rejects.toThrow(
         'breakpoints[1] (exception): a condition applies to a line breakpoint only',
       );
-      expect(world.log).toEqual([]);
+      assert.deepStrictEqual(world.log, []);
     });
   });
 
@@ -184,26 +208,28 @@ describe('the start', () => {
       const error = await session
         .start('refuse', { breakpoints: [LINE] })
         .catch((e: unknown) => e);
-      expect(error).toBeInstanceOf(DebugConflictError);
-      expect((error as DebugConflictError).conflictText).toMatch(
+      assert.ok(error instanceof DebugConflictError);
+      assert.match(
+        (error as DebugConflictError).conflictText,
         /global debugging scope/,
       );
-      expect((error as DebugConflictError).ideUser).toBe('SAPUSER01');
-      expect(world.calls).toEqual(['checkListener']);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
-      expect(session.holdsState()).toBe(false);
-      expect(session.currentIdentity()).toBeUndefined();
+      assert.equal((error as DebugConflictError).ideUser, 'SAPUSER01');
+      assert.deepStrictEqual(world.calls, ['checkListener']);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
+      assert.equal(session.holdsState(), false);
+      assert.equal(session.currentIdentity(), undefined);
     });
 
     it('a failure of the preflight itself refuses the start before any change', async () => {
       const world = fakeWorld();
       world.checkAnswers.push(() => refusedResponse('No authorization'));
       const session = new DebugSession(world.ports, IDS, HELD).bind('origin');
-      await expect(
+      await assertRejects(
         session.start('refuse', { breakpoints: [LINE] }),
-      ).rejects.toThrow(new DebugRequestError('No authorization'));
-      expect(world.calls).toEqual(['checkListener']);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+        new DebugRequestError('No authorization'),
+      );
+      assert.deepStrictEqual(world.calls, ['checkListener']);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     });
 
     it('runs on the control connection, then the reconciliation, then the arming, then the listener on a connection of its own', async () => {
@@ -216,12 +242,12 @@ describe('the start', () => {
       const at = (call: string) => world.log.findIndex((c) => c.call === call);
       const on = (call: string) =>
         world.log.find((c) => c.call === call)!.connection;
-      expect(at('checkListener')).toBeLessThan(at('stopListener'));
-      expect(at('stopListener')).toBeLessThan(at('setBreakpoints'));
-      expect(at('setBreakpoints')).toBeLessThan(at('listen'));
-      expect(on('stopListener')).toBe(on('checkListener'));
-      expect(on('setBreakpoints')).toBe(on('checkListener'));
-      expect(on('listen')).not.toBe(on('checkListener'));
+      assert.ok(at('checkListener') < at('stopListener'));
+      assert.ok(at('stopListener') < at('setBreakpoints'));
+      assert.ok(at('setBreakpoints') < at('listen'));
+      assert.equal(on('stopListener'), on('checkListener'));
+      assert.equal(on('setBreakpoints'), on('checkListener'));
+      assert.notEqual(on('listen'), on('checkListener'));
     });
 
     it('under take-over it is checked all the same', async () => {
@@ -232,7 +258,7 @@ describe('the start', () => {
         { breakpoints: [LINE] },
         'takeOver',
       );
-      expect(world.calls.slice(0, 2)).toEqual([
+      assert.deepStrictEqual(world.calls.slice(0, 2), [
         'checkListener',
         'setBreakpoints:1',
       ]);
@@ -246,7 +272,7 @@ describe('the start', () => {
         { breakpoints: [LINE] },
         'takeOver',
       );
-      expect(world.calls).not.toContain('checkListener');
+      assert.ok(!world.calls.includes('checkListener'));
     });
 
     it('a later replacement is checked first; our own listener under the same ideId does not block it', async () => {
@@ -254,7 +280,7 @@ describe('the start', () => {
       world.calls.length = 0;
       await session.setBreakpoints([LINE]);
       // The start's breakpoint travels with the new one.
-      expect(world.calls.slice(0, 2)).toEqual([
+      assert.deepStrictEqual(world.calls.slice(0, 2), [
         'checkListener',
         'setBreakpoints:2',
       ]);
@@ -264,11 +290,9 @@ describe('the start', () => {
       const { session, world } = await listening(fakeWorld(), IDS, HELD);
       world.calls.length = 0;
       world.checkAnswers.push(CONFLICT_409);
-      await expect(session.setBreakpoints([LINE])).rejects.toThrow(
-        DebugConflictError,
-      );
-      expect(world.calls).toEqual(['checkListener']);
-      expect((await session.wait(0)).state).toBe('listening');
+      await assertRejects(session.setBreakpoints([LINE]), DebugConflictError);
+      assert.deepStrictEqual(world.calls, ['checkListener']);
+      assert.equal((await session.wait(0)).state, 'listening');
     });
   });
 
@@ -286,29 +310,31 @@ describe('the start', () => {
           breakpoints: [LINE],
         },
       );
-      expect(world.calls).toEqual([
+      assert.deepStrictEqual(world.calls.slice(0, 3), [
         'checkListener',
         'setBreakpoints:1',
         `listen:${FIRST_POLL_HOLD_SECONDS}`,
-        expect.stringMatching(/^listen:/),
       ]);
+      assert.equal(world.calls.length, 4);
+      assert.match(world.calls[3] ?? '', /^listen:/);
       const on = (call: string) =>
         world.log.find((c) => c.call === call)!.connection;
-      expect(on('setBreakpoints')).toBe(on('checkListener'));
-      expect(on('listen')).not.toBe(on('checkListener'));
+      assert.equal(on('setBreakpoints'), on('checkListener'));
+      assert.notEqual(on('listen'), on('checkListener'));
     });
 
     it('a 409 there refuses the start before any change: no arming, no stopListener, no deletion', async () => {
       const world = fakeWorld();
       world.checkAnswers.push(CONFLICT_409);
       const session = new DebugSession(world.ports, IDS).bind('origin');
-      await expect(
+      await assertRejects(
         session.start('refuse', { breakpoints: [LINE] }),
-      ).rejects.toThrow(DebugConflictError);
-      expect(world.calls).toEqual(['checkListener']);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
-      expect(session.holdsState()).toBe(false);
-      expect(session.currentIdentity()).toBeUndefined();
+        DebugConflictError,
+      );
+      assert.deepStrictEqual(world.calls, ['checkListener']);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
+      assert.equal(session.holdsState(), false);
+      assert.equal(session.currentIdentity(), undefined);
     });
 
     it('with stated ids the check comes before the reconciliation too', async () => {
@@ -318,17 +344,18 @@ describe('the start', () => {
         ...IDS,
         stated: true,
       }).bind('origin');
-      await expect(
+      await assertRejects(
         session.start('refuse', { breakpoints: [LINE] }),
-      ).rejects.toThrow(DebugConflictError);
-      expect(world.calls).toEqual(['checkListener']);
+        DebugConflictError,
+      );
+      assert.deepStrictEqual(world.calls, ['checkListener']);
     });
 
     it('a later replacement is checked first as well', async () => {
       const { session, world } = await listening(fakeWorld(), IDS, {});
       world.calls.length = 0;
       await session.setBreakpoints([LINE]);
-      expect(world.calls.slice(0, 2)).toEqual([
+      assert.deepStrictEqual(world.calls.slice(0, 2), [
         'checkListener',
         'setBreakpoints:2',
       ]);
@@ -345,15 +372,15 @@ describe('the start', () => {
     const started = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT_409());
-    await expect(started).rejects.toThrow(DebugConflictError);
-    expect(world.calls).toEqual([
+    await assertRejects(started, DebugConflictError);
+    assert.deepStrictEqual(world.calls, [
       'checkListener',
       'setBreakpoints:1',
       `listen:${FIRST_POLL_HOLD_SECONDS}`,
       'stopListener',
     ]);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
-    expect(session.holdsState()).toBe(false);
-    expect(session.currentIdentity()).toBeUndefined();
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
+    assert.equal(session.holdsState(), false);
+    assert.equal(session.currentIdentity(), undefined);
   });
 });

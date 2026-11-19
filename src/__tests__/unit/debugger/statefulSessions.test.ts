@@ -9,9 +9,13 @@
  * from a breakpoint in a loop runs to the end instead of stopping there
  * again.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebugSession } from '../../../lib/debugger/DebugSession';
 import { okResponse } from '../../helpers/fakeClient';
+import { useFakeTimers, useRealTimers } from '../../helpers/fakeTime';
 import {
   AMDP_BREAK,
   AMDP_START,
@@ -28,8 +32,13 @@ import {
 } from './fakes';
 
 describe('stateful sessions of a debug run', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   it('ABAP: the breakpoints, the listener and the attach stateful, the run stateless; each closed once; the listener stopped before the debuggee is let go', async () => {
     const world = fakeWorld();
@@ -48,16 +57,16 @@ describe('stateful sessions of a debug run', () => {
 
     const kinds = (kind: string) =>
       world.sessionKinds.filter((k) => k === kind).length;
-    expect(kinds('stateful')).toBe(3); // breakpoints, listener, attach
-    expect(kinds('stateless')).toBe(1); // the run
-    expect(world.sessionKinds).toHaveLength(world.opened.length);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
-    expect(world.closed).toHaveLength(world.opened.length);
+    assert.equal(kinds('stateful'), 3); // breakpoints, listener, attach
+    assert.equal(kinds('stateless'), 1); // the run
+    assert.equal(world.sessionKinds.length, world.opened.length);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
+    assert.equal(world.closed.length, world.opened.length);
 
     const stopAt = world.calls.indexOf('stopListener');
     const releaseAt = world.calls.lastIndexOf('step:stepContinue:analysed');
-    expect(stopAt).toBeGreaterThanOrEqual(0);
-    expect(releaseAt).toBeGreaterThan(stopAt);
+    assert.ok(stopAt >= 0);
+    assert.ok(releaseAt > stopAt);
   });
 
   it('AMDP: the events and the commands connection stateful, the run stateless; each closed once', async () => {
@@ -111,12 +120,11 @@ describe('stateful sessions of a debug run', () => {
     await until(() => reads.length === 3);
     await session.stop();
 
-    expect(opened.map((c) => c.session)).toEqual([
-      'stateful',
-      'stateful',
-      'stateless',
-    ]);
-    expect(new Set(closed)).toEqual(new Set(opened));
-    expect(closed).toHaveLength(opened.length);
+    assert.deepStrictEqual(
+      opened.map((c) => c.session),
+      ['stateful', 'stateful', 'stateless'],
+    );
+    assert.deepStrictEqual(new Set(closed), new Set(opened));
+    assert.equal(closed.length, opened.length);
   });
 });

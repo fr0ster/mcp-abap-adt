@@ -4,11 +4,14 @@
  * for the bound origin (`headersOf`); with no such port, the default pair.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import type { IAdtHeaders } from '@mcp-abap-adt/interfaces-adt';
 import type { AdtHeaderPort } from '../../../lib/adtHeaders/AdtHeaderPairs';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { DebugSession } from '../../../lib/debugger/DebugSession';
 import { liveAmdpPorts, liveDebugPorts } from '../../../lib/debugger/ports';
+import { useFakeTimers, useRealTimers } from '../../helpers/fakeTime';
 import { recordingConnection } from '../../helpers/recordingConnection';
 import { fakeWorld, IDS, LISTEN_NOTHING, START, until } from './fakes';
 
@@ -45,8 +48,13 @@ async function armed(
 }
 
 describe('a debug session sends with its origin system’s header pair', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   it('the pair the ports name for the origin', async () => {
     const world = fakeWorld();
@@ -55,14 +63,14 @@ describe('a debug session sends with its origin system’s header pair', () => {
       IDS,
     ).bind('origin');
     await armed(world, session);
-    expect(breakpointHeaders(world)).toEqual([KEPT]);
+    assert.deepStrictEqual(breakpointHeaders(world), [KEPT]);
   });
 
   it('the default pair when the ports name none', async () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
     await armed(world, session);
-    expect(breakpointHeaders(world)).toEqual([
+    assert.deepStrictEqual(breakpointHeaders(world), [
       DEFAULT_ADT_HEADERS['debugger.setBreakpoints'],
     ]);
   });
@@ -72,7 +80,7 @@ describe('a debug session sends with its origin system’s header pair', () => {
       connection: recordingConnection([]),
       adtHeaders: keptPort,
     };
-    expect(liveDebugPorts().headersOf?.(context).adtHeaders).toBe(keptPort);
-    expect(liveAmdpPorts().headersOf?.(context).adtHeaders).toBe(keptPort);
+    assert.equal(liveDebugPorts().headersOf?.(context).adtHeaders, keptPort);
+    assert.equal(liveAmdpPorts().headersOf?.(context).adtHeaders, keptPort);
   });
 });

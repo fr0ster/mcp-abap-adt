@@ -1,9 +1,13 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import {
   DebugRequestError,
   DebugSession,
   DebugStateError,
 } from '../../../lib/debugger/DebugSession';
+import { assertRejects } from '../../helpers/assertions';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
+import { useFakeTimers, useRealTimers } from '../../helpers/fakeTime';
 import {
   fakeWorld,
   IDS,
@@ -21,8 +25,13 @@ const A = {
 const idOf = (c: unknown) => (c as { id: number }).id;
 
 describe('leaving a debuggee running', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   async function stoppedWith(world = fakeWorld()) {
     world.breakpointAnswers.push(() =>
@@ -44,13 +53,16 @@ describe('leaving a debuggee running', () => {
 
   it('detach: the debugger leaves, its connection closes, and the session listens on with its breakpoints', async () => {
     const { session, world, debuggee } = await stoppedWith();
-    await expect(session.detach()).resolves.toEqual({ state: 'listening' });
-    expect(world.calls).toContain('detachDebugger');
-    expect(world.closed).toContain(debuggee);
-    expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10']);
-    expect(session.requestedBreakpoints()).toEqual([A]);
+    assert.deepStrictEqual(await session.detach(), { state: 'listening' });
+    assert.ok(world.calls.includes('detachDebugger'));
+    assert.ok(world.closed.includes(debuggee));
+    assert.deepStrictEqual(
+      session.listBreakpoints().map((r) => r.id),
+      ['L10'],
+    );
+    assert.deepStrictEqual(session.requestedBreakpoints(), [A]);
     await until(() => world.polls.length === 3); // polling resumed
-    expect(session.holdsState()).toBe(true);
+    assert.equal(session.holdsState(), true);
   });
 
   it('a catch after detach is attached again', async () => {
@@ -59,26 +71,30 @@ describe('leaving a debuggee running', () => {
     await until(() => world.polls.length === 3);
     world.polls[2].resolve(LISTEN_CATCH());
     await until(() => world.calls.filter((c) => c === 'getStack').length === 2);
-    expect((await session.wait(0)).state).toBe('stopped');
+    assert.equal((await session.wait(0)).state, 'stopped');
   });
 
   it('release_debugger: read as freed; the freed connection is dropped with no further request and never logged off; the session listens on', async () => {
     const { session, world, debuggee } = await stoppedWith();
-    await expect(session.releaseDebugger()).resolves.toEqual({
+    assert.deepStrictEqual(await session.releaseDebugger(), {
       state: 'listening',
     });
-    expect(world.calls).toContain('terminateDebugger:freed');
-    expect(world.dropped).toEqual([debuggee]);
+    assert.ok(world.calls.includes('terminateDebugger:freed'));
+    assert.deepStrictEqual(world.dropped, [debuggee]);
     const onIt = world.log.filter((c) => c.connection === idOf(debuggee));
-    expect(onIt[onIt.length - 1].call).toBe('terminateDebugger');
-    expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10']);
+    assert.equal(onIt[onIt.length - 1].call, 'terminateDebugger');
+    assert.deepStrictEqual(
+      session.listBreakpoints().map((r) => r.id),
+      ['L10'],
+    );
     await until(() => world.polls.length === 3);
     await session.stop();
-    expect(world.closed).not.toContain(debuggee);
-    expect(
-      world.log.filter((c) => c.connection === idOf(debuggee)),
-    ).toHaveLength(onIt.length);
-    expect(session.holdsState()).toBe(false);
+    assert.ok(!world.closed.includes(debuggee));
+    assert.equal(
+      world.log.filter((c) => c.connection === idOf(debuggee)).length,
+      onIt.length,
+    );
+    assert.equal(session.holdsState(), false);
   });
 
   it('a refused release_debugger is a failure, and the stop stays for DebugStop', async () => {
@@ -86,15 +102,16 @@ describe('leaving a debuggee running', () => {
     const { session, debuggee } = await stoppedWith(world);
     world.override.terminateDebugger = async () =>
       refusedResponse('Debugger session is busy');
-    await expect(session.releaseDebugger()).rejects.toThrow(
+    await assertRejects(
+      session.releaseDebugger(),
       new DebugRequestError('Debugger session is busy'),
     );
-    expect((await session.wait(0)).state).toBe('stopped');
-    expect(world.dropped).toEqual([]);
+    assert.equal((await session.wait(0)).state, 'stopped');
+    assert.deepStrictEqual(world.dropped, []);
     delete world.override.terminateDebugger;
     await session.stop();
-    expect(world.calls).toContain('step:stepContinue:analysed');
-    expect(world.closed).toContain(debuggee);
+    assert.ok(world.calls.includes('step:stepContinue:analysed'));
+    assert.ok(world.closed.includes(debuggee));
   });
 
   /** What adt-clients carries for a terminateDebugger over RFC whose call the RFC SDK answered with this code. */
@@ -113,20 +130,24 @@ describe('leaving a debuggee running', () => {
     const world = fakeWorld();
     const { session, debuggee } = await stoppedWith(world);
     world.override.terminateDebugger = async () => rfcFailure('RFC_CLOSED');
-    await expect(session.releaseDebugger()).resolves.toEqual({
+    assert.deepStrictEqual(await session.releaseDebugger(), {
       state: 'listening',
     });
-    expect(world.dropped).toEqual([debuggee]);
+    assert.deepStrictEqual(world.dropped, [debuggee]);
     const onIt = world.log.filter((c) => c.connection === idOf(debuggee));
-    expect(onIt[onIt.length - 1].call).toBe('terminateDebugger');
-    expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10']);
+    assert.equal(onIt[onIt.length - 1].call, 'terminateDebugger');
+    assert.deepStrictEqual(
+      session.listBreakpoints().map((r) => r.id),
+      ['L10'],
+    );
     await until(() => world.polls.length === 3);
     delete world.override.terminateDebugger;
     await session.stop();
-    expect(world.closed).not.toContain(debuggee);
-    expect(
-      world.log.filter((c) => c.connection === idOf(debuggee)),
-    ).toHaveLength(onIt.length);
+    assert.ok(!world.closed.includes(debuggee));
+    assert.equal(
+      world.log.filter((c) => c.connection === idOf(debuggee)).length,
+      onIt.length,
+    );
   });
 
   it('release_debugger over RFC with another RFC code is a failure, and the stop stays for DebugStop', async () => {
@@ -134,14 +155,15 @@ describe('leaving a debuggee running', () => {
     const { session, debuggee } = await stoppedWith(world);
     world.override.terminateDebugger = async () =>
       rfcFailure('RFC_COMMUNICATION_FAILURE');
-    await expect(session.releaseDebugger()).rejects.toThrow(
+    await assertRejects(
+      session.releaseDebugger(),
       new DebugRequestError('the RFC call failed'),
     );
-    expect((await session.wait(0)).state).toBe('stopped');
-    expect(world.dropped).toEqual([]);
+    assert.equal((await session.wait(0)).state, 'stopped');
+    assert.deepStrictEqual(world.dropped, []);
     delete world.override.terminateDebugger;
     await session.stop();
-    expect(world.closed).toContain(debuggee);
+    assert.ok(world.closed.includes(debuggee));
   });
 
   it('a connection failure of release_debugger without RFC fields is a failure, and the stop stays', async () => {
@@ -149,11 +171,12 @@ describe('leaving a debuggee running', () => {
     const { session } = await stoppedWith(world);
     world.override.terminateDebugger = async () =>
       refusedResponse('socket hang up', { origin: 'connection' });
-    await expect(session.releaseDebugger()).rejects.toThrow(
+    await assertRejects(
+      session.releaseDebugger(),
       new DebugRequestError('socket hang up'),
     );
-    expect((await session.wait(0)).state).toBe('stopped');
-    expect(world.dropped).toEqual([]);
+    assert.equal((await session.wait(0)).state, 'stopped');
+    assert.deepStrictEqual(world.dropped, []);
   });
 
   it('a refused detach is a failure, and the stop stays', async () => {
@@ -161,8 +184,8 @@ describe('leaving a debuggee running', () => {
     const { session } = await stoppedWith(world);
     world.override.detachDebugger = async () =>
       refusedResponse('Debuggee is not attached');
-    await expect(session.detach()).rejects.toThrow(DebugRequestError);
-    expect((await session.wait(0)).state).toBe('stopped');
+    await assertRejects(session.detach(), DebugRequestError);
+    assert.equal((await session.wait(0)).state, 'stopped');
   });
 
   it('without a stop both are refused and send nothing', async () => {
@@ -172,12 +195,13 @@ describe('leaving a debuggee running', () => {
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
-    await expect(session.detach()).rejects.toThrow(DebugStateError);
-    await expect(session.releaseDebugger()).rejects.toThrow(DebugStateError);
-    expect(
+    await assertRejects(session.detach(), DebugStateError);
+    await assertRejects(session.releaseDebugger(), DebugStateError);
+    assert.deepStrictEqual(
       world.calls.filter(
         (c) => c === 'detachDebugger' || c.startsWith('terminateDebugger'),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 });

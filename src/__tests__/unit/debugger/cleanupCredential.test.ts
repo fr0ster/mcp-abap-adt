@@ -6,6 +6,8 @@
  * words, and they stay for the next stop.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import {
@@ -14,7 +16,9 @@ import {
 } from '../../../lib/debugger/DebugSession';
 import { NOT_ATTEMPTED_WORDS } from '../../../lib/debugger/failures';
 import { return_error } from '../../../lib/utils';
+import { assertMatchObject } from '../../helpers/assertions';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
+import { useFakeTimers, useRealTimers } from '../../helpers/fakeTime';
 import { fakeWorld, IDS, LISTEN_NOTHING, rowsXml, until } from './fakes';
 
 const A = {
@@ -44,8 +48,13 @@ const payloadOf = (error: unknown) =>
   JSON.parse((return_error(error) as any).content[0].text);
 
 describe('a debugger cleanup that meets a credential failure', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   async function armed(world = fakeWorld()) {
     world.breakpointAnswers.push(ROWS);
@@ -64,7 +73,7 @@ describe('a debugger cleanup that meets a credential failure', () => {
       (e: unknown) => e,
     );
     const error = await stopped;
-    expect(error).toBeInstanceOf(DebugCleanupError);
+    assert.ok(error instanceof DebugCleanupError);
     return error;
   };
 
@@ -75,11 +84,12 @@ describe('a debugger cleanup that meets a credential failure', () => {
     };
     world.calls.length = 0;
     const error = await stopFailure(session);
-    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
+    assert.equal(
+      world.calls.some((c) => c.startsWith('deleteBreakpoint:')),
       false,
     );
     const payload = payloadOf(error);
-    expect(payload).toMatchObject({
+    assertMatchObject(payload, {
       error: 'authentication_failed',
       kind: 'connection',
       step: 'stop listener',
@@ -88,14 +98,14 @@ describe('a debugger cleanup that meets a credential failure', () => {
         steps: ['delete breakpoint L10', 'delete breakpoint E1'],
       },
     });
-    expect(payload.failures).toBeUndefined();
+    assert.equal(payload.failures, undefined);
     // Kept for the next stop, which sends what was not attempted.
-    expect(session.holdsState()).toBe(true);
+    assert.equal(session.holdsState(), true);
     delete world.override.stopListener;
     world.calls.length = 0;
     await session.stop();
-    expect(world.calls).toContain('stopListener');
-    expect(session.holdsState()).toBe(false);
+    assert.ok(world.calls.includes('stopListener'));
+    assert.equal(session.holdsState(), false);
   });
 
   it('stopListener answered 401 by SAP: the same, no breakpoint is deleted', async () => {
@@ -103,10 +113,11 @@ describe('a debugger cleanup that meets a credential failure', () => {
     world.override.stopListener = async () => unauthorized();
     world.calls.length = 0;
     const error = await stopFailure(session);
-    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
+    assert.equal(
+      world.calls.some((c) => c.startsWith('deleteBreakpoint:')),
       false,
     );
-    expect(payloadOf(error)).toMatchObject({
+    assertMatchObject(payloadOf(error), {
       status: 401,
       step: 'stop listener',
       not_attempted: {
@@ -124,9 +135,9 @@ describe('a debugger cleanup that meets a credential failure', () => {
       throw refused();
     };
     const error = await stopFailure(session);
-    expect(deletes).toEqual(['L10']);
+    assert.deepStrictEqual(deletes, ['L10']);
     const payload = payloadOf(error);
-    expect(payload).toMatchObject({
+    assertMatchObject(payload, {
       error: 'authentication_failed',
       step: 'delete breakpoint L10',
       failures: [{ message: 'listener busy', step: 'stop listener' }],
@@ -146,19 +157,19 @@ describe('a debugger cleanup that meets a credential failure', () => {
     world.calls.length = 0;
     world.polls[0].reject(refused());
     const error = await s;
-    expect(world.calls).not.toContain('stopListener');
-    expect(error).toBeInstanceOf(DebugCleanupError);
-    expect(payloadOf(error)).toMatchObject({
+    assert.ok(!world.calls.includes('stopListener'));
+    assert.ok(error instanceof DebugCleanupError);
+    assertMatchObject(payloadOf(error), {
       error: 'authentication_failed',
       step: 'listen',
       not_attempted: { steps: ['stop listener'] },
     });
-    expect(session.holdsState()).toBe(true);
+    assert.equal(session.holdsState(), true);
     // What was not attempted is still owed: the next stop sends it.
     world.calls.length = 0;
     await session.stop();
-    expect(world.calls).toContain('stopListener');
-    expect(session.holdsState()).toBe(false);
+    assert.ok(world.calls.includes('stopListener'));
+    assert.equal(session.holdsState(), false);
   });
 
   it('a start whose reconciling stopListener the credential refused: nothing is armed, no further request, the refusal is the answer', async () => {
@@ -177,10 +188,16 @@ describe('a debugger cleanup that meets a credential failure', () => {
       () => undefined,
       (e: unknown) => e,
     );
-    expect(world.calls.some((c) => c.startsWith('setBreakpoints'))).toBe(false);
-    expect(world.calls.some((c) => c.startsWith('listen'))).toBe(false);
-    expect(stops).toEqual(['stopListener']);
-    expect(payloadOf(error)).toMatchObject({
+    assert.equal(
+      world.calls.some((c) => c.startsWith('setBreakpoints')),
+      false,
+    );
+    assert.equal(
+      world.calls.some((c) => c.startsWith('listen')),
+      false,
+    );
+    assert.deepStrictEqual(stops, ['stopListener']);
+    assertMatchObject(payloadOf(error), {
       error: 'authentication_failed',
       step: 'start',
       not_attempted: { steps: ['stop listener'] },

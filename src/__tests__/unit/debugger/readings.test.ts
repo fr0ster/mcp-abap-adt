@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   breakpointKey,
   failureText,
@@ -14,24 +17,27 @@ import {
   terseVariables,
 } from '../../../lib/debugger/readings';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 import { settingsXml } from './fakes';
 
 describe('a blank document reads as an empty one', () => {
-  it.each(['', ' \n\t '])(
-    '%j: no debuggee, no frames, no breakpoints',
-    (xml) => {
-      expect(readDebuggee(xml)).toBeUndefined();
-      expect(readStack(xml)).toEqual({ cursor: 0, frames: [] });
-      expect(readBreakpoints(xml)).toEqual([]);
-      expect(readVariables(xml)).toEqual({ variables: [], children: [] });
-    },
-  );
+  for (const xml of ['', ' \n\t ']) {
+    it(format('%j: no debuggee, no frames, no breakpoints', xml), () => {
+      assert.equal(readDebuggee(xml), undefined);
+      assert.deepStrictEqual(readStack(xml), { cursor: 0, frames: [] });
+      assert.deepStrictEqual(readBreakpoints(xml), []);
+      assert.deepStrictEqual(readVariables(xml), {
+        variables: [],
+        children: [],
+      });
+    });
+  }
 });
 
 describe('readings of the debugger documents (recorded answers)', () => {
   it('the listener catch names the debuggee and its server', () => {
     const d = readDebuggee(corpusBody('debugger-run-to-line--02-listen'));
-    expect(d).toMatchObject({
+    assertMatchObject(d, {
       debuggeeId: '194B2024D1671FE1B0DDF891EDADF59C',
       user: 'SAPUSER01',
       include: 'ZCL_CV_DBG_MEASURE============CM002',
@@ -42,30 +48,30 @@ describe('readings of the debugger documents (recorded answers)', () => {
   });
 
   it('an empty listener answer is no catch', () => {
-    expect(readDebuggee('')).toBeUndefined();
+    assert.equal(readDebuggee(''), undefined);
   });
 
   it('the attach says whether stepping is possible', () => {
     const a = readAttach(corpusBody('debugger-run-to-line--03-attach'));
-    expect(a.isSteppingPossible).toBe(true);
-    expect(a.reachedBreakpoints).toHaveLength(1);
+    assert.equal(a.isSteppingPossible, true);
+    assert.equal(a.reachedBreakpoints.length, 1);
   });
 
   it('the stack, top frame first', () => {
     const s = readStack(corpusBody('debugger-run-to-line--04-stack'));
-    expect(s.frames[0]).toMatchObject({
+    assertMatchObject(s.frames[0], {
       position: 12,
       line: 32,
       event: 'IF_OO_ADT_CLASSRUN~MAIN',
     });
-    expect(s.frames.length).toBeGreaterThan(5);
+    assert.ok(s.frames.length > 5);
   });
 
   it('variables with values; children with their parents', () => {
     const v = readVariables(
       corpusBody('debugger-run-to-line--07-variables-at-write'),
     );
-    expect(v.variables[0]).toMatchObject({
+    assertMatchObject(v.variables[0], {
       name: 'LV_COUNTER',
       type: 'I',
       value: '241',
@@ -73,23 +79,23 @@ describe('readings of the debugger documents (recorded answers)', () => {
     const root = readVariables(
       corpusBody('debugger-conversation--07-children-root'),
     );
-    expect(root.children.map((c) => c.child)).toEqual([
-      'ME',
-      '@PARAMETERS',
-      '@LOCALS',
-    ]);
+    assert.deepStrictEqual(
+      root.children.map((c) => c.child),
+      ['ME', '@PARAMETERS', '@LOCALS'],
+    );
   });
 
   it('breakpoints: placed with ids, refused with the message, in the answer order', () => {
     const b = readBreakpoints(
       corpusBody('debugger-conversation--01-breakpoints-set'),
     );
-    expect(b[0]).toMatchObject({
+    assertMatchObject(b[0], {
       kind: 'line',
       error: 'Cannot create a breakpoint at this position',
     });
-    expect(b[1].id).toMatch(/^KIND=0\./);
-    expect(b[1].uri).toBe(
+    assert.match(b[1].id ?? '', /^KIND=0\./);
+    assert.equal(
+      b[1].uri,
       '/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=32',
     );
   });
@@ -100,7 +106,8 @@ describe('readings of the debugger documents (recorded answers)', () => {
         'debugger-kinds-and-exception--04-kind-message-with-condition',
       ),
     )[0];
-    expect(breakpointKey(placed)).toBe(
+    assert.equal(
+      breakpointKey(placed),
       breakpointKey({
         kind: 'message',
         msgId: 'ZCV',
@@ -111,18 +118,21 @@ describe('readings of the debugger documents (recorded answers)', () => {
     const exc = readBreakpoints(
       corpusBody('debugger-kinds-and-exception--12-exception-bp-set'),
     )[0];
-    expect(breakpointKey(exc)).toBe(
+    assert.equal(
+      breakpointKey(exc),
       breakpointKey({ kind: 'exception', exceptionClass: 'CX_SY_ZERODIVIDE' }),
     );
   });
 
   it('the end of a debuggee is read from the exception subtype', () => {
-    expect(
+    assert.equal(
       readDebuggeeEnd(corpusBody('debugger-terminate--01-terminate-debuggee')),
-    ).toBe('terminateDebuggee');
-    expect(
+      'terminateDebuggee',
+    );
+    assert.equal(
       readDebuggeeEnd(corpusBody('debugger-run-to-line--05-stepruntoline')),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('terse: where the stop stands — the object address AND the technical place — and every frame of an ordinary stack', () => {
@@ -132,7 +142,7 @@ describe('readings of the debugger documents (recorded answers)', () => {
       stack,
       readAttach(corpusBody('debugger-run-to-line--03-attach')),
     );
-    expect(t.at).toEqual({
+    assert.deepStrictEqual(t.at, {
       address: {
         object_type: 'CLAS',
         object_name: 'ZCL_CV_DBG_MEASURE',
@@ -143,10 +153,10 @@ describe('readings of the debugger documents (recorded answers)', () => {
       include: 'ZCL_CV_DBG_MEASURE============CM002',
       include_line: 32,
     });
-    expect(t.frames).toHaveLength(stack.frames.length);
-    expect(t.frames.length).toBeGreaterThan(5);
-    expect(t).not.toHaveProperty('stack_depth');
-    expect(t.frames[1].address).toEqual({
+    assert.equal(t.frames.length, stack.frames.length);
+    assert.ok(t.frames.length > 5);
+    assert.ok(!('stack_depth' in Object(t)));
+    assert.deepStrictEqual(t.frames[1].address, {
       object_type: 'CLAS',
       object_name: 'CL_OO_ADT_RES_CLASSRUN',
       line: 105,
@@ -166,20 +176,19 @@ describe('readings of the debugger documents (recorded answers)', () => {
       deep,
       readAttach(corpusBody('debugger-run-to-line--03-attach')),
     );
-    expect(t.frames).toHaveLength(TERSE_STACK_FRAMES);
-    expect(t.stack_depth).toBe(TERSE_STACK_FRAMES + 7);
+    assert.equal(t.frames.length, TERSE_STACK_FRAMES);
+    assert.equal(t.stack_depth, TERSE_STACK_FRAMES + 7);
   });
 
   it('terse variables: name, type, value', () => {
-    expect(
+    assert.deepStrictEqual(
       terseVariables(
         readVariables(
           corpusBody('debugger-run-to-line--07-variables-at-write'),
         ),
       ),
-    ).toEqual([
-      { id: 'LV_COUNTER', name: 'LV_COUNTER', type: 'I', value: '241' },
-    ]);
+      [{ id: 'LV_COUNTER', name: 'LV_COUNTER', type: 'I', value: '241' }],
+    );
   });
 });
 
@@ -191,13 +200,13 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
 
   it('the catch: attach possibility, listener identity and server routing (debugger-run-to-line--02-listen)', () => {
     const d = readDebuggee(corpusBody(LISTEN))!;
-    expect(d.attachImpossible).toBe(false);
-    expect(d.terminalId).toBe('');
-    expect(d.ideId).toBe('');
-    expect(d.isSameServer).toBe(true);
-    expect(d.canAdtCrossServer).toBe(true);
-    expect(d.kind).toBe('DEBUGGEE');
-    expect(d.dump).toBeUndefined(); // DUMP_ID and DUMP_URI are empty there
+    assert.equal(d.attachImpossible, false);
+    assert.equal(d.terminalId, '');
+    assert.equal(d.ideId, '');
+    assert.equal(d.isSameServer, true);
+    assert.equal(d.canAdtCrossServer, true);
+    assert.equal(d.kind, 'DEBUGGEE');
+    assert.equal(d.dump, undefined); // DUMP_ID and DUMP_URI are empty there
   });
 
   it('an impossible attach is read from IS_ATTACH_IMPOSSIBLE (the element of debugger-run-to-line--02-listen, set true)', () => {
@@ -205,7 +214,7 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
       '<IS_ATTACH_IMPOSSIBLE>false<',
       '<IS_ATTACH_IMPOSSIBLE>true<',
     );
-    expect(readDebuggee(xml)!.attachImpossible).toBe(true);
+    assert.equal(readDebuggee(xml)!.attachImpossible, true);
   });
 
   it('a short dump catch carries the dump (the DUMP_* elements of debugger-run-to-line--02-listen, filled)', () => {
@@ -213,7 +222,7 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
       .replace('<DUMP_ID/>', '<DUMP_ID>ID1</DUMP_ID>')
       .replace('<DUMP_URI/>', '<DUMP_URI>/dump/uri</DUMP_URI>')
       .replace('<DUMP_UNAME/>', '<DUMP_UNAME>SAPUSER01</DUMP_UNAME>');
-    expect(readDebuggee(xml)!.dump).toMatchObject({
+    assertMatchObject(readDebuggee(xml)!.dump, {
       id: 'ID1',
       uri: '/dump/uri',
       user: 'SAPUSER01',
@@ -225,9 +234,9 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
 
   it('the attach: post-mortem, non-exclusive, and the reached breakpoint with its condition (debugger-run-to-line--03-attach)', () => {
     const a = readAttach(corpusBody(ATTACH));
-    expect(a.isPostMortem).toBe(false);
-    expect(a.isNonExclusive).toBe(false);
-    expect(a.reachedBreakpoints).toEqual([
+    assert.equal(a.isPostMortem, false);
+    assert.equal(a.isNonExclusive, false);
+    assert.deepStrictEqual(a.reachedBreakpoints, [
       {
         id: 'KIND=0.SOURCETYPE=ABAP.MAIN_PROGRAM=ZCL_CV_DBG_MEASURE============CP.INCLUDE=ZCL_CV_DBG_MEASURE============CM002.LINE_NR=9',
       },
@@ -243,8 +252,8 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
       )
       .replace('isPostMortem="false"', 'isPostMortem="true"');
     const a = readAttach(xml);
-    expect(a.isPostMortem).toBe(true);
-    expect(a.reachedBreakpoints[0]).toMatchObject({
+    assert.equal(a.isPostMortem, true);
+    assertMatchObject(a.reachedBreakpoints[0], {
       unresolvableCondition: 'X = 1',
       unresolvableConditionErrorOffset: '4',
     });
@@ -252,17 +261,18 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
 
   it('the step answer says whether the debuggee changed (debugger-conversation--17-stepinto)', () => {
     const s = readAttach(corpusBody(STEP));
-    expect(s.isDebuggeeChanged).toBe(false);
-    expect(s.isNonExclusive).toBe(false);
-    expect(s.isSteppingPossible).toBe(true);
-    expect(
+    assert.equal(s.isDebuggeeChanged, false);
+    assert.equal(s.isNonExclusive, false);
+    assert.equal(s.isSteppingPossible, true);
+    assert.equal(
       readAttach(
         corpusBody(STEP).replace(
           'isDebuggeeChanged="false"',
           'isDebuggeeChanged="true"',
         ),
       ).isDebuggeeChanged,
-    ).toBe(true);
+      true,
+    );
   });
 
   it('terse without flags adds nothing', () => {
@@ -271,7 +281,7 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
       stack(),
       readAttach(corpusBody(ATTACH)),
     );
-    expect(Object.keys(t).sort()).toEqual(['at', 'frames']);
+    assert.deepStrictEqual(Object.keys(t).sort(), ['at', 'frames']);
   });
 
   it('terse with the flags names them', () => {
@@ -287,11 +297,11 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
         .replace('isPostMortem="false"', 'isPostMortem="true"'),
     );
     const t = terseStop(d, stack(), a) as any;
-    expect(t.attach_impossible).toBe(true);
-    expect(t.dump).toMatchObject({ id: 'ID1', uri: '/dump/uri' });
-    expect(t.is_post_mortem).toBe(true);
-    expect(t.kind).toBeUndefined(); // DEBUGGEE is the ordinary catch
-    expect(t.unresolvable_conditions).toEqual([
+    assert.equal(t.attach_impossible, true);
+    assertMatchObject(t.dump, { id: 'ID1', uri: '/dump/uri' });
+    assert.equal(t.is_post_mortem, true);
+    assert.equal(t.kind, undefined); // DEBUGGEE is the ordinary catch
+    assert.deepStrictEqual(t.unresolvable_conditions, [
       { id: a.reachedBreakpoints[0].id, condition: 'X = 1' },
     ]);
   });
@@ -302,42 +312,50 @@ describe('fields SAP answers that were dropped (recorded answers)', () => {
       response: { data: corpusBody(name) },
     });
     it('a refused listener: the conflict text, the subtype and the T100 key', () => {
-      expect(failureText(failed('debugger-conflict--01-listen-refused'))).toBe(
+      assert.equal(
+        failureText(failed('debugger-conflict--01-listen-refused')),
         'Request failed with status code 409: Another session (user SAPUSER01) exists with global debugging scope for user SAPUSER01 [conflictDetected, SY 530]',
       );
     });
     it('a poll taken over: the subtype tells it from a refusal', () => {
-      expect(
-        failureText(failed('debugger-conflict--02-poll-taken-over')),
-      ).toContain('[conflictNotification, SY 530]');
+      assert.ok(
+        failureText(failed('debugger-conflict--02-poll-taken-over')).includes(
+          '[conflictNotification, SY 530]',
+        ),
+      );
     });
     it('no exception document: the line as it was', () => {
-      expect(failureText({ message: 'socket hang up' })).toBe('socket hang up');
+      assert.equal(
+        failureText({ message: 'socket hang up' }),
+        'socket hang up',
+      );
     });
   });
 });
 
 describe('readSettings', () => {
   it('reads the five settings a caller may set; showDataAging is not read', () => {
-    expect(
+    assert.deepStrictEqual(
       readSettings(settingsXml({ systemDebugging: true, backgroundRFC: true })),
-    ).toEqual({
-      systemDebugging: true,
-      createExceptionObject: false,
-      backgroundRFC: true,
-      sharedObjectDebugging: false,
-      updateDebugging: false,
-    });
+      {
+        systemDebugging: true,
+        createExceptionObject: false,
+        backgroundRFC: true,
+        sharedObjectDebugging: false,
+        updateDebugging: false,
+      },
+    );
   });
   it('an empty answer reads as nothing known', () => {
-    expect(readSettings('')).toEqual({});
+    assert.deepStrictEqual(readSettings(''), {});
   });
   it('terse names them as the tools do', () => {
-    expect(
+    assert.deepStrictEqual(
       terseSettings({ systemDebugging: false, backgroundRFC: true }),
-    ).toEqual({
-      system_debugging: false,
-      background_rfc: true,
-    });
+      {
+        system_debugging: false,
+        background_rfc: true,
+      },
+    );
   });
 });

@@ -1,22 +1,38 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import {
   DebugCleanupError,
   DebugSession,
   type RunTarget,
 } from '../../../lib/debugger/DebugSession';
+import { assertMatchObject, assertRejects } from '../../helpers/assertions';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
+  advanceTimersByTimeAsync,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
+import {
+  assertMessageHolding,
   deferred,
   fakeWorld,
   IDS,
   LISTEN_CATCH,
   LISTEN_NOTHING,
   START,
+  stringOf,
   until,
 } from './fakes';
 
 describe('DebugSession lifecycle', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // Jest's defaults: setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   async function started(
     run?: { kind: 'class' | 'program'; name: string },
@@ -44,7 +60,7 @@ describe('DebugSession lifecycle', () => {
     });
     world.run.resolve({ ok: true, output: 'total 6' });
     await until(() => session.holdsState() && world.closed.length === 1);
-    expect(await session.wait(0)).toEqual({
+    assert.deepStrictEqual(await session.wait(0), {
       state: 'ended',
       reason: 'run_finished',
       run: { ok: true, output: 'total 6' },
@@ -61,7 +77,7 @@ describe('DebugSession lifecycle', () => {
       { debuggingMode: 'terminal' },
     );
     const identity = session.currentIdentity()!;
-    expect(world.runs).toEqual([
+    assert.deepStrictEqual(world.runs, [
       {
         target: { kind: 'class', name: 'CLASS_A' },
         debuggee: { terminalId: identity.terminalId, ideId: identity.ideId },
@@ -71,7 +87,7 @@ describe('DebugSession lifecycle', () => {
 
   it('a run under user mode carries no ids', async () => {
     const { world } = await started({ kind: 'program', name: 'PROGRAM_A' });
-    expect(world.runs).toEqual([
+    assert.deepStrictEqual(world.runs, [
       { target: { kind: 'program', name: 'PROGRAM_A' }, debuggee: undefined },
     ]);
   });
@@ -87,16 +103,17 @@ describe('DebugSession lifecycle', () => {
     world.polls[1].resolve(LISTEN_CATCH());
     await until(() => world.calls.includes('getStack'));
     await session.stop();
-    expect(world.calls).toContain('step:stepContinue:analysed');
-    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
+    assert.ok(world.calls.includes('step:stepContinue:analysed'));
+    assert.equal(
+      world.calls.some((c) => c.startsWith('deleteBreakpoint:')),
       false,
     );
-    expect(session.listBreakpoints()).toEqual([]);
-    expect(world.calls).toContain('stopListener');
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
-    expect(world.closed.length).toBe(world.opened.length);
-    expect(session.holdsState()).toBe(false);
-    expect((await session.wait(0)).state).toBe('idle');
+    assert.deepStrictEqual(session.listBreakpoints(), []);
+    assert.ok(world.calls.includes('stopListener'));
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
+    assert.equal(world.closed.length, world.opened.length);
+    assert.equal(session.holdsState(), false);
+    assert.equal((await session.wait(0)).state, 'idle');
   });
 
   it('stop during an attach waits for it and leaves no stop behind (no resurrection)', async () => {
@@ -109,8 +126,8 @@ describe('DebugSession lifecycle', () => {
     const stopping = session.stop();
     attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
     await stopping;
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a catch in the poll a stop ends is attached and released at once, on a connection of its own; no poll follows', async () => {
@@ -122,25 +139,25 @@ describe('DebugSession lifecycle', () => {
       return okResponse(undefined);
     };
     await session.stop();
-    await jest.advanceTimersByTimeAsync(0);
+    await advanceTimersByTimeAsync(0);
     const attach = world.calls.findIndex((c) => c.startsWith('attach:'));
-    expect(attach).toBeGreaterThan(world.calls.indexOf('stopListener'));
-    expect(world.calls[attach + 1]).toBe('step:stepContinue:analysed');
-    expect(world.polls).toHaveLength(2);
-    expect(session.holdsState()).toBe(false);
-    expect((await session.wait(0)).state).toBe('idle');
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.ok(attach > world.calls.indexOf('stopListener'));
+    assert.equal(world.calls[attach + 1], 'step:stepContinue:analysed');
+    assert.equal(world.polls.length, 2);
+    assert.equal(session.holdsState(), false);
+    assert.equal((await session.wait(0)).state, 'idle');
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a catch answered just before the stop, its answer not yet handled, is released by the stop', async () => {
     const { session, world } = await started();
     world.polls[1].resolve(LISTEN_CATCH()); // answered; its handling waits behind the stop
     await session.stop();
-    await jest.advanceTimersByTimeAsync(0);
-    expect(world.calls.filter((c) => c.startsWith('attach:'))).toHaveLength(1);
-    expect(world.calls).toContain('step:stepContinue:analysed');
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    await advanceTimersByTimeAsync(0);
+    assert.equal(world.calls.filter((c) => c.startsWith('attach:')).length, 1);
+    assert.ok(world.calls.includes('step:stepContinue:analysed'));
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a caught debuggee the stop cannot attach is named in its failures, and kept to report', async () => {
@@ -151,20 +168,22 @@ describe('DebugSession lifecycle', () => {
       world.polls[1].resolve(LISTEN_CATCH());
       return okResponse(undefined);
     };
-    await expect(session.stop()).rejects.toThrow(
+    await assertRejects(
+      session.stop(),
       /attach a debuggee caught during the stop .*: debuggee gone/,
     );
-    expect(session.failures()).toEqual([
-      {
-        message: 'debuggee gone',
-        origin: 'refusal',
-        step: expect.stringMatching(
-          /^attach a debuggee caught during the stop \(/,
-        ),
-      },
-    ]);
-    expect(session.holdsState()).toBe(true);
-    expect((await session.wait(0)).state).toBe('idle'); // not a notice: the failure is the stop's
+    const failures = session.failures();
+    assert.equal(failures.length, 1);
+    assert.match(
+      stringOf(failures[0]?.step),
+      /^attach a debuggee caught during the stop \(/,
+    );
+    assert.deepStrictEqual(
+      { ...failures[0], step: undefined },
+      { message: 'debuggee gone', origin: 'refusal', step: undefined },
+    );
+    assert.equal(session.holdsState(), true);
+    assert.equal((await session.wait(0)).state, 'idle'); // not a notice: the failure is the stop's
   });
 
   it('a caught debuggee the stop attached but could not release is named in its failures', async () => {
@@ -175,11 +194,15 @@ describe('DebugSession lifecycle', () => {
       world.polls[1].resolve(LISTEN_CATCH());
       return okResponse(undefined);
     };
-    await expect(session.stop()).rejects.toThrow(
+    await assertRejects(
+      session.stop(),
       /release a debuggee caught during the stop .*: release refused/,
     );
-    expect(world.calls.some((c) => c.startsWith('attach:'))).toBe(true);
-    expect(session.holdsState()).toBe(true);
+    assert.equal(
+      world.calls.some((c) => c.startsWith('attach:')),
+      true,
+    );
+    assert.equal(session.holdsState(), true);
   });
 
   it('a caught debuggee whose release failed is kept with its connection, and the next stop retries the release before closing it', async () => {
@@ -192,18 +215,18 @@ describe('DebugSession lifecycle', () => {
     };
     const releases = () =>
       world.calls.filter((c) => c === 'step:stepContinue:analysed').length;
-    await expect(session.stop()).rejects.toThrow(/release refused/);
-    expect(releases()).toBe(1);
+    await assertRejects(session.stop(), /release refused/);
+    assert.equal(releases(), 1);
     const attaching = world.opened[world.opened.length - 1];
-    expect(world.closed).not.toContain(attaching); // only the attaching session can release it
-    expect(session.holdsState()).toBe(true);
+    assert.ok(!world.closed.includes(attaching)); // only the attaching session can release it
+    assert.equal(session.holdsState(), true);
     delete world.override.stopListener;
-    await expect(session.stop()).resolves.toEqual([]);
-    expect(releases()).toBe(2); // retried on the session that attached it
-    expect(world.closed).toContain(attaching);
-    expect(world.calls.filter((c) => c.startsWith('attach:'))).toHaveLength(1);
-    expect(session.holdsState()).toBe(false);
-    expect(session.failures()).toEqual([]);
+    assert.deepStrictEqual(await session.stop(), []);
+    assert.equal(releases(), 2); // retried on the session that attached it
+    assert.ok(world.closed.includes(attaching));
+    assert.equal(world.calls.filter((c) => c.startsWith('attach:')).length, 1);
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(session.failures(), []);
   });
 
   it('a caught debuggee whose release finds its connection spent is dropped without a request, reported, and nothing stays owed', async () => {
@@ -221,17 +244,15 @@ describe('DebugSession lifecycle', () => {
     };
     const notes = await session.stop();
     const attaching = world.opened[world.opened.length - 1];
-    expect(world.dropped).toEqual([attaching]);
-    expect(world.closed).not.toContain(attaching);
-    expect(notes).toEqual([
-      expect.objectContaining({
-        step: expect.stringMatching(
-          /^release a debuggee caught during the stop \(/,
-        ),
-        cleanup: { message: expect.stringContaining('dropped') },
-      }),
-    ]);
-    expect(session.holdsState()).toBe(false);
+    assert.deepStrictEqual(world.dropped, [attaching]);
+    assert.ok(!world.closed.includes(attaching));
+    assert.equal(notes.length, 1);
+    assert.match(
+      stringOf(notes[0]?.step),
+      /^release a debuggee caught during the stop \(/,
+    );
+    assertMessageHolding(notes[0]?.cleanup, 'dropped');
+    assert.equal(session.holdsState(), false);
   });
 
   it('a caught debuggee whose release fails again stays owed, and is named by each stop', async () => {
@@ -242,15 +263,16 @@ describe('DebugSession lifecycle', () => {
       world.polls[1].resolve(LISTEN_CATCH());
       return okResponse(undefined);
     };
-    await expect(session.stop()).rejects.toThrow(/release refused/);
-    await expect(session.stop()).rejects.toThrow(
+    await assertRejects(session.stop(), /release refused/);
+    await assertRejects(
+      session.stop(),
       /release a debuggee caught during the stop .*: release refused/,
     );
-    expect(session.holdsState()).toBe(true);
+    assert.equal(session.holdsState(), true);
     delete world.override.step;
-    await expect(session.stop()).resolves.toEqual([]);
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.deepStrictEqual(await session.stop(), []);
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a run finishing after stop reports nothing and its connection closes once', async () => {
@@ -260,9 +282,9 @@ describe('DebugSession lifecycle', () => {
     });
     await session.stop();
     world.run.resolve({ ok: true, output: 'late' });
-    await jest.advanceTimersByTimeAsync(0);
-    expect((await session.wait(0)).state).toBe('idle');
-    expect(world.closed.length).toBe(new Set(world.closed).size);
+    await advanceTimersByTimeAsync(0);
+    assert.equal((await session.wait(0)).state, 'idle');
+    assert.equal(world.closed.length, new Set(world.closed).size);
   });
 
   it('a cleanup that fails is reported, and what failed stays to retry', async () => {
@@ -277,14 +299,14 @@ describe('DebugSession lifecycle', () => {
     world.override.stopListener = async () => refusedResponse('listener busy');
     world.override.deleteBreakpoint = async () =>
       refusedResponse('not authorised');
-    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+    await assertRejects(session.stop(), DebugCleanupError);
     // The start's breakpoint and the one set after it.
-    expect(session.listBreakpoints()).toHaveLength(2);
-    expect(session.holdsState()).toBe(true);
+    assert.equal(session.listBreakpoints().length, 2);
+    assert.equal(session.holdsState(), true);
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
-    await expect(session.stop()).resolves.toEqual([]); // the retry undoes what was left
-    expect(session.holdsState()).toBe(false);
+    assert.deepStrictEqual(await session.stop(), []); // the retry undoes what was left
+    assert.equal(session.holdsState(), false);
   });
 
   it('a release that fails keeps the stop for a retry', async () => {
@@ -293,23 +315,24 @@ describe('DebugSession lifecycle', () => {
     world.polls[1].resolve(LISTEN_CATCH());
     await until(() => world.calls.includes('getStack'));
     world.override.step = async () => refusedResponse('work process busy');
-    await expect(session.stop()).rejects.toThrow(/work process busy/);
-    expect((await session.wait(0)).state).toBe('stopped');
+    await assertRejects(session.stop(), /work process busy/);
+    assert.equal((await session.wait(0)).state, 'stopped');
     delete world.override.step;
     await session.stop();
-    expect(session.holdsState()).toBe(false);
+    assert.equal(session.holdsState(), false);
   });
 
   it('stated ids: the first start stops a predecessor listener under those ids', async () => {
     const world = fakeWorld();
     await started(undefined, { ...IDS, stated: true }, world);
-    expect(world.calls).toContain('stopListener');
-    expect(world.calls.indexOf('stopListener')).toBeLessThan(
-      world.calls.findIndex((c) => c.startsWith('listen:')),
+    assert.ok(world.calls.includes('stopListener'));
+    assert.ok(
+      world.calls.indexOf('stopListener') <
+        world.calls.findIndex((c) => c.startsWith('listen:')),
     );
   });
 
-  it.each([
+  for (const [_, mode, stated, reconciles] of [
     ['user mode, the IDE id alone stated', {}, { stated: true }, true],
     [
       'terminal mode, the IDE id alone stated',
@@ -329,14 +352,24 @@ describe('DebugSession lifecycle', () => {
       {},
       false,
     ],
-  ])(
-    'the first start reconciles a predecessor only under ids that can have one: %s',
-    async (_, mode, stated, reconciles) => {
-      const world = fakeWorld();
-      await started(undefined, { ...IDS, ...stated }, world, mode);
-      expect(world.calls.includes('stopListener')).toBe(reconciles);
-    },
-  );
+  ] satisfies [
+    string,
+    { debuggingMode?: 'terminal' },
+    { stated?: boolean; terminalStated?: boolean },
+    boolean,
+  ][]) {
+    it(
+      format(
+        'the first start reconciles a predecessor only under ids that can have one: %s',
+        _,
+      ),
+      async () => {
+        const world = fakeWorld();
+        await started(undefined, { ...IDS, ...stated }, world, mode);
+        assert.equal(world.calls.includes('stopListener'), reconciles);
+      },
+    );
+  }
 
   // Measured on premise (2026-10-12): a poll sent just before the stop can reach
   // the system after the stopListener and then holds its full hold.
@@ -356,18 +389,18 @@ describe('DebugSession lifecycle', () => {
       }
       return okResponse(undefined);
     };
-    await expect(session.stop()).resolves.toEqual([]);
-    expect(world.calls.filter((c) => c === 'stopListener')).toHaveLength(2);
-    expect(unansweredAtSecond).toEqual([true]);
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.deepStrictEqual(await session.stop(), []);
+    assert.equal(world.calls.filter((c) => c === 'stopListener').length, 2);
+    assert.deepStrictEqual(unansweredAtSecond, [true]);
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a stop whose stopListener answered the open poll stops the listener once', async () => {
     const { session, world } = await started();
-    await expect(session.stop()).resolves.toEqual([]);
-    expect(world.calls.filter((c) => c === 'stopListener')).toHaveLength(1);
-    expect(session.holdsState()).toBe(false);
+    assert.deepStrictEqual(await session.stop(), []);
+    assert.equal(world.calls.filter((c) => c === 'stopListener').length, 1);
+    assert.equal(session.holdsState(), false);
   });
 
   it('a second stopListener that fails is no failure of the stop: the first one succeeded', async () => {
@@ -381,9 +414,9 @@ describe('DebugSession lifecycle', () => {
       open.resolve(LISTEN_NOTHING()); // the system answers the poll at last
       return refusedResponse('listener already stopped');
     };
-    await expect(session.stop()).resolves.toEqual([]);
-    expect(stops).toBe(2);
-    expect(session.holdsState()).toBe(false);
+    assert.deepStrictEqual(await session.stop(), []);
+    assert.equal(stops, 2);
+    assert.equal(session.holdsState(), false);
   });
 
   describe('a close that throws during stop', () => {
@@ -404,15 +437,13 @@ describe('DebugSession lifecycle', () => {
       const { session } = await started(undefined, IDS, world);
       closeFailsOnce(world);
       const failed = session.stop();
-      await expect(failed).rejects.toThrow(DebugCleanupError);
-      await expect(failed).rejects.toThrow(/close refused/);
-      expect(session.holdsState()).toBe(true);
-      expect(session.failures()).toContainEqual(
-        expect.objectContaining({ message: 'close refused' }),
-      );
-      await expect(session.stop()).resolves.toEqual([]);
-      expect(session.holdsState()).toBe(false);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      await assertRejects(failed, DebugCleanupError);
+      await assertRejects(failed, /close refused/);
+      assert.equal(session.holdsState(), true);
+      assert.ok(session.failures().some((f) => f.message === 'close refused'));
+      assert.deepStrictEqual(await session.stop(), []);
+      assert.equal(session.holdsState(), false);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     });
 
     it("the debuggee's connection is kept without a second release", async () => {
@@ -421,14 +452,15 @@ describe('DebugSession lifecycle', () => {
       world.polls[1].resolve(LISTEN_CATCH());
       await until(() => world.calls.includes('getStack'));
       closeFailsOnce(world);
-      await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-      expect(session.holdsState()).toBe(true);
-      await expect(session.stop()).resolves.toEqual([]);
-      expect(
-        world.calls.filter((c) => c === 'step:stepContinue:analysed'),
-      ).toHaveLength(1);
-      expect(session.holdsState()).toBe(false);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      await assertRejects(session.stop(), DebugCleanupError);
+      assert.equal(session.holdsState(), true);
+      assert.deepStrictEqual(await session.stop(), []);
+      assert.equal(
+        world.calls.filter((c) => c === 'step:stepContinue:analysed').length,
+        1,
+      );
+      assert.equal(session.holdsState(), false);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     });
 
     it("the run's connection is fenced, kept and named; a late run reports nothing", async () => {
@@ -449,14 +481,14 @@ describe('DebugSession lifecycle', () => {
         }
         return realClose(c);
       };
-      await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-      expect(session.holdsState()).toBe(true);
+      await assertRejects(session.stop(), DebugCleanupError);
+      assert.equal(session.holdsState(), true);
       world.run.resolve({ ok: true, output: 'late' });
-      await jest.advanceTimersByTimeAsync(0);
-      expect((await session.wait(0)).state).toBe('idle');
-      await expect(session.stop()).resolves.toEqual([]);
-      expect(session.holdsState()).toBe(false);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      await advanceTimersByTimeAsync(0);
+      assert.equal((await session.wait(0)).state, 'idle');
+      assert.deepStrictEqual(await session.stop(), []);
+      assert.equal(session.holdsState(), false);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     });
   });
 
@@ -491,23 +523,27 @@ describe('DebugSession lifecycle', () => {
         );
         const gate = closeFails(world);
         world.run.resolve({ ok: true, output: 'total 6' });
-        await jest.advanceTimersByTimeAsync(0);
-        await jest.advanceTimersByTimeAsync(0);
-        expect(watch.seen).toEqual([]);
-        expect(await session.wait(0)).toMatchObject({
+        await advanceTimersByTimeAsync(0);
+        await advanceTimersByTimeAsync(0);
+        assert.deepStrictEqual(watch.seen, []);
+        assertMatchObject(await session.wait(0), {
           state: 'ended',
           reason: 'run_finished',
         });
-        expect(session.failures()).toContainEqual({
-          error: 'client_threw',
-          message: 'close refused',
-          step: "close the run's connection",
-        });
-        expect(session.holdsState()).toBe(true);
+        assert.ok(
+          session.failures().some((e) =>
+            isDeepStrictEqual(e, {
+              error: 'client_threw',
+              message: 'close refused',
+              step: "close the run's connection",
+            }),
+          ),
+        );
+        assert.equal(session.holdsState(), true);
         gate.refuse = false;
-        await expect(session.stop()).resolves.toEqual([]);
-        expect(session.holdsState()).toBe(false);
-        expect(new Set(world.closed)).toEqual(new Set(world.opened));
+        assert.deepStrictEqual(await session.stop(), []);
+        assert.equal(session.holdsState(), false);
+        assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
       } finally {
         watch.off();
       }
@@ -518,18 +554,22 @@ describe('DebugSession lifecycle', () => {
       const { session } = await started(undefined, IDS, world);
       const gate = closeFails(world);
       world.polls[1].resolve(refusedResponse('session gone'));
-      await jest.advanceTimersByTimeAsync(0);
-      await expect(session.wait(0)).rejects.toThrow(/session gone/);
-      expect(session.failures()).toContainEqual({
-        error: 'client_threw',
-        message: 'close refused',
-        step: "close the listener's connection",
-      });
-      expect(session.holdsState()).toBe(true);
+      await advanceTimersByTimeAsync(0);
+      await assertRejects(session.wait(0), /session gone/);
+      assert.ok(
+        session.failures().some((e) =>
+          isDeepStrictEqual(e, {
+            error: 'client_threw',
+            message: 'close refused',
+            step: "close the listener's connection",
+          }),
+        ),
+      );
+      assert.equal(session.holdsState(), true);
       gate.refuse = false;
-      await expect(session.stop()).resolves.toEqual([]);
-      expect(session.holdsState()).toBe(false);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      assert.deepStrictEqual(await session.stop(), []);
+      assert.equal(session.holdsState(), false);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     });
 
     it('an attach that throws: the attach connection is kept and named', async () => {
@@ -541,17 +581,21 @@ describe('DebugSession lifecycle', () => {
       const gate = closeFails(world);
       world.polls[1].resolve(LISTEN_CATCH());
       await until(() => world.calls.some((c) => c.startsWith('attach:')));
-      await jest.advanceTimersByTimeAsync(0);
-      await expect(session.wait(0)).rejects.toThrow(/attach broke/);
-      expect(session.failures()).toContainEqual({
-        error: 'client_threw',
-        message: 'close refused',
-        step: "close the debuggee's connection",
-      });
+      await advanceTimersByTimeAsync(0);
+      await assertRejects(session.wait(0), /attach broke/);
+      assert.ok(
+        session.failures().some((e) =>
+          isDeepStrictEqual(e, {
+            error: 'client_threw',
+            message: 'close refused',
+            step: "close the debuggee's connection",
+          }),
+        ),
+      );
       gate.refuse = false;
-      await expect(session.stop()).resolves.toEqual([]);
-      expect(session.holdsState()).toBe(false);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      assert.deepStrictEqual(await session.stop(), []);
+      assert.equal(session.holdsState(), false);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     });
 
     it('an attach overtaken by a newer generation whose release fails: the failed release is recorded', async () => {
@@ -564,22 +608,25 @@ describe('DebugSession lifecycle', () => {
       (session as any).generation++; // the listener moved on while the attach ran
       world.override.step = async () => refusedResponse('work process busy');
       attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
-      await jest.advanceTimersByTimeAsync(0);
-      await jest.advanceTimersByTimeAsync(0);
-      expect(session.failures()).toContainEqual(
-        expect.objectContaining({
-          message: 'work process busy',
-          step: 'release the debuggee',
-        }),
+      await advanceTimersByTimeAsync(0);
+      await advanceTimersByTimeAsync(0);
+      assert.ok(
+        session
+          .failures()
+          .some(
+            (f) =>
+              f.message === 'work process busy' &&
+              f.step === 'release the debuggee',
+          ),
       );
-      expect(session.holdsState()).toBe(true);
+      assert.equal(session.holdsState(), true);
       const attaching = world.opened[world.opened.length - 1];
-      expect(world.closed).not.toContain(attaching); // kept: only it can release the debuggee
+      assert.ok(!world.closed.includes(attaching)); // kept: only it can release the debuggee
       delete world.override.step;
-      await expect(session.stop()).resolves.toEqual([]);
-      expect(world.calls).toContain('step:stepContinue:analysed'); // the retried release
-      expect(world.closed).toContain(attaching);
-      expect(session.holdsState()).toBe(false);
+      assert.deepStrictEqual(await session.stop(), []);
+      assert.ok(world.calls.includes('step:stepContinue:analysed')); // the retried release
+      assert.ok(world.closed.includes(attaching));
+      assert.equal(session.holdsState(), false);
     });
   });
 
@@ -597,15 +644,15 @@ describe('DebugSession lifecycle', () => {
         sessionLost: 'ADT_SESSION_REPLACED',
       });
     attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
-    await jest.advanceTimersByTimeAsync(0);
-    await jest.advanceTimersByTimeAsync(0);
+    await advanceTimersByTimeAsync(0);
+    await advanceTimersByTimeAsync(0);
     const attaching = world.opened[world.opened.length - 1];
-    expect(world.dropped).toEqual([attaching]);
-    expect(world.closed).not.toContain(attaching);
-    expect(session.failures()).toEqual([]);
+    assert.deepStrictEqual(world.dropped, [attaching]);
+    assert.ok(!world.closed.includes(attaching));
+    assert.deepStrictEqual(session.failures(), []);
     delete world.override.step;
-    await expect(session.stop()).resolves.toEqual([]);
-    expect(session.holdsState()).toBe(false);
+    assert.deepStrictEqual(await session.stop(), []);
+    assert.equal(session.holdsState(), false);
   });
 
   it('stated ids: a start that failed before reconciling reconciles on the next start', async () => {
@@ -623,17 +670,16 @@ describe('DebugSession lifecycle', () => {
       ...IDS,
       stated: true,
     }).bind('origin');
-    await expect(session.start('refuse', START)).rejects.toThrow(
-      /no route to host/,
-    );
-    expect(world.calls).not.toContain('stopListener');
+    await assertRejects(session.start('refuse', START), /no route to host/);
+    assert.ok(!world.calls.includes('stopListener'));
     const s = session.start('refuse', START);
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
-    expect(world.calls).toContain('stopListener');
-    expect(world.calls.indexOf('stopListener')).toBeLessThan(
-      world.calls.findIndex((c) => c.startsWith('listen:')),
+    assert.ok(world.calls.includes('stopListener'));
+    assert.ok(
+      world.calls.indexOf('stopListener') <
+        world.calls.findIndex((c) => c.startsWith('listen:')),
     );
   });
 
@@ -649,14 +695,14 @@ describe('DebugSession lifecycle', () => {
       done = true;
     });
     await until(() => world.calls.includes('stopListener'));
-    await jest.advanceTimersByTimeAsync(1000);
-    expect(done).toBe(false);
+    await advanceTimersByTimeAsync(1000);
+    assert.equal(done, false);
     const listenerConnection = world.opened[1];
-    expect(world.closed).not.toContain(listenerConnection);
+    assert.ok(!world.closed.includes(listenerConnection));
     world.polls[1].resolve(LISTEN_NOTHING());
     await stopping;
-    expect(world.closed).toContain(listenerConnection);
-    expect(session.holdsState()).toBe(false);
+    assert.ok(world.closed.includes(listenerConnection));
+    assert.equal(session.holdsState(), false);
   });
 
   it('a failed answer of the stopped poll is a cleanup failure, named, kept for the next stop', async () => {
@@ -666,15 +712,15 @@ describe('DebugSession lifecycle', () => {
       world.polls[1].resolve(refusedResponse('poll broke'));
       return okResponse(undefined);
     };
-    await expect(session.stop()).rejects.toThrow(/listen: .*poll broke/);
-    expect(session.failures()).toEqual([
+    await assertRejects(session.stop(), /listen: .*poll broke/);
+    assert.deepStrictEqual(session.failures(), [
       { message: 'poll broke', origin: 'refusal', step: 'listen' },
     ]);
-    expect(session.holdsState()).toBe(true);
+    assert.equal(session.holdsState(), true);
     delete world.override.stopListener;
     await session.stop();
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a stale loop that throws after stop records no failure', async () => {
@@ -688,10 +734,10 @@ describe('DebugSession lifecycle', () => {
       }
     });
     world.polls[1].resolve(LISTEN_NOTHING());
-    await jest.advanceTimersByTimeAsync(0);
-    expect(late).toBe(false); // the stale loop did throw
-    expect(session.holdsState()).toBe(false);
-    expect((await session.wait(0)).state).toBe('idle');
+    await advanceTimersByTimeAsync(0);
+    assert.equal(late, false); // the stale loop did throw
+    assert.equal(session.holdsState(), false);
+    assert.equal((await session.wait(0)).state, 'idle');
   });
 
   describe('a start that fails after attaching on the first poll', () => {
@@ -713,24 +759,22 @@ describe('DebugSession lifecycle', () => {
 
     it('releases the stop it attached', async () => {
       const { session, world, s } = await failedStart();
-      await expect(s).rejects.toThrow(/^run refused$/);
-      expect(world.calls).toContain('step:stepContinue:analysed');
-      expect(session.holdsState()).toBe(false);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      await assertRejects(s, /^run refused$/);
+      assert.ok(world.calls.includes('step:stepContinue:analysed'));
+      assert.equal(session.holdsState(), false);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     });
 
     it('names a release that failed, and keeps the stop for DebugStop', async () => {
       const world = fakeWorld();
       world.override.step = async () => refusedResponse('work process busy');
       const { session, s } = await failedStart(world);
-      await expect(s).rejects.toThrow(
-        /run refused; not undone: .*work process busy/,
-      );
-      expect((await session.wait(0)).state).toBe('stopped');
+      await assertRejects(s, /run refused; not undone: .*work process busy/);
+      assert.equal((await session.wait(0)).state, 'stopped');
       delete world.override.step;
       await session.stop();
-      expect(session.holdsState()).toBe(false);
-      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+      assert.equal(session.holdsState(), false);
+      assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     });
   });
 });

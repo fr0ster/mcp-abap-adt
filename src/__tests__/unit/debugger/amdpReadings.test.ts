@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import {
   locationId,
   readAmdpEvents,
@@ -7,6 +10,7 @@ import {
 } from '../../../lib/debugger/amdpReadings';
 import { TERSE_STACK_FRAMES } from '../../../lib/debugger/readings';
 import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   AMDP_BREAK_LINE,
   AMDP_MAIN_ID,
@@ -19,31 +23,33 @@ import {
 
 describe('AMDP readings', () => {
   it('the start names the session in Location and the HANA session in the body', () => {
-    expect(readAmdpStart(START)).toEqual({
+    assert.deepStrictEqual(readAmdpStart(START), {
       mainId: AMDP_MAIN_ID,
       hanaSession: 'sap.example.local:PORT:225615',
     });
-    expect(
+    assert.equal(
       locationId({
         headers: { Location: '/x/y/ABCDEF0123456789ABCDEF0123456789' },
       }),
-    ).toBe('ABCDEF0123456789ABCDEF0123456789');
+      'ABCDEF0123456789ABCDEF0123456789',
+    );
   });
   it('the sync names its request by a bare id in Location', () => {
-    expect(
+    assert.equal(
       locationId({ headers: { location: 'ABCDEF0123456789ABCDEF0123456789' } }),
-    ).toBe('ABCDEF0123456789ABCDEF0123456789');
-    expect(locationId({ headers: {} })).toBe('');
+      'ABCDEF0123456789ABCDEF0123456789',
+    );
+    assert.equal(locationId({ headers: {} }), '');
   });
   it('an ON_BREAK: kind, line, debuggee, every variable at any depth', () => {
     const [e] = readAmdpEvents(BREAK);
-    expect(e).toMatchObject({
+    assertMatchObject(e, {
       kind: 'ON_BREAK',
       requestId: '',
       debuggeeId: 'D1',
       line: AMDP_BREAK_LINE,
     });
-    expect(e.variables).toEqual([
+    assert.deepStrictEqual(e.variables, [
       { name: '::CURRENT_OBJECT_NAME', value: 'ZMCP_DBG_AMDP=>SUM_TO' },
       { name: '::CURRENT_OBJECT_SCHEMA', value: 'SAPHANADB' },
       { name: '::ROWCOUNT', value: '0' },
@@ -52,8 +58,8 @@ describe('AMDP readings', () => {
       { name: 'IV_LIMIT', value: '3' },
       { name: 'LV_I', value: '1' },
     ]);
-    expect(e.breakpoints).toEqual([]);
-    expect(terseAmdpEvent(e)).toEqual({
+    assert.deepStrictEqual(e.breakpoints, []);
+    assert.deepStrictEqual(terseAmdpEvent(e), {
       kind: 'ON_BREAK',
       debuggeeId: 'D1',
       line: AMDP_BREAK_LINE,
@@ -73,7 +79,7 @@ describe('AMDP readings', () => {
   });
   it('an ON_BREAK carries its call stack: the procedure, the ABAP position, the native line', () => {
     const [e] = readAmdpEvents(corpusBody('amdp-debugger--05-events-on-break'));
-    expect(e.stack).toEqual([
+    assert.deepStrictEqual(e.stack, [
       {
         index: 1,
         procedure: 'ZMCP_DBG_AMDP=>SUM_TO',
@@ -93,10 +99,10 @@ describe('AMDP readings', () => {
     const [e] = readAmdpEvents(
       corpusBody('amdp-debugger--07-events-on-break-table-function'),
     );
-    expect(e.stack).toMatchObject([
+    assertMatchObject(e.stack, [
       { index: 0, procedure: 'ZMCP_DBG_AMDP=>TF', line: 37, nativeLine: 16 },
     ]);
-    expect(terseAmdpEvent(e).stack).toEqual([
+    assert.deepStrictEqual(terseAmdpEvent(e).stack, [
       {
         procedure: 'ZMCP_DBG_AMDP=>TF',
         address: {
@@ -118,31 +124,32 @@ describe('AMDP readings', () => {
       'amdpdbg:isDebugCompiled="true"',
       'amdpdbg:isDebugCompiled="false"',
     );
-    expect(cold).not.toBe(entry);
+    assert.notEqual(cold, entry);
     const xml = recorded.replace(
       entry,
       cold + entry.repeat(TERSE_STACK_FRAMES + 2),
     );
     const terse = terseAmdpEvent(readAmdpEvents(xml)[0]);
-    expect(terse.stack).toHaveLength(TERSE_STACK_FRAMES);
-    expect(terse.stack_depth).toBe(TERSE_STACK_FRAMES + 3);
-    expect(terse.stack?.[0].not_debug_compiled).toBe(true);
-    expect(terse.stack?.[1].not_debug_compiled).toBeUndefined();
+    assert.equal(terse.stack?.length, TERSE_STACK_FRAMES);
+    assert.equal(terse.stack_depth, TERSE_STACK_FRAMES + 3);
+    assert.equal(terse.stack?.[0].not_debug_compiled, true);
+    assert.equal(terse.stack?.[1].not_debug_compiled, undefined);
   });
   it('a nested stop: the innermost frame first; the callers keep their object, not their lines', () => {
     const [e] = readAmdpEvents(
       corpusBody('amdp-debugger--10-events-on-break-nested'),
     );
-    expect(
+    assert.deepStrictEqual(
       e.stack?.map((f) => [f.index, f.procedure, f.isDebugCompiled]),
-    ).toEqual([
-      [3, 'ZMCP_DBG_AMDP=>INNER', true],
-      [2, 'ZMCP_DBG_AMDP=>MIDDLE', false],
-      [1, 'ZMCP_DBG_AMDP=>OUTER', false],
-    ]);
-    expect(e.stack?.[1]).toMatchObject({ line: 27, nativeLine: 0 });
+      [
+        [3, 'ZMCP_DBG_AMDP=>INNER', true],
+        [2, 'ZMCP_DBG_AMDP=>MIDDLE', false],
+        [1, 'ZMCP_DBG_AMDP=>OUTER', false],
+      ],
+    );
+    assertMatchObject(e.stack?.[1], { line: 27, nativeLine: 0 });
     const object = { object_type: 'CLAS', object_name: 'ZMCP_DBG_AMDP' };
-    expect(terseAmdpEvent(e).stack).toEqual([
+    assert.deepStrictEqual(terseAmdpEvent(e).stack, [
       {
         procedure: 'ZMCP_DBG_AMDP=>INNER',
         address: { ...object, line: 37 },
@@ -161,35 +168,43 @@ describe('AMDP readings', () => {
     ]);
   });
   it('an event without a call stack has none', () => {
-    expect(readAmdpEvents(END)[0].stack).toBeUndefined();
-    expect(terseAmdpEvent(readAmdpEvents(END)[0]).stack).toBeUndefined();
+    assert.equal(readAmdpEvents(END)[0].stack, undefined);
+    assert.equal(terseAmdpEvent(readAmdpEvents(END)[0]).stack, undefined);
   });
   it('a variable the system marks null reads NULL', () => {
     const xml = BREAK.replace(
       'amdpdbg:name="LV_I" amdpdbg:type="INTEGER" amdpdbg:isNullValue="false"',
       'amdpdbg:name="LV_I" amdpdbg:type="INTEGER" amdpdbg:isNullValue="true"',
     );
-    expect(xml).not.toBe(BREAK);
-    expect(readAmdpEvents(xml)[0].variables).toContainEqual({
-      name: 'LV_I',
-      value: 'NULL',
-    });
+    assert.notEqual(xml, BREAK);
+    assert.ok(
+      readAmdpEvents(xml)[0].variables.some((e) =>
+        isDeepStrictEqual(e, {
+          name: 'LV_I',
+          value: 'NULL',
+        }),
+      ),
+    );
   });
   it('an ON_EXECUTION_END names the debuggee that ended', () => {
-    expect(readAmdpEvents(END)).toEqual([
-      expect.objectContaining({
-        kind: 'ON_EXECUTION_END',
-        debuggeeId: 'D1',
-        variables: [],
-        breakpoints: [],
-      }),
-    ]);
+    // objectContaining: its primitive fields matched, its array fields
+    // compared whole (spec §3.1).
+    const events = readAmdpEvents(END);
+    assert.equal(events.length, 1);
+    const [end] = events;
+    assertMatchObject(end, { kind: 'ON_EXECUTION_END', debuggeeId: 'D1' });
+    assert.ok(end !== undefined && 'variables' in end && 'breakpoints' in end);
+    assert.deepStrictEqual(end.variables, []);
+    assert.deepStrictEqual(end.breakpoints, []);
   });
   it('a stopped session answers the open read with a STOP event', () => {
-    expect(readAmdpEvents(AMDP_STOPPED).map((e) => e.kind)).toEqual(['STOP']);
+    assert.deepStrictEqual(
+      readAmdpEvents(AMDP_STOPPED).map((e) => e.kind),
+      ['STOP'],
+    );
   });
   it('a SYNC_BREAKPOINTS carries its request id and the states', () => {
-    expect(readAmdpEvents(SYNCED('Q1'))[0]).toMatchObject({
+    assertMatchObject(readAmdpEvents(SYNCED('Q1'))[0], {
       kind: 'SYNC_BREAKPOINTS',
       requestId: 'Q1',
       breakpoints: [{ state: 'PENDING' }, { state: 'PENDING' }],
@@ -200,15 +215,16 @@ describe('AMDP readings', () => {
       corpusBody('amdp-debugger--04-events-toggle-breakpoints'),
     );
     for (const e of [first, second])
-      expect(e.body).toMatch(
+      assert.match(
+        e.body,
         /^<amdpdbg:mainResponse[\s\S]*<\/amdpdbg:mainResponse>$/,
       );
-    expect(first.body).toContain('#start=37');
-    expect(second.body).toContain('#start=27');
-    expect(readAmdpEvents(END)[0].body).toContain('<amdpdbg:value/>');
+    assert.ok(first.body.includes('#start=37'));
+    assert.ok(second.body.includes('#start=27'));
+    assert.ok(readAmdpEvents(END)[0].body.includes('<amdpdbg:value/>'));
   });
   it('no events in an empty answer', () => {
-    expect(readAmdpEvents('')).toEqual([]);
+    assert.deepStrictEqual(readAmdpEvents(''), []);
   });
   it('a data preview becomes rows: one per position across the columns, none without columns', () => {
     const recorded = corpusBody('amdp-debugger--08-data-preview-table');
@@ -219,7 +235,7 @@ describe('AMDP readings', () => {
       (row) =>
         `${row}<dataPreview:data>${++n === 1 ? '2' : '4'}</dataPreview:data>`,
     );
-    expect(readAmdpPreview(twoRows)).toEqual({
+    assert.deepStrictEqual(readAmdpPreview(twoRows), {
       columns: ['N', 'SQUARE'],
       rows: [
         { N: '1', SQUARE: '1' },
@@ -230,7 +246,10 @@ describe('AMDP readings', () => {
       /<dataPreview:columns>[\s\S]*<\/dataPreview:columns>/,
       '',
     );
-    expect(readAmdpPreview(noColumns)).toEqual({ columns: [], rows: [] });
+    assert.deepStrictEqual(readAmdpPreview(noColumns), {
+      columns: [],
+      rows: [],
+    });
   });
 
   describe('recorded on a system', () => {
@@ -238,26 +257,33 @@ describe('AMDP readings', () => {
       const [e] = readAmdpEvents(
         corpusBody('amdp-debugger--03-events-sync-breakpoints'),
       );
-      expect(e.kind).toBe('SYNC_BREAKPOINTS');
-      expect(e.requestId).toBe(
+      assert.equal(e.kind, 'SYNC_BREAKPOINTS');
+      assert.equal(
+        e.requestId,
         corpusSidecar('amdp-debugger--02-sync-breakpoints').response.headers
           .location,
       );
-      expect(e.breakpoints.map((b) => b.state)).toEqual(['PENDING', 'PENDING']);
+      assert.deepStrictEqual(
+        e.breakpoints.map((b) => b.state),
+        ['PENDING', 'PENDING'],
+      );
     });
     it('a toggle batch reads as one event per breakpoint, each VALID, with its place and no reason', () => {
       const events = readAmdpEvents(
         corpusBody('amdp-debugger--04-events-toggle-breakpoints'),
       );
-      expect(events.map((e) => e.kind)).toEqual([
-        'ON_TOGGLE_BREAKPOINTS',
-        'ON_TOGGLE_BREAKPOINTS',
-      ]);
-      expect(events.flatMap((e) => e.breakpoints)).toEqual([
-        { class_name: 'ZMCP_DBG_AMDP', line: 37, state: 'VALID' },
-        { class_name: 'ZMCP_DBG_AMDP', line: 27, state: 'VALID' },
-      ]);
-      expect(terseAmdpEvent(events[0]).breakpoints).toEqual([
+      assert.deepStrictEqual(
+        events.map((e) => e.kind),
+        ['ON_TOGGLE_BREAKPOINTS', 'ON_TOGGLE_BREAKPOINTS'],
+      );
+      assert.deepStrictEqual(
+        events.flatMap((e) => e.breakpoints),
+        [
+          { class_name: 'ZMCP_DBG_AMDP', line: 37, state: 'VALID' },
+          { class_name: 'ZMCP_DBG_AMDP', line: 27, state: 'VALID' },
+        ],
+      );
+      assert.deepStrictEqual(terseAmdpEvent(events[0]).breakpoints, [
         { class_name: 'ZMCP_DBG_AMDP', line: 37, state: 'VALID' },
       ]);
     });
@@ -269,7 +295,7 @@ describe('AMDP readings', () => {
           'amdpdbg:errorMessage="No executable statement at this line"',
         );
       const [first, second] = readAmdpEvents(invalid);
-      expect(terseAmdpEvent(first).breakpoints).toEqual([
+      assert.deepStrictEqual(terseAmdpEvent(first).breakpoints, [
         {
           class_name: 'ZMCP_DBG_AMDP',
           line: 37,
@@ -277,7 +303,7 @@ describe('AMDP readings', () => {
           errorMessage: 'No executable statement at this line',
         },
       ]);
-      expect(terseAmdpEvent(second).breakpoints).toEqual([
+      assert.deepStrictEqual(terseAmdpEvent(second).breakpoints, [
         { class_name: 'ZMCP_DBG_AMDP', line: 27, state: 'VALID' },
       ]);
     });
@@ -285,17 +311,22 @@ describe('AMDP readings', () => {
       const [e] = readAmdpEvents(
         corpusBody('amdp-debugger--07-events-on-break-table-function'),
       );
-      expect(e).toMatchObject({ kind: 'ON_BREAK', line: 37 });
-      expect(e.debuggeeId).toMatch(/:2$/);
-      expect(e.variables).toContainEqual({
-        name: 'LT_ROWS',
-        value: 'TABLE[0]',
-      });
+      assertMatchObject(e, { kind: 'ON_BREAK', line: 37 });
+      assert.match(e.debuggeeId, /:2$/);
+      assert.ok(
+        e.variables.some((e) =>
+          isDeepStrictEqual(e, {
+            name: 'LT_ROWS',
+            value: 'TABLE[0]',
+          }),
+        ),
+      );
     });
     it('the data preview of a table variable reads as rows', () => {
-      expect(
+      assert.deepStrictEqual(
         readAmdpPreview(corpusBody('amdp-debugger--08-data-preview-table')),
-      ).toEqual({ columns: ['N', 'SQUARE'], rows: [{ N: '1', SQUARE: '1' }] });
+        { columns: ['N', 'SQUARE'], rows: [{ N: '1', SQUARE: '1' }] },
+      );
     });
     it('the start names the session in Location and the HANA session in the body', () => {
       const start = corpusSidecar('amdp-debugger--01-start');
@@ -303,8 +334,8 @@ describe('AMDP readings', () => {
         headers: start.response.headers,
         data: corpusBody('amdp-debugger--01-start'),
       });
-      expect(read.mainId).toMatch(/^[0-9A-F]{32}$/);
-      expect(read.hanaSession).toContain(':');
+      assert.match(read.mainId, /^[0-9A-F]{32}$/);
+      assert.ok(read.hanaSession.includes(':'));
     });
   });
 });
@@ -329,19 +360,24 @@ describe('AMDP documents read through the XML parser', () => {
     return spans;
   }
 
-  it.each([
+  for (const name of [
     'amdp-debugger--03-events-sync-breakpoints',
     'amdp-debugger--04-events-toggle-breakpoints',
     'amdp-debugger--05-events-on-break',
     'amdp-debugger--06-events-on-execution-end',
     'amdp-debugger--07-events-on-break-table-function',
     'amdp-debugger--10-events-on-break-nested',
-  ])('each event of %s keeps its recorded body', (name) => {
-    const body = corpusBody(name);
-    const spans = recordedSpans(body);
-    expect(spans.length).toBeGreaterThan(0);
-    expect(readAmdpEvents(body).map((e) => e.body)).toEqual(spans);
-  });
+  ]) {
+    it(format('each event of %s keeps its recorded body', name), () => {
+      const body = corpusBody(name);
+      const spans = recordedSpans(body);
+      assert.ok(spans.length > 0);
+      assert.deepStrictEqual(
+        readAmdpEvents(body).map((e) => e.body),
+        spans,
+      );
+    });
+  }
 
   it("an event's body runs to its own end, past a closing tag written inside CDATA", () => {
     const body =
@@ -350,7 +386,8 @@ describe('AMDP documents read through the XML parser', () => {
       '<amdpdbg:value><![CDATA[a</amdpdbg:mainResponse>b]]></amdpdbg:value>' +
       '</amdpdbg:mainResponse></amdpdbg:mainResponseList>';
     const [event] = readAmdpEvents(body);
-    expect(event.body).toBe(
+    assert.equal(
+      event.body,
       '<amdpdbg:mainResponse amdpdbg:kind="ON_BREAK" amdpdbg:requestId="R1" amdpdbg:debuggeeId="D1">' +
         '<amdpdbg:value><![CDATA[a</amdpdbg:mainResponse>b]]></amdpdbg:value>' +
         '</amdpdbg:mainResponse>',
@@ -358,23 +395,25 @@ describe('AMDP documents read through the XML parser', () => {
   });
 
   it('the HANA session of a start whose attributes are quoted with apostrophes, its key after its value', () => {
-    expect(
+    assert.deepStrictEqual(
       readAmdpStart({
         headers: { location: '/x/ABCDEF0123456789ABCDEF0123456789' },
         data: "<amdpdbg:startParameters xmlns:amdpdbg='http://www.sap.com/adt/amdp/debugger'><amdpdbg:parameter amdpdbg:value='host:30015:42' amdpdbg:key='HANA_SESSION_ID'/></amdpdbg:startParameters>",
       }),
-    ).toEqual({
-      mainId: 'ABCDEF0123456789ABCDEF0123456789',
-      hanaSession: 'host:30015:42',
-    });
+      {
+        mainId: 'ABCDEF0123456789ABCDEF0123456789',
+        hanaSession: 'host:30015:42',
+      },
+    );
   });
 
   it('no HANA session in a start that names none', () => {
-    expect(
+    assert.equal(
       readAmdpStart({
         headers: {},
         data: '<amdpdbg:startParameters xmlns:amdpdbg="http://www.sap.com/adt/amdp/debugger"><amdpdbg:parameter amdpdbg:key="OTHER" amdpdbg:value="x"/></amdpdbg:startParameters>',
       }).hanaSession,
-    ).toBe('');
+      '',
+    );
   });
 });

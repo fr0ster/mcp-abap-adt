@@ -11,9 +11,11 @@
  * inspection-only refusal before anything is read.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { LeftoverSessions } from '@mcp-abap-adt/lib/embeddable';
@@ -36,14 +38,12 @@ import {
 import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
 import { StdioServer } from '../StdioServer.js';
 
-jest.setTimeout(30_000);
-
 let root: string;
 let dir: string;
 let standIn: AdtStandIn;
 
 beforeEach(async () => {
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'leftover-core-'));
   dir = path.join(root, 'runtime');
@@ -53,7 +53,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await standIn.close();
   fs.rmSync(root, { recursive: true, force: true });
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const registry = () =>
@@ -104,11 +104,11 @@ async function serve(withDestination: boolean, atStart = false) {
 
 it("the destination's connection keeps its file until its logoff is written", async () => {
   const { server, client, call } = await serve(true);
-  expect((await call('ProbeAdt', { id: 'one' })).isError).toBe(false);
-  expect(runtimeFiles(dir)).toHaveLength(1);
+  assert.equal((await call('ProbeAdt', { id: 'one' })).isError, false);
+  assert.equal(runtimeFiles(dir).length, 1);
   await client.close();
   await server.terminalClose();
-  expect(runtimeFiles(dir)).toEqual([]);
+  assert.deepStrictEqual(runtimeFiles(dir), []);
 });
 
 it("the start takes up the destination's one leftover session; another destination's stays listed for it, and nothing is asked of SAP to list", async () => {
@@ -122,24 +122,24 @@ it("the start takes up the destination's one leftover session; another destinati
     destination: 'other',
   });
   const { server, client, call, started } = await serve(true, true);
-  expect(started).toEqual({ session: 'picked_up', handle });
+  assert.deepStrictEqual(started, { session: 'picked_up', handle });
   const from = standIn.requests.length;
   // Taken up: this process's now, not listed.
   const listed = JSON.parse((await call('ListLeftoverSessions')).text)
     .sessions as Array<{ handle: string }>;
-  expect(listed).toEqual([]);
-  expect(standIn.requests.length).toBe(from);
-  expect(runtimeFiles(dir)).toContain(other);
-  expect(runtimeFiles(dir)).toContain(handle);
+  assert.deepStrictEqual(listed, []);
+  assert.equal(standIn.requests.length, from);
+  assert.ok(runtimeFiles(dir).includes(other));
+  assert.ok(runtimeFiles(dir).includes(handle));
   await client.close();
   await server.terminalClose();
-  expect(runtimeFiles(dir)).toEqual([other]);
+  assert.deepStrictEqual(runtimeFiles(dir), [other]);
 });
 
 it('inspection-only mode refuses the tools in its own words', async () => {
   const { client, call } = await serve(false);
   const answer = await call('ListLeftoverSessions');
-  expect(answer.isError).toBe(true);
-  expect(JSON.parse(answer.text).error).toBe('inspection_only');
+  assert.equal(answer.isError, true);
+  assert.equal(JSON.parse(answer.text).error, 'inspection_only');
   await client.close();
 });

@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
 /**
  * Only the chain's own session format. auth-stores 5 refuses a session
@@ -79,7 +82,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   process.argv = savedArgv;
   process.env = { ...savedEnv };
   process.chdir(savedCwd);
@@ -166,7 +169,7 @@ function expectClean(text: string): void {
     'SessionStore',
     'regenerate it with mcp-auth;',
   ]) {
-    expect(text).not.toContain(value);
+    assert.ok(!text.includes(value));
   }
 }
 
@@ -176,13 +179,16 @@ async function start(argv: string[]) {
   const logins = recordingLogins();
   const stderr: string[] = [];
   const exits: number[] = [];
-  const stdioStart = jest
-    .spyOn(StdioServer.prototype, 'start')
-    .mockResolvedValue(undefined);
+  const stdioStart = mock.method(
+    StdioServer.prototype,
+    'start',
+    async () => undefined,
+  );
   // The connection at start is the launcher's own step: not made here.
-  jest
-    .spyOn(StdioServer.prototype, 'connectAtStart')
-    .mockResolvedValue({ session: 'logged_on' });
+  const atStart: Awaited<ReturnType<StdioServer['connectAtStart']>> = {
+    session: 'logged_on',
+  };
+  mock.method(StdioServer.prototype, 'connectAtStart', async () => atStart);
   await launch(config, TEST_OPTIONS, {
     browserStrategy: logins.browserStrategy,
     stderr: (line) => stderr.push(line),
@@ -193,7 +199,7 @@ async function start(argv: string[]) {
     platform: 'linux',
   });
   const started = stdioStart.mock.calls.length;
-  stdioStart.mockRestore();
+  stdioStart.mock.restore();
   return { stderr, exits, logins, started };
 }
 
@@ -203,7 +209,7 @@ async function toolCall(name: string, over: object) {
   const factory = new AuthBrokerFactory(
     factoryConfig(base, logins, over as never),
   );
-  const reached = jest.fn();
+  const reached = mock.fn();
   const group = {
     getName: () => 'stub',
     getHandlers: () => [
@@ -242,71 +248,85 @@ async function toolCall(name: string, over: object) {
   }
 }
 
-describe.each(MODES)('a record not of the store’s format ($mode)', (mode) => {
-  it.each(MALFORMED)(
-    '%s: the start stops, a tool call answers destination_refused, nothing sent, the file unchanged',
-    async (_label, lines) => {
-      const file = mode.write(lines());
-      const before = fs.readFileSync(file);
-      const errorLines: string[] = [];
-      const stderrSpy = jest
-        .spyOn(process.stderr, 'write')
-        .mockImplementation((chunk: unknown) => {
-          errorLines.push(String(chunk));
-          return true;
-        });
-      try {
-        // The start.
-        const run = await start(mode.argv(file));
-        expect(run.exits).toEqual([1]);
-        expect(run.started).toBe(0);
-        expect(run.stderr).toEqual([
-          `[MCP] ${refusal(mode.name)}\n${RECORD_FORMAT_HINT}`,
-        ]);
-        expect(run.logins.requests).toEqual([]);
+for (const mode of MODES) {
+  describe(`a record not of the store’s format (${mode.mode})`, () => {
+    for (const [_label, lines] of MALFORMED) {
+      it(
+        format(
+          '%s: the start stops, a tool call answers destination_refused, nothing sent, the file unchanged',
+          _label,
+        ),
+        async (t) => {
+          const file = mode.write(lines());
+          const before = fs.readFileSync(file);
+          const errorLines: string[] = [];
+          const stderrSpy = t.mock.method(
+            process.stderr,
+            'write',
+            (chunk: unknown) => {
+              errorLines.push(String(chunk));
+              return true;
+            },
+          );
+          try {
+            // The start.
+            const run = await start(mode.argv(file));
+            assert.deepStrictEqual(run.exits, [1]);
+            assert.equal(run.started, 0);
+            assert.deepStrictEqual(run.stderr, [
+              `[MCP] ${refusal(mode.name)}\n${RECORD_FORMAT_HINT}`,
+            ]);
+            assert.deepStrictEqual(run.logins.requests, []);
 
-        // A request on core's server.
-        const { result, reached, logins } = await toolCall(
-          mode.name,
-          mode.factory(file),
-        );
-        expect(result.isError).toBe(true);
-        const text = result.content[0].text;
-        expect(JSON.parse(text)).toEqual({
-          error: 'destination_refused',
-          message: refusal(mode.name),
-          hint: RECORD_FORMAT_HINT,
-        });
-        expect(reached).not.toHaveBeenCalled();
-        expect(logins.requests).toEqual([]);
+            // A request on core's server.
+            const { result, reached, logins } = await toolCall(
+              mode.name,
+              mode.factory(file),
+            );
+            assert.equal(result.isError, true);
+            const text = result.content[0].text;
+            assert.deepStrictEqual(JSON.parse(text), {
+              error: 'destination_refused',
+              message: refusal(mode.name),
+              hint: RECORD_FORMAT_HINT,
+            });
+            assert.equal(reached.mock.callCount(), 0);
+            assert.deepStrictEqual(logins.requests, []);
 
-        // Nothing reached the system or the token endpoint; the file is as it was.
-        expect(adt.requests).toEqual([]);
-        expect(uaa.requests).toEqual([]);
-        expect(fs.readFileSync(file).equals(before)).toBe(true);
-        for (const line of [...run.stderr, text, ...errorLines]) {
-          expectClean(line);
-        }
-      } finally {
-        stderrSpy.mockRestore();
-      }
-    },
-  );
+            // Nothing reached the system or the token endpoint; the file is as it was.
+            assert.deepStrictEqual(adt.requests, []);
+            assert.deepStrictEqual(uaa.requests, []);
+            assert.equal(fs.readFileSync(file).equals(before), true);
+            for (const line of [...run.stderr, text, ...errorLines]) {
+              expectClean(line);
+            }
+          } finally {
+            stderrSpy.mock.restore();
+          }
+        },
+      );
+    }
 
-  it('the means and no token or cookies: no session — the destination logs in through the browser', async () => {
-    const file = mode.write([...means(), 'SAP_ISSUED_FOR=', 'SAP_ISSUED_BY=']);
-    const run = await start(mode.argv(file));
-    expect(run.exits).toEqual([]);
-    expect(run.started).toBe(1);
+    it('the means and no token or cookies: no session — the destination logs in through the browser', async () => {
+      const file = mode.write([
+        ...means(),
+        'SAP_ISSUED_FOR=',
+        'SAP_ISSUED_BY=',
+      ]);
+      const run = await start(mode.argv(file));
+      assert.deepStrictEqual(run.exits, []);
+      assert.equal(run.started, 1);
 
-    const { logins } = await toolCall(mode.name, mode.factory(file));
-    // The login started (the fake browser's strategy was asked).
-    expect(logins.requests).toHaveLength(1);
+      const { logins } = await toolCall(mode.name, mode.factory(file));
+      // The login started (the fake browser's strategy was asked).
+      assert.equal(logins.requests.length, 1);
+    });
   });
-});
+}
 
 it('the hint, verbatim', () => {
-  expect(RECORD_FORMAT_HINT).toBe(
+  assert.equal(
+    RECORD_FORMAT_HINT,
     'regenerate the session with mcp-auth: `mcp-auth --destination <name> --type abap|xsuaa`, or `mcp-auth --service-key <file> --output <file> --type abap|xsuaa` (from @mcp-abap-adt/auth-broker-cli)',
   );
 });

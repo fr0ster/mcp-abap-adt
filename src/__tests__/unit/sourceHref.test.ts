@@ -4,45 +4,53 @@
  * ones recorded in this repository's fixtures and the one the 751 report
  * carried.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { fragmentStart, readSourceHref } from '../../lib/sourceHref';
 
 describe('readSourceHref', () => {
   it('reads #start=LINE,COLUMN (the 751 report)', () => {
-    expect(
+    assert.deepStrictEqual(
       readSourceHref(
         '/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main#start=16,15',
       ),
-    ).toEqual({
-      uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main',
-      position: { line: 16, column: 15 },
-    });
+      {
+        uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe/source/main',
+        position: { line: 16, column: 15 },
+      },
+    );
   });
 
   it('reads #start=LINE,COLUMN;end=LINE,COLUMN', () => {
-    expect(
+    assert.deepStrictEqual(
       readSourceHref(
         '/sap/bc/adt/ddic/structures/zobj_tabl_broken/source/main#start=3,17;end=3,29',
       ),
-    ).toEqual({
-      uri: '/sap/bc/adt/ddic/structures/zobj_tabl_broken/source/main',
-      position: { line: 3, column: 17, end: { line: 3, column: 29 } },
-    });
+      {
+        uri: '/sap/bc/adt/ddic/structures/zobj_tabl_broken/source/main',
+        position: { line: 3, column: 17, end: { line: 3, column: 29 } },
+      },
+    );
   });
 
   it('an href with no fragment names its uri alone (DOMA, DTEL)', () => {
-    expect(readSourceHref('/sap/bc/adt/ddic/domains/zobj_doma_broken')).toEqual(
+    assert.deepStrictEqual(
+      readSourceHref('/sap/bc/adt/ddic/domains/zobj_doma_broken'),
       { uri: '/sap/bc/adt/ddic/domains/zobj_doma_broken' },
     );
-    expect(
+    assert.deepStrictEqual(
       readSourceHref('/sap/bc/adt/ddic/dataelements/zobj_dtel_broken'),
-    ).toEqual({ uri: '/sap/bc/adt/ddic/dataelements/zobj_dtel_broken' });
+      { uri: '/sap/bc/adt/ddic/dataelements/zobj_dtel_broken' },
+    );
   });
 
   it('an empty href names nothing', () => {
-    expect(readSourceHref('')).toBeUndefined();
+    assert.equal(readSourceHref(''), undefined);
   });
 
-  it.each([
+  for (const [_case, fragment] of [
     ['a line alone', '#start=29'],
     ['no start', '#type=CLAS%2FOM;name=POST'],
     ['an empty fragment', '#'],
@@ -53,23 +61,28 @@ describe('readSourceHref', () => {
     ['two starts', '#start=1,2;start=3,4'],
     ['an end that does not read', '#start=1,2;end=x'],
     ['an end without a column', '#start=1,2;end=3'],
-  ])('%s gives no position, the uri alone', (_case, fragment) => {
-    expect(readSourceHref(`/sap/bc/adt/x/source/main${fragment}`)).toEqual({
-      uri: '/sap/bc/adt/x/source/main',
+  ]) {
+    it(format('%s gives no position, the uri alone', _case), () => {
+      assert.deepStrictEqual(
+        readSourceHref(`/sap/bc/adt/x/source/main${fragment}`),
+        {
+          uri: '/sap/bc/adt/x/source/main',
+        },
+      );
     });
-  });
+  }
 });
 
 describe('fragmentStart', () => {
   it('reads a line with its column, and a line alone', () => {
-    expect(fragmentStart('start=9,4')).toEqual({ line: 9, column: 4 });
-    expect(fragmentStart('type=CLAS%2FOM;name=POST;start=29')).toEqual({
+    assert.deepStrictEqual(fragmentStart('start=9,4'), { line: 9, column: 4 });
+    assert.deepStrictEqual(fragmentStart('type=CLAS%2FOM;name=POST;start=29'), {
       line: 29,
     });
   });
 
   it('none where no start reads', () => {
-    expect(fragmentStart('type=CLAS%2FOM')).toBeUndefined();
-    expect(fragmentStart('start=x')).toBeUndefined();
+    assert.equal(fragmentStart('type=CLAS%2FOM'), undefined);
+    assert.equal(fragmentStart('start=x'), undefined);
   });
 });

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   safeCleanup,
   safeRequest,
@@ -16,8 +18,11 @@ describe('safeRequest', () => {
       httpsAgent: { options: { cert: 'PEM' } },
     };
     const out = safeRequest(sent);
-    expect(out).toEqual({ method: 'POST', url: '/sap/bc/adt/domains/ZD' });
-    expect(JSON.stringify(out)).not.toContain(SECRET);
+    assert.deepStrictEqual(out, {
+      method: 'POST',
+      url: '/sap/bc/adt/domains/ZD',
+    });
+    assert.ok(!JSON.stringify(out).includes(SECRET));
   });
 
   it('drops the lock handle from the url, keeping the rest of it as sent', () => {
@@ -26,45 +31,50 @@ describe('safeRequest', () => {
       method: 'PUT',
       url: `/sap/bc/adt/ddic/domains/zd?lockHandle=${handle}&corrNr=SYSK900001`,
     });
-    expect(out).toEqual({
+    assert.deepStrictEqual(out, {
       method: 'PUT',
       url: '/sap/bc/adt/ddic/domains/zd?corrNr=SYSK900001',
     });
-    expect(JSON.stringify(out)).not.toContain(handle);
+    assert.ok(!JSON.stringify(out).includes(handle));
   });
 
   it('drops the query mark too when the lock handle was all the url asked', () => {
-    expect(
+    assert.deepStrictEqual(
       safeRequest({
         method: 'PUT',
         url: '/sap/bc/adt/ddic/domains/zd?lockHandle=SECRETHANDLE',
       }),
-    ).toEqual({ method: 'PUT', url: '/sap/bc/adt/ddic/domains/zd' });
+      { method: 'PUT', url: '/sap/bc/adt/ddic/domains/zd' },
+    );
   });
 
   it('drops the lock handle whatever its place, spelling or encoding', () => {
     const out = safeRequest({
       url: '/sap/bc/adt/x?version=inactive&lockhandle=H1&a=%2F&lock%48andle=H2&lockHandle=H3',
     });
-    expect(out).toEqual({ url: '/sap/bc/adt/x?version=inactive&a=%2F' });
+    assert.deepStrictEqual(out, {
+      url: '/sap/bc/adt/x?version=inactive&a=%2F',
+    });
   });
 
   it('answers undefined when neither field is given', () => {
-    expect(safeRequest(undefined)).toBeUndefined();
-    expect(safeRequest({})).toBeUndefined();
+    assert.equal(safeRequest(undefined), undefined);
+    assert.equal(safeRequest({}), undefined);
   });
 
   it('a thrown carrier: a request with neither field a string is dropped', () => {
     const base = { message: 'm', origin: 'refusal' };
-    expect(
+    assert.deepStrictEqual(
       thrownCleanup({
         ...base,
         request: { headers: { authorization: SECRET } },
       }),
-    ).toEqual(base);
-    expect(
+      base,
+    );
+    assert.deepStrictEqual(
       thrownCleanup({ ...base, request: { method: 7, url: null } }),
-    ).toEqual(base);
+      base,
+    );
   });
 });
 
@@ -81,7 +91,7 @@ describe('safeCleanup', () => {
       request,
       extra: 'dropped',
     };
-    expect(safeCleanup(carrier)).toEqual({
+    assert.deepStrictEqual(safeCleanup(carrier), {
       message: 'Unlock refused',
       origin: 'refusal',
       request: { method: 'POST', url: '/u' },
@@ -91,24 +101,25 @@ describe('safeCleanup', () => {
   it('drops the origin from a throw-shaped carrier', () => {
     // Having no origin is that shape's whole point: `connection` and `refusal`
     // are claims about the server, and neither is true of a local defect.
-    expect(
+    assert.deepStrictEqual(
       safeCleanup({
         error: 'client_threw',
         message: 'no handle',
         origin: 'refusal',
       }),
-    ).toEqual({ error: 'client_threw', message: 'no handle' });
+      { error: 'client_threw', message: 'no handle' },
+    );
   });
 
   it('answers undefined for nothing and for an empty result', () => {
-    expect(safeCleanup(undefined)).toBeUndefined();
-    expect(safeCleanup({})).toBeUndefined();
+    assert.equal(safeCleanup(undefined), undefined);
+    assert.equal(safeCleanup({}), undefined);
   });
 });
 
 describe('thrownCleanup: the cleanup a thrown value carries', () => {
   it('narrows a refusal carrier, request included', () => {
-    expect(
+    assert.deepStrictEqual(
       thrownCleanup({
         message: 'Unlock refused',
         origin: 'refusal',
@@ -119,26 +130,28 @@ describe('thrownCleanup: the cleanup a thrown value carries', () => {
         },
         extra: 'dropped',
       }),
-    ).toEqual({
-      message: 'Unlock refused',
-      origin: 'refusal',
-      request: { method: 'POST', url: '/u' },
-    });
+      {
+        message: 'Unlock refused',
+        origin: 'refusal',
+        request: { method: 'POST', url: '/u' },
+      },
+    );
   });
 
   it('drops the origin from a throw-shaped carrier', () => {
-    expect(
+    assert.deepStrictEqual(
       thrownCleanup({
         error: 'client_threw',
         message: 'no handle',
         origin: 'refusal',
       }),
-    ).toEqual({ error: 'client_threw', message: 'no handle' });
+      { error: 'client_threw', message: 'no handle' },
+    );
   });
 
   it('answers undefined for a non-object and for an empty result', () => {
-    expect(thrownCleanup(null)).toBeUndefined();
-    expect(thrownCleanup('boom')).toBeUndefined();
-    expect(thrownCleanup({ unrelated: 1 })).toBeUndefined();
+    assert.equal(thrownCleanup(null), undefined);
+    assert.equal(thrownCleanup('boom'), undefined);
+    assert.equal(thrownCleanup({ unrelated: 1 }), undefined);
   });
 });

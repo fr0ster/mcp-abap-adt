@@ -8,6 +8,8 @@
  * states no `objDescr`, so it carries no `object`; the checklist's does.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleCheckClass } from '../../handlers/class/low/handleCheckClass';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
@@ -68,8 +70,8 @@ describe('a non-2xx refusal names where each message stands', () => {
       { connection },
       { class_name: 'ZMCP_BLD_ANSCH01' },
     );
-    expect(answered.isError).toBe(true);
-    expect(payloadOf(answered).messages).toEqual([
+    assert.equal(answered.isError, true);
+    assert.deepStrictEqual(payloadOf(answered).messages, [
       {
         type: 'E',
         text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
@@ -95,8 +97,8 @@ describe('a non-2xx refusal names where each message stands', () => {
         ],
       },
     );
-    expect(answered.isError).toBe(true);
-    expect(payloadOf(answered).messages).toEqual([
+    assert.equal(answered.isError, true);
+    assert.deepStrictEqual(payloadOf(answered).messages, [
       {
         type: 'E',
         text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',

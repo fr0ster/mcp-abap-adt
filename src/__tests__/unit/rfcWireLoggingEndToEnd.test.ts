@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { RfcTransport } from '@mcp-abap-adt/connection';
 
 /**
@@ -65,20 +67,27 @@ describe('the wire log a caller asked for', () => {
   it('writes the headers and both bodies when logWire is on', async () => {
     const lines = await send({ logWire: true });
 
-    expect(lines.some((l) => l.startsWith('RFC HEADERS:'))).toBe(true);
-    expect(lines.some((l) => l.includes('the body under suspicion'))).toBe(
+    assert.equal(
+      lines.some((l) => l.startsWith('RFC HEADERS:')),
       true,
     );
-    expect(lines.some((l) => l.includes('from the server'))).toBe(true);
+    assert.equal(
+      lines.some((l) => l.includes('the body under suspicion')),
+      true,
+    );
+    assert.equal(
+      lines.some((l) => l.includes('from the server')),
+      true,
+    );
   });
 
   it('redacts the credential header while keeping its name', async () => {
     const lines = await send({ logWire: true });
     const headers = lines.find((l) => l.startsWith('RFC HEADERS:')) ?? '';
 
-    expect(headers).toContain('Authorization');
-    expect(headers).toContain('[redacted]');
-    expect(headers).not.toContain('c2VjcmV0');
+    assert.ok(headers.includes('Authorization'));
+    assert.ok(headers.includes('[redacted]'));
+    assert.ok(!headers.includes('c2VjcmV0'));
   });
 
   it('writes neither when it was not asked', async () => {
@@ -86,9 +95,16 @@ describe('the wire log a caller asked for', () => {
 
     // The request line still goes out — that is the old behaviour, and it is
     // what made #222 unanswerable on its own.
-    expect(lines.some((l) => l.startsWith('RFC →'))).toBe(true);
-    expect(lines.some((l) => l.startsWith('RFC HEADERS:'))).toBe(false);
-    expect(lines.some((l) => l.includes('the body under suspicion'))).toBe(
+    assert.equal(
+      lines.some((l) => l.startsWith('RFC →')),
+      true,
+    );
+    assert.equal(
+      lines.some((l) => l.startsWith('RFC HEADERS:')),
+      false,
+    );
+    assert.equal(
+      lines.some((l) => l.includes('the body under suspicion')),
       false,
     );
   });

@@ -1,9 +1,13 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { patchTableTypeDocument } from '@mcp-abap-adt/adt-clients';
 import {
   readStoredDefinition,
   readTableTypeDefinition,
 } from '../../lib/strategies/tableTypeStored';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 
 /**
  * The document SAP answers for STRING_TABLE, byte for byte (the corpus
@@ -16,7 +20,7 @@ const TABLE_TYPE = corpusBody(
 
 describe('reading the definition a table type document states', () => {
   it('reads each element the table-type writes change, as SAP wrote it', () => {
-    expect(readTableTypeDefinition(TABLE_TYPE)).toEqual({
+    assert.deepStrictEqual(readTableTypeDefinition(TABLE_TYPE), {
       row_type_kind: 'predefinedAbapType',
       row_type_name: '',
       data_type: 'STRING',
@@ -37,7 +41,7 @@ describe('reading the definition a table type document states', () => {
       keyKind: 'unique',
     });
     if (!patched.ok) throw new Error(`patch refused: ${patched.refusal.kind}`);
-    expect(readTableTypeDefinition(patched.document)).toMatchObject({
+    assertMatchObject(readTableTypeDefinition(patched.document), {
       row_type_kind: 'dictionaryType',
       row_type_name: 'MARA',
       access_type: 'hashed',
@@ -52,21 +56,23 @@ describe('reading the definition a table type document states', () => {
       '',
     );
     const read = readTableTypeDefinition(without);
-    expect(read).toBeDefined();
-    expect(read).not.toHaveProperty('access_type');
-    expect(read?.key_kind).toBe('nonUnique');
+    assert.notEqual(read, undefined);
+    assert.ok(!('access_type' in Object(read)));
+    assert.equal(read?.key_kind, 'nonUnique');
   });
 
-  it.each([
+  for (const [_what, document] of [
     ['an empty body', ''],
     ['text that is not XML', 'not xml'],
     [
       'another document',
       '<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><message>refused</message></exc:exception>',
     ],
-  ])('answers undefined for %s', (_what, document) => {
-    expect(readTableTypeDefinition(document)).toBeUndefined();
-  });
+  ]) {
+    it(format('answers undefined for %s', _what), () => {
+      assert.equal(readTableTypeDefinition(document), undefined);
+    });
+  }
 });
 
 describe('reading the stored definition', () => {
@@ -78,7 +84,7 @@ describe('reading the stored definition', () => {
       'active',
       'terse',
     );
-    expect(said).toEqual({
+    assert.deepStrictEqual(said, {
       stored_version: 'active',
       stored_definition_not_read: {
         error: 'client_threw',

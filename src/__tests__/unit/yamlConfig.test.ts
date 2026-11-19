@@ -7,9 +7,11 @@
  * validates without the `yaml` package present, against a binary's table.
  */
 
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import {
   ParameterRefusal,
   type ParameterTable,
@@ -23,6 +25,7 @@ import {
   parseConfigArg,
   validateYamlConfig,
 } from '../../lib/config/yamlConfig';
+import { assertThrows } from '../helpers/assertions';
 
 /** A table with a nested row, a list row and the removed --transport. */
 const TABLE: ParameterTable = {
@@ -71,7 +74,7 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
       ['http:', '  port: 8080', '  host: 127.0.0.1'].join('\n'),
     );
 
-    expect(loadYamlConfig(TABLE, file)).toEqual({
+    assert.deepStrictEqual(loadYamlConfig(TABLE, file), {
       http: { port: 8080, host: '127.0.0.1' },
     });
   });
@@ -84,17 +87,18 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
 
     const config = loadYamlConfig(TABLE, file);
 
-    expect(config?.items).toEqual(['readonly', 'high', 'low']);
+    assert.deepStrictEqual(config?.items, ['readonly', 'high', 'low']);
   });
 
   it('returns null when the config file does not exist', () => {
     const missing = path.join(os.tmpdir(), 'definitely-not-here-143.yaml');
-    expect(loadYamlConfig(TABLE, missing)).toBeNull();
+    assert.equal(loadYamlConfig(TABLE, missing), null);
   });
 
   it('throws when the parsed config fails validation: --transport is gone', () => {
     const file = writeTempYaml('bad.yaml', 'transport: telepathy\n');
-    expect(() => loadYamlConfig(TABLE, file)).toThrow(
+    assertThrows(
+      () => loadYamlConfig(TABLE, file),
       '`--transport` is gone: `mcp-abap-adt-http` serves Streamable HTTP',
     );
   });
@@ -108,21 +112,22 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
       thrown = error;
     }
     // Exactly these words: the file and the position, nothing of the document.
-    expect(thrown).toBeInstanceOf(ParameterRefusal);
-    expect(String(thrown)).toBe(
+    assert.ok(thrown instanceof ParameterRefusal);
+    assert.equal(
+      String(thrown),
       String(
         new ParameterRefusal(
           `The config file ${file} is not valid YAML (line 2, column 1)`,
         ),
       ),
     );
-    expect(String(thrown)).not.toContain('secret-ish');
+    assert.ok(!String(thrown).includes('secret-ish'));
   });
 
   it('validateYamlConfig rejects an out-of-range port, naming its key', () => {
     const result = validateYamlConfig(TABLE, { http: { port: 70000 } });
-    expect(result.valid).toBe(false);
-    expect(result.errors).toEqual([
+    assert.equal(result.valid, false);
+    assert.deepStrictEqual(result.errors, [
       'Invalid http.port (config file): "70000". Must be a port between 1 and 65535',
     ]);
   });
@@ -137,14 +142,16 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
     });
 
     it('a --conf that names a directory cannot be read (not "not valid YAML")', () => {
-      expect(() => loadYamlConfig(TABLE, dir)).toThrow(
+      assertThrows(
+        () => loadYamlConfig(TABLE, dir),
         new ParameterRefusal(`The config file ${dir} cannot be read`),
       );
     });
 
     it('a template in a directory that does not exist cannot be written', () => {
       const file = path.join(dir, 'missing', 'conf.yaml');
-      expect(() => generateConfigTemplateIfNeeded(TABLE, file)).toThrow(
+      assertThrows(
+        () => generateConfigTemplateIfNeeded(TABLE, file),
         new ParameterRefusal(`The config file ${file} cannot be written`),
       );
     });
@@ -167,9 +174,9 @@ describe('yamlConfig (js-yaml runtime parsing, #143)', () => {
           },
           () => 'read',
         );
-        expect(read).toBeUndefined();
-        expect(lines).toEqual([`[MCP] ${words}`]);
-        expect(exits).toEqual([1]);
+        assert.equal(read, undefined);
+        assert.deepStrictEqual(lines, [`[MCP] ${words}`]);
+        assert.deepStrictEqual(exits, [1]);
       }
     });
   });
@@ -188,18 +195,20 @@ describe('parseConfigArg reads the program arguments by default', () => {
   }
 
   it('a script path starting with --conf is not read', () => {
-    expect(
+    assert.equal(
       withArgv(['/usr/bin/node', '--conf=/from/the/script/path.yaml'], () =>
         parseConfigArg(),
       ),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('a --conf among the arguments is read', () => {
-    expect(
+    assert.equal(
       withArgv(['/usr/bin/node', '/bin/server', '--conf=/etc/given.yaml'], () =>
         parseConfigArg(),
       ),
-    ).toBe('/etc/given.yaml');
+      '/etc/given.yaml',
+    );
   });
 });

@@ -3,63 +3,80 @@
  * (tools/readings.js): names, TODO lines, path lists, trace and dump ids,
  * and a profiler trace entry's user and title by field.
  */
-const readings = require('../../../tools/readings.js');
+
+import assert from 'node:assert/strict';
+import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../helpers/repoRoot';
+
+const readings = require(
+  path.join(repositoryRoot(__dirname), 'tools', 'readings.js'),
+);
 
 describe('tools/readings.js', () => {
   it('finds a TODO in any case, on every line it is asked about', () => {
     // A global pattern's `test` kept its position between lines: every second
     // TODO line was missed.
     const lines = ['// TODO: a', '// todo: b', '// @Todo c', '// done'];
-    expect(lines.map((line) => readings.hasTodo(line))).toEqual([
-      true,
-      true,
-      true,
-      false,
-    ]);
+    assert.deepStrictEqual(
+      lines.map((line) => readings.hasTodo(line)),
+      [true, true, true, false],
+    );
   });
 
   it('reads an upper-case ABAP name and an ABAP user', () => {
-    expect(readings.isUpperAbapName('ZCL_X1')).toBe(true);
-    expect(readings.isUpperAbapName('1ZCL')).toBe(false);
-    expect(readings.isUpperAbapName('ZCL-X')).toBe(false);
-    expect(readings.isUpperAbapName('')).toBe(false);
-    expect(readings.isAbapUser('DEV.USER$-1')).toBe(true);
-    expect(readings.isAbapUser('dev')).toBe(false);
-    expect(readings.isAbapUser('')).toBe(false);
+    assert.equal(readings.isUpperAbapName('ZCL_X1'), true);
+    assert.equal(readings.isUpperAbapName('1ZCL'), false);
+    assert.equal(readings.isUpperAbapName('ZCL-X'), false);
+    assert.equal(readings.isUpperAbapName(''), false);
+    assert.equal(readings.isAbapUser('DEV.USER$-1'), true);
+    assert.equal(readings.isAbapUser('dev'), false);
+    assert.equal(readings.isAbapUser(''), false);
   });
 
   it('replaces a name as written, a dot included', () => {
-    expect(readings.replacedEverywhere('Z.A Z.A ZXA', 'Z.A', 'ZB')).toBe(
+    assert.equal(
+      readings.replacedEverywhere('Z.A Z.A ZXA', 'Z.A', 'ZB'),
       'ZB ZB ZXA',
     );
-    expect(readings.asNameCharacters('A-B c')).toBe('A_B__');
-    expect(readings.collapseBlanks('a \n\t b')).toBe('a b');
+    assert.equal(readings.asNameCharacters('A-B c'), 'A_B__');
+    assert.equal(readings.collapseBlanks('a \n\t b'), 'a b');
   });
 
   it('splits a path list on ":" and ";", keeping an empty segment', () => {
-    expect(readings.splitPathList('/a::/b;/c')).toEqual(['/a', '', '/b', '/c']);
+    assert.deepStrictEqual(readings.splitPathList('/a::/b;/c'), [
+      '/a',
+      '',
+      '/b',
+      '/c',
+    ]);
   });
 
   it('reads a trace id and every dump id', () => {
     const id = 'ABCDEF0123456789ABCDEF0123456789';
-    expect(
+    assert.equal(
       readings.traceIdIn(`/SAP/bc/ADT/runtime/traces/abaptraces/${id}/x`),
-    ).toBe(id);
-    expect(
-      readings.traceIdIn('/runtime/traces/abaptraces/XYZ'),
-    ).toBeUndefined();
-    // A dotted capital I lower-cases to two code units: the id stays where it is.
-    expect(readings.traceIdIn(`\u0130 /runtime/traces/abaptraces/${id}`)).toBe(
       id,
     );
-    expect(
+    assert.equal(
+      readings.traceIdIn('/runtime/traces/abaptraces/XYZ'),
+      undefined,
+    );
+    // A dotted capital I lower-cases to two code units: the id stays where it is.
+    assert.equal(
+      readings.traceIdIn(`\u0130 /runtime/traces/abaptraces/${id}`),
+      id,
+    );
+    assert.equal(
       readings.traceIdIn(`/runtime/traces/abaptraces/${id.slice(1)}\u212A`),
-    ).toBeUndefined();
-    expect(
+      undefined,
+    );
+    assert.deepStrictEqual(
       readings.dumpIdsIn(
         'href="/sap/bc/adt/runtime/dumps/D1" /sap/bc/adt/runtime/dumps/D2?x /sap/bc/adt/runtime/dumps/ ',
       ),
-    ).toEqual(['D1', 'D2']);
+      ['D1', 'D2'],
+    );
   });
 
   it("reads a trace entry's user and title by field, not by its words", () => {
@@ -69,11 +86,12 @@ describe('tools/readings.js', () => {
       'trc:extendedData': { 'trc:user': 'dev_user' },
       'atom:summary': 'mentions SOMEONE and RUN MARKER',
     };
-    expect(readings.traceEntryUser(entry)).toBe('DEV_USER');
-    expect(readings.traceEntryTitle(entry)).toBe('RUN MARKER');
-    expect(
+    assert.equal(readings.traceEntryUser(entry), 'DEV_USER');
+    assert.equal(readings.traceEntryTitle(entry), 'RUN MARKER');
+    assert.equal(
       readings.traceEntryUser({ 'atom:author': { 'atom:name': 'a' } }),
-    ).toBe('A');
-    expect(readings.traceEntryUser({})).toBe('');
+      'A',
+    );
+    assert.equal(readings.traceEntryUser({}), '');
   });
 });

@@ -8,6 +8,9 @@
  * (`wait` with `runner: 'sync'`) must therefore carry no `default` for it:
  * 22.0.0's `wait` default refused every sync run whose client sent no `wait`.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -72,14 +75,13 @@ async function received(
   return seen;
 }
 
-describe.each(RUNNER_TOOLS)(
-  '$tool.name through the MCP SDK',
-  ({ tool, args }) => {
+for (const { tool, args } of RUNNER_TOOLS) {
+  describe(`${tool.name} through the MCP SDK`, () => {
     it('a sync run without wait reaches the handler without wait, and is not refused', async () => {
       const given = await received(tool, { ...args, runner: 'sync' });
-      expect(given).not.toHaveProperty('wait');
-      expect(runnerOf(runArgs(given))).toBe('sync');
-      expect(runnerWaitOf(runArgs(given), 'sync')).not.toBeInstanceOf(Error);
+      assert.ok(!('wait' in Object(given)));
+      assert.equal(runnerOf(runArgs(given)), 'sync');
+      assert.ok(!(runnerWaitOf(runArgs(given), 'sync') instanceof Error));
     });
 
     it('a sync run with wait is refused', async () => {
@@ -88,13 +90,13 @@ describe.each(RUNNER_TOOLS)(
         runner: 'sync',
         wait: true,
       });
-      expect(runnerWaitOf(runArgs(given), 'sync')).toBeInstanceOf(Error);
+      assert.ok(runnerWaitOf(runArgs(given), 'sync') instanceof Error);
     });
 
     it('an async run without wait waits', async () => {
       const given = await received(tool, args);
-      expect(runnerOf(runArgs(given))).toBe('async');
-      expect(runnerWaitOf(runArgs(given), 'async')).toBe(true);
+      assert.equal(runnerOf(runArgs(given)), 'async');
+      assert.equal(runnerWaitOf(runArgs(given), 'async'), true);
     });
-  },
-);
+  });
+}

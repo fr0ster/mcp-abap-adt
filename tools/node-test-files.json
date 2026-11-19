@@ -48,6 +48,7 @@
   "server-runtime/src/__tests__/launchersLeaveEnv.test.ts",
   "server-runtime/src/__tests__/listenerOptionsBesideApp.test.ts",
   "server-runtime/src/__tests__/sdkTransport.test.ts",
+  "server-runtime/src/__tests__/secondCopy.test.ts",
   "server-runtime/src/__tests__/sessionKeepAlive.test.ts",
   "server-runtime/src/__tests__/statedFlags.test.ts",
   "server-runtime/src/__tests__/unreadInput.test.ts",

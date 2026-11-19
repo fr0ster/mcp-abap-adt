@@ -8,12 +8,30 @@
  * line on stderr naming the first two copies (an earlier one in fixed words,
  * never its file) and the package to reinstall. One entry starts as today.
  */
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import net from 'node:net';
 import { join } from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import type { LauncherEdges, LibInstance } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { main as compactMain } from '../../../compact/src/launcher';
+import { main as compactHttpMain } from '../../../compact-http/src/launcher';
+import { main as compactHttpRoMain } from '../../../compact-http-ro/src/launcher';
+import { main as compactRoMain } from '../../../compact-ro/src/launcher';
+import { main as compactSseMain } from '../../../compact-sse/src/launcher';
+import { main as compactSseRoMain } from '../../../compact-sse-ro/src/launcher';
+import { main as coreRoMain } from '../../../core-ro/src/launcher';
+import { HTTP_PACKAGE } from '../../../http/src/httpVersion';
+import { main as oldHttpMain } from '../../../http/src/launcher';
+import { main as httpRoMain } from '../../../http-ro/src/launcher';
+import { CORE_PACKAGE } from '../../../server/src/coreVersion';
+import { main as oldCoreMain } from '../../../server/src/launcher';
+import { repositoryRoot } from '../../../src/__tests__/helpers/repoRoot';
+import { main as oldSseMain } from '../../../sse/src/launcher';
+import { SSE_PACKAGE } from '../../../sse/src/sseVersion';
+import { main as sseRoMain } from '../../../sse-ro/src/launcher';
 import { main as httpMain } from '../http/launcher';
 import { secondCopyLine } from '../secondCopy';
 import { main as sseMain } from '../sse/launcher';
@@ -38,7 +56,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   Reflect.set(globalThis, REGISTRY, saved);
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 function register(...entries: LibInstance[]): void {
@@ -80,81 +98,86 @@ const TRANSPORTS = [
 
 describe('secondCopyLine', () => {
   it('one entry: undefined', () => {
-    expect(secondCopyLine([FIRST], '@mcp-abap-adt/core')).toBe(undefined);
+    assert.equal(secondCopyLine([FIRST], '@mcp-abap-adt/core'), undefined);
   });
 
   it('no entry (a process that loaded no lib cannot ask): undefined, as one', () => {
-    expect(secondCopyLine([], '@mcp-abap-adt/core')).toBe(undefined);
+    assert.equal(secondCopyLine([], '@mcp-abap-adt/core'), undefined);
   });
 
   it('two entries: the line, verbatim, naming both copies and the package', () => {
-    expect(secondCopyLine([FIRST, SECOND], '@mcp-abap-adt/http')).toBe(
+    assert.equal(
+      secondCopyLine([FIRST, SECOND], '@mcp-abap-adt/http'),
       lineFor('@mcp-abap-adt/http'),
     );
   });
 
   it('three entries: the first two copies', () => {
-    expect(secondCopyLine([FIRST, SECOND, THIRD], '@mcp-abap-adt/sse')).toBe(
+    assert.equal(
+      secondCopyLine([FIRST, SECOND, THIRD], '@mcp-abap-adt/sse'),
       lineFor('@mcp-abap-adt/sse'),
     );
   });
 
   it('a copy before 24.0.0 is named in fixed words, never by its file', () => {
     const line = secondCopyLine([EARLIER, FIRST], '@mcp-abap-adt/core');
-    expect(line).toBe(
+    assert.equal(
+      line,
       lineFor('@mcp-abap-adt/core', 'a copy before 24.0.0', '24.0.0 dist'),
     );
-    expect(line).not.toContain(EARLIER_FILE);
+    assert.ok(!line?.includes(EARLIER_FILE));
   });
 });
 
-describe.each(TRANSPORTS)("%s's main", (_name, main) => {
-  it('two registered copies: exit 1, exactly the line on stderr, no parameter read, nothing listens', async () => {
-    register(FIRST, SECOND);
-    const listen = jest.spyOn(net.Server.prototype, 'listen');
-    const { edges, record } = recordingEdges(['--version']);
-    const result = await main(
-      {
-        toolSet: fullToolSet,
-        program: 'mcp-abap-adt-test',
-        version: '9.9.9',
-        packageName: '@mcp-abap-adt/test-package',
-      },
-      edges,
-    );
-    expect(result).toBe(undefined);
-    expect(record.exits).toEqual([1]);
-    expect(record.stderr).toEqual([lineFor('@mcp-abap-adt/test-package')]);
-    expect(record.stdout).toEqual([]);
-    expect(record.argvReads).toBe(0);
-    expect(listen).not.toHaveBeenCalled();
-  });
+for (const [name, main] of TRANSPORTS) {
+  describe(`${name}'s main`, () => {
+    it('two registered copies: exit 1, exactly the line on stderr, no parameter read, nothing listens', async () => {
+      register(FIRST, SECOND);
+      const listen = mock.method(net.Server.prototype, 'listen');
+      const { edges, record } = recordingEdges(['--version']);
+      const result = await main(
+        {
+          toolSet: fullToolSet,
+          program: 'mcp-abap-adt-test',
+          version: '9.9.9',
+          packageName: '@mcp-abap-adt/test-package',
+        },
+        edges,
+      );
+      assert.equal(result, undefined);
+      assert.deepEqual(record.exits, [1]);
+      assert.deepEqual(record.stderr, [lineFor('@mcp-abap-adt/test-package')]);
+      assert.deepEqual(record.stdout, []);
+      assert.equal(record.argvReads, 0);
+      assert.equal(listen.mock.callCount(), 0);
+    });
 
-  it('one registered copy: starts as today (--version answered)', async () => {
-    register(FIRST);
-    const { edges, record } = recordingEdges(['--version']);
-    await main(
-      {
-        toolSet: fullToolSet,
-        program: 'mcp-abap-adt-test',
-        version: '9.9.9',
-        packageName: '@mcp-abap-adt/test-package',
-      },
-      edges,
-    );
-    expect(record.argvReads).toBeGreaterThan(0);
-    expect(record.stdout).toEqual(['9.9.9']);
-    expect(record.stderr).toEqual([]);
-    expect(record.exits).toEqual([0]);
+    it('one registered copy: starts as today (--version answered)', async () => {
+      register(FIRST);
+      const { edges, record } = recordingEdges(['--version']);
+      await main(
+        {
+          toolSet: fullToolSet,
+          program: 'mcp-abap-adt-test',
+          version: '9.9.9',
+          packageName: '@mcp-abap-adt/test-package',
+        },
+        edges,
+      );
+      assert.ok(record.argvReads > 0);
+      assert.deepEqual(record.stdout, ['9.9.9']);
+      assert.deepEqual(record.stderr, []);
+      assert.deepEqual(record.exits, [0]);
+    });
   });
-});
+}
 
 /**
  * Each binary names ITS package: the nine wrappers are called here; the
  * three plain bins (`server`, `http`, `sse`) pass their version module's
  * name, checked against their own manifest.
  */
-const ROOT = join(__dirname, '..', '..', '..');
+const ROOT = repositoryRoot(__dirname);
 const manifestName = (dir: string): string =>
   JSON.parse(readFileSync(join(ROOT, dir, 'package.json'), 'utf8')).name;
 
@@ -162,45 +185,48 @@ describe('each binary passes its own package name', () => {
   const wrappers: ReadonlyArray<
     readonly [string, (edges: LauncherEdges) => Promise<unknown>]
   > = [
-    ['compact', require('../../../compact/src/launcher').main],
-    ['compact-http', require('../../../compact-http/src/launcher').main],
-    ['compact-sse', require('../../../compact-sse/src/launcher').main],
-    ['core-ro', require('../../../core-ro/src/launcher').main],
-    ['http-ro', require('../../../http-ro/src/launcher').main],
-    ['sse-ro', require('../../../sse-ro/src/launcher').main],
-    ['compact-ro', require('../../../compact-ro/src/launcher').main],
-    ['compact-http-ro', require('../../../compact-http-ro/src/launcher').main],
-    ['compact-sse-ro', require('../../../compact-sse-ro/src/launcher').main],
+    ['compact', compactMain],
+    ['compact-http', compactHttpMain],
+    ['compact-sse', compactSseMain],
+    ['core-ro', coreRoMain],
+    ['http-ro', httpRoMain],
+    ['sse-ro', sseRoMain],
+    ['compact-ro', compactRoMain],
+    ['compact-http-ro', compactHttpRoMain],
+    ['compact-sse-ro', compactSseRoMain],
   ];
 
-  it.each(wrappers)('%s', async (dir, main) => {
-    register(FIRST, SECOND);
-    // `--version`: a wrapper that skipped the guard answers it and exits 0.
-    const { edges, record } = recordingEdges(['--version']);
-    await main(edges);
-    expect(record.exits).toEqual([1]);
-    expect(record.stderr).toEqual([lineFor(manifestName(dir))]);
-  });
+  for (const [dir, main] of wrappers) {
+    it(dir, async () => {
+      register(FIRST, SECOND);
+      // `--version`: a wrapper that skipped the guard answers it and exits 0.
+      const { edges, record } = recordingEdges(['--version']);
+      await main(edges);
+      assert.deepEqual(record.exits, [1]);
+      assert.deepEqual(record.stderr, [lineFor(manifestName(dir))]);
+    });
+  }
 
-  it.each([
-    ['server', () => require('../../../server/src/coreVersion').CORE_PACKAGE],
-    ['http', () => require('../../../http/src/httpVersion').HTTP_PACKAGE],
-    ['sse', () => require('../../../sse/src/sseVersion').SSE_PACKAGE],
-  ] as const)(
-    "%s's version module names its manifest's package",
-    (dir, read) => {
-      expect(read()).toBe(manifestName(dir));
-    },
-  );
+  for (const [dir, constant] of [
+    ['server', CORE_PACKAGE],
+    ['http', HTTP_PACKAGE],
+    ['sse', SSE_PACKAGE],
+  ] as const) {
+    it(`${dir}'s version module names its manifest's package`, () => {
+      assert.equal(constant, manifestName(dir));
+    });
+  }
 
-  it.each([
+  for (const [dir, bin, constant] of [
     ['server', 'mcp-abap-adt.js', 'CORE_PACKAGE'],
     ['http', 'mcp-abap-adt-http.js', 'HTTP_PACKAGE'],
     ['sse', 'mcp-abap-adt-sse.js', 'SSE_PACKAGE'],
-  ] as const)("%s's bin passes it", (dir, bin, constant) => {
-    const source = readFileSync(join(ROOT, dir, 'bin', bin), 'utf8');
-    expect(source).toContain(`packageName: ${constant},`);
-  });
+  ] as const) {
+    it(`${dir}'s bin passes it`, () => {
+      const source = readFileSync(join(ROOT, dir, 'bin', bin), 'utf8');
+      assert.ok(source.includes(`packageName: ${constant},`));
+    });
+  }
 });
 
 /**
@@ -215,7 +241,7 @@ describe("the old launcher paths: 19.1.0's options, the path's own package", () 
       string,
       (
         options: {
-          toolSet: unknown;
+          toolSet: typeof fullToolSet;
           program: string;
           version: string;
           packageName?: string;
@@ -224,26 +250,13 @@ describe("the old launcher paths: 19.1.0's options, the path's own package", () 
       ) => Promise<unknown>,
     ]
   > = [
-    [
-      '@mcp-abap-adt/core/launcher',
-      'server',
-      require('../../../server/src/launcher').main,
-    ],
-    [
-      '@mcp-abap-adt/http/launcher',
-      'http',
-      require('../../../http/src/launcher').main,
-    ],
-    [
-      '@mcp-abap-adt/sse/launcher',
-      'sse',
-      require('../../../sse/src/launcher').main,
-    ],
+    ['@mcp-abap-adt/core/launcher', 'server', oldCoreMain],
+    ['@mcp-abap-adt/http/launcher', 'http', oldHttpMain],
+    ['@mcp-abap-adt/sse/launcher', 'sse', oldSseMain],
   ];
 
-  it.each(oldPaths)(
-    '%s without packageName: the line names its own package',
-    async (modulePath, dir, main) => {
+  for (const [modulePath, dir, main] of oldPaths) {
+    it(`${modulePath} without packageName: the line names its own package`, async () => {
       register(FIRST, SECOND);
       const { edges, record } = recordingEdges(['--version']);
       await main(
@@ -254,18 +267,19 @@ describe("the old launcher paths: 19.1.0's options, the path's own package", () 
         },
         edges,
       );
-      expect(record.exits).toEqual([1]);
-      expect(record.stderr).toEqual([lineFor(manifestName(dir))]);
+      assert.deepEqual(record.exits, [1]);
+      assert.deepEqual(record.stderr, [lineFor(manifestName(dir))]);
       // The path's own package: `@mcp-abap-adt/core`, `/http`, `/sse`.
-      expect(record.stderr[0]).toContain(
-        `reinstall ${modulePath.split('/launcher')[0]} `,
+      assert.ok(
+        record.stderr[0]?.includes(
+          `reinstall ${modulePath.split('/launcher')[0]} `,
+        ),
       );
-    },
-  );
+    });
+  }
 
-  it.each(oldPaths)(
-    '%s with packageName: that package',
-    async (_path, _dir, main) => {
+  for (const [modulePath, , main] of oldPaths) {
+    it(`${modulePath} with packageName: that package`, async () => {
       register(FIRST, SECOND);
       const { edges, record } = recordingEdges(['--version']);
       await main(
@@ -277,7 +291,7 @@ describe("the old launcher paths: 19.1.0's options, the path's own package", () 
         },
         edges,
       );
-      expect(record.stderr).toEqual([lineFor('@mcp-abap-adt/test-package')]);
-    },
-  );
+      assert.deepEqual(record.stderr, [lineFor('@mcp-abap-adt/test-package')]);
+    });
+  }
 });

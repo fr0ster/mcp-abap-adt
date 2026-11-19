@@ -162,7 +162,7 @@ describe('npm run release:verify', () => {
       views.some(
         (call) =>
           call.args[0] === 'view' &&
-          call.args.slice(6).join(' ') ===
+          call.args.slice(7).join(' ') ===
             `--json=false @mcp-abap-adt/lib@${VERSION} version`,
       ),
     );
@@ -188,8 +188,9 @@ describe('npm run release:verify', () => {
     assert.equal(run.calls.length, 19);
     for (const call of run.calls) {
       assert.equal(call.cwd, work, call.args.join(' '));
-      const settings = call.args.slice(1, 6);
+      const settings = call.args.slice(1, 7);
       assert.deepEqual(settings, [
+        `--prefix=${work}`,
         `--userconfig=${path.join(work, 'user.npmrc')}`,
         `--globalconfig=${path.join(work, 'global.npmrc')}`,
         `--registry=${REGISTRY}`,

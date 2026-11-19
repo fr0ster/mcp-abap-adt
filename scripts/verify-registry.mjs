@@ -13,10 +13,11 @@
 //    no waiting loop or timer here.
 // 2. All of them are installed together into a fresh directory outside the
 //    repository (`npm install --ignore-scripts`), from the registry alone.
-//    Every npm call (`view` too) runs from that directory, so no project
-//    `.npmrc` applies, with an empty file each as `--userconfig`
-//    and `--globalconfig`, so no user or global setting is read (a mirror, a
-//    scoped `@scope:registry`, `offline`), and with
+//    Every npm call (`view` too) runs from that directory with it as
+//    `--prefix`, so no project or parent workspace `.npmrc` applies; with an
+//    empty file each as `--userconfig` and `--globalconfig`, so no user or
+//    global setting is read (a mirror, a scoped `@scope:registry`,
+//    `offline`); and with
 //    `--registry=https://registry.npmjs.org/ --offline=false --prefer-online`;
 //    `npm view` adds `--json=false`, so its answer is the bare version.
 // 3. The installed lockfile holds no `"link": true`, and every package in it
@@ -94,8 +95,10 @@ const manifest = (dir) =>
 // refuses one file for both) (no
 // `registry`, scoped `@scope:registry`, `offline`, …), the registry itself,
 // and online. The calls run from the temporary directory, outside the
-// repository, so no project `.npmrc` applies either.
+// repository, with it as `--prefix`, so npm walks up into no parent project
+// or workspace and no project `.npmrc` applies either.
 const isolated = (work) => [
+  `--prefix=${work}`,
   `--userconfig=${path.join(work, 'user.npmrc')}`,
   `--globalconfig=${path.join(work, 'global.npmrc')}`,
   `--registry=${REGISTRY}`,

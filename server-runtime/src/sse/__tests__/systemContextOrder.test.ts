@@ -1,4 +1,15 @@
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 /**
  * Who creates objects (responsible) and on which system (master system), per
  * session, over SSE, where an on-premise system has no systeminformation
@@ -20,20 +31,6 @@ import type { AddressInfo } from 'node:net';
 // applies — where the system names its user, its answer wins over all of it.
 // Each lookup is counted.
 const mockLookups = { count: 0 };
-jest.mock('../../../../src/lib/connectionFactory', () => ({
-  ...jest.requireActual('../../../../src/lib/connectionFactory'),
-  createAbapConnection: () => ({
-    connect: async () => {},
-    makeAdtRequest: async (options: { url?: string }) => {
-      if (String(options?.url ?? '').includes('systeminformation')) {
-        mockLookups.count += 1;
-      }
-      throw Object.assign(new Error('Request failed with status code 404'), {
-        response: { status: 404 },
-      });
-    },
-  }),
-}));
 
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import {
@@ -42,11 +39,27 @@ import {
   type IHandlerGroup,
 } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
+import * as connectionFactory from '../../../../src/lib/connectionFactory';
 import {
   getStatedSystemContext,
   resetSystemContextCache,
 } from '../../../../src/lib/systemContext';
 import { SseServer } from '../SseServer.js';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+mock.method(connectionFactory, 'createAbapConnection', () => ({
+  connect: async () => {},
+  makeAdtRequest: async (options: { url?: string }) => {
+    if (String(options?.url ?? '').includes('systeminformation')) {
+      mockLookups.count += 1;
+    }
+    throw Object.assign(new Error('Request failed with status code 404'), {
+      response: { status: 404 },
+    });
+  },
+}));
 
 /** One tool: waits `delayMs`, then answers the context its call sees. */
 const whoAmI: IHandlerGroup = {
@@ -129,7 +142,7 @@ const PROCESS_KEYS = [
   'SAP_SYSTEM_TYPE',
 ] as const;
 const saved: Record<string, string | undefined> = {};
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 beforeEach(() => {
   for (const key of PROCESS_KEYS) {
@@ -139,11 +152,11 @@ beforeEach(() => {
   process.env.SAP_RESPONSIBLE = 'PROCESS_USER';
   process.env.SAP_MASTER_SYSTEM = 'PROCESS_SYS';
   resetSystemContextCache();
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
 });
 afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 20));
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
   for (const key of PROCESS_KEYS) {
     if (saved[key] === undefined) delete process.env[key];
     else process.env[key] = saved[key];
@@ -221,14 +234,15 @@ describe('SseServer: responsible and master system per session', () => {
   }
 
   it('the opening headers only: the process environment answers neither (D26 D2)', async () => {
-    await expect(
-      ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
-    ).resolves.toEqual({
-      responsible: 'HEADER_USER',
-      masterSystem: null,
-    });
+    assert.deepStrictEqual(
+      await ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
+      {
+        responsible: 'HEADER_USER',
+        masterSystem: null,
+      },
+    );
     // No responsible header: the basic connection's login stands in.
-    await expect(ask(BASIC)).resolves.toEqual({
+    assert.deepStrictEqual(await ask(BASIC), {
       responsible: 'HEADER_LOGIN',
       masterSystem: null,
     });
@@ -237,7 +251,7 @@ describe('SseServer: responsible and master system per session', () => {
   it('the login: x-sap-login of a basic connection', async () => {
     delete process.env.SAP_RESPONSIBLE;
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    await expect(ask(BASIC)).resolves.toEqual({
+    assert.deepStrictEqual(await ask(BASIC), {
       responsible: 'HEADER_LOGIN',
       masterSystem: null,
     });
@@ -248,64 +262,71 @@ describe('SseServer: responsible and master system per session', () => {
     delete process.env.SAP_MASTER_SYSTEM;
     resetSystemContextCache();
     // (a) responsible only: a token connection states no login.
-    await expect(
-      ask({
+    assert.deepStrictEqual(
+      await ask({
         ...TOKEN,
         'x-sap-responsible': 'HEADER_RESP',
         'x-sap-master-system': 'HEADER_SYS',
       }),
-    ).resolves.toEqual({
-      responsible: 'HEADER_RESP',
-      masterSystem: 'HEADER_SYS',
-    });
+      {
+        responsible: 'HEADER_RESP',
+        masterSystem: 'HEADER_SYS',
+      },
+    );
     // (b) login only.
-    await expect(ask(BASIC)).resolves.toEqual({
+    assert.deepStrictEqual(await ask(BASIC), {
       responsible: 'HEADER_LOGIN',
       masterSystem: null,
     });
     // (c) both: the responsible.
-    await expect(
-      ask({ ...BASIC, 'x-sap-responsible': 'HEADER_RESP' }),
-    ).resolves.toEqual({ responsible: 'HEADER_RESP', masterSystem: null });
+    assert.deepStrictEqual(
+      await ask({ ...BASIC, 'x-sap-responsible': 'HEADER_RESP' }),
+      { responsible: 'HEADER_RESP', masterSystem: null },
+    );
     // (d) neither.
     const refused = await (await session(TOKEN))();
-    expect(refused.isError).toBe(true);
-    expect(JSON.parse(refused.text)).toMatchObject({
+    assert.equal(refused.isError, true);
+    assertMatchObject(JSON.parse(refused.text), {
       error: 'system_user_unknown',
     });
   });
 
-  it.each([
+  for (const [_case, headers] of [
     ['a token connection', TOKEN],
     [
       'a token connection with x-sap-login (it logs nobody on)',
       { ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' },
     ],
-  ])(
-    '%s states no user: system_user_unknown, the tool not run; the connection fails with its parameters, nothing is kept, so the next call asks again',
-    async (_case, headers) => {
-      delete process.env.SAP_RESPONSIBLE;
-      resetSystemContextCache();
-      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-      const before = mockLookups.count;
-      const next = await session(headers);
-      for (let i = 0; i < 2; i += 1) {
-        const answer = await next();
-        expect(answer.isError).toBe(true);
-        expect(JSON.parse(answer.text)).toMatchObject({
-          error: 'system_user_unknown',
-        });
-      }
-      expect(mockLookups.count - before).toBe(2);
-    },
-  );
+  ] satisfies [string, Record<string, string>][]) {
+    it(
+      format(
+        '%s states no user: system_user_unknown, the tool not run; the connection fails with its parameters, nothing is kept, so the next call asks again',
+        _case,
+      ),
+      async () => {
+        delete process.env.SAP_RESPONSIBLE;
+        resetSystemContextCache();
+        process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+        const before = mockLookups.count;
+        const next = await session(headers);
+        for (let i = 0; i < 2; i += 1) {
+          const answer = await next();
+          assert.equal(answer.isError, true);
+          assertMatchObject(JSON.parse(answer.text), {
+            error: 'system_user_unknown',
+          });
+        }
+        assert.equal(mockLookups.count - before, 2);
+      },
+    );
+  }
 
   it('a session that states its user: every call runs, asked once (an on-premise 404 is kept)', async () => {
     const before = mockLookups.count;
     const next = await session(BASIC);
-    expect((await next()).isError).toBe(false);
-    expect((await next()).isError).toBe(false);
-    expect(mockLookups.count - before).toBe(1);
+    assert.equal((await next()).isError, false);
+    assert.equal((await next()).isError, false);
+    assert.equal(mockLookups.count - before, 1);
   });
 
   it('two concurrent sessions each see their own', async () => {
@@ -313,7 +334,10 @@ describe('SseServer: responsible and master system per session', () => {
       ask({ ...BASIC, 'x-sap-responsible': 'FIRST' }, 60),
       ask({ ...BASIC, 'x-sap-master-system': 'HDR' }, 0),
     ]);
-    expect(a).toEqual({ responsible: 'FIRST', masterSystem: null });
-    expect(b).toEqual({ responsible: 'HEADER_LOGIN', masterSystem: 'HDR' });
+    assert.deepStrictEqual(a, { responsible: 'FIRST', masterSystem: null });
+    assert.deepStrictEqual(b, {
+      responsible: 'HEADER_LOGIN',
+      masterSystem: 'HDR',
+    });
   });
 });

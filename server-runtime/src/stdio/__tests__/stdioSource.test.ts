@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import * as z from 'zod';
 
 /**
@@ -13,9 +15,26 @@ import * as z from 'zod';
 let built = 0;
 /** The connections built, by tag: a case marks one's session lost. */
 const connections = new Map<string, { connected: boolean }>();
-jest.mock('../../../../src/lib/connectionFactory', () => ({
-  ...jest.requireActual('../../../../src/lib/connectionFactory'),
-  createAbapConnection: jest.fn((_settings: unknown, credential: unknown) => {
+
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
+import {
+  CompositeHandlersRegistry,
+  type HandlerEntry,
+} from '@mcp-abap-adt/lib/handlers';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { presented } from '../../../../src/__tests__/helpers/presented';
+import * as connectionFactory from '../../../../src/lib/connectionFactory';
+import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
+import { StdioServer } from '../StdioServer.js';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time), as the Jest factory
+// did; the names it left out stay real.
+const build = mock.method(
+  connectionFactory,
+  'createAbapConnection',
+  (_settings: unknown, credential: unknown) => {
     built += 1;
     const connection = {
       tag: `connection-${built}`,
@@ -35,22 +54,8 @@ jest.mock('../../../../src/lib/connectionFactory', () => ({
     };
     connections.set(connection.tag, connection);
     return connection;
-  }),
-}));
-
-import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
-import {
-  CompositeHandlersRegistry,
-  type HandlerEntry,
-} from '@mcp-abap-adt/lib/handlers';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { presented } from '../../../../src/__tests__/helpers/presented';
-import { createAbapConnection } from '../../../../src/lib/connectionFactory';
-import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
-import { StdioServer } from '../StdioServer.js';
-
-const build = createAbapConnection as jest.Mock;
+  },
+);
 
 function provider(): IAuthProvider {
   const ok = async () => ({ ok: true as const });
@@ -108,7 +113,7 @@ let previousType: string | undefined;
 beforeEach(() => {
   built = 0;
   connections.clear();
-  build.mockClear();
+  build.mock.resetCalls();
   previousType = process.env.SAP_SYSTEM_TYPE;
   process.env.SAP_SYSTEM_TYPE = 'onprem';
 });
@@ -120,7 +125,7 @@ afterEach(() => {
 describe("stdio: the connection is kept while getProvider answers the session's provider", () => {
   it('the same provider on every call: the same connection, no reopen', async () => {
     const session = provider();
-    const getProvider = jest.fn(
+    const getProvider = mock.fn(
       async (
         _destination: string,
         _options?: { readonly signal?: AbortSignal | undefined },
@@ -137,17 +142,19 @@ describe("stdio: the connection is kept while getProvider answers the session's 
     };
     const { client, which } = await serve(destinations);
     try {
-      expect(await which()).toBe('connection-1');
-      expect(await which()).toBe('connection-1');
-      expect(await which()).toBe('connection-1');
+      assert.equal(await which(), 'connection-1');
+      assert.equal(await which(), 'connection-1');
+      assert.equal(await which(), 'connection-1');
 
-      expect(build).toHaveBeenCalledTimes(1);
-      expect(presented(build.mock.calls[0][1])).toBe(session);
+      assert.equal(build.mock.callCount(), 1);
+      assert.equal(presented(build.mock.calls[0]?.arguments[1]), session);
       // Asked on every call, each with a signal.
-      expect(getProvider).toHaveBeenCalledTimes(3);
-      for (const [destination, options] of getProvider.mock.calls) {
-        expect(destination).toBe('dest');
-        expect(options?.signal).toBeInstanceOf(AbortSignal);
+      assert.equal(getProvider.mock.callCount(), 3);
+      for (const {
+        arguments: [destination, options],
+      } of getProvider.mock.calls) {
+        assert.equal(destination, 'dest');
+        assert.ok(options?.signal instanceof AbortSignal);
       }
     } finally {
       await client.close();
@@ -156,7 +163,7 @@ describe("stdio: the connection is kept while getProvider answers the session's 
 
   it('a session SAP already lost: a new connection, built with the provider getProvider answers — the same one', async () => {
     const session = provider();
-    const getProvider = jest.fn(async () => session);
+    const getProvider = mock.fn(async () => session);
     const destinations: IDestinations = {
       settingsFor: async () => ({
         url: 'https://system.example.invalid',
@@ -168,17 +175,17 @@ describe("stdio: the connection is kept while getProvider answers the session's 
     };
     const { client, which } = await serve(destinations);
     try {
-      expect(await which()).toBe('connection-1');
+      assert.equal(await which(), 'connection-1');
       const lost = connections.get('connection-1');
       if (lost) lost.connected = false;
-      expect(await which()).toBe('connection-2');
-      expect(await which()).toBe('connection-2');
+      assert.equal(await which(), 'connection-2');
+      assert.equal(await which(), 'connection-2');
 
-      expect(build).toHaveBeenCalledTimes(2);
-      expect(presented(build.mock.calls[0][1])).toBe(session);
-      expect(presented(build.mock.calls[1][1])).toBe(session);
+      assert.equal(build.mock.callCount(), 2);
+      assert.equal(presented(build.mock.calls[0]?.arguments[1]), session);
+      assert.equal(presented(build.mock.calls[1]?.arguments[1]), session);
       // The replacement's provider came from this call's getProvider.
-      expect(getProvider).toHaveBeenCalledTimes(3);
+      assert.equal(getProvider.mock.callCount(), 3);
     } finally {
       await client.close();
     }

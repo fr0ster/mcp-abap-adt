@@ -26,16 +26,6 @@ import { batchStand } from '../../helpers/batchStand';
 // (mock.method; their callers read them at call time), as the Jest factory
 // did; the names it left out stay real.
 mock.method(connectionFactory, 'createAbapConnection', () => undefined);
-mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
-// A long read outside a batch opens a connection of its own: a sibling
-// of the stand's, built by the mock below.
-mock.method(connectionFactory, 'siblingRecordOf', () => ({
-  settings: {},
-  credential: {},
-  kind: 'onprem',
-}));
-// A view over a connection keeps its kind: the kind is mocked above.
-mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

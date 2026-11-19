@@ -34,16 +34,6 @@ import { runPlainNode } from '../../helpers/plainNode';
 // Every case restores every mock after it: they are replaced before each.
 beforeEach(() => {
   mock.method(connectionFactory, 'createAbapConnection', () => undefined);
-  mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
-  // A long read outside a batch opens a connection of its own: a sibling
-  // of the stand's, built by the mock below.
-  mock.method(connectionFactory, 'siblingRecordOf', () => ({
-    settings: {},
-    credential: {},
-    kind: 'onprem',
-  }));
-  // A view over a connection keeps its kind: the kind is mocked above.
-  mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
 });
 
 // The process declares its system type, as every launcher requires: the ADT

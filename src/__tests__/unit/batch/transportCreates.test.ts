@@ -22,9 +22,6 @@ import { batchStand, payloadOf } from '../../helpers/batchStand';
 // Every case restores every mock after it: they are replaced before each.
 beforeEach(() => {
   mock.method(connectionFactory, 'createAbapConnection', () => undefined);
-  mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
-  // A view over a connection keeps its kind: the kind is mocked above.
-  mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
 });
 
 // The process declares its system type, as every launcher requires.

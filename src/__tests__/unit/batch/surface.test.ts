@@ -44,9 +44,6 @@ const connectionBuilt = mock.method(
     throw new Error('no connection may be built here');
   },
 );
-mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
-// A view over a connection keeps its kind: the kind is mocked above.
-mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 

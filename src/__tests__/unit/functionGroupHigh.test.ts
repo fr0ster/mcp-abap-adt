@@ -1,10 +1,15 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { handleUpdateFunctionGroup } from '../../handlers/function/high/handleUpdateFunctionGroup';
+import * as clients from '../../lib/clients';
 import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOfWithFactory,
   okResponse,
   reading,
 } from '../helpers/fakeClient';
+
+mock.method(clients, 'createAdtClient', () => fakeClient);
 
 /**
  * A mutation `highTierWriteChannel.test.ts`'s shared table cannot see,
@@ -14,7 +19,6 @@ import {
  */
 
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 const context = {
   connection: { getSessionId: () => null } as any,
@@ -44,7 +48,7 @@ describe('UpdateFunctionGroup: what the shared wire-channel table does not check
       description: 'after',
     });
 
-    expect(result.isError).toBe(false);
-    expect(updateCall?.options?.lockHandle).toBe('REAL_LOCK_HANDLE_42');
+    assert.equal(result.isError, false);
+    assert.equal(updateCall?.options?.lockHandle, 'REAL_LOCK_HANDLE_42');
   });
 });

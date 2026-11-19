@@ -1,6 +1,12 @@
 let toClient: unknown;
 
-jest.mock('../../lib/clients', () => {
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
+import * as clients from '../../lib/clients';
+import { stateSystemKind } from '../helpers/systemKind';
+
+{
   // A function module's metadata names the group the cases give (#2).
   const metadata =
     '<?xml version="1.0" encoding="utf-8"?><fmodule:abapFunctionModule adtcore:name="Z_AC_FM01" xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core">' +
@@ -33,16 +39,12 @@ jest.mock('../../lib/clients', () => {
       },
     }),
   });
-  return {
-    // The declared variant the boundary checks a type argument against.
-    variantOf: () => 'onprem',
-    createAdtClient: client,
-    // An on-premise group activation is the on-premise client's.
-    createOnPremAdtClient: client,
-  };
-});
-
-import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
+  // The declared variant the boundary checks a type argument against.
+  stateSystemKind('onprem');
+  mock.method(clients, 'createAdtClient', client);
+  // An on-premise group activation is the on-premise client's.
+  mock.method(clients, 'createOnPremAdtClient', client);
+}
 
 /**
  * What reaches the client when a caller gives an address.
@@ -79,7 +81,7 @@ describe('ActivateObjectLow and the address it was given', () => {
       ],
     } as never);
 
-    expect(toClient).toEqual([
+    assert.deepStrictEqual(toClient, [
       {
         name: 'Z_AC_FM01',
         type: 'FUGR/FF',
@@ -97,7 +99,7 @@ describe('ActivateObjectLow and the address it was given', () => {
       ],
     } as never);
 
-    expect(toClient).toEqual([
+    assert.deepStrictEqual(toClient, [
       { name: 'Z_AC_FM01', type: 'FUGR/FF', parentName: 'ZAC_FGR01' },
     ]);
   });
@@ -114,7 +116,7 @@ describe('ActivateObjectLow and the address it was given', () => {
       ],
     } as never);
 
-    expect(toClient).toEqual([
+    assert.deepStrictEqual(toClient, [
       { name: 'ZCL_A', type: 'CLAS/OC' },
       { name: 'ZCL_B', type: 'CLAS/OC' },
     ]);
@@ -133,10 +135,12 @@ describe('ActivateObjectLow and the address it was given', () => {
       ],
     } as never);
 
-    expect(toClient).toBeUndefined();
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(
-      'objects[].parentName is required for Z_AC_FM01 (FUGR/FF): the name of the object it belongs to; nothing was sent',
+    assert.equal(toClient, undefined);
+    assert.equal(result.isError, true);
+    assert.ok(
+      result.content[0].text.includes(
+        'objects[].parentName is required for Z_AC_FM01 (FUGR/FF): the name of the object it belongs to; nothing was sent',
+      ),
     );
   });
 
@@ -154,9 +158,9 @@ describe('ActivateObjectLow and the address it was given', () => {
       ],
     } as never);
 
-    expect((toClient as { name: string }[]).map((o) => o.name)).toEqual([
-      'Z_AC_FM01',
-      'ZCL_B',
-    ]);
+    assert.deepStrictEqual(
+      (toClient as { name: string }[]).map((o) => o.name),
+      ['Z_AC_FM01', 'ZCL_B'],
+    );
   });
 });

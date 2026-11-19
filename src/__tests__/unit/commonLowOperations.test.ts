@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import {
   analyseActivation,
   analyseException,
@@ -10,11 +13,13 @@ import {
   handleValidateObject,
   TOOL_DEFINITION as VALIDATE_OBJECT,
 } from '../../handlers/common/low/handleValidateObject';
+import * as clients from '../../lib/clients';
 import { defineTool } from '../../lib/handlers/interfaces';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured } from '../../lib/strategies/reading';
 import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
+import { assertRejects } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
@@ -22,6 +27,13 @@ import {
   recordAnalyse,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The declared variant the boundary checks a type argument against.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => fakeClient);
+// An on-premise group activation is the on-premise client's.
+mock.method(clients, 'createOnPremAdtClient', () => fakeClient);
 
 // The recorder IS the client, or it records nothing. Every test in this file
 // that reads `seen.last`/`seen.calls` needs this wiring. A group activation
@@ -35,13 +47,6 @@ const seen = recordAnalyse({
     ),
 });
 let fakeClient: unknown = seen.client;
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => fakeClient,
-  // An on-premise group activation is the on-premise client's.
-  createOnPremAdtClient: () => fakeClient,
-}));
 
 // As in domainLow.test.ts: nothing here asserts that a handler injects
 // `resultsFor(xDocuments)` into `getX(...)` — both test doubles ignore the
@@ -80,7 +85,7 @@ const refusalFrom = (
     [member]: async (_config: unknown, options: any) => {
       const status = Number(corpusSidecar(caseName).response.status);
       const wire = { data: corpusBody(caseName), status };
-      expect(options.analyse).toBe(analyse);
+      assert.equal(options.analyse, analyse);
       const verdict = options.analyse('adt:no-failure', wire);
       // The strategy's own verdict is the error, not a re-wrap of its
       // message — passing only `message` would let this test pass even if
@@ -105,10 +110,10 @@ describe('the three masking cases (Task 13, Step 2)', () => {
       object_name: 'ZCL_TAKEN',
       package_name: 'ZP',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     // `origin` proves the failure came from the strategy rather than from the
     // handler's own input validation, which answers isError too.
-    expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
+    assert.equal(JSON.parse(result.content[0].text).origin, 'refusal');
   });
 
   it('reports a refused activation as an error', async () => {
@@ -125,8 +130,8 @@ describe('the three masking cases (Task 13, Step 2)', () => {
     const result: any = await handleActivateObject(context as any, {
       objects: [{ name: 'ZCL_X', type: 'CLAS/OC' }],
     });
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
+    assert.equal(result.isError, true);
+    assert.equal(JSON.parse(result.content[0].text).origin, 'refusal');
   });
 });
 
@@ -144,8 +149,10 @@ describe('ValidateObjectLow', () => {
       package_name: 'ZP',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
+      admissible: true,
+    });
   });
 
   it('hands validate its own analyseException, with the class field names validate() declares', async () => {
@@ -157,12 +164,13 @@ describe('ValidateObjectLow', () => {
       description: 'x',
     });
     const call = seen.calls.filter((c) => c.member === 'validate').at(-1);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args[0], {
       className: 'ZCL_X',
       packageName: 'zp',
       description: 'x',
+      superclass: undefined,
     });
   });
 
@@ -175,7 +183,7 @@ describe('ValidateObjectLow', () => {
       description: 'x',
     });
     const call = seen.calls.filter((c) => c.member === 'validate').at(-1);
-    expect(call?.args[0]).toEqual({
+    assert.deepStrictEqual(call?.args[0], {
       domainName: 'ZD',
       packageName: 'zp',
       description: 'x',
@@ -184,14 +192,15 @@ describe('ValidateObjectLow', () => {
 
   it('rejects an unsupported object_type at the schema, before ever reaching the client', async () => {
     fakeClient = seen.client;
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(VALIDATE_OBJECT, handleValidateObject).call(context as any, {
         object_type: 'not_a_type',
         object_name: 'ZX',
       }),
-    ).rejects.toThrow('Invalid arguments for tool ValidateObjectLow: ');
+      'Invalid arguments for tool ValidateObjectLow: ',
+    );
     await refused;
-    expect(seen.calls.length).toBe(0);
+    assert.equal(seen.calls.length, 0);
   });
 
   it('an empty package_name or description collapses to absent, not to an empty string on the wire', async () => {
@@ -203,10 +212,11 @@ describe('ValidateObjectLow', () => {
       description: '',
     });
     const call = seen.calls.filter((c) => c.member === 'validate').at(-1);
-    expect(call?.args[0]).toEqual({
+    assert.deepStrictEqual(call?.args[0], {
       className: 'ZCL_X',
       packageName: undefined,
       description: undefined,
+      superclass: undefined,
     });
   });
 
@@ -224,9 +234,10 @@ describe('ValidateObjectLow', () => {
       root_entity: 'e',
       implementation_type: 'Managed',
     });
-    expect(
+    assert.equal(
       seen.calls.filter((c) => c.member === 'validate').at(-1)?.factory,
-    ).toBe('getBehaviorDefinition');
+      'getBehaviorDefinition',
+    );
 
     await handleValidateObject(context as any, {
       object_type: 'metadata_extension',
@@ -234,9 +245,10 @@ describe('ValidateObjectLow', () => {
       package_name: 'zp',
       description: 'x',
     });
-    expect(
+    assert.equal(
       seen.calls.filter((c) => c.member === 'validate').at(-1)?.factory,
-    ).toBe('getMetadataExtension');
+      'getMetadataExtension',
+    );
   });
 });
 
@@ -253,8 +265,8 @@ describe('CheckObjectLow', () => {
       object_name: 'zd',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       ran: true,
       status_text: 'Object ZBP_MCP_SHR_I_ROOT has been checked',
     });
@@ -268,10 +280,13 @@ describe('CheckObjectLow', () => {
       version: 'inactive',
     });
     const call = seen.calls.filter((c) => c.member === 'check').at(-1);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[0]).toEqual({ className: 'ZCL_X' });
-    expect(call?.args[1]).toBe('inactive');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args[0], {
+      className: 'ZCL_X',
+      source: undefined,
+    });
+    assert.equal(call?.args[1], 'inactive');
   });
 
   // Pinned, not merely asserted in passing: this is the one place this
@@ -286,18 +301,23 @@ describe('CheckObjectLow', () => {
   // call now checks the ACTIVE version, which for a freshly-created,
   // not-yet-activated object may not exist yet. Kept deliberately (see the
   // task report), but it must stay pinned here rather than merely declared.
-  it.each(['function_group', 'behavior_definition'] as const)(
-    "defaults %s's check to the active version when the caller omits it",
-    async (objectType) => {
-      fakeClient = seen.client;
-      await handleCheckObject(context as any, {
-        object_type: objectType,
-        object_name: 'zx',
-      });
-      const call = seen.calls.filter((c) => c.member === 'check').at(-1);
-      expect(call?.args[1]).toBe('active');
-    },
-  );
+  for (const objectType of ['function_group', 'behavior_definition'] as const) {
+    it(
+      format(
+        "defaults %s's check to the active version when the caller omits it",
+        objectType,
+      ),
+      async () => {
+        fakeClient = seen.client;
+        await handleCheckObject(context as any, {
+          object_type: objectType,
+          object_name: 'zx',
+        });
+        const call = seen.calls.filter((c) => c.member === 'check').at(-1);
+        assert.equal(call?.args[1], 'active');
+      },
+    );
+  }
 
   it('behavior_definition and metadata_extension reach their own factory', async () => {
     fakeClient = seen.client;
@@ -305,7 +325,8 @@ describe('CheckObjectLow', () => {
       object_type: 'behavior_definition',
       object_name: 'zbd',
     });
-    expect(seen.calls.filter((c) => c.member === 'check').at(-1)?.factory).toBe(
+    assert.equal(
+      seen.calls.filter((c) => c.member === 'check').at(-1)?.factory,
       'getBehaviorDefinition',
     );
 
@@ -313,7 +334,8 @@ describe('CheckObjectLow', () => {
       object_type: 'metadata_extension',
       object_name: 'zmd',
     });
-    expect(seen.calls.filter((c) => c.member === 'check').at(-1)?.factory).toBe(
+    assert.equal(
+      seen.calls.filter((c) => c.member === 'check').at(-1)?.factory,
       'getMetadataExtension',
     );
   });
@@ -331,8 +353,8 @@ describe('ActivateObjectLow', () => {
       objects: [{ name: 'zd', type: 'DOMA/DD' }],
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -343,12 +365,12 @@ describe('ActivateObjectLow', () => {
     await handleActivateObject(context as any, {
       objects: [{ name: 'zcl_x', type: 'CLAS/OC' }],
     });
-    expect(seen.calls).toHaveLength(1);
+    assert.equal(seen.calls.length, 1);
     const call = seen.calls[0];
-    expect(call.member).toBe('activate');
-    expect(call.carriedAnalyse).toBe(true);
-    expect(call.analyse).toBe(analyseActivation);
-    expect(call.args[0]).toEqual({ className: 'ZCL_X' });
+    assert.equal(call.member, 'activate');
+    assert.equal(call.carriedAnalyse, true);
+    assert.equal(call.analyse, analyseActivation);
+    assert.deepStrictEqual(call.args[0], { className: 'ZCL_X' });
   });
 
   /**
@@ -385,13 +407,13 @@ describe('ActivateObjectLow', () => {
     // The discovery is read first: which endpoint the system offers
     // (fr0ster/mcp-abap-adt#351); the recording double offers the runs.
     const members = seen.calls.map((c) => c.member);
-    expect(members[0]).toBe('discovery');
-    expect(members[1]).toBe('activateObjectsGroup');
-    expect(members).toContain('getActivationRun');
-    expect(members.at(-1)).toBe('getActivationResults');
+    assert.equal(members[0], 'discovery');
+    assert.equal(members[1], 'activateObjectsGroup');
+    assert.ok(members.includes('getActivationRun'));
+    assert.equal(members.at(-1), 'getActivationResults');
     for (const call of seen.calls) {
-      expect(call.factory).toBe('getUtils');
-      expect(call.carriedAnalyse).toBe(true);
+      assert.equal(call.factory, 'getUtils');
+      assert.equal(call.carriedAnalyse, true);
     }
   });
 
@@ -400,7 +422,7 @@ describe('ActivateObjectLow', () => {
     await handleActivateObject(context as any, {
       objects: [{ name: 'zsb', type: 'SRVB/SVB' }],
     });
-    expect(seen.calls.map((c) => c.member).slice(0, 2)).toEqual([
+    assert.deepStrictEqual(seen.calls.map((c) => c.member).slice(0, 2), [
       'discovery',
       'activateObjectsGroup',
     ]);
@@ -414,11 +436,11 @@ describe('ActivateObjectLow', () => {
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.accepted).toBe(true);
-    expect(payload.run_id).toBe('ACT-RUN-1');
-    expect(payload.run_status).toBe('finished');
+    assert.equal(payload.accepted, true);
+    assert.equal(payload.run_id, 'ACT-RUN-1');
+    assert.equal(payload.run_status, 'finished');
   });
 
   it('a finished run with no error-severity message answers activated: true', async () => {
@@ -432,8 +454,8 @@ describe('ActivateObjectLow', () => {
     const payload = JSON.parse(result.content[0].text);
     // The errata is explicit: only an error-severity message is a failure, and
     // a run with nothing to do says nothing at all.
-    expect(payload.activated).toBe(true);
-    expect(payload.messages).toEqual([]);
+    assert.equal(payload.activated, true);
+    assert.deepStrictEqual(payload.messages, []);
   });
 
   it('a finished run carrying an error is an error naming the object', async () => {
@@ -448,10 +470,10 @@ describe('ActivateObjectLow', () => {
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.origin).toBe('refusal');
-    expect(payload.messages).toEqual([
+    assert.equal(payload.origin, 'refusal');
+    assert.deepStrictEqual(payload.messages, [
       {
         type: 'E',
         text: 'Interface ZIF_MCP_SHARED is not active',
@@ -462,7 +484,7 @@ describe('ActivateObjectLow', () => {
     ]);
     // The message a caller could not see before this sequence existed: the
     // accept response carries none.
-    expect(payload.message).toContain('ZIF_MCP_SHARED');
+    assert.ok(payload.message.includes('ZIF_MCP_SHARED'));
   });
 
   it('an empty run id reads as not accepted, not as a silent success', async () => {
@@ -475,11 +497,11 @@ describe('ActivateObjectLow', () => {
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.accepted).toBe(false);
-    expect(payload.run_id).toBeNull();
-    expect(payload.activated).toBeNull();
+    assert.equal(payload.accepted, false);
+    assert.equal(payload.run_id, null);
+    assert.equal(payload.activated, null);
   });
 
   it('behavior_definition and metadata_extension reach their own factory', async () => {
@@ -487,12 +509,12 @@ describe('ActivateObjectLow', () => {
     await handleActivateObject(context as any, {
       objects: [{ name: 'zbd', type: 'behavior_definition' }],
     });
-    expect(seen.calls.at(-1)?.factory).toBe('getBehaviorDefinition');
+    assert.equal(seen.calls.at(-1)?.factory, 'getBehaviorDefinition');
 
     await handleActivateObject(context as any, {
       objects: [{ name: 'zmd', type: 'metadata_extension' }],
     });
-    expect(seen.calls.at(-1)?.factory).toBe('getMetadataExtension');
+    assert.equal(seen.calls.at(-1)?.factory, 'getMetadataExtension');
   });
 });
 
@@ -506,11 +528,11 @@ describe('LockObjectLow', () => {
       object_name: 'zcl_x',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.success).toBe(true);
-    expect(payload.object_name).toBe('ZCL_X');
-    expect(payload.lock_handle).toBe(handle);
+    assert.equal(payload.success, true);
+    assert.equal(payload.object_name, 'ZCL_X');
+    assert.equal(payload.lock_handle, handle);
   });
 
   it('LockObject passes analyseLock', async () => {
@@ -520,8 +542,8 @@ describe('LockObjectLow', () => {
       object_name: 'ZCL_X',
     });
     const call = seen.calls.filter((c) => c.member === 'lock').at(-1);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseLock);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseLock);
   });
 
   it('requires super_package for package locking, and uppercases it when present', async () => {
@@ -530,8 +552,8 @@ describe('LockObjectLow', () => {
       object_type: 'package',
       object_name: 'ZPKG',
     });
-    expect(missing.isError).toBe(true);
-    expect(seen.calls.length).toBe(0);
+    assert.equal(missing.isError, true);
+    assert.equal(seen.calls.length, 0);
 
     await handleLockObject(context as any, {
       object_type: 'package',
@@ -539,7 +561,7 @@ describe('LockObjectLow', () => {
       super_package: 'zsuper',
     });
     const call = seen.calls.filter((c) => c.member === 'lock').at(-1);
-    expect(call?.args[0]).toEqual({
+    assert.deepStrictEqual(call?.args[0], {
       packageName: 'ZPKG',
       superPackage: 'ZSUPER',
     });
@@ -551,7 +573,8 @@ describe('LockObjectLow', () => {
       object_type: 'behavior_definition',
       object_name: 'zbd',
     });
-    expect(seen.calls.filter((c) => c.member === 'lock').at(-1)?.factory).toBe(
+    assert.equal(
+      seen.calls.filter((c) => c.member === 'lock').at(-1)?.factory,
       'getBehaviorDefinition',
     );
 
@@ -559,7 +582,8 @@ describe('LockObjectLow', () => {
       object_type: 'metadata_extension',
       object_name: 'zmd',
     });
-    expect(seen.calls.filter((c) => c.member === 'lock').at(-1)?.factory).toBe(
+    assert.equal(
+      seen.calls.filter((c) => c.member === 'lock').at(-1)?.factory,
       'getMetadataExtension',
     );
   });
@@ -575,8 +599,8 @@ describe('UnlockObjectLow', () => {
       lock_handle: 'h',
     });
 
-    expect(result.isError).toBe(false);
-    expect(result.content[0].text).toBe('SUCCESS');
+    assert.equal(result.isError, false);
+    assert.equal(result.content[0].text, 'SUCCESS');
   });
 
   it('UnlockObject passes analyseException, and forwards the lock handle', async () => {
@@ -587,9 +611,9 @@ describe('UnlockObjectLow', () => {
       lock_handle: 'h',
     });
     const call = seen.calls.filter((c) => c.member === 'unlock').at(-1);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args).toEqual([{ className: 'ZCL_X' }, 'h']);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args, [{ className: 'ZCL_X' }, 'h']);
   });
 
   it('behavior_definition and metadata_extension reach their own factory', async () => {
@@ -599,17 +623,19 @@ describe('UnlockObjectLow', () => {
       object_name: 'zbd',
       lock_handle: 'h',
     });
-    expect(
+    assert.equal(
       seen.calls.filter((c) => c.member === 'unlock').at(-1)?.factory,
-    ).toBe('getBehaviorDefinition');
+      'getBehaviorDefinition',
+    );
 
     await handleUnlockObject(context as any, {
       object_type: 'metadata_extension',
       object_name: 'zmd',
       lock_handle: 'h',
     });
-    expect(
+    assert.equal(
       seen.calls.filter((c) => c.member === 'unlock').at(-1)?.factory,
-    ).toBe('getMetadataExtension');
+      'getMetadataExtension',
+    );
   });
 });

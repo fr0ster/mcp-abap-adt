@@ -1,8 +1,12 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleCreateDomain } from '../../handlers/domain/high/handleCreateDomain';
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import * as clients from '../../lib/clients';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
@@ -10,8 +14,9 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 const context = {
   connection: { getSessionId: () => null } as any,
@@ -60,21 +65,23 @@ describe('UpdateDomain (high) — updateMetadata request shape', () => {
       activate: false,
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
 
-    expect(updateCall?.config).toEqual({
+    assert.deepStrictEqual(updateCall?.config, {
       domainName: 'ZD',
       transportRequest: undefined,
     });
-    expect(updateCall?.options).toEqual({
+    const { source, ...options } = updateCall?.options ?? {};
+    assert.ok(source.includes('adtcore:description="after"'));
+    assert.deepStrictEqual(options, {
       headers: DEFAULT_ADT_HEADERS['domain.updateMetadata'],
-      source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'LOCK123',
       analyse: analyseException,
     });
-    expect(
+    assert.equal(
       (updateCall?.config as { document?: unknown })?.document,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 });
 
@@ -113,8 +120,8 @@ describe('CreateDomain (high) — a lock nobody released reaches the caller', ()
       activate: true,
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text).cleanup).toMatchObject({
+    assert.equal(result.isError, false);
+    assertMatchObject(JSON.parse(result.content[0].text).cleanup, {
       message: 'Unlock refused',
     });
   });

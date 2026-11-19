@@ -6,6 +6,8 @@
  * A source or level that is not there (`404`) stays what it was.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
@@ -16,6 +18,7 @@ import { handleGetPackageContents } from '../../handlers/package/readonly/handle
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
 import { createBatchAvailability } from '../../lib/batch/availability';
+import * as clients from '../../lib/clients';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import { skipSapAnswers } from '../../lib/search-source/readFailure';
@@ -29,6 +32,7 @@ import {
   awaitActivationRun,
 } from '../../lib/strategies/activationRun';
 import { carryingFailure, methodFailureOf } from '../../lib/strategies/step';
+import { assertMatchObject, rejectionOf } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
@@ -36,18 +40,21 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 import { exactPackages, listing } from '../helpers/sourceReaderFake';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The declared variant the boundary checks a type argument against.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => fakeClient);
+// The declared variant's client, tagged with it (SearchObject's filter is
+// that variant's search names).
+mock.method(clients, 'adtClientOf', () => ({
+  variant: 'onprem',
+  client: fakeClient,
+}));
+// An on-premise group activation is the on-premise client's.
+mock.method(clients, 'createOnPremAdtClient', () => fakeClient);
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => fakeClient,
-  // The declared variant's client, tagged with it (SearchObject's filter is
-  // that variant's search names).
-  adtClientOf: () => ({ variant: 'onprem', client: fakeClient }),
-  // An on-premise group activation is the on-premise client's.
-  createOnPremAdtClient: () => fakeClient,
-}));
 
 const context = { connection: {} as any, logger: undefined };
 
@@ -91,19 +98,19 @@ const failureEntryOf = (step: string, message: string) => ({
 
 describe('a multi-step handler adds the step that failed', () => {
   it('UpdateClass refused at the lock answers the lock error with step lock, and nothing is written', async () => {
-    const update = jest.fn(async () => okResponse(reading('')));
+    const update = mock.fn(async () => okResponse(reading('')));
     fakeClient = fakeClientOf({ lock: async () => forbidden(), update });
     const result: any = await handleUpdateClass(context as any, {
       class_name: 'ZCL_X',
       source_code: 'CLASS zcl_x DEFINITION. ENDCLASS.',
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual(expectedPayload('lock'));
-    expect(update).not.toHaveBeenCalled();
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(payloadOf(result), expectedPayload('lock'));
+    assert.equal(update.mock.callCount(), 0);
   });
 
   it('UpdateClass refused at the update answers the update error with step update, and unlocks', async () => {
-    const unlock = jest.fn(async () => okResponse(reading('')));
+    const unlock = mock.fn(async () => okResponse(reading('')));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('HANDLE'),
       update: async () => forbidden('Object is locked by another user'),
@@ -113,11 +120,12 @@ describe('a multi-step handler adds the step that failed', () => {
       class_name: 'ZCL_X',
       source_code: 'CLASS zcl_x DEFINITION. ENDCLASS.',
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual(
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(
+      payloadOf(result),
       expectedPayload('update', 'Object is locked by another user'),
     );
-    expect(unlock).toHaveBeenCalledTimes(1);
+    assert.equal(unlock.mock.callCount(), 1);
   });
 
   it('a throw inside a step is the method failure with the step, not a SAP answer', async () => {
@@ -133,11 +141,11 @@ describe('a multi-step handler adds the step that failed', () => {
       source_code: 'CLASS zcl_x DEFINITION. ENDCLASS.',
     });
     const payload = payloadOf(result);
-    expect(payload.error).toBe('client_threw');
-    expect(payload.message).toBe('could not parse the answer');
-    expect(payload.step).toBe('update');
-    expect(payload.origin).toBeUndefined();
-    expect(payload.status).toBeUndefined();
+    assert.equal(payload.error, 'client_threw');
+    assert.equal(payload.message, 'could not parse the answer');
+    assert.equal(payload.step, 'update');
+    assert.equal(payload.origin, undefined);
+    assert.equal(payload.status, undefined);
   });
 });
 
@@ -147,8 +155,9 @@ describe('a refusal is not swallowed', () => {
     const result: any = await handleGetPackageContents(context as any, {
       package_name: 'ZPKG',
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual(
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(
+      payloadOf(result),
       expectedPayload('read package node structure'),
     );
   });
@@ -158,8 +167,8 @@ describe('a refusal is not swallowed', () => {
     const result: any = await handleGetPackageContents(context as any, {
       package_name: 'ZPKG',
     });
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual([]);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), []);
   });
 
   it('GetEnhancements: a refused includes walk is the method error with its step, not an empty list', async () => {
@@ -177,8 +186,8 @@ describe('a refusal is not swallowed', () => {
       { object_name: 'ZPROG', object_type: 'program', include_nested: true },
     );
     const body = JSON.parse(result.content[0].text);
-    expect(body.partial_result).toBe(true);
-    expect(body.error).toEqual(expectedPayload('read node structure'));
+    assert.equal(body.partial_result, true);
+    assert.deepStrictEqual(body.error, expectedPayload('read node structure'));
   });
 
   it('SearchSource: a refused source read is skipped by owner decision (DO17): nothing is yielded', async () => {
@@ -195,7 +204,7 @@ describe('a refusal is not swallowed', () => {
       'active',
       skipSapAnswers,
     );
-    expect((await units.next()).done).toBe(true);
+    assert.equal((await units.next()).done, true);
   });
 
   it('SearchSource: a listed source that is not there is skipped (DO17): nothing is yielded', async () => {
@@ -212,7 +221,7 @@ describe('a refusal is not swallowed', () => {
       'active',
       skipSapAnswers,
     );
-    expect((await units.next()).done).toBe(true);
+    assert.equal((await units.next()).done, true);
   });
 
   it("DescribeByList: a refused search is that object's error with the step, and the others are described", async () => {
@@ -236,15 +245,15 @@ describe('a refusal is not swallowed', () => {
         { name: 'ZCL_Y', type: 'CLAS/OC' },
       ],
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const items = result.content.map((c: any) => JSON.parse(c.text));
-    expect(items[0]).toEqual({
+    assert.deepStrictEqual(items[0], {
       name: 'ZCL_X',
       error: expectedPayload('search'),
     });
-    expect(items).toHaveLength(2);
-    expect(items[1].name).toBe('ZCL_Y');
-    expect(items[1].error).toBeUndefined();
+    assert.equal(items.length, 2);
+    assert.equal(items[1].name, 'ZCL_Y');
+    assert.equal(items[1].error, undefined);
   });
 });
 
@@ -264,8 +273,8 @@ describe('GetStructuresList: both endpoints failed', () => {
       structure_name: 'ZS',
       include_extensions: false,
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual([
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(payloadOf(result), [
       failureEntryOf('read structure', 'No authorization'),
       failureEntryOf('read table', 'No authorization for the table'),
     ]);
@@ -280,14 +289,15 @@ describe('GetStructuresList: both endpoints failed', () => {
       structure_name: 'ZS',
       include_extensions: false,
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const [structure, table] = payloadOf(result);
-    expect(structure).toMatchObject({
+    assertMatchObject(structure, {
       step: 'read structure',
       status: 404,
       adt_type: 'ExceptionResourceNotFound',
     });
-    expect(table).toEqual(
+    assert.deepStrictEqual(
+      table,
       failureEntryOf('read table', 'No authorization for the table'),
     );
   });
@@ -298,9 +308,11 @@ describe('GetStructuresList: both endpoints failed', () => {
       structure_name: 'ZS',
       include_extensions: false,
     });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(
-      'Could not read source for structure/table ZS',
+    assert.equal(result.isError, true);
+    assert.ok(
+      result.content[0].text.includes(
+        'Could not read source for structure/table ZS',
+      ),
     );
   });
 
@@ -317,10 +329,10 @@ describe('GetStructuresList: both endpoints failed', () => {
       structure_name: 'ZS',
       include_extensions: false,
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const [child] = JSON.parse(result.content[0].text).tree.children;
-    expect(child.structure).toBe('ZINC');
-    expect(child.error).toEqual([
+    assert.equal(child.structure, 'ZINC');
+    assert.deepStrictEqual(child.error, [
       failureEntryOf('read structure', 'No authorization'),
       failureEntryOf('read table', 'No authorization for the table'),
     ]);
@@ -339,8 +351,11 @@ describe('GetEnhancements: a refused elements read is the method error as it is,
       readEnhancementElements: async () => forbidden(),
     });
     const result = await run();
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual(expectedPayload('read enhancements'));
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(
+      payloadOf(result),
+      expectedPayload('read enhancements'),
+    );
   });
 
   it('a 401: the call ends as it came, with the step', async () => {
@@ -351,9 +366,9 @@ describe('GetEnhancements: a refused elements read is the method error as it is,
         } as Partial<IAdtError>),
     });
     const body = payloadOf(await run());
-    expect(body.status).toBe(401);
-    expect(body.message).toBe('Unauthorized');
-    expect(body.step).toBe('read enhancements');
+    assert.equal(body.status, 401);
+    assert.equal(body.message, 'Unauthorized');
+    assert.equal(body.step, 'read enhancements');
   });
 });
 
@@ -390,40 +405,41 @@ describe('GetEnhancements include_nested lists an include SAP refused', () => {
   it('the refused include is listed with its name, the method error and the step, beside the others', async () => {
     fakeClient = walk({ name: 'ZINC2', status: 403 });
     const body = payloadOf(await run());
-    expect(body.objects.length).toBe(0); // the others answered (none holds an enhancement)
-    expect(body.total_objects_analyzed).toBe(2); // the main object and ZINC1
-    expect(body.includes_unread).toEqual([
-      {
-        include: 'ZINC2',
-        step: 'read enhancements',
-        failures: [
-          expect.objectContaining({
-            message: 'Request failed with status code 403',
-            origin: 'refusal',
-            step: 'read enhancements',
-            status: 403,
-            raw_body: DOCUMENT,
-          }),
-        ],
-      },
-    ]);
+    assert.equal(body.objects.length, 0); // the others answered (none holds an enhancement)
+    assert.equal(body.total_objects_analyzed, 2); // the main object and ZINC1
+    // One unread include, its one failure checked for the fields named.
+    const [unread, ...more] = body.includes_unread;
+    assert.deepStrictEqual(more, []);
+    const { failures, ...rest } = unread;
+    assert.deepStrictEqual(rest, {
+      include: 'ZINC2',
+      step: 'read enhancements',
+    });
+    assert.equal(failures.length, 1);
+    assertMatchObject(failures[0], {
+      message: 'Request failed with status code 403',
+      origin: 'refusal',
+      step: 'read enhancements',
+      status: 403,
+      raw_body: DOCUMENT,
+    });
   });
 
   it('no include refused: no includes_unread', async () => {
     fakeClient = walk();
     const body = payloadOf(await run());
-    expect(body.includes_unread).toBeUndefined();
-    expect(body.total_objects_analyzed).toBe(3);
+    assert.equal(body.includes_unread, undefined);
+    assert.equal(body.total_objects_analyzed, 3);
   });
 
   it('a 401 on an include ends the call as it came', async () => {
     fakeClient = walk({ name: 'ZINC1', status: 401 });
     const result = await run();
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const body = payloadOf(result);
-    expect(body.status).toBe(401);
-    expect(body.includes_unread).toBeUndefined();
-    expect(body.partial_result).toBeUndefined();
+    assert.equal(body.status, 401);
+    assert.equal(body.includes_unread, undefined);
+    assert.equal(body.partial_result, undefined);
   });
 });
 
@@ -465,8 +481,8 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
         concurrency: 1,
       },
     );
-    await expect(run).rejects.toBe(failure);
-    expect(read).toEqual(['ZA', 'ZB']);
+    assert.equal(await rejectionOf(run), failure);
+    assert.deepStrictEqual(read, ['ZA', 'ZB']);
   });
 
   it('SearchSource: a 401 SAP answered ends it too', async () => {
@@ -494,7 +510,7 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
       },
       { query: 'marker', packages: ['ZPKG'], object_types: ['PROG'] },
     );
-    await expect(run).rejects.toBe(unauthorized);
+    assert.equal(await rejectionOf(run), unauthorized);
   });
 
   // The sequential versions, one request after another: a destination known
@@ -520,10 +536,10 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
         { name: 'ZCL_Y', type: 'CLAS/OC' },
       ],
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({ error: 'authentication_failed' });
-    expect(payloadOf(result).step).toBeUndefined();
-    expect(new Set(searched)).toEqual(new Set(['ZCL_X']));
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), { error: 'authentication_failed' });
+    assert.equal(payloadOf(result).step, undefined);
+    assert.deepStrictEqual(new Set(searched), new Set(['ZCL_X']));
   });
 });
 
@@ -567,9 +583,9 @@ describe('GetStructuresList: an append candidate SAP refused to read is listed',
     const result: any = await handleGetStructuresList(context as any, {
       structure_name: 'ZS',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const answer = JSON.parse(result.content[0].text);
-    expect(answer.append_candidates_unread).toEqual([
+    assert.deepStrictEqual(answer.append_candidates_unread, [
       {
         candidate: 'ZREFUSED',
         step: 'read append candidate',
@@ -579,7 +595,10 @@ describe('GetStructuresList: an append candidate SAP refused to read is listed',
         ],
       },
     ]);
-    expect(answer.tree.children.map((c: any) => c.structure)).toEqual(['ZAPP']);
+    assert.deepStrictEqual(
+      answer.tree.children.map((c: any) => c.structure),
+      ['ZAPP'],
+    );
   });
 
   it('lists nothing when every candidate is absent', async () => {
@@ -587,9 +606,10 @@ describe('GetStructuresList: an append candidate SAP refused to read is listed',
     const result: any = await handleGetStructuresList(context as any, {
       structure_name: 'ZS',
     });
-    expect(
+    assert.equal(
       JSON.parse(result.content[0].text).append_candidates_unread,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 });
 
@@ -641,10 +661,13 @@ describe('SearchSource: a refused object is skipped, the scan goes on (DO17)', (
       },
     );
     // One pump: ZC was read after ZB's refusal.
-    expect(read).toEqual(['ZA', 'ZB', 'ZC']);
-    expect(result.results.map((h) => h.object_name)).toEqual(['ZA', 'ZC']);
-    expect(Object.keys(result)).not.toContain('failures');
-    expect(result.scanned.objects).toBe(2);
+    assert.deepStrictEqual(read, ['ZA', 'ZB', 'ZC']);
+    assert.deepStrictEqual(
+      result.results.map((h) => h.object_name),
+      ['ZA', 'ZC'],
+    );
+    assert.ok(!Object.keys(result).includes('failures'));
+    assert.equal(result.scanned.objects, 2);
   });
 
   it("a function group include and module are read through adt-clients at the call's version, a refusal answered with SAP's error", async () => {
@@ -661,9 +684,9 @@ describe('SearchSource: a refused object is skipped, the scan goes on (DO17)', (
       name: 'LZFGU01',
       version: 'inactive',
     });
-    expect(include.ok).toBe(false);
+    assert.equal(include.ok, false);
     if (!include.ok) {
-      expect(include.error).toMatchObject({ message: 'No authorization' });
+      assertMatchObject(include.error, { message: 'No authorization' });
     }
     const module = await deps.readSource({
       reader: 'functionModule',
@@ -671,8 +694,8 @@ describe('SearchSource: a refused object is skipped, the scan goes on (DO17)', (
       name: 'Z_FM',
       version: 'inactive',
     });
-    expect(module.ok).toBe(false);
-    expect(calls).toEqual([
+    assert.equal(module.ok, false);
+    assert.deepStrictEqual(calls, [
       { config: { includeName: 'LZFGU01' }, version: 'inactive' },
       {
         config: { functionGroupName: 'ZFG', functionModuleName: 'Z_FM' },
@@ -690,8 +713,8 @@ describe('SearchSource: a refused object is skipped, the scan goes on (DO17)', (
       name: 'Z_FM',
       version: 'active',
     });
-    expect(answer.ok).toBe(false);
-    if (!answer.ok) expect(answer.error.response?.status).toBe(404);
+    assert.equal(answer.ok, false);
+    if (!answer.ok) assert.equal(answer.error.response?.status, 404);
   });
 });
 
@@ -712,9 +735,9 @@ describe('an activation run whose reading was refused', () => {
       analyseException,
       [],
     );
-    expect(outcome.messages).toEqual([]);
-    expect(outcome.status).toBe('');
-    expect(outcome.failure).toEqual({
+    assert.deepStrictEqual(outcome.messages, []);
+    assert.equal(outcome.status, '');
+    assert.deepStrictEqual(outcome.failure, {
       message: 'No authorization',
       origin: 'refusal',
       adtType: 'ExceptionResourceNoAuthorization',
@@ -737,8 +760,11 @@ describe('an activation run whose reading was refused', () => {
         ],
       } as any,
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual(expectedPayload('read activation run'));
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(
+      payloadOf(result),
+      expectedPayload('read activation run'),
+    );
   });
 
   it('a refused results read names its own step', async () => {
@@ -756,8 +782,9 @@ describe('an activation run whose reading was refused', () => {
       analyseException,
       [],
     );
-    expect(outcome.messages).toEqual([]);
-    expect((outcome.failure as { step?: string }).step).toBe(
+    assert.deepStrictEqual(outcome.messages, []);
+    assert.equal(
+      (outcome.failure as { step?: string }).step,
       'read activation results',
     );
   });
@@ -787,11 +814,11 @@ describe('GetEnhancements: a probe that SAP refused is not replaced by words', (
       readMetadata: async () => refused(403, 'No authorization'),
     });
     const result = await run({ object_name: 'ZINC', object_type: 'include' });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual({
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(payloadOf(result), {
       failures: [expectedPayload('read include metadata')],
     });
-    expect(result.content[0].text).not.toContain('could not be read');
+    assert.ok(!result.content[0].text.includes('could not be read'));
   });
 
   it('an include SAP refused (401): the call ends as it came', async () => {
@@ -799,12 +826,12 @@ describe('GetEnhancements: a probe that SAP refused is not replaced by words', (
       readMetadata: async () => refused(401, 'Unauthorized'),
     });
     const result = await run({ object_name: 'ZINC', object_type: 'include' });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const body = payloadOf(result);
-    expect(body.status).toBe(401);
-    expect(body.message).toBe('Unauthorized');
-    expect(body.step).toBe('read include metadata');
-    expect(body.failures).toBeUndefined();
+    assert.equal(body.status, 401);
+    assert.equal(body.message, 'Unauthorized');
+    assert.equal(body.step, 'read include metadata');
+    assert.equal(body.failures, undefined);
   });
 
   it('an unknown type: every refused probe is listed, each with its step', async () => {
@@ -812,15 +839,15 @@ describe('GetEnhancements: a probe that SAP refused is not replaced by words', (
       readMetadata: async () => forbidden(),
     });
     const result = await run({ object_name: 'ZX', object_type: 'unknown' });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual({
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(payloadOf(result), {
       failures: [
         expectedPayload('read class metadata'),
         expectedPayload('read program metadata'),
         expectedPayload('read include metadata'),
       ],
     });
-    expect(result.content[0].text).not.toContain('Could not determine');
+    assert.ok(!result.content[0].text.includes('Could not determine'));
   });
 
   it('an unknown type: a credential failure at the first probe ends the call, no further probe', async () => {
@@ -835,25 +862,29 @@ describe('GetEnhancements: a probe that SAP refused is not replaced by words', (
       },
     });
     const result = await run({ object_name: 'ZX', object_type: 'unknown' });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(probed.length).toBe(1);
+    assert.equal(result.isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(probed.length, 1);
   });
 
   it('an unknown type that is absent (404 on every probe) keeps its words', async () => {
     fakeClient = fakeClientOf({ readMetadata: async () => notThere() });
     const result = await run({ object_name: 'ZX', object_type: 'unknown' });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(
-      'Could not determine object type for: ZX',
+    assert.equal(result.isError, true);
+    assert.ok(
+      result.content[0].text.includes(
+        'Could not determine object type for: ZX',
+      ),
     );
   });
 
   it('an include that is absent (404) keeps its words', async () => {
     fakeClient = fakeClientOf({ readMetadata: async () => notThere() });
     const result = await run({ object_name: 'ZINC', object_type: 'include' });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Include ZINC could not be read.');
+    assert.equal(result.isError, true);
+    assert.ok(
+      result.content[0].text.includes('Include ZINC could not be read.'),
+    );
   });
 });
 
@@ -884,13 +915,13 @@ describe('GetStructuresList: a credential failure ends the whole call', () => {
       structure_name: 'ZS',
       include_extensions: false,
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), {
       status: 401,
       message: 'Unauthorized',
       step: 'read structure',
     });
-    expect(read).toEqual(['ZS', 'ZINC1']);
+    assert.deepStrictEqual(read, ['ZS', 'ZINC1']);
   });
 
   it('a thrown credential failure on an embedded structure ends it too', async () => {
@@ -909,9 +940,9 @@ describe('GetStructuresList: a credential failure ends the whole call', () => {
       structure_name: 'ZS',
       include_extensions: false,
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(read).toEqual(['ZS', 'ZINC1']);
+    assert.equal(result.isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.deepStrictEqual(read, ['ZS', 'ZINC1']);
   });
 
   it('a 403 on an embedded structure stays that node, the walk goes on', async () => {
@@ -926,7 +957,7 @@ describe('GetStructuresList: a credential failure ends the whole call', () => {
       structure_name: 'ZS',
       include_extensions: false,
     });
-    expect(result.isError).toBe(false);
-    expect(read).toEqual(['ZS', 'ZINC1', 'ZINC1', 'ZINC2', 'ZINC2']);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(read, ['ZS', 'ZINC1', 'ZINC1', 'ZINC2', 'ZINC2']);
   });
 });

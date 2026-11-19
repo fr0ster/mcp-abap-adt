@@ -636,6 +636,7 @@ order ([Release](docs/deployment/RELEASE.md)):
 ```bash
 npm run release:dry        # rehearses every package, touches nothing
 npm run release:publish    # @mcp-abap-adt/lib first, then the packages that depend on it
+npm run release:verify     # the published release: registry, clean install, every bin's --version
 ```
 
 `release:publish` skips a version already on the registry, so re-running after

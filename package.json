@@ -172,6 +172,7 @@
     "docs:tools": "npm run build && node ./tools/generate-tools-docs.js",
     "release:publish": "bash scripts/publish-all.sh",
     "release:dry": "bash scripts/publish-all.sh --dry-run",
+    "release:verify": "node scripts/verify-registry.mjs",
     "prepublishOnly": "npm run build",
     "portable:build": "node scripts/portable/build.mjs all",
     "portable:build:full": "node scripts/portable/build.mjs full",

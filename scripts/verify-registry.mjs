@@ -1,0 +1,326 @@
+#!/usr/bin/env node
+// Checks a release as it is published on the npm registry (npm run
+// release:verify): the post-publish step of docs/deployment/RELEASE.md.
+//
+//   npm run release:verify                 the root package.json's version
+//   npm run release:verify -- <version>    another one, e.g. 24.0.1
+//
+// 1. Every package of the release — the eighteen of scripts/publish-all.sh's
+//    PACKAGES list, read from there — answers `npm view <name>@<version>
+//    version` with the version. When any does not, the script says "not
+//    visible yet", with the count, and exits 2: the registry can lag a few
+//    minutes behind a publish, and the caller runs the script again. There is
+//    no waiting loop or timer here.
+// 2. All of them are installed together into a fresh directory outside the
+//    repository (`npm install --ignore-scripts`), from the registry alone.
+//    Every npm call (`view` too) runs from that directory with it as
+//    `--prefix`, so no project or parent workspace `.npmrc` applies; with an
+//    empty file each as `--userconfig` and `--globalconfig`, so no user or
+//    global setting is read (a mirror, a scoped `@scope:registry`,
+//    `offline`); and with
+//    `--registry=https://registry.npmjs.org/ --offline=false --prefer-online`;
+//    `npm view` adds `--json=false`, so its answer is the bare version.
+// 3. The installed lockfile holds no `"link": true`, and every package in it
+//    is resolved from https://registry.npmjs.org/. The installed versions of
+//    adt-clients, adt-strategies and connection are reported.
+// 4. Every bin each package declares (its installed package.json's `bin`)
+//    runs as `node <bin> --version` — no shell, no node_modules/.bin, no npx —
+//    and answers exactly the version (stdout and stderr together, so a
+//    `Two copies of @mcp-abap-adt/lib` line fails it).
+//
+// Exit 0 only when all of it holds, with one summary line; 1 on a failure; 2
+// when the release is not visible on the registry yet. The directory is
+// removed at the end. npm is started as the portable build starts it
+// (scripts/portable/tools.cjs, `npmCommand`: node and npm-cli.js, no shell),
+// and without the npm_* settings `npm run` hands this script.
+import { execFile } from 'node:child_process';
+import * as fs from 'node:fs';
+import { createRequire } from 'node:module';
+import * as os from 'node:os';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { promisify } from 'node:util';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const repo = path.resolve(here, '..');
+const require_ = createRequire(import.meta.url);
+const { npmCommand } = require_('./portable/tools.cjs');
+const { withoutNpmSettings } = require_('./portable/readings.cjs');
+// Taken before the npm_* variables are dropped.
+const npm = npmCommand();
+const env = withoutNpmSettings(process.env);
+const run = promisify(execFile);
+
+const REGISTRY = 'https://registry.npmjs.org/';
+const REPORTED = [
+  '@mcp-abap-adt/adt-clients',
+  '@mcp-abap-adt/adt-strategies',
+  '@mcp-abap-adt/connection',
+];
+
+function fail(lines, code = 1) {
+  for (const line of lines) console.error(`release:verify: ${line}`);
+  process.exit(code);
+}
+
+// The directories of scripts/publish-all.sh's `PACKAGES=( … )`, one quoted
+// entry per line, in publish order.
+function releaseDirs() {
+  const lines = fs
+    .readFileSync(path.join(repo, 'scripts', 'publish-all.sh'), 'utf8')
+    .split('\n')
+    .map((line) => line.trim());
+  const start = lines.indexOf('PACKAGES=(');
+  const end = lines.indexOf(')', start);
+  if (start === -1 || end === -1) {
+    fail(['scripts/publish-all.sh holds no PACKAGES=( … ) list']);
+  }
+  const dirs = [];
+  for (const line of lines.slice(start + 1, end)) {
+    if (line === '') continue;
+    if (!line.startsWith('"') || !line.endsWith('"') || line.length < 3) {
+      fail([`scripts/publish-all.sh: an unreadable PACKAGES entry: ${line}`]);
+    }
+    const dir = line.slice(1, -1);
+    dirs.push(dir.startsWith('./') ? dir.slice(2) : dir);
+  }
+  return dirs;
+}
+
+const manifest = (dir) =>
+  JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'));
+
+// The settings every npm call states, so no configuration of the user's is
+// read: an empty file each as the user and the global configuration (npm
+// refuses one file for both) (no
+// `registry`, scoped `@scope:registry`, `offline`, …), the registry itself,
+// and online. The calls run from the temporary directory, outside the
+// repository, with it as `--prefix`, so npm walks up into no parent project
+// or workspace and no project `.npmrc` applies either.
+const isolated = (work) => [
+  `--prefix=${work}`,
+  `--userconfig=${path.join(work, 'user.npmrc')}`,
+  `--globalconfig=${path.join(work, 'global.npmrc')}`,
+  `--registry=${REGISTRY}`,
+  '--offline=false',
+  '--prefer-online',
+];
+
+// `npm <command> <isolated settings> <args>` from `work`: its exit status and
+// output, never a throw.
+async function npmRun(work, command, args) {
+  try {
+    const all = [...npm.args, command, ...isolated(work), ...args];
+    const { stdout, stderr } = await run(npm.cmd, all, {
+      cwd: work,
+      env,
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+    return { status: 0, stdout, stderr };
+  } catch (error) {
+    return {
+      status: typeof error.code === 'number' ? error.code : 1,
+      stdout: typeof error.stdout === 'string' ? error.stdout : '',
+      stderr: typeof error.stderr === 'string' ? error.stderr : String(error),
+    };
+  }
+}
+
+// Each name whose `<name>@<version>` the registry does not answer yet, and
+// the failures that are not npm's E404 (they stop the run).
+async function notVisible(work, names, version) {
+  const answers = await Promise.all(
+    names.map(async (name) => ({
+      name,
+      answer: await npmRun(work, 'view', [
+        '--json=false',
+        `${name}@${version}`,
+        'version',
+      ]),
+    })),
+  );
+  const missing = [];
+  const failed = [];
+  for (const { name, answer } of answers) {
+    if (answer.status === 0 && answer.stdout.trim() === version) continue;
+    if (answer.status === 0 || answer.stderr.includes('E404')) {
+      missing.push(name);
+      continue;
+    }
+    failed.push(
+      `npm view ${name}@${version} failed (exit ${answer.status}):`,
+      answer.stderr.trim(),
+    );
+  }
+  return { missing, failed };
+}
+
+// What the installed lockfile says against a registry-only install, and the
+// versions of the reported packages.
+function readLockfile(file) {
+  const lock = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const findings = [];
+  const versions = new Map(REPORTED.map((name) => [name, new Set()]));
+  for (const [key, entry] of Object.entries(lock.packages ?? {})) {
+    if (key === '') continue;
+    // A bundled package comes inside its parent's tarball and may state no
+    // `resolved`; one it states is checked like any other.
+    if (entry.link === true) findings.push(`${key}: "link": true`);
+    else if (typeof entry.resolved !== 'string') {
+      if (entry.inBundle !== true) findings.push(`${key}: no "resolved"`);
+    } else if (!entry.resolved.startsWith(REGISTRY)) {
+      findings.push(`${key}: resolved from ${entry.resolved}`);
+    }
+    for (const name of REPORTED) {
+      if (
+        key === `node_modules/${name}` ||
+        key.endsWith(`/node_modules/${name}`)
+      )
+        versions.get(name).add(entry.version);
+    }
+  }
+  for (const [name, found] of versions) {
+    if (found.size === 0) findings.push(`${name}: not installed`);
+  }
+  return { findings, versions };
+}
+
+// Whether `dir` lies inside `root`: a relative path from `root` that is not
+// empty, not absolute, and whose first segment is not `..` (a segment, so a
+// directory named `..scratch` is inside).
+function inside(root, dir) {
+  const relative = path.relative(root, dir);
+  return (
+    relative !== '' &&
+    !path.isAbsolute(relative) &&
+    relative.split(path.sep)[0] !== '..'
+  );
+}
+
+// Every bin an installed package declares: [bin name, absolute path].
+function binsOf(packageDir, name) {
+  const { bin } = manifest(packageDir);
+  if (bin === undefined) return [];
+  if (typeof bin === 'string') {
+    return [
+      [name.slice(name.lastIndexOf('/') + 1), path.join(packageDir, bin)],
+    ];
+  }
+  return Object.entries(bin).map(([binName, file]) => [
+    binName,
+    path.join(packageDir, file),
+  ]);
+}
+
+const args = process.argv.slice(2);
+if (args.length > 1) fail(['usage: npm run release:verify [-- <version>]']);
+const version = args[0] ?? manifest(repo).version;
+if (version === '' || version[0] < '0' || version[0] > '9') {
+  fail([`not a version: ${version}`]);
+}
+
+const names = releaseDirs().map((dir) => manifest(path.join(repo, dir)).name);
+
+// Created before the `try`, and nothing between: whatever fails after it,
+// the `finally` removes it.
+const created = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-abap-adt-verify-'));
+const failures = [];
+let missing = [];
+let summary = '';
+try {
+  const work = fs.realpathSync(created);
+  if (inside(fs.realpathSync(repo), work)) {
+    throw new Error(`the temporary directory ${work} is inside the repository`);
+  }
+  fs.writeFileSync(path.join(work, 'user.npmrc'), '');
+  fs.writeFileSync(path.join(work, 'global.npmrc'), '');
+  fs.writeFileSync(path.join(work, 'package.json'), '{"private":true}\n');
+  const view = await notVisible(work, names, version);
+  missing = view.missing;
+  failures.push(...view.failed);
+  if (failures.length > 0 || missing.length > 0) {
+    // Nothing installed: the registry first.
+  } else {
+    console.log(
+      `release:verify: all ${names.length} packages at ${version} are on the registry`,
+    );
+    await verifyInstalled(work);
+  }
+} catch (error) {
+  failures.push(String(error));
+} finally {
+  fs.rmSync(created, { recursive: true, force: true });
+}
+
+if (failures.length > 0) fail(['FAILED:', ...failures.map((f) => `  ${f}`)]);
+if (missing.length > 0) {
+  fail(
+    [
+      `not visible yet: ${missing.length} of ${names.length} packages at ${version}; run it again in a few minutes`,
+      ...missing.map((name) => `  ${name}@${version}`),
+    ],
+    2,
+  );
+}
+console.log(summary);
+
+// The clean install from the registry, its lockfile and every bin.
+async function verifyInstalled(work) {
+  const install = await npmRun(work, 'install', [
+    '--ignore-scripts',
+    '--no-audit',
+    '--no-fund',
+    ...names.map((name) => `${name}@${version}`),
+  ]);
+  if (install.status !== 0) {
+    failures.push(
+      `npm install failed (exit ${install.status}):`,
+      install.stderr.trim(),
+    );
+  } else {
+    const { findings, versions } = readLockfile(
+      path.join(work, 'package-lock.json'),
+    );
+    failures.push(...findings);
+    const reported = [...versions]
+      .map(
+        ([name, found]) =>
+          `${name.slice('@mcp-abap-adt/'.length)} ${[...found].join(', ')}`,
+      )
+      .join(', ');
+    console.log(`release:verify: installed ${reported}`);
+
+    let binCount = 0;
+    for (const name of names) {
+      const dir = path.join(work, 'node_modules', ...name.split('/'));
+      const installed = manifest(dir).version;
+      if (installed !== version) {
+        failures.push(`${name}: installed ${installed}, not ${version}`);
+      }
+      for (const [binName, file] of binsOf(dir, name)) {
+        binCount += 1;
+        let said;
+        try {
+          const { stdout, stderr } = await run(
+            process.execPath,
+            [file, '--version'],
+            { cwd: work, env, encoding: 'utf8' },
+          );
+          said = `${stdout}${stderr}`.trim();
+        } catch (error) {
+          said = `exit ${error.code}: ${`${error.stdout ?? ''}${error.stderr ?? ''}`.trim()}`;
+        }
+        if (said === version)
+          console.log(`release:verify: ${binName} --version: ${said}`);
+        else
+          failures.push(
+            `${binName} --version answered "${said}", not ${version}`,
+          );
+      }
+    }
+    if (binCount === 0)
+      failures.push('no package of the release declares a bin');
+    summary = `OK: ${names.length} packages at ${version} installed from the registry, lockfile registry-only, ${binCount} bins answer ${version} (${reported})`;
+  }
+}

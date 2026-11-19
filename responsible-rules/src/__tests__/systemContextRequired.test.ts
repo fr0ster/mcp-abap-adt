@@ -17,11 +17,11 @@
  * Master system: the system's `systemID`, else (on-premise `404`) its own
  * variable; otherwise it is left out of the request — never refused.
  */
-jest.mock('../../../src/lib/systemInformation', () => ({
-  ...jest.requireActual('../../../src/lib/systemInformation'),
-  readSystemInformation: jest.fn(),
-}));
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
+import { assertMatchObject } from '../../../src/__tests__/helpers/assertions';
 import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../../src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
@@ -42,10 +42,23 @@ import {
   systemContextFromConfiguration,
 } from '../../../src/lib/systemContext';
 import { MISSING_RESPONSIBLE } from '../../../src/lib/systemContextGuard';
-import { readSystemInformation } from '../../../src/lib/systemInformation';
+import * as systemInformation from '../../../src/lib/systemInformation';
 import { EmbeddableMcpServer } from './helpers/withRules';
 
-const lookup = readSystemInformation as jest.Mock;
+/**
+ * readSystemInformation replaced on the module that defines it (its callers
+ * read it at call time), a fresh mock before each case and restored after
+ * it, as Jest's mockReset left it: answering undefined until a case says
+ * otherwise, with no implementation left over from an earlier case.
+ */
+function stubLookup() {
+  return mock.method(
+    systemInformation,
+    'readSystemInformation',
+    () => undefined,
+  );
+}
+let lookup: ReturnType<typeof stubLookup>;
 
 const KEYS = [
   'SAP_MASTER_SYSTEM',
@@ -61,9 +74,10 @@ beforeEach(() => {
     delete process.env[key];
   }
   resetSystemContextCache();
-  lookup.mockReset();
+  lookup = stubLookup();
 });
 afterEach(() => {
+  lookup.mock.restore();
   for (const key of KEYS) {
     if (saved[key] === undefined) delete process.env[key];
     else process.env[key] = saved[key];
@@ -133,10 +147,10 @@ describe('cloud', () => {
     )._registeredTools;
 
   it('nothing stated: both from systeminformation, and the create carries them', async () => {
-    lookup.mockResolvedValue({
+    lookup.mock.mockImplementation(async () => ({
       user: 'CB_USER',
       systemId: 'CLD',
-    });
+    }));
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -144,19 +158,19 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(lookup).toHaveBeenCalledTimes(1);
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(createBody(connection)).toContain('adtcore:masterSystem="CLD"');
-    expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
+    assert.equal(lookup.mock.callCount(), 1);
+    assert.ok(!textOf(result).includes(MISSING_RESPONSIBLE));
+    assert.ok(createBody(connection).includes('adtcore:masterSystem="CLD"'));
+    assert.ok(createBody(connection).includes('adtcore:responsible="CB_USER"'));
   });
 
   it('the process SAP_USERNAME is not a cloud login: systeminformation is the responsible', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
-    lookup.mockResolvedValue({
+    lookup.mock.mockImplementation(async () => ({
       user: 'CB_USER',
       systemId: 'CLD',
-    });
+    }));
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -164,15 +178,15 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(lookup).toHaveBeenCalledTimes(1);
-    expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
+    assert.equal(lookup.mock.callCount(), 1);
+    assert.ok(createBody(connection).includes('adtcore:responsible="CB_USER"'));
   });
 
   it('a scope login is not a cloud login either; the system user wins over a stated SAP_RESPONSIBLE', async () => {
-    lookup.mockResolvedValue({
+    lookup.mock.mockImplementation(async () => ({
       user: 'CB_USER',
       systemId: 'CLD',
-    });
+    }));
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -182,7 +196,7 @@ describe('cloud', () => {
     await runWithRequestContext({ login: 'SCOPE_LOGIN' }, () =>
       toolsOf(server).CreateMessageClass.handler(MSAG_ARGS),
     );
-    expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
+    assert.ok(createBody(connection).includes('adtcore:responsible="CB_USER"'));
 
     process.env.SAP_RESPONSIBLE = 'STATED_USER';
     systemContextFromConfiguration();
@@ -193,16 +207,16 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     await toolsOf(statedServer).CreateMessageClass.handler(MSAG_ARGS);
-    expect(createBody(stated)).toContain('adtcore:responsible="CB_USER"');
+    assert.ok(createBody(stated).includes('adtcore:responsible="CB_USER"'));
   });
 
   it('a cloud system that answers no user: one step to the error — the process login does not stand in, the call is refused system_lookup_failed, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
-    lookup.mockResolvedValue({
+    lookup.mock.mockImplementation(async () => ({
       user: undefined,
       systemId: 'CLD',
-    });
+    }));
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -210,65 +224,75 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(JSON.parse(textOf(result))).toMatchObject({
+    assertMatchObject(JSON.parse(textOf(result)), {
       error: 'system_lookup_failed',
     });
-    expect(textOf(result)).not.toContain('PROCESS_LOGIN');
-    expect(connection.requests).toEqual([]);
+    assert.ok(!textOf(result).includes('PROCESS_LOGIN'));
+    assert.deepStrictEqual(connection.requests, []);
   });
 
-  it.each([
+  for (const [systemType, answered] of [
     ['cloud', true],
     ['onprem', true],
     ['onprem', false],
-  ] as const)(
-    'a host scope carrying both keys as undefined (%s, answered %s): the system fills both; on-premise without the function it is refused',
-    async (systemType, answered) => {
-      const filled = answered;
-      if (answered) {
-        lookup.mockResolvedValue({
-          user: 'CB_USER',
-          systemId: 'CLD',
-        });
-      } else {
-        lookup.mockRejectedValue(
-          Object.assign(new Error('placeholder'), {
-            response: { status: 404 },
-          }),
-        );
-      }
-      const connection = recordingConnection();
-      const server = new EmbeddableMcpServer({
-        connection: connection as never,
-        handlersRegistry: registry,
+  ] as const) {
+    it(
+      format(
+        'a host scope carrying both keys as undefined (%s, answered %s): the system fills both; on-premise without the function it is refused',
         systemType,
-      });
-      const result = await runWithRequestContext(
-        { responsible: undefined, masterSystem: undefined },
-        () => toolsOf(server).CreateMessageClass.handler(MSAG_ARGS),
-      );
-      if (filled) {
-        expect(lookup).toHaveBeenCalledTimes(1);
-        expect(createBody(connection)).toContain('adtcore:masterSystem="CLD"');
-        expect(createBody(connection)).toContain(
-          'adtcore:responsible="CB_USER"',
+        answered,
+      ),
+      async () => {
+        const filled = answered;
+        if (answered) {
+          lookup.mock.mockImplementation(async () => ({
+            user: 'CB_USER',
+            systemId: 'CLD',
+          }));
+        } else {
+          lookup.mock.mockImplementation(async () => {
+            throw Object.assign(new Error('placeholder'), {
+              response: { status: 404 },
+            });
+          });
+        }
+        const connection = recordingConnection();
+        const server = new EmbeddableMcpServer({
+          connection: connection as never,
+          handlersRegistry: registry,
+          systemType,
+        });
+        const result = await runWithRequestContext(
+          { responsible: undefined, masterSystem: undefined },
+          () => toolsOf(server).CreateMessageClass.handler(MSAG_ARGS),
         );
-      } else {
-        // No user stated (no login in the scope, none in the connection):
-        // refused before the tool.
-        expect(lookup).toHaveBeenCalledTimes(1);
-        expect(textOf(result)).toContain('system_user_unknown');
-        expect(connection.requests).toEqual([]);
-      }
-    },
-  );
+        if (filled) {
+          assert.equal(lookup.mock.callCount(), 1);
+          assert.ok(
+            createBody(connection).includes('adtcore:masterSystem="CLD"'),
+          );
+          assert.ok(
+            createBody(connection).includes('adtcore:responsible="CB_USER"'),
+          );
+        } else {
+          // No user stated (no login in the scope, none in the connection):
+          // refused before the tool.
+          assert.equal(lookup.mock.callCount(), 1);
+          assert.ok(textOf(result).includes('system_user_unknown'));
+          assert.deepStrictEqual(connection.requests, []);
+        }
+      },
+    );
+  }
 
   it('a cloud 500: system_lookup_failed — the process login does not stand in, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 500 } }),
-    );
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 500 },
+      });
+    });
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -276,17 +300,19 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(JSON.parse(textOf(result))).toEqual({
+    assert.deepStrictEqual(JSON.parse(textOf(result)), {
       error: 'system_lookup_failed',
       message: SYSTEM_LOOKUP_FAILED_WORDS,
     });
-    expect(connection.requests).toEqual([]);
+    assert.deepStrictEqual(connection.requests, []);
   });
 
   it('a lookup that fails: the connect fails in fixed words (system_lookup_failed), not as SAP_RESPONSIBLE missing; nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
-    lookup.mockRejectedValue(new Error('placeholder failure'));
+    lookup.mock.mockImplementation(async () => {
+      throw new Error('placeholder failure');
+    });
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -296,23 +322,25 @@ describe('cloud', () => {
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
     // The lookup is part of the connect: its failure fails the
     // call before any tool proceeds, in fixed words.
-    expect(textOf(result)).toContain(SYSTEM_LOOKUP_FAILED_WORDS);
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(textOf(result)).not.toContain('placeholder failure');
-    expect(textOf(result)).not.toContain('SAP_RESPONSIBLE');
-    expect(textOf(result)).not.toContain('x-sap-responsible');
-    expect(JSON.parse(textOf(result))).toMatchObject({
+    assert.ok(textOf(result).includes(SYSTEM_LOOKUP_FAILED_WORDS));
+    assert.ok(!textOf(result).includes(MISSING_RESPONSIBLE));
+    assert.ok(!textOf(result).includes('placeholder failure'));
+    assert.ok(!textOf(result).includes('SAP_RESPONSIBLE'));
+    assert.ok(!textOf(result).includes('x-sap-responsible'));
+    assertMatchObject(JSON.parse(textOf(result)), {
       error: 'system_lookup_failed',
     });
-    expect(connection.requests).toEqual([]);
+    assert.deepStrictEqual(connection.requests, []);
   });
 
   it('a cloud system without the endpoint (404): the configuration is inconsistent, cloud_without_systeminformation — the process login does not stand in, nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+    });
     const connection = recordingConnection();
     const server = new EmbeddableMcpServer({
       connection: connection as never,
@@ -320,13 +348,13 @@ describe('cloud', () => {
       systemType: 'cloud',
     });
     const result = await toolsOf(server).CreateMessageClass.handler(MSAG_ARGS);
-    expect(JSON.parse(textOf(result))).toEqual({
+    assert.deepStrictEqual(JSON.parse(textOf(result)), {
       error: 'cloud_without_systeminformation',
       message:
         'the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration or the headers are inconsistent; the tool did not run',
     });
-    expect(textOf(result)).not.toContain('PROCESS_LOGIN');
-    expect(connection.requests).toEqual([]);
+    assert.ok(!textOf(result).includes('PROCESS_LOGIN'));
+    assert.deepStrictEqual(connection.requests, []);
   });
 });
 
@@ -378,21 +406,26 @@ describe('on-premise, through the server', () => {
   });
 
   it('the system names its user: it wins over SAP_RESPONSIBLE, SAP_MASTER_SYSTEM and the login', async () => {
-    lookup.mockResolvedValue({ user: 'OP_USER', systemId: 'OPS' });
+    lookup.mock.mockImplementation(async () => ({
+      user: 'OP_USER',
+      systemId: 'OPS',
+    }));
     const { connection } = await create();
-    expect(lookup).toHaveBeenCalledTimes(1);
-    expect(createBody(connection)).toContain('adtcore:responsible="OP_USER"');
-    expect(createBody(connection)).toContain('adtcore:masterSystem="OPS"');
+    assert.equal(lookup.mock.callCount(), 1);
+    assert.ok(createBody(connection).includes('adtcore:responsible="OP_USER"'));
+    assert.ok(createBody(connection).includes('adtcore:masterSystem="OPS"'));
   });
 
   it('without the function (404): the configured responsible and master system', async () => {
-    lookup.mockRejectedValue(status(404));
+    lookup.mock.mockImplementation(async () => {
+      throw status(404);
+    });
     const { connection } = await create();
-    expect(createBody(connection)).toContain(
-      'adtcore:responsible="STATED_USER"',
+    assert.ok(
+      createBody(connection).includes('adtcore:responsible="STATED_USER"'),
     );
-    expect(createBody(connection)).toContain(
-      'adtcore:masterSystem="STATED_SYSTEM"',
+    assert.ok(
+      createBody(connection).includes('adtcore:masterSystem="STATED_SYSTEM"'),
     );
   });
 
@@ -400,21 +433,27 @@ describe('on-premise, through the server', () => {
     delete process.env.SAP_RESPONSIBLE;
     resetSystemContextCache();
     systemContextFromConfiguration();
-    lookup.mockRejectedValue(status(404));
+    lookup.mock.mockImplementation(async () => {
+      throw status(404);
+    });
     const { connection } = await create();
-    expect(createBody(connection)).toContain(
-      'adtcore:responsible="LOGIN_PLACEHOLDER"',
+    assert.ok(
+      createBody(connection).includes(
+        'adtcore:responsible="LOGIN_PLACEHOLDER"',
+      ),
     );
   });
 
   it('without the function (404) and only a responsible (no login): the responsible and the master system', async () => {
-    lookup.mockRejectedValue(status(404));
+    lookup.mock.mockImplementation(async () => {
+      throw status(404);
+    });
     const { connection } = await create({});
-    expect(createBody(connection)).toContain(
-      'adtcore:responsible="STATED_USER"',
+    assert.ok(
+      createBody(connection).includes('adtcore:responsible="STATED_USER"'),
     );
-    expect(createBody(connection)).toContain(
-      'adtcore:masterSystem="STATED_SYSTEM"',
+    assert.ok(
+      createBody(connection).includes('adtcore:masterSystem="STATED_SYSTEM"'),
     );
   });
 
@@ -422,52 +461,85 @@ describe('on-premise, through the server', () => {
     delete process.env.SAP_RESPONSIBLE;
     resetSystemContextCache();
     systemContextFromConfiguration();
-    lookup.mockRejectedValue(status(404));
+    lookup.mock.mockImplementation(async () => {
+      throw status(404);
+    });
     const first = await create({});
-    expect(textOf(first.result)).toContain('system_user_unknown');
-    expect(first.connection.requests).toEqual([]);
-    expect(lookup).toHaveBeenCalledTimes(1);
+    assert.ok(textOf(first.result).includes('system_user_unknown'));
+    assert.deepStrictEqual(first.connection.requests, []);
+    assert.equal(lookup.mock.callCount(), 1);
   });
 
-  it.each([
+  for (const [_case, answer] of [
     [
       'an answer without a user',
-      () => lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' }),
+      () =>
+        lookup.mock.mockImplementation(async () => ({
+          user: undefined,
+          systemId: 'OPS',
+        })),
     ],
-    ['a lookup answered 500', () => lookup.mockRejectedValue(status(500))],
-  ] as const)(
-    '%s: the configured responsible and master system',
-    async (_case, answer) => {
-      answer();
-      const first = await create();
-      expect(createBody(first.connection)).toContain(
-        'adtcore:responsible="STATED_USER"',
-      );
-      expect(createBody(first.connection)).toContain(
-        'adtcore:masterSystem="STATED_SYSTEM"',
-      );
-      expect(lookup).toHaveBeenCalledTimes(1);
-    },
-  );
+    [
+      'a lookup answered 500',
+      () =>
+        lookup.mock.mockImplementation(async () => {
+          throw status(500);
+        }),
+    ],
+  ] as const) {
+    it(
+      format('%s: the configured responsible and master system', _case),
+      async () => {
+        answer();
+        const first = await create();
+        assert.ok(
+          createBody(first.connection).includes(
+            'adtcore:responsible="STATED_USER"',
+          ),
+        );
+        assert.ok(
+          createBody(first.connection).includes(
+            'adtcore:masterSystem="STATED_SYSTEM"',
+          ),
+        );
+        assert.equal(lookup.mock.callCount(), 1);
+      },
+    );
+  }
 
-  it.each([
+  for (const [_case, answer] of [
     [
       'an answer without a user',
-      () => lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' }),
+      () =>
+        lookup.mock.mockImplementation(async () => ({
+          user: undefined,
+          systemId: 'OPS',
+        })),
     ],
-    ['a lookup answered 500', () => lookup.mockRejectedValue(status(500))],
-  ] as const)(
-    '%s and neither a responsible nor a login: system_user_unknown, nothing sent',
-    async (_case, answer) => {
-      delete process.env.SAP_RESPONSIBLE;
-      resetSystemContextCache();
-      systemContextFromConfiguration();
-      answer();
-      const { connection, result } = await create({});
-      expect(JSON.parse(textOf(result))).toMatchObject({
-        error: 'system_user_unknown',
-      });
-      expect(connection.requests).toEqual([]);
-    },
-  );
+    [
+      'a lookup answered 500',
+      () =>
+        lookup.mock.mockImplementation(async () => {
+          throw status(500);
+        }),
+    ],
+  ] as const) {
+    it(
+      format(
+        '%s and neither a responsible nor a login: system_user_unknown, nothing sent',
+        _case,
+      ),
+      async () => {
+        delete process.env.SAP_RESPONSIBLE;
+        resetSystemContextCache();
+        systemContextFromConfiguration();
+        answer();
+        const { connection, result } = await create({});
+        assertMatchObject(JSON.parse(textOf(result)), {
+          error: 'system_user_unknown',
+        });
+        assert.deepStrictEqual(connection.requests, []);
+      },
+    );
+  }
 });

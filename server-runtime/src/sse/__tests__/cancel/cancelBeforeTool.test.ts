@@ -12,9 +12,12 @@
  * suite opens.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import type { AuthOutcome, IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { PROBE_PATH } from '../../../../../src/__tests__/helpers/adtStandIn';
 import { activeTools } from '../../../../../src/lib/activeTools';
+import * as credentialSources from '../../../../../src/lib/credentialSources';
 import {
   type SseConnection,
   type SseStand,
@@ -41,51 +44,51 @@ function mockReset(): void {
   });
 }
 
-jest.mock('../../../../../src/lib/credentialSources', () => {
-  const actual = jest.requireActual('../../../../../src/lib/credentialSources');
-  /** The headers' provider, its renewal and (when set) its authorize held at the gate. */
-  const gated = (basic: IAuthProvider): IAuthProvider => ({
-    kind: basic.kind,
-    prepare: () => basic.prepare(),
-    establish: (logon) => basic.establish(logon),
-    authorize: async (request) => {
-      if (mockGate.authorize) {
-        mockGate.waiting += 1;
-        await mockGate.opened;
-      }
-      return basic.authorize(request);
-    },
-    // A renewal that took its time, then changed what the credential presents.
-    rejected: async (): Promise<AuthOutcome> => {
+// credentialFromHeaders replaced on the module that defines it (its
+// callers read it at call time), as the Jest factory did: the real one's
+// answer, its credential held at the gate. Every other name stays real.
+const realCredentialFromHeaders = credentialSources.credentialFromHeaders;
+/** The headers' provider, its renewal and (when set) its authorize held at the gate. */
+const gated = (basic: IAuthProvider): IAuthProvider => ({
+  kind: basic.kind,
+  prepare: () => basic.prepare(),
+  establish: (logon) => basic.establish(logon),
+  authorize: async (request) => {
+    if (mockGate.authorize) {
       mockGate.waiting += 1;
       await mockGate.opened;
-      return { ok: true };
-    },
-  });
-  return {
-    ...actual,
-    credentialFromHeaders: (headers: Record<string, string>) => {
-      const built = actual.credentialFromHeaders(headers);
-      return { ...built, credential: gated(built.credential) };
-    },
-  };
+    }
+    return basic.authorize(request);
+  },
+  // A renewal that took its time, then changed what the credential presents.
+  rejected: async (): Promise<AuthOutcome> => {
+    mockGate.waiting += 1;
+    await mockGate.opened;
+    return { ok: true };
+  },
 });
-
-jest.setTimeout(30_000);
+mock.method(
+  credentialSources,
+  'credentialFromHeaders',
+  (headers: Record<string, string>) => {
+    const built = realCredentialFromHeaders(headers);
+    return { ...built, credential: gated(built.credential) };
+  },
+);
 
 let s: SseStand;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 beforeEach(async () => {
   mockReset();
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
   s = await sseStand();
 });
 
 afterEach(async () => {
   mockGate.open();
   await s.close();
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
 const pause = () => new Promise((r) => setTimeout(r, 150));
@@ -112,31 +115,35 @@ async function cancel(port: number, c: SseConnection, id: number) {
 /** R1 cancelled, R2 kept, both waiting in the one connect; then the gate opens. */
 async function cancelledWhileWaiting() {
   const c = await s.open();
-  expect(await c.call('ProbeAdt', { id: 'r1' }, 1)).toBe(202);
-  expect(await c.call('ProbeAdt', { id: 'r2' }, 2)).toBe(202);
+  assert.equal(await c.call('ProbeAdt', { id: 'r1' }, 1), 202);
+  assert.equal(await c.call('ProbeAdt', { id: 'r2' }, 2), 202);
   // One connection, one connect: its credential is asked once.
   await until(() => mockGate.waiting === 1);
   await until(() => activeTools().length === 2);
   await turns();
-  expect(probes('r1') + probes('r2')).toBe(0);
+  assert.equal(probes('r1') + probes('r2'), 0);
 
-  expect(await cancel(s.port, c, 1)).toBe(202);
+  assert.equal(await cancel(s.port, c, 1), 202);
   await pause();
   // R1 is still a live call, its signal not aborted.
-  expect(activeTools()).toHaveLength(2);
-  expect(activeTools().every((t) => !t.signal.aborted)).toBe(true);
+  assert.equal(activeTools().length, 2);
+  assert.equal(
+    activeTools().every((t) => !t.signal.aborted),
+    true,
+  );
 
   const renewedFrom = s.standIn.requests.length;
   mockGate.open();
-  expect(await c.answer(2)).toEqual({ text: 'r2', isError: false });
+  assert.deepStrictEqual(await c.answer(2), { text: 'r2', isError: false });
   await until(() => probes('r1') === 1);
   await until(() => activeTools().length === 0);
   await turns(20);
   // R1's tool ran once, after its credential answered.
-  expect(probes('r1')).toBe(1);
-  expect(
-    s.standIn.requests.findIndex((r) => r.url === `${PROBE_PATH}r1`),
-  ).toBeGreaterThanOrEqual(renewedFrom);
+  assert.equal(probes('r1'), 1);
+  assert.ok(
+    s.standIn.requests.findIndex((r) => r.url === `${PROBE_PATH}r1`) >=
+      renewedFrom,
+  );
   c.close();
 }
 
@@ -145,7 +152,7 @@ it('R1 cancelled while both wait in rejected(): its tool runs once after the ren
   s.standIn.answerOnce(isDiscovery, 401);
   await cancelledWhileWaiting();
   // The connection logged on again after its renewal.
-  expect(s.connects()).toBe(2);
+  assert.equal(s.connects(), 2);
 });
 
 it('R1 cancelled while both wait in authorize(): its tool runs once after the credential answered; R2 is answered', async () => {

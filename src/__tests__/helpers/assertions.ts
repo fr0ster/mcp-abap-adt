@@ -36,6 +36,39 @@ function fail(
 }
 
 /**
+ * Jest's `expect(value).not.toHaveProperty(key)` for a one-segment key
+ * (`@jest/expect-utils` `getPath`).
+ * - An undefined or null value is refused outright, as Jest refuses it, so
+ *   an absent value never passes.
+ * - Otherwise the value has the key when `value[key]` is not undefined, or,
+ *   for a non-primitive value, when `key in value`. Inherited members count,
+ *   and so does an own key whose value is undefined.
+ */
+export function assertNoProperty(value: unknown, key: string): void {
+  if (value === undefined || value === null) {
+    fail(
+      `expected a value without the property ${shown(key)}, received ${shown(value)}`,
+      value,
+      key,
+      'not.toHaveProperty',
+    );
+  }
+  const boxed: object = Object(value);
+  const primitive = typeof value !== 'object' && typeof value !== 'function';
+  if (
+    Reflect.get(boxed, key) !== undefined ||
+    (!primitive && Reflect.has(boxed, key))
+  ) {
+    fail(
+      `expected no property ${shown(key)}, received ${shown(value)}`,
+      value,
+      key,
+      'not.toHaveProperty',
+    );
+  }
+}
+
+/**
  * The message of a thrown value, as Jest reads it (`getThrown`): its
  * `message` when that is a string — an own or an inherited one —, else
  * `String(value)`.

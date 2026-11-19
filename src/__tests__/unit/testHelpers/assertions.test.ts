@@ -9,6 +9,7 @@ import { describe, it } from 'node:test';
 import * as vm from 'node:vm';
 import {
   assertMatchObject,
+  assertNoProperty,
   assertRejects,
   assertThrows,
   messageOf,
@@ -336,5 +337,37 @@ describe('rejectionOf', () => {
 
   it('a fulfilment fails', async () => {
     await refusesAsync(rejectionOf(Promise.resolve(3)), 'fulfilled');
+  });
+});
+
+describe('assertNoProperty', () => {
+  it('passes for an object without the key', () => {
+    assertNoProperty({ a: 1 }, 'b');
+  });
+
+  it('fails for an undefined value, as Jest does', () => {
+    refuses(() => assertNoProperty(undefined, 'b'), 'undefined');
+  });
+
+  it('fails for a null value, as Jest does', () => {
+    refuses(() => assertNoProperty(null, 'b'), 'null');
+  });
+
+  it('fails for an own key', () => {
+    refuses(() => assertNoProperty({ b: 1 }, 'b'), "'b'");
+  });
+
+  it('fails for an own key whose value is undefined', () => {
+    refuses(() => assertNoProperty({ b: undefined }, 'b'), "'b'");
+  });
+
+  it('fails for an inherited key, Object.prototype members included', () => {
+    refuses(() => assertNoProperty(Object.create({ b: 1 }), 'b'), "'b'");
+    refuses(() => assertNoProperty({}, 'toString'), "'toString'");
+  });
+
+  it("reads a primitive's members by bracket access, as Jest does", () => {
+    refuses(() => assertNoProperty('abc', 'length'), "'length'");
+    assertNoProperty('abc', 'b');
   });
 });

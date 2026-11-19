@@ -1,3 +1,12 @@
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import * as z from 'zod';
 /**
  * Failures outside a handler (the connect phase), each through a
@@ -35,7 +44,7 @@ const TOOL = 'StubTool';
 const SECRET = 'client-secret-PLACEHOLDER';
 
 class StubGroup {
-  readonly reached = jest.fn();
+  readonly reached = mock.fn();
   getName() {
     return 'stub';
   }
@@ -127,7 +136,7 @@ async function callTool(
       isError?: boolean;
       content: Array<{ text: string }>;
     };
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     return { payload: JSON.parse(result.content[0].text), group };
   } finally {
     await client.close();
@@ -141,7 +150,7 @@ function expectRendered(
   facts: object,
 ): void {
   const words = render(kind as never, facts as never);
-  expect(payload).toEqual({
+  assert.deepStrictEqual(payload, {
     error: 'authentication_failed',
     kind,
     message: words.reason,
@@ -150,7 +159,7 @@ function expectRendered(
 }
 
 let stderrLines: string[];
-let stderrSpy: jest.SpyInstance;
+let stderrSpy: Mock<typeof process.stderr.write>;
 const savedEnv = process.env;
 
 beforeEach(() => {
@@ -162,16 +171,14 @@ beforeEach(() => {
   };
   resetSystemContextCache();
   stderrLines = [];
-  stderrSpy = jest
-    .spyOn(process.stderr, 'write')
-    .mockImplementation((chunk: unknown) => {
-      stderrLines.push(String(chunk));
-      return true;
-    });
+  stderrSpy = mock.method(process.stderr, 'write', (chunk: unknown) => {
+    stderrLines.push(String(chunk));
+    return true;
+  });
 });
 
 afterEach(() => {
-  stderrSpy.mockRestore();
+  stderrSpy.mock.restore();
   process.env = savedEnv;
   resetSystemContextCache();
 });
@@ -216,16 +223,16 @@ describe("a provider's failure from a token endpoint stand-in", () => {
       });
       const error = (thrown as { error: { kind: string; facts: object } })
         .error;
-      expect((thrown as { name?: unknown }).name).toBe('AuthProviderFailure');
-      expect(error.kind).toBe('request-failed');
+      assert.equal((thrown as { name?: unknown }).name, 'AuthProviderFailure');
+      assert.equal(error.kind, 'request-failed');
       expectRendered(payload, error.kind, error.facts);
-      expect(group.reached).not.toHaveBeenCalled();
-      expect(tokenEndpoint.requests.length).toBeGreaterThan(0);
-      expect(adt.requests).toEqual([]);
+      assert.equal(group.reached.mock.callCount(), 0);
+      assert.ok(tokenEndpoint.requests.length > 0);
+      assert.deepStrictEqual(adt.requests, []);
       const text = JSON.stringify(payload);
-      expect(text).not.toContain(SECRET);
-      expect(text).not.toContain(tokenEndpoint.url);
-      expect(stderrLines.join('')).toContain('"kind":"request-failed"');
+      assert.ok(!text.includes(SECRET));
+      assert.ok(!text.includes(tokenEndpoint.url));
+      assert.ok(stderrLines.join('').includes('"kind":"request-failed"'));
     } finally {
       await adt.close();
     }
@@ -248,18 +255,18 @@ describe("a provider's failure from a token endpoint stand-in", () => {
           () => undefined,
           (e: { error: { kind: string; facts: object } }) => e.error,
         );
-      expect(own?.kind).toBe('request-failed');
+      assert.equal(own?.kind, 'request-failed');
       expectRendered(payload, 'request-failed', own?.facts ?? {});
-      expect(group.reached).not.toHaveBeenCalled();
-      expect(tokenEndpoint.requests.length).toBeGreaterThan(0);
-      expect(adt.requests).toEqual([]);
+      assert.equal(group.reached.mock.callCount(), 0);
+      assert.ok(tokenEndpoint.requests.length > 0);
+      assert.deepStrictEqual(adt.requests, []);
       const text = JSON.stringify(payload);
-      expect(text).not.toContain(SECRET);
-      expect(text).not.toContain('diagnostics');
-      expect(text).not.toContain(tokenEndpoint.url);
+      assert.ok(!text.includes(SECRET));
+      assert.ok(!text.includes('diagnostics'));
+      assert.ok(!text.includes(tokenEndpoint.url));
       const line = stderrLines.join('');
-      expect(line).toContain('[MCP] authentication_failed: ');
-      expect(line).toContain('"kind":"request-failed"');
+      assert.ok(line.includes('[MCP] authentication_failed: '));
+      assert.ok(line.includes('"kind":"request-failed"'));
     } finally {
       await adt.close();
     }
@@ -272,7 +279,7 @@ describe("connection's AuthRefusedError from an ADT stand-in answering 401 twice
     try {
       // A provider that answers Ok to the rejection — it says it renewed —
       // so the connection retries once and, refused again, words it itself.
-      const rejected = jest.fn(async () => ({ ok: true as const }));
+      const rejected = mock.fn(async () => ({ ok: true as const }));
       const ok = async () => ({ ok: true as const });
       const provider: IAuthProvider = {
         kind: 'renewing',
@@ -290,12 +297,12 @@ describe("connection's AuthRefusedError from an ADT stand-in answering 401 twice
         problem: 'refused-after-renewal',
         at: 'logon',
       });
-      expect(group.reached).not.toHaveBeenCalled();
+      assert.equal(group.reached.mock.callCount(), 0);
       // Each logon attempt asks for a CSRF token (sessions, then discovery):
       // refused, renewed once, refused again.
-      expect(adt.requests.length).toBeGreaterThanOrEqual(2);
-      expect(rejected).toHaveBeenCalledTimes(1);
-      expect(stderrLines.join('')).toContain('"kind":"connection"');
+      assert.ok(adt.requests.length >= 2);
+      assert.equal(rejected.mock.callCount(), 1);
+      assert.ok(stderrLines.join('').includes('"kind":"connection"'));
     } finally {
       await adt.close();
     }

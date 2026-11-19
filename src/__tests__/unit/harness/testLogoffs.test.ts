@@ -9,6 +9,8 @@
  * 2026-10-19: the test's own connection stayed in SM05).
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { own } from '../../../lib/ownedConnections';
 import { logOffLeft } from '../../integration/helpers/debuggerCleanup';
 import {
@@ -24,8 +26,8 @@ function fakeConnection() {
   });
   const flushes: unknown[][] = [];
   const connection = {
-    disconnect: jest.fn(async () => undefined),
-    flushGoodbye: jest.fn(async (...args: unknown[]) => {
+    disconnect: mock.fn(async () => undefined),
+    flushGoodbye: mock.fn(async (...args: unknown[]) => {
       flushes.push(args);
       await answered;
     }),
@@ -47,19 +49,19 @@ describe("the harness's logoffs", () => {
     const c = fakeConnection();
     trackConnection(c.connection);
     const closing = closeTrackedConnections();
-    expect(await settles(closing)).toBe(false);
+    assert.equal(await settles(closing), false);
     c.answer();
-    expect(await settles(closing)).toBe(true);
-    expect(c.connection.disconnect).toHaveBeenCalledTimes(1);
-    expect(c.flushes).toEqual([[]]);
+    assert.equal(await settles(closing), true);
+    assert.equal(c.connection.disconnect.mock.callCount(), 1);
+    assert.deepStrictEqual(c.flushes, [[]]);
   });
 
   it("endTestConnection: a test's own close waits the same way", async () => {
     const c = fakeConnection();
     const ending = endTestConnection(c.connection);
-    expect(await settles(ending)).toBe(false);
+    assert.equal(await settles(ending), false);
     c.answer();
-    expect(await settles(ending)).toBe(true);
+    assert.equal(await settles(ending), true);
   });
 
   it('a tracked connection the test ended itself is disconnected once: the close of tracked connections leaves it', async () => {
@@ -68,7 +70,7 @@ describe("the harness's logoffs", () => {
     c.answer();
     await endTestConnection(c.connection);
     await closeTrackedConnections();
-    expect(c.connection.disconnect).toHaveBeenCalledTimes(1);
+    assert.equal(c.connection.disconnect.mock.callCount(), 1);
   });
 
   it("logOffLeft resolves once the logoffs of the server's connections it ended are answered", async () => {
@@ -76,9 +78,9 @@ describe("the harness's logoffs", () => {
     const c = fakeConnection();
     own(c.connection, { role: 'state' });
     const left = logOffLeft(before, 'a case');
-    expect(await settles(left)).toBe(false);
+    assert.equal(await settles(left), false);
     c.answer();
-    expect(await settles(left)).toBe(true);
-    expect(await left).toHaveLength(1);
+    assert.equal(await settles(left), true);
+    assert.equal((await left).length, 1);
   });
 });

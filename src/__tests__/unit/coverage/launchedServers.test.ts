@@ -9,9 +9,11 @@
  * nothing.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   brokerBase,
@@ -31,6 +33,7 @@ import {
   isLogoff,
   type StandInRequest,
 } from '../../helpers/adtStandIn';
+import { assertRejects } from '../../helpers/assertions';
 import { endTestConnection } from '../../integration/helpers/openConnections';
 import {
   credentialRefused,
@@ -38,8 +41,6 @@ import {
   REFUSED_AFTER_MARKER,
 } from '../../integration/helpers/refusalGuard';
 import { launchStdio } from '../../integration/helpers/testers/hardMode';
-
-jest.setTimeout(180_000);
 
 const USER = 'LAUNCH_USER';
 const PASSWORD = 'launch-password';
@@ -93,7 +94,7 @@ describe('launched servers', () => {
       authType: 'basic' as const,
       username: USER,
     };
-    const logOn = jest.fn(async () => {
+    const logOn = mock.fn(async () => {
       const own = guardedTestConnection(
         settings,
         new BasicAuthProvider(USER, PASSWORD),
@@ -111,25 +112,23 @@ describe('launched servers', () => {
       });
     const server = await launch();
     try {
-      expect(logOn).toHaveBeenCalledTimes(1);
+      assert.equal(logOn.mock.callCount(), 1);
       const ok = await server.call('GetAdtTypes', {});
-      expect(ok.isError).toBe(false);
-      expect(credentialRefused()).toBe(false);
+      assert.equal(ok.isError, false);
+      assert.equal(credentialRefused(), false);
 
       // The system now refuses the basic credential: the child cannot renew it.
       stand.refuse(true);
       const refused = await server.call('GetAdtTypes', {});
-      expect(refused.isError).toBe(true);
-      expect(credentialRefused()).toBe(true);
+      assert.equal(refused.isError, true);
+      assert.equal(credentialRefused(), true);
 
       const sent = stand.requests.length;
-      await expect(server.call('GetAdtTypes', {})).rejects.toThrow(
-        REFUSED_AFTER_MARKER,
-      );
+      await assertRejects(server.call('GetAdtTypes', {}), REFUSED_AFTER_MARKER);
       // The next launch refuses before the parent logs on or spawns.
-      await expect(launch()).rejects.toThrow(REFUSED_AFTER_MARKER);
-      expect(logOn).toHaveBeenCalledTimes(1);
-      expect(stand.requests.length).toBe(sent);
+      await assertRejects(launch(), REFUSED_AFTER_MARKER);
+      assert.equal(logOn.mock.callCount(), 1);
+      assert.equal(stand.requests.length, sent);
     } finally {
       await server.close();
     }
@@ -185,15 +184,18 @@ describe('launched servers', () => {
         const grantsBefore = tokens.grants.length;
         stand.answerOnce(isToolRequest, 401);
         const answer = await server.call('GetAdtTypes', {});
-        expect(answer.isError).toBe(false);
-        expect(tokens.grants.slice(grantsBefore)).toEqual(['refresh_token']);
-        expect(credentialRefused()).toBe(false);
+        assert.equal(answer.isError, false);
+        assert.deepStrictEqual(tokens.grants.slice(grantsBefore), [
+          'refresh_token',
+        ]);
+        assert.equal(credentialRefused(), false);
         // Never the basic credential of the other case: the child's token.
-        expect(
+        assert.equal(
           stand.requests.some(
             (r) => r.authorization === basicOf(USER, PASSWORD),
           ),
-        ).toBe(false);
+          false,
+        );
       } finally {
         await server.close();
       }

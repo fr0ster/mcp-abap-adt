@@ -475,6 +475,7 @@
   "src/__tests__/unit/failureStep.test.ts",
   "src/__tests__/unit/fakeClient.test.ts",
   "src/__tests__/unit/feapDescriptor.test.ts",
+  "src/__tests__/unit/freshConnection.test.ts",
   "src/__tests__/unit/freshConnectionKind.test.ts",
   "src/__tests__/unit/fullUpdatesLockThemselves.test.ts",
   "src/__tests__/unit/functionGroup/functionModuleGroup.test.ts",

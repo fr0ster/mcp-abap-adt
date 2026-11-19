@@ -32,9 +32,10 @@ const FAKE_NPM = [
   'fs.appendFileSync(plan.log, `${JSON.stringify({ args, cwd: process.cwd() })}\\n`);',
   "const split = (spec) => { const at = spec.lastIndexOf('@'); return [spec.slice(0, at), spec.slice(at + 1)]; };",
   "if (args[0] === 'view') {",
-  '  const [name, version] = split(args[1]);',
+  '  const [name, version] = split(args.at(-2));',
   '  if (plan.viewFails) { process.stderr.write("npm error code ECONNRESET\\n"); process.exit(1); }',
-  '  if (!plan.hidden.includes(name)) process.stdout.write(`${version}\\n`);',
+  '  if (plan.hidden.includes(name)) { process.stderr.write(`npm error code E404\\nnpm error 404 No match found for version ${version}\\n`); process.exit(1); }',
+  '  if (!plan.empty.includes(name)) process.stdout.write(`${version}\\n`);',
   '  process.exit(0);',
   '}',
   "if (args[0] === 'install') {",
@@ -49,7 +50,7 @@ const FAKE_NPM = [
   '      manifest.bin = {};',
   '      for (const [bin, said] of Object.entries(bins)) {',
   '        manifest.bin[bin] = `./bin/${bin}.js`;',
-  "        fs.writeFileSync(path.join(dir, 'bin', `${bin}.js`), `process.stdout.write(${JSON.stringify(`${said ?? version}\\n`)});\\n`);",
+  "        fs.writeFileSync(path.join(dir, 'bin', `${bin}.js`), `process.stdout.write(process.argv[2] === '--version' ? ${JSON.stringify(`${said ?? version}\\n`)} : 'not asked for the version');\\n`);",
   '      }',
   '    }',
   "    fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest));",
@@ -83,6 +84,7 @@ const REPORTED_LOCK = {
 
 interface Plan {
   hidden?: string[];
+  empty?: string[];
   viewFails?: boolean;
   bins?: Record<string, Record<string, string | null>>;
   lock?: Record<string, Record<string, string | boolean>>;
@@ -109,6 +111,7 @@ function verify(
     JSON.stringify({
       log,
       hidden: plan.hidden ?? [],
+      empty: plan.empty ?? [],
       viewFails: plan.viewFails ?? false,
       bins: plan.bins ?? {
         '@mcp-abap-adt/core': { 'mcp-abap-adt': null },
@@ -144,17 +147,19 @@ describe('npm run release:verify', () => {
     );
     const views = run.calls.filter((call) => call.args[0] === 'view');
     assert.equal(views.length, 18);
-    assert.equal(new Set(views.map((call) => call.args[1])).size, 18);
+    assert.equal(new Set(views.map((call) => call.args.join(' '))).size, 18);
     assert.ok(
       views.some(
         (call) =>
-          call.args.join(' ') === `view @mcp-abap-adt/lib@${VERSION} version`,
+          call.args.join(' ') ===
+          `view --registry=${REGISTRY} --json=false @mcp-abap-adt/lib@${VERSION} version`,
       ),
     );
     const [install, ...more] = installs(run.calls);
     assert.equal(more.length, 0);
     assert.ok(install);
     assert.ok(install.args.includes('--ignore-scripts'));
+    assert.ok(install.args.includes(`--registry=${REGISTRY}`));
     assert.equal(
       install.args.filter((arg) => arg.endsWith(`@${VERSION}`)).length,
       18,
@@ -175,7 +180,7 @@ describe('npm run release:verify', () => {
     );
   });
 
-  it('says "not visible yet" with the count, exits 2 and installs nothing', () => {
+  it('says "not visible yet" for a version npm answers E404, exits 2 and installs nothing', () => {
     const run = verify({
       hidden: ['@mcp-abap-adt/core', '@mcp-abap-adt/compact-sse-ro'],
     });
@@ -185,6 +190,20 @@ describe('npm run release:verify', () => {
       run.stderr,
     );
     assert.ok(run.stderr.includes(`@mcp-abap-adt/compact-sse-ro@${VERSION}`));
+    assert.deepEqual(installs(run.calls), []);
+  });
+
+  it('counts an empty npm view answer as not visible yet', () => {
+    const run = verify({
+      hidden: ['@mcp-abap-adt/core'],
+      empty: ['@mcp-abap-adt/lib'],
+    });
+    assert.equal(run.status, 2, run.stderr);
+    assert.ok(
+      run.stderr.includes(`not visible yet: 2 of 18 packages at ${VERSION}`),
+      run.stderr,
+    );
+    assert.ok(run.stderr.includes(`@mcp-abap-adt/lib@${VERSION}`));
     assert.deepEqual(installs(run.calls), []);
   });
 
@@ -222,6 +241,30 @@ describe('npm run release:verify', () => {
       ),
       run.stderr,
     );
+  });
+
+  it('checks a bundled package that states where it was resolved from', () => {
+    const run = verify({
+      lock: {
+        'node_modules/x/node_modules/bundled': {
+          version: '1.0.0',
+          inBundle: true,
+          resolved: 'https://npm.example.com/bundled-1.0.0.tgz',
+        },
+        'node_modules/x/node_modules/plain-bundled': {
+          version: '1.0.0',
+          inBundle: true,
+        },
+      },
+    });
+    assert.equal(run.status, 1);
+    assert.ok(
+      run.stderr.includes(
+        'node_modules/x/node_modules/bundled: resolved from https://npm.example.com/',
+      ),
+      run.stderr,
+    );
+    assert.ok(!run.stderr.includes('plain-bundled'), run.stderr);
   });
 
   it('fails on a bin that answers another version', () => {

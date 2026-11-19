@@ -25,6 +25,10 @@
 //   never overridden.
 // - An argument starting with `-` is an option, never a file, and so is the
 //   value after an option that takes one (`--test-name-pattern <x>`, …).
+//   Only node's `--test-*` options reach `node --test`; any other option, and
+//   any argument that is not a `….test.ts` / `….test.js` file (a directory
+//   above all, which node would expand itself, past the live check), is
+//   refused before anything runs: a directory is selected with `--root`.
 // - Options go to `node --test` before the files: after a file, `node --test`
 //   ignores them.
 // - `--env NAME=VALUE` sets a variable for the run; a shell prefix
@@ -157,8 +161,17 @@ for (let i = 0; i < args.length; i += 1) {
     (arg.endsWith('.test.ts') || arg.endsWith('.test.js'))
   ) {
     named.push(arg);
-  } else {
+  } else if (arg.startsWith('--test-')) {
     options.push(arg);
+  } else {
+    // Only node's `--test-*` options reach `node --test`: a directory or any
+    // other argument forwarded there would be expanded by node, past the
+    // live check.
+    fail(
+      arg.startsWith('-')
+        ? `${arg}: not an option of the runner, and only --test-* options reach node --test`
+        : `${arg}: not a test file — name a ….test.ts or ….test.js file, or select a directory with --root <dir>`,
+    );
   }
 }
 

@@ -118,6 +118,27 @@ describe('the node:test runner', () => {
     }
   });
 
+  it('an unknown positional argument or option is refused before anything runs', () => {
+    const file = recordingFixture('unknown', ['ran']);
+    const record = path.join(scratch.dir, 'unknown.record');
+    for (const [arg, words] of [
+      ['stray', 'stray: not a test file'],
+      ['--inspect', '--inspect: not an option of the runner'],
+    ] as const) {
+      const run = runTool('run-tests.mjs', [
+        '--concurrency',
+        '1',
+        '--env',
+        `RECORD=${record}`,
+        file,
+        arg,
+      ]);
+      assert.equal(run.status, 1, run.stdout + run.stderr);
+      assert.ok(run.stderr.includes(words), run.stderr);
+    }
+    assert.deepEqual(recorded(record), []);
+  });
+
   it('--env sets a variable without a shell', () => {
     const file = writeAt(
       scratch.dir,

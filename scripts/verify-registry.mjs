@@ -146,10 +146,11 @@ function readLockfile(file) {
   const versions = new Map(REPORTED.map((name) => [name, new Set()]));
   for (const [key, entry] of Object.entries(lock.packages ?? {})) {
     if (key === '') continue;
+    // A bundled package comes inside its parent's tarball and may state no
+    // `resolved`; one it states is checked like any other.
     if (entry.link === true) findings.push(`${key}: "link": true`);
-    else if (entry.inBundle === true) continue;
     else if (typeof entry.resolved !== 'string') {
-      findings.push(`${key}: no "resolved"`);
+      if (entry.inBundle !== true) findings.push(`${key}: no "resolved"`);
     } else if (!entry.resolved.startsWith(REGISTRY)) {
       findings.push(`${key}: resolved from ${entry.resolved}`);
     }

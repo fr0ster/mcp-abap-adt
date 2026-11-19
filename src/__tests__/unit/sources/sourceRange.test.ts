@@ -19,10 +19,14 @@
  * parse and the real adt-clients request are part of it.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
 import { answerSourceRead } from '../../../lib/handlers/sourceRange';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 import { moduleInGroup } from '../../helpers/functionModuleMetadata';
 import { type PinCase, recordCase } from '../../helpers/pinCases';
 
@@ -130,63 +134,73 @@ function sourceOf(text: string): unknown {
   return payload === undefined ? text : member(payload, 'source');
 }
 
-describe.each(READERS)('$tool: a line range', ({ tool, args, first = [] }) => {
-  it('sends the whole read’s one GET and answers exactly the lines asked', async () => {
-    const whole = await read(tool, args, first);
-    expect(whole.isError).toBe(false);
-    expect(whole.requests).toHaveLength(1 + first.length);
-    expect(sourceOf(whole.text)).toBe(SOURCE);
+for (const { tool, args, first = [] } of READERS) {
+  describe(`${tool}: a line range`, () => {
+    it('sends the whole read’s one GET and answers exactly the lines asked', async () => {
+      const whole = await read(tool, args, first);
+      assert.equal(whole.isError, false);
+      assert.equal(whole.requests.length, 1 + first.length);
+      assert.equal(sourceOf(whole.text), SOURCE);
 
-    const ranged = await read(
-      tool,
-      { ...args, start_line: 2, end_line: 4 },
-      first,
-    );
-    expect(ranged.isError).toBe(false);
-    expect(ranged.requests).toEqual(whole.requests);
-    expect(sourceOf(ranged.text)).toBe('line two\nline three\nline four');
-    const payload = payloadOf(ranged.text);
-    if (payload !== undefined) {
-      expect({
-        start_line: member(payload, 'start_line'),
-        end_line: member(payload, 'end_line'),
-        line_count: member(payload, 'line_count'),
-      }).toEqual({ start_line: 2, end_line: 4, line_count: 5 });
+      const ranged = await read(
+        tool,
+        { ...args, start_line: 2, end_line: 4 },
+        first,
+      );
+      assert.equal(ranged.isError, false);
+      assert.deepStrictEqual(ranged.requests, whole.requests);
+      assert.equal(sourceOf(ranged.text), 'line two\nline three\nline four');
+      const payload = payloadOf(ranged.text);
+      if (payload !== undefined) {
+        assert.deepStrictEqual(
+          {
+            start_line: member(payload, 'start_line'),
+            end_line: member(payload, 'end_line'),
+            line_count: member(payload, 'line_count'),
+          },
+          { start_line: 2, end_line: 4, line_count: 5 },
+        );
+      }
+    });
+
+    it('start_line alone reads to the end, end_line alone from the first line', async () => {
+      const tail = await read(tool, { ...args, start_line: 4 }, first);
+      assert.equal(tail.isError, false);
+      assert.equal(sourceOf(tail.text), 'line four\nline five');
+      const head = await read(tool, { ...args, end_line: 1 }, first);
+      assert.equal(head.isError, false);
+      assert.equal(sourceOf(head.text), 'line one');
+    });
+
+    for (const range of [
+      { start_line: 0 },
+      { end_line: -1 },
+      { start_line: 1.5 },
+      { start_line: 3, end_line: 2 },
+    ]) {
+      it(format('refuses %j before any request', range), async () => {
+        const refused = await read(tool, { ...args, ...range }, first);
+        assert.deepStrictEqual(refused.requests, []);
+        assert.equal(
+          refused.thrown !== undefined || refused.isError === true,
+          true,
+        );
+      });
     }
-  });
 
-  it('start_line alone reads to the end, end_line alone from the first line', async () => {
-    const tail = await read(tool, { ...args, start_line: 4 }, first);
-    expect(tail.isError).toBe(false);
-    expect(sourceOf(tail.text)).toBe('line four\nline five');
-    const head = await read(tool, { ...args, end_line: 1 }, first);
-    expect(head.isError).toBe(false);
-    expect(sourceOf(head.text)).toBe('line one');
+    it('a range outside the source is refused after the one GET, naming its line count', async () => {
+      const whole = await read(tool, args, first);
+      const outside = await read(
+        tool,
+        { ...args, start_line: 3, end_line: 6 },
+        first,
+      );
+      assert.deepStrictEqual(outside.requests, whole.requests);
+      assert.equal(outside.isError, true);
+      assert.ok(outside.text.includes('the source has 5 lines'));
+    });
   });
-
-  it.each([
-    { start_line: 0 },
-    { end_line: -1 },
-    { start_line: 1.5 },
-    { start_line: 3, end_line: 2 },
-  ])('refuses %j before any request', async (range) => {
-    const refused = await read(tool, { ...args, ...range }, first);
-    expect(refused.requests).toEqual([]);
-    expect(refused.thrown !== undefined || refused.isError === true).toBe(true);
-  });
-
-  it('a range outside the source is refused after the one GET, naming its line count', async () => {
-    const whole = await read(tool, args, first);
-    const outside = await read(
-      tool,
-      { ...args, start_line: 3, end_line: 6 },
-      first,
-    );
-    expect(outside.requests).toEqual(whole.requests);
-    expect(outside.isError).toBe(true);
-    expect(outside.text).toContain('the source has 5 lines');
-  });
-});
+}
 
 it('GetClass: the ranged read is the source GET, literally', async () => {
   const ranged = await read('GetClass', {
@@ -194,7 +208,7 @@ it('GetClass: the ranged read is the source GET, literally', async () => {
     start_line: 2,
     end_line: 3,
   });
-  expect(ranged.requests).toEqual([
+  assert.deepStrictEqual(ranged.requests, [
     {
       method: 'GET',
       url: '/sap/bc/adt/oo/classes/zcl_pin/source/main?version=active',
@@ -214,8 +228,10 @@ it('a source ending in a line break has as many lines as it has line breaks', as
     expected: 'none',
   };
   const recorded = await recordCase(c);
-  expect(recorded.answer?.isError).toBe(true);
-  expect(recorded.answer?.content[0]?.text).toContain('the source has 2 lines');
+  assert.equal(recorded.answer?.isError, true);
+  assert.ok(
+    recorded.answer?.content[0]?.text.includes('the source has 2 lines'),
+  );
 });
 
 /** SAP's answer to a class source read: CRLF line ends, none after the last line. */
@@ -243,34 +259,35 @@ async function ranged(source: string, range: ToolArgs) {
 describe('CRLF source, as SAP sends it', () => {
   it('a middle range: its lines joined by CRLF, no line end after the last', async () => {
     const cut = await ranged(CRLF_SOURCE, { start_line: 1, end_line: 2 });
-    expect(cut.source).toBe('CLASS zbp_mcp_shr_i_root DEFINITION\r\n  PUBLIC');
-    expect(cut.line_count).toBe(13);
+    assert.equal(cut.source, 'CLASS zbp_mcp_shr_i_root DEFINITION\r\n  PUBLIC');
+    assert.equal(cut.line_count, 13);
   });
 
   it('one line in the middle is that line alone', async () => {
     const cut = await ranged(CRLF_SOURCE, { start_line: 12, end_line: 12 });
-    expect(cut.source).toBe('CLASS ZBP_MCP_SHR_I_ROOT IMPLEMENTATION.');
+    assert.equal(cut.source, 'CLASS ZBP_MCP_SHR_I_ROOT IMPLEMENTATION.');
   });
 
   it('the last line, which SAP ends with no line end', async () => {
     const cut = await ranged(CRLF_SOURCE, { start_line: 12 });
-    expect(cut.source).toBe(
+    assert.equal(
+      cut.source,
       'CLASS ZBP_MCP_SHR_I_ROOT IMPLEMENTATION.\r\nENDCLASS.',
     );
   });
 
   it('an empty line answers empty', async () => {
     const cut = await ranged(CRLF_SOURCE, { start_line: 4, end_line: 4 });
-    expect(cut.source).toBe('');
+    assert.equal(cut.source, '');
   });
 
   it('a CRLF at the end closes the last line and opens none', async () => {
     const cut = await ranged(`${CRLF_SOURCE}\r\n`, { start_line: 13 });
-    expect(cut.source).toBe('ENDCLASS.');
-    expect(cut.line_count).toBe(13);
+    assert.equal(cut.source, 'ENDCLASS.');
+    assert.equal(cut.line_count, 13);
     const outside = await ranged(`${CRLF_SOURCE}\r\n`, { start_line: 14 });
-    expect(outside.isError).toBe(true);
-    expect(outside.text).toContain('the source has 13 lines');
+    assert.equal(outside.isError, true);
+    assert.ok(outside.text.includes('the source has 13 lines'));
   });
 });
 
@@ -282,9 +299,9 @@ it('a range with part "metadata" is refused before any request', async () => {
     args: { class_name: 'ZCL_PIN', part: 'metadata', start_line: 1 },
     expected: 'none',
   });
-  expect(recorded.requests).toEqual([]);
-  expect(recorded.answer?.isError).toBe(true);
-  expect(recorded.answer?.content[0]?.text).toContain('part "source"');
+  assert.deepStrictEqual(recorded.requests, []);
+  assert.equal(recorded.answer?.isError, true);
+  assert.ok(recorded.answer?.content[0]?.text.includes('part "source"'));
 });
 
 it("a throw while the ranged answer is read is answered inside answer()'s boundary", async () => {
@@ -299,8 +316,8 @@ it("a throw while the ranged answer is read is answered inside answer()'s bounda
     }),
     (source) => source,
   );
-  expect(result.isError).toBe(true);
-  expect(JSON.parse(result.content[0]?.text ?? '{}')).toMatchObject({
+  assert.equal(result.isError, true);
+  assertMatchObject(JSON.parse(result.content[0]?.text ?? '{}'), {
     error: 'adapter_threw',
     tool: 'GetClass',
     message: 'the reading broke',

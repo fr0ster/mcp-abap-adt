@@ -4,6 +4,7 @@
  * and a behavior implementation's metadata and source. SAP's answers are
  * the documents the corpus captured, or a minimal one where it has none.
  */
+import { describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { pinCases } from '../../helpers/pinCases';
 

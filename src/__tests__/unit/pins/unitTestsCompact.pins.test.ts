@@ -6,6 +6,7 @@
  * without long polling, and HandlerCdsUnitTestResult reads a finished run's
  * result. SAP's answers are the run documents the corpus captured.
  */
+import { describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { pinCases } from '../../helpers/pinCases';
 

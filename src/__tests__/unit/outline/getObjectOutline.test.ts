@@ -12,6 +12,8 @@
  * the schema parse and the real adt-clients request are part of it.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { type PinCase, recordCase } from '../../helpers/pinCases';
 
@@ -76,48 +78,57 @@ describe('GetObjectOutline', () => {
       answers: answered('read-outline-class--01-objectstructure'),
       expected: 'none',
     });
-    expect(result.isError).toBe(false);
-    expect(result.urls).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(result.urls, [
       '/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/objectstructure?version=active',
     ]);
     const outline = member(result.payload, 'outline');
-    expect(member(outline, 'name')).toBe('ZMCP_D1_9E25_CL');
-    expect(member(outline, 'type')).toBe('CLAS/OC');
-    expect(member(outline, 'final')).toBe(true);
+    assert.equal(member(outline, 'name'), 'ZMCP_D1_9E25_CL');
+    assert.equal(member(outline, 'type'), 'CLAS/OC');
+    assert.equal(member(outline, 'final'), true);
 
     const pub = childNamed(outline, 'PUB');
-    expect({
-      type: member(pub, 'type'),
-      visibility: member(pub, 'visibility'),
-      level: member(pub, 'level'),
-      clif_name: member(pub, 'clif_name'),
-    }).toEqual({
-      type: 'CLAS/OM',
-      visibility: 'public',
-      level: 'instance',
-      clif_name: 'ZMCP_D1_9E25_CL',
-    });
-    expect(linkOf(pub, 'definitionIdentifier')).toEqual({
+    assert.deepStrictEqual(
+      {
+        type: member(pub, 'type'),
+        visibility: member(pub, 'visibility'),
+        level: member(pub, 'level'),
+        clif_name: member(pub, 'clif_name'),
+      },
+      {
+        type: 'CLAS/OM',
+        visibility: 'public',
+        level: 'instance',
+        clif_name: 'ZMCP_D1_9E25_CL',
+      },
+    );
+    assert.deepStrictEqual(linkOf(pub, 'definitionIdentifier'), {
       rel: 'definitionIdentifier',
       source: '/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main',
       start: { line: 12, column: 12 },
       end: { line: 12, column: 15 },
       type: 'CLAS/OM',
     });
-    expect(linkOf(pub, 'implementationBlock')).toEqual({
+    assert.deepStrictEqual(linkOf(pub, 'implementationBlock'), {
       rel: 'implementationBlock',
       source: '/sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main',
       start: { line: 25, column: 2 },
       end: { line: 28, column: 11 },
     });
-    expect(member(childNamed(outline, 'PROT'), 'visibility')).toBe('protected');
-    expect(member(childNamed(outline, 'PRIV'), 'visibility')).toBe('private');
+    assert.equal(
+      member(childNamed(outline, 'PROT'), 'visibility'),
+      'protected',
+    );
+    assert.equal(member(childNamed(outline, 'PRIV'), 'visibility'), 'private');
     const constant = childNamed(outline, 'C_MAX');
-    expect({
-      constant: member(constant, 'constant'),
-      read_only: member(constant, 'read_only'),
-      level: member(constant, 'level'),
-    }).toEqual({ constant: true, read_only: true, level: 'static' });
+    assert.deepStrictEqual(
+      {
+        constant: member(constant, 'constant'),
+        read_only: member(constant, 'read_only'),
+        level: member(constant, 'level'),
+      },
+      { constant: true, read_only: true, level: 'static' },
+    );
   });
 
   it("a class's local components point into its local includes", async () => {
@@ -129,23 +140,24 @@ describe('GetObjectOutline', () => {
       answers: answered('read-outline-local-class--01-objectstructure'),
       expected: 'none',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const outline = member(result.payload, 'outline');
     const local = childNamed(outline, 'LCL_HELPER');
-    expect(member(local, 'type')).toBe('CLAS/OCL');
+    assert.equal(member(local, 'type'), 'CLAS/OCL');
     const help = childNamed(local, 'HELP');
-    expect(linkOf(help, 'implementationBlock')).toEqual({
+    assert.deepStrictEqual(linkOf(help, 'implementationBlock'), {
       rel: 'implementationBlock',
       source: '/sap/bc/adt/oo/classes/zmcp_d1_276d_cl/includes/implementations',
       start: { line: 3, column: 2 },
       end: { line: 5, column: 11 },
     });
-    expect(
+    assert.equal(
       member(
         linkOf(childNamed(outline, 'TY_LOCAL'), 'definitionBlock'),
         'source',
       ),
-    ).toBe('/sap/bc/adt/oo/classes/zmcp_d1_276d_cl/includes/definitions');
+      '/sap/bc/adt/oo/classes/zmcp_d1_276d_cl/includes/definitions',
+    );
   });
 
   it('an interface: its components with positions', async () => {
@@ -161,13 +173,13 @@ describe('GetObjectOutline', () => {
       answers: answered('read-outline-interface--01-objectstructure'),
       expected: 'none',
     });
-    expect(result.isError).toBe(false);
-    expect(result.urls).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(result.urls, [
       '/sap/bc/adt/oo/interfaces/zmcp_d1_9e25_if/objectstructure?version=inactive',
     ]);
     const method = childNamed(member(result.payload, 'outline'), 'RUN');
-    expect(member(method, 'type')).toBe('INTF/IO');
-    expect(linkOf(method, 'definitionBlock')).toEqual({
+    assert.equal(member(method, 'type'), 'INTF/IO');
+    assert.deepStrictEqual(linkOf(method, 'definitionBlock'), {
       rel: 'definitionBlock',
       source: '/sap/bc/adt/oo/interfaces/zmcp_d1_9e25_if/source/main',
       start: { line: 5, column: 2 },
@@ -184,24 +196,26 @@ describe('GetObjectOutline', () => {
       answers: answered('read-outline-program--01-objectstructure'),
       expected: 'none',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const outline = member(result.payload, 'outline');
-    expect(
+    assert.deepStrictEqual(
       linkOf(childNamed(outline, 'MAIN_FORM'), 'definitionIdentifier'),
-    ).toEqual({
-      rel: 'definitionIdentifier',
-      source: '/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main',
-      fragment: 'type=PROG%2FPU;name=MAIN_FORM',
-    });
-    expect(
+      {
+        rel: 'definitionIdentifier',
+        source: '/sap/bc/adt/programs/programs/zmcp_d1_9e25_pr/source/main',
+        fragment: 'type=PROG%2FPU;name=MAIN_FORM',
+      },
+    );
+    assert.deepStrictEqual(
       linkOf(childNamed(outline, 'INC_FORM'), 'definitionIdentifier'),
-    ).toEqual({
-      rel: 'definitionIdentifier',
-      source:
-        '/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr',
-      fragment: 'type=PROG%2FPU;name=INC_FORM',
-    });
-    expect(member(childNamed(outline, 'INC_FORM'), 'type')).toBe('PROG/PU');
+      {
+        rel: 'definitionIdentifier',
+        source:
+          '/sap/bc/adt/programs/includes/zmcp_d1_9e25_i01/source/main?context=%2fsap%2fbc%2fadt%2fprograms%2fprograms%2fzmcp_d1_9e25_pr',
+        fragment: 'type=PROG%2FPU;name=INC_FORM',
+      },
+    );
+    assert.equal(member(childNamed(outline, 'INC_FORM'), 'type'), 'PROG/PU');
   });
 
   it('a function group: its includes and modules, each with its source', async () => {
@@ -213,16 +227,16 @@ describe('GetObjectOutline', () => {
       answers: answered('read-outline-function-group--01-objectstructure'),
       expected: 'none',
     });
-    expect(result.isError).toBe(false);
-    expect(result.urls).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(result.urls, [
       '/sap/bc/adt/functions/groups/zmcp_d19e25/objectstructure?version=active',
     ]);
     const module = childNamed(
       member(result.payload, 'outline'),
       'Z_MCP_D1_9E25',
     );
-    expect(member(module, 'type')).toBe('FUGR/FF');
-    expect(linkOf(module, 'definitionIdentifier')).toEqual({
+    assert.equal(member(module, 'type'), 'FUGR/FF');
+    assert.deepStrictEqual(linkOf(module, 'definitionIdentifier'), {
       rel: 'definitionIdentifier',
       source:
         '/sap/bc/adt/functions/groups/zmcp_d19e25/fmodules/z_mcp_d1_9e25/source/main',
@@ -242,8 +256,9 @@ describe('GetObjectOutline', () => {
       answers: answered('read-outline-interface--01-objectstructure'),
       expected: 'none',
     });
-    expect(result.isError).toBe(false);
-    expect(result.text).toBe(
+    assert.equal(result.isError, false);
+    assert.equal(
+      result.text,
       corpusBody('read-outline-interface--01-objectstructure'),
     );
   });
@@ -262,8 +277,8 @@ describe('GetObjectOutline', () => {
       ],
       expected: 'none',
     });
-    expect(result.isError).toBe(true);
-    expect(result.text).toContain('ExceptionResourceNotFound');
+    assert.equal(result.isError, true);
+    assert.ok(result.text.includes('ExceptionResourceNotFound'));
   });
 
   it('a 200 that is not an outline is refused, not answered as an empty outline', async () => {
@@ -275,8 +290,8 @@ describe('GetObjectOutline', () => {
       answers: [{ status: 200, data: '' }],
       expected: 'none',
     });
-    expect(result.isError).toBe(true);
-    expect(result.text).toContain('no outline document');
+    assert.equal(result.isError, true);
+    assert.ok(result.text.includes('no outline document'));
   });
 
   it('on the cloud a program is refused before anything is sent', async () => {
@@ -288,9 +303,10 @@ describe('GetObjectOutline', () => {
       expected: 'nothing-sent',
       refusal: 'thrown',
     });
-    expect(recorded.requests).toEqual([]);
-    expect(
+    assert.deepStrictEqual(recorded.requests, []);
+    assert.equal(
       recorded.thrown instanceof Error || recorded.answer?.isError === true,
-    ).toBe(true);
+      true,
+    );
   });
 });

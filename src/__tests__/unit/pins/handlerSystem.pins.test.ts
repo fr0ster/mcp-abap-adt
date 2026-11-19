@@ -19,6 +19,7 @@
  * so a row with it sends what the row without it sends.
  */
 
+import { describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { envelopeResponse } from '../../helpers/batchEnvelope';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';

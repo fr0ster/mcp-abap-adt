@@ -22,6 +22,8 @@
  * stated as that variant.
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import type { McpResult } from '../../helpers/pinCases';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
@@ -49,9 +51,9 @@ function member(value: unknown, key: string): unknown {
 
 /** A finished read run, as Get answers it: its header, then the rows. */
 function expectFinished(answer: McpResult, tool: string): void {
-  expect(member(itemOf(answer, 0), 'state')).toBe('finished');
-  expect(member(itemOf(answer, 0), 'tool')).toBe(tool);
-  expect(member(itemOf(answer, 1), 'sql_query')).toBe(QUERY);
+  assert.equal(member(itemOf(answer, 0), 'state'), 'finished');
+  assert.equal(member(itemOf(answer, 0), 'tool'), tool);
+  assert.equal(member(itemOf(answer, 1), 'sql_query'), QUERY);
 }
 
 /**
@@ -60,11 +62,11 @@ function expectFinished(answer: McpResult, tool: string): void {
  */
 function statedAs(variant: 'onprem' | 'cloud'): void {
   let previous: string | undefined;
-  beforeAll(() => {
+  before(() => {
     previous = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = variant;
   });
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
@@ -242,9 +244,10 @@ describe('onprem', () => {
       expected: 'none',
       ran: (answer) => {
         const runs = member(itemOf(answer, 0), 'runs');
-        expect(
+        assert.deepStrictEqual(
           Array.isArray(runs) ? runs.map((run) => member(run, 'state')) : runs,
-        ).toEqual(['finished']);
+          ['finished'],
+        );
       },
     },
     {
@@ -259,7 +262,7 @@ describe('onprem', () => {
       args: {},
       expected: 'none',
       ran: (answer) =>
-        expect(member(itemOf(answer, 0), 'state')).toBe('discarded'),
+        assert.equal(member(itemOf(answer, 0), 'state'), 'discarded'),
     },
     {
       tool: 'HandlerBackgroundRunGet',
@@ -286,9 +289,10 @@ describe('onprem', () => {
       expected: 'none',
       ran: (answer) => {
         const runs = member(itemOf(answer, 0), 'runs');
-        expect(
+        assert.deepStrictEqual(
           Array.isArray(runs) ? runs.map((run) => member(run, 'state')) : runs,
-        ).toEqual(['finished']);
+          ['finished'],
+        );
       },
     },
     {
@@ -303,7 +307,7 @@ describe('onprem', () => {
       args: {},
       expected: 'none',
       ran: (answer) =>
-        expect(member(itemOf(answer, 0), 'state')).toBe('discarded'),
+        assert.equal(member(itemOf(answer, 0), 'state'), 'discarded'),
     },
   ]);
 });
@@ -526,9 +530,10 @@ describe('cloud', () => {
       expected: 'none',
       ran: (answer) => {
         const runs = member(itemOf(answer, 0), 'runs');
-        expect(
+        assert.deepStrictEqual(
           Array.isArray(runs) ? runs.map((run) => member(run, 'state')) : runs,
-        ).toEqual(['finished']);
+          ['finished'],
+        );
       },
     },
     {
@@ -543,7 +548,7 @@ describe('cloud', () => {
       args: {},
       expected: 'none',
       ran: (answer) =>
-        expect(member(itemOf(answer, 0), 'state')).toBe('discarded'),
+        assert.equal(member(itemOf(answer, 0), 'state'), 'discarded'),
     },
     {
       tool: 'HandlerBackgroundRunGet',
@@ -570,9 +575,10 @@ describe('cloud', () => {
       expected: 'none',
       ran: (answer) => {
         const runs = member(itemOf(answer, 0), 'runs');
-        expect(
+        assert.deepStrictEqual(
           Array.isArray(runs) ? runs.map((run) => member(run, 'state')) : runs,
-        ).toEqual(['finished']);
+          ['finished'],
+        );
       },
     },
     {
@@ -587,7 +593,7 @@ describe('cloud', () => {
       args: {},
       expected: 'none',
       ran: (answer) =>
-        expect(member(itemOf(answer, 0), 'state')).toBe('discarded'),
+        assert.equal(member(itemOf(answer, 0), 'state'), 'discarded'),
     },
   ]);
 });

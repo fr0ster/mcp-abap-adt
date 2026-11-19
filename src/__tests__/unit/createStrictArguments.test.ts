@@ -6,6 +6,8 @@
  * schema) and one undeclared argument.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { listedTool, statedEnvironment } from '../../lib/listedTool';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import {
@@ -69,23 +71,29 @@ const CASES = [
 
 describe('a create tool refuses an argument its schema does not declare', () => {
   it('runs every full Create* tool', () => {
-    expect(CASES.length).toBeGreaterThanOrEqual(27);
+    assert.ok(CASES.length >= 27);
   });
 
-  it.each(CASES)('$tool ($variant)', async ({ tool, variant, args }) => {
-    const recording = await recordCase({
-      tool,
-      variant,
-      stand: 'recording',
-      args: { ...args, not_an_argument: 'X' },
-      expected: 'none',
+  for (const { tool, variant, args } of CASES) {
+    it(`${tool} (${variant})`, async () => {
+      const recording = await recordCase({
+        tool,
+        variant,
+        stand: 'recording',
+        args: { ...args, not_an_argument: 'X' },
+        expected: 'none',
+      });
+      assert.deepStrictEqual(recording.requests, []);
+      const message =
+        recording.thrown instanceof Error ? recording.thrown.message : '';
+      assert.ok(
+        message.includes(
+          `Input validation error: Invalid arguments for tool ${tool}: `,
+        ),
+      );
+      assert.ok(
+        message.includes(`not_an_argument is not an argument of ${tool}`),
+      );
     });
-    expect(recording.requests).toEqual([]);
-    const message =
-      recording.thrown instanceof Error ? recording.thrown.message : '';
-    expect(message).toContain(
-      `Input validation error: Invalid arguments for tool ${tool}: `,
-    );
-    expect(message).toContain(`not_an_argument is not an argument of ${tool}`);
-  });
+  }
 });

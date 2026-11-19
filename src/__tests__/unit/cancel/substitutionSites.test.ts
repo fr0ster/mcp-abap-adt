@@ -15,6 +15,16 @@
  *     reaches the lock session and logs it off.
  */
 
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format } from 'node:util';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
@@ -64,8 +74,8 @@ interface Sent {
 
 type FakeRfc = IAbapConnection & {
   sent: Sent[];
-  connect: jest.Mock;
-  disconnect: jest.Mock;
+  connect: Mock<() => Promise<void>>;
+  disconnect: Mock<() => Promise<void>>;
   /** From now on every request `match` accepts is refused by SAP. */
   refuse(match: (sent: Sent) => boolean): void;
 };
@@ -79,14 +89,14 @@ function rfcConnection(): FakeRfc {
   const refusals: Array<(sent: Sent) => boolean> = [];
   return Object.assign(base, {
     sent,
-    connect: jest.fn(async () => {}),
-    setSessionType: jest.fn(),
+    connect: mock.fn(async () => {}),
+    setSessionType: mock.fn(),
     getConfig: () => ({
       url: 'https://sap.example.invalid',
       client: '100',
       connectionType: 'rfc',
     }),
-    disconnect: jest.fn(async () => {}),
+    disconnect: mock.fn(async () => {}),
     refuse: (match: (sent: Sent) => boolean) => {
       refusals.push(match);
     },
@@ -138,10 +148,10 @@ let previousType: string | undefined;
 beforeEach(() => {
   previousType = process.env.SAP_SYSTEM_TYPE;
   process.env.SAP_SYSTEM_TYPE = 'onprem';
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
 });
@@ -202,45 +212,53 @@ const SITES: Array<[string, string, Record<string, unknown>]> = [
   ],
 ];
 
-describe.each(SITES)('%s', (_label, tool, args) => {
-  it('SAP accepts it: its fresh connection is disconnected once, no request of it carries a signal', async () => {
-    const injected = rfcConnection();
-    const factory = hostFactory();
-    const client = await served(injected, factory);
-    try {
-      // SAP accepts every request (how the tool reads the stand-in's empty
-      // answers is not the point here).
-      await client.callTool({ name: tool, arguments: args });
-      expect(factory.calls).toEqual([[]]);
-      const fresh = factory.made[0] as FakeRfc;
-      expect(fresh.sent.length).toBeGreaterThan(0);
-      expect(fresh.sent.filter((s) => s.signal)).toEqual([]);
-      expect(fresh.disconnect).toHaveBeenCalledTimes(1);
-      expect(injected.sent).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
+for (const [_label, tool, args] of SITES) {
+  describe(format('%s', _label), () => {
+    it('SAP accepts it: its fresh connection is disconnected once, no request of it carries a signal', async () => {
+      const injected = rfcConnection();
+      const factory = hostFactory();
+      const client = await served(injected, factory);
+      try {
+        // SAP accepts every request (how the tool reads the stand-in's empty
+        // answers is not the point here).
+        await client.callTool({ name: tool, arguments: args });
+        assert.deepStrictEqual(factory.calls, [[]]);
+        const fresh = factory.made[0] as FakeRfc;
+        assert.ok(fresh.sent.length > 0);
+        assert.deepStrictEqual(
+          fresh.sent.filter((s) => s.signal),
+          [],
+        );
+        assert.equal(fresh.disconnect.mock.callCount(), 1);
+        assert.deepStrictEqual(injected.sent, []);
+      } finally {
+        await client.close();
+      }
+    });
 
-  it('fails, SAP refusing it: its fresh connection is disconnected once all the same, no request of it carries a signal', async () => {
-    const injected = rfcConnection();
-    // Every request on the fresh connection is refused.
-    const factory = hostFactory((fresh) => fresh.refuse(() => true));
-    const client = await served(injected, factory);
-    try {
-      const result = await client.callTool({ name: tool, arguments: args });
-      expect(result.isError).toBe(true);
-      expect(factory.calls).toEqual([[]]);
-      const fresh = factory.made[0] as FakeRfc;
-      expect(fresh.sent.length).toBeGreaterThan(0);
-      expect(fresh.sent.filter((s) => s.signal)).toEqual([]);
-      expect(fresh.disconnect).toHaveBeenCalledTimes(1);
-      expect(injected.sent).toEqual([]);
-    } finally {
-      await client.close();
-    }
+    it('fails, SAP refusing it: its fresh connection is disconnected once all the same, no request of it carries a signal', async () => {
+      const injected = rfcConnection();
+      // Every request on the fresh connection is refused.
+      const factory = hostFactory((fresh) => fresh.refuse(() => true));
+      const client = await served(injected, factory);
+      try {
+        const result = await client.callTool({ name: tool, arguments: args });
+        assert.equal(result.isError, true);
+        assert.deepStrictEqual(factory.calls, [[]]);
+        const fresh = factory.made[0] as FakeRfc;
+        assert.ok(fresh.sent.length > 0);
+        assert.deepStrictEqual(
+          fresh.sent.filter((s) => s.signal),
+          [],
+        );
+        assert.equal(fresh.disconnect.mock.callCount(), 1);
+        assert.deepStrictEqual(injected.sent, []);
+      } finally {
+        await client.close();
+      }
+    });
   });
-});
+}
 
 describe('over RFC: HandlerLock → HandlerUpdate → HandlerUnlock PACKAGE', () => {
   const isUnlock = (s: Sent) => s.url.includes('_action=UNLOCK');
@@ -257,8 +275,8 @@ describe('over RFC: HandlerLock → HandlerUpdate → HandlerUnlock PACKAGE', ()
       },
     });
     const handle = JSON.parse(textOf(locked)).lock_handle as string;
-    expect(typeof handle).toBe('string');
-    expect(factory.made).toHaveLength(1);
+    assert.equal(typeof handle, 'string');
+    assert.equal(factory.made.length, 1);
     return { handle, session: factory.made[0] as FakeRfc };
   }
 
@@ -289,24 +307,27 @@ describe('over RFC: HandlerLock → HandlerUpdate → HandlerUnlock PACKAGE', ()
     const client = await served(injected, factory);
     try {
       const { handle, session } = await lock(client, factory);
-      expect(session.disconnect).not.toHaveBeenCalled();
+      assert.equal(session.disconnect.mock.callCount(), 0);
 
       const updated = await update(client, handle);
-      expect(updated.isError).toBeFalsy();
+      assert.ok(!updated.isError);
       // On the lock's session, nothing on the injected one, no new session.
-      expect(session.sent.filter(isWrite)).toHaveLength(1);
-      expect(session.disconnect).not.toHaveBeenCalled();
-      expect(factory.made).toHaveLength(1);
+      assert.equal(session.sent.filter(isWrite).length, 1);
+      assert.equal(session.disconnect.mock.callCount(), 0);
+      assert.equal(factory.made.length, 1);
 
       await unlock(client, handle);
-      expect(session.sent.filter(isUnlock)).toHaveLength(1);
-      expect(session.sent.findIndex(isUnlock)).toBeGreaterThan(
-        session.sent.findIndex(isWrite),
+      assert.equal(session.sent.filter(isUnlock).length, 1);
+      assert.ok(
+        session.sent.findIndex(isUnlock) > session.sent.findIndex(isWrite),
       );
-      expect(session.disconnect).toHaveBeenCalledTimes(1);
-      expect(session.sent.filter((s) => s.signal)).toEqual([]);
-      expect(injected.sent).toEqual([]);
-      expect(factory.made).toHaveLength(1);
+      assert.equal(session.disconnect.mock.callCount(), 1);
+      assert.deepStrictEqual(
+        session.sent.filter((s) => s.signal),
+        [],
+      );
+      assert.deepStrictEqual(injected.sent, []);
+      assert.equal(factory.made.length, 1);
     } finally {
       await client.close();
     }
@@ -321,16 +342,19 @@ describe('over RFC: HandlerLock → HandlerUpdate → HandlerUnlock PACKAGE', ()
       session.refuse(isWrite);
 
       const updated = await update(client, handle);
-      expect(updated.isError).toBe(true);
-      expect(session.sent.filter(isWrite)).toHaveLength(1);
-      expect(session.disconnect).not.toHaveBeenCalled();
+      assert.equal(updated.isError, true);
+      assert.equal(session.sent.filter(isWrite).length, 1);
+      assert.equal(session.disconnect.mock.callCount(), 0);
 
       await unlock(client, handle);
-      expect(session.sent.filter(isUnlock)).toHaveLength(1);
-      expect(session.disconnect).toHaveBeenCalledTimes(1);
-      expect(session.sent.filter((s) => s.signal)).toEqual([]);
-      expect(injected.sent).toEqual([]);
-      expect(factory.made).toHaveLength(1);
+      assert.equal(session.sent.filter(isUnlock).length, 1);
+      assert.equal(session.disconnect.mock.callCount(), 1);
+      assert.deepStrictEqual(
+        session.sent.filter((s) => s.signal),
+        [],
+      );
+      assert.deepStrictEqual(injected.sent, []);
+      assert.equal(factory.made.length, 1);
     } finally {
       await client.close();
     }

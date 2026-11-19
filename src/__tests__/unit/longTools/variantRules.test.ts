@@ -14,6 +14,9 @@
  *   McpServer.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { ADT_SEARCH_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -31,18 +34,16 @@ import { registerFreshConnectionFactory } from '../../../lib/packageSessions';
 import { notASearchType, searchNameOf } from '../../../lib/searchTypes';
 import { declareSystemKind } from '../../../lib/systemKind';
 
-jest.setTimeout(60_000);
-
 const saved = process.env.SAP_SYSTEM_TYPE;
 beforeEach(() => {
   delete process.env.SAP_SYSTEM_TYPE;
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(console, 'error', () => {});
+  mock.method(process.stderr, 'write', () => true);
 });
 afterEach(() => {
   if (saved === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = saved;
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 type Variant = 'onprem' | 'cloud';
@@ -60,11 +61,11 @@ const ONLY: Readonly<Record<Variant, string>> = {
 };
 
 it('the names are each one table’s alone', () => {
-  expect(ONPREM_ONLY).not.toBe('');
-  expect(searchNameOf('cloud', ONLY.cloud)).toBeDefined();
-  expect(searchNameOf('onprem', ONLY.cloud)).toBeUndefined();
-  expect(searchNameOf('onprem', ONLY.onprem)).toBeDefined();
-  expect(searchNameOf('cloud', ONLY.onprem)).toBeUndefined();
+  assert.notEqual(ONPREM_ONLY, '');
+  assert.notEqual(searchNameOf('cloud', ONLY.cloud), undefined);
+  assert.equal(searchNameOf('onprem', ONLY.cloud), undefined);
+  assert.notEqual(searchNameOf('onprem', ONLY.onprem), undefined);
+  assert.equal(searchNameOf('cloud', ONLY.onprem), undefined);
 });
 
 /** A connection that records each request and answers 200 with no body. */
@@ -113,9 +114,8 @@ async function clientOn(server: McpServer | EmbeddableMcpServer) {
   return client;
 }
 
-describe.each(TYPE_CASES)(
-  'on %s, the %s-only search name',
-  (variant, owner, refused) => {
+for (const [variant, owner, refused] of TYPE_CASES) {
+  describe(format('on %s, the %s-only search name', variant, owner), () => {
     const type = ONLY[owner];
     const words = notASearchType('object_type', type);
     const calls = [
@@ -123,62 +123,66 @@ describe.each(TYPE_CASES)(
       ['HandlerSystem', { action: 'search_object', ...searchArgs(type) }],
     ] as const;
 
-    it.each(calls)('the server: %s', async (tool, args) => {
-      const { connection } = recording();
-      declareSystemKind(connection, variant);
-      const placeholder = {
-        connection: null,
-        logger: undefined,
-      } as unknown as HandlerContext;
-      const server = new EmbeddableMcpServer({
-        connection: connection as never,
-        systemType: variant,
-        handlersRegistry: new CompositeHandlersRegistry(groups(placeholder)),
+    for (const [tool, args] of calls) {
+      it(format('the server: %s', tool), async () => {
+        const { connection } = recording();
+        declareSystemKind(connection, variant);
+        const placeholder = {
+          connection: null,
+          logger: undefined,
+        } as unknown as HandlerContext;
+        const server = new EmbeddableMcpServer({
+          connection: connection as never,
+          systemType: variant,
+          handlersRegistry: new CompositeHandlersRegistry(groups(placeholder)),
+        });
+        const client = await clientOn(server);
+        try {
+          const text = textOf(
+            (await client.callTool({ name: tool, arguments: args })) as {
+              content?: Array<{ text?: string }>;
+            },
+          );
+          if (refused) assert.ok(text.includes(words));
+          else assert.ok(!text.includes(words));
+        } finally {
+          await client.close();
+        }
       });
-      const client = await clientOn(server);
-      try {
-        const text = textOf(
-          (await client.callTool({ name: tool, arguments: args })) as {
-            content?: Array<{ text?: string }>;
-          },
-        );
-        if (refused) expect(text).toContain(words);
-        else expect(text).not.toContain(words);
-      } finally {
-        await client.close();
-      }
-    });
+    }
 
-    it.each(calls)('a plain McpServer: %s', async (tool, args) => {
-      const { connection } = recording();
-      declareSystemKind(connection, variant);
-      const context = {
-        connection,
-        logger: undefined,
-        systemType: variant,
-      } as unknown as HandlerContext;
-      const group = groups(context).find((g) =>
-        g.getHandlers().some((e) => e.toolDefinition.name === tool),
-      );
-      const entry = group
-        ?.getHandlers()
-        .find((e) => e.toolDefinition.name === tool);
-      if (group === undefined || entry === undefined) throw new Error(tool);
-      const server = new McpServer({ name: 'plain', version: '1.0.0' });
-      group.registerOneTool(server, entry, async () => context);
-      const client = await clientOn(server);
-      try {
-        const text = textOf(
-          (await client.callTool({ name: tool, arguments: args })) as {
-            content?: Array<{ text?: string }>;
-          },
+    for (const [tool, args] of calls) {
+      it(format('a plain McpServer: %s', tool), async () => {
+        const { connection } = recording();
+        declareSystemKind(connection, variant);
+        const context = {
+          connection,
+          logger: undefined,
+          systemType: variant,
+        } as unknown as HandlerContext;
+        const group = groups(context).find((g) =>
+          g.getHandlers().some((e) => e.toolDefinition.name === tool),
         );
-        if (refused) expect(text).toContain(words);
-        else expect(text).not.toContain(words);
-      } finally {
-        await client.close();
-      }
-    });
+        const entry = group
+          ?.getHandlers()
+          .find((e) => e.toolDefinition.name === tool);
+        if (group === undefined || entry === undefined) throw new Error(tool);
+        const server = new McpServer({ name: 'plain', version: '1.0.0' });
+        group.registerOneTool(server, entry, async () => context);
+        const client = await clientOn(server);
+        try {
+          const text = textOf(
+            (await client.callTool({ name: tool, arguments: args })) as {
+              content?: Array<{ text?: string }>;
+            },
+          );
+          if (refused) assert.ok(text.includes(words));
+          else assert.ok(!text.includes(words));
+        } finally {
+          await client.close();
+        }
+      });
+    }
 
     it('compact HandlerSystem’s target, called through its entry', async () => {
       const { connection } = recording();
@@ -198,8 +202,8 @@ describe.each(TYPE_CASES)(
           (answer) => textOf(answer),
           (error: Error) => error.message,
         );
-      if (refused) expect(thrown).toContain(words);
-      else expect(thrown).not.toContain(words);
+      if (refused) assert.ok(thrown.includes(words));
+      else assert.ok(!thrown.includes(words));
     });
 
     it('HandlerExporter: SearchObject', async () => {
@@ -215,11 +219,11 @@ describe.each(TYPE_CASES)(
           (answer) => textOf(answer),
           (error: Error) => error.message,
         );
-      if (refused) expect(thrown).toContain(words);
-      else expect(thrown).not.toContain(words);
+      if (refused) assert.ok(thrown.includes(words));
+      else assert.ok(!thrown.includes(words));
     });
-  },
-);
+  });
+}
 
 /** Each variant-dependent long tool, its arguments, no kind anywhere. */
 const NO_KIND: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
@@ -240,67 +244,71 @@ const NO_KIND: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
 ];
 
 describe('no kind stated or recorded: system_type_required before anything', () => {
-  it.each(NO_KIND)('the server: %s', async (tool, args) => {
-    const { connection, requests } = recording();
-    const fresh = jest.fn(async () => {
-      throw new Error('the factory was called');
+  for (const [tool, args] of NO_KIND) {
+    it(format('the server: %s', tool), async () => {
+      const { connection, requests } = recording();
+      const fresh = mock.fn(async () => {
+        throw new Error('the factory was called');
+      });
+      const placeholder = {
+        connection: null,
+        logger: undefined,
+      } as unknown as HandlerContext;
+      const server = new EmbeddableMcpServer({
+        connection: connection as never,
+        freshConnection: fresh,
+        handlersRegistry: new CompositeHandlersRegistry(groups(placeholder)),
+      });
+      const client = await clientOn(server);
+      try {
+        const text = textOf(
+          (await client.callTool({
+            name: tool,
+            arguments: { ...args, background: false },
+          })) as { content?: Array<{ text?: string }> },
+        );
+        assert.ok(text.includes('system_type_required'));
+        assert.equal(fresh.mock.callCount(), 0);
+        assert.deepStrictEqual(requests, []);
+      } finally {
+        await client.close();
+      }
     });
-    const placeholder = {
-      connection: null,
-      logger: undefined,
-    } as unknown as HandlerContext;
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      freshConnection: fresh,
-      handlersRegistry: new CompositeHandlersRegistry(groups(placeholder)),
-    });
-    const client = await clientOn(server);
-    try {
-      const text = textOf(
-        (await client.callTool({
-          name: tool,
-          arguments: { ...args, background: false },
-        })) as { content?: Array<{ text?: string }> },
-      );
-      expect(text).toContain('system_type_required');
-      expect(fresh).not.toHaveBeenCalled();
-      expect(requests).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
+  }
 
-  it.each(NO_KIND)('a plain McpServer: %s', async (tool, args) => {
-    const { connection, requests } = recording();
-    const fresh = jest.fn(async () => {
-      throw new Error('the factory was called');
-    });
-    registerFreshConnectionFactory(connection, fresh as never);
-    const context = {
-      connection,
-      logger: undefined,
-    } as unknown as HandlerContext;
-    const group = groups(context).find((g) =>
-      g.getHandlers().some((e) => e.toolDefinition.name === tool),
-    );
-    const entry = group
-      ?.getHandlers()
-      .find((e) => e.toolDefinition.name === tool);
-    if (group === undefined || entry === undefined) throw new Error(tool);
-    const server = new McpServer({ name: 'plain', version: '1.0.0' });
-    group.registerOneTool(server, entry, async () => context);
-    const client = await clientOn(server);
-    try {
-      const text = textOf(
-        (await client.callTool({ name: tool, arguments: args })) as {
-          content?: Array<{ text?: string }>;
-        },
+  for (const [tool, args] of NO_KIND) {
+    it(format('a plain McpServer: %s', tool), async () => {
+      const { connection, requests } = recording();
+      const fresh = mock.fn(async () => {
+        throw new Error('the factory was called');
+      });
+      registerFreshConnectionFactory(connection, fresh as never);
+      const context = {
+        connection,
+        logger: undefined,
+      } as unknown as HandlerContext;
+      const group = groups(context).find((g) =>
+        g.getHandlers().some((e) => e.toolDefinition.name === tool),
       );
-      expect(text).toContain('system_type_required');
-      expect(fresh).not.toHaveBeenCalled();
-      expect(requests).toEqual([]);
-    } finally {
-      await client.close();
-    }
-  });
+      const entry = group
+        ?.getHandlers()
+        .find((e) => e.toolDefinition.name === tool);
+      if (group === undefined || entry === undefined) throw new Error(tool);
+      const server = new McpServer({ name: 'plain', version: '1.0.0' });
+      group.registerOneTool(server, entry, async () => context);
+      const client = await clientOn(server);
+      try {
+        const text = textOf(
+          (await client.callTool({ name: tool, arguments: args })) as {
+            content?: Array<{ text?: string }>;
+          },
+        );
+        assert.ok(text.includes('system_type_required'));
+        assert.equal(fresh.mock.callCount(), 0);
+        assert.deepStrictEqual(requests, []);
+      } finally {
+        await client.close();
+      }
+    });
+  }
 });

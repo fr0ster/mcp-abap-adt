@@ -3,6 +3,10 @@
  * once. A debug tool called through it with a wrongly typed argument is refused
  * by the SDK, and the handler is never called.
  */
+
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
@@ -18,6 +22,7 @@ import { TOOL_DEFINITION as VirtualFolders } from '../../../handlers/system/low/
 import { TOOL_DEFINITION as CompactSession } from '../../../lib/compact/debug/handleHandlerDebugSession';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { assertMatchObject } from '../../helpers/assertions';
 import { withSystemInformation } from '../../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 
@@ -27,7 +32,7 @@ beforeEach(() => {
 });
 
 class BoundaryServer extends BaseMcpServer {
-  readonly handler = jest.fn(async (_context: unknown, _args: unknown) => ({
+  readonly handler = mock.fn(async (_context: unknown, _args: unknown) => ({
     isError: false,
     content: [{ type: 'text', text: 'called' }],
   }));
@@ -79,7 +84,7 @@ const textOf = (r: any) =>
 
 describe('the MCP boundary validates debug tool arguments', () => {
   const handle = '0'.repeat(32);
-  it.each([
+  for (const [_, name, args] of [
     [
       'a string for a number',
       Wait.name,
@@ -153,15 +158,17 @@ describe('the MCP boundary validates debug tool arguments', () => {
       SnapshotGet.name,
       { snapshot_id: 'S1', view: 'ranking', max_objects: 0 },
     ],
-  ])('refuses %s; the handler is not called', async (_, name, args) => {
-    const server = new BoundaryServer();
-    const client = await connected(server);
-    const result = await client.callTool({ name, arguments: args });
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toMatch(/Input validation error/);
-    expect(server.handler).not.toHaveBeenCalled();
-    await client.close();
-  });
+  ] satisfies [string, string, Record<string, unknown>][]) {
+    it(format('refuses %s; the handler is not called', _), async () => {
+      const server = new BoundaryServer();
+      const client = await connected(server);
+      const result = await client.callTool({ name, arguments: args });
+      assert.equal(result.isError, true);
+      assert.match(textOf(result), /Input validation error/);
+      assert.equal(server.handler.mock.callCount(), 0);
+      await client.close();
+    });
+  }
 
   it('a start with none of the new parameters reaches the handler without them: no default fills them in', async () => {
     const server = new BoundaryServer();
@@ -171,11 +178,14 @@ describe('the MCP boundary validates debug tool arguments', () => {
       name: StartListener.name,
       arguments: { breakpoints: [{ statement: 'WRITE' }] },
     });
-    expect(result.isError).toBeFalsy();
-    const received = server.handler.mock.calls[0][1] as Record<string, unknown>;
-    expect(received).not.toHaveProperty('request_user');
-    expect(received).not.toHaveProperty('debugging_mode');
-    expect(received).not.toHaveProperty('settings');
+    assert.ok(!result.isError);
+    const received = server.handler.mock.calls[0]?.arguments[1] as Record<
+      string,
+      unknown
+    >;
+    assert.ok(!('request_user' in Object(received)));
+    assert.ok(!('debugging_mode' in Object(received)));
+    assert.ok(!('settings' in Object(received)));
     await client.close();
   });
 
@@ -186,11 +196,14 @@ describe('the MCP boundary validates debug tool arguments', () => {
       name: CompactSession.name,
       arguments: { kind: 'amdp', operation: 'start' },
     });
-    expect(result.isError).toBeFalsy();
-    const received = server.handler.mock.calls[0][1] as Record<string, unknown>;
-    expect(received).not.toHaveProperty('request_user');
-    expect(received).not.toHaveProperty('debugging_mode');
-    expect(received).not.toHaveProperty('settings');
+    assert.ok(!result.isError);
+    const received = server.handler.mock.calls[0]?.arguments[1] as Record<
+      string,
+      unknown
+    >;
+    assert.ok(!('request_user' in Object(received)));
+    assert.ok(!('debugging_mode' in Object(received)));
+    assert.ok(!('settings' in Object(received)));
     await client.close();
   });
 
@@ -202,9 +215,11 @@ describe('the MCP boundary validates debug tool arguments', () => {
       name: SetBreakpoints.name,
       arguments: { state_handle: handle, breakpoints },
     });
-    expect(result.isError).toBeFalsy();
-    expect(server.handler).toHaveBeenCalledTimes(1);
-    expect(server.handler.mock.calls[0][1]).toMatchObject({ breakpoints });
+    assert.ok(!result.isError);
+    assert.equal(server.handler.mock.callCount(), 1);
+    assertMatchObject(server.handler.mock.calls[0]?.arguments[1], {
+      breakpoints,
+    });
     await client.close();
   });
 
@@ -219,10 +234,13 @@ describe('the MCP boundary validates debug tool arguments', () => {
         unknown_top: true,
       },
     });
-    expect(result.isError).toBeFalsy();
-    const received = server.handler.mock.calls[0][1] as Record<string, unknown>;
-    expect(received.preselection).toEqual(preselection);
-    expect(received).not.toHaveProperty('unknown_top');
+    assert.ok(!result.isError);
+    const received = server.handler.mock.calls[0]?.arguments[1] as Record<
+      string,
+      unknown
+    >;
+    assert.deepStrictEqual(received.preselection, preselection);
+    assert.ok(!('unknown_top' in Object(received)));
     await client.close();
   });
 
@@ -233,9 +251,9 @@ describe('the MCP boundary validates debug tool arguments', () => {
       name: SetStackPosition.name,
       arguments: { state_handle: handle, position: 2 },
     });
-    expect(result.isError).toBeFalsy();
-    expect(textOf(result)).toBe('called');
-    expect(server.handler).toHaveBeenCalledTimes(1);
+    assert.ok(!result.isError);
+    assert.equal(textOf(result), 'called');
+    assert.equal(server.handler.mock.callCount(), 1);
     await client.close();
   });
 });

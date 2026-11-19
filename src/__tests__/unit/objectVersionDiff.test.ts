@@ -24,14 +24,17 @@ import { assertRejects } from '../helpers/assertions';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 import { stateSystemKind } from '../helpers/systemKind';
 
-const mockClassGetVersionSource = mock.fn<(...args: any[]) => any>();
-const mockGetClass = mock.fn<(...args: any[]) => any>();
+// Made afresh before each case (Jest's mockReset): no one-off answer a case
+// left unconsumed reaches the next one.
+let mockClassGetVersionSource = mock.fn<(...args: any[]) => any>();
+let mockGetClass = mock.fn<(...args: any[]) => any>();
 
 // The declared variant the boundary checks a type argument against.
 // The declared variant: the kind stated, read by the real variantOf.
 stateSystemKind('onprem');
 mock.method(clients, 'createAdtClient', () => ({
-  getClass: mockGetClass,
+  // This case's mock, read when the client is asked.
+  getClass: (...args: any[]) => mockGetClass(...args),
 }));
 
 const ctx = { connection: {}, logger: undefined } as any;
@@ -51,11 +54,8 @@ function tool(name: string) {
 }
 
 beforeEach(() => {
-  mockClassGetVersionSource.mock.resetCalls();
-  mockClassGetVersionSource.mock.mockImplementation(() => undefined);
-  mockGetClass.mock.resetCalls();
-  mockGetClass.mock.mockImplementation(() => undefined);
-  mockGetClass.mock.mockImplementation(() => ({
+  mockClassGetVersionSource = mock.fn<(...args: any[]) => any>();
+  mockGetClass = mock.fn<(...args: any[]) => any>(() => ({
     getVersionSource: mockClassGetVersionSource,
   }));
 });

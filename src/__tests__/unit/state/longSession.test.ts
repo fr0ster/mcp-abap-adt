@@ -49,15 +49,13 @@ import {
 } from '../../../lib/toolSet';
 import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 
-// lib/connectionFactory's names replaced on the module that defines them
-// (mock.method; their callers read them at call time), as the Jest factory
-// did; the names it left out stay real.
+// lib/connectionFactory's createAbapConnection replaced on the module that
+// defines it (its callers read it at call time): a guard, nothing here may
+// build a connection. The Jest factory's systemKindOf / withSystemKindOf
+// were not load-bearing under node:test and are gone.
 mock.method(connectionFactory, 'createAbapConnection', () => {
   throw new Error('no connection may be built here');
 });
-mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
-// A view over a connection keeps its kind: the kind is mocked above.
-mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 

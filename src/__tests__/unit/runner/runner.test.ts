@@ -276,6 +276,9 @@ describe('the node:test runner', () => {
         '1',
         '--env',
         `RECORD=${record}`,
+        // The reporter stated: Node 22 reports in TAP to a pipe, 23 and
+        // later in spec; the counts are read in spec's words.
+        '--test-reporter=spec',
         file,
       ]);
       assert.equal(run.status, 0, run.stdout + run.stderr);
@@ -312,6 +315,9 @@ describe('the node:test runner', () => {
         '1',
         '--env',
         `RECORD=${record}`,
+        // The reporter stated: Node 22 reports in TAP to a pipe, 23 and
+        // later in spec; the counts are read in spec's words.
+        '--test-reporter=spec',
         file,
       ]);
       assert.equal(run.status, 0, run.stdout + run.stderr);

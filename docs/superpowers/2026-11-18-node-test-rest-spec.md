@@ -278,7 +278,7 @@ refuses another name, Code), and `assert` from `node:assert/strict`.
   over the rest: `expect.any(C)` → `typeof` for a primitive wrapper (Jest's `Any` treats
   `String`, `Number`, `Boolean`, `Function` by `typeof`, Code), else `instanceof`;
   `stringContaining(s)` → `includes`; `stringMatching(re)` → `assert.match` (the same
-  RegExp); `objectContaining(o)` → `assertMatchObject`; `arrayContaining(xs)` → each
+  RegExp); `objectContaining(o)` → `assertMatchObject` for its primitive fields, and `assert.deepStrictEqual` for each field whose value is an object or an array (Jest compares a named field with full equality; `assertMatchObject` would subset-match it) (owner, 2026-11-19); `arrayContaining(xs)` → each
   element of `xs` found by `isDeepStrictEqual`; `anything()` → `!== undefined && !== null`.
   Inside `toHaveBeenCalledWith`, the call's arguments are taken out and checked the same way.
 - A check that needs a type the value does not have (a `.includes` on `unknown`) narrows by

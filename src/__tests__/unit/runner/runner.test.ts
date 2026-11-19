@@ -162,40 +162,99 @@ describe('the node:test runner', () => {
     assert.deepEqual(recorded(record), ['ran']);
   });
 
-  it('a file that spies on process.stdout.write still reports its result', () => {
-    // The shape of the moved stdout suites: a spy on the file's own
-    // `process.stdout.write` around every test, each test taking a turn and
-    // writing through it. The file's process reports to the runner through
-    // that same stream, during the tests' turns too (measured: the spy
-    // records the report's writes; a spy that throws loses the file's result;
-    // one that swallows them loses the earlier tests' results and the run
-    // still exits 0), so the spy must call the real write for every result
-    // to arrive.
-    const file = writeAt(
-      scratch.dir,
-      'stdout-spy.test.js',
-      [
-        "const { afterEach, beforeEach, mock, test } = require('node:test');",
-        'let spy;',
-        "beforeEach(() => { spy = mock.method(process.stdout, 'write'); });",
-        'afterEach(() => { spy.mock.restore(); });',
-        ...['one', 'two', 'three'].map(
-          (word) =>
-            `test('${word}', async () => { await new Promise((turn) => setImmediate(turn)); process.stdout.write('${word}\\n'); });`,
-        ),
-        '',
-      ].join('\n'),
-    );
-    const run = runTool('run-tests.mjs', ['--concurrency', '1', file]);
-    assert.equal(run.status, 0, run.stdout + run.stderr);
-    const counted = run.stdout
-      .split('\n')
-      .filter((line) =>
-        ['ℹ tests ', 'ℹ pass ', 'ℹ fail '].some((head) =>
-          line.startsWith(head),
-        ),
+  describe("a stdout spy sees the runner's report unless it is synchronous", () => {
+    // A test file's process reports to the runner through its own
+    // `process.stdout.write`, while its tests take turns. Measured on the
+    // moved stdout suites: a spy held across a turn records the report's
+    // frames (a "nothing reaches stdout" check then fails), one that throws
+    // loses the file's result, one that swallows loses earlier results and
+    // the run still exits 0. A spy made and restored in one synchronous body
+    // cannot see a frame: nothing else runs between. Each fixture test writes
+    // nothing itself, so every write its spy records is the runner's.
+
+    /** The counted lines of a run's report. */
+    const counts = (stdout: string) =>
+      stdout
+        .split('\n')
+        .filter((line) =>
+          ['ℹ tests ', 'ℹ pass ', 'ℹ fail '].some((head) =>
+            line.startsWith(head),
+          ),
+        );
+
+    it("a recording spy held across a turn records the runner's frames, and the counts still arrive", () => {
+      const record = path.join(scratch.dir, 'stdout-held.record');
+      const file = writeAt(
+        scratch.dir,
+        'stdout-held.test.js',
+        [
+          "const { appendFileSync } = require('node:fs');",
+          "const { afterEach, beforeEach, mock, test } = require('node:test');",
+          'let spy;',
+          "beforeEach(() => { spy = mock.method(process.stdout, 'write'); });",
+          'afterEach(() => {',
+          '  const seen = spy.mock.callCount();',
+          '  spy.mock.restore();',
+          '  appendFileSync(process.env.RECORD, `${seen}\\n`);',
+          '});',
+          ...['one', 'two', 'three'].map(
+            (word) =>
+              `test('${word}', async () => { await new Promise((turn) => setImmediate(turn)); });`,
+          ),
+          '',
+        ].join('\n'),
       );
-    assert.deepEqual(counted, ['ℹ tests 3', 'ℹ pass 3', 'ℹ fail 0']);
+      const run = runTool('run-tests.mjs', [
+        '--concurrency',
+        '1',
+        '--env',
+        `RECORD=${record}`,
+        file,
+      ]);
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.deepEqual(counts(run.stdout), [
+        'ℹ tests 3',
+        'ℹ pass 3',
+        'ℹ fail 0',
+      ]);
+      const seen = recorded(record).map(Number);
+      assert.equal(seen.length, 3);
+      assert.ok(
+        seen.reduce((sum, n) => sum + n, 0) > 0,
+        `writes seen per test: ${seen.join(', ')}`,
+      );
+    });
+
+    it('a spy made and restored inside one synchronous test body records no write, and the counts arrive', () => {
+      const record = path.join(scratch.dir, 'stdout-sync.record');
+      const file = writeAt(
+        scratch.dir,
+        'stdout-sync.test.js',
+        [
+          "const { appendFileSync } = require('node:fs');",
+          "const { mock, test } = require('node:test');",
+          ...['one', 'two', 'three'].map(
+            (word) =>
+              `test('${word}', () => { const spy = mock.method(process.stdout, 'write'); const seen = spy.mock.callCount(); spy.mock.restore(); appendFileSync(process.env.RECORD, \`\${seen}\\n\`); });`,
+          ),
+          '',
+        ].join('\n'),
+      );
+      const run = runTool('run-tests.mjs', [
+        '--concurrency',
+        '1',
+        '--env',
+        `RECORD=${record}`,
+        file,
+      ]);
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.deepEqual(counts(run.stdout), [
+        'ℹ tests 3',
+        'ℹ pass 3',
+        'ℹ fail 0',
+      ]);
+      assert.deepEqual(recorded(record), ['0', '0', '0']);
+    });
   });
 
   describe('every file runs in its own process', () => {

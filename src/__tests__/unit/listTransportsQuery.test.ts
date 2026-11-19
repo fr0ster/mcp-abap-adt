@@ -6,11 +6,15 @@
  * configuration is read, and the answer is every request SAP returned: SAP
  * selects the requests the user owns or holds a task in.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
 import { runWithRequestContext } from '../../lib/requestContext';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -60,9 +64,10 @@ describe('ListTransports sends the query by user', () => {
 
   it("the session's login, not the responsible: modifiable requests of every type", async () => {
     const { requests } = await sentFor({});
-    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `GET ${COLLECTION}?user=SESSION_USER&requestStatus=D&requestType=KWT`,
-    ]);
+    assert.deepStrictEqual(
+      requests.map((r) => `${r.method} ${r.url}`),
+      [`GET ${COLLECTION}?user=SESSION_USER&requestStatus=D&requestType=KWT`],
+    );
   });
 
   it('login and responsible both stated (systeminformation unavailable): the login', async () => {
@@ -71,9 +76,10 @@ describe('ListTransports sends the query by user', () => {
       {},
       [{ data: LISTING }],
     );
-    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `GET ${COLLECTION}?user=ALICE&requestStatus=D&requestType=KWT`,
-    ]);
+    assert.deepStrictEqual(
+      requests.map((r) => `${r.method} ${r.url}`),
+      [`GET ${COLLECTION}?user=ALICE&requestStatus=D&requestType=KWT`],
+    );
   });
 
   it("no login stated: the system's user, as systeminformation names it", async () => {
@@ -81,10 +87,13 @@ describe('ListTransports sends the query by user', () => {
       { data: '{"userName":"bob","systemID":"SID"}' },
       { data: LISTING },
     ]);
-    expect(requests.map((r) => r.url)).toEqual([
-      '/sap/bc/adt/core/http/systeminformation',
-      `${COLLECTION}?user=BOB&requestStatus=D&requestType=KWT`,
-    ]);
+    assert.deepStrictEqual(
+      requests.map((r) => r.url),
+      [
+        '/sap/bc/adt/core/http/systeminformation',
+        `${COLLECTION}?user=BOB&requestStatus=D&requestType=KWT`,
+      ],
+    );
   });
 
   it('no login and no system user: an error, and no listing is sent', async () => {
@@ -93,26 +102,29 @@ describe('ListTransports sends the query by user', () => {
       {},
       [{ status: 404, statusText: 'Not Found', data: '' }],
     );
-    expect(answered.isError).toBe(true);
+    assert.equal(answered.isError, true);
     const [first] = answered.content ?? [];
-    expect(first?.text).toContain('Pass `user`');
-    expect(requests.map((r) => r.url)).toEqual([
-      '/sap/bc/adt/core/http/systeminformation',
-    ]);
+    assert.ok(first?.text.includes('Pass `user`'));
+    assert.deepStrictEqual(
+      requests.map((r) => r.url),
+      ['/sap/bc/adt/core/http/systeminformation'],
+    );
   });
 
   it('another user, named by the argument', async () => {
     const { requests } = await sentFor({ user: ' other_user ' });
-    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `GET ${COLLECTION}?user=OTHER_USER&requestStatus=D&requestType=KWT`,
-    ]);
+    assert.deepStrictEqual(
+      requests.map((r) => `${r.method} ${r.url}`),
+      [`GET ${COLLECTION}?user=OTHER_USER&requestStatus=D&requestType=KWT`],
+    );
   });
 
   it('modifiable_only false: modifiable and released', async () => {
     const { requests } = await sentFor({ modifiable_only: false });
-    expect(requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `GET ${COLLECTION}?user=SESSION_USER&requestStatus=DR&requestType=KWT`,
-    ]);
+    assert.deepStrictEqual(
+      requests.map((r) => `${r.method} ${r.url}`),
+      [`GET ${COLLECTION}?user=SESSION_USER&requestStatus=DR&requestType=KWT`],
+    );
   });
 
   it('reads no search configuration', async () => {
@@ -122,18 +134,19 @@ describe('ListTransports sends the query by user', () => {
       { modifiable_only: false },
     ]) {
       const { requests } = await sentFor(args);
-      expect(
+      assert.deepStrictEqual(
         requests.filter((r) => r.url.includes('searchconfiguration')),
-      ).toEqual([]);
-      expect(requests).toHaveLength(1);
+        [],
+      );
+      assert.equal(requests.length, 1);
     }
   });
 
   it('answers every request SAP returned, whoever owns it and whatever its status', async () => {
     const { answered } = await sentFor({});
-    expect(answered.isError).toBe(false);
+    assert.equal(answered.isError, false);
     const [first] = answered.content ?? [];
-    expect(JSON.parse(first?.text ?? 'null')).toEqual({
+    assert.deepStrictEqual(JSON.parse(first?.text ?? 'null'), {
       success: true,
       count: 2,
       transports: [
@@ -165,7 +178,7 @@ describe('ListTransports sends the query by user', () => {
       { data: body },
     ]);
     const [first] = answered.content ?? [];
-    expect(JSON.parse(first?.text ?? 'null')).toMatchObject({
+    assertMatchObject(JSON.parse(first?.text ?? 'null'), {
       success: true,
       count: 1,
       transports: [{ number: 'TRLK900438', owner: 'SAPUSER01' }],

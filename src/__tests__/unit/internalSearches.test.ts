@@ -9,6 +9,9 @@
  * variant — no SAP — and reads the quickSearch on the wire.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { enhancementTypeOf } from '../../handlers/enhancement/readonly/enhancementAvailability';
 import type { ProjectionVariant } from '../../lib/adtProjections';
 import {
@@ -27,7 +30,7 @@ const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
 /** The one quickSearch on the wire, its parameters read. */
 function sentSearch(requests: readonly RecordedRequest[]) {
-  expect(requests).toHaveLength(1);
+  assert.equal(requests.length, 1);
   const [request] = requests;
   if (request === undefined) throw new Error('no request was sent');
   const url = new URL(request.url, 'https://system.invalid');
@@ -45,39 +48,47 @@ function declared(variant: ProjectionVariant) {
   return connection;
 }
 
-describe.each(VARIANTS)('the searches the server sends, on %s', (variant) => {
-  it('a package pattern is searched by the package search name, DEVC', async () => {
-    expect(PACKAGE_SEARCH_NAME).toBe('DEVC');
-    const connection = declared(variant);
-    await resolvePackagePatterns(
-      {
-        searchObjects: createPackagePatternResolver({ connection }),
-        sapAnswers: skipSapAnswers,
-      },
-      ['ZPKG*'],
-    );
-    expect(sentSearch(connection.requests)).toEqual({
-      path: '/sap/bc/adt/repository/informationsystem/search',
-      operation: 'quickSearch',
-      query: 'ZPKG*',
-      objectType: 'DEVC',
-    });
-  });
-
-  it.each([
-    ['ENHO/XHH', 'ENHO'],
-    ['ENHS/XSB', 'ENHS'],
-  ] as const)(
-    "an enhancement's subtype is searched by its main type: %s by %s",
-    async (code, name) => {
+for (const variant of VARIANTS) {
+  describe(format('the searches the server sends, on %s', variant), () => {
+    it('a package pattern is searched by the package search name, DEVC', async () => {
+      assert.equal(PACKAGE_SEARCH_NAME, 'DEVC');
       const connection = declared(variant);
-      await enhancementTypeOf(connection, 'ZENH', code);
-      expect(sentSearch(connection.requests)).toEqual({
+      await resolvePackagePatterns(
+        {
+          searchObjects: createPackagePatternResolver({ connection }),
+          sapAnswers: skipSapAnswers,
+        },
+        ['ZPKG*'],
+      );
+      assert.deepStrictEqual(sentSearch(connection.requests), {
         path: '/sap/bc/adt/repository/informationsystem/search',
         operation: 'quickSearch',
-        query: 'ZENH',
-        objectType: name,
+        query: 'ZPKG*',
+        objectType: 'DEVC',
       });
-    },
-  );
-});
+    });
+
+    for (const [code, name] of [
+      ['ENHO/XHH', 'ENHO'],
+      ['ENHS/XSB', 'ENHS'],
+    ] as const) {
+      it(
+        format(
+          "an enhancement's subtype is searched by its main type: %s by %s",
+          code,
+          name,
+        ),
+        async () => {
+          const connection = declared(variant);
+          await enhancementTypeOf(connection, 'ZENH', code);
+          assert.deepStrictEqual(sentSearch(connection.requests), {
+            path: '/sap/bc/adt/repository/informationsystem/search',
+            operation: 'quickSearch',
+            query: 'ZENH',
+            objectType: name,
+          });
+        },
+      );
+    }
+  });
+}

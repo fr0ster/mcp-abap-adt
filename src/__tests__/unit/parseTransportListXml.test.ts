@@ -1,5 +1,8 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { parseTransportListXml } from '../../handlers/transport/readonly/handleListTransports';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 
 /**
  * Guard for #168: `ListTransports` reported `count: 0` on a system where the
@@ -86,8 +89,8 @@ const CAPTURED_WITH_TARGETS = corpusBody(
 describe('the two captured shapes of one listing', () => {
   it('reads the request without ?targets=true', () => {
     const [entry, ...rest] = parseTransportListXml(CAPTURED_FLAT);
-    expect(rest).toEqual([]);
-    expect(entry).toMatchObject({
+    assert.deepStrictEqual(rest, []);
+    assertMatchObject(entry, {
       number: 'TRLK900438',
       description: 'adt-clients integration tests',
       type: 'K',
@@ -98,10 +101,11 @@ describe('the two captured shapes of one listing', () => {
 
   it('reads the same request through the tm:target level ?targets=true adds', () => {
     // The level is really there: the document differs, the answer must not.
-    expect(CAPTURED_WITH_TARGETS).toContain('<tm:target ');
-    expect(CAPTURED_FLAT).not.toContain('<tm:target ');
+    assert.ok(CAPTURED_WITH_TARGETS.includes('<tm:target '));
+    assert.ok(!CAPTURED_FLAT.includes('<tm:target '));
 
-    expect(parseTransportListXml(CAPTURED_WITH_TARGETS)).toEqual(
+    assert.deepStrictEqual(
+      parseTransportListXml(CAPTURED_WITH_TARGETS),
       parseTransportListXml(CAPTURED_FLAT),
     );
   });
@@ -110,7 +114,7 @@ describe('the two captured shapes of one listing', () => {
     const numbers = parseTransportListXml(CAPTURED_WITH_TARGETS).map(
       (t) => t.number,
     );
-    expect(numbers).toEqual(['TRLK900438']);
+    assert.deepStrictEqual(numbers, ['TRLK900438']);
   });
 });
 
@@ -118,7 +122,7 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
   it('finds requests nested under status containers, in every branch', () => {
     const numbers = parseTransportListXml(TREE_PAYLOAD).map((t) => t.number);
 
-    expect(numbers).toEqual([
+    assert.deepStrictEqual(numbers, [
       'SIDK905635',
       'SIDK905640',
       'SIDK905600',
@@ -130,7 +134,7 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
   it('maps the request attributes', () => {
     const first = parseTransportListXml(TREE_PAYLOAD)[0];
 
-    expect(first).toEqual({
+    assert.deepStrictEqual(first, {
       number: 'SIDK905635',
       description: 'Feature work',
       type: 'K',
@@ -143,7 +147,7 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
   it('does not report tasks as requests', () => {
     const numbers = parseTransportListXml(TREE_PAYLOAD).map((t) => t.number);
 
-    expect(numbers).not.toContain('SIDK905636');
+    assert.ok(!numbers.includes('SIDK905636'));
   });
 
   it('falls back to the container status when the request has none', () => {
@@ -151,24 +155,25 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
       (t) => t.number === 'SIDK905700',
     );
 
-    expect(entry?.status).toBe('D');
+    assert.equal(entry?.status, 'D');
   });
 
   it('still parses the flat shape', () => {
-    expect(parseTransportListXml(FLAT_PAYLOAD).map((t) => t.number)).toEqual([
-      'SIDK900001',
-    ]);
+    assert.deepStrictEqual(
+      parseTransportListXml(FLAT_PAYLOAD).map((t) => t.number),
+      ['SIDK900001'],
+    );
   });
 
   it('returns an empty list for an empty tree and for empty input', () => {
-    expect(parseTransportListXml(EMPTY_PAYLOAD)).toEqual([]);
-    expect(parseTransportListXml('')).toEqual([]);
+    assert.deepStrictEqual(parseTransportListXml(EMPTY_PAYLOAD), []);
+    assert.deepStrictEqual(parseTransportListXml(''), []);
   });
 
   it('reports nothing for a captured response from a system with no requests', () => {
     // Guards the honest-empty case: `count: 0` must stay 0 when it is true,
     // not become noise once the parser walks the whole tree.
-    expect(parseTransportListXml(CAPTURED_NO_TRANSPORTS)).toEqual([]);
+    assert.deepStrictEqual(parseTransportListXml(CAPTURED_NO_TRANSPORTS), []);
   });
 
   it('collapses a request reachable through more than one branch', () => {
@@ -184,7 +189,7 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
 
     const parsed = parseTransportListXml(duplicated);
 
-    expect(parsed).toHaveLength(1);
-    expect(parsed[0].description).toBe('Once');
+    assert.equal(parsed.length, 1);
+    assert.equal(parsed[0].description, 'Once');
   });
 });

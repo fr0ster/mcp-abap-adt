@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
 
 const payload = (result: any) => {
@@ -28,9 +30,10 @@ describe('helper failures never become success results (#155)', () => {
       transport_number: 'TRLK900001',
     });
 
-    expect(result.isError).toBe(true);
-    expect(payload(result).success).not.toBe(true);
-    expect(result.content[0].text).not.toMatch(
+    assert.equal(result.isError, true);
+    assert.notEqual(payload(result).success, true);
+    assert.doesNotMatch(
+      result.content[0].text,
       /\bMcpError:\s|\bMCP error -?\d+: |(?:^|\s)(?:Error|ADT error): /,
     );
   });

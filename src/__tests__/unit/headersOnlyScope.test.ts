@@ -8,6 +8,8 @@
  * environment (stdio only).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import {
   resolveBreakpointConflict,
   statedDebuggerIds,
@@ -21,6 +23,7 @@ import {
   resetSystemContextCache,
   systemContextFromConfiguration,
 } from '../../lib/systemContext';
+import { assertMatchObject } from '../helpers/assertions';
 
 const KEYS = [
   'SAP_RESPONSIBLE',
@@ -56,19 +59,26 @@ const inRequest = <T>(headers: Record<string, string>, fn: () => T): T =>
 describe('a request without the headers (http/sse)', () => {
   it('has no responsible and no master system, not the process values', () => {
     const stated = inRequest({}, () => getStatedSystemContext());
-    expect(stated.responsible).toBeUndefined();
-    expect(stated.masterSystem).toBeUndefined();
+    assert.equal(stated.responsible, undefined);
+    assert.equal(stated.masterSystem, undefined);
   });
 
   it('has no debugger ids from the environment', () => {
-    expect(inRequest({}, () => statedDebuggerIds())).toEqual({});
+    assert.deepStrictEqual(
+      inRequest({}, () => statedDebuggerIds()),
+      {},
+    );
   });
 
   it('takes the breakpoint conflict from the option, never the environment', () => {
-    expect(inRequest({}, () => resolveBreakpointConflict())).toBe('replace');
-    expect(
+    assert.equal(
+      inRequest({}, () => resolveBreakpointConflict()),
+      'replace',
+    );
+    assert.equal(
       inRequest({}, () => resolveBreakpointConflict('refuse-if-held')),
-    ).toBe('refuse-if-held');
+      'refuse-if-held',
+    );
   });
 });
 
@@ -82,37 +92,37 @@ describe('a request with the headers', () => {
       'x-sap-debug-breakpoint-conflict': 'replace',
     };
     inRequest(headers, () => {
-      expect(getStatedSystemContext()).toMatchObject({
+      assertMatchObject(getStatedSystemContext(), {
         responsible: 'HEADER_USER',
         masterSystem: 'HDR',
       });
-      expect(statedDebuggerIds()).toEqual({
+      assert.deepStrictEqual(statedDebuggerIds(), {
         terminalId: 'HEADER_TERMINAL',
         ideId: 'HEADER_IDE',
       });
       // The header beats the option.
-      expect(resolveBreakpointConflict('refuse-if-held')).toBe('replace');
+      assert.equal(resolveBreakpointConflict('refuse-if-held'), 'replace');
     });
   });
 });
 
 describe('outside a request scope (stdio)', () => {
   it('the environment answers', () => {
-    expect(getStatedSystemContext()).toMatchObject({
+    assertMatchObject(getStatedSystemContext(), {
       responsible: 'PROCESS_USER',
       masterSystem: 'PRC',
     });
-    expect(statedDebuggerIds()).toEqual({
+    assert.deepStrictEqual(statedDebuggerIds(), {
       terminalId: 'PROCESS_TERMINAL',
       ideId: 'PROCESS_IDE',
     });
   });
 
   it('the breakpointConflict option beats SAP_DEBUG_BREAKPOINT_CONFLICT', () => {
-    expect(resolveBreakpointConflict('replace')).toBe('replace');
+    assert.equal(resolveBreakpointConflict('replace'), 'replace');
   });
 
   it('with no option, SAP_DEBUG_BREAKPOINT_CONFLICT answers', () => {
-    expect(resolveBreakpointConflict()).toBe('refuse-if-held');
+    assert.equal(resolveBreakpointConflict(), 'refuse-if-held');
   });
 });

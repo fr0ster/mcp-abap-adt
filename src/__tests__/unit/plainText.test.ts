@@ -2,6 +2,9 @@
  * The plain-code text readings that replaced the regular expressions
  * (`src/lib/plainText.ts`).
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   asciiLower,
   asciiUpper,
@@ -19,69 +22,69 @@ import {
 
 describe('linesOf', () => {
   it('ends a line at CR LF, LF and a lone CR', () => {
-    expect(linesOf('a\r\nb\nc\rd')).toEqual(['a', 'b', 'c', 'd']);
+    assert.deepStrictEqual(linesOf('a\r\nb\nc\rd'), ['a', 'b', 'c', 'd']);
   });
   it('keeps empty lines and a trailing empty one', () => {
-    expect(linesOf('a\n\nb\n')).toEqual(['a', '', 'b', '']);
-    expect(linesOf('')).toEqual(['']);
+    assert.deepStrictEqual(linesOf('a\n\nb\n'), ['a', '', 'b', '']);
+    assert.deepStrictEqual(linesOf(''), ['']);
   });
   it('reads CR CR LF as two line ends', () => {
-    expect(linesOf('a\r\r\nb')).toEqual(['a', '', 'b']);
+    assert.deepStrictEqual(linesOf('a\r\r\nb'), ['a', '', 'b']);
   });
 });
 
 describe('character tests', () => {
   it('reads ASCII digits only', () => {
-    expect(isAsciiDigits('0123')).toBe(true);
-    expect(isAsciiDigits('')).toBe(false);
-    expect(isAsciiDigits('12a')).toBe(false);
-    expect(isAsciiDigits('١٢')).toBe(false);
-    expect(leadingDigits('42,7')).toBe('42');
-    expect(leadingDigits('x42')).toBe('');
+    assert.equal(isAsciiDigits('0123'), true);
+    assert.equal(isAsciiDigits(''), false);
+    assert.equal(isAsciiDigits('12a'), false);
+    assert.equal(isAsciiDigits('١٢'), false);
+    assert.equal(leadingDigits('42,7'), '42');
+    assert.equal(leadingDigits('x42'), '');
   });
   it('reads a word character as an ASCII letter, digit or underscore', () => {
-    expect([...'aZ9_'].every(isWordCharacter)).toBe(true);
-    expect(isWordCharacter('-')).toBe(false);
-    expect(isWordCharacter('ä')).toBe(false);
+    assert.equal([...'aZ9_'].every(isWordCharacter), true);
+    assert.equal(isWordCharacter('-'), false);
+    assert.equal(isWordCharacter('ä'), false);
   });
   it('reads white space as trim does', () => {
     for (const blank of [' ', '\t', '\n', '\r', ' ', '　']) {
-      expect(isBlank(blank)).toBe(true);
+      assert.equal(isBlank(blank), true);
     }
-    expect(isBlank('a')).toBe(false);
-    expect(isBlank('')).toBe(false);
+    assert.equal(isBlank('a'), false);
+    assert.equal(isBlank(''), false);
   });
 });
 
 describe('withoutTrailing and collapsedBlanks', () => {
   it('drops every trailing character of the kind', () => {
-    expect(withoutTrailing('https://h:1///', '/')).toBe('https://h:1');
-    expect(withoutTrailing('///', '/')).toBe('');
-    expect(withoutTrailing('a/b', '/')).toBe('a/b');
+    assert.equal(withoutTrailing('https://h:1///', '/'), 'https://h:1');
+    assert.equal(withoutTrailing('///', '/'), '');
+    assert.equal(withoutTrailing('a/b', '/'), 'a/b');
   });
   it('turns each run of white space into one blank', () => {
-    expect(collapsedBlanks('  a \t\n b  ')).toBe(' a b ');
-    expect(collapsedBlanks('ab')).toBe('ab');
+    assert.equal(collapsedBlanks('  a \t\n b  '), ' a b ');
+    assert.equal(collapsedBlanks('ab'), 'ab');
   });
 });
 
 describe('globMatches', () => {
   it('matches the whole text, letters without case', () => {
-    expect(globMatches('Z*', 'zfoo')).toBe(true);
-    expect(globMatches('Z*', 'AZ')).toBe(false);
-    expect(globMatches('*_TEST', 'Z_TEST')).toBe(true);
-    expect(globMatches('Z?B', 'ZAB')).toBe(true);
-    expect(globMatches('Z?B', 'ZB')).toBe(false);
+    assert.equal(globMatches('Z*', 'zfoo'), true);
+    assert.equal(globMatches('Z*', 'AZ'), false);
+    assert.equal(globMatches('*_TEST', 'Z_TEST'), true);
+    assert.equal(globMatches('Z?B', 'ZAB'), true);
+    assert.equal(globMatches('Z?B', 'ZB'), false);
   });
   it('reads a dot as itself', () => {
-    expect(globMatches('Z.CL*', 'Z.CLASS')).toBe(true);
-    expect(globMatches('Z.CL*', 'ZXCLASS')).toBe(false);
+    assert.equal(globMatches('Z.CL*', 'Z.CLASS'), true);
+    assert.equal(globMatches('Z.CL*', 'ZXCLASS'), false);
   });
   it('lets a star stand for nothing and backtracks over runs', () => {
-    expect(globMatches('*', '')).toBe(true);
-    expect(globMatches('A*B*C', 'AXBYBZC')).toBe(true);
-    expect(globMatches('A*B*C', 'AXBYBZ')).toBe(false);
-    expect(globMatches('/NS/*', '/ns/name')).toBe(true);
+    assert.equal(globMatches('*', ''), true);
+    assert.equal(globMatches('A*B*C', 'AXBYBZC'), true);
+    assert.equal(globMatches('A*B*C', 'AXBYBZ'), false);
+    assert.equal(globMatches('/NS/*', '/ns/name'), true);
   });
 });
 
@@ -90,18 +93,18 @@ describe('ASCII only: no Unicode case mapping', () => {
   const NOT_ASCII = ['K', 'İ', 'ı', 'ß'];
   it('reads none of them as a letter', () => {
     for (const character of NOT_ASCII) {
-      expect(isAsciiLetter(character)).toBe(false);
-      expect(isWordCharacter(character)).toBe(false);
+      assert.equal(isAsciiLetter(character), false);
+      assert.equal(isWordCharacter(character), false);
     }
   });
   it('folds none of them onto an ASCII letter', () => {
-    expect(wordAt('ınclude', 0, 'INCLUDE')).toBe(false);
-    expect(wordAt('Key', 0, 'key')).toBe(false);
-    expect(wordAt('Include', 0, 'iNCLUDE')).toBe(true);
-    expect(globMatches('Zß*', 'ZSSX')).toBe(false);
-    expect(globMatches('K*', 'kx')).toBe(false);
-    expect(globMatches('k*', 'KX')).toBe(true);
-    expect(asciiUpper('abıßz')).toBe('ABıßZ');
-    expect(asciiLower('ABİKZ')).toBe('abİKz');
+    assert.equal(wordAt('ınclude', 0, 'INCLUDE'), false);
+    assert.equal(wordAt('Key', 0, 'key'), false);
+    assert.equal(wordAt('Include', 0, 'iNCLUDE'), true);
+    assert.equal(globMatches('Zß*', 'ZSSX'), false);
+    assert.equal(globMatches('K*', 'kx'), false);
+    assert.equal(globMatches('k*', 'KX'), true);
+    assert.equal(asciiUpper('abıßz'), 'ABıßZ');
+    assert.equal(asciiLower('ABİKZ'), 'abİKz');
   });
 });

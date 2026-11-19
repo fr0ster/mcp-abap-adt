@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { format } from 'node:util';
-import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
 import type { IRenewalStrategy } from '@mcp-abap-adt/interfaces-auth';
 import { assertRejects } from '../../../../../src/__tests__/helpers/assertions';
+import { authBroker as authBrokerModule } from '../../../../../src/__tests__/helpers/packageFiles';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import {
   authorizationCodeLines,

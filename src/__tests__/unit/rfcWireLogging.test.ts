@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { format } from 'node:util';
-import * as createConnectionModule from '@mcp-abap-adt/connection/dist/connection/createConnection.js';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../lib/credentialSources';
 import { assertMatchObject } from '../helpers/assertions';
+import { connectionCreate as createConnectionModule } from '../helpers/packageFiles';
 import { stateSystemKind } from '../helpers/systemKind';
 
 // The system kind is required: the stand-in's is stated for every case.

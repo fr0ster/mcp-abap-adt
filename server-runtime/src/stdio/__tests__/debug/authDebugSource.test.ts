@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
-import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
+import { authBroker as authBrokerModule } from '../../../../../src/__tests__/helpers/packageFiles';
 import { repositoryRoot } from '../../../../../src/__tests__/helpers/repoRoot';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { AUTH_DEBUG_ROW, readCoreConfig } from '../../config/coreParameters';

@@ -12,9 +12,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { format, isDeepStrictEqual } from 'node:util';
-import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
-import * as browsers from '@mcp-abap-adt/auth-providers/dist/authorization/presentation/browsers';
 import { assertRejects } from '../../../../src/__tests__/helpers/assertions';
+import {
+  authBroker as authBrokerModule,
+  authProviderBrowsers as browsers,
+} from '../../../../src/__tests__/helpers/packageFiles';
 
 // The shipped browsers are stand-ins tagged with what they were built for:
 // the launcher's mapping is observed, and nothing is ever launched. They are

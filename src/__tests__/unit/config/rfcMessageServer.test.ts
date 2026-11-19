@@ -11,7 +11,6 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { format } from 'node:util';
-import * as createConnectionModule from '@mcp-abap-adt/connection/dist/connection/createConnection.js';
 import type { DestinationKeyValues } from '../../../lib/config/messageServer';
 import {
   checkDestinationStatement,
@@ -19,6 +18,7 @@ import {
 } from '../../../lib/config/rfcDestination';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
+import { connectionCreate as createConnectionModule } from '../../helpers/packageFiles';
 
 // connection's createConnection watched on the module that defines it (the
 // package index re-exports it by getter, read at call time): every call

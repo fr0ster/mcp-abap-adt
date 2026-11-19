@@ -8,6 +8,7 @@ import {
   mock,
 } from 'node:test';
 import { format, isDeepStrictEqual } from 'node:util';
+
 /**
  * A fresh connection on a host's connection comes from the host.
  *
@@ -28,10 +29,6 @@ import { format, isDeepStrictEqual } from 'node:util';
  * the request's signal — and still receives none.
  */
 
-import * as basicProvider from '@mcp-abap-adt/auth-providers/dist/credentials/BasicAuthProvider';
-import * as certificateProvider from '@mcp-abap-adt/auth-providers/dist/credentials/CertificateAuthProvider';
-import * as samlProvider from '@mcp-abap-adt/auth-providers/dist/credentials/SamlAuthProvider';
-import * as tokenProvider from '@mcp-abap-adt/auth-providers/dist/credentials/TokenAuthProvider';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
@@ -48,6 +45,12 @@ import type { HandlerContext } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
 import { runWithRequestSignal } from '../../lib/requestSignal';
 import { assertMatchObject, rejectionOf } from '../helpers/assertions';
+import {
+  basicAuthProvider as basicProvider,
+  certificateAuthProvider as certificateProvider,
+  samlAuthProvider as samlProvider,
+  tokenAuthProvider as tokenProvider,
+} from '../helpers/packageFiles';
 import {
   type RecordingConnection,
   recordingConnection,

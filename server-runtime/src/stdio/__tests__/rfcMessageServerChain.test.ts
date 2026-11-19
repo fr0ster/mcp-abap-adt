@@ -28,10 +28,10 @@ import { format } from 'node:util';
 /** What the start's connection was built with; the build then stops the start. */
 class Recorded extends Error {}
 
-import * as createConnectionModule from '@mcp-abap-adt/connection/dist/connection/createConnection.js';
 import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
 import { readConfigFile } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { connectionCreate as createConnectionModule } from '../../../../src/__tests__/helpers/packageFiles';
 import { AuthBrokerFactory } from '../auth/brokerFactory';
 import { CORE_PARAMETERS, readCoreConfig } from '../config/coreParameters';
 import { launch } from '../launcher.js';

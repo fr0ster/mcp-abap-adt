@@ -10,7 +10,6 @@ import {
   type AuthBroker,
   DestinationConfigError,
 } from '@mcp-abap-adt/auth-broker';
-import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
 import { classify } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthOutcome,
@@ -30,6 +29,7 @@ import {
   useFakeTimers,
   useRealTimers,
 } from '../../../../../src/__tests__/helpers/fakeTime';
+import { authBroker as authBrokerModule } from '../../../../../src/__tests__/helpers/packageFiles';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import { SHUTDOWN_REFUSAL } from '../../auth/countedProvider';
 import {

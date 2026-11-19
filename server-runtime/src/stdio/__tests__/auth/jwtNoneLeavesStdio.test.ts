@@ -12,14 +12,13 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
-
-// Every broker the factory builds is counted; nothing else changes.
-import * as authBrokerModule from '@mcp-abap-adt/auth-broker/dist/AuthBroker';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import {
   type AdtStandIn,
   adtStandIn,
 } from '../../../../../src/__tests__/helpers/adtStandIn';
+// Every broker the factory builds is counted; nothing else changes.
+import { authBroker as authBrokerModule } from '../../../../../src/__tests__/helpers/packageFiles';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import {
   destinationFailureOf,

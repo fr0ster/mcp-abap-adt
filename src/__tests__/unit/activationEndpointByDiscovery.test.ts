@@ -11,6 +11,9 @@
  * of SAP_BASIS 7.40 and the 751 partial one (`tests/fixtures/adt/`).
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
+import { format } from 'node:util';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -22,6 +25,7 @@ import type { HandlerContext } from '../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 import { setSystemContext } from '../helpers/processSystemContext';
 
 const RUN_ID = 'RUN0001';
@@ -144,18 +148,18 @@ function read(result: object): {
   return { isError, payload: JSON.parse(text) };
 }
 
-beforeAll(() => {
+before(() => {
   setSystemContext({ masterSystem: 'SID', responsible: 'SAPUSER01' });
 });
-afterAll(() => resetSystemContextCache());
+after(() => resetSystemContextCache());
 
 describe('the group endpoint, from discovery', () => {
   it('S/4HANA 2025 lists /activation/runs: the run sequence', async () => {
     const { result, requests } = await activateGroup(
       system(discoveryOf('system-description-s4-2025--03-discovery')),
     );
-    expect(read(result).isError).toBe(false);
-    expect(requests).toEqual([
+    assert.equal(read(result).isError, false);
+    assert.deepStrictEqual(requests, [
       'GET /sap/bc/adt/discovery',
       'POST /sap/bc/adt/activation/runs',
       `GET /sap/bc/adt/activation/runs/${RUN_ID}`,
@@ -163,32 +167,34 @@ describe('the group endpoint, from discovery', () => {
     ]);
   });
 
-  it.each([
+  for (const [_what, name] of [
     ['SAP_BASIS 7.40', 'system-description-basis-740--03-discovery'],
     ['751 (partial)', 'system-description-751-partial--01-discovery'],
-  ])(
-    '%s lists no /activation/runs: one POST /activation',
-    async (_what, name) => {
-      const { result, requests } = await activateGroup(
-        system(discoveryOf(name)),
-      );
-      expect(read(result).isError).toBe(false);
-      expect(read(result).payload).toMatchObject({ activated: true });
-      expect(requests).toEqual([
-        'GET /sap/bc/adt/discovery',
-        'POST /sap/bc/adt/activation',
-      ]);
-    },
-  );
+  ]) {
+    it(
+      format('%s lists no /activation/runs: one POST /activation', _what),
+      async () => {
+        const { result, requests } = await activateGroup(
+          system(discoveryOf(name)),
+        );
+        assert.equal(read(result).isError, false);
+        assertMatchObject(read(result).payload, { activated: true });
+        assert.deepStrictEqual(requests, [
+          'GET /sap/bc/adt/discovery',
+          'POST /sap/bc/adt/activation',
+        ]);
+      },
+    );
+  }
 
   it('a discovery that fails: an error at step discovery, no activation request', async () => {
     const { result, requests } = await activateGroup(
       system({ status: 500, data: 'Internal Server Error' }),
     );
     const { isError, payload } = read(result);
-    expect(isError).toBe(true);
-    expect(payload.step).toBe('discovery');
-    expect(requests).toEqual(['GET /sap/bc/adt/discovery']);
+    assert.equal(isError, true);
+    assert.equal(payload.step, 'discovery');
+    assert.deepStrictEqual(requests, ['GET /sap/bc/adt/discovery']);
   });
 
   it('a discovery that lists nothing: an error at step discovery, no activation request', async () => {
@@ -196,10 +202,13 @@ describe('the group endpoint, from discovery', () => {
       system({ status: 200, data: '<html><body>Logon</body></html>' }),
     );
     const { isError, payload } = read(result);
-    expect(isError).toBe(true);
-    expect(payload.step).toBe('discovery');
-    expect(payload.message).toContain('could not be read');
-    expect(requests).toEqual(['GET /sap/bc/adt/discovery']);
+    assert.equal(isError, true);
+    assert.equal(payload.step, 'discovery');
+    assert.ok(
+      typeof payload.message === 'string' &&
+        payload.message.includes('could not be read'),
+    );
+    assert.deepStrictEqual(requests, ['GET /sap/bc/adt/discovery']);
   });
 
   it('a 404 from /activation/runs is the answer: nothing is posted elsewhere', async () => {
@@ -209,8 +218,8 @@ describe('the group endpoint, from discovery', () => {
         data: corpusBody('activation-runs-absent-751--01-activation'),
       }),
     );
-    expect(read(result).isError).toBe(true);
-    expect(requests).toEqual([
+    assert.equal(read(result).isError, true);
+    assert.deepStrictEqual(requests, [
       'GET /sap/bc/adt/discovery',
       'POST /sap/bc/adt/activation/runs',
     ]);
@@ -262,39 +271,40 @@ describe('an empty 200 from /activation: activated, at every detail', () => {
         ],
       },
     );
-    expect(read(result)).toEqual({
+    assert.deepStrictEqual(read(result), {
       isError: false,
       payload: { activated: true },
     });
-    expect(requests).toEqual([
+    assert.deepStrictEqual(requests, [
       'GET /sap/bc/adt/discovery',
       'POST /sap/bc/adt/activation',
     ]);
   });
 
-  it.each(['terse', 'full', 'raw'] as const)(
-    'the group path at detail %s: a success',
-    async (detail) => {
+  for (const detail of ['terse', 'full', 'raw'] as const) {
+    it(format('the group path at detail %s: a success', detail), async () => {
       const { result } = await activate(OBJECTS, detail);
-      expect('isError' in result && result.isError === true).toBe(false);
+      assert.equal('isError' in result && result.isError === true, false);
       if (detail !== 'raw') {
-        expect(read(result).payload).toEqual({ activated: true });
+        assert.deepStrictEqual(read(result).payload, { activated: true });
       }
-    },
-  );
+    });
+  }
 
-  it.each(['terse', 'full', 'raw'] as const)(
-    'the single-object path at detail %s: a success',
-    async (detail) => {
-      const { result, requests } = await activate(
-        [{ name: 'ZP', type: 'PROG/P' }],
-        detail,
-      );
-      expect(requests.at(-1)).toBe('POST /sap/bc/adt/activation');
-      expect('isError' in result && result.isError === true).toBe(false);
-      if (detail !== 'raw') {
-        expect(read(result).payload).toEqual({ activated: true });
-      }
-    },
-  );
+  for (const detail of ['terse', 'full', 'raw'] as const) {
+    it(
+      format('the single-object path at detail %s: a success', detail),
+      async () => {
+        const { result, requests } = await activate(
+          [{ name: 'ZP', type: 'PROG/P' }],
+          detail,
+        );
+        assert.equal(requests.at(-1), 'POST /sap/bc/adt/activation');
+        assert.equal('isError' in result && result.isError === true, false);
+        if (detail !== 'raw') {
+          assert.deepStrictEqual(read(result).payload, { activated: true });
+        }
+      },
+    );
+  }
 });

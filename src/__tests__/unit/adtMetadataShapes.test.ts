@@ -1,5 +1,8 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   ADT_CORPUS_DIR,
   corpusBody,
@@ -65,20 +68,19 @@ describe('object metadata differs by family', () => {
   const fixtures = metadataFixtures();
 
   it('covers more than one family, or it proves nothing', () => {
-    expect(fixtures.length).toBeGreaterThanOrEqual(8);
+    assert.ok(fixtures.length >= 8);
   });
 
-  it.each(fixtures.map((f) => [f.family, f] as const))(
-    '%s answers 200 with a body',
-    (_family, f) => {
-      expect(f.sidecar.response.status).toBe(200);
-      expect(f.body.length).toBeGreaterThan(0);
-    },
-  );
+  for (const [_family, f] of fixtures.map((f) => [f.family, f] as const)) {
+    it(format('%s answers 200 with a body', _family), () => {
+      assert.equal(f.sidecar.response.status, 200);
+      assert.ok(f.body.length > 0);
+    });
+  }
 
   it('every family negotiates its own media type', () => {
     const types = fixtures.map((f) => mediaType(f.sidecar));
-    expect(new Set(types).size).toBe(fixtures.length);
+    assert.equal(new Set(types).size, fixtures.length);
   });
 
   it('the root elements diverge too, and the one collision is honest', () => {
@@ -91,16 +93,20 @@ describe('object metadata differs by family', () => {
     // DDIC's generic envelope — and even there the media types differ, which is
     // what a reading would have to dispatch on.
     const shared = [...roots.entries()].filter(([, fams]) => fams.length > 1);
-    expect(shared.map(([root]) => root)).toEqual(['blue:blueSource']);
-    expect(roots.size).toBeGreaterThanOrEqual(7);
+    assert.deepStrictEqual(
+      shared.map(([root]) => root),
+      ['blue:blueSource'],
+    );
+    assert.ok(roots.size >= 7);
   });
 
   it('no two families would be served by one parse keyed on the root alone', () => {
     const structure = fixtures.find((f) => f.family === 'structure');
     const bdef = fixtures.find((f) => f.family === 'behavior-definition');
-    expect(rootElement(structure?.body ?? '')).toBe(
+    assert.equal(
+      rootElement(structure?.body ?? ''),
       rootElement(bdef?.body ?? ''),
     );
-    expect(mediaType(structure!.sidecar)).not.toBe(mediaType(bdef!.sidecar));
+    assert.notEqual(mediaType(structure!.sidecar), mediaType(bdef!.sidecar));
   });
 });

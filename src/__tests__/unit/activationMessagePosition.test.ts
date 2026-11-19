@@ -6,6 +6,9 @@
  * with its type, text, object (`objDescr`), uri, position and code, and none
  * reports the ordinal as a line.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { analyseActivation, analyseCheck } from '@mcp-abap-adt/adt-strategies';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
@@ -95,16 +98,16 @@ function activationFailure(data: string) {
 describe('the reported 751 answer', () => {
   it('a refusal names the position, the object and the uri, and line 16, never the ordinal 1', () => {
     const payload = failurePayload(activationFailure(REPORTED));
-    expect(payload.messages).toEqual([refused(REPORTED_MESSAGE)]);
+    assert.deepStrictEqual(payload.messages, [refused(REPORTED_MESSAGE)]);
   });
 
   it('the terse checklist answer names them too', () => {
     const terse = terseActivation(parseStructure(REPORTED));
-    expect(terse?.messages).toEqual([REPORTED_MESSAGE]);
+    assert.deepStrictEqual(terse?.messages, [REPORTED_MESSAGE]);
   });
 
   it('parseActivationResponse names them too', () => {
-    expect(parseActivationResponse(REPORTED).messages).toEqual([
+    assert.deepStrictEqual(parseActivationResponse(REPORTED).messages, [
       parsed(REPORTED_MESSAGE),
     ]);
   });
@@ -132,35 +135,36 @@ describe('ActivateObjectLow answers the reported refusal with the position', () 
       { connection },
       { objects: [{ name: 'ZCL_AI_ACT_PROBE', type: 'CLAS/OC' }] },
     );
-    expect(answered.isError).toBe(true);
+    assert.equal(answered.isError, true);
     const [first] = answered.content ?? [];
     const payload = JSON.parse(first?.text ?? 'null');
-    expect(payload.messages).toEqual([refused(REPORTED_MESSAGE)]);
+    assert.deepStrictEqual(payload.messages, [refused(REPORTED_MESSAGE)]);
   });
 });
 
 describe('the ;end= form and the recorded refusal', () => {
   it('a refusal', () => {
     const payload = failurePayload(activationFailure(corpusBody(FAILS)));
-    expect(payload.messages).toEqual([refused(FAILS_MESSAGE)]);
+    assert.deepStrictEqual(payload.messages, [refused(FAILS_MESSAGE)]);
   });
 
   it('the terse answer', () => {
     const terse = terseActivation(parseStructure(corpusBody(FAILS)));
-    expect(terse?.messages).toEqual([FAILS_MESSAGE]);
+    assert.deepStrictEqual(terse?.messages, [FAILS_MESSAGE]);
   });
 
   it('parseActivationResponse', () => {
-    expect(parseActivationResponse(corpusBody(FAILS)).messages).toEqual([
-      parsed(FAILS_MESSAGE),
-    ]);
+    assert.deepStrictEqual(
+      parseActivationResponse(corpusBody(FAILS)).messages,
+      [parsed(FAILS_MESSAGE)],
+    );
   });
 });
 
 describe('an href with no fragment, and an empty href', () => {
   it('DOMA: the uri alone, no position', () => {
     const terse = terseActivation(parseStructure(resultsOf('onprem', 'DOMA')));
-    expect(terse?.messages).toEqual([
+    assert.deepStrictEqual(terse?.messages, [
       { type: 'W', text: 'Activation was cancelled.' },
       { type: 'W', text: 'No next/previous object found', code: 'ED(064)' },
       {
@@ -182,7 +186,7 @@ describe('an href with no fragment, and an empty href', () => {
 
   it('DTEL: the uri alone, no position', () => {
     const terse = terseActivation(parseStructure(resultsOf('cloud', 'DTEL')));
-    expect(terse?.messages).toEqual([
+    assert.deepStrictEqual(terse?.messages, [
       {
         type: 'E',
         text: 'No active domain ZOBJ_DTEL_NODOM available',
@@ -197,7 +201,7 @@ describe('an href with no fragment, and an empty href', () => {
     for (const run of MEASURED_RUNS) {
       const terse = terseActivation(parseStructure(run.results));
       for (const message of terse?.messages ?? []) {
-        expect(message).not.toHaveProperty('line');
+        assert.ok(!('line' in Object(message)));
       }
     }
   });
@@ -211,7 +215,7 @@ describe('an activation run names each message where it stands', () => {
       [],
     );
     const errors = messages.filter((m) => m.type === 'E');
-    expect(errors[0]).toEqual({
+    assert.deepStrictEqual(errors[0], {
       type: 'E',
       text: 'Nametab for table ZOBJ_TABL_BROKEN cannot be generated',
       object: 'Structure ZOBJ_TABL_BROKEN',
@@ -219,7 +223,7 @@ describe('an activation run names each message where it stands', () => {
       position: { line: 3, column: 17, end: { line: 3, column: 29 } },
       code: 'DT(005)',
     });
-    expect(messages[0]).toEqual({
+    assert.deepStrictEqual(messages[0], {
       type: 'W',
       text: 'Activation was cancelled.',
     });
@@ -238,7 +242,7 @@ describe('check runs: chkrun:uri carries the position', () => {
 
   it('terseCheck', () => {
     const terse = terseCheck(parseStructure(corpusBody(SYNTAX)));
-    expect(terse?.messages).toEqual([SYNTAX_MESSAGE]);
+    assert.deepStrictEqual(terse?.messages, [SYNTAX_MESSAGE]);
   });
 
   it('a refused check', () => {
@@ -249,12 +253,14 @@ describe('check runs: chkrun:uri carries the position', () => {
       headers: {},
     });
     if (verdict === ADT_NO_FAILURE) throw new Error('not refused');
-    expect(failurePayload(verdict).messages).toEqual([refused(SYNTAX_MESSAGE)]);
+    assert.deepStrictEqual(failurePayload(verdict).messages, [
+      refused(SYNTAX_MESSAGE),
+    ]);
   });
 
   it('parseCheckRunResponse', () => {
     const parsed = parseCheckRunResponse({ data: corpusBody(SYNTAX) });
-    expect(parsed.errors).toEqual([SYNTAX_MESSAGE]);
+    assert.deepStrictEqual(parsed.errors, [SYNTAX_MESSAGE]);
   });
 });
 
@@ -282,7 +288,7 @@ describe('a refusal answers each message from its own fields, never by its words
     const payload = failurePayload(
       refusalWith([{ type: 'E', text: 'Field "LV_UNDEFINED" is unknown.' }]),
     );
-    expect(payload.messages).toEqual([
+    assert.deepStrictEqual(payload.messages, [
       { type: 'E', text: 'Field "LV_UNDEFINED" is unknown.' },
     ]);
   });
@@ -307,7 +313,7 @@ describe('a refusal answers each message from its own fields, never by its words
         { type: 'W', text: 'words no document says', code: 'X(1)' },
       ]),
     );
-    expect(payload.messages).toEqual([
+    assert.deepStrictEqual(payload.messages, [
       {
         type: 'E',
         text: 'same words',
@@ -330,7 +336,7 @@ describe('a refusal answers each message from its own fields, never by its words
 
   it('the deprecated line is the source line of the position, and absent without one', () => {
     const verdict = activationFailure(REPORTED);
-    expect(failurePayload(verdict).messages).toEqual([
+    assert.deepStrictEqual(failurePayload(verdict).messages, [
       { ...REPORTED_MESSAGE, line: '16' },
     ]);
     // A strategy's line that disagrees with the position is not answered.
@@ -347,7 +353,7 @@ describe('a refusal answers each message from its own fields, never by its words
         { type: 'W', text: 'no position', line: '2' },
       ],
     });
-    expect(disagreeing.messages).toEqual([
+    assert.deepStrictEqual(disagreeing.messages, [
       {
         type: 'E',
         text: 'words',

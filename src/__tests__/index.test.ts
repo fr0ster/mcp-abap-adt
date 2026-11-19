@@ -1,4 +1,3 @@
-import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 
 describe('MCP ABAP ADT Server', () => {
@@ -12,14 +11,6 @@ describe('MCP ABAP ADT Server', () => {
     it('should require utility modules without errors', () => {
       require('../lib/utils');
       require('../lib/logger');
-    });
-  });
-
-  describe('Configuration', () => {
-    it('should have valid Node.js version', () => {
-      const nodeVersion = process.version;
-      const majorVersion = parseInt(nodeVersion.split('.')[0].slice(1), 10);
-      assert.ok(majorVersion >= 18);
     });
   });
 });

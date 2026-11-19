@@ -39,14 +39,17 @@ describe('packageSummary', () => {
 
 describe('packageDetails', () => {
   it('adds every sub-package by name and description', () => {
-    assertMatchObject(packageDetails(WITH_SUB_PACKAGES), {
+    const details = packageDetails(WITH_SUB_PACKAGES);
+    assertMatchObject(details, {
       name: 'ZPARENT',
       package_type: 'structure',
       sub_package_count: 2,
-      sub_packages: [
-        { name: 'ZCHILD_A', description: 'Child A' },
-        { name: 'ZCHILD_B', description: 'Child B' },
-      ],
     });
+    // Jest's objectContaining compared each named property with full
+    // equality: the sub-packages exactly, not as a subset match.
+    assert.deepStrictEqual(details.sub_packages, [
+      { name: 'ZCHILD_A', description: 'Child A' },
+      { name: 'ZCHILD_B', description: 'Child B' },
+    ]);
   });
 });

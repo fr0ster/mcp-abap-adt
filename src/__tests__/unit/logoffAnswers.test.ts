@@ -8,6 +8,9 @@
  * process alive until the logoffs were answered, none stayed. Nothing reads
  * the answer. The forced close still ends at the writes.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import {
   closeOwnedConnections,
   endConnection,
@@ -29,8 +32,8 @@ function fakeConnection() {
   const answer = deferred();
   const flushes: unknown[][] = [];
   const connection = {
-    disconnect: jest.fn(async () => undefined),
-    flushGoodbye: jest.fn(async (...args: unknown[]) => {
+    disconnect: mock.fn(async () => undefined),
+    flushGoodbye: mock.fn(async (...args: unknown[]) => {
       flushes.push(args);
       await answer.promise;
     }),
@@ -56,15 +59,15 @@ describe("the logoffs' answers at the end", () => {
     own(earlier.connection, { role: 'state', owner });
     await endConnection(earlier.connection); // a site's own end: written
     const ending = logOffAtOnce();
-    expect(await settles(ending)).toBe(false);
+    assert.equal(await settles(ending), false);
     atOnce.answer.resolve();
-    expect(await settles(ending)).toBe(false); // the earlier one still unanswered
+    assert.equal(await settles(ending), false); // the earlier one still unanswered
     earlier.answer.resolve();
-    expect(await settles(ending)).toBe(true);
+    assert.equal(await settles(ending), true);
     // Followed with no bound of ours: no timeout passed.
-    expect(atOnce.flushes).toEqual([[]]);
-    expect(earlier.flushes).toEqual([[]]);
-    expect(atOnce.connection.disconnect).toHaveBeenCalledTimes(1);
+    assert.deepStrictEqual(atOnce.flushes, [[]]);
+    assert.deepStrictEqual(earlier.flushes, [[]]);
+    assert.equal(atOnce.connection.disconnect.mock.callCount(), 1);
   });
 
   it("an instance's terminal close resolves once its logoffs have been answered", async () => {
@@ -72,26 +75,26 @@ describe("the logoffs' answers at the end", () => {
     const c = fakeConnection();
     own(c.connection, { role: 'built', owner });
     const closing = closeOwnedConnections(owner);
-    expect(await settles(closing)).toBe(false);
+    assert.equal(await settles(closing), false);
     c.answer.resolve();
-    expect(await settles(closing)).toBe(true);
+    assert.equal(await settles(closing), true);
   });
 
   it('a logoff whose answer fails ends the wait as an answer does', async () => {
     const owner = {};
     const c = fakeConnection();
-    c.connection.flushGoodbye.mockImplementation(async () => {
+    c.connection.flushGoodbye.mock.mockImplementation(async () => {
       throw new Error('socket hang up');
     });
     own(c.connection, { role: 'built', owner });
-    expect(await settles(closeOwnedConnections(owner))).toBe(true);
+    assert.equal(await settles(closeOwnedConnections(owner)), true);
   });
 
   it('the forced close ends at the writes', async () => {
     const owner = {};
     const c = fakeConnection();
     own(c.connection, { role: 'built', owner });
-    expect(await settles(forceClose())).toBe(true);
+    assert.equal(await settles(forceClose()), true);
     c.answer.resolve();
   });
 });

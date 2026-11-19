@@ -12,6 +12,9 @@
  * Run: npm test -- --testPathPatterns=unit/readonlyHighSameNameDedup
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
 import { ReadOnlyHandlersGroup } from '../../lib/handlers/groups/ReadOnlyHandlersGroup';
@@ -47,17 +50,21 @@ function spyOnContributors() {
       if (names(entries).includes(TOOL)) contributors.push(label);
       return entries;
     };
-  const ro = jest
-    .spyOn(ReadOnlyHandlersGroup.prototype, 'getHandlers')
-    .mockImplementation(record('readonly', roOriginal));
-  const hi = jest
-    .spyOn(HighLevelHandlersGroup.prototype, 'getHandlers')
-    .mockImplementation(record('high', hiOriginal));
+  const ro = mock.method(
+    ReadOnlyHandlersGroup.prototype,
+    'getHandlers',
+    record('readonly', roOriginal),
+  );
+  const hi = mock.method(
+    HighLevelHandlersGroup.prototype,
+    'getHandlers',
+    record('high', hiOriginal),
+  );
   return {
     contributors,
     restore: () => {
-      ro.mockRestore();
-      hi.mockRestore();
+      ro.mock.restore();
+      hi.mock.restore();
     },
   };
 }
@@ -70,25 +77,30 @@ describe('the same tool in readonly and high', () => {
     const hi = new HighLevelHandlersGroup(ctx)
       .getHandlers()
       .find((e) => e.toolDefinition.name === TOOL);
-    expect(ro).toBeDefined();
-    expect(hi).toBeDefined();
-    expect(ro?.toolDefinition).toBe(hi?.toolDefinition);
+    assert.notEqual(ro, undefined);
+    assert.notEqual(hi, undefined);
+    assert.equal(ro?.toolDefinition, hi?.toolDefinition);
   });
 
   describe('ReadOnlyHandlersGroup', () => {
     it('readonly alone: keeps the tool', () => {
-      expect(names(new ReadOnlyHandlersGroup(ctx).getHandlers())).toContain(
-        TOOL,
+      assert.ok(
+        names(new ReadOnlyHandlersGroup(ctx).getHandlers()).includes(TOOL),
       );
     });
 
-    it.each([
+    for (const [_n, s] of [
       ['no strategy', undefined],
       ['NoDedupStrategy', new NoDedupStrategy()],
-    ])('with high exposed (%s): withholds it, so high supplies it', (_n, s) => {
-      const group = new ReadOnlyHandlersGroup(ctx, highNames(), s);
-      expect(names(group.getHandlers())).not.toContain(TOOL);
-    });
+    ] satisfies [string, NoDedupStrategy | undefined][]) {
+      it(
+        format('with high exposed (%s): withholds it, so high supplies it', _n),
+        () => {
+          const group = new ReadOnlyHandlersGroup(ctx, highNames(), s);
+          assert.ok(!names(group.getHandlers()).includes(TOOL));
+        },
+      );
+    }
   });
 
   describe('EmbeddableMcpServer', () => {
@@ -100,36 +112,40 @@ describe('the same tool in readonly and high', () => {
           exposition: ['readonly'],
           systemType: 'onprem',
         });
-        expect(
-          registeredToolNames(server).filter((n) => n === TOOL),
-        ).toHaveLength(1);
-        expect([...new Set(spy.contributors)]).toEqual(['readonly']);
+        assert.equal(
+          registeredToolNames(server).filter((n) => n === TOOL).length,
+          1,
+        );
+        assert.deepStrictEqual([...new Set(spy.contributors)], ['readonly']);
       } finally {
         spy.restore();
       }
     });
 
-    it.each([
+    for (const [_n, strategy] of [
       ['default strategy', undefined],
       ['NoDedupStrategy', new NoDedupStrategy()],
-    ])('readonly+high (%s): registered once, from high', (_n, strategy) => {
-      const spy = spyOnContributors();
-      try {
-        const server = new EmbeddableMcpServer({
-          connection: {} as never,
-          exposition: ['readonly', 'high'],
-          systemType: 'onprem',
-          ...(strategy !== undefined && { readOnlyDedupStrategy: strategy }),
-        });
-        expect(
-          registeredToolNames(server).filter((n) => n === TOOL),
-        ).toHaveLength(1);
-        // Only high handed it over; readonly's answer did not carry it.
-        expect([...new Set(spy.contributors)]).toEqual(['high']);
-      } finally {
-        spy.restore();
-      }
-    });
+    ] satisfies [string, NoDedupStrategy | undefined][]) {
+      it(format('readonly+high (%s): registered once, from high', _n), () => {
+        const spy = spyOnContributors();
+        try {
+          const server = new EmbeddableMcpServer({
+            connection: {} as never,
+            exposition: ['readonly', 'high'],
+            systemType: 'onprem',
+            ...(strategy !== undefined && { readOnlyDedupStrategy: strategy }),
+          });
+          assert.equal(
+            registeredToolNames(server).filter((n) => n === TOOL).length,
+            1,
+          );
+          // Only high handed it over; readonly's answer did not carry it.
+          assert.deepStrictEqual([...new Set(spy.contributors)], ['high']);
+        } finally {
+          spy.restore();
+        }
+      });
+    }
   });
 
   describe('HandlerExporter', () => {
@@ -138,7 +154,7 @@ describe('the same tool in readonly and high', () => {
         systemType: 'onprem',
         includeHighLevel: false,
       });
-      expect(exporter.getToolNames().filter((n) => n === TOOL)).toHaveLength(1);
+      assert.equal(exporter.getToolNames().filter((n) => n === TOOL).length, 1);
     });
 
     it('readonly+high: one entry, from high; one GetClass, no ReadClass', () => {
@@ -149,13 +165,13 @@ describe('the same tool in readonly and high', () => {
           systemContextResolver: null,
         });
         const all = exporter.getToolNames();
-        expect(all.filter((n) => n === TOOL)).toHaveLength(1);
-        expect(new Set(all).size).toBe(all.length);
-        expect(all.filter((n) => n === 'GetClass')).toHaveLength(1);
-        expect(all).not.toContain('ReadClass');
+        assert.equal(all.filter((n) => n === TOOL).length, 1);
+        assert.equal(new Set(all).size, all.length);
+        assert.equal(all.filter((n) => n === 'GetClass').length, 1);
+        assert.ok(!all.includes('ReadClass'));
         spy.contributors.length = 0;
         exporter.getHandlerEntries();
-        expect([...new Set(spy.contributors)]).toEqual(['high']);
+        assert.deepStrictEqual([...new Set(spy.contributors)], ['high']);
       } finally {
         spy.restore();
       }

@@ -8,6 +8,8 @@
  * and `latch(instance)` refuses only that instance's calls.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
@@ -22,6 +24,7 @@ import {
   settled,
 } from '../../lib/activeTools';
 import type { IHandlersRegistry } from '../../lib/handlers/interfaces';
+import { assertMatchObject } from '../helpers/assertions';
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
@@ -64,6 +67,16 @@ class Instance extends BaseMcpServer {
   }
 }
 
+/**
+ * Every stand a test served, ended in afterEach whatever the test's checks
+ * said: a call still waiting keeps the SDK's request timer (600 s) alive, and
+ * with it the file's process.
+ */
+const opened: Array<{
+  work: Array<ReturnType<typeof deferred<string>>>;
+  close(): Promise<void>;
+}> = [];
+
 async function serve() {
   const work: Array<ReturnType<typeof deferred<string>>> = [];
   let reached = 0;
@@ -92,25 +105,34 @@ async function serve() {
         (r) => r as { content: { text: string }[]; isError?: boolean },
         () => 'cancelled' as const,
       );
-  return {
+  let closed = false;
+  const stand = {
     server,
     work,
     reached: () => reached,
     call,
     close: async () => {
+      if (closed) return;
+      closed = true;
       await client.close();
       await server.close();
     },
   };
+  opened.push(stand);
+  return stand;
 }
 
 beforeEach(() => {
   resetProcessLatchForTests();
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 
-afterEach(() => {
-  jest.restoreAllMocks();
+afterEach(async () => {
+  for (const stand of opened.splice(0)) {
+    for (const held of stand.work) held.resolve('ended by the file');
+    await stand.close();
+  }
+  mock.restoreAll();
   resetProcessLatchForTests();
 });
 
@@ -120,16 +142,19 @@ it('registers calls of two server instances in the one registry, and removes eac
   const ca = a.call();
   const cb = b.call();
   await turns();
-  expect(activeTools()).toHaveLength(2);
-  expect(activeTools().map((t) => t.name)).toEqual(['Held', 'Held']);
+  assert.equal(activeTools().length, 2);
+  assert.deepStrictEqual(
+    activeTools().map((t) => t.name),
+    ['Held', 'Held'],
+  );
 
   a.work[0]?.resolve('a');
-  expect(await ca).toMatchObject({ content: [{ text: 'a' }] });
-  expect(activeTools()).toHaveLength(1);
+  assertMatchObject(await ca, { content: [{ text: 'a' }] });
+  assert.equal(activeTools().length, 1);
 
   b.work[0]?.reject(new Error('the tool failed'));
   await cb;
-  expect(activeTools()).toHaveLength(0);
+  assert.equal(activeTools().length, 0);
   await a.close();
   await b.close();
 });
@@ -139,14 +164,14 @@ it('removes a call whose request was cancelled once it ends — its tool is not 
   const controller = new AbortController();
   const ca = a.call(controller.signal);
   await turns();
-  expect(activeTools()).toHaveLength(1);
+  assert.equal(activeTools().length, 1);
   controller.abort();
-  expect(await ca).toBe('cancelled');
+  assert.equal(await ca, 'cancelled');
   // The tool still runs: nothing of the registry aborted it.
-  expect(activeTools()).toHaveLength(1);
+  assert.equal(activeTools().length, 1);
   a.work[0]?.resolve('ran to its end');
   await settled();
-  expect(activeTools()).toHaveLength(0);
+  assert.equal(activeTools().length, 0);
   await a.close();
 });
 
@@ -161,14 +186,17 @@ it('settled() waits for every registered call, across instances, without abortin
     done = true;
   });
   await turns();
-  expect(done).toBe(false);
-  expect(activeTools().every((t) => !t.signal.aborted)).toBe(true);
+  assert.equal(done, false);
+  assert.equal(
+    activeTools().every((t) => !t.signal.aborted),
+    true,
+  );
   a.work[0]?.resolve('a');
   await turns();
-  expect(done).toBe(false);
+  assert.equal(done, false);
   b.work[0]?.resolve('b');
   await waiting;
-  expect(done).toBe(true);
+  assert.equal(done, true);
   await a.close();
   await b.close();
 });
@@ -176,20 +204,20 @@ it('settled() waits for every registered call, across instances, without abortin
 it('after latch() register refuses, and the wrapper answers the shutdown refusal before the tool', async () => {
   const a = await serve();
   latch();
-  expect(isLatched()).toBe(true);
-  expect(registerActiveTool(new AbortController())).toBeUndefined();
+  assert.equal(isLatched(), true);
+  assert.equal(registerActiveTool(new AbortController()), undefined);
   const answer = await a.call();
-  expect(a.reached()).toBe(0);
-  expect(answer).not.toBe('cancelled');
+  assert.equal(a.reached(), 0);
+  assert.notEqual(answer, 'cancelled');
   const result = answer as { content: { text: string }[]; isError?: boolean };
-  expect(result.isError).toBe(true);
+  assert.equal(result.isError, true);
   const payload = JSON.parse(result.content[0]?.text ?? '{}');
-  expect(payload).toMatchObject({
+  assertMatchObject(payload, {
     error: 'authentication_failed',
     kind: 'interactive-login',
     server: SHUTDOWN_SENTENCE,
   });
-  expect(activeTools()).toHaveLength(0);
+  assert.equal(activeTools().length, 0);
   await a.close();
 });
 
@@ -203,11 +231,11 @@ it('a call registered just before the latch is still awaited by settled()', asyn
     done = true;
   });
   await turns();
-  expect(done).toBe(false);
-  expect(pending()).toEqual(['Held']);
+  assert.equal(done, false);
+  assert.deepStrictEqual(pending(), ['Held']);
   a.work[0]?.resolve('a');
   await waiting;
-  expect(pending()).toEqual([]);
+  assert.deepStrictEqual(pending(), []);
   await a.close();
 });
 
@@ -224,10 +252,10 @@ describe('per instance', () => {
     });
     a.work[0]?.resolve('a');
     await aSettled;
-    expect(aDone).toBe(true);
+    assert.equal(aDone, true);
     // b's call still runs, untouched.
-    expect(activeTools()).toHaveLength(1);
-    expect(activeTools()[0]?.signal.aborted).toBe(false);
+    assert.equal(activeTools().length, 1);
+    assert.equal(activeTools()[0]?.signal.aborted, false);
     b.work[0]?.resolve('b');
     await settled();
     await a.close();
@@ -238,17 +266,17 @@ describe('per instance', () => {
     const a = await serve();
     const b = await serve();
     latch(a.server);
-    expect(isLatched(a.server)).toBe(true);
-    expect(isLatched(b.server)).toBe(false);
-    expect(isLatched()).toBe(false);
+    assert.equal(isLatched(a.server), true);
+    assert.equal(isLatched(b.server), false);
+    assert.equal(isLatched(), false);
     const refused = (await a.call()) as { isError?: boolean };
-    expect(refused.isError).toBe(true);
-    expect(a.reached()).toBe(0);
+    assert.equal(refused.isError, true);
+    assert.equal(a.reached(), 0);
     const cb = b.call();
     await turns();
-    expect(b.reached()).toBe(1);
+    assert.equal(b.reached(), 1);
     b.work[0]?.resolve('b');
-    expect(await cb).toMatchObject({ content: [{ text: 'b' }] });
+    assertMatchObject(await cb, { content: [{ text: 'b' }] });
     await a.close();
     await b.close();
   });

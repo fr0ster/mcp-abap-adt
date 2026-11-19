@@ -12,6 +12,10 @@
  * Real adt-clients code runs over the batch proof's counting connection, held
  * open, answered with a document and answered `404` alike.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
   type Answer,
@@ -124,59 +128,65 @@ describe('compact HandlerProfileSchedule', () => {
     const [held, documented, refused] = await Promise.all(
       MODES.map((mode) => schedule(mode, args, SCHEDULED)),
     );
-    expect(held.sent).toEqual([SCHEDULE_POST]);
-    expect(documented.sent).toEqual(held.sent);
-    expect(refused.sent).toEqual(held.sent);
+    assert.deepStrictEqual(held.sent, [SCHEDULE_POST]);
+    assert.deepStrictEqual(documented.sent, held.sent);
+    assert.deepStrictEqual(refused.sent, held.sent);
 
-    expect(documented.answer?.isError).not.toBe(true);
-    expect(jsonOf(documented.answer)).toEqual({
+    assert.notEqual(documented.answer?.isError, true);
+    assert.deepStrictEqual(jsonOf(documented.answer), {
       success: true,
       profiler_id: PROFILER_ID,
     });
 
-    expect(refused.answer?.isError).toBe(true);
-    expect(jsonOf(refused.answer).status).toBe(404);
-    expect(jsonOf(refused.answer).step).toBe('schedule trace');
+    assert.equal(refused.answer?.isError, true);
+    assert.equal(jsonOf(refused.answer).status, 404);
+    assert.equal(jsonOf(refused.answer).step, 'schedule trace');
   });
 
   it('takes no argument it needs: an empty call is the one request', async () => {
     const { sent, answer } = await schedule('document', {}, SCHEDULED);
-    expect(sent).toEqual([SCHEDULE_POST]);
-    expect(jsonOf(answer).profiler_id).toBe(PROFILER_ID);
+    assert.deepStrictEqual(sent, [SCHEDULE_POST]);
+    assert.equal(jsonOf(answer).profiler_id, PROFILER_ID);
   });
 
   it('a 2xx without Location is a failure with its step, one request', async () => {
     const { sent, answer } = await schedule('document', {});
-    expect(sent).toEqual([SCHEDULE_POST]);
-    expect(answer?.isError).toBe(true);
+    assert.deepStrictEqual(sent, [SCHEDULE_POST]);
+    assert.equal(answer?.isError, true);
     const failed = jsonOf(answer);
-    expect(failed.message).toBe(SCHEDULE_WITHOUT_ID);
-    expect(failed.step).toBe('schedule trace');
-    expect(failed).not.toHaveProperty('profiler_id');
+    assert.equal(failed.message, SCHEDULE_WITHOUT_ID);
+    assert.equal(failed.step, 'schedule trace');
+    assert.ok(!('profiler_id' in Object(failed)));
   });
 });
 
 describe('compact HandlerProfileRun', () => {
-  describe.each(RUN_CALLS)(
-    '%s',
-    (_label, args, request, nameKey, plainRequest, plainStep) => {
+  for (const [
+    _label,
+    args,
+    request,
+    nameKey,
+    plainRequest,
+    plainStep,
+  ] of RUN_CALLS) {
+    describe(format('%s', _label), () => {
       it('HandlerProfileRun with profilerId: exactly one request', async () => {
         const [held, documented, refused] = await Promise.all(
           MODES.map((mode) => run(mode, args)),
         );
-        expect(held.sent).toEqual([request]);
-        expect(documented.sent).toEqual(held.sent);
-        expect(refused.sent).toEqual(held.sent);
+        assert.deepStrictEqual(held.sent, [request]);
+        assert.deepStrictEqual(documented.sent, held.sent);
+        assert.deepStrictEqual(refused.sent, held.sent);
 
-        expect(documented.answer?.isError).not.toBe(true);
+        assert.notEqual(documented.answer?.isError, true);
         const answered = jsonOf(documented.answer);
-        expect(answered.success).toBe(true);
-        expect(answered[nameKey]).toBe(String(args[nameKey]).toUpperCase());
-        expect(answered.profile).toEqual({ profiler_id: PROFILER_ID });
+        assert.equal(answered.success, true);
+        assert.equal(answered[nameKey], String(args[nameKey]).toUpperCase());
+        assert.deepStrictEqual(answered.profile, { profiler_id: PROFILER_ID });
 
-        expect(refused.answer?.isError).toBe(true);
-        expect(jsonOf(refused.answer).status).toBe(404);
-        expect(jsonOf(refused.answer).step).toBe('run with profiler');
+        assert.equal(refused.answer?.isError, true);
+        assert.equal(jsonOf(refused.answer).status, 404);
+        assert.equal(jsonOf(refused.answer).step, 'run with profiler');
       });
 
       it('HandlerProfileRun without profilerId: exactly one plain run request', async () => {
@@ -184,19 +194,19 @@ describe('compact HandlerProfileRun', () => {
         const [held, documented, refused] = await Promise.all(
           MODES.map((mode) => run(mode, plain)),
         );
-        expect(held.sent).toEqual([plainRequest]);
-        expect(documented.sent).toEqual(held.sent);
-        expect(refused.sent).toEqual(held.sent);
+        assert.deepStrictEqual(held.sent, [plainRequest]);
+        assert.deepStrictEqual(documented.sent, held.sent);
+        assert.deepStrictEqual(refused.sent, held.sent);
 
-        expect(documented.answer?.isError).not.toBe(true);
+        assert.notEqual(documented.answer?.isError, true);
         const answered = jsonOf(documented.answer);
-        expect(answered.success).toBe(true);
-        expect(answered[nameKey]).toBe(String(args[nameKey]).toUpperCase());
-        expect(answered).not.toHaveProperty('profile');
+        assert.equal(answered.success, true);
+        assert.equal(answered[nameKey], String(args[nameKey]).toUpperCase());
+        assert.ok(!('profile' in Object(answered)));
 
-        expect(refused.answer?.isError).toBe(true);
-        expect(jsonOf(refused.answer).status).toBe(404);
-        expect(jsonOf(refused.answer).step).toBe(plainStep);
+        assert.equal(refused.answer?.isError, true);
+        assert.equal(jsonOf(refused.answer).status, 404);
+        assert.equal(jsonOf(refused.answer).step, plainStep);
       });
 
       it('HandlerProfileRun with an empty profilerId refused before any request', async () => {
@@ -204,31 +214,36 @@ describe('compact HandlerProfileRun', () => {
           ...args,
           profiler_id: '',
         });
-        expect(sent).toEqual([]);
-        expect(answer?.isError).toBe(true);
-        expect(textOf(answer)).toContain('profiler_id');
+        assert.deepStrictEqual(sent, []);
+        assert.equal(answer?.isError, true);
+        assert.ok(textOf(answer).includes('profiler_id'));
       });
 
-      it('no trace-list poll', async () => {
-        const timer = jest.spyOn(global, 'setTimeout');
+      it('no trace-list poll', async (t) => {
+        const timer = t.mock.method(global, 'setTimeout');
         try {
           const { sent } = await run('document', args);
-          expect(sent).toEqual([request]);
-          expect(
+          assert.deepStrictEqual(sent, [request]);
+          assert.equal(
             sent.some((line) => line.includes('/runtime/traces/abaptraces')),
-          ).toBe(false);
-          expect(timer).not.toHaveBeenCalled();
+            false,
+          );
+          assert.equal(timer.mock.callCount(), 0);
         } finally {
-          timer.mockRestore();
+          timer.mock.restore();
         }
       });
-    },
-  );
+    });
+  }
 
   it('declares profiler_id optional and the profiling flags on the schedule', () => {
-    expect(declaredRequired(runTool.inputSchema)).toEqual(['target_type']);
-    expect(Object.keys(runTool.inputSchema.shape)).toContain('profiler_id');
-    expect(Object.keys(runTool.inputSchema.shape)).not.toContain('sql_trace');
-    expect(Object.keys(scheduleTool.inputSchema.shape)).toContain('sql_trace');
+    assert.deepStrictEqual(declaredRequired(runTool.inputSchema), [
+      'target_type',
+    ]);
+    assert.ok(Object.keys(runTool.inputSchema.shape).includes('profiler_id'));
+    assert.ok(!Object.keys(runTool.inputSchema.shape).includes('sql_trace'));
+    assert.ok(
+      Object.keys(scheduleTool.inputSchema.shape).includes('sql_trace'),
+    );
   });
 });

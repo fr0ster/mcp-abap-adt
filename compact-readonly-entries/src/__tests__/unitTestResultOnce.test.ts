@@ -10,6 +10,10 @@
  *
  * Real adt-clients code runs over the batch proof's counting connection.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
 import {
@@ -129,78 +133,83 @@ const FINISHED_SENTENCE =
   "Valid once the status is FINISHED; a finished run's result carries executionTime.";
 
 describe('compact unit-test results are read once', () => {
-  describe.each(RESULT_CALLS)('%s', (_label, handler, args, step) => {
-    it('exactly one request, getResult — no status poll', async () => {
-      const timer = jest.spyOn(global, 'setTimeout');
-      try {
-        const [held, documented, refused] = await Promise.all(
-          MODES.map((mode) => runWith(handler, mode, args, FINISHED_RESULT)),
-        );
-        expect(held.sent).toEqual([RESULT_GET]);
-        expect(documented.sent).toEqual(held.sent);
-        expect(refused.sent).toEqual(held.sent);
-        for (const run of [held, documented, refused]) {
-          expect(run.sent.some((line) => line.includes('/abapunit/runs'))).toBe(
-            false,
+  for (const [_label, handler, args, step] of RESULT_CALLS) {
+    describe(format('%s', _label), () => {
+      it('exactly one request, getResult — no status poll', async (t) => {
+        const timer = t.mock.method(global, 'setTimeout');
+        try {
+          const [held, documented, refused] = await Promise.all(
+            MODES.map((mode) => runWith(handler, mode, args, FINISHED_RESULT)),
           );
+          assert.deepStrictEqual(held.sent, [RESULT_GET]);
+          assert.deepStrictEqual(documented.sent, held.sent);
+          assert.deepStrictEqual(refused.sent, held.sent);
+          for (const run of [held, documented, refused]) {
+            assert.equal(
+              run.sent.some((line) => line.includes('/abapunit/runs')),
+              false,
+            );
+          }
+          assert.equal(timer.mock.callCount(), 0);
+
+          assert.notEqual(documented.answer?.isError, true);
+          const answered = jsonOf(documented.answer);
+          assert.equal(answered.run_id, 'RUN_A');
+          assert.ok(!('finished' in Object(answered)));
+          assert.ok(
+            JSON.stringify(answered.run_result).includes('executionTime'),
+          );
+
+          assert.equal(refused.answer?.isError, true);
+          assert.equal(jsonOf(refused.answer).status, 404);
+          assert.equal(jsonOf(refused.answer).step, step);
+        } finally {
+          timer.mock.restore();
         }
-        expect(timer).not.toHaveBeenCalled();
+      });
 
-        expect(documented.answer?.isError).not.toBe(true);
-        const answered = jsonOf(documented.answer);
-        expect(answered.run_id).toBe('RUN_A');
-        expect(answered).not.toHaveProperty('finished');
-        expect(JSON.stringify(answered.run_result)).toContain('executionTime');
+      it("an unfinished run's result is answered as it came", async () => {
+        const { sent, answer } = await runWith(
+          handler,
+          'document',
+          args,
+          UNFINISHED_RESULT,
+        );
+        assert.deepStrictEqual(sent, [RESULT_GET]);
+        assert.notEqual(answer?.isError, true);
+        const answered = jsonOf(answer);
+        assert.equal(answered.run_id, 'RUN_A');
+        assert.ok('run_result' in Object(answered));
+        assert.ok(!('finished' in Object(answered)));
+        assert.ok(!('run_status' in Object(answered)));
+        assert.ok(
+          !JSON.stringify(answered.run_result).includes('executionTime'),
+        );
 
-        expect(refused.answer?.isError).toBe(true);
-        expect(jsonOf(refused.answer).status).toBe(404);
-        expect(jsonOf(refused.answer).step).toBe(step);
-      } finally {
-        timer.mockRestore();
-      }
+        const raw = await runWith(
+          handler,
+          'document',
+          { ...args, detail: 'raw' },
+          UNFINISHED_RESULT,
+        );
+        assert.deepStrictEqual(raw.sent, [RESULT_GET]);
+        assert.equal(jsonOf(raw.answer).run_result, UNFINISHED_RESULT);
+      });
     });
-
-    it("an unfinished run's result is answered as it came", async () => {
-      const { sent, answer } = await runWith(
-        handler,
-        'document',
-        args,
-        UNFINISHED_RESULT,
-      );
-      expect(sent).toEqual([RESULT_GET]);
-      expect(answer?.isError).not.toBe(true);
-      const answered = jsonOf(answer);
-      expect(answered.run_id).toBe('RUN_A');
-      expect(answered).toHaveProperty('run_result');
-      expect(answered).not.toHaveProperty('finished');
-      expect(answered).not.toHaveProperty('run_status');
-      expect(JSON.stringify(answered.run_result)).not.toContain(
-        'executionTime',
-      );
-
-      const raw = await runWith(
-        handler,
-        'document',
-        { ...args, detail: 'raw' },
-        UNFINISHED_RESULT,
-      );
-      expect(raw.sent).toEqual([RESULT_GET]);
-      expect(jsonOf(raw.answer).run_result).toBe(UNFINISHED_RESULT);
-    });
-  });
+  }
 
   it('a missing run_id is refused before any request', async () => {
     for (const [, handler, args] of RESULT_CALLS) {
       const { run_id: _omitted, ...rest } = args;
       const { sent, answer } = await runWith(handler, 'document', rest);
-      expect(sent).toEqual([]);
-      expect(answer?.isError).toBe(true);
+      assert.deepStrictEqual(sent, []);
+      assert.equal(answer?.isError, true);
     }
   });
 
   it('the description carries the FINISHED sentence', () => {
     for (const tool of [RESULT_TOOL, CDS_RESULT_TOOL, GET_TOOL]) {
-      expect(tool.description).toContain(FINISHED_SENTENCE);
+      assert.ok(tool.description.includes(FINISHED_SENTENCE));
     }
   });
 });

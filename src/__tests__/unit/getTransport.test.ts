@@ -5,8 +5,12 @@
  * request's document as before — `include_objects` / `include_tasks` choose
  * what the answer carries.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
+import { assertMatchObject } from '../helpers/assertions';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -30,7 +34,7 @@ type Sent = { url?: string; method?: string; headers?: Record<string, string> };
 function connectionAnswering(data: string) {
   const sent: Sent[] = [];
   const connection = {
-    makeAdtRequest: jest.fn(async (request: Sent) => {
+    makeAdtRequest: mock.fn(async (request: Sent) => {
       sent.push(request);
       return { status: 200, statusText: 'OK', headers: {}, data };
     }),
@@ -49,16 +53,17 @@ describe('GetTransport', () => {
       { transport_number: 'TRLK900001' },
     );
 
-    expect(result.isError).toBe(false);
-    expect(sent).toHaveLength(1);
-    expect(sent[0].method).toBe('GET');
-    expect(sent[0].url).toBe('/sap/bc/adt/cts/transportrequests/TRLK900001');
-    expect(sent[0].headers?.Accept).toBe(
+    assert.equal(result.isError, false);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].method, 'GET');
+    assert.equal(sent[0].url, '/sap/bc/adt/cts/transportrequests/TRLK900001');
+    assert.equal(
+      sent[0].headers?.Accept,
       'application/vnd.sap.adt.transportorganizer.v1+xml',
     );
 
     const payload = payloadOf(result);
-    expect(payload).toMatchObject({
+    assertMatchObject(payload, {
       success: true,
       transport_number: 'TRLK900001',
       transport: {
@@ -69,11 +74,11 @@ describe('GetTransport', () => {
       object_count: 2,
       task_count: 1,
     });
-    expect(payload.objects.map((o: any) => o.name)).toEqual([
-      'ZCL_ONE',
-      'ZP_TWO',
-    ]);
-    expect(payload.tasks[0]).toMatchObject({
+    assert.deepStrictEqual(
+      payload.objects.map((o: any) => o.name),
+      ['ZCL_ONE', 'ZP_TWO'],
+    );
+    assertMatchObject(payload.tasks[0], {
       number: 'TRLK900002',
       objects: [{ name: 'ZCL_ONE', type: 'CLAS' }],
     });
@@ -90,11 +95,12 @@ describe('GetTransport', () => {
       }),
     );
 
-    expect(sent.map((r) => r.url)).toEqual([
-      '/sap/bc/adt/cts/transportrequests/TRLK900001',
-    ]);
-    expect(payload.objects).toBeUndefined();
-    expect(payload.tasks).toBeUndefined();
-    expect(payload.transport.number).toBe('TRLK900001');
+    assert.deepStrictEqual(
+      sent.map((r) => r.url),
+      ['/sap/bc/adt/cts/transportrequests/TRLK900001'],
+    );
+    assert.equal(payload.objects, undefined);
+    assert.equal(payload.tasks, undefined);
+    assert.equal(payload.transport.number, 'TRLK900001');
   });
 });

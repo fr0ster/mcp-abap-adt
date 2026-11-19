@@ -10,6 +10,9 @@
  * the credential failure as it came, on both kinds.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import {
@@ -17,6 +20,7 @@ import {
   adtStandIn,
   type StandInRequest,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 import {
   clientOf,
   shippedGroups,
@@ -25,8 +29,6 @@ import {
 import type { DestinationSystemContext } from '../../../../src/lib/auth/destinationSystemContext';
 import { SYSTEM_USER_UNKNOWN_WORDS } from '../../../../src/lib/auth/serverRefusal';
 import { StandServer } from '../helpers/withRules';
-
-jest.setTimeout(30_000);
 
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
 
@@ -50,50 +52,59 @@ const WITHOUT_USER: Array<[string, string]> = [
   ['JSON null', 'null'],
 ];
 
-it.each(WITHOUT_USER)(
-  'on ABAP Cloud a caller lookup answered with %s is system_lookup_failed, and is not kept',
-  async (_what, body) => {
-    const standIn = await adtStandIn();
-    let fixed = false;
-    standIn.body((r) => isLookup(r) && !fixed, body);
-    standIn.body(
-      isLookup,
-      JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
-    );
-    const server = new StandServer({
-      name: 'caller-without-user',
-      logger: silent,
-      systemType: 'cloud',
-      backgroundRuns: new InMemoryBackgroundRuns(),
-    });
-    server.use({
-      settings: { url: standIn.url, client: '100', authType: 'jwt' },
-      credential: TokenAuthProvider.fixed('placeholder.token.sig'),
-    });
-    server.register(shippedGroups());
-    const client = await clientOf(server);
-    try {
-      // A management tool: its caller is looked up with no per-call lookup.
-      const first = await client.call('GetBackgroundRun', {
-        run_handle: 'unknown-handle',
+for (const [_what, body] of WITHOUT_USER) {
+  it(
+    format(
+      'on ABAP Cloud a caller lookup answered with %s is system_lookup_failed, and is not kept',
+      _what,
+    ),
+    async () => {
+      const standIn = await adtStandIn();
+      let fixed = false;
+      standIn.body((r) => isLookup(r) && !fixed, body);
+      standIn.body(
+        isLookup,
+        JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
+      );
+      const server = new StandServer({
+        name: 'caller-without-user',
+        logger: silent,
+        systemType: 'cloud',
+        backgroundRuns: new InMemoryBackgroundRuns(),
       });
-      expect(first.isError).toBe(true);
-      expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
+      server.use({
+        settings: { url: standIn.url, client: '100', authType: 'jwt' },
+        credential: TokenAuthProvider.fixed('placeholder.token.sig'),
+      });
+      server.register(shippedGroups());
+      const client = await clientOf(server);
+      try {
+        // A management tool: its caller is looked up with no per-call lookup.
+        const first = await client.call('GetBackgroundRun', {
+          run_handle: 'unknown-handle',
+        });
+        assert.equal(first.isError, true);
+        assertMatchObject(first.payload, { error: 'system_lookup_failed' });
 
-      fixed = true;
-      const second = await client.call('GetBackgroundRun', {
-        run_handle: 'unknown-handle',
-      });
-      expect(second.payload).not.toMatchObject({
-        error: 'system_lookup_failed',
-      });
-    } finally {
-      await client.close();
-      await server.terminalClose();
-      await standIn.close();
-    }
-  },
-);
+        fixed = true;
+        const second = await client.call('GetBackgroundRun', {
+          run_handle: 'unknown-handle',
+        });
+        assert.throws(
+          () =>
+            assertMatchObject(second.payload, {
+              error: 'system_lookup_failed',
+            }),
+          assert.AssertionError,
+        );
+      } finally {
+        await client.close();
+        await server.terminalClose();
+        await standIn.close();
+      }
+    },
+  );
+}
 
 /** A server on the stand, its connection built from `settings`. */
 async function standServerOn(
@@ -102,7 +113,7 @@ async function standServerOn(
   systemContext?: DestinationSystemContext,
 ) {
   const backgroundRuns = new InMemoryBackgroundRuns();
-  const listed = jest.spyOn(backgroundRuns, 'list');
+  const listed = mock.method(backgroundRuns, 'list');
   const server = new StandServer({
     name: 'caller-by-kind',
     logger: silent,
@@ -115,7 +126,7 @@ async function standServerOn(
   });
   server.register(shippedGroups());
   /** The caller user the last listing ran for. */
-  const caller = () => listed.mock.calls.at(-1)?.[0].user;
+  const caller = () => listed.mock.calls.at(-1)?.arguments[0].user;
   return { server, client: await clientOf(server), caller };
 }
 
@@ -127,8 +138,8 @@ it('on ABAP Cloud the user the system names wins over a configured login', async
   });
   try {
     const answer = await client.call('ListBackgroundRuns');
-    expect(answer.isError).toBeFalsy();
-    expect(caller()).toBe('SYSTEM_USER');
+    assert.ok(!answer.isError);
+    assert.equal(caller(), 'SYSTEM_USER');
   } finally {
     await client.close();
     await server.terminalClose();
@@ -146,13 +157,13 @@ it('on ABAP Cloud a caller lookup answered 404: cloud_without_systeminformation 
     const answer = await client.call('GetBackgroundRun', {
       run_handle: 'unknown-handle',
     });
-    expect(answer.isError).toBe(true);
-    expect(answer.payload).toEqual({
+    assert.equal(answer.isError, true);
+    assert.deepStrictEqual(answer.payload, {
       error: 'cloud_without_systeminformation',
       message:
         'the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration or the headers are inconsistent; the tool did not run',
     });
-    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    assert.equal(standIn.requests.filter(isLookup).length, 1);
   } finally {
     if (saved === undefined) delete process.env.SAP_USERNAME;
     else process.env.SAP_USERNAME = saved;
@@ -162,31 +173,36 @@ it('on ABAP Cloud a caller lookup answered 404: cloud_without_systeminformation 
   }
 });
 
-it.each([405, 501, 500])(
-  'on ABAP Cloud a caller lookup answered %i is system_lookup_failed, never the login',
-  async (status) => {
-    const standIn = await adtStandIn();
-    standIn.answer(isLookup, status);
-    const saved = process.env.SAP_USERNAME;
-    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-    const { server, client } = await standServerOn(standIn, {});
-    try {
-      const answer = await client.call('GetBackgroundRun', {
-        run_handle: 'unknown-handle',
-      });
-      expect(answer.isError).toBe(true);
-      expect(answer.payload).toMatchObject({ error: 'system_lookup_failed' });
-      expect(JSON.stringify(answer.payload)).not.toContain('PROCESS_LOGIN');
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
-    } finally {
-      if (saved === undefined) delete process.env.SAP_USERNAME;
-      else process.env.SAP_USERNAME = saved;
-      await client.close();
-      await server.terminalClose();
-      await standIn.close();
-    }
-  },
-);
+for (const status of [405, 501, 500]) {
+  it(
+    format(
+      'on ABAP Cloud a caller lookup answered %i is system_lookup_failed, never the login',
+      status,
+    ),
+    async () => {
+      const standIn = await adtStandIn();
+      standIn.answer(isLookup, status);
+      const saved = process.env.SAP_USERNAME;
+      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+      const { server, client } = await standServerOn(standIn, {});
+      try {
+        const answer = await client.call('GetBackgroundRun', {
+          run_handle: 'unknown-handle',
+        });
+        assert.equal(answer.isError, true);
+        assertMatchObject(answer.payload, { error: 'system_lookup_failed' });
+        assert.ok(!JSON.stringify(answer.payload).includes('PROCESS_LOGIN'));
+        assert.equal(standIn.requests.filter(isLookup).length, 1);
+      } finally {
+        if (saved === undefined) delete process.env.SAP_USERNAME;
+        else process.env.SAP_USERNAME = saved;
+        await client.close();
+        await server.terminalClose();
+        await standIn.close();
+      }
+    },
+  );
+}
 
 describe('on-premise', () => {
   beforeEach(() => {
@@ -201,9 +217,9 @@ describe('on-premise', () => {
     });
     try {
       const answer = await client.call('ListBackgroundRuns');
-      expect(answer.isError).toBeFalsy();
-      expect(caller()).toBe('SYSTEM_USER');
-      expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+      assert.ok(!answer.isError);
+      assert.equal(caller(), 'SYSTEM_USER');
+      assert.equal(standIn.requests.filter(isLookup).length, 1);
     } finally {
       await client.close();
       await server.terminalClose();
@@ -228,78 +244,82 @@ describe('on-premise', () => {
       ['an error (500)', (standIn) => standIn.answer(isLookup, 500), 1],
     ];
 
-  it.each(NO_INFORMATION)(
-    '%s: the configured login; the parameters made with the connection are kept, asked once',
-    async (_case, answer, lookups) => {
-      const standIn = await adtStandIn();
-      answer(standIn);
-      const { server, client, caller } = await standServerOn(standIn, {
-        username: 'login_user',
-      });
-      try {
-        expect((await client.call('ListBackgroundRuns')).isError).toBeFalsy();
-        expect(caller()).toBe('LOGIN_USER');
-        expect((await client.call('ListBackgroundRuns')).isError).toBeFalsy();
-        expect(standIn.requests.filter(isLookup)).toHaveLength(lookups);
-      } finally {
-        await client.close();
-        await server.terminalClose();
-        await standIn.close();
-      }
-    },
-  );
+  for (const [_case, answer, lookups] of NO_INFORMATION) {
+    it(
+      format(
+        '%s: the configured login; the parameters made with the connection are kept, asked once',
+        _case,
+      ),
+      async () => {
+        const standIn = await adtStandIn();
+        answer(standIn);
+        const { server, client, caller } = await standServerOn(standIn, {
+          username: 'login_user',
+        });
+        try {
+          assert.ok(!(await client.call('ListBackgroundRuns')).isError);
+          assert.equal(caller(), 'LOGIN_USER');
+          assert.ok(!(await client.call('ListBackgroundRuns')).isError);
+          assert.equal(standIn.requests.filter(isLookup).length, lookups);
+        } finally {
+          await client.close();
+          await server.terminalClose();
+          await standIn.close();
+        }
+      },
+    );
+  }
 
-  it.each(NO_INFORMATION)(
-    '%s: the responsible if stated, else the login',
-    async (_case, answer) => {
-      const standIn = await adtStandIn();
-      answer(standIn);
-      const onlyResponsible = await standServerOn(
-        standIn,
-        {},
-        {
-          responsible: 'resp_user',
-        },
-      );
-      try {
-        expect(
-          (await onlyResponsible.client.call('ListBackgroundRuns')).isError,
-        ).toBeFalsy();
-        expect(onlyResponsible.caller()).toBe('RESP_USER');
-      } finally {
-        await onlyResponsible.client.close();
-        await onlyResponsible.server.terminalClose();
-      }
-      const both = await standServerOn(
-        standIn,
-        { username: 'login_user' },
-        {
-          responsible: 'resp_user',
-        },
-      );
-      try {
-        expect(
-          (await both.client.call('ListBackgroundRuns')).isError,
-        ).toBeFalsy();
-        expect(both.caller()).toBe('RESP_USER');
-      } finally {
-        await both.client.close();
-        await both.server.terminalClose();
-        await standIn.close();
-      }
-    },
-  );
+  for (const [_case, answer] of NO_INFORMATION) {
+    it(
+      format('%s: the responsible if stated, else the login', _case),
+      async () => {
+        const standIn = await adtStandIn();
+        answer(standIn);
+        const onlyResponsible = await standServerOn(
+          standIn,
+          {},
+          {
+            responsible: 'resp_user',
+          },
+        );
+        try {
+          assert.ok(
+            !(await onlyResponsible.client.call('ListBackgroundRuns')).isError,
+          );
+          assert.equal(onlyResponsible.caller(), 'RESP_USER');
+        } finally {
+          await onlyResponsible.client.close();
+          await onlyResponsible.server.terminalClose();
+        }
+        const both = await standServerOn(
+          standIn,
+          { username: 'login_user' },
+          {
+            responsible: 'resp_user',
+          },
+        );
+        try {
+          assert.ok(!(await both.client.call('ListBackgroundRuns')).isError);
+          assert.equal(both.caller(), 'RESP_USER');
+        } finally {
+          await both.client.close();
+          await both.server.terminalClose();
+          await standIn.close();
+        }
+      },
+    );
+  }
 
-  it.each(NO_INFORMATION)(
-    '%s and no login: system_user_unknown',
-    async (_case, answer) => {
+  for (const [_case, answer] of NO_INFORMATION) {
+    it(format('%s and no login: system_user_unknown', _case), async () => {
       const standIn = await adtStandIn();
       answer(standIn);
       const { server, client } = await standServerOn(standIn, {});
       try {
         const result = await client.call('ListBackgroundRuns');
-        expect(result.isError).toBe(true);
-        expect(result.payload).toEqual({
+        assert.equal(result.isError, true);
+        assert.deepStrictEqual(result.payload, {
           error: 'system_user_unknown',
           message: SYSTEM_USER_UNKNOWN_WORDS,
         });
@@ -308,29 +328,31 @@ describe('on-premise', () => {
         await server.terminalClose();
         await standIn.close();
       }
-    },
-  );
+    });
+  }
 });
 
-describe.each([
+for (const [_kind, kind] of [
   ['on-premise', 'onprem'],
   ['ABAP Cloud', 'cloud'],
-])('%s: a 401 on the caller lookup', (_kind, kind) => {
-  it('is the credential failure as it came — no login stands in', async () => {
-    process.env.SAP_SYSTEM_TYPE = kind;
-    const standIn = await adtStandIn();
-    standIn.answer(isLookup, 401);
-    const { server, client } = await standServerOn(standIn, {
-      username: 'LOGIN_USER',
+]) {
+  describe(format('%s: a 401 on the caller lookup', _kind), () => {
+    it('is the credential failure as it came — no login stands in', async () => {
+      process.env.SAP_SYSTEM_TYPE = kind;
+      const standIn = await adtStandIn();
+      standIn.answer(isLookup, 401);
+      const { server, client } = await standServerOn(standIn, {
+        username: 'LOGIN_USER',
+      });
+      try {
+        const result = await client.call('ListBackgroundRuns');
+        assert.equal(result.isError, true);
+        assertMatchObject(result.payload, { error: 'authentication_failed' });
+      } finally {
+        await client.close();
+        await server.terminalClose();
+        await standIn.close();
+      }
     });
-    try {
-      const result = await client.call('ListBackgroundRuns');
-      expect(result.isError).toBe(true);
-      expect(result.payload).toMatchObject({ error: 'authentication_failed' });
-    } finally {
-      await client.close();
-      await server.terminalClose();
-      await standIn.close();
-    }
   });
-});
+}

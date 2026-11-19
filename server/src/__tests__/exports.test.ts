@@ -13,16 +13,23 @@
  * answers core's version when it is constructed without one, whatever version
  * the runtime has.
  */
-jest.mock('../../../server-runtime/src/runtimeVersion', () => ({
-  RUNTIME_VERSION: '0.0.0-runtime',
-}));
-
+import assert from 'node:assert/strict';
 import * as path from 'node:path';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
+import * as runtimeVersion from '../../../server-runtime/src/runtimeVersion';
+
+// server-runtime's RUNTIME_VERSION replaced on its module before the servers
+// load (they read it when constructed), as the Jest factory did: the entry's
+// own version must win over it.
+mock.property(runtimeVersion, 'RUNTIME_VERSION', '0.0.0-runtime');
+
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import * as runtime from '@mcp-abap-adt/server-runtime/stdio/server';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../../../src/__tests__/helpers/repoRoot';
 import * as auth from '../auth/index';
 import { CORE_VERSION } from '../coreVersion';
 import * as core from '../index';
@@ -117,7 +124,7 @@ const AUTH_19_1_0 = {
   ],
 };
 
-const SRC = path.resolve(__dirname, '..');
+const SRC = path.resolve(repositoryRoot(__dirname), 'server', 'src');
 const ENTRIES = [
   ['@mcp-abap-adt/core', 'index.ts', core, CORE_19_1_0],
   ['@mcp-abap-adt/core/launcher', 'launcher.ts', launcher, LAUNCHER_19_1_0],
@@ -163,31 +170,37 @@ const kept = (names: readonly string[]) =>
   names.filter((name) => !REMOVED_IN_24_0_0.has(name));
 
 describe('@mcp-abap-adt/core keeps every name 19.1.0 exported', () => {
-  describe.each(ENTRIES)('%s', (_name, _file, loaded, before) => {
-    it.each(kept(before.values))('exports the value %s', (name) => {
-      expect(loaded).toHaveProperty(name);
-      expect((loaded as Record<string, unknown>)[name]).toBeDefined();
+  for (const [_name, _file, loaded, before] of ENTRIES) {
+    describe(format('%s', _name), () => {
+      for (const name of kept(before.values)) {
+        it(format('exports the value %s', name), () => {
+          assert.ok(
+            typeof loaded === 'object' && loaded !== null && name in loaded,
+          );
+          assert.notEqual((loaded as Record<string, unknown>)[name], undefined);
+        });
+      }
     });
-  });
+  }
 
   // One program for the three entries: the checker follows each re-export
   // into server-runtime's sources through tsconfig.test.json's paths.
   const checked = checkedExports();
-  describe.each(ENTRIES)(
-    '%s, as the checker reads it',
-    (_name, file, _l, before) => {
+  for (const [_name, file, _l, before] of ENTRIES) {
+    describe(format('%s, as the checker reads it', _name), () => {
       const exported = checked.get(path.join(SRC, file)) ?? [];
-      it.each(kept([...before.values, ...before.types]))(
-        'exports %s',
-        (name) => {
-          expect(exported).toContain(name);
-        },
-      );
-      it.each([...REMOVED_IN_24_0_0])('no longer exports %s', (name) => {
-        expect(exported).not.toContain(name);
-      });
-    },
-  );
+      for (const name of kept([...before.values, ...before.types])) {
+        it(format('exports %s', name), () => {
+          assert.ok(exported.includes(name));
+        });
+      }
+      for (const name of [...REMOVED_IN_24_0_0]) {
+        it(format('no longer exports %s', name), () => {
+          assert.ok(!exported.includes(name));
+        });
+      }
+    });
+  }
 });
 
 async function versionAnswered(server: {
@@ -213,8 +226,8 @@ describe("core's StdioServer answers core's version", () => {
       new CompositeHandlersRegistry([]),
       undefined,
     );
-    expect(await versionAnswered(server)).toBe('0.0.0-runtime');
-    expect(CORE_VERSION).not.toBe('0.0.0-runtime');
+    assert.equal(await versionAnswered(server), '0.0.0-runtime');
+    assert.notEqual(CORE_VERSION, '0.0.0-runtime');
   });
 
   it('without a version: CORE_VERSION', async () => {
@@ -222,7 +235,7 @@ describe("core's StdioServer answers core's version", () => {
       new CompositeHandlersRegistry([]),
       undefined,
     );
-    expect(await versionAnswered(server)).toBe(CORE_VERSION);
+    assert.equal(await versionAnswered(server), CORE_VERSION);
   });
 
   it('with a version: that version', async () => {
@@ -231,7 +244,7 @@ describe("core's StdioServer answers core's version", () => {
       undefined,
       { version: '9.9.9-given' },
     );
-    expect(await versionAnswered(server)).toBe('9.9.9-given');
+    assert.equal(await versionAnswered(server), '9.9.9-given');
   });
 
   it('is the runtime StdioServer underneath', () => {
@@ -239,6 +252,6 @@ describe("core's StdioServer answers core's version", () => {
       new CompositeHandlersRegistry([]),
       undefined,
     );
-    expect(server).toBeInstanceOf(runtime.StdioServer);
+    assert.ok(server instanceof runtime.StdioServer);
   });
 });

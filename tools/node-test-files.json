@@ -31,6 +31,7 @@
   "compact/src/__tests__/launcher.test.ts",
   "core-ro/src/__tests__/launcher.test.ts",
   "http-ro/src/__tests__/launcher.test.ts",
+  "http/src/__tests__/exports.test.ts",
   "responsible-rules/src/__tests__/backgroundRuns/callerWithoutUser.test.ts",
   "responsible-rules/src/__tests__/debugger/requestUser.test.ts",
   "responsible-rules/src/__tests__/debugger/requestUserWithoutUser.test.ts",
@@ -167,6 +168,7 @@
   "server-runtime/src/stdio/__tests__/startConnector.test.ts",
   "server-runtime/src/stdio/__tests__/stateLogger.test.ts",
   "server-runtime/src/stdio/__tests__/stdioSource.test.ts",
+  "server/src/__tests__/exports.test.ts",
   "src/__tests__/admin/shared-deps/check.test.ts",
   "src/__tests__/admin/shared-deps/setup.test.ts",
   "src/__tests__/admin/shared-deps/teardown.test.ts",
@@ -764,5 +766,6 @@
   "src/__tests__/unit/xml/tree.test.ts",
   "src/__tests__/unit/yamlConfig.test.ts",
   "src/__tests__/utils.test.ts",
-  "sse-ro/src/__tests__/launcher.test.ts"
+  "sse-ro/src/__tests__/launcher.test.ts",
+  "sse/src/__tests__/exports.test.ts"
 ]

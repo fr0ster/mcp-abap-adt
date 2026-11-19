@@ -1,5 +1,12 @@
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import { format } from 'node:util';
 import * as z from 'zod';
 /**
@@ -140,7 +147,7 @@ for (const [_mode, enableJsonResponse] of [
       let previousType: string | undefined;
 
       /** The logons: BaseMcpServer's getConnection, replaced for each test. */
-      let getConnection: { mock: { callCount(): number } };
+      let getConnection: Mock<() => Promise<unknown>>;
 
       beforeEach(async () => {
         mock.method(console, 'error', () => {});
@@ -406,9 +413,12 @@ for (const [_mode, enableJsonResponse] of [
 
       it('a tool call without a handle still gets an instance', async () => {
         const made = instancesMade();
+        const before = logons();
         const handle = await hold();
         assert.match(handle, /^[0-9A-F]{32}$/);
         assert.ok(made.mock.callCount() > 0);
+        // It logs on: the counter the "no logon" cases read does move.
+        assert.ok(logons() > before);
         made.mock.restore();
       });
 

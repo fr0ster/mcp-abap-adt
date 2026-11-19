@@ -23,25 +23,32 @@ import { fixtureRepo, REPO, runTool, temporaryDir, writeAt } from './toolRuns';
 const scratch = temporaryDir('selection-');
 after(() => scratch.remove());
 
-/** The live suites' directories, under which only a live script runs. */
-const LIVE_ROOTS = ['src/__tests__/integration', 'src/__tests__/admin'];
+/**
+ * A list of strings `tools/node-test-list.mjs` exports, read from its module:
+ * data from outside the type system.
+ */
+function exportedList(module: unknown, name: string): string[] {
+  const list: unknown =
+    typeof module === 'object' && module !== null
+      ? Reflect.get(module, name)
+      : undefined;
+  assert.ok(
+    Array.isArray(list) &&
+      list.every((item): item is string => typeof item === 'string'),
+    `tools/node-test-list.mjs exports no ${name}`,
+  );
+  return list;
+}
 
-/** The runner's test roots, read from its module: data from outside the type system. */
+/** The runner's test roots and live roots, as the runner states them. */
 let testRoots: readonly string[] = [];
+let liveRoots: readonly string[] = [];
 before(async () => {
   const module: unknown = await import(
     pathToFileURL(path.join(REPO, 'tools', 'node-test-list.mjs')).href
   );
-  const roots: unknown =
-    typeof module === 'object' && module !== null
-      ? Reflect.get(module, 'TEST_ROOTS')
-      : undefined;
-  assert.ok(
-    Array.isArray(roots) &&
-      roots.every((root): root is string => typeof root === 'string'),
-    'tools/node-test-list.mjs exports no TEST_ROOTS',
-  );
-  testRoots = roots;
+  testRoots = exportedList(module, 'TEST_ROOTS');
+  liveRoots = exportedList(module, 'LIVE_ROOTS');
 });
 
 /** The lines of a child's output, the empty ones dropped. */
@@ -57,7 +64,8 @@ function runnerList(repo: string, args: readonly string[]): string[] {
 
 /** Every file the runner selects in `repo`: the unit run, the live runs, the runs of their own. */
 function everySelected(repo: string): string[] {
-  const live = LIVE_ROOTS.map((root) => path.join(repo, ...root.split('/')))
+  const live = liveRoots
+    .map((root) => path.join(repo, ...root.split('/')))
     .filter((dir) => fs.existsSync(dir))
     .flatMap((dir) => ['--root', dir]);
   const separateFile = path.join(repo, 'tools', 'separate-runs.json');

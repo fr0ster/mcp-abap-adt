@@ -79,6 +79,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   buildDir,
   compiledFile,
+  LIVE_ROOTS,
   OWN_REPO,
   separateSources,
   sourceFile,
@@ -161,12 +162,9 @@ function inRoots(dirs, file) {
   return dirs.length === 0 || dirs.some((dir) => isUnder(dir, file));
 }
 
-/** The directories of the live suites, by their repository paths. */
-const LIVE_ROOTS = ['src/__tests__/integration/', 'src/__tests__/admin/'];
-
 /** Whether `source` (a repository source path) is a live suite's file. */
 function isLiveSource(source) {
-  return LIVE_ROOTS.some((root) => source.startsWith(root));
+  return LIVE_ROOTS.some((root) => source.startsWith(`${root}/`));
 }
 
 /** The compiled module `parts` of this repository's build, required. */

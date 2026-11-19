@@ -42,6 +42,12 @@ export const TEST_ROOTS = [
   'compact-sse-ro/src',
 ];
 
+/**
+ * The live suites' directories, written with `/`: a file under one runs only
+ * under a live npm script (`run-tests.mjs`).
+ */
+export const LIVE_ROOTS = ['src/__tests__/integration', 'src/__tests__/admin'];
+
 /** The directories the walk never enters, by name. */
 export const SKIPPED_DIRECTORIES = [
   'node_modules',

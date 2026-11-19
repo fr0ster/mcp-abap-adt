@@ -22,8 +22,11 @@ export async function turns(n = 20): Promise<void> {
   }
 }
 
-/** Writes `facts` and the recorded rejections as the report, and exits. */
-export function report(facts: Record<string, unknown>): never {
-  process.stdout.write(`${JSON.stringify({ ...facts, unhandled })}\n`);
-  process.exit(0);
+/** Writes `facts` and the recorded rejections as the report, and exits once it is written. */
+export function report(facts: Record<string, unknown>): void {
+  // Exits once the line is written: a pipe write is asynchronous on macOS,
+  // and an exit at once could cut the report short.
+  process.stdout.write(`${JSON.stringify({ ...facts, unhandled })}\n`, () =>
+    process.exit(0),
+  );
 }

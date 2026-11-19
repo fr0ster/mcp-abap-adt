@@ -124,8 +124,9 @@ async function main(): Promise<void> {
   const run = cases[process.argv[2] ?? ''];
   if (run === undefined) throw new Error('no such case');
   const facts = await run();
-  process.stdout.write(`${JSON.stringify(facts)}\n`);
-  process.exit(0);
+  // Exits once the line is written: a pipe write is asynchronous on macOS,
+  // and an exit at once could cut the record short.
+  process.stdout.write(`${JSON.stringify(facts)}\n`, () => process.exit(0));
 }
 
 main().catch((error: unknown) => {

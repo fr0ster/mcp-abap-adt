@@ -72,6 +72,8 @@ async function run(
     typeof parsed === 'object' && parsed !== null && key in parsed
       ? Reflect.get(parsed, key)
       : undefined;
+  // The child saw no unhandled rejection (the recorder's list).
+  assert.deepStrictEqual(field('unhandled'), []);
   return {
     seen: {
       answer: field('answer'),

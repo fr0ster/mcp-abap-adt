@@ -5,8 +5,9 @@
 Expose two ADT sub-resources the server cannot reach today, in one change:
 
 - a table's **technical settings** (`TABL/DTT`, `/sap/bc/adt/ddic/db/settings/{name}`) — read, and
-  write non-default values (the owner reports Eclipse refusing to activate a table without them —
-  not reproduced by S6; V1);
+  write **non-default** values. The complaint seen in Eclipse is Eclipse's own client-side check,
+  raised for any table, not an SAP refusal (owner); the server activates tables with SAP's default
+  settings (Measured, S6). The tool exists to set values other than the defaults;
 - the **text elements** of programs, function groups and classes (`PROG/PX`, `CLAS/OCX`,
   `/sap/bc/adt/textelements/{programs|functiongroups|classes}/{name}`) — text symbols, selection
   texts and list/column headings; full read and write.
@@ -36,7 +37,7 @@ The library side is published: `@mcp-abap-adt/adt-clients` 46.0.0 (`getTableSett
 - **Function groups' text elements are served on onprem and on cloud** (T10).
 - **Compact:** `TABLE_SETTINGS`, `PROGRAM_TEXT_ELEMENTS`, `FUNCTION_GROUP_TEXT_ELEMENTS`,
   `CLASS_TEXT_ELEMENTS`.
-- `TABL/DTT` stays out of where-used until it is measured.
+- `TABL/DTT` stays out of where-used: SAP does not serve it (W4).
 - The unused `adt-clients-legacy` dependency is dropped: the server imports nothing from it.
 - `activate` on the new update tools is a **required** boolean: the existing update tools have no
   single convention (some default to `true`, some to `false`, some have none), so no implicit
@@ -47,9 +48,11 @@ The library side is published: `@mcp-abap-adt/adt-clients` 46.0.0 (`getTableSett
 Every statement about SAP behaviour carries its ground: **Code** (handler class, method, quoted
 line), **Measured** (system, request, status), or **unverified** — and every unverified one is in
 "To verify in SAP handlers". Sources are the research notes of 2026-11-19 (`sap-handler/` in the
-session scratchpad: `table-settings.md` (TS), `texts-translation.md` (TT), their raw answers) and
-the recorded discovery of adt-clients' corpus (`corpus/adt/discovery/`). Handler code was read on
-premise only; on the cloud the ground is a measurement or nothing.
+session scratchpad: `table-settings.md` (TS), `texts-translation.md` (TT), their raw answers in
+`raw/`, `raw-te/`, `raw-v/`) and the recorded discovery of adt-clients' corpus
+(`corpus/adt/discovery/`). The handler sources behind S2, S3, S5, S8, W1, T3, T6, T7 and T11 were
+read on both systems (TS §14, TT §14, `raw-v/code-{onprem,cloud}/`); the rest of the Code lines were
+read on premise.
 
 ### Table settings
 
@@ -57,41 +60,62 @@ premise only; on the cloud the ground is a measurement or nothing.
   v2 Accept → 200, a v1 Accept → 406 SADT_RESOURCE 037 (TS §3, `raw/onprem-get-sflight-v2.txt`,
   `-v1.txt`). Measured cloud: discovery lists the collection accepting v2 and text/html only; an
   existing table's GET → 200 with an ETag (TS §8 "Cloud reads", `raw/cloud-read2.txt`).
-- **S2 Own lock, `TABT`.** Code onprem: `CL_TABT_WB_PERSIST->if_wb_object_persist~lock`,
-  `CALL FUNCTION 'ENQUEUE_ESDICT' … objtype = cl_tabt_object_data=>co_sub_transport_type`
-  (`co_sub_transport_type = 'TABT'`, `CL_TABT_OBJECT_DATA`; `raw/cls-persist.abap:135-138`). Measured
-  both: `POST …/settings/{t}?_action=LOCK&accessMode=MODIFY` → 200 with a handle; UNLOCK → 200
-  (TS §8 step 3, `raw/onprem-trial2.txt` §3a/3c, `raw/cloud-trial2.txt` §3a/3c). That the table's
-  own lock does not cover the settings: Code onprem only (another `objtype`); unverified on cloud
-  and never measured (V3).
-- **S3 The PUT writes the settings row from the document, a field left out reset.** Code onprem:
-  `CL_TABT_WB_PERSIST->move_adt_to_ddv` sets `tabart`, `tabkat`, `bufallow` (blank → `'N'`),
-  `pufferung`, `schfeldanz` (only `IF e_dd09l_wa-pufferung = 'G'`), `roworcolst`, `sharingtype`,
-  `load_unit`, `uebersetz`, `protokoll` from the document, then `save` calls `DDIF_TABT_PUT`
-  (`raw/cls-persist.abap:175-177, 214-237`). Measured both: active `storageType` `C` → PUT of a
-  document without `storageType` → 200 → the inactive read answers `storageType` empty
-  (`raw/onprem-trial2.txt` lines 29 → 52, `raw/cloud-trial2.txt` lines 47 → 70).
-- **S4 `adtcore:description` required.** Measured onprem: PUT without it → 400
-  `ExceptionInvalidData` SWB_TOOL 019 "The description is missing" (TS §8 step 3, run 1,
-  `raw/onprem-trial.txt`). Cloud: unverified (every cloud PUT carried it; V4).
-- **S5 `ts:translation`.** Measured both: the minimal PUT without `ts:translation` → 200 (TS §8
-  "Minimal document", `raw/onprem-trial2.txt` §3b, `raw/cloud-trial2.txt` §3b). adt-clients 46.0.0's
-  README says SAP refuses a write without it (`400 00/001`): **contradicted** by this measurement;
-  what that refusal was is V5. `uebersetz` is written from it (S3), so leaving it out resets it.
+- **S2 Own lock, `TABT`, apart from the table's.** Code, both systems:
+  `CL_TABT_WB_PERSIST->if_wb_object_persist~lock` (l. 136–139), `CALL FUNCTION 'ENQUEUE_ESDICT' …
+  objtype = cl_tabt_object_data=>co_sub_transport_type`, `co_sub_transport_type … VALUE 'TABT'`
+  (`CL_TABT_OBJECT_DATA`; TS §2, §14 V3). Measured, both systems: with the table locked
+  (`/ddic/tables/{t}?_action=LOCK` → 200) a settings LOCK → 200, and in the reverse order → 200; all
+  four UNLOCKs → 200 (`raw-v/{onprem,cloud}/04–11`). Limit: one user, one session; a clash between
+  two users is unverified (V12).
+- **S3 The PUT writes every settings field from the document; a field left out is reset.** Code,
+  both systems: `CL_TABT_WB_PERSIST->move_adt_to_ddv` (l. 215–238) sets `tabart`, `tabkat`,
+  `bufallow` (blank → `'N'`), `pufferung`, `schfeldanz` (only `IF e_dd09l_wa-pufferung = 'G'`),
+  `roworcolst = …storage_type`, `sharingtype`, `load_unit`, `uebersetz = …translation-value`,
+  `protokoll = …logging_enabled`, and on cloud also `e_dd09l_wa-allowed_for_amdp_write =
+  i_object_data-content-is_writable_by_amdp.` (l. 238); `save` then calls `DDIF_TABT_PUT name
+  dd09l_wa`. Measured, both systems: a PUT with `storageType C`, `loggingEnabled true` and (cloud)
+  `isWritableByAMDP true` → read back with those values; then a minimal PUT → `storageType` empty,
+  `loggingEnabled false`, cloud `isWritableByAMDP false` (`raw-v/{onprem,cloud}/27–34`; earlier
+  `raw/onprem-trial2.txt` lines 29 → 52, `raw/cloud-trial2.txt` lines 47 → 70).
+- **S4 `adtcore:description` required.** Measured, both systems: a PUT without it → 400
+  `ExceptionInvalidData` "The description is missing for {table}", `SWB_TOOL/019`
+  (`raw/onprem-trial.txt`; `raw-v/{onprem,cloud}/13`).
+- **S5 `ts:translation` may be absent; when present it carries all four attributes.** Code, both
+  systems: `SDDIC_ADT_TTAB` writes `<ts:translation>` with four `tt:attribute`s (`ts:value`,
+  `ts:isVisible`, `ts:isEditable`, `ts:granularity`) inside a `tt:cond`;
+  `CL_ADT_REST_ST_HANDLER->if_adt_rest_content_handler~deserialize`, `catch cx_st_error into
+  data(st_error). raise_adt_deserialize_exc( st_error )` → `cx_adt_rest_data_invalid`, T100 `00/001`
+  with the ST text and `XML_PATH` (TS §14 V5). Measured, both systems: `<ts:translation ts:value=""/>`
+  → 400 `00/001` "…isVisible…", `XML_PATH ts:tableSettings(1)ts:translation(4)`;
+  `<ts:translation/>` → 400 `00/001` "…value…"; all four attributes → 200; element absent → 200
+  (`raw-v/{onprem,cloud}/15–26`). Since `uebersetz` is written from it (S3), an absent element
+  resets the translation value. adt-clients 46.0.0's README ("SAP refuses a write without one") is
+  wrong; 46.1.0 corrects it.
 - **S6 Defaults with the table; activation of the table activates them.** Measured both:
   `CreateTable` → settings GET → 200 `version="new"`, APPL0 / 0 / N; activating the table alone
   (`POST /sap/bc/adt/activation?method=activate`, one `TABL/DT` reference) → 200
   `activationExecuted="true"`, settings then `active`; after a settings PUT the same table-only
   activation → settings `active` with the written values (TS §8 steps 1, 2, 4, 5). An activation of
   `TABL/DTT` alone was never sent.
-- **S7 Cloud reads `isWritableByAMDP`.** Measured cloud: the element is in every cloud read
-  (`raw/cloud-trial2.txt`), absent on premise; Code onprem: not in `SDDIC_ADT_TTAB` (TS §2, §8).
-  Whether the cloud PUT accepts or refuses it: unverified; the design never writes it.
-- **S8 Value-help data classes.** Measured onprem: `…/settings/dataClass/values` → 200 APPL0, APPL1,
-  APPL2, DDIM, DFACT, … (TS §3, `raw/onprem-dataclass-values.txt`). Cloud values and whether a system
-  may define its own data classes: unverified (V6).
+- **S7 `isWritableByAMDP` is cloud's, and the cloud PUT writes it.** Measured: present in every cloud
+  read, absent on premise (`raw/cloud-trial2.txt`); Code: in the cloud `SDDIC_ADT_TTAB` and
+  `move_adt_to_ddv` (l. 238, S3), not in the on-premise ones (TS §14). Leaving it out of a cloud PUT
+  resets it to `false` (Measured, S3). So on cloud it is read, written back as read, and settable;
+  interfaces-adt 30.0.0's `isWritableByAMDP?: never` on the update is wrong, and 30.1.0 corrects it.
+- **S8 The data class is not limited to the value help; activation judges it.** Code, both systems:
+  `CL_TABT_DATA_CLASS_VH->get_named_items` selects `dartt JOIN ddart … WHERE ( b~ddclass = 'STD' )`
+  — standard classes only. Measured, both systems: `…/settings/dataClass/values` → APPL0, APPL1,
+  APPL2, DDIM, DFACT, DODS, …; PUT `USER` → 200, read back `USER`; PUT a 6-character value → 400
+  `00/001` (the TABART length, `XML_PATH …dataClassCategory(1)`); PUT `ZZNOP` (no such class) → 200,
+  stored; activating the table then → 200 `activationExecuted="true"` with an error message
+  "Activation was cancelled." / "Value in field Data Class (value ZZNOP not permitted)", table and
+  settings stay inactive (`raw-v/v6/{onprem,cloud}/45–50`). So the tool takes any data class, and an
+  activation is judged by its messages, not by `activationExecuted` alone (`analyseActivation`).
 - **S9 Not on 7.40.** Measured (recorded discovery): `system-description-basis-740--03-discovery`
   has no `/sap/bc/adt/ddic/db/settings` (0 occurrences; checked 2026-11-19).
+- **S10 If-Match.** Measured, both systems: PUT with `If-Match` and the content type without charset
+  → 200; with `; charset=utf-8` → 412 `SADT_RESOURCE/043`; with charset and no `If-Match` → 200
+  (`ts-etag-onprem.txt`, `ts-etag-cloud.txt`; TS §14 V11).
 
 ### Text elements
 
@@ -105,10 +129,12 @@ premise only; on the cloud the ground is a measurement or nothing.
   (`sedx-locals.abap:330-345`). Measured both: `POST /textelements/{kind}/{n}?_action=LOCK&accessMode=MODIFY`
   → 200 `IS_LOCAL=X`; UNLOCK → 200 (TT §8, §10 step 08, §13.3). Cloud's lock answers
   `MODIFICATION_SUPPORT=NoModification` and the PUT still saves (Measured cloud, TT §8, §13.3).
-- **T3 A write replaces the whole part.** Measured onprem: PUT symbols with only 001 → 200, 002 gone
-  (TT §8); headings: an empty or left-out key is deleted, Code onprem `lcl_textpool->save`
-  `if sy-subrc = 0 and i_tpool-&1 is initial. delete tpool index sy-tabix.` (TT §12.3). Cloud:
-  unverified (V7).
+- **T3 A write replaces the whole part.** Code, both systems: `lcl_textpool->save` deletes the
+  symbols missing from the body (`read table i_tpool-text_elements … check sy-subrc <> 0. delete tpool
+  index del_index.`); `update_header`: `if sy-subrc = 0 and i_tpool-&1 is initial. delete tpool
+  index sy-tabix.` (TT §12.3, §14 V7). Measured: onprem symbols 001+002 then 001 alone → 002 gone (TT
+  §8); cloud the same, and headings 1–3 then column 2 empty and column 3 left out → both empty
+  (`raw-v/cloud/65, 69, 73`).
 - **T4 Original language only.** Code onprem: `lcl_textpool->read` reads `masterlang` from TADIR and
   calls `RS_TEXTPOOL_READ … language = master_language`; `save` calls
   `RPY_TEXTELEMENTS_INSERT_AIE … language = tadir-masterlang` (`sedx-locals.abap:30-50, 174-200`).
@@ -122,16 +148,25 @@ premise only; on the cloud the ground is a measurement or nothing.
   `activationExecuted="true"`, inactive list empty (TT §8, §10 steps 38-39); onprem, after a later
   change, the text-elements URI alone (TT §10 steps 51-52); onprem function group — `{FUGR/F}` +
   `{PROG/PX, /textelements/functiongroups/{g}}`, and `{PROG/PX, te-uri}` alone, either name (TT §12.1);
-  cloud function group — the pair (TT §13.4); cloud class — class URI + text-elements URI (TT §8).
+  cloud function group — the pair (TT §13.4); cloud class — class URI + text-elements URI (TT §8);
+  onprem class — properties `adtcore:type="CLAS/OCX"`, LOCK/PUT/UNLOCK → 200, the inactive list
+  names the part **`PROG/PX` with the class pool name (`{CLASS}====CP`)** next to `CLAS/OC`,
+  `{CLAS/OC, /oo/classes/{c}}` + `{CLAS/OCX, /textelements/classes/{c}}` → `activationExecuted="true"`,
+  both leave the list (`raw-v/onprem/56–64, 73`). Code, both systems:
+  `CL_SEDX_ADT_SRC_UTIL=>get_type_and_name_from_uri`, `when 'classes'. … objtype_tr = 'CLAS'.
+  subtype_wb = swbm_c_type_cls_textelement. e_rept_name = cl_oo_classname_service=>get_classpool_name(
+  … )` (TT §14 V8). So a `still_inactive` entry `PROG/PX {CLASS}====CP` is the class's text elements.
   `ActivateObjects [{PROG/P}]` alone after a text write → "no activation ran; still inactive PROG/P
-  and PROG/PX" (Measured onprem, TT §8). Onprem class (`CLAS/OCX`) write and activation: unverified
-  (the onprem trials used a program; V8).
-- **T7 Refusals on the write.** Measured onprem, each with its Code line (TT §10, §12.2): selection
-  name over 8 → 406 `SEDX_ADT/102` (`if strlen( key ) > 8. message e102(sedx_adt) with key 8`);
-  selection text over 30 → 406 `SEDX_ADT/110`, nothing saved; a symbol line without `=` in its first
-  four characters (key `0001`) → 406 `SEDX_ADT/106`; a headings key outside the five → 406
-  `SEDX_ADT/101`. An unknown selection name → 200, stored. A symbol text longer than its
-  `maxLength`, and every refusal on cloud: unverified (V9).
+  and PROG/PX" (Measured onprem, TT §8).
+- **T7 Refusals on the write, the same on both systems.** Measured onprem and cloud, with the Code
+  lines (TT §10, §12.2, §14 V9): selection name over 8 → 406 `SEDX_ADT/102`
+  (`if strlen( key ) > 8. message e102(sedx_adt) with key 8`); selection text over 30 → 406
+  `SEDX_ADT/110`, nothing saved; a symbol line without `=` in its first four characters (key
+  `0001`) → 406 `SEDX_ADT/106`; a headings key outside the five → 406 `SEDX_ADT/101`; a symbol text
+  longer than its `@MaxLength` → 406 `DS/512` "Text elements contain errors", nothing saved
+  (`map_source_to_textpool_data`, `perform check_textentry in program saplsetxp … message e512(ds)`;
+  `raw-v/onprem/66, 68`, `raw-v/cloud/75, 77`); an unknown selection name → 200, stored
+  (`raw-v/cloud/79–93`).
 - **T8 Selection text with `@DDICReference`.** Measured onprem: the text written is replaced by the
   dictionary label (TT §10).
 - **T9 Versions.** Measured onprem: no parameter = `workingArea` = `inactive`; `active` = the last
@@ -141,9 +176,15 @@ premise only; on the cloud the ground is a measurement or nothing.
   package with no transport → success; properties → 200 `adtcore:type="FUGR/PX"`; symbols, selections
   → 200; headings → 200 with five empty keys; LOCK, PUT symbols, UNLOCK → 200; the pair activation →
   `activationExecuted="true"`; where-used → 200 `globalType="PROG/PX"`.
-- **T11 Programs on cloud.** Measured cloud: delivered programs' text elements read → 200 (TT §12.5,
-  §12.6). That cloud has no program of its own to write: the server's documented gating (CLAUDE.md,
-  "Cloud vs On-Prem"), not measured here (V10).
+- **T11 Programs on cloud.** Measured cloud: delivered programs' text elements read → 200 (TT
+  §12.5, §12.6). A write to a delivered program: Code only, nothing locked or written — the cloud
+  `CL_SEDX_ADT_RES_TEXTELEMENT->lock` runs `access_permission->modify( )` (`RS_ACCESS_PERMISSION …
+  mode = swbm_c_op_modify … object_class = 'TEXT'`; `when 6 or 7 or 8.` → `cx_adt_res_no_authorization`,
+  `when others.` → `cx_adt_res_no_access`), then `RS_EXTEND_CHECK … if extend_mod = abap_true. …
+  message s533(eu) … raise exception type cx_adt_res_no_access`; cloud's `RS_ACCESS_PERMISSION` adds
+  `cl_eui_object_blocklist=>…is_access_restricted( … ) … MESSAGE e607` (TT §14 V10). Inference: a
+  delivered program is refused there; which check fires is unverified (V13). The cloud write schema
+  leaves `program` out on this ground.
 - **T12 Not on 7.40.** Measured (recorded discovery): `system-description-basis-740--03-discovery`
   has no `/textelements` (TT §9; 0 occurrences, checked 2026-11-19).
 
@@ -157,7 +198,11 @@ premise only; on the cloud the ground is a measurement or nothing.
   (TT §13.6) → 200 `globalType="PROG/PX"`.
 - **W3 `CLAS/OCX`.** Measured both: 200, "Where-Used List is not supported for Text Element: Class.",
   0 results (TT §11).
-- **W4 `TABL/DTT`.** Unverified on both (V2).
+- **W4 `TABL/DTT` not served.** Measured, both systems:
+  `POST /repository/informationsystem/usageReferences?uri=/sap/bc/adt/ddic/db/settings/{t}` → 200,
+  `globalType="TABL/DTT"`, "Where-Used List is not supported for Technical Table Settings.", 0
+  results, on an own and an existing table (`raw-v/onprem/47–52`, `raw-v/cloud/51–56`). Code, both
+  systems: `CL_RIS_ADT_RES_REFERENCES->get_ref_result_from_ref_object`, the W1 branch.
 
 ## Tools
 
@@ -173,8 +218,7 @@ Names follow the full set's verbs; every update tool does lock → write → unl
   (optional, default `active`; `READ_VERSION_FIELD`).
 - **Returns:** `{ table_name, version, description, data_class, size_category, buffering: { allowed,
   type, area_key_fields }, storage_type, sharing_type, load_unit, translation: { value, is_visible,
-  is_editable, granularity }, logging_enabled, is_writable_by_amdp? }` — the last only where SAP
-  answers it (cloud, S7).
+  is_editable, granularity }, logging_enabled, is_writable_by_amdp? }` — the last on cloud (S7).
 - **Served:** `ReadOnlyHandlersGroup` (every full binary, `-ro` included); `available_in:
   ['onprem', 'cloud']` (S1; 7.40 S9).
 
@@ -186,11 +230,13 @@ Names follow the full set's verbs; every update tool does lock → write → unl
 - **Parameters:** `table_name: string` (required); each optional — `data_class: string`,
   `size_category: string`, `buffering: { allowed?: string, type?: string, area_key_fields?:
   number }`, `storage_type: string`, `sharing_type: string`, `load_unit: string`,
-  `logging_enabled: boolean`; `transport_request?: string` ("not a task");
+  `logging_enabled: boolean`, on cloud also `is_writable_by_amdp: boolean` (S7);
+  `transport_request?: string` ("not a task");
   `activate: boolean` (required); `...DETAIL_SHAPE`. At least one setting is required
   (schema refinement). The value help's data classes and size categories
   (`TABLE_DATA_CLASSES`, `TABLE_SIZE_CATEGORIES`) are listed in the descriptions, not enforced as an
-  enum (S8; whether a system may define its own is V6).
+  enum: SAP takes any data class and judges it at activation (S8), so the activation's messages
+  decide whether it ran.
 - **Returns:** the settings as written (the PUT's answer, `terseWrite` by default), plus the
   activation's messages when activated.
 - **Served:** `HighLevelHandlersGroup`; `available_in: ['onprem', 'cloud']`.
@@ -210,7 +256,7 @@ interface ITableSettingsPatchConfig {
   tableName: string;
   transportRequest?: string | undefined;
   /** The settings to change; every field optional, `buffering` and `translation` field by field. */
-  changes: ITableSettingsChanges; // DeepPartial of ITableSettings, isWritableByAMDP?: never
+  changes: ITableSettingsChanges; // DeepPartial of ITableSettings; isWritableByAMDP on cloud (S7)
 }
 type IAdtTableSettingsPatchOptions<E> = Omit<IAdtUpdateOptions<E>, 'source' | 'lockHandle' | 'ifMatch'>
   & { source?: never; ifMatch?: never; lockHandle: string };
@@ -220,13 +266,14 @@ type IAdtTableSettingsPatchOptions<E> = Omit<IAdtUpdateOptions<E>, 'source' | 'l
   `readMetadata(version: 'inactive')` — the working area, with its ETag (S1); overlay `changes` on the
   typed settings read (a field given replaces, a field not given keeps the value read; `buffering`
   and `translation` per field; every field is written back because a left-out one is reset, S3);
-  `description` written back as read (S4); `isWritableByAMDP` never written (S7); then
-  `updateMetadata` of the whole document with `ifMatch` = the read's ETag (the If-Match form is V11).
+  `description` written back as read (S4); `translation` written with all four attributes as read
+  (S5); on cloud `isWritableByAMDP` written back as read unless changed (S7); then `updateMetadata`
+  of the whole document with `ifMatch` = the read's ETag, the content type without charset (S10).
 - `changes` with no field is refused before any request. A read that answers no ETag is a refusal
   (nothing written). A refused read or PUT is answered as SAP answered it, under the caller's
   `analyse`; nothing is retried.
 - Its interfaces (`ITableSettingsPatchConfig`, `ITableSettingsChanges`,
-  `IAdtTableSettingsPatchable`) go into interfaces-adt first (a minor), then adt-clients 46.1.0.
+  `IAdtTableSettingsPatchable`) go into interfaces-adt 30.1.0 first, then adt-clients 46.1.0.
 
 ### GetTextElements (full; read-only build too)
 
@@ -262,7 +309,7 @@ type IAdtTableSettingsPatchOptions<E> = Omit<IAdtUpdateOptions<E>, 'source' | 'l
   failure.
 - **Served:** `HighLevelHandlersGroup`; `available_in: ['onprem', 'cloud']`. On cloud the schema
   takes `object_kind: 'class' | 'function_group'` (`byVariant`; T6, T10); `program` is left out on
-  cloud on the server's gating, not a measurement (T11, V10).
+  cloud (T11: Code, V13).
 
 ### Compact
 
@@ -280,18 +327,18 @@ operation: 'read' | 'update' }`); `compactReadRouterMap` (`compact-readonly-entr
 `compactWriteRoutes` (`compact-modify`) map them to the full handlers through `defineTool`, as
 `LOCAL_TYPES` does. HandlerGet's `part` takes `symbols | selections | headings` for the text-element
 types; `version` is HandlerGet's. On cloud, `COMPACT_UPDATE.cloud` filters out
-`PROGRAM_TEXT_ELEMENTS` only (T11, V10). The read-only compact binaries get the
+`PROGRAM_TEXT_ELEMENTS` only (T11). The read-only compact binaries get the
 HandlerGet members only.
 
 ## Parameters per system kind
 
 | | onprem | cloud | legacy (7.40) |
 |---|---|---|---|
-| GetTableSettings / UpdateTableSettings | all fields (S1–S6) | all fields; `is_writable_by_amdp` read only (S1–S7; S4 V4) | not served (S9) |
+| GetTableSettings / UpdateTableSettings | all fields (S1–S6, S8, S10) | all fields and `is_writable_by_amdp` (S1–S8, S10) | not served (S9) |
 | GetTextElements | program, function group, class (T1–T9) | program (T11), function group (T10), class (T6) | not served (T12) |
-| UpdateTextElements | program, function group (T5, T6); class (V8) | function group (T10), class (T6) | not served (T12) |
+| UpdateTextElements | program, function group, class (T5, T6) | function group (T10), class (T6); program left out (T11) | not served (T12) |
 | ActivateObjects `PROG/PX` | program, function group via `parentName` (T6) | function group via `parentName` (T10) | not served (T12) |
-| ActivateObjects `CLAS/OCX` | V8 | yes (T6) | not served (T12) |
+| ActivateObjects `CLAS/OCX` | yes (T6) | yes (T6) | not served (T12) |
 | GetWhereUsed `PROG/PX` + `container` | program, function group (W2) | program, function group (W2) | not served (T12) |
 
 **Legacy.** The full tools are filtered by `available_in` (legacy is its own kind there). The compact
@@ -305,7 +352,7 @@ builds no `AdtClientLegacy` today, so the dependency is dropped.
 | option | what it does | for | against |
 |---|---|---|---|
 | **A. Automatic pairing** | every `PROG/P`, `FUGR/F`, `CLAS/OC` in the request also sends its text elements' reference | the model names only the object; matches "activate together" literally | changes the wire of every program, function group and class activation (single activation becomes a group one); a reference to text elements with nothing inactive is unmeasured; on cloud every class activation grows |
-| **B. Explicit codes** (decided) | `objects[].type` takes `PROG/PX` and `CLAS/OCX` (the library lists them as activation codes, and the server's projection must list them anyway); `PROG/PX` with `parentName` is a function group's text elements (address `/textelements/functiongroups/{parentName}`; T6, T10); `still_inactive` names them, so the next call names both; the update tools' `activate: true` pairs them themselves (`textElementsActivationReferences`) | explicit, measured (the pair, and the text elements alone, both activated: T6), no change to any existing activation | the model names two objects after a text write by `ActivateObjects` |
+| **B. Explicit codes** (decided) | `objects[].type` takes `PROG/PX` and `CLAS/OCX` (the library lists them as activation codes, and the server's projection must list them anyway); `PROG/PX` with `parentName` is a function group's text elements (address `/textelements/functiongroups/{parentName}`; T6, T10); `still_inactive` names them, so the next call names both; the update tools' `activate: true` pairs them themselves (`textElementsActivationReferences`); a `still_inactive` `PROG/PX {CLASS}====CP` is read as the class's text elements (T6) | explicit, measured (the pair, and the text elements alone, both activated: T6), no change to any existing activation | the model names two objects after a text write by `ActivateObjects` |
 | **C. Pair from the inactive list** | before activating, read the inactive objects and add the text elements of the objects named | automatic only where needed | one extra request per activation; a second read deciding what is sent |
 
 Decided: **B**. HandlerActivate gets the same through the three text-element compact types.
@@ -375,7 +422,7 @@ released by its own handle):
   group (symbols), a class (symbols): write, read `inactive`, activate with the update tool, read
   `active`, whole-list replace deletes a left-out entry; cloud — a class and a function group
   (symbols) write/read/activate, and the read of a delivered program named by the test config (never
-  a literal in the file). The suites also measure V3, V4, V7, V8, V9 where they can. Compact text-element types the same.
+  a literal in the file). Compact text-element types the same.
 - `coverage/activateObjectsRefusal.live.test.ts` and `coverage/activatePerType.live.test.ts`: after a
   text write, `[PROG/P]` alone names `PROG/PX` in `still_inactive`; the pair activates; a function
   group's `PROG/PX` + `parentName` activates.
@@ -391,8 +438,8 @@ from the registry; one copy of interfaces-adt. `npm run build` stops at the root
 `test:check` (all packages) finds the same 12 plus one:
 
 1. `WHERE_USED_CODES` (onprem, cloud): missing `TABL/DTT`, `PROG/PX` (`Complete`). Fix: add `PROG/PX`;
-   `TABL/DTT` excluded by type (`Exclude<WhereUsedCode<V>, 'TABL/DTT'>` in the projection) until
-   measured.
+   `TABL/DTT` excluded by type (`Exclude<WhereUsedCode<V>, 'TABL/DTT'>` in the projection): not
+   served (W4).
 2. `ACTIVATION_CODES` (onprem, cloud): missing `PROG/PX`, `CLAS/OCX`. Fix: add them (option B).
 3. `TABLE_CODES`: missing `TABL/DTT`, `PROG/PX`, `CLAS/OCX`. Fix: add them.
 4. `whereUsedList.ts:228,245`, `handleGetWhereUsed.ts:555,564,598,600`: a variable of the whole
@@ -408,8 +455,10 @@ with the root. `adt-clients-legacy` is removed from the install. The install is 
 ## Dependency
 
 `UpdateTableSettings` and `HandlerUpdate TABLE_SETTINGS` need adt-clients **46.1.0** (`patchMetadata`,
-above) published on the registry, on the interfaces-adt minor carrying its types. Order:
-interfaces-adt minor → adt-clients 46.1.0 → this server takes `^46.1.0`. Everything else here builds
+above) published on the registry, on **interfaces-adt 30.1.0** carrying its types. Order:
+interfaces-adt 30.1.0 → adt-clients 46.1.0 → this server takes `^46.1.0` and `^30.1.0`. The two also
+carry the fixes the measurements found: `isWritableByAMDP` written on cloud (S7), the
+`ts:translation` wording (S5), the CLAS/OCX inactive entry under the class pool name (T6). Everything else here builds
 on 46.0.0; the server never builds against an unpublished release.
 
 adt-clients 46.1.0 also corrects its test skip for function groups on cloud: it assumed cloud
@@ -417,22 +466,11 @@ creates no function group, which was unverified and is contradicted by T10.
 
 ## To verify in SAP handlers
 
-Each item has neither Code nor a measurement behind it; what must be read or measured:
+Closed by the owner's answer or by measurement: V1 (Eclipse client check (owner); the server activates tables with SAP's default settings, Measured S6), V2 (W4), V3 (S2), V4 (S4), V5
+(S5), V6 (S8), V7 (T3), V8 (T6), V9 (T7), V11 (S10). Still open:
 
-- **V1** The owner's failing activation: the table's DDL and SAP's activation answer, measured,
-  against S6 (default settings activated on both).
-- **V2** Where-used of `TABL/DTT` (`/ddic/db/settings/{t}`) on both: measure; until then no
-  where-used code.
-- **V3** Cloud lock objects: read `CL_TABT_WB_PERSIST->lock` and the text-elements lock on cloud, or
-  measure: a table held by its own lock, then a settings LOCK on it (and the reverse).
-- **V4** Cloud PUT of the settings without `adtcore:description`: measure the status.
-- **V5** The `400 00/001` adt-clients attributes to a missing `ts:translation`: reproduce (an element
-  with missing attributes?) on both, against S5.
-- **V6** Cloud `dataClass/values`, and whether a customer data class is accepted by the PUT.
-- **V7** Cloud whole-part replace (an entry left out deleted), and the headings rule on cloud.
-- **V8** Onprem class text symbols: LOCK, PUT, read, and the `CLAS/OC` + `CLAS/OCX` activation.
-- **V9** A symbol text longer than its `maxLength` (both), and the T7 refusals on cloud.
-- **V10** Cloud text write to a delivered program (a lock on it): measure the refusal, or read the
-  cloud handler's check.
-- **V11** The settings PUT with `If-Match` with and without `; charset=utf-8` (adt-clients says 412
-  with it): measure on both before `patchMetadata` relies on it.
+- **V12** A settings lock held by one user against a table lock (or settings lock) of another user:
+  measure the clash; S2 was measured with one user and one session.
+- **V13** Which check refuses a cloud text write to a delivered program (`RS_CORR_CHECK`,
+  `RS_EXTEND_CHECK` EU 533, or the object blocklist e607), and the status the client gets: measure
+  only on an object the measurement may lock, or settle from the code (T11).

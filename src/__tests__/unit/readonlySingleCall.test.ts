@@ -21,6 +21,9 @@
  *    makes no call of its own.
  */
 
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetBehaviorDefinition } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
 import { handleGetBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleGetBehaviorImplementation';
@@ -68,8 +71,10 @@ import { handleGetCdsUnitTestStatus } from '../../handlers/unit_test/high/handle
 import { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTest';
 import { handleGetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult';
 import { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus';
+import * as runTests from '../../handlers/unit_test/shared/runTests';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
+import * as clients from '../../lib/clients';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
 import {
@@ -79,6 +84,7 @@ import {
 } from '../../lib/strategies/reading';
 import { child, listOf } from '../../lib/thrownValue';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertThrows } from '../helpers/assertions';
 import {
   fakeClientOf,
   fakeClientOfWithFactory,
@@ -89,27 +95,31 @@ import {
   refusingClient,
 } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The declared variant the boundary checks a type argument against.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => fakeClient);
+// The declared variant's client, tagged with it (SearchObject's filter is
+// that variant's search names).
+mock.method(clients, 'adtClientOf', () => ({
+  variant: 'onprem',
+  client: fakeClient,
+}));
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => fakeClient,
-  // The declared variant's client, tagged with it (SearchObject's filter is
-  // that variant's search names).
-  adtClientOf: () => ({ variant: 'onprem', client: fakeClient }),
-}));
+
 // The unit-test Get* functions take their runner from `AdtExecutor` (adt-clients
 // 24), not from `createAdtClient`: route that door to the same double.
-jest.mock('../../handlers/unit_test/shared/runTests', () => ({
-  ...jest.requireActual('../../handlers/unit_test/shared/runTests'),
-  testRunner: () => fakeClient.getClassTestRunner(),
-}));
+// The unit-test runner from the fake client: `testRunner` on the module that
+// defines it (its call inside runTests.ts itself stays the real one, as under
+// Jest's requireActual).
+mock.method(runTests, 'testRunner', () => fakeClient.getClassTestRunner());
 
 const context = { connection: {} as any, logger: undefined };
 
 describe('readonlySingleCall handlers answer through the adapter and surface a refusal', () => {
-  it.each([
+  for (const [_n, handler, args] of [
     [
       'GetObjectsByType',
       handleGetObjectsByType,
@@ -150,15 +160,17 @@ describe('readonlySingleCall handlers answer through the adapter and surface a r
         content_uri_to: 'uri2',
       },
     ],
-  ])(
-    '%s answers through the adapter and surfaces a refusal',
-    async (_n, handler, args) => {
-      fakeClient = refusingClient('Not found');
-      const result: any = await (handler as any)(context as any, args);
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text).message).toBe('Not found');
-    },
-  );
+  ]) {
+    it(
+      format('%s answers through the adapter and surfaces a refusal', _n),
+      async () => {
+        fakeClient = refusingClient('Not found');
+        const result: any = await (handler as any)(context as any, args);
+        assert.equal(result.isError, true);
+        assert.equal(JSON.parse(result.content[0].text).message, 'Not found');
+      },
+    );
+  }
 });
 
 /**
@@ -178,7 +190,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     fakeClient = seen.client;
     await handleGetMessageClass(context as any, { message_class_name: 'ZMC' });
     const call = seen.calls.filter((c) => c.member === 'readMetadata').at(-1);
-    expect(call?.args[0]).toEqual({ name: 'ZMC' });
+    assert.deepStrictEqual(call?.args[0], { name: 'ZMC' });
   });
 
   it('GetMessageClassMessage calls getMessageClassMessage().read({className, msgno}, active, ...)', async () => {
@@ -189,8 +201,8 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       msgno: '001',
     });
     const call = seen.calls.filter((c) => c.member === 'read').at(-1);
-    expect(call?.args[0]).toEqual({ className: 'ZMC', msgno: '001' });
-    expect(call?.args[1]).toBe('active');
+    assert.deepStrictEqual(call?.args[0], { className: 'ZMC', msgno: '001' });
+    assert.equal(call?.args[1], 'active');
   });
 
   it('GetObjectsByType calls fetchNodeStructure(parent_type, parent_name, {nodeId, withShortDescriptions})', async () => {
@@ -205,7 +217,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'fetchNodeStructure')
       .at(-1);
-    expect(call?.args).toEqual([
+    assert.deepStrictEqual(call?.args, [
       'DEVC/K',
       'ZPKG',
       {
@@ -229,7 +241,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'fetchNodeStructure')
       .at(-1);
-    expect(call?.args).toEqual([
+    assert.deepStrictEqual(call?.args, [
       'DEVC/K',
       'ZPKG',
       {
@@ -245,7 +257,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     fakeClient = seen.client;
     await handleSearchObject(context as any, { object_name: 'ZCL*' });
     const call = seen.calls.filter((c) => c.member === 'search').at(-1);
-    expect(call?.args).toEqual([{ query: 'ZCL*', maxResults: 100 }]);
+    assert.deepStrictEqual(call?.args, [{ query: 'ZCL*', maxResults: 100 }]);
   });
 
   it('GetAdtTypes calls getAllTypes(999, "*", "usedByProvider")', async () => {
@@ -253,7 +265,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     fakeClient = seen.client;
     await handleGetAdtTypes(context as any, {});
     const call = seen.calls.filter((c) => c.member === 'getAllTypes').at(-1);
-    expect(call?.args).toEqual([999, '*', 'usedByProvider']);
+    assert.deepStrictEqual(call?.args, [999, '*', 'usedByProvider']);
   });
 
   it('GetInactiveObjects calls getInactiveObjects() with no arguments', async () => {
@@ -263,7 +275,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'getInactiveObjects')
       .at(-1);
-    expect(call?.args).toEqual([]);
+    assert.deepStrictEqual(call?.args, []);
   });
 
   it('GetObjectInfo calls fetchNodeStructure(parent_type, parent_name, {withShortDescriptions}) — no node id at the root', async () => {
@@ -278,7 +290,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'fetchNodeStructure')
       .at(-1);
-    expect(call?.args).toEqual([
+    assert.deepStrictEqual(call?.args, [
       'DEVC/K',
       'ZPKG',
       {
@@ -299,7 +311,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'getObjectStructure')
       .at(-1);
-    expect(call?.args).toEqual(['CLAS/OC', 'ZCL_X']);
+    assert.deepStrictEqual(call?.args, ['CLAS/OC', 'ZCL_X']);
   });
 
   it('GetSqlQuery calls getSqlQuery({sql_query, row_number})', async () => {
@@ -307,7 +319,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     fakeClient = seen.client;
     await handleGetSqlQuery(context as any, { sql_query: 'SELECT 1' });
     const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
-    expect(call?.args).toEqual([
+    assert.deepStrictEqual(call?.args, [
       { sql_query: 'SELECT 1', row_number: 100 },
       { headers: DEFAULT_ADT_HEADERS['utils.getSqlQuery'] },
     ]);
@@ -321,11 +333,14 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       GetTableContents.inputSchema.parse({ table_name: 'ZT', max_rows: 7 }),
     );
     const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
-    expect(call?.args).toEqual([
+    assert.deepStrictEqual(call?.args, [
       { sql_query: 'SELECT * FROM ZT', row_number: 7 },
       { headers: DEFAULT_ADT_HEADERS['utils.getSqlQuery'] },
     ]);
-    expect(seen.calls.some((c) => c.member === 'getTableContents')).toBe(false);
+    assert.equal(
+      seen.calls.some((c) => c.member === 'getTableContents'),
+      false,
+    );
   });
 
   it('ListTransports lists once, by the user asked for', async () => {
@@ -337,8 +352,11 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     });
 
     // One request: the query by user, and no saved search configuration.
-    expect(seen.calls.map((c) => c.member)).toEqual(['list']);
-    expect(seen.calls.at(-1)?.args).toEqual([
+    assert.deepStrictEqual(
+      seen.calls.map((c) => c.member),
+      ['list'],
+    );
+    assert.deepStrictEqual(seen.calls.at(-1)?.args, [
       {
         user: 'SOMEONE',
         requestStatus: ['D', 'R'],
@@ -356,7 +374,10 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       content_uri_to: 'uri2',
     });
     const calls = seen.calls.filter((c) => c.member === 'getVersionSource');
-    expect(calls.map((c) => c.args)).toEqual([['uri1'], ['uri2']]);
+    assert.deepStrictEqual(
+      calls.map((c) => c.args),
+      [['uri1'], ['uri2']],
+    );
   });
 });
 
@@ -366,7 +387,7 @@ describe('GetEnhancements', () => {
    * (`readEnhancementElements`), with `analyseException` — not a request of
    * the handler's own.
    */
-  it.each([
+  for (const [object_type, object_name, factory, args] of [
     ['class', 'ZCL_X', 'getClass', [{ className: 'ZCL_X' }]],
     ['program', 'ZPROG', 'getProgram', [{ programName: 'ZPROG' }]],
     [
@@ -376,27 +397,34 @@ describe('GetEnhancements', () => {
       [{ functionGroupName: 'ZFG' }],
     ],
     ['program', 'SAPLZFG', 'getFunctionGroup', [{ functionGroupName: 'ZFG' }]],
-  ])(
-    'a %s (%s) reads its elements through %s().readEnhancementElements',
-    async (object_type, object_name, factory, args) => {
-      const seen = recordAnalyse();
-      fakeClient = seen.client;
-      const result: any = await handleGetEnhancements(context as any, {
-        object_name,
+  ] as const) {
+    it(
+      format(
+        'a %s (%s) reads its elements through %s().readEnhancementElements',
         object_type,
-      });
-      expect(result.isError).toBe(false);
-      expect(seen.calls).toEqual([
-        {
-          member: 'readEnhancementElements',
-          factory,
-          analyse: analyseException,
-          carriedAnalyse: true,
-          args,
-        },
-      ]);
-    },
-  );
+        object_name,
+        factory,
+      ),
+      async () => {
+        const seen = recordAnalyse();
+        fakeClient = seen.client;
+        const result: any = await handleGetEnhancements(context as any, {
+          object_name,
+          object_type,
+        });
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(seen.calls, [
+          {
+            member: 'readEnhancementElements',
+            factory,
+            analyse: analyseException,
+            carriedAnalyse: true,
+            args,
+          },
+        ]);
+      },
+    );
+  }
 
   it('an include reads its elements through getInclude(), naming its main program', async () => {
     const seen = recordAnalyse({
@@ -408,18 +436,22 @@ describe('GetEnhancements', () => {
       object_name: 'LSVIMTOP',
       object_type: 'include',
     });
-    expect(result.isError).toBe(false);
-    expect(seen.calls.map((c) => [c.factory, c.member])).toEqual([
-      ['getInclude', 'readMetadata'],
-      ['getInclude', 'readEnhancementElements'],
-    ]);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(
+      seen.calls.map((c) => [c.factory, c.member]),
+      [
+        ['getInclude', 'readMetadata'],
+        ['getInclude', 'readEnhancementElements'],
+      ],
+    );
     const elements = seen.calls[1];
-    expect(elements?.analyse).toBe(analyseException);
-    expect(elements?.args).toEqual([
+    assert.equal(elements?.analyse, analyseException);
+    assert.deepStrictEqual(elements?.args, [
       { includeName: 'LSVIMTOP' },
       { context: 'SAPLSVIM' },
     ]);
-    expect(JSON.parse(result.content[0].text).context).toBe(
+    assert.equal(
+      JSON.parse(result.content[0].text).context,
       '/sap/bc/adt/functions/groups/svim',
     );
   });
@@ -432,10 +464,10 @@ describe('GetEnhancements', () => {
       object_name: 'ZFOO',
       object_type: 'program',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.message).toBe('No authorization');
-    expect(payload.step).toBe('read enhancements');
+    assert.equal(payload.message, 'No authorization');
+    assert.equal(payload.step, 'read enhancements');
   });
 });
 
@@ -481,7 +513,7 @@ describe('resolveVersionedObject', () => {
   it('resolves a class by className', async () => {
     const resolved = resolveVersionedObject(client, 'class', 'zcl_x');
     await resolved.getVersions({ analyse: analyseException });
-    expect(calls).toEqual([['getClass', { className: 'ZCL_X' }]]);
+    assert.deepStrictEqual(calls, [['getClass', { className: 'ZCL_X' }]]);
   });
 
   it('resolves a function_module, given its group', async () => {
@@ -492,7 +524,7 @@ describe('resolveVersionedObject', () => {
       'zfg',
     );
     await resolved.getVersions({ analyse: analyseException });
-    expect(calls).toEqual([
+    assert.deepStrictEqual(calls, [
       [
         'getFunctionModule.readMetadata',
         { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
@@ -511,7 +543,7 @@ describe('resolveVersionedObject', () => {
       'zfg|zfm',
     );
     await resolved.getVersions({ analyse: analyseException });
-    expect(calls).toEqual([
+    assert.deepStrictEqual(calls, [
       [
         'getFunctionModule.readMetadata',
         { functionGroupName: 'ZFG', functionModuleName: 'ZFM' },
@@ -524,9 +556,10 @@ describe('resolveVersionedObject', () => {
   });
 
   it('throws for a function_module with no group name reachable', () => {
-    expect(() =>
-      resolveVersionedObject(client, 'function_module', 'zfm'),
-    ).toThrow(/function_group_name is required/);
+    assertThrows(
+      () => resolveVersionedObject(client, 'function_module', 'zfm'),
+      /function_group_name is required/,
+    );
   });
 
   // An unknown object_type no longer reaches it: the kind is typed by the
@@ -572,9 +605,9 @@ describe('the members that accept an analyse strategy, which one is deliberately
       message_class_name: 'zmc',
     });
 
-    expect(seen.countOf('readMetadata')).toBe(1);
-    expect(seen.last?.carriedAnalyse).toBe(true);
-    expect(seen.last?.analyse).toBe(analyseException);
+    assert.equal(seen.countOf('readMetadata'), 1);
+    assert.equal(seen.last?.carriedAnalyse, true);
+    assert.equal(seen.last?.analyse, analyseException);
   });
 
   it('GetMessageClassMessage carries its msgno check into getMessageClassMessage().read — adt-clients 23 applies none of its own', async () => {
@@ -586,11 +619,11 @@ describe('the members that accept an analyse strategy, which one is deliberately
       msgno: '001',
     });
 
-    expect(seen.countOf('read')).toBe(1);
-    expect(seen.last?.carriedAnalyse).toBe(true);
+    assert.equal(seen.countOf('read'), 1);
+    assert.equal(seen.last?.carriedAnalyse, true);
     // `analyseMessageClassMessage(msgno)` builds a strategy per message.
-    expect(typeof seen.last?.analyse).toBe('function');
-    expect(seen.last?.analyse).not.toBe(analyseException);
+    assert.equal(typeof seen.last?.analyse, 'function');
+    assert.notEqual(seen.last?.analyse, analyseException);
   });
 
   it('SearchObject carries analyseException into search — interfaces-adt 11 gave every util member one', async () => {
@@ -599,9 +632,9 @@ describe('the members that accept an analyse strategy, which one is deliberately
 
     await handleSearchObject(context as any, { object_name: 'ZCL*' });
 
-    expect(seen.countOf('search')).toBe(1);
-    expect(seen.last?.carriedAnalyse).toBe(true);
-    expect(seen.last?.analyse).toBe(analyseException);
+    assert.equal(seen.countOf('search'), 1);
+    assert.equal(seen.last?.carriedAnalyse, true);
+    assert.equal(seen.last?.analyse, analyseException);
   });
 });
 
@@ -626,9 +659,9 @@ describe('GetObjectsByType, mapped from a real captured node-structure document'
       node_id: '000032',
     });
 
-    expect(result.isError).toBe(false);
-    expect(result.content[0].text).toContain('ZMCP_SHR_I_ROOT');
-    expect(result.content[0].text).toContain('BDEF/BDO');
+    assert.equal(result.isError, false);
+    assert.ok(result.content[0].text.includes('ZMCP_SHR_I_ROOT'));
+    assert.ok(result.content[0].text.includes('BDEF/BDO'));
   });
 });
 
@@ -684,8 +717,8 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
       TECH_NAME: 'SAPLZMCP_SHR_FGRP',
       OBJECT_URI: FUGR_URI,
     };
-    expect(byTypeRow).toEqual(expected);
-    expect(listRow).toEqual(expected);
+    assert.deepStrictEqual(byTypeRow, expected);
+    assert.deepStrictEqual(listRow, expected);
   });
 
   it('GetObjectNodeFromCache finds a row either handler wrote, by its real technical name', async () => {
@@ -711,10 +744,10 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
       },
     );
 
-    expect(result.content[0].type).toBe('json');
-    expect(result.content[0].json.OBJECT_TYPE).toBe('FUGR/F');
-    expect(result.content[0].json.OBJECT_NAME).toBe('ZMCP_SHR_FGRP');
-    expect(result.content[0].json.OBJECT_URI).toBe(FUGR_URI);
+    assert.equal(result.content[0].type, 'json');
+    assert.equal(result.content[0].json.OBJECT_TYPE, 'FUGR/F');
+    assert.equal(result.content[0].json.OBJECT_NAME, 'ZMCP_SHR_FGRP');
+    assert.equal(result.content[0].json.OBJECT_URI, FUGR_URI);
   });
 });
 
@@ -758,24 +791,24 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
           ...(describe ? { include_descriptions: true } : {}),
         },
       );
-      expect(result.isError).toBe(false);
+      assert.equal(result.isError, false);
       const tree = JSON.parse(result.content[0].text);
-      expect(tree.OBJECT_TYPE).toBe('DEVC/K');
-      expect(tree.OBJECT_NAME).toBe('ZMCP_SHR_PKG');
+      assert.equal(tree.OBJECT_TYPE, 'DEVC/K');
+      assert.equal(tree.OBJECT_NAME, 'ZMCP_SHR_PKG');
       const bdef = tree.CHILDREN.find(
         (c: any) => c.OBJECT_NAME === 'ZMCP_SHR_I_ROOT',
       );
-      expect(bdef).toBeDefined();
-      expect(bdef.OBJECT_TYPE).toBe('BDEF/BDO');
+      assert.notEqual(bdef, undefined);
+      assert.equal(bdef.OBJECT_TYPE, 'BDEF/BDO');
       return bdef;
     };
 
     // Asked for: the node structure's description.
-    expect((await read(true)).OBJECT_DESCRIPTION).toContain('Shared BDEF');
+    assert.ok((await read(true)).OBJECT_DESCRIPTION.includes('Shared BDEF'));
     // Not asked for: none, though the captured document carries one — the
     // batched path answers none either.
-    expect(bdefBody).toContain('Shared BDEF');
-    expect('OBJECT_DESCRIPTION' in (await read(false))).toBe(false);
+    assert.ok(bdefBody.includes('Shared BDEF'));
+    assert.equal('OBJECT_DESCRIPTION' in (await read(false)), false);
   });
 });
 
@@ -802,9 +835,9 @@ describe('ListTransports, mapped from a real captured transport list', () => {
 
       const result: any = await handleListTransports(context as any, args);
 
-      expect(result.isError).toBe(false);
+      assert.equal(result.isError, false);
       const payload = JSON.parse(result.content[0].text);
-      expect(payload).toEqual({
+      assert.deepStrictEqual(payload, {
         success: true,
         count: 1,
         transports: [
@@ -841,7 +874,7 @@ describe('ListTransports, mapped from a real captured transport list', () => {
  * this file already documents for its own rows.
  */
 describe('the high-tier Get*/List* handlers answer through the adapter and surface a refusal', () => {
-  it.each([
+  for (const [_n, handler, args] of [
     ['GetClass', handleGetClass, { class_name: 'ZCL_X' }],
     ['GetDomain', handleGetDomain, { domain_name: 'ZD' }],
     ['GetTable', handleGetTable, { table_name: 'ZT' }],
@@ -903,15 +936,17 @@ describe('the high-tier Get*/List* handlers answer through the adapter and surfa
     ['GetCdsUnitTest', handleGetCdsUnitTest, { run_id: 'r1' }],
     ['GetCdsUnitTestStatus', handleGetCdsUnitTestStatus, { run_id: 'r1' }],
     ['GetCdsUnitTestResult', handleGetCdsUnitTestResult, { run_id: 'r1' }],
-  ])(
-    '%s answers through the adapter and surfaces a refusal',
-    async (_n, handler, args) => {
-      fakeClient = refusingClient('Not found');
-      const result: any = await (handler as any)(context as any, args);
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text).message).toBe('Not found');
-    },
-  );
+  ]) {
+    it(
+      format('%s answers through the adapter and surfaces a refusal', _n),
+      async () => {
+        fakeClient = refusingClient('Not found');
+        const result: any = await (handler as any)(context as any, args);
+        assert.equal(result.isError, true);
+        assert.equal(JSON.parse(result.content[0].text).message, 'Not found');
+      },
+    );
+  }
 });
 
 /**
@@ -1136,23 +1171,30 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     },
   ];
 
-  it.each(rows)(
-    "$name calls the right factory and member, with the caller's own identity, and its strategy exactly where the signature accepts one",
-    async ({ handler, args, factory, member, identity, hasAnalyse }) => {
+  for (const {
+    name,
+    handler,
+    args,
+    factory,
+    member,
+    identity,
+    hasAnalyse,
+  } of rows) {
+    it(`${name} calls the right factory and member, with the caller's own identity, and its strategy exactly where the signature accepts one`, async () => {
       const seen = recordAnalyse();
       fakeClient = seen.client;
 
       await handler(context as any, args);
 
       const call = seen.calls.filter((c) => c.member === member).at(-1);
-      expect(call?.factory).toBe(factory);
-      expect(call?.args[0]).toEqual(identity);
-      expect(call?.carriedAnalyse).toBe(hasAnalyse !== false);
-      if (hasAnalyse === true) expect(call?.analyse).toBe(analyseException);
+      assert.equal(call?.factory, factory);
+      assert.deepStrictEqual(call?.args[0], identity);
+      assert.equal(call?.carriedAnalyse, hasAnalyse !== false);
+      if (hasAnalyse === true) assert.equal(call?.analyse, analyseException);
       // A strategy of the call's own — `analyseMessageClassMessage(msgno)`.
-      if (hasAnalyse === 'own') expect(typeof call?.analyse).toBe('function');
-    },
-  );
+      if (hasAnalyse === 'own') assert.equal(typeof call?.analyse, 'function');
+    });
+  }
 
   it('ListServiceBindingTypes calls getServiceBinding().getServiceBindingTypes() with no arguments at all', async () => {
     const seen = recordAnalyse();
@@ -1163,10 +1205,10 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'getServiceBindingTypes')
       .at(-1);
-    expect(call?.factory).toBe('getServiceBinding');
-    expect(call?.args).toEqual([]);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.factory, 'getServiceBinding');
+    assert.deepStrictEqual(call?.args, []);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('GetUnitTestStatus calls getStatus(run_id, with_long_polling) on the class runner', async () => {
@@ -1176,10 +1218,10 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     await handleGetUnitTestStatus(context as any, { run_id: 'r1' });
 
     const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
-    expect(call?.factory).toBe('getClassTestRunner');
-    expect(call?.args).toEqual(['r1', true]);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.factory, 'getClassTestRunner');
+    assert.deepStrictEqual(call?.args, ['r1', true]);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('GetCdsUnitTestStatus calls getStatus(run_id, with_long_polling) on the class runner', async () => {
@@ -1189,10 +1231,10 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     await handleGetCdsUnitTestStatus(context as any, { run_id: 'r1' });
 
     const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
-    expect(call?.factory).toBe('getClassTestRunner');
-    expect(call?.args).toEqual(['r1', true]);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.factory, 'getClassTestRunner');
+    assert.deepStrictEqual(call?.args, ['r1', true]);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 });
 
@@ -1231,22 +1273,25 @@ describe('GetFunctionModule, mapped from a real captured source', () => {
       function_group_name: 'zmcp_shr_fgrp',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.function_module_name).toBe('Z_MCP_SHR_FM');
-    expect(payload.function_group_name).toBe('ZMCP_SHR_FGRP');
-    expect(payload.source).toBe(source);
-    expect(double.factory).toBe('getFunctionModule');
+    assert.equal(payload.function_module_name, 'Z_MCP_SHR_FM');
+    assert.equal(payload.function_group_name, 'ZMCP_SHR_FGRP');
+    assert.equal(payload.source, source);
+    assert.equal(double.factory, 'getFunctionModule');
 
-    expect(calls.map((c) => c.member)).toEqual(['readMetadata', 'read']);
-    expect(calls[1]?.args[0]).toEqual({
+    assert.deepStrictEqual(
+      calls.map((c) => c.member),
+      ['readMetadata', 'read'],
+    );
+    assert.deepStrictEqual(calls[1]?.args[0], {
       functionModuleName: 'Z_MCP_SHR_FM',
       functionGroupName: 'ZMCP_SHR_FGRP',
     });
     const readOptions = calls[1]?.args.at(-1) as
       | { analyse?: unknown }
       | undefined;
-    expect(readOptions?.analyse).toBe(analyseException);
+    assert.equal(readOptions?.analyse, analyseException);
   });
 });
 
@@ -1271,7 +1316,7 @@ describe('two behaviours unpinned before fix round 1', () => {
 
     const call = seen.calls.filter((c) => c.member === 'readMetadata').at(-1);
     const options = call?.args.at(-1) as { version?: string } | undefined;
-    expect(options?.version).toBe('inactive');
+    assert.equal(options?.version, 'inactive');
   });
 
   // SAP ignores the group of the address (#2): the module's metadata is read
@@ -1292,9 +1337,12 @@ describe('two behaviours unpinned before fix round 1', () => {
       function_group_name: 'zmcp_shr_fgrp',
     });
 
-    expect(seen.calls.map((c) => c.member)).toEqual(['readMetadata', 'read']);
+    assert.deepStrictEqual(
+      seen.calls.map((c) => c.member),
+      ['readMetadata', 'read'],
+    );
     for (const call of seen.calls) {
-      expect(call.args[0]).toEqual({
+      assert.deepStrictEqual(call.args[0], {
         functionModuleName: 'Z_MCP_SHR_FM',
         functionGroupName: 'ZMCP_SHR_FGRP',
       });
@@ -1330,10 +1378,10 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
   );
 
   it('GetUnitTest answers a real finished run from the captured status+result fixtures, and calls both members through the class runner', async () => {
-    const getStatus = jest.fn(async () =>
+    const getStatus = mock.fn(async () =>
       okResponse(structured({ data: passingStatus, status: 200 } as any)),
     );
-    const getResult = jest.fn(async () =>
+    const getResult = mock.fn(async () =>
       okResponse(structured({ data: passingResult, status: 200 } as any)),
     );
     const double = fakeClientOfWithFactory({ getStatus, getResult });
@@ -1343,31 +1391,42 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
       run_id: 'FA53C505DD7B1FD1ABB8599833A05D44',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.finished).toBe(true);
-    expect(payload.run_id).toBe('FA53C505DD7B1FD1ABB8599833A05D44');
-    expect(JSON.stringify(payload.run_result)).toContain('TEST_METHOD');
+    assert.equal(payload.finished, true);
+    assert.equal(payload.run_id, 'FA53C505DD7B1FD1ABB8599833A05D44');
+    assert.ok(JSON.stringify(payload.run_result).includes('TEST_METHOD'));
     // A finished run is read once, without long polling (#3).
-    expect(getStatus).toHaveBeenCalledWith(
-      'FA53C505DD7B1FD1ABB8599833A05D44',
-      false,
-      { analyse: analyseException },
+    assert.ok(
+      getStatus.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'FA53C505DD7B1FD1ABB8599833A05D44',
+          false,
+          { analyse: analyseException },
+        ]),
+      ),
     );
-    expect(getResult).toHaveBeenCalledWith('FA53C505DD7B1FD1ABB8599833A05D44', {
-      analyse: analyseException,
-    });
+    assert.ok(
+      getResult.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'FA53C505DD7B1FD1ABB8599833A05D44',
+          {
+            analyse: analyseException,
+          },
+        ]),
+      ),
+    );
     // Read AFTER invoking the handler — `factory` is a getter on the
     // double, and destructuring it eagerly captures `undefined` (the value
     // before any factory was ever accessed).
-    expect(double.factory).toBe('getClassTestRunner');
+    assert.equal(double.factory, 'getClassTestRunner');
   });
 
   it('GetUnitTest surfaces a refused result as an error once the run is confirmed finished, not success with an empty result', async () => {
-    const getStatus = jest.fn(async () =>
+    const getStatus = mock.fn(async () =>
       okResponse(structured({ data: passingStatus, status: 200 } as any)),
     );
-    const getResult = jest.fn(async () =>
+    const getResult = mock.fn(async () =>
       refusedResponse('Result not available'),
     );
     fakeClient = fakeClientOf({ getStatus, getResult });
@@ -1376,17 +1435,17 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
       run_id: 'r1',
     });
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.message).toBe('Result not available');
-    expect(result.content[0].text).not.toContain('"success": true');
+    assert.equal(payload.message, 'Result not available');
+    assert.ok(!result.content[0].text.includes('"success": true'));
   });
 
   it('GetUnitTest surfaces a refused status as an error without ever calling getResult', async () => {
-    const getStatus = jest.fn(async () =>
+    const getStatus = mock.fn(async () =>
       refusedResponse('Status endpoint down'),
     );
-    const getResult = jest.fn(async () => {
+    const getResult = mock.fn(async () => {
       throw new Error('must not be called — status itself refused');
     });
     fakeClient = fakeClientOf({ getStatus, getResult });
@@ -1395,18 +1454,19 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
       run_id: 'r1',
     });
 
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
+    assert.equal(result.isError, true);
+    assert.equal(
+      JSON.parse(result.content[0].text).message,
       'Status endpoint down',
     );
-    expect(getResult).not.toHaveBeenCalled();
+    assert.equal(getResult.mock.callCount(), 0);
   });
 
   it('GetUnitTestResult answers the real captured result once the real captured status says FINISHED', async () => {
-    const getStatus = jest.fn(async () =>
+    const getStatus = mock.fn(async () =>
       okResponse(structured({ data: passingStatus, status: 200 } as any)),
     );
-    const getResult = jest.fn(async () =>
+    const getResult = mock.fn(async () =>
       okResponse(structured({ data: passingResult, status: 200 } as any)),
     );
     fakeClient = fakeClientOf({ getStatus, getResult });
@@ -1415,10 +1475,10 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
       run_id: 'r1',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.finished).toBe(true);
-    expect(JSON.stringify(payload.run_result)).toContain('TEST_METHOD');
+    assert.equal(payload.finished, true);
+    assert.ok(JSON.stringify(payload.run_result).includes('TEST_METHOD'));
   });
 
   // CDS variants: `AdtCdsUnitTest extends AdtUnitTest` and inherits both
@@ -1431,10 +1491,10 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     '<?xml version="1.0" encoding="utf-8"?><aunit:runResult xmlns:aunit="http://www.sap.com/adt/aunit">CDS RESULT MARKER (no fixture)</aunit:runResult>';
 
   it('GetCdsUnitTest answers finished:true from a synthetic FINISHED status, and calls both members through the class runner', async () => {
-    const getStatus = jest.fn(async () =>
+    const getStatus = mock.fn(async () =>
       okResponse(structured({ data: cdsStatus, status: 200 } as any)),
     );
-    const getResult = jest.fn(async () =>
+    const getResult = mock.fn(async () =>
       okResponse(structured({ data: cdsResult, status: 200 } as any)),
     );
     const double = fakeClientOfWithFactory({ getStatus, getResult });
@@ -1444,25 +1504,40 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
       run_id: 'r1',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.finished).toBe(true);
+    assert.equal(payload.finished, true);
     // Read AFTER invoking the handler — see the comment on the analogous
     // assertion in `GetUnitTest`'s own test above.
-    expect(double.factory).toBe('getClassTestRunner');
-    expect(getStatus).toHaveBeenCalledWith('r1', false, {
-      analyse: analyseException,
-    });
-    expect(getResult).toHaveBeenCalledWith('r1', {
-      analyse: analyseException,
-    });
+    assert.equal(double.factory, 'getClassTestRunner');
+    assert.ok(
+      getStatus.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'r1',
+          false,
+          {
+            analyse: analyseException,
+          },
+        ]),
+      ),
+    );
+    assert.ok(
+      getResult.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'r1',
+          {
+            analyse: analyseException,
+          },
+        ]),
+      ),
+    );
   });
 
   it('GetCdsUnitTestResult answers finished:true from a synthetic finished run', async () => {
-    const getStatusFinished = jest.fn(async () =>
+    const getStatusFinished = mock.fn(async () =>
       okResponse(structured({ data: cdsStatus, status: 200 } as any)),
     );
-    const getResultSpy = jest.fn(async () =>
+    const getResultSpy = mock.fn(async () =>
       okResponse(structured({ data: cdsResult, status: 200 } as any)),
     );
     fakeClient = fakeClientOf({
@@ -1473,6 +1548,6 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     const finished: any = await handleGetCdsUnitTestResult(context as any, {
       run_id: 'r1',
     });
-    expect(JSON.parse(finished.content[0].text).finished).toBe(true);
+    assert.equal(JSON.parse(finished.content[0].text).finished, true);
   });
 });

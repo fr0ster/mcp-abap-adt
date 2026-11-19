@@ -33,6 +33,25 @@
  *        `activate !== false`.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
+import { mockModuleExports } from '../helpers/moduleMock';
+
+// adt-clients replaced for this file before any module under test loads: the
+// handlers and src/lib/clients bind it when they load (node:test mock.module,
+// helpers/moduleMock.ts; its other exports stay the real ones).
+const AdtExecutorMock = mock.fn<(...args: any[]) => any>(
+  function AdtExecutor() {
+    return {
+      getProgramExecutor: () => programExecutor,
+    };
+  },
+);
+mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
+  AdtExecutor: AdtExecutorMock,
+});
+
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
@@ -45,6 +64,7 @@ import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/
 import { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import { handleRuntimeRunProgram } from '../../handlers/system/high/handleRuntimeRunProgram';
 import { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed';
+import * as clients from '../../lib/clients';
 import { createPackageContentsFetcher } from '../../lib/search-source/packageEnumerator';
 import { createPackagePatternResolver } from '../../lib/search-source/packageResolver';
 import { skipSapAnswers } from '../../lib/search-source/readFailure';
@@ -55,36 +75,30 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
+// The declared variant the boundary checks a type argument against.
+mock.method(clients, 'createAdtClient', () => fakeClient);
+// SHAPE 3's door: `handleRuntimeRunProgram.ts` reaches its members through
+// the on-premise executor (`createOnPremExecutor`, an `AdtExecutor<'onprem'>`).
+mock.method(clients, 'createOnPremExecutor', () => ({
+  getProgramExecutor: () => programExecutor,
+}));
+
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 let fakeClient: any;
 let programExecutor: Record<string, unknown>;
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => fakeClient,
-  // SHAPE 3's door: `handleRuntimeRunProgram.ts` reaches its members through
-  // the on-premise executor (`createOnPremExecutor`, an `AdtExecutor<'onprem'>`).
-  createOnPremExecutor: () => ({ getProgramExecutor: () => programExecutor }),
-}));
 
 // The class executors still come from `new AdtExecutor(connection, logger)`
-// directly, so the `../../lib/clients` mock above does nothing for them. `jest.mock` must sit
-// at module top level (not nested in a `describe`) for babel-plugin-jest-hoist to
-// hoist it above the handlers' own `import { AdtExecutor } from
-// '@mcp-abap-adt/adt-clients'` — nested inside a `describe` callback it runs too
-// late, after those imports already bound the real class.
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  AdtExecutor: jest.fn(() => ({ getProgramExecutor: () => programExecutor })),
-}));
+// directly, so the `../../lib/clients` swap above does nothing for them: the
+// AdtExecutor replacement is made at the top of this file, before the
+// handlers load and bind adt-clients.
 
 const context = { connection: {} as any, logger: undefined };
 
 describe('SHAPE 1 — a rename, still one call', () => {
-  it.each([
+  for (const [_n, handler, args, member, step] of [
     [
       'GetWhereUsed',
       handleGetWhereUsed,
@@ -129,20 +143,25 @@ describe('SHAPE 1 — a rename, still one call', () => {
       'update',
       'publish',
     ],
-  ])(
-    '%s calls the member that replaced it and surfaces its refusal',
-    async (_n, handler, args, member, step) => {
-      fakeClient = fakeClientOf({
-        [member as string]: async () => refusedResponse('Refused'),
-      });
-      const result: any = await (handler as any)(context as any, args);
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text).message).toBe('Refused');
-      // The refusal as it came; a handler of several steps adds the one it
-      // arose at, and a single call adds none.
-      expect(JSON.parse(result.content[0].text).step).toBe(step);
-    },
-  );
+  ]) {
+    it(
+      format(
+        '%s calls the member that replaced it and surfaces its refusal',
+        _n,
+      ),
+      async () => {
+        fakeClient = fakeClientOf({
+          [member as string]: async () => refusedResponse('Refused'),
+        });
+        const result: any = await (handler as any)(context as any, args);
+        assert.equal(result.isError, true);
+        assert.equal(JSON.parse(result.content[0].text).message, 'Refused');
+        // The refusal as it came; a handler of several steps adds the one it
+        // arose at, and a single call adds none.
+        assert.equal(JSON.parse(result.content[0].text).step, step);
+      },
+    );
+  }
 
   it('ValidateServiceBinding passes analyseException, not analyseException', async () => {
     const seen: unknown[] = [];
@@ -157,7 +176,7 @@ describe('SHAPE 1 — a rename, still one call', () => {
       service_definition_name: 'ZSD',
       package_name: 'ZPKG',
     });
-    expect(seen).toEqual([analyseException]);
+    assert.deepStrictEqual(seen, [analyseException]);
   });
 
   it('packageResolver searches through the renamed member, with a strategy', async () => {
@@ -170,7 +189,7 @@ describe('SHAPE 1 — a rename, still one call', () => {
     });
     const fn = createPackagePatternResolver(context as any);
     await fn({ query: 'ZMCP*', objectType: 'DEVC', maxResults: 1000 });
-    expect(seen).toEqual([analyseException]);
+    assert.deepStrictEqual(seen, [analyseException]);
   });
 });
 
@@ -221,9 +240,10 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     const result: any = await handleListFunctionModules(context as any, {
       function_group_name: 'ZFG',
     });
-    expect(JSON.parse(result.content[0].text).function_modules).toEqual([
-      'Z_FM_ONLY',
-    ]);
+    assert.deepStrictEqual(
+      JSON.parse(result.content[0].text).function_modules,
+      ['Z_FM_ONLY'],
+    );
   });
 
   it('ListFunctionGroupIncludes reads the FUGR/I child, not FUGR/FF', async () => {
@@ -231,31 +251,39 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     const result: any = await handleListFunctionGroupIncludes(context as any, {
       function_group_name: 'ZFG',
     });
-    expect(JSON.parse(result.content[0].text).includes).toEqual(['LFGTOP']);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text).includes, [
+      'LFGTOP',
+    ]);
   });
 
-  it.each([
+  for (const [_n, handler] of [
     ['ListFunctionModules', handleListFunctionModules],
     ['ListFunctionGroupIncludes', handleListFunctionGroupIncludes],
-  ])(
-    '%s tells a nonexistent function group apart from an empty one — refuses on readMetadata, before the walk',
-    async (_n, handler) => {
-      const walk = jest.fn();
-      fakeClient = fakeClientOf({
-        readMetadata: async () =>
-          refusedResponse('Function group ZFG not found'),
-        fetchNodeStructure: walk,
-      });
-      const result: any = await (handler as any)(context as any, {
-        function_group_name: 'ZFG',
-      });
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text).message).toBe(
-        'Function group ZFG not found',
-      );
-      expect(walk).not.toHaveBeenCalled();
-    },
-  );
+  ]) {
+    it(
+      format(
+        '%s tells a nonexistent function group apart from an empty one — refuses on readMetadata, before the walk',
+        _n,
+      ),
+      async () => {
+        const walk = mock.fn();
+        fakeClient = fakeClientOf({
+          readMetadata: async () =>
+            refusedResponse('Function group ZFG not found'),
+          fetchNodeStructure: walk,
+        });
+        const result: any = await (handler as any)(context as any, {
+          function_group_name: 'ZFG',
+        });
+        assert.equal(result.isError, true);
+        assert.equal(
+          JSON.parse(result.content[0].text).message,
+          'Function group ZFG not found',
+        );
+        assert.equal(walk.mock.callCount(), 0);
+      },
+    );
+  }
 });
 
 describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () => {
@@ -282,8 +310,8 @@ describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () =
     const contents = await fetcher('ZMCP_SHR_PKG', {
       includeSubpackages: false,
     });
-    expect(walked).toContain('ZMCP_SHR_PKG');
-    expect(contents).toEqual([]);
+    assert.ok(walked.includes('ZMCP_SHR_PKG'));
+    assert.deepStrictEqual(contents, []);
   });
 });
 
@@ -298,45 +326,47 @@ describe('SHAPE 3 — the program-profiling handler: two calls where there was o
     ],
   ] as const;
 
-  it.each(profiling)(
-    '%s passes the scheduled id to the profiler run',
-    async (_n, handler, args) => {
-      const order: string[] = [];
-      let passed: unknown;
-      programExecutor = {
-        scheduleTrace: async () => {
-          order.push('schedule');
-          return okResponse(PROGRAM_REQUEST);
-        },
-        runWithProfiler: async (_target: unknown, options: any) => {
-          order.push('run');
-          passed = options?.profilerId;
-          return okResponse('program output');
-        },
-      };
-      const result: any = await (handler as any)(context as any, args);
-      expect(order).toEqual(['schedule', 'run']);
-      expect(passed).toBe(PROGRAM_REQUEST);
-      expect(result.isError).toBe(false);
-    },
-  );
+  for (const [_n, handler, args] of profiling) {
+    it(
+      format('%s passes the scheduled id to the profiler run', _n),
+      async () => {
+        const order: string[] = [];
+        let passed: unknown;
+        programExecutor = {
+          scheduleTrace: async () => {
+            order.push('schedule');
+            return okResponse(PROGRAM_REQUEST);
+          },
+          runWithProfiler: async (_target: unknown, options: any) => {
+            order.push('run');
+            passed = options?.profilerId;
+            return okResponse('program output');
+          },
+        };
+        const result: any = await (handler as any)(context as any, args);
+        assert.deepStrictEqual(order, ['schedule', 'run']);
+        assert.equal(passed, PROGRAM_REQUEST);
+        assert.equal(result.isError, false);
+      },
+    );
+  }
 
-  it.each(profiling)(
-    '%s stops at the first refused step',
-    async (_n, handler, args) => {
-      const run = jest.fn();
+  for (const [_n, handler, args] of profiling) {
+    it(format('%s stops at the first refused step', _n), async () => {
+      const run = mock.fn();
       programExecutor = {
         scheduleTrace: async () => refusedResponse('Trace scheduling refused'),
         runWithProfiler: run,
       };
       const result: any = await (handler as any)(context as any, args);
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text).message).toBe(
+      assert.equal(result.isError, true);
+      assert.equal(
+        JSON.parse(result.content[0].text).message,
         'Trace scheduling refused',
       );
-      expect(run).not.toHaveBeenCalled();
-    },
-  );
+      assert.equal(run.mock.callCount(), 0);
+    });
+  }
 });
 
 describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the composite shape', () => {
@@ -368,9 +398,9 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
       },
     });
     const result: any = await handleUpdateServiceBinding(context as any, args);
-    expect(result.isError).toBe(false);
-    expect(order).toEqual(['lock', 'update', 'unlock']);
-    expect(seen.config).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(order, ['lock', 'update', 'unlock']);
+    assert.deepStrictEqual(seen.config, {
       bindingName: 'ZSB',
       desiredPublicationState: 'published',
       serviceType: 'odatav4',
@@ -379,14 +409,14 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
     // options: adt-clients 23 no longer reads SAP's publication refusal on its
     // own. `classifyServiceBinding` is not called: there was never a second
     // member in the removed composite's replacement to call.
-    expect((seen.options as any).lockHandle).toBe('LOCK_HANDLE_1');
+    assert.equal((seen.options as any).lockHandle, 'LOCK_HANDLE_1');
     // No deadline of the server's (19.0.0): `0` — not absent, which would
     // take adt-clients' 120 s default into a job measured to run longer.
-    expect((seen.options as any).timeout).toBe(0);
-    expect((seen.options as any).analyse).toBe(analysePublication);
+    assert.equal((seen.options as any).timeout, 0);
+    assert.equal((seen.options as any).analyse, analysePublication);
     // The handle `unlock` releases is the one `lock` answered — a wrong or
     // constant handle would still pass every assertion above.
-    expect(seen.unlockedWith).toBe('LOCK_HANDLE_1');
+    assert.equal(seen.unlockedWith, 'LOCK_HANDLE_1');
   });
 
   it("refuses 'unchanged' before building any client", async () => {
@@ -399,10 +429,10 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
       ...args,
       desired_publication_state: 'unchanged',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     // `return_error` (not `answer()`'s failure path — this check runs
     // before any client is built) answers plain text, not a JSON envelope.
-    expect(result.content[0].text).toContain("Cannot update to 'unchanged'");
+    assert.ok(result.content[0].text.includes("Cannot update to 'unchanged'"));
   });
 });
 
@@ -430,8 +460,8 @@ describe('SHAPE 4b — CreateServiceBinding: create, then activate and read the 
       },
     });
     const result: any = await handleCreateServiceBinding(context as any, args);
-    expect(order).toEqual(['create', 'activate', 'serviceGroup']);
-    expect(result.isError).toBe(false);
+    assert.deepStrictEqual(order, ['create', 'activate', 'serviceGroup']);
+    assert.equal(result.isError, false);
   });
 
   // The "answer is the create's own" fix bites only past `terse`: both a
@@ -450,32 +480,33 @@ describe('SHAPE 4b — CreateServiceBinding: create, then activate and read the 
       ...args,
       detail: 'full',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const text = result.content[0].text;
-    expect(text).toContain('CREATED_DOCUMENT');
-    expect(text).not.toContain('GROUP_DOCUMENT');
+    assert.ok(text.includes('CREATED_DOCUMENT'));
+    assert.ok(!text.includes('GROUP_DOCUMENT'));
   });
 
   it('stops at the first refused step and never reaches activate or the read', async () => {
-    const activate = jest.fn();
-    const readGroup = jest.fn();
+    const activate = mock.fn();
+    const readGroup = mock.fn();
     fakeClient = fakeClientOf({
       create: async () => refusedResponse('Name already exists'),
       activate,
       getServiceGroup: readGroup,
     });
     const result: any = await handleCreateServiceBinding(context as any, args);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
+    assert.equal(result.isError, true);
+    assert.equal(
+      JSON.parse(result.content[0].text).message,
       'Name already exists',
     );
-    expect(activate).not.toHaveBeenCalled();
-    expect(readGroup).not.toHaveBeenCalled();
+    assert.equal(activate.mock.callCount(), 0);
+    assert.equal(readGroup.mock.callCount(), 0);
   });
 
   it('skips activate and the read when activate: false', async () => {
-    const activate = jest.fn();
-    const readGroup = jest.fn();
+    const activate = mock.fn();
+    const readGroup = mock.fn();
     fakeClient = fakeClientOf({
       create: async () => okResponse(reading(undefined, '', 200)),
       activate,
@@ -485,9 +516,9 @@ describe('SHAPE 4b — CreateServiceBinding: create, then activate and read the 
       ...args,
       activate: false,
     });
-    expect(result.isError).toBe(false);
-    expect(activate).not.toHaveBeenCalled();
-    expect(readGroup).not.toHaveBeenCalled();
+    assert.equal(result.isError, false);
+    assert.equal(activate.mock.callCount(), 0);
+    assert.equal(readGroup.mock.callCount(), 0);
   });
 });
 

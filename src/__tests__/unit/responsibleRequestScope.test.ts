@@ -10,14 +10,34 @@
  * scopes the language keeps the responsible it resolved from its environment
  * or the system.
  */
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  AdtClientOnPrem: jest.fn(),
-  AdtClientCloud: jest.fn(),
-  AdtClientLegacy: jest.fn(),
-  getSystemInformation: jest.fn(),
-}));
 
-import { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { mockModuleExports } from '../helpers/moduleMock';
+
+// adt-clients replaced for this file before any module under test loads: the
+// handlers and src/lib/clients bind it when they load (node:test mock.module,
+// helpers/moduleMock.ts; its other exports stay the real ones).
+const AdtClientOnPremMock = mock.fn<(...args: any[]) => any>(
+  function AdtClientOnPrem() {},
+);
+const AdtClientCloudMock = mock.fn<(...args: any[]) => any>(
+  function AdtClientCloud() {},
+);
+const AdtClientLegacyMock = mock.fn<(...args: any[]) => any>(
+  function AdtClientLegacy() {},
+);
+const getSystemInformationMock = mock.fn<(...args: any[]) => any>(
+  function getSystemInformation() {},
+);
+mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
+  AdtClientOnPrem: AdtClientOnPremMock,
+  AdtClientCloud: AdtClientCloudMock,
+  AdtClientLegacy: AdtClientLegacyMock,
+  getSystemInformation: getSystemInformationMock,
+});
+
+import type { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../lib/clients';
 import { runWithRequestContext } from '../../lib/requestContext';
@@ -25,6 +45,7 @@ import {
   getStatedSystemContext,
   resetSystemContextCache,
 } from '../../lib/systemContext';
+import { assertMatchObject } from '../helpers/assertions';
 import { setSystemContext } from '../helpers/processSystemContext';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -34,14 +55,14 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 const conn = {} as IAbapConnection;
 
 function lastOptions(): ConstructorParameters<typeof AdtClientOnPrem>[2] {
-  const calls = jest.mocked(AdtClientOnPrem).mock.calls;
-  return calls.at(-1)?.[2];
+  const calls = AdtClientOnPremMock.mock.calls;
+  return calls.at(-1)?.arguments[2];
 }
 
 describe('responsible and master system are request-scoped', () => {
   beforeEach(() => {
     resetSystemContextCache();
-    jest.mocked(AdtClientOnPrem).mockClear();
+    AdtClientOnPremMock.mock.resetCalls();
     setSystemContext({
       masterSystem: 'PROC_SYS',
       responsible: 'PROC_USER',
@@ -50,7 +71,7 @@ describe('responsible and master system are request-scoped', () => {
 
   it('outside any scope, the process context decides', () => {
     createAdtClient(conn);
-    expect(lastOptions()).toMatchObject({
+    assertMatchObject(lastOptions(), {
       responsible: 'PROC_USER',
       masterSystem: 'PROC_SYS',
     });
@@ -60,7 +81,7 @@ describe('responsible and master system are request-scoped', () => {
     runWithRequestContext({ responsible: 'ALICE', masterSystem: 'SID' }, () => {
       createAdtClient(conn);
     });
-    expect(lastOptions()).toMatchObject({
+    assertMatchObject(lastOptions(), {
       responsible: 'ALICE',
       masterSystem: 'SID',
     });
@@ -70,16 +91,16 @@ describe('responsible and master system are request-scoped', () => {
     runWithRequestContext({ responsible: undefined }, () => {
       createAdtClient(conn);
     });
-    expect(lastOptions()?.responsible).toBeUndefined();
+    assert.equal(lastOptions()?.responsible, undefined);
     // masterSystem was not carried, so the process value stays.
-    expect(lastOptions()?.masterSystem).toBe('PROC_SYS');
+    assert.equal(lastOptions()?.masterSystem, 'PROC_SYS');
   });
 
   it('a scope that only carries the language keeps the process responsible', () => {
     runWithRequestContext({ masterLanguage: 'DE' }, () => {
       createAdtClient(conn);
     });
-    expect(lastOptions()).toMatchObject({
+    assertMatchObject(lastOptions(), {
       responsible: 'PROC_USER',
       masterSystem: 'PROC_SYS',
       masterLanguage: 'DE',
@@ -95,7 +116,7 @@ describe('responsible and master system are request-scoped', () => {
         seen.push(`${user}:${lastOptions()?.responsible}`);
       });
     await Promise.all([run('ALICE', 20), run('BOB', 5)]);
-    expect(seen.sort()).toEqual(['ALICE:ALICE', 'BOB:BOB']);
+    assert.deepStrictEqual(seen.sort(), ['ALICE:ALICE', 'BOB:BOB']);
   });
 
   it('a scope does not persist after it ends', () => {
@@ -103,14 +124,14 @@ describe('responsible and master system are request-scoped', () => {
       createAdtClient(conn);
     });
     createAdtClient(conn);
-    expect(lastOptions()?.responsible).toBe('PROC_USER');
+    assert.equal(lastOptions()?.responsible, 'PROC_USER');
   });
 
   it('getStatedSystemContext applies the same rule for other readers', () => {
-    expect(getStatedSystemContext().responsible).toBe('PROC_USER');
+    assert.equal(getStatedSystemContext().responsible, 'PROC_USER');
     runWithRequestContext({ responsible: 'ALICE' }, () => {
-      expect(getStatedSystemContext().responsible).toBe('ALICE');
-      expect(getStatedSystemContext().masterSystem).toBe('PROC_SYS');
+      assert.equal(getStatedSystemContext().responsible, 'ALICE');
+      assert.equal(getStatedSystemContext().masterSystem, 'PROC_SYS');
     });
   });
 });

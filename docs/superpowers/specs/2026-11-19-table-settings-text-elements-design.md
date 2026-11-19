@@ -101,8 +101,9 @@ read on premise.
 - **S7 `isWritableByAMDP` is cloud's, and the cloud PUT writes it.** Measured: present in every cloud
   read, absent on premise (`raw/cloud-trial2.txt`); Code: in the cloud `SDDIC_ADT_TTAB` and
   `move_adt_to_ddv` (l. 238, S3), not in the on-premise ones (TS §14). Leaving it out of a cloud PUT
-  resets it to `false` (Measured, S3). So on cloud it is read, written back as read, and settable;
-  interfaces-adt 30.0.0's `isWritableByAMDP?: never` on the update is wrong, and 30.1.0 corrects it.
+  resets it to `false` (Measured, S3). So every settings write carries it: interfaces-adt 30.1.0
+  (fr0ster/mcp-abap-adt-interfaces#194) makes it writable (30.0.0 typed it `?: never`), and
+  `patchMetadata` keeps the value read unless the caller changes it.
 - **S8 The data class is not limited to the value help; activation judges it.** Code, both systems:
   `CL_TABT_DATA_CLASS_VH->get_named_items` selects `dartt JOIN ddart … WHERE ( b~ddclass = 'STD' )`
   — standard classes only. Measured, both systems: `…/settings/dataClass/values` → APPL0, APPL1,
@@ -258,7 +259,7 @@ interface ITableSettingsPatchConfig {
   tableName: string;
   transportRequest?: string | undefined;
   /** The settings to change; every field optional, `buffering` and `translation` field by field. */
-  changes: ITableSettingsChanges; // DeepPartial of ITableSettings; isWritableByAMDP on cloud (S7)
+  changes: ITableSettingsChanges; // at least one setting, field by field; isWritableByAMDP among them (S7)
 }
 type IAdtTableSettingsPatchOptions<E> = Omit<IAdtUpdateOptions<E>, 'source' | 'lockHandle' | 'ifMatch'>
   & { source?: never; ifMatch?: never; lockHandle: string };
@@ -269,9 +270,10 @@ type IAdtTableSettingsPatchOptions<E> = Omit<IAdtUpdateOptions<E>, 'source' | 'l
   typed settings read (a field given replaces, a field not given keeps the value read; `buffering`
   and `translation` per field; every field is written back because a left-out one is reset, S3);
   `description` written back as read (S4); `translation` written with all four attributes as read
-  (S5); on cloud `isWritableByAMDP` written back as read unless changed (S7); then `updateMetadata`
+  (S5); `isWritableByAMDP` kept as read unless `changes` names it (S7); then `updateMetadata`
   of the whole document with `ifMatch` = the read's ETag, the content type without charset (S10).
-- `changes` with no field is refused before any request. A read that answers no ETag is a refusal
+- `changes` with no setting does not compile (`ITableSettingsChanges` is "at least one setting",
+  interfaces-adt 30.1.0); no runtime check stands in for it. A read that answers no ETag is a refusal
   (nothing written). A refused read or PUT is answered as SAP answered it, under the caller's
   `analyse`; nothing is retried.
 - Its interfaces (`ITableSettingsPatchConfig`, `ITableSettingsChanges`,

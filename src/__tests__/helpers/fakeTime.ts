@@ -14,6 +14,12 @@
  * counted — no production source imports it, and
  * `unit/testHelpers/noTimersImport.test.ts` keeps it so.
  *
+ * Two limits, harmless today: `advanceTimersByTimeAsync(ms)` steps by 1 ms
+ * while the step is below `ms`, so a non-integer `ms` is advanced to the next
+ * whole millisecond; and the counting wrapper of `setTimeout` carries no
+ * `util.promisify.custom`, so `promisify(setTimeout)` on a faked clock is not
+ * the timers' own promise form (no source promisifies it).
+ *
  * Each clause is proven by a case of `unit/testHelpers/fakeTime.test.ts`.
  */
 import assert from 'node:assert/strict';

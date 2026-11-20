@@ -52,7 +52,7 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json",
-    "test": "npm --prefix .. test -- --roots compact-sse/src",
+    "test": "npm --prefix .. test -- --root compact-sse/src",
     "lint:check": "biome check src",
     "prepublishOnly": "npm run build",
     "start": "node ./bin/mcp-abap-adt-compact-sse.js"

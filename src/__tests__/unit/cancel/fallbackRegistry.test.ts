@@ -11,6 +11,8 @@
  * in-memory transport, so the cancel is processed before the tool would run.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
@@ -22,9 +24,12 @@ import { currentRequestSignal } from '../../../lib/requestSignal';
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
+/** What a tool reports: the request signal it saw, and whether it was aborted. */
+type Reached = (signal: AbortSignal | undefined, aborted: boolean) => void;
+
 /** A registry that registers its tools itself, through `registerTool`. */
 function ownRegistry(
-  reached: jest.Mock,
+  reached: Mock<Reached>,
   seen?: (extraSignal: AbortSignal | undefined) => void,
 ): IHandlersRegistry {
   return {
@@ -65,26 +70,28 @@ let ended: number;
 
 beforeEach(() => {
   ended = 0;
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
   const register = activeToolsModule.registerActiveTool;
-  jest
-    .spyOn(activeToolsModule, 'registerActiveTool')
-    .mockImplementation((controller, entry) => {
+  mock.method(
+    activeToolsModule,
+    'registerActiveTool',
+    (...[controller, entry]: Parameters<typeof register>) => {
       const remove = register(controller, entry);
       if (remove === undefined) return undefined;
       return () => {
         ended += 1;
         remove();
       };
-    });
+    },
+  );
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 async function serve(
-  reached: jest.Mock,
+  reached: Mock<Reached>,
   seen?: (extraSignal: AbortSignal | undefined) => void,
 ) {
   const server = new OwnRegistryServer(ownRegistry(reached, seen));
@@ -105,18 +112,18 @@ async function serve(
 }
 
 it('(control) a call reaches a tool its own registry registered, inside the request signal scope', async () => {
-  const reached = jest.fn();
+  const reached = mock.fn<Reached>();
   const { server, clientSide, answers, call } = await serve(reached);
   await clientSide.send(call(1));
   await until(() => answers.length === 1);
-  expect(reached).toHaveBeenCalledTimes(1);
-  expect(reached.mock.calls[0][0]).toBeInstanceOf(AbortSignal);
-  expect(activeTools()).toHaveLength(0);
+  assert.equal(reached.mock.callCount(), 1);
+  assert.ok(reached.mock.calls[0]?.arguments[0] instanceof AbortSignal);
+  assert.equal(activeTools().length, 0);
   await server.close();
 });
 
 it('a cancel aborts nothing: the tool its own registry registered runs, its signal not aborted', async () => {
-  const reached = jest.fn();
+  const reached = mock.fn<Reached>();
   let extraSignal: AbortSignal | undefined;
   const { server, clientSide, call } = await serve(reached, (signal) => {
     extraSignal = signal;
@@ -130,10 +137,10 @@ it('a cancel aborts nothing: the tool its own registry registered runs, its sign
   await Promise.all([sent, cancelled]);
   await until(() => ended === 1);
   await until(() => activeTools().length === 0);
-  expect(reached).toHaveBeenCalledTimes(1);
+  assert.equal(reached.mock.callCount(), 1);
   // Neither the scope's signal nor the one in `extra` was aborted while the
   // tool ran.
-  expect(reached.mock.calls[0][1]).toBe(false);
-  expect(extraSignal).toBe(reached.mock.calls[0][0]);
+  assert.equal(reached.mock.calls[0]?.arguments[1], false);
+  assert.equal(extraSignal, reached.mock.calls[0]?.arguments[0]);
   await server.close();
 });

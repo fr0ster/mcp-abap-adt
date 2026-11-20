@@ -14,7 +14,7 @@ import * as z from 'zod';
  *   DEBUG_ADT_LIBS=true      - Library logs
  *   DEBUG_CONNECTORS=true    - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/class/local
+ * Run: npm run test:integration -- src/__tests__/integration/high/class/ClassLocalIncludesHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

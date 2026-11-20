@@ -5,6 +5,8 @@
  * connect is prepared once before its first use.
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import type {
   AuthOutcome,
@@ -49,17 +51,17 @@ it('forwards every moment to the credential in force; the one put in force later
   const a = recording('a');
   const b = recording('b');
   const current = new CurrentCredential(a.credential);
-  expect(current.kind).toBe('a');
-  expect(await current.prepare()).toEqual(OK);
-  expect(await current.authorize(request)).toEqual(OK);
+  assert.equal(current.kind, 'a');
+  assert.deepStrictEqual(await current.prepare(), OK);
+  assert.deepStrictEqual(await current.authorize(request), OK);
   current.take(b.credential);
-  expect(current.kind).toBe('b');
-  expect(current.inForce).toBe(b.credential);
-  expect(await current.authorize(request)).toEqual(OK);
-  expect(await current.establish(logon)).toEqual(OK);
-  expect(await current.rejected(rejection)).toEqual(OK);
-  expect(a.seen).toEqual(['a.prepare', 'a.authorize']);
-  expect(b.seen).toEqual([
+  assert.equal(current.kind, 'b');
+  assert.equal(current.inForce, b.credential);
+  assert.deepStrictEqual(await current.authorize(request), OK);
+  assert.deepStrictEqual(await current.establish(logon), OK);
+  assert.deepStrictEqual(await current.rejected(rejection), OK);
+  assert.deepStrictEqual(a.seen, ['a.prepare', 'a.authorize']);
+  assert.deepStrictEqual(b.seen, [
     'b.prepare',
     'b.authorize',
     'b.establish',
@@ -75,8 +77,8 @@ it("hands on the credential's refusal as it came", async () => {
   const a = recording('a', { authorize: () => ({ ok: false, refusal }) });
   const current = new CurrentCredential(a.credential);
   const outcome = await current.authorize(request);
-  expect(outcome.ok).toBe(false);
-  expect(outcome.ok === false && outcome.refusal).toBe(refusal);
+  assert.equal(outcome.ok, false);
+  assert.equal(outcome.ok === false && outcome.refusal, refusal);
 });
 
 it('a credential that throws: a refusal, never a rejection', async () => {
@@ -87,8 +89,8 @@ it('a credential that throws: a refusal, never a rejection', async () => {
   });
   const current = new CurrentCredential(a.credential);
   const outcome = await current.authorize(request);
-  expect(outcome.ok).toBe(false);
-  expect(JSON.stringify(outcome)).not.toContain('secret-bearing text');
+  assert.equal(outcome.ok, false);
+  assert.ok(!JSON.stringify(outcome).includes('secret-bearing text'));
 });
 
 it('a credential whose prepare refuses: the request is not authorized, and prepare is asked again next time', async () => {
@@ -102,8 +104,8 @@ it('a credential whose prepare refuses: the request is not authorized, and prepa
   });
   const current = new CurrentCredential(recording('a').credential);
   current.take(b.credential);
-  expect((await current.authorize(request)).ok).toBe(false);
+  assert.equal((await current.authorize(request)).ok, false);
   refuse = false;
-  expect(await current.authorize(request)).toEqual(OK);
-  expect(b.seen).toEqual(['b.prepare', 'b.prepare', 'b.authorize']);
+  assert.deepStrictEqual(await current.authorize(request), OK);
+  assert.deepStrictEqual(b.seen, ['b.prepare', 'b.prepare', 'b.authorize']);
 });

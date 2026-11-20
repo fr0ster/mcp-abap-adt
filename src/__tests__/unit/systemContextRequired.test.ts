@@ -1,8 +1,12 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import {
   accessControlDocuments,
   serviceDefinitionDocuments,
   transformationDocuments,
 } from '@mcp-abap-adt/adt-clients';
+import { assertMatchObject } from '../helpers/assertions';
 import { setSystemContext } from '../helpers/processSystemContext';
 
 /**
@@ -21,10 +25,6 @@ import { setSystemContext } from '../helpers/processSystemContext';
  * Master system: its own variable; otherwise it is left out of the request
  * — never refused.
  */
-jest.mock('../../lib/systemInformation', () => ({
-  ...jest.requireActual('../../lib/systemInformation'),
-  readSystemInformation: jest.fn(),
-}));
 
 import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementationHigh } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
@@ -46,10 +46,7 @@ import {
   systemContextFromConfiguration,
 } from '../../lib/systemContext';
 import { MISSING_RESPONSIBLE } from '../../lib/systemContextGuard';
-import { readSystemInformation } from '../../lib/systemInformation';
 import { recordingConnection } from '../helpers/recordingConnection';
-
-const lookup = readSystemInformation as jest.Mock;
 
 const KEYS = [
   'SAP_MASTER_SYSTEM',
@@ -65,7 +62,6 @@ beforeEach(() => {
     delete process.env[key];
   }
   resetSystemContextCache();
-  lookup.mockReset();
 });
 afterEach(() => {
   for (const key of KEYS) {
@@ -124,19 +120,21 @@ describe('on-premise', () => {
     process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
     systemContextFromConfiguration();
     const { connection, result } = await createMessageClass();
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(createBody(connection)).toContain(
-      'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+    assert.ok(!textOf(result).includes(MISSING_RESPONSIBLE));
+    assert.ok(
+      createBody(connection).includes(
+        'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+      ),
     );
-    expect(createBody(connection)).not.toContain('adtcore:masterSystem');
+    assert.ok(!createBody(connection).includes('adtcore:masterSystem'));
   });
 
   it('no rules: the process SAP_USERNAME is no responsible — refused, nothing sent', async () => {
     process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
     systemContextFromConfiguration();
     const { connection, result } = await createMessageClass();
-    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
-    expect(connection.requests).toEqual([]);
+    assert.ok(textOf(result).includes(MISSING_RESPONSIBLE));
+    assert.deepStrictEqual(connection.requests, []);
   });
 
   it('no rules: the stated login alone is the responsible', async () => {
@@ -145,9 +143,11 @@ describe('on-premise', () => {
       { login: 'LOGIN_PLACEHOLDER' },
       createMessageClass,
     );
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(createBody(connection)).toContain(
-      'adtcore:responsible="LOGIN_PLACEHOLDER"',
+    assert.ok(!textOf(result).includes(MISSING_RESPONSIBLE));
+    assert.ok(
+      createBody(connection).includes(
+        'adtcore:responsible="LOGIN_PLACEHOLDER"',
+      ),
     );
   });
 
@@ -156,8 +156,10 @@ describe('on-premise', () => {
       { login: 'LOGIN_PLACEHOLDER', responsible: 'RESPONSIBLE_PLACEHOLDER' },
       createMessageClass,
     );
-    expect(createBody(connection)).toContain(
-      'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+    assert.ok(
+      createBody(connection).includes(
+        'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+      ),
     );
   });
 
@@ -166,8 +168,10 @@ describe('on-premise', () => {
     process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
     systemContextFromConfiguration();
     const { connection } = await createMessageClass();
-    expect(createBody(connection)).toContain(
-      'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+    assert.ok(
+      createBody(connection).includes(
+        'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+      ),
     );
   });
 
@@ -177,33 +181,37 @@ describe('on-premise', () => {
       responsible: 'USER_PLACEHOLDER',
     });
     const stated = await createMessageClass();
-    expect(createBody(stated.connection)).toContain(
-      'adtcore:masterSystem="SYSTEM_PLACEHOLDER"',
+    assert.ok(
+      createBody(stated.connection).includes(
+        'adtcore:masterSystem="SYSTEM_PLACEHOLDER"',
+      ),
     );
 
     resetSystemContextCache();
     setSystemContext({ responsible: 'USER_PLACEHOLDER' });
     const unstated = await createMessageClass();
-    expect(textOf(unstated.result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(createBody(unstated.connection)).toContain(
-      'adtcore:responsible="USER_PLACEHOLDER"',
+    assert.ok(!textOf(unstated.result).includes(MISSING_RESPONSIBLE));
+    assert.ok(
+      createBody(unstated.connection).includes(
+        'adtcore:responsible="USER_PLACEHOLDER"',
+      ),
     );
-    expect(createBody(unstated.connection)).not.toContain(
-      'adtcore:masterSystem',
+    assert.ok(
+      !createBody(unstated.connection).includes('adtcore:masterSystem'),
     );
   });
 
   it('SNC / a handed-over token with nothing stated: refused naming SAP_RESPONSIBLE, nothing sent', async () => {
     const { connection, result } = await createMessageClass();
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
-    expect(textOf(result)).toContain('SAP_RESPONSIBLE');
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.ok(textOf(result).includes(MISSING_RESPONSIBLE));
+    assert.ok(textOf(result).includes('SAP_RESPONSIBLE'));
     // The server's own refusal, not a claim about the connection.
-    expect(JSON.parse(textOf(result))).toMatchObject({
+    assertMatchObject(JSON.parse(textOf(result)), {
       error: 'system_context_missing',
       tool: 'CreateMessageClass',
     });
-    expect(connection.requests).toEqual([]);
+    assert.deepStrictEqual(connection.requests, []);
   });
 
   it('a service definition through its tool (whose builder would send responsible="") is refused, nothing sent', async () => {
@@ -215,11 +223,14 @@ describe('on-premise', () => {
         package_name: 'ZPACKAGE_PLACEHOLDER',
       },
     );
-    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
+    assert.ok(textOf(result).includes(MISSING_RESPONSIBLE));
     for (const request of connection.requests) {
-      expect(String(request.data)).not.toContain('adtcore:responsible=""');
+      assert.ok(!String(request.data).includes('adtcore:responsible=""'));
     }
-    expect(connection.requests.filter((r) => r.method === 'POST')).toEqual([]);
+    assert.deepStrictEqual(
+      connection.requests.filter((r) => r.method === 'POST'),
+      [],
+    );
   });
 
   // The three adt-clients builders that write adtcore:responsible="" when the
@@ -264,26 +275,34 @@ describe('on-premise', () => {
     ],
   ] as const;
 
-  it.each(emptyAttributeBuilders)(
-    'a %s create with nothing stated is refused, no responsible="" sent; with a responsible stated it carries it',
-    async (_kind, create) => {
-      const refusedConnection = recordingConnection();
-      const refused = await create(createAdtClient(refusedConnection));
-      expect(refused.ok).toBe(false);
-      expect(
-        (refused as unknown as { getError(): Error }).getError().message,
-      ).toBe(MISSING_RESPONSIBLE);
-      expect(refusedConnection.requests).toEqual([]);
+  for (const [_kind, create] of emptyAttributeBuilders) {
+    it(
+      format(
+        'a %s create with nothing stated is refused, no responsible="" sent; with a responsible stated it carries it',
+        _kind,
+      ),
+      async () => {
+        const refusedConnection = recordingConnection();
+        const refused = await create(createAdtClient(refusedConnection));
+        assert.equal(refused.ok, false);
+        assert.equal(
+          (refused as unknown as { getError(): Error }).getError().message,
+          MISSING_RESPONSIBLE,
+        );
+        assert.deepStrictEqual(refusedConnection.requests, []);
 
-      process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
-      systemContextFromConfiguration();
-      const sentConnection = recordingConnection();
-      await create(createAdtClient(sentConnection));
-      expect(createBody(sentConnection)).toContain(
-        'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
-      );
-    },
-  );
+        process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
+        systemContextFromConfiguration();
+        const sentConnection = recordingConnection();
+        await create(createAdtClient(sentConnection));
+        assert.ok(
+          createBody(sentConnection).includes(
+            'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+          ),
+        );
+      },
+    );
+  }
 
   const BIMP_ARGS = {
     class_name: 'ZBP_PLACEHOLDER',
@@ -293,47 +312,57 @@ describe('on-premise', () => {
   };
   const bimpTools = [['high', handleCreateBehaviorImplementationHigh]] as const;
 
-  it.each(bimpTools)(
-    'CreateBehaviorImplementation (%s), basic: no responsible attribute, no master system, not refused',
-    async (_tier, handler) => {
-      process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
-      systemContextFromConfiguration();
-      const connection = recordingConnection();
-      const result = await handler(
-        { connection, logger: undefined } as never,
-        BIMP_ARGS as never,
-      );
-      expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-      // adt-clients 26.0.1: SAP reads it as the creator, so it is not sent.
-      expect(createBody(connection)).not.toContain('adtcore:responsible');
-      expect(createBody(connection)).not.toContain('adtcore:masterSystem');
-    },
-  );
+  for (const [_tier, handler] of bimpTools) {
+    it(
+      format(
+        'CreateBehaviorImplementation (%s), basic: no responsible attribute, no master system, not refused',
+        _tier,
+      ),
+      async () => {
+        process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
+        systemContextFromConfiguration();
+        const connection = recordingConnection();
+        const result = await handler(
+          { connection, logger: undefined } as never,
+          BIMP_ARGS as never,
+        );
+        assert.ok(!textOf(result).includes(MISSING_RESPONSIBLE));
+        // adt-clients 26.0.1: SAP reads it as the creator, so it is not sent.
+        assert.ok(!createBody(connection).includes('adtcore:responsible'));
+        assert.ok(!createBody(connection).includes('adtcore:masterSystem'));
+      },
+    );
+  }
 
   it('a class create carries no responsible attribute, whatever the context says', async () => {
     // adt-clients 26.0.1, measured on premise: SAP stores adtcore:responsible on
     // a class create as the creator, and records the logon user as responsible.
     setSystemContext({ responsible: 'USER_PLACEHOLDER' });
     const { connection, result } = await createClass();
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(createBody(connection)).not.toContain('adtcore:responsible');
+    assert.ok(!textOf(result).includes(MISSING_RESPONSIBLE));
+    assert.ok(!createBody(connection).includes('adtcore:responsible'));
   });
 
-  it.each(bimpTools)(
-    'CreateBehaviorImplementation (%s), nothing stated: refused naming SAP_RESPONSIBLE, nothing sent',
-    async (_tier, handler) => {
-      const connection = recordingConnection();
-      const result = await handler(
-        { connection, logger: undefined } as never,
-        BIMP_ARGS as never,
-      );
-      expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
-      expect(JSON.parse(textOf(result))).toMatchObject({
-        error: 'system_context_missing',
-      });
-      expect(connection.requests).toEqual([]);
-    },
-  );
+  for (const [_tier, handler] of bimpTools) {
+    it(
+      format(
+        'CreateBehaviorImplementation (%s), nothing stated: refused naming SAP_RESPONSIBLE, nothing sent',
+        _tier,
+      ),
+      async () => {
+        const connection = recordingConnection();
+        const result = await handler(
+          { connection, logger: undefined } as never,
+          BIMP_ARGS as never,
+        );
+        assert.ok(textOf(result).includes(MISSING_RESPONSIBLE));
+        assertMatchObject(JSON.parse(textOf(result)), {
+          error: 'system_context_missing',
+        });
+        assert.deepStrictEqual(connection.requests, []);
+      },
+    );
+  }
 
   it('CreateBehaviorImplementation sends a stated master system', async () => {
     setSystemContext({
@@ -345,8 +374,10 @@ describe('on-premise', () => {
       { connection, logger: undefined } as never,
       BIMP_ARGS as never,
     );
-    expect(createBody(connection)).toContain(
-      'adtcore:masterSystem="SYSTEM_PLACEHOLDER"',
+    assert.ok(
+      createBody(connection).includes(
+        'adtcore:masterSystem="SYSTEM_PLACEHOLDER"',
+      ),
     );
   });
 
@@ -364,8 +395,8 @@ describe('on-premise', () => {
       { connection: refusedConnection, logger: undefined } as never,
       MSAG_ARGS as never,
     );
-    expect(textOf(refused)).toContain(MISSING_RESPONSIBLE);
-    expect(refusedConnection.requests).toEqual([]);
+    assert.ok(textOf(refused).includes(MISSING_RESPONSIBLE));
+    assert.deepStrictEqual(refusedConnection.requests, []);
 
     setSystemContext({ responsible: 'USER_PLACEHOLDER' });
     const sentConnection = recordingConnection();
@@ -373,8 +404,10 @@ describe('on-premise', () => {
       { connection: sentConnection, logger: undefined } as never,
       MSAG_ARGS as never,
     );
-    expect(createBody(sentConnection)).toContain(
-      'adtcore:responsible="USER_PLACEHOLDER"',
+    assert.ok(
+      createBody(sentConnection).includes(
+        'adtcore:responsible="USER_PLACEHOLDER"',
+      ),
     );
   });
 
@@ -384,17 +417,17 @@ describe('on-premise', () => {
       { connection: refusedConnection, logger: undefined } as never,
       { description: 'placeholder' },
     );
-    expect(textOf(refused)).toContain(MISSING_RESPONSIBLE);
-    expect(refusedConnection.requests).toEqual([]);
+    assert.ok(textOf(refused).includes(MISSING_RESPONSIBLE));
+    assert.deepStrictEqual(refusedConnection.requests, []);
 
     const sentConnection = recordingConnection();
     await handleCreateTransport(
       { connection: sentConnection, logger: undefined } as never,
       { description: 'placeholder', owner: 'OWNER_PLACEHOLDER' },
     );
-    expect(sentConnection.requests.map((r) => r.method)).toContain('POST');
-    expect(String(sentConnection.requests[0].data)).toContain(
-      'OWNER_PLACEHOLDER',
+    assert.ok(sentConnection.requests.map((r) => r.method).includes('POST'));
+    assert.ok(
+      String(sentConnection.requests[0].data).includes('OWNER_PLACEHOLDER'),
     );
   });
 
@@ -404,7 +437,7 @@ describe('on-premise', () => {
       { connection, logger: undefined } as never,
       { class_name: 'ZCL_PLACEHOLDER' },
     );
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(connection.requests.length).toBeGreaterThan(0);
+    assert.ok(!textOf(result).includes(MISSING_RESPONSIBLE));
+    assert.ok(connection.requests.length > 0);
   });
 });

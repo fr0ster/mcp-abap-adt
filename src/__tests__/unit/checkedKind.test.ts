@@ -11,6 +11,8 @@
  * the connection it was dispatched on.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -63,13 +65,13 @@ class ProbeGroup extends BaseHandlerGroup {
 
 const saved = process.env.SAP_SYSTEM_TYPE;
 beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(console, 'error', () => {});
+  mock.method(process.stderr, 'write', () => true);
 });
 afterEach(() => {
   if (saved === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = saved;
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 function setEnv(kind: Kind | undefined): void {
@@ -130,17 +132,17 @@ function expectOneKind(
   declared: Kind | undefined,
 ): void {
   if (kind === undefined) {
-    expect(result.called).toContain('system_type_required');
+    assert.ok(result.called.includes('system_type_required'));
     return;
   }
-  expect(result.listed).toBe(`listed for ${kind}`);
+  assert.equal(result.listed, `listed for ${kind}`);
   const disagrees =
     (record !== undefined && record !== kind) ||
     (declared !== undefined && declared !== kind);
   if (disagrees) {
-    expect(result.called).toContain('system_type_conflict');
+    assert.ok(result.called.includes('system_type_conflict'));
   } else {
-    expect(result.called).toBe(`dispatched on ${kind}`);
+    assert.equal(result.called, `dispatched on ${kind}`);
   }
 }
 
@@ -152,9 +154,8 @@ const COMBINATIONS = KINDS.flatMap((stated) =>
   ),
 );
 
-describe.each(COMBINATIONS)(
-  'stated $stated, env $env, record $record, declared $declared',
-  ({ stated, env, record, declared }) => {
+for (const { stated, env, record, declared } of COMBINATIONS) {
+  describe(`stated ${stated}, env ${env}, record ${record}, declared ${declared}`, () => {
     it('the server: listed, checked and dispatched on its one kind', async () => {
       setEnv(env);
       const connection = connectionWith(record, declared);
@@ -189,5 +190,5 @@ describe.each(COMBINATIONS)(
       // The environment is never the group's kind.
       expectOneKind(await listedAndCalled(server), stated, record, declared);
     });
-  },
-);
+  });
+}

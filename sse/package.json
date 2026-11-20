@@ -58,7 +58,7 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json",
-    "test": "npm --prefix .. test -- --roots sse/src",
+    "test": "npm --prefix .. test -- --root sse/src",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
     "lint:check": "biome check src",
     "prepublishOnly": "npm run build"
@@ -71,7 +71,6 @@
   },
   "devDependencies": {
     "@types/express": "*",
-    "@types/jest": "*",
     "@types/node": "*",
     "typescript": "*"
   }

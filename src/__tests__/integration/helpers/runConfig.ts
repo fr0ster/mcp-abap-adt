@@ -1,6 +1,6 @@
 /**
- * The test config as Jest's `globalSetup` and `globalTeardown` read it,
- * outside the test runtime: the file `MCP_TEST_CONFIG` names (refused when
+ * The test config as the live run's setup and teardown (`globalSetup.ts`,
+ * `globalTeardown.ts`) read it, outside the test files' processes: the file `MCP_TEST_CONFIG` names (refused when
  * blank or missing), else `tests/test-config.yaml`; `undefined` when there
  * is none. The template is never read here: without a config nothing logs
  * on.

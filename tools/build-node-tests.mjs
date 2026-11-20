@@ -4,15 +4,15 @@
 //
 // Removes `.test-build/`, then compiles into `.test-build/tree/`, with the options of
 // `tsconfig.node-test.json`, the files that configuration names (the
-// runner's preload) and every source of the node:test list
-// (`tools/node-test-files.json`), with what they import, into it. `tsc -p`
-// cannot take the list from a JSON file, so the program is built here through
+// runner's preload) and every test the runner's selection walks
+// (`walkSources`, `tools/node-test-list.mjs`), with what they import, into
+// it. `tsc -p` cannot take the walk, so the program is built here through
 // TypeScript's own API; `noEmitOnError` in the configuration means a failed
 // compile emits nothing, and the build exits non-zero. After a successful
 // compile it places the files of `tools/node-test-placed.json` beside the
 // compiled code (spec §2, "Files production code reads beside itself").
 //
-// `--repo` names another repository holding its own list and
+// `--repo` names another repository holding its own tests and
 // `tsconfig.node-test.json` (the runner's tests build fixtures that way); the
 // default is the repository this file belongs to.
 import { cpSync, rmSync } from 'node:fs';
@@ -22,9 +22,9 @@ import {
   buildDir,
   buildRoot,
   OWN_REPO,
-  readList,
   readPlaced,
   sourceFile,
+  walkSources,
 } from './node-test-list.mjs';
 
 function fail(words) {
@@ -91,7 +91,7 @@ rmSync(buildRoot(repo), { recursive: true, force: true });
 const program = ts.createProgram({
   rootNames: [
     ...parsed.fileNames,
-    ...readList(repo).map((source) => sourceFile(repo, source)),
+    ...walkSources(repo).map((source) => sourceFile(repo, source)),
   ],
   options: parsed.options,
   projectReferences: parsed.projectReferences,

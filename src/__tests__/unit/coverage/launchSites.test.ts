@@ -9,10 +9,13 @@
  * plain text, file by file.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const TESTS = path.join(__dirname, '..', '..');
+const TESTS = path.join(repositoryRoot(__dirname), 'src', '__tests__');
 const LAUNCHER = path.join(
   TESTS,
   'integration',
@@ -55,10 +58,11 @@ describe('launch sites', () => {
     const files = ['integration', 'admin']
       .flatMap((dir) => filesBelow(path.join(TESTS, dir)))
       .filter((file) => file !== LAUNCHER);
-    expect(files.length).toBeGreaterThan(0);
-    expect(
+    assert.ok(files.length > 0);
+    assert.deepStrictEqual(
       launchFindings(files, (file) => fs.readFileSync(file, 'utf8')),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('a file that spawns, or uses the SDK client, is found', () => {
@@ -70,12 +74,13 @@ describe('launch sites', () => {
       'clean.ts': "import { launchStdio } from './testers/hardMode';",
     };
     const files = Object.keys(sources).map((name) => path.join(TESTS, name));
-    expect(
+    assert.deepStrictEqual(
       launchFindings(files, (file) => sources[path.basename(file)] ?? ''),
-    ).toEqual([
-      'spawns.ts: node:child_process',
-      'client.ts: @modelcontextprotocol/sdk/client/index.js',
-      'primitive.ts: startChild',
-    ]);
+      [
+        'spawns.ts: node:child_process',
+        'client.ts: @modelcontextprotocol/sdk/client/index.js',
+        'primitive.ts: startChild',
+      ],
+    );
   });
 });

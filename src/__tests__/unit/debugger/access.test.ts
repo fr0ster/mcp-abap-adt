@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { requireDebugger } from '../../../lib/debugger/access';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugCleanupError } from '../../../lib/debugger/DebugSession';
@@ -6,6 +9,7 @@ import {
   StateUnavailableError,
 } from '../../../lib/state/InstanceState';
 import { return_error } from '../../../lib/utils';
+import { assertThrows } from '../../helpers/assertions';
 
 const fake = (holds: boolean) =>
   ({
@@ -33,32 +37,45 @@ function ctx(holds: boolean) {
 describe('requireDebugger', () => {
   it('create gives the debugger, whatever the state holds', () => {
     const { context, dbg } = ctx(false);
-    expect(requireDebugger(context, {}, { create: 'abap' })).toBe(dbg);
+    assert.equal(requireDebugger(context, {}, { create: 'abap' }), dbg);
   });
   it('use wants this instance handle with state held', () => {
     const { context, state, dbg } = ctx(true);
-    expect(
+    assert.equal(
       requireDebugger(context, { state_handle: state.handle }, 'use'),
-    ).toBe(dbg);
-    expect(() =>
-      requireDebugger(context, { state_handle: 'F'.repeat(32) }, 'use'),
-    ).toThrow(StateUnavailableError);
+      dbg,
+    );
+    assertThrows(
+      () => requireDebugger(context, { state_handle: 'F'.repeat(32) }, 'use'),
+      StateUnavailableError,
+    );
   });
   it('a server instance without state or debugger refuses plainly', () => {
-    expect(() =>
-      requireDebugger({ connection: {} as any }, {}, { create: 'abap' }),
-    ).toThrow(/debugging is not served/);
+    assertThrows(
+      () => requireDebugger({ connection: {} as any }, {}, { create: 'abap' }),
+      /debugging is not served/,
+    );
   });
   it('a start is not limited by anything of ours: it binds the sessions and answers the debugger', () => {
-    const abap = { ...fake(false), bind: jest.fn() };
-    const amdp = { ...fake(false), bind: jest.fn() };
+    const abapBind = mock.fn((_context: unknown): void => {});
+    const amdpBind = mock.fn((_context: unknown): void => {});
+    const abap = { ...fake(false), bind: abapBind };
+    const amdp = { ...fake(false), bind: amdpBind };
     const state = new InstanceState();
     const dbg = new DebuggerInstance({ abap, amdp });
     state.attach(dbg);
     const context = { connection: {} as any, state, debugger: () => dbg };
-    expect(requireDebugger(context, {}, { create: 'amdp' })).toBe(dbg);
-    expect(abap.bind).toHaveBeenCalledWith(context);
-    expect(amdp.bind).toHaveBeenCalledWith(context);
+    assert.equal(requireDebugger(context, {}, { create: 'amdp' }), dbg);
+    assert.ok(
+      abapBind.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [context]),
+      ),
+    );
+    assert.ok(
+      amdpBind.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [context]),
+      ),
+    );
   });
   it("a handle that is not this instance's and an empty handle get the same answer", () => {
     const { context } = ctx(true);
@@ -70,7 +87,7 @@ describe('requireDebugger', () => {
         return (e as Error).message;
       }
     });
-    expect(answers).toEqual([
+    assert.deepStrictEqual(answers, [
       'state is not available',
       'state is not available',
     ]);
@@ -93,9 +110,9 @@ describe('DebuggerInstance', () => {
       () => undefined,
       (e: unknown) => e,
     );
-    expect(error).toBeInstanceOf(DebugCleanupError);
+    assert.ok(error instanceof DebugCleanupError);
     // Each side's throw is an entry of its own, with the step — not one text.
-    expect((error as DebugCleanupError).failures).toEqual([
+    assert.deepStrictEqual((error as DebugCleanupError).failures, [
       { error: 'client_threw', message: 'abap: close refused', step: 'stop' },
       {
         error: 'client_threw',
@@ -130,14 +147,14 @@ describe('DebuggerInstance', () => {
       () => undefined,
       (e: unknown) => e,
     );
-    expect(error).toBeInstanceOf(DebugCleanupError);
-    expect((error as DebugCleanupError).failures).toEqual([refused]);
-    expect((error as DebugCleanupError).notes).toEqual([note]);
+    assert.ok(error instanceof DebugCleanupError);
+    assert.deepStrictEqual((error as DebugCleanupError).failures, [refused]);
+    assert.deepStrictEqual((error as DebugCleanupError).notes, [note]);
     // The consumer gets both lists, each entry as it is.
     const answered = JSON.parse(
       (return_error(error) as { content: Array<{ text: string }> }).content[0]
         .text,
     );
-    expect(answered).toEqual({ failures: [refused], notes: [note] });
+    assert.deepStrictEqual(answered, { failures: [refused], notes: [note] });
   });
 });

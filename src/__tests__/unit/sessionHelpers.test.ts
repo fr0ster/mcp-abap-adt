@@ -9,16 +9,16 @@
  * Nothing here prints a cookie: only its presence is asserted.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { after, before, describe, it } from 'node:test';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { type AdtStandIn, adtStandIn } from '../helpers/adtStandIn';
 import { stateSystemKind } from '../helpers/systemKind';
 import { closeTrackedConnections } from '../integration/helpers/openConnections';
 import { createTestConnectionAndSession } from '../integration/helpers/sessionHelpers';
-
-jest.setTimeout(60_000);
 
 const USER = 'SESSION_USER';
 
@@ -31,7 +31,7 @@ const KEYS = [
   'SAP_SYSTEM_TYPE',
 ] as const;
 
-beforeAll(async () => {
+before(async () => {
   for (const key of KEYS) saved[key] = process.env[key];
   stateSystemKind();
   stand = await adtStandIn();
@@ -67,7 +67,7 @@ beforeAll(async () => {
   process.env.MCP_TEST_CONFIG = config;
 });
 
-afterAll(async () => {
+after(async () => {
   await closeTrackedConnections();
   await stand.close();
   resetSystemContextCache();
@@ -83,9 +83,9 @@ describe('createTestConnectionAndSession', () => {
   it('an HTTP connection that logged on answers its session: the cookies it holds', async () => {
     const { connection, session, connectionSource } =
       await createTestConnectionAndSession();
-    expect(connectionSource).toBe('env');
-    expect(connection.getSessionId()).not.toBeNull();
+    assert.equal(connectionSource, 'env');
+    assert.notEqual(connection.getSessionId(), null);
     // Presence only: the cookies are a secret and never printed.
-    expect(session.session_state.cookies.length > 0).toBe(true);
+    assert.equal(session.session_state.cookies.length > 0, true);
   });
 });

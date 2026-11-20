@@ -1,8 +1,12 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleCreateDomain } from '../../handlers/domain/high/handleCreateDomain';
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
+import * as clients from '../../lib/clients';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
@@ -10,8 +14,9 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 /** A minimal but complete domain metadata document, for the create lifecycle's
  * read-modify-write to patch without tripping over a field it cannot find. */
@@ -24,7 +29,7 @@ const context = {
 
 describe('high-tier writes that hold a lock, through withLock', () => {
   it('releases the lock when the update is refused, and answers the update failure', async () => {
-    const unlock = jest.fn(async () => okResponse(undefined));
+    const unlock = mock.fn(async () => okResponse(undefined));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       update: async () => refusedResponse('Update refused'),
@@ -34,9 +39,9 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
-    expect(unlock).toHaveBeenCalledTimes(1);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe('Update refused');
+    assert.equal(unlock.mock.callCount(), 1);
+    assert.equal(result.isError, true);
+    assert.equal(JSON.parse(result.content[0].text).message, 'Update refused');
   });
 
   /**
@@ -56,10 +61,10 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.result).toBe('SUCCESS');
-    expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
+    assert.equal(payload.result, 'SUCCESS');
+    assertMatchObject(payload.cleanup, { message: 'Unlock refused' });
   });
 
   /**
@@ -84,8 +89,8 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       source_code: 'x',
       activate: true,
     });
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text).cleanup).toMatchObject({
+    assert.equal(result.isError, false);
+    assertMatchObject(JSON.parse(result.content[0].text).cleanup, {
       message: 'Unlock refused',
     });
   });
@@ -105,10 +110,10 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       source_code: 'x',
       activate: true,
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.message).toBe('Object is locked by SAPUSER01');
-    expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
+    assert.equal(payload.message, 'Object is locked by SAPUSER01');
+    assertMatchObject(payload.cleanup, { message: 'Unlock refused' });
   });
 
   it('keeps the lock note when the activation throws outright', async () => {
@@ -130,11 +135,11 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       source_code: 'x',
       activate: true,
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.error).toBe('client_threw');
-    expect(payload.message).toBe('socket hang up');
-    expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
+    assert.equal(payload.error, 'client_threw');
+    assert.equal(payload.message, 'socket hang up');
+    assertMatchObject(payload.cleanup, { message: 'Unlock refused' });
   });
 
   /**
@@ -158,7 +163,7 @@ describe('high-tier writes that hold a lock, through withLock', () => {
   it('writes past what the pre-write check found', async () => {
     // Findings arrive as a successful answer: `ran` and the messages beside
     // it, which is what `terseCheck` renders. Nothing here refuses.
-    const check = jest.fn(async () =>
+    const check = mock.fn(async () =>
       okResponse(
         reading(
           {
@@ -170,8 +175,8 @@ describe('high-tier writes that hold a lock, through withLock', () => {
         ),
       ),
     );
-    const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
-    const unlock = jest.fn(async () => okResponse(undefined));
+    const update = mock.fn(async () => okResponse(reading(undefined, '', 200)));
+    const unlock = mock.fn(async () => okResponse(undefined));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       check,
@@ -184,18 +189,18 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       source_code: 'bad source',
       activate: true,
     });
-    expect(check).toHaveBeenCalledTimes(1);
-    expect(update).toHaveBeenCalledTimes(1);
-    expect(unlock).toHaveBeenCalledTimes(1);
-    expect(result.isError).toBe(false);
+    assert.equal(check.mock.callCount(), 1);
+    assert.equal(update.mock.callCount(), 1);
+    assert.equal(unlock.mock.callCount(), 1);
+    assert.equal(result.isError, false);
   });
 
   it('does not write when the pre-write check could not run', async () => {
-    const check = jest.fn(async () =>
+    const check = mock.fn(async () =>
       refusedResponse('Resource not found', { origin: 'refusal' }),
     );
-    const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
-    const unlock = jest.fn(async () => okResponse(undefined));
+    const update = mock.fn(async () => okResponse(reading(undefined, '', 200)));
+    const unlock = mock.fn(async () => okResponse(undefined));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       check,
@@ -208,18 +213,19 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       source_code: 'x',
       activate: true,
     });
-    expect(check).toHaveBeenCalledTimes(1);
-    expect(update).not.toHaveBeenCalled();
+    assert.equal(check.mock.callCount(), 1);
+    assert.equal(update.mock.callCount(), 0);
     // The lock is still released: `withLock` is not a `sequence`.
-    expect(unlock).toHaveBeenCalledTimes(1);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
+    assert.equal(unlock.mock.callCount(), 1);
+    assert.equal(result.isError, true);
+    assert.equal(
+      JSON.parse(result.content[0].text).message,
       'Resource not found',
     );
   });
 
   it('skips the pre-write check on the default (non-activating) path', async () => {
-    const check = jest.fn(async () => refusedResponse('would have refused'));
+    const check = mock.fn(async () => refusedResponse('would have refused'));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       check,
@@ -230,12 +236,12 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
-    expect(result.isError).toBe(false);
-    expect(check).not.toHaveBeenCalled();
+    assert.equal(result.isError, false);
+    assert.equal(check.mock.callCount(), 0);
   });
 
   it('runs the post-write check unconditionally on the default path (fix round 1)', async () => {
-    const check = jest.fn(async () => refusedResponse('Refused post-write'));
+    const check = mock.fn(async () => refusedResponse('Refused post-write'));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       readMetadata: async () => okResponse(reading(DOMAIN_XML)),
@@ -252,11 +258,12 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       package_name: 'ZP',
       activate: false,
     });
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
+    assert.equal(result.isError, true);
+    assert.equal(
+      JSON.parse(result.content[0].text).message,
       'Refused post-write',
     );
-    expect(check).toHaveBeenCalledTimes(1);
+    assert.equal(check.mock.callCount(), 1);
   });
 
   const lifecycleArgs = {
@@ -312,13 +319,13 @@ describe('high-tier writes that hold a lock, through withLock', () => {
     const order: string[] = [];
     fakeClient = recordingLifecycle(order);
     const result: any = await handleCreateDomain(context as any, lifecycleArgs);
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     // The order the handler performs today: validate, create, then the
     // read-modify-write held under one lock, then a best-effort wait (a
     // second `readMetadata`, discarded) immediately before `check` — the
     // first call after the write that reads it back, and so the one the
     // wait has to sit ahead of, not after — then activate.
-    expect(order).toEqual([
+    assert.deepStrictEqual(order, [
       'validate',
       'create',
       'lock',
@@ -340,29 +347,30 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       },
     });
     const result: any = await handleCreateDomain(context as any, lifecycleArgs);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
+    assert.equal(result.isError, true);
+    assert.equal(
+      JSON.parse(result.content[0].text).message,
       'Syntax check failed',
     );
-    expect(order).not.toContain('activate');
+    assert.ok(!order.includes('activate'));
     // The lock was released before the check ran, so a refused check leaves none.
-    expect(order.filter((p) => p === 'unlock')).toHaveLength(1);
+    assert.equal(order.filter((p) => p === 'unlock').length, 1);
   });
 
   it('a refused activation is answered as the strategy built it', async () => {
     const order: string[] = [];
     fakeClient = recordingLifecycle(order, {
       activate: async (_c: unknown, o: any) => {
-        expect(o.analyse).toBe(analyseActivation);
+        assert.equal(o.analyse, analyseActivation);
         return refusedResponse('Activation failed');
       },
     });
     const result: any = await handleCreateDomain(context as any, lifecycleArgs);
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.message).toBe('Activation failed');
-    expect(payload.origin).toBe('refusal');
+    assert.equal(payload.message, 'Activation failed');
+    assert.equal(payload.origin, 'refusal');
     // No sentence of the handler's own about which phase it was.
-    expect(result.content[0].text).not.toContain('phase');
+    assert.ok(!result.content[0].text.includes('phase'));
   });
 });

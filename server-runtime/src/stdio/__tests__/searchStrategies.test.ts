@@ -5,10 +5,13 @@
  * launcher itself (`launch`, on an in-memory transport); the handler is
  * replaced by one recording the context it is called in.
  */
+
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { browserCallbackStrategy } from '@mcp-abap-adt/lib/auth';
 import {
   skipSapAnswers,
@@ -22,23 +25,23 @@ import {
   type AdtStandIn,
   adtStandIn,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import * as searchSourceHandler from '../../../../src/handlers/system/readonly/handleSearchSource';
 import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
 import { readCoreConfig } from '../config/coreParameters';
 import { launch } from '../launcher.js';
 
 const seen: HandlerContext[] = [];
-jest.mock('../../../../src/handlers/system/readonly/handleSearchSource', () => {
-  const actual = jest.requireActual(
-    '../../../../src/handlers/system/readonly/handleSearchSource',
-  );
-  return {
-    ...actual,
-    handleSearchSource: async (context: HandlerContext) => {
-      seen.push(context);
-      return { isError: false, content: [{ type: 'text', text: 'recorded' }] };
-    },
-  };
-});
+// handleSearchSource replaced on the module that defines it (the search
+// group reads it at call time); its other names
+// stay real.
+mock.method(
+  searchSourceHandler,
+  'handleSearchSource',
+  async (context: HandlerContext) => {
+    seen.push(context);
+    return { isError: false, content: [{ type: 'text', text: 'recorded' }] };
+  },
+);
 
 let standIn: AdtStandIn;
 let root: string;
@@ -107,9 +110,9 @@ it('the stdio launcher passes the shipped strategies to its server', async () =>
       arguments: { query: 'x', packages: ['Z'], background: false },
     });
     console.log('ANSWER', JSON.stringify(answer).slice(0, 300));
-    expect(seen).toHaveLength(1);
-    expect(seen[0]?.sapAnswerStrategy).toBe(skipSapAnswers);
-    expect(seen[0]?.lineMatchStrategy).toBe(substringLineMatch);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
+    assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
   } finally {
     await client.close();
   }

@@ -5,6 +5,9 @@
  * random bits after the host's prefix.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { assertMatchObject } from '../../../src/__tests__/helpers/assertions';
 import { BACKGROUND_RUNS_PER_CALLER, InMemoryBackgroundRuns } from '../index';
 
 describe('the in-memory store', () => {
@@ -19,11 +22,11 @@ describe('the in-memory store', () => {
     const started = store.start(alice, run);
     if (!('handle' in started)) throw new Error('refused');
     for (const someone of [bob, otherClient]) {
-      expect(store.get(started.handle, someone)).toBeUndefined();
-      expect(store.list(someone)).toEqual([]);
-      expect(store.discard(started.handle, someone)).toBe('not-available');
+      assert.equal(store.get(started.handle, someone), undefined);
+      assert.deepStrictEqual(store.list(someone), []);
+      assert.equal(store.discard(started.handle, someone), 'not-available');
     }
-    expect(store.get(started.handle, alice)).toMatchObject({
+    assertMatchObject(store.get(started.handle, alice), {
       state: 'running',
     });
   });
@@ -32,17 +35,17 @@ describe('the in-memory store', () => {
     const store = new InMemoryBackgroundRuns();
     const started = store.start(alice, run);
     if (!('handle' in started)) throw new Error('refused');
-    expect(store.discard(started.handle, alice)).toBe('running');
+    assert.equal(store.discard(started.handle, alice), 'running');
     store.finish(started.handle, answer, 't1');
-    expect(store.get(started.handle, alice)).toEqual({
+    assert.deepStrictEqual(store.get(started.handle, alice), {
       ...run,
       run_handle: started.handle,
       state: 'finished',
       finished_at: 't1',
       answer,
     });
-    expect(store.discard(started.handle, alice)).toBe('discarded');
-    expect(store.get(started.handle, alice)).toBeUndefined();
+    assert.equal(store.discard(started.handle, alice), 'discarded');
+    assert.equal(store.get(started.handle, alice), undefined);
   });
 
   it(`refuses the ${BACKGROUND_RUNS_PER_CALLER + 1}th run of a caller, running and kept counted; others are not limited`, () => {
@@ -53,17 +56,17 @@ describe('the in-memory store', () => {
       if (!('handle' in started)) throw new Error('refused early');
       handles.push(started.handle);
     }
-    expect(store.start(alice, run)).toEqual({
+    assert.deepStrictEqual(store.start(alice, run), {
       refused: 'limit',
       limit: BACKGROUND_RUNS_PER_CALLER,
     });
-    expect('handle' in store.start(bob, run)).toBe(true);
+    assert.equal('handle' in store.start(bob, run), true);
     const first = handles[0] ?? '';
     store.finish(first, answer, 't1');
     // Kept still counts.
-    expect('refused' in store.start(alice, run)).toBe(true);
+    assert.equal('refused' in store.start(alice, run), true);
     store.discard(first, alice);
-    expect('handle' in store.start(alice, run)).toBe(true);
+    assert.equal('handle' in store.start(alice, run), true);
   });
 
   it('handles are 128 random bits after the prefix', () => {
@@ -71,8 +74,8 @@ describe('the in-memory store', () => {
     const a = store.start(alice, run);
     const b = store.start(alice, run);
     if (!('handle' in a) || !('handle' in b)) throw new Error('refused');
-    expect(a.handle).toMatch(/^i7-[0-9a-f]{32}$/);
-    expect(a.handle).not.toBe(b.handle);
+    assert.match(a.handle, /^i7-[0-9a-f]{32}$/);
+    assert.notEqual(a.handle, b.handle);
   });
 
   it('a kept answer carrying cancelled: true is read and listed as cancelled, and is discarded like a finished one', () => {
@@ -87,14 +90,14 @@ describe('the in-memory store', () => {
     store.finish(started.handle, cancelled, 't1');
     // A late answer changes nothing: the first kept answer stays.
     store.finish(started.handle, answer, 't2');
-    expect(store.get(started.handle, alice)).toEqual({
+    assert.deepStrictEqual(store.get(started.handle, alice), {
       ...read,
       run_handle: started.handle,
       state: 'cancelled',
       finished_at: 't1',
       answer: cancelled,
     });
-    expect(store.list(alice)).toEqual([
+    assert.deepStrictEqual(store.list(alice), [
       {
         ...read,
         run_handle: started.handle,
@@ -102,7 +105,7 @@ describe('the in-memory store', () => {
         finished_at: 't1',
       },
     ]);
-    expect(store.discard(started.handle, alice)).toBe('discarded');
-    expect(store.get(started.handle, alice)).toBeUndefined();
+    assert.equal(store.discard(started.handle, alice), 'discarded');
+    assert.equal(store.get(started.handle, alice), undefined);
   });
 });

@@ -4,7 +4,7 @@
  * line marked `@ts-expect-error` fails `npm run test:check` the moment the
  * setter is exported again.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 // @ts-expect-error `setSystemContext` is gone from the system context module.

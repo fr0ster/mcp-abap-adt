@@ -5,9 +5,12 @@
  * are in it, and its YAML template and validation come from it.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
@@ -17,6 +20,10 @@ import {
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { load } from 'js-yaml';
+import {
+  assertMatchObject,
+  assertThrows,
+} from '../../../../../src/__tests__/helpers/assertions';
 import { HTTP_PARAMETERS, readHttpConfig } from '../../config/httpParameters';
 import { httpHelp, main } from '../../launcher';
 import { StreamableHttpServer } from '../../StreamableHttpServer';
@@ -47,7 +54,7 @@ function cleanEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 }
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   process.argv = savedArgv;
   process.env = savedEnv;
 });
@@ -58,17 +65,19 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
   process.env = cleanEnv(env);
   const written: string[] = [];
   const exits: number[] = [];
-  jest.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+  mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
     written.push(String(chunk));
     return true;
   });
-  jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+  mock.method(process, 'exit', ((code?: number) => {
     exits.push(code ?? 0);
   }) as never);
   // A start that is not stopped serves nothing here: no socket, no stdin.
-  const served = jest
-    .spyOn(StreamableHttpServer.prototype, 'start')
-    .mockResolvedValue(undefined);
+  const served = mock.method(
+    StreamableHttpServer.prototype,
+    'start',
+    async () => undefined,
+  );
   await main({
     toolSet: fullToolSet,
     program: 'mcp-abap-adt-http',
@@ -85,7 +94,7 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
 describe("http's help", () => {
   const help = httpHelp();
 
-  it.each([
+  for (const name of [
     '--transport',
     '--mcp',
     '--env',
@@ -103,11 +112,13 @@ describe("http's help", () => {
     '--sse-',
     '--post-path',
     'MCP_SSE_',
-  ])('lists no %s', (name) => {
-    expect(help).not.toContain(name);
-  });
+  ]) {
+    it(format('lists no %s', name), () => {
+      assert.ok(!help.includes(name));
+    });
+  }
 
-  it.each([
+  for (const name of [
     '--host',
     '--http-host',
     'MCP_HTTP_HOST',
@@ -138,93 +149,108 @@ describe("http's help", () => {
     'x-sap-debug-ide-id',
     // Named as the environment that is not read (D26 D2: headers only).
     'SAP_DEBUG_* of the',
-  ])('lists %s', (name) => {
-    expect(help).toContain(name);
-  });
+  ]) {
+    it(format('lists %s', name), () => {
+      assert.ok(help.includes(name));
+    });
+  }
 });
 
 describe('--shutdown-timeout is a row of http', () => {
   it('no default: absent unless given', () => {
-    expect(readHttpConfig([], {}).shutdownTimeout).toBeUndefined();
+    assert.equal(readHttpConfig([], {}).shutdownTimeout, undefined);
   });
 
   it('CLI, env and YAML reach the config, in seconds', () => {
-    expect(readHttpConfig(['--shutdown-timeout=5'], {}).shutdownTimeout).toBe(
+    assert.equal(
+      readHttpConfig(['--shutdown-timeout=5'], {}).shutdownTimeout,
       5,
     );
-    expect(
+    assert.equal(
       readHttpConfig([], { MCP_SHUTDOWN_TIMEOUT: '7' }).shutdownTimeout,
-    ).toBe(7);
-    expect(
+      7,
+    );
+    assert.equal(
       readHttpConfig([], {}, { 'shutdown-timeout': 9 }).shutdownTimeout,
-    ).toBe(9);
+      9,
+    );
   });
 
-  it.each(['0', '1.5', 'abc', '86401'])('%s stops the start', async (value) => {
-    const { stderr, exits, served } = await start([
-      `--shutdown-timeout=${value}`,
-    ]);
-    expect(stderr).toContain('Invalid --shutdown-timeout');
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  for (const value of ['0', '1.5', 'abc', '86401']) {
+    it(format('%s stops the start', value), async () => {
+      const { stderr, exits, served } = await start([
+        `--shutdown-timeout=${value}`,
+      ]);
+      assert.ok(stderr.includes('Invalid --shutdown-timeout'));
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 });
 
 describe('--state-idle-minutes is a row of http', () => {
   it("29 stops the start with main's words", async () => {
     const { stderr, exits, served } = await start(['--state-idle-minutes=29']);
-    expect(stderr).toContain(
-      'Invalid --state-idle-minutes: "29". Must be a whole number of minutes, at least 30',
+    assert.ok(
+      stderr.includes(
+        'Invalid --state-idle-minutes: "29". Must be a whole number of minutes, at least 30',
+      ),
     );
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
+    assert.deepStrictEqual(exits, [1]);
+    assert.equal(served, 0);
   });
 
   it('CLI, env and YAML reach the config; 30 by default', () => {
-    expect(readHttpConfig([], {}).stateIdleMinutes).toBe(30);
-    expect(
+    assert.equal(readHttpConfig([], {}).stateIdleMinutes, 30);
+    assert.equal(
       readHttpConfig(['--state-idle-minutes=45'], {}).stateIdleMinutes,
-    ).toBe(45);
-    expect(
+      45,
+    );
+    assert.equal(
       readHttpConfig([], { MCP_STATE_IDLE_MINUTES: '40' }).stateIdleMinutes,
-    ).toBe(40);
-    expect(
+      40,
+    );
+    assert.equal(
       readHttpConfig([], {}, { 'state-idle-minutes': 35 }).stateIdleMinutes,
-    ).toBe(35);
+      35,
+    );
   });
 });
 
 describe('the Streamable HTTP rows', () => {
   it('defaults: 127.0.0.1:3000, no TLS, no DNS protection', () => {
     const config = readHttpConfig([], {});
-    expect(config).toMatchObject({
+    assertMatchObject(config, {
       host: '127.0.0.1',
       port: 3000,
       enableDnsRebindingProtection: false,
     });
-    expect(config.tls).toBeUndefined();
+    assert.equal(config.tls, undefined);
   });
 
   it('--host beats --http-host; CLI beats env beats YAML', () => {
-    expect(
+    assert.equal(
       readHttpConfig(['--http-host=10.0.0.1', '--host=0.0.0.0'], {}).host,
-    ).toBe('0.0.0.0');
-    expect(
+      '0.0.0.0',
+    );
+    assert.equal(
       readHttpConfig(
         ['--http-port=8080'],
         { MCP_HTTP_PORT: '8081' },
         { http: { port: 8082 } },
       ).port,
-    ).toBe(8080);
-    expect(
+      8080,
+    );
+    assert.equal(
       readHttpConfig([], { MCP_HTTP_PORT: '8081' }, { http: { port: 8082 } })
         .port,
-    ).toBe(8081);
-    expect(readHttpConfig([], {}, { http: { port: 8082 } }).port).toBe(8082);
+      8081,
+    );
+    assert.equal(readHttpConfig([], {}, { http: { port: 8082 } }).port, 8082);
   });
 
   it('the DNS-rebinding rows, in each form', () => {
-    expect(
+    assertMatchObject(
       readHttpConfig(
         [
           '--http-allowed-origins=https://a.com,https://b.com',
@@ -233,21 +259,23 @@ describe('the Streamable HTTP rows', () => {
         ],
         {},
       ),
-    ).toMatchObject({
-      allowedOrigins: ['https://a.com', 'https://b.com'],
-      allowedHosts: ['localhost:3000'],
-      enableDnsRebindingProtection: true,
-    });
-    expect(
+      {
+        allowedOrigins: ['https://a.com', 'https://b.com'],
+        allowedHosts: ['localhost:3000'],
+        enableDnsRebindingProtection: true,
+      },
+    );
+    assertMatchObject(
       readHttpConfig([], {
         MCP_HTTP_ALLOWED_ORIGINS: 'https://a.com',
         MCP_HTTP_ENABLE_DNS_PROTECTION: 'true',
       }),
-    ).toMatchObject({
-      allowedOrigins: ['https://a.com'],
-      enableDnsRebindingProtection: true,
-    });
-    expect(
+      {
+        allowedOrigins: ['https://a.com'],
+        enableDnsRebindingProtection: true,
+      },
+    );
+    assertMatchObject(
       readHttpConfig(
         [],
         {},
@@ -258,30 +286,35 @@ describe('the Streamable HTTP rows', () => {
           },
         },
       ),
-    ).toMatchObject({
-      allowedHosts: ['localhost:3000'],
-      enableDnsRebindingProtection: true,
-    });
+      {
+        allowedHosts: ['localhost:3000'],
+        enableDnsRebindingProtection: true,
+      },
+    );
   });
 
   it('TLS: cert and key together, from the CLI, the env or http.tls', () => {
-    expect(
+    assert.deepStrictEqual(
       readHttpConfig(['--tls-cert=/c.pem', '--tls-key=/k.pem'], {}).tls,
-    ).toEqual({ cert: '/c.pem', key: '/k.pem' });
-    expect(
+      { cert: '/c.pem', key: '/k.pem' },
+    );
+    assert.deepStrictEqual(
       readHttpConfig(
         [],
         {},
         { http: { tls: { cert: '/c', key: '/k', ca: '/a' } } },
       ).tls,
-    ).toEqual({ cert: '/c', key: '/k', ca: '/a' });
-    expect(() => readHttpConfig(['--tls-cert=/c.pem'], {})).toThrow(
+      { cert: '/c', key: '/k', ca: '/a' },
+    );
+    assertThrows(
+      () => readHttpConfig(['--tls-cert=/c.pem'], {}),
       'TLS needs both --tls-cert and --tls-key',
     );
   });
 
   it('a port out of range is refused, naming the form', () => {
-    expect(() => readHttpConfig(['--port=70000'], {})).toThrow(
+    assertThrows(
+      () => readHttpConfig(['--port=70000'], {}),
       'Invalid --port: "70000". Must be a port between 0 and 65535 (0: one the system chooses)',
     );
   });
@@ -291,14 +324,14 @@ describe('the Streamable HTTP rows', () => {
 // each word answered with the binary of this transport that serves it.
 describe('--exposition is gone', () => {
   it('the flag stops the start, naming the binary its words ask for', () => {
-    expect(() => readHttpConfig(['--exposition=readonly'], {})).toThrow(
+    assertThrows(
+      () => readHttpConfig(['--exposition=readonly'], {}),
       new ParameterRefusal(
         '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`)',
       ),
     );
-    expect(() =>
-      readHttpConfig(['--exposition', 'readonly,high,debug'], {}),
-    ).toThrow(
+    assertThrows(
+      () => readHttpConfig(['--exposition', 'readonly,high,debug'], {}),
       new ParameterRefusal(
         '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the high tools are served, beside the readonly ones, by `mcp-abap-adt-http` (`@mcp-abap-adt/http`)',
       ),
@@ -306,7 +339,8 @@ describe('--exposition is gone', () => {
   });
 
   it('in the config file too, and the help lists no such option', () => {
-    expect(() => readHttpConfig([], {}, { exposition: 'readonly' })).toThrow(
+    assertThrows(
+      () => readHttpConfig([], {}, { exposition: 'readonly' }),
       new ParameterRefusal(
         'exposition (config file) is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-http-ro` (`@mcp-abap-adt/http-ro`)',
       ),
@@ -315,28 +349,31 @@ describe('--exposition is gone', () => {
 });
 
 describe('--transport, with any value, stops the start with the sentence of the binary that serves it', () => {
-  it.each([
+  for (const [argv, env] of [
     [['--transport=http'], {}],
     [['--transport=streamable-http'], {}],
     [['--transport=stdio'], {}],
     [['--transport', 'sse'], {}],
     [[], { MCP_TRANSPORT: 'http' }],
-  ] as const)('%j %j', async (argv, env) => {
-    const { stderr, exits, served } = await start([...argv], { ...env });
-    expect(stderr).toBe(`[MCP] ${HTTP_SENTENCE}\n`);
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  ] as const) {
+    it(format('%j %j', argv, env), async () => {
+      const { stderr, exits, served } = await start([...argv], { ...env });
+      assert.equal(stderr, `[MCP] ${HTTP_SENTENCE}\n`);
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 
   it('in the config file too', () => {
-    expect(() => readHttpConfig([], {}, { transport: 'http' })).toThrow(
+    assertThrows(
+      () => readHttpConfig([], {}, { transport: 'http' }),
       HTTP_SENTENCE,
     );
   });
 });
 
 describe('every removed parameter stops http with its words', () => {
-  it.each([
+  for (const [arg, form, words] of [
     ['--mcp=TRIAL', '--mcp', DESTINATION_WORDS],
     ['--env=trial', '--env', DESTINATION_WORDS],
     ['--env-path=./.env', '--env-path', DESTINATION_WORDS],
@@ -370,14 +407,16 @@ describe('every removed parameter stops http with its words', () => {
     ['--sse-allowed-hosts=a:1', '--sse-allowed-hosts', SSE_WORDS],
     ['--sse-allowed-origins=http://a', '--sse-allowed-origins', SSE_WORDS],
     ['--sse-enable-dns-protection', '--sse-enable-dns-protection', SSE_WORDS],
-  ])('%s', async (arg, form, words) => {
-    const { stderr, exits, served } = await start([arg]);
-    expect(stderr).toBe(`[MCP] ${form}: ${words}\n`);
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  ]) {
+    it(format('%s', arg), async () => {
+      const { stderr, exits, served } = await start([arg]);
+      assert.equal(stderr, `[MCP] ${form}: ${words}\n`);
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 
-  it.each([
+  for (const [_family, env] of [
     [
       'MCP_SSE_*',
       {
@@ -401,37 +440,45 @@ describe('every removed parameter stops http with its words', () => {
     ['MCP_RENEWAL', { MCP_RENEWAL: 'refresh-only' }],
     ['AUTH_BROKER_PATH', { AUTH_BROKER_PATH: '/x' }],
     ['SAP_CONNECTION_TYPE', { SAP_CONNECTION_TYPE: 'rfc' }],
-  ] as const)(
-    "another binary's %s is not read: the start proceeds and the value is not used",
-    (_family, env) => {
-      const lines: string[] = [];
-      const exits: number[] = [];
-      const config = readStartupConfig(
-        HTTP_PARAMETERS,
-        [],
-        { ...env },
-        {
-          stderr: (line) => lines.push(line),
-          exit: (code) => exits.push(code),
-        },
-        readHttpConfig,
-      );
-      expect(lines).toEqual([]);
-      expect(exits).toEqual([]);
-      expect(config).toEqual(readHttpConfig([], {}));
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        "another binary's %s is not read: the start proceeds and the value is not used",
+        _family,
+      ),
+      () => {
+        const lines: string[] = [];
+        const exits: number[] = [];
+        const config = readStartupConfig(
+          HTTP_PARAMETERS,
+          [],
+          { ...env },
+          {
+            stderr: (line) => lines.push(line),
+            exit: (code) => exits.push(code),
+          },
+          readHttpConfig,
+        );
+        assert.deepStrictEqual(lines, []);
+        assert.deepStrictEqual(exits, []);
+        assert.deepStrictEqual(config, readHttpConfig([], {}));
+      },
+    );
+  }
 
-  it.each([
+  for (const [key, words] of [
     ['mcp', DESTINATION_WORDS],
     ['env-path', DESTINATION_WORDS],
     ['browser', DESTINATION_WORDS],
     ['sse', SSE_WORDS],
-  ])('YAML %s', (key, words) => {
-    expect(() => readHttpConfig([], {}, { [key]: 'x' })).toThrow(
-      `${key} (config file): ${words}`,
-    );
-  });
+  ]) {
+    it(format('YAML %s', key), () => {
+      assertThrows(
+        () => readHttpConfig([], {}, { [key]: 'x' }),
+        `${key} (config file): ${words}`,
+      );
+    });
+  }
 });
 
 describe('the YAML template and validation come from the table', () => {
@@ -439,8 +486,11 @@ describe('the YAML template and validation come from the table', () => {
   const parsed = load(template) as YamlConfig;
 
   it('the template is valid and sets only defaults', () => {
-    expect(validateYamlConfig(HTTP_PARAMETERS, parsed).errors).toEqual([]);
-    expect(readHttpConfig([], {}, parsed)).toMatchObject({
+    assert.deepStrictEqual(
+      validateYamlConfig(HTTP_PARAMETERS, parsed).errors,
+      [],
+    );
+    assertMatchObject(readHttpConfig([], {}, parsed), {
       host: '127.0.0.1',
       port: 3000,
       stateIdleMinutes: 30,
@@ -448,7 +498,8 @@ describe('the YAML template and validation come from the table', () => {
   });
 
   it('holds http rows under http, and no other binary keys', () => {
-    expect(Object.keys(parsed).sort()).toEqual(
+    assert.deepStrictEqual(
+      Object.keys(parsed).sort(),
       [
         'batch',
         'enable-data-tools',
@@ -460,8 +511,9 @@ describe('the YAML template and validation come from the table', () => {
         'system-type',
       ].sort(),
     );
-    expect(parsed.batch).toEqual({ keepRawParts: false });
-    expect(Object.keys(parsed.http as object).sort()).toEqual(
+    assert.deepStrictEqual(parsed.batch, { keepRawParts: false });
+    assert.deepStrictEqual(
+      Object.keys(parsed.http as object).sort(),
       [
         'allowed-hosts',
         'allowed-origins',
@@ -480,7 +532,7 @@ describe('the YAML template and validation come from the table', () => {
       mcp: 'TRIAL',
       sse: { port: 3001 },
     });
-    expect(errors).toEqual([
+    assert.deepStrictEqual(errors, [
       HTTP_SENTENCE,
       `mcp (config file): ${DESTINATION_WORDS}`,
       `sse (config file): ${SSE_WORDS}`,
@@ -499,18 +551,18 @@ describe('the YAML template and validation come from the table', () => {
     it('a missing file gets the template and the start ends 0', async () => {
       const file = path.join(dir, 'conf.yaml');
       const { exits, served } = await start([`--conf=${file}`]);
-      expect(exits).toEqual([0]);
-      expect(served).toBe(0);
-      expect(fs.readFileSync(file, 'utf8')).toBe(template);
+      assert.deepStrictEqual(exits, [0]);
+      assert.equal(served, 0);
+      assert.equal(fs.readFileSync(file, 'utf8'), template);
     });
 
     it('a file with a destination key stops the start with its words', async () => {
       const file = path.join(dir, 'conf.yaml');
       fs.writeFileSync(file, 'mcp: TRIAL\n');
       const { stderr, exits, served } = await start([`--conf=${file}`]);
-      expect(stderr).toContain(`mcp (config file): ${DESTINATION_WORDS}`);
-      expect(exits).toEqual([1]);
-      expect(served).toBe(0);
+      assert.ok(stderr.includes(`mcp (config file): ${DESTINATION_WORDS}`));
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
     });
   });
 });

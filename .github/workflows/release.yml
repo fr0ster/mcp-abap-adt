@@ -37,14 +37,10 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
-      # As in ci.yml: any known advisory of moderate severity or above in a
-      # production dependency stops the release (dev dependencies again once
-      # the tests leave Jest, #361). GHSA-fc5q-39xc-vjpf (picomatch) was
-      # withdrawn on GitHub on 2026-11-18 and is still reported by
-      # `npm audit` (npm advisory 1247710); it reaches the tree only through
-      # jest, jest-util and lint-staged, all dev only.
+      # As in ci.yml: any known advisory of moderate severity or above in the
+      # whole tree, dev dependencies included, stops the release.
       - name: Security audit (moderate+)
-        run: npm audit --omit=dev --audit-level=moderate
+        run: npm audit --audit-level=moderate
 
       - name: Run Biome lint
         run: npm run lint:check -- --diagnostic-level=error
@@ -79,7 +75,8 @@ jobs:
       - name: Run Biome lint (server-runtime)
         run: npm --prefix server-runtime run lint:check
 
-      # Their suites run in the root `npm test` (its Jest roots name them).
+      # Their suites run in the root `npm test` (the runner walks every
+      # package's `src`).
       - name: Run Biome lint (compact-http)
         run: npm --prefix compact-http run lint:check
 
@@ -87,7 +84,7 @@ jobs:
         run: npm --prefix compact-sse run lint:check
 
       # The six read-only packages; their suites run in the root
-      # `npm test` (its Jest roots name them).
+      # `npm test` (the runner walks every package's `src`).
       - name: Run Biome lint (core-ro)
         run: npm --prefix core-ro run lint:check
 
@@ -109,9 +106,10 @@ jobs:
       - name: Build project
         run: npm run build
 
-      # The build compiles `src` without the tests, and Jest strips types
-      # without checking them, so a test that does not type-check still runs
-      # green. This step is the only place its types are checked.
+      # The build compiles `src` without the tests, and the test build
+      # (`npm run test:build`, part of `npm test`) compiles only the tests
+      # and what they import, so this step is the one place every test
+      # file's types are checked, with `tsconfig.test.json`.
       - name: Type-check tests
         run: npm run test:check
 
@@ -132,9 +130,9 @@ jobs:
           # ubuntu-latest); the Node 24 cell skips it, and the suite says so.
           SKIP_INSTALL_MATRIX: ${{ matrix.node-version == 22 && 'false' || 'true' }}
 
-      # These six packages' tests run in the root `npm test` above (one shared
-      # Jest configuration, its roots name every package); only their types are
-      # checked here, each against its own tsconfig.test.json. Since 19.2.0 the
+      # These six packages' tests run in the root `npm test` above (one
+      # runner, whose walk reaches every package's `src`); only their types
+      # are checked here, each against its own tsconfig.test.json. Since 19.2.0 the
       # transports' launch code and its suites live in server-runtime; server,
       # http and sse keep the test of their own entry points.
       - name: Type-check server-runtime tests

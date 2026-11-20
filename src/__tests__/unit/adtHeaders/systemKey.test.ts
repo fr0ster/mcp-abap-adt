@@ -5,6 +5,9 @@
  * are two systems, and an RFC key is never an HTTP one.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { SapRfcConfig } from '@mcp-abap-adt/connection';
 import { adtSystemKey } from '../../../lib/adtHeaders/systemKey';
 
@@ -29,17 +32,19 @@ const MS: SapRfcConfig = {
 
 describe('adtSystemKey', () => {
   it('HTTP: ["http", <URL>, <client>], trailing slashes and spaces dropped', () => {
-    expect(
+    assert.equal(
       adtSystemKey({
         url: ' https://system.example.test/ ',
         client: '100',
         authType: 'basic',
       }),
-    ).toBe(JSON.stringify(['http', 'https://system.example.test', '100']));
+      JSON.stringify(['http', 'https://system.example.test', '100']),
+    );
   });
 
   it('RFC: every address field, the SAProuter and the client', () => {
-    expect(adtSystemKey({ ...MS, saprouter: '/H/r/' })).toBe(
+    assert.equal(
+      adtSystemKey({ ...MS, saprouter: '/H/r/' }),
       JSON.stringify([
         'rfc',
         '',
@@ -54,31 +59,32 @@ describe('adtSystemKey', () => {
     );
   });
 
-  it.each([
+  for (const [_f, other] of [
     ['ashost', { ...APP, ashost: 'other.example.test' }],
     ['sysnr', { ...APP, sysnr: '01' }],
     ['client', { ...APP, client: '200' }],
     ['saprouter', { ...APP, saprouter: '/H/r/' }],
-  ] as const)(
-    'an application server differing in %s is another system',
-    (_f, other) => {
-      expect(adtSystemKey(other)).not.toBe(adtSystemKey(APP));
-    },
-  );
+  ] as const) {
+    it(
+      format('an application server differing in %s is another system', _f),
+      () => {
+        assert.notEqual(adtSystemKey(other), adtSystemKey(APP));
+      },
+    );
+  }
 
-  it.each([
+  for (const [_f, other] of [
     ['mshost', { ...MS, mshost: 'other.example.test' }],
     ['msserv', { ...MS, msserv: 'sapmsY' }],
     ['sysid', { ...MS, sysid: 'SYY' }],
     ['group', { ...MS, group: 'H' }],
-  ] as const)(
-    'a message server differing in %s is another system',
-    (_f, other) => {
-      expect(adtSystemKey(other)).not.toBe(adtSystemKey(MS));
-    },
-  );
+  ] as const) {
+    it(format('a message server differing in %s is another system', _f), () => {
+      assert.notEqual(adtSystemKey(other), adtSystemKey(MS));
+    });
+  }
 
   it('the language is no part of the system', () => {
-    expect(adtSystemKey({ ...APP, language: 'DE' })).toBe(adtSystemKey(APP));
+    assert.equal(adtSystemKey({ ...APP, language: 'DE' }), adtSystemKey(APP));
   });
 });

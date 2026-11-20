@@ -9,8 +9,11 @@
  * its own object.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 import {
   envelopeResponse,
   innerRequests,
@@ -22,8 +25,6 @@ import {
   httpStand,
   turns,
 } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const placeholder = { connection: undefined } as unknown as HandlerContext;
 const OBJECTS = ['ZCL_B1', 'ZCL_B2', 'ZCL_B3'];
@@ -49,7 +50,7 @@ const lockAnswer = (handle: string) =>
 
 beforeEach(async () => {
   parts.length = 0;
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
   s = await httpStand({
     server: { batch: { keepRawParts: false } },
     groups: [
@@ -96,7 +97,7 @@ afterEach(async () => {
   // The server logs a request's end after its answer went out.
   await turns(20);
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const withHeader = (handle: string) => ({
@@ -113,23 +114,26 @@ async function batch(
     { action: 'begin' },
     stateHandle === undefined ? undefined : withHeader(stateHandle),
   );
-  expect(begun.isError).toBe(false);
+  assert.equal(begun.isError, false);
   const handle = (JSON.parse(begun.text) as { state_handle: string })
     .state_handle;
-  if (stateHandle !== undefined) expect(handle).toBe(stateHandle);
+  if (stateHandle !== undefined) assert.equal(handle, stateHandle);
   for (const [tool, args] of calls) {
     const recorded = await s.call(tool, args, withHeader(handle));
-    expect({ tool, recorded: recorded.isError }).toEqual({
-      tool,
-      recorded: false,
-    });
+    assert.deepStrictEqual(
+      { tool, recorded: recorded.isError },
+      {
+        tool,
+        recorded: false,
+      },
+    );
   }
   const ended = await s.call(
     'HandlerBatch',
     { action: 'end' },
     withHeader(handle),
   );
-  expect(JSON.parse(ended.text)).toMatchObject({
+  assertMatchObject(JSON.parse(ended.text), {
     recorded: calls.length,
     sent: calls.length,
     received: calls.length,
@@ -141,7 +145,7 @@ async function batch(
       { action: 'answers', number: n },
       withHeader(handle),
     );
-    expect(read.isError).toBe(false);
+    assert.equal(read.isError, false);
     answers.push(JSON.parse(read.text) as Record<string, unknown>);
   }
   return { stateHandle: handle, answers };
@@ -151,7 +155,7 @@ async function batch(
 const answerOf = (entry: Record<string, unknown>): Record<string, unknown> => {
   const text = JSON.stringify(entry);
   const at = text.indexOf('lock_handle');
-  expect(at).toBeGreaterThan(-1);
+  assert.ok(at > -1);
   return entry;
 };
 
@@ -166,7 +170,7 @@ it('lock batch, write batch, unlock batch: the handles held for the instance, ev
   const handles = OBJECTS.map((name) => `HANDLE_${name}`);
   for (const [i, entry] of locked.answers.entries()) {
     answerOf(entry);
-    expect(JSON.stringify(entry)).toContain(handles[i]);
+    assert.ok(JSON.stringify(entry).includes(handles[i]));
   }
 
   await batch(
@@ -189,29 +193,32 @@ it('lock batch, write batch, unlock batch: the handles held for the instance, ev
     ]),
   );
 
-  expect(envelopes()).toHaveLength(3);
-  expect(new Set(envelopes().map((r) => r.session)).size).toBe(1);
-  expect(parts.filter((p) => p.url.includes('_action=LOCK'))).toHaveLength(3);
+  assert.equal(envelopes().length, 3);
+  assert.equal(new Set(envelopes().map((r) => r.session)).size, 1);
+  assert.equal(parts.filter((p) => p.url.includes('_action=LOCK')).length, 3);
   const puts = parts.filter((p) => p.method === 'PUT');
-  expect(puts).toHaveLength(3);
+  assert.equal(puts.length, 3);
   for (const [i, handle] of handles.entries()) {
-    expect(puts[i]?.url).toContain(`lockHandle=${handle}`);
+    assert.ok(puts[i]?.url.includes(`lockHandle=${handle}`));
   }
-  expect(parts.filter((p) => p.url.includes('_action=UNLOCK'))).toHaveLength(3);
+  assert.equal(parts.filter((p) => p.url.includes('_action=UNLOCK')).length, 3);
 });
 
 it('without the state_handle a write batch on another instance is refused before anything is recorded', async () => {
   const locked = await batch(undefined, [
     ['HandlerLock', { object_type: 'CLASS', object_name: 'ZCL_B1' }],
   ]);
-  expect(JSON.stringify(locked.answers[0])).toContain('HANDLE_ZCL_B1');
+  assert.ok(JSON.stringify(locked.answers[0]).includes('HANDLE_ZCL_B1'));
   const updated = await s.call('HandlerUpdate', {
     object_type: 'CLASS',
     class_name: 'ZCL_B1',
     source_code: 'CLASS ZCL_B1 DEFINITION. ENDCLASS.',
     lock_handle: 'HANDLE_ZCL_B1',
   });
-  expect(updated.isError).toBe(true);
-  expect(updated.text).toContain('lock_handle is not held by this instance');
-  expect(parts.filter((p) => p.method === 'PUT')).toEqual([]);
+  assert.equal(updated.isError, true);
+  assert.ok(updated.text.includes('lock_handle is not held by this instance'));
+  assert.deepStrictEqual(
+    parts.filter((p) => p.method === 'PUT'),
+    [],
+  );
 });

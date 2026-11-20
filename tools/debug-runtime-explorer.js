@@ -9,8 +9,8 @@ const { isUpperAbapName } = require('./readings.js');
 const readline = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
 // `js-yaml`, which this project declares, rather than `yaml`, which it never
-// did: that one resolved only because lint-staged happened to hoist it, and it
-// stopped resolving the moment the tree changed.
+// did: that one resolved only because another dev dependency happened to
+// hoist it, and it stopped resolving the moment the tree changed.
 const yaml = require('js-yaml');
 const { XMLParser } = require('fast-xml-parser');
 const { createAbapConnection } = require('../dist/lib/connectionFactory.js');
@@ -23,10 +23,7 @@ const {
   browserCallbackStrategy,
 } = require('../dist/lib/auth/index.js');
 const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces-adt');
-const {
-  AdtClient,
-  AdtRuntimeClient,
-} = require('@mcp-abap-adt/adt-clients');
+const { AdtClient, AdtRuntimeClient } = require('@mcp-abap-adt/adt-clients');
 
 function makeLogger(verbose) {
   const noop = () => {};
@@ -161,9 +158,7 @@ function getProbeFromTestConfig() {
   if (!builderCase) return null;
 
   const params =
-    builderCase?.params ||
-    builderCase?.params_groups?.builder_class ||
-    {};
+    builderCase?.params || builderCase?.params_groups?.builder_class || {};
 
   const className = toUpperOrUndefined(params.class_name);
   const packageName =
@@ -460,7 +455,10 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
       failures.push(`write threw: ${error?.message ?? String(error)}`);
     }
     try {
-      const released = await api.unlock({ className: probe.className }, lockHandle);
+      const released = await api.unlock(
+        { className: probe.className },
+        lockHandle,
+      );
       if (!released?.ok) {
         failures.push(
           `the lock was NOT released and stays on ${probe.className} in SAP: ${released?.getError?.()?.message ?? 'no answer'}`,
@@ -584,7 +582,9 @@ async function runBaselineUnitTest(adtClient, probe, logger) {
 
 function readHeader(headers, key) {
   if (!headers) return undefined;
-  return headers[key] || headers[key.toLowerCase()] || headers[key.toUpperCase()];
+  return (
+    headers[key] || headers[key.toLowerCase()] || headers[key.toUpperCase()]
+  );
 }
 
 async function callRuntime(runtimeContext, label, fn) {
@@ -628,7 +628,10 @@ async function launchDebuggerWithFallback(runtimeContext) {
     try {
       const options = mode ? { debuggingMode: mode } : {};
       const resp = await runtimeContext.runtime.launchDebugger(options);
-      const adtConnectionId = readHeader(resp?.headers, 'sap-adt-connection-id');
+      const adtConnectionId = readHeader(
+        resp?.headers,
+        'sap-adt-connection-id',
+      );
       if (adtConnectionId && !runtimeContext.adtConnectionId) {
         runtimeContext.adtConnectionId = String(adtConnectionId);
         console.log(
@@ -665,7 +668,10 @@ async function startAmdpDebuggerWithFallback(runtimeContext) {
   for (const options of candidates) {
     try {
       const resp = await runtimeContext.runtime.startAmdpDebugger(options);
-      const adtConnectionId = readHeader(resp?.headers, 'sap-adt-connection-id');
+      const adtConnectionId = readHeader(
+        resp?.headers,
+        'sap-adt-connection-id',
+      );
       if (adtConnectionId && !runtimeContext.adtConnectionId) {
         runtimeContext.adtConnectionId = String(adtConnectionId);
         console.log(
@@ -673,7 +679,9 @@ async function startAmdpDebuggerWithFallback(runtimeContext) {
         );
       }
       const tag = Object.keys(options).length ? JSON.stringify(options) : '{}';
-      console.log(`[ok] startAmdpDebugger(${tag}) -> HTTP ${resp?.status || 'n/a'}`);
+      console.log(
+        `[ok] startAmdpDebugger(${tag}) -> HTTP ${resp?.status || 'n/a'}`,
+      );
       console.log(compact(resp?.data));
       return;
     } catch (error) {
@@ -752,7 +760,9 @@ async function main() {
   try {
     while (true) {
       printMenu();
-      const choice = (await rl.question('Select action: ')).trim().toLowerCase();
+      const choice = (await rl.question('Select action: '))
+        .trim()
+        .toLowerCase();
 
       if (choice === 'q') break;
       if (choice === '1') {
@@ -782,9 +792,9 @@ async function main() {
         continue;
       }
       if (choice === '6') {
-        const action = (await rl.question(
-          'Action (e.g. step_over, step_into, continue): ',
-        )).trim();
+        const action = (
+          await rl.question('Action (e.g. step_over, step_into, continue): ')
+        ).trim();
         const value = (await rl.question('Value (optional): ')).trim();
         await callRuntime(
           runtimeContext,
@@ -805,7 +815,9 @@ async function main() {
       }
       if (choice === '8') {
         const variableName = (await rl.question('Variable name: ')).trim();
-        const part = (await rl.question('Variable part (default DATA): ')).trim() || 'DATA';
+        const part =
+          (await rl.question('Variable part (default DATA): ')).trim() ||
+          'DATA';
         await callRuntime(
           runtimeContext,
           `getVariableAsJson(${variableName})`,

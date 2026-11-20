@@ -33,7 +33,7 @@
  * connection (the HANA check, the shared reads) is logged off by the setup
  * file's close of tracked connections, its logoff let finish.
  *
- * Run: npm test -- src/__tests__/integration/batch/amdpHttpHandle.test.ts --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
+ * Run: npm run test:integration -- src/__tests__/integration/batch/amdpHttpHandle.test.ts
  */
 
 import assert from 'node:assert/strict';

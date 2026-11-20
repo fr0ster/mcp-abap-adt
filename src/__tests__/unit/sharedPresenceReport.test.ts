@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   classifyRead,
   connectionFailureWords,
@@ -24,47 +27,52 @@ const transportRefused = (status?: number) =>
 
 describe('shared:check classifyRead', () => {
   it('ok is present', () => {
-    expect(classifyRead({ ok: true }).state).toBe('present');
+    assert.equal(classifyRead({ ok: true }).state, 'present');
   });
 
   it('a 404 is absent whatever its origin', () => {
-    expect(classifyRead(transportRefused(404)).state).toBe('absent');
-    expect(
+    assert.equal(classifyRead(transportRefused(404)).state, 'absent');
+    assert.equal(
       classifyRead(
         failure({ origin: 'refusal', response: { status: 404 }, message: 'x' }),
       ).state,
-    ).toBe('absent');
+      'absent',
+    );
   });
 
-  it.each([401, 403, 500, 503])(
-    'a refusal on %s is unreadable, with the status',
-    (status) => {
+  for (const status of [401, 403, 500, 503]) {
+    it(format('a refusal on %s is unreadable, with the status', status), () => {
       const r = classifyRead(
         failure({ origin: 'refusal', response: { status }, message: 'x' }),
       );
-      expect(r.state).toBe('unreadable');
-      expect(r.detail).toContain(`HTTP ${status}`);
-    },
-  );
+      assert.equal(r.state, 'unreadable');
+      assert.ok(r.detail?.includes(`HTTP ${status}`));
+    });
+  }
 
-  it.each([401, 500])(
-    'a transport-refused %s is unreadable with its status, not "no answer"',
-    (status) => {
-      const r = classifyRead(transportRefused(status));
-      expect(r.state).toBe('unreadable');
-      expect(r.detail).toBe(`HTTP ${status}`);
-    },
-  );
+  for (const status of [401, 500]) {
+    it(
+      format(
+        'a transport-refused %s is unreadable with its status, not "no answer"',
+        status,
+      ),
+      () => {
+        const r = classifyRead(transportRefused(status));
+        assert.equal(r.state, 'unreadable');
+        assert.equal(r.detail, `HTTP ${status}`);
+      },
+    );
+  }
 
   it('no response at all is unreadable, "no answer"', () => {
     const r = classifyRead(transportRefused());
-    expect(r.state).toBe('unreadable');
-    expect(r.detail).toBe('no answer');
+    assert.equal(r.state, 'unreadable');
+    assert.equal(r.detail, 'no answer');
   });
 
   it('an answer with no error to read is unreadable, not absent', () => {
-    expect(classifyRead({ ok: false }).state).toBe('unreadable');
-    expect(classifyRead(undefined).state).toBe('unreadable');
+    assert.equal(classifyRead({ ok: false }).state, 'unreadable');
+    assert.equal(classifyRead(undefined).state, 'unreadable');
   });
 
   it('keeps a code of a constant shape, never the message', () => {
@@ -76,11 +84,11 @@ describe('shared:check classifyRead', () => {
         message: 'Bearer SECRET-TEXT',
       }),
     );
-    expect(r.detail).toBe('HTTP 500, LOCK_FAILED');
+    assert.equal(r.detail, 'HTTP 500, LOCK_FAILED');
     const odd = classifyRead(
       failure({ origin: 'refusal', code: 'has spaces SECRET-TEXT' }),
     );
-    expect(odd.detail).not.toContain('SECRET');
+    assert.equal(odd.detail?.includes('SECRET'), false);
   });
 });
 
@@ -90,8 +98,8 @@ describe('shared:check presence report', () => {
       { section: 'tables', name: 'ZT1', state: 'present' },
       { section: 'views', name: 'ZV1', state: 'present' },
     ]);
-    expect(r.message).toBe('');
-    expect(r.present).toEqual(['tables: ZT1', 'views: ZV1']);
+    assert.equal(r.message, '');
+    assert.deepStrictEqual(r.present, ['tables: ZT1', 'views: ZV1']);
   });
 
   it('lists absent and unreadable apart, each as category: name', () => {
@@ -105,14 +113,14 @@ describe('shared:check presence report', () => {
         detail: 'HTTP 401',
       },
     ]);
-    expect(r.absent).toEqual(['tables: ZT1']);
-    expect(r.unreadable).toEqual(['classes: ZC1']);
+    assert.deepStrictEqual(r.absent, ['tables: ZT1']);
+    assert.deepStrictEqual(r.unreadable, ['classes: ZC1']);
     const [absentPart, unreadablePart] = r.message.split('could not be read');
-    expect(absentPart).toContain('tables: ZT1');
-    expect(absentPart).not.toContain('ZC1');
-    expect(unreadablePart).toContain('classes: ZC1 (HTTP 401)');
-    expect(unreadablePart).not.toContain('ZT1');
-    expect(r.message).not.toContain('ZV1');
+    assert.ok(absentPart.includes('tables: ZT1'));
+    assert.ok(!absentPart.includes('ZC1'));
+    assert.ok(unreadablePart.includes('classes: ZC1 (HTTP 401)'));
+    assert.ok(!unreadablePart.includes('ZT1'));
+    assert.ok(!r.message.includes('ZV1'));
   });
 
   it('an all-unreadable run (a dead token) lists nothing as absent', () => {
@@ -124,15 +132,15 @@ describe('shared:check presence report', () => {
         detail: 'HTTP 401',
       },
     ]);
-    expect(r.absent).toEqual([]);
-    expect(r.message).not.toContain('absent on the system');
-    expect(r.message).toContain('tables: ZT1');
+    assert.deepStrictEqual(r.absent, []);
+    assert.ok(!r.message.includes('absent on the system'));
+    assert.ok(r.message.includes('tables: ZT1'));
   });
 });
 
 describe('shared:check readShared', () => {
   it('covers the fourteen shared categories', () => {
-    expect(Object.keys(SHARED_READS)).toHaveLength(14);
+    assert.equal(Object.keys(SHARED_READS).length, 14);
   });
 
   it('reads each name once: 404 absent, 401 and a throw unreadable, no message text, unavailable skipped, no write', async () => {
@@ -170,18 +178,26 @@ describe('shared:check readShared', () => {
       },
       (a) => !a || a.includes('onprem'),
     );
-    expect(calls).toEqual(['ZPRESENT', 'ZMISSING', 'ZEXPIRED', 'ZTHROWS']);
-    expect(results.map((r) => [r.name, r.state])).toEqual([
-      ['ZPRESENT', 'present'],
-      ['ZMISSING', 'absent'],
-      ['ZEXPIRED', 'unreadable'],
-      ['ZTHROWS', 'unreadable'],
+    assert.deepStrictEqual(calls, [
+      'ZPRESENT',
+      'ZMISSING',
+      'ZEXPIRED',
+      'ZTHROWS',
     ]);
+    assert.deepStrictEqual(
+      results.map((r) => [r.name, r.state]),
+      [
+        ['ZPRESENT', 'present'],
+        ['ZMISSING', 'absent'],
+        ['ZEXPIRED', 'unreadable'],
+        ['ZTHROWS', 'unreadable'],
+      ],
+    );
     const report = presenceReport(results);
-    expect(report.message).toContain('HTTP 401');
-    expect(report.message).toContain('ECONNRESET');
-    expect(report.message).not.toContain('SECRET');
-    expect(report.absent).toEqual(['tables: ZMISSING']);
+    assert.ok(report.message.includes('HTTP 401'));
+    assert.ok(report.message.includes('ECONNRESET'));
+    assert.ok(!report.message.includes('SECRET'));
+    assert.deepStrictEqual(report.absent, ['tables: ZMISSING']);
   });
 });
 
@@ -193,25 +209,29 @@ describe('connectionFailureWords', () => {
         response: { status: 401, data: 'SECRET body' },
       }),
     );
-    expect(words).toBe(
+    assert.equal(
+      words,
       'No connection to the system, nothing was read (HTTP 401, ERR_BAD_REQUEST)',
     );
-    expect(words).not.toContain('SECRET');
+    assert.ok(!words.includes('SECRET'));
   });
 
   it('a failure with no status or usable code reads as a failed connection', () => {
-    expect(
+    assert.equal(
       connectionFailureWords(
         Object.assign(new Error('SECRET'), { code: 'has spaces SECRET' }),
       ),
-    ).toBe('No connection to the system, nothing was read (connection failed)');
-    expect(connectionFailureWords('SECRET')).toBe(
+      'No connection to the system, nothing was read (connection failed)',
+    );
+    assert.equal(
+      connectionFailureWords('SECRET'),
       'No connection to the system, nothing was read (connection failed)',
     );
   });
 
   it('no client and no failure is said so', () => {
-    expect(connectionFailureWords(undefined)).toBe(
+    assert.equal(
+      connectionFailureWords(undefined),
       'No connection to the system, nothing was read (no client)',
     );
   });

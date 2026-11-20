@@ -7,11 +7,14 @@
  * instance is gone.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { httpStand } from '../../../../server-runtime/src/http/__tests__/shutdown/harness';
 import { sseStand } from '../../../../server-runtime/src/sse/__tests__/shutdown/harness';
 import { stand as coreStand } from '../../../../server-runtime/src/stdio/__tests__/helpers/loginStand';
 import { ownedConnections } from '../../../lib/ownedConnections';
 import { isLogoff } from '../../helpers/adtStandIn';
+import { assertMatchObject } from '../../helpers/assertions';
 import { isLockOf, isUnlockOf } from '../../helpers/shutdownTools';
 import { stateSystemKind } from '../../helpers/systemKind';
 
@@ -19,8 +22,6 @@ import { stateSystemKind } from '../../helpers/systemKind';
 beforeEach(() => {
   stateSystemKind();
 });
-
-jest.setTimeout(30_000);
 
 async function until(done: () => boolean, limitMs = 10_000) {
   const end = Date.now() + limitMs;
@@ -39,27 +40,27 @@ const loggedOffAfterLock = (log: Log, id: string) => {
 };
 
 beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 it('core, at shutdown: the lock tool and the refused UNLOCK end with the session logged off', async () => {
   const s = await coreStand({ kind: 'onprem', shutdown: {} });
   try {
     s.adt.answer((r) => isUnlockOf('B')(r.url), 500);
-    expect(await s.callTool('LockOnly', { id: 'A' })).toMatchObject({
+    assertMatchObject(await s.callTool('LockOnly', { id: 'A' }), {
       isError: false,
     });
-    expect(await s.callTool('LockedUpdate', { id: 'B' })).toMatchObject({
+    assertMatchObject(await s.callTool('LockedUpdate', { id: 'B' }), {
       isError: true,
     });
-    expect(s.adt.logoffs()).toBe(0);
+    assert.equal(s.adt.logoffs(), 0);
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
+    assert.equal(await s.exited, 0);
     await until(() => s.adt.logoffs() === 1);
-    expect(loggedOffAfterLock(s.adt.requests, 'A')).toBe(true);
-    expect(loggedOffAfterLock(s.adt.requests, 'B')).toBe(true);
+    assert.equal(loggedOffAfterLock(s.adt.requests, 'A'), true);
+    assert.equal(loggedOffAfterLock(s.adt.requests, 'B'), true);
   } finally {
     await s.close();
   }
@@ -68,11 +69,11 @@ it('core, at shutdown: the lock tool and the refused UNLOCK end with the session
 it("http per-request, at the pool's eviction after the request: logged off before the instance is gone", async () => {
   const s = await httpStand();
   try {
-    expect((await s.call('LockOnly', { id: 'A' })).isError).toBe(false);
+    assert.equal((await s.call('LockOnly', { id: 'A' })).isError, false);
     await until(() => loggedOffAfterLock(s.standIn.requests, 'A'));
-    expect(ownedConnections()).toEqual([]);
+    assert.deepStrictEqual(ownedConnections(), []);
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
+    assert.equal(await s.exited, 0);
   } finally {
     await s.close();
   }
@@ -83,14 +84,15 @@ it('http pooled, at shutdown: the kept instance’s session is logged off after 
   try {
     const held = await s.call('HoldState', { id: 'S' });
     s.standIn.answer((r) => isUnlockOf('B')(r.url), 500);
-    expect(
+    assert.equal(
       (await s.call('LockedUpdate', { id: 'B', state_handle: held.text }))
         .isError,
-    ).toBe(true);
+      true,
+    );
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
+    assert.equal(await s.exited, 0);
     await until(() => loggedOffAfterLock(s.standIn.requests, 'B'));
-    expect(ownedConnections()).toEqual([]);
+    assert.deepStrictEqual(ownedConnections(), []);
   } finally {
     await s.close();
   }
@@ -108,12 +110,12 @@ it('sse, at shutdown and at an SSE close', async () => {
 
     closing.close();
     await until(() => loggedOffAfterLock(s.standIn.requests, 'C'));
-    expect(s.standIn.logoffs()).toBe(1);
+    assert.equal(s.standIn.logoffs(), 1);
 
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
+    assert.equal(await s.exited, 0);
     await until(() => s.standIn.logoffs() === 2);
-    expect(loggedOffAfterLock(s.standIn.requests, 'O')).toBe(true);
+    assert.equal(loggedOffAfterLock(s.standIn.requests, 'O'), true);
   } finally {
     await s.close();
   }

@@ -6,7 +6,7 @@
  * Prerequisites: Shared objects must exist (npm run shared:setup),
  * including ZMCP_SHR_SRVD01 service definition.
  *
- * Run: npm test -- --testPathPattern=integration/high/serviceBinding
+ * Run: npm run test:integration -- src/__tests__/integration/high/serviceBinding/ServiceBindingHighHandlers.test.ts
  */
 
 import { after, afterEach, before, beforeEach, it } from 'node:test';

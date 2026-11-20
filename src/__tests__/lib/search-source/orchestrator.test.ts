@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
   type OrchestratorDeps,
@@ -69,17 +72,18 @@ describe('runSearchSource', () => {
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, baseInput);
-    expect(
+    assert.deepStrictEqual(
       result.results.map(
         (r) => `${r.devclass}/${r.object_name}:${'line' in r ? r.line : ''}`,
       ),
-    ).toEqual(['ZA/ZA_CLAS:3', 'ZA/ZA_PROG:1', 'ZB/ZB_PROG:2']);
-    expect(result.scanned).toEqual({
+      ['ZA/ZA_CLAS:3', 'ZA/ZA_PROG:1', 'ZB/ZB_PROG:2'],
+    );
+    assert.deepStrictEqual(result.scanned, {
       objects: 3,
       sources: 3,
       objects_with_hits: 3,
     });
-    expect(result.truncated).toEqual({ by_object_cap: false });
+    assert.deepStrictEqual(result.truncated, { by_object_cap: false });
   });
 
   it('caps hits per object and flips truncated.by_object_cap', async () => {
@@ -98,8 +102,8 @@ describe('runSearchSource', () => {
       ...baseInput,
       max_hits_per_object: 2,
     });
-    expect(result.results).toHaveLength(2);
-    expect(result.truncated.by_object_cap).toBe(true);
+    assert.equal(result.results.length, 2);
+    assert.equal(result.truncated.by_object_cap, true);
   });
 
   it('does not flip truncated.by_object_cap when an object has exactly max_hits_per_object matches', async () => {
@@ -118,8 +122,8 @@ describe('runSearchSource', () => {
       ...baseInput,
       max_hits_per_object: 1,
     });
-    expect(result.results).toHaveLength(1);
-    expect(result.truncated.by_object_cap).toBe(false);
+    assert.equal(result.results.length, 1);
+    assert.equal(result.truncated.by_object_cap, false);
   });
 
   it('probes later source units and flips truncated.by_object_cap when matches are omitted after the per-object budget is filled', async () => {
@@ -141,8 +145,8 @@ describe('runSearchSource', () => {
       ...baseInput,
       max_hits_per_object: 1,
     });
-    expect(result.results).toHaveLength(1);
-    expect(result.truncated.by_object_cap).toBe(true);
+    assert.equal(result.results.length, 1);
+    assert.equal(result.truncated.by_object_cap, true);
   });
 
   it('two includes of one group each have their own allowance (DO27)', async () => {
@@ -163,11 +167,14 @@ describe('runSearchSource', () => {
       ...baseInput,
       max_hits_per_object: 1,
     });
-    expect(result.results.map((h) => [h.object_type, h.object_name])).toEqual([
-      ['FUGR/I', 'LZ_A'],
-      ['FUGR/I', 'LZ_B'],
-    ]);
-    expect(result.truncated.by_object_cap).toBe(false);
+    assert.deepStrictEqual(
+      result.results.map((h) => [h.object_type, h.object_name]),
+      [
+        ['FUGR/I', 'LZ_A'],
+        ['FUGR/I', 'LZ_B'],
+      ],
+    );
+    assert.equal(result.truncated.by_object_cap, false);
   });
 
   it('two function modules of one group each have their own allowance (DO18)', async () => {
@@ -188,11 +195,11 @@ describe('runSearchSource', () => {
       ...baseInput,
       max_hits_per_object: 1,
     });
-    expect(result.results.map((h) => h.object_name)).toEqual([
-      'Z_FM_A',
-      'Z_FM_B',
-    ]);
-    expect(result.truncated.by_object_cap).toBe(false);
+    assert.deepStrictEqual(
+      result.results.map((h) => h.object_name),
+      ['Z_FM_A', 'Z_FM_B'],
+    );
+    assert.equal(result.truncated.by_object_cap, false);
   });
 
   it('orders the hits by the walk, whatever order the package answers in', async () => {
@@ -217,12 +224,10 @@ describe('runSearchSource', () => {
       ...baseInput,
       concurrency: 1,
     });
-    expect(result.results.map((h) => h.object_name)).toEqual([
-      'ZPROG_O',
-      'ZPROG_A',
-      'ZPROG_B',
-      'ZCL_A',
-    ]);
+    assert.deepStrictEqual(
+      result.results.map((h) => h.object_name),
+      ['ZPROG_O', 'ZPROG_A', 'ZPROG_B', 'ZCL_A'],
+    );
   });
 
   it('an object without a hit is not in the answer, and counts as read', async () => {
@@ -240,9 +245,12 @@ describe('runSearchSource', () => {
       resolvePackages: identityResolver,
     };
     const result = await runSearchSource(deps, baseInput);
-    expect(result.results.map((r) => r.object_name)).toEqual(['Z_HIT']);
-    expect(Object.keys(result)).not.toContain('no_hits');
-    expect(result.scanned).toEqual({
+    assert.deepStrictEqual(
+      result.results.map((r) => r.object_name),
+      ['Z_HIT'],
+    );
+    assert.ok(!Object.keys(result).includes('no_hits'));
+    assert.deepStrictEqual(result.scanned, {
       objects: 2,
       sources: 2,
       objects_with_hits: 1,
@@ -270,8 +278,8 @@ describe('runSearchSource — the resolved packages are walked; no package count
       ...baseInput,
       packages: ['Z*'],
     });
-    expect(walked).toEqual(['ZA', 'ZB']);
-    expect(Object.keys(result.scanned)).not.toContain('packages');
+    assert.deepStrictEqual(walked, ['ZA', 'ZB']);
+    assert.ok(!Object.keys(result.scanned).includes('packages'));
   });
 
   it('returns an empty result when resolution is empty', async () => {
@@ -288,13 +296,13 @@ describe('runSearchSource — the resolved packages are walked; no package count
       ...baseInput,
       packages: ['ZZZ_NONEXISTENT*'],
     });
-    expect(result.results).toEqual([]);
-    expect(result.scanned).toEqual({
+    assert.deepStrictEqual(result.results, []);
+    assert.deepStrictEqual(result.scanned, {
       objects: 0,
       sources: 0,
       objects_with_hits: 0,
     });
-    expect(result.truncated).toEqual({ by_object_cap: false });
+    assert.deepStrictEqual(result.truncated, { by_object_cap: false });
   });
 
   it('collapses case-duplicate exact entries before enumeration', async () => {
@@ -324,8 +332,8 @@ describe('runSearchSource — the resolved packages are walked; no package count
       ...baseInput,
       packages: ['ZPKG', 'zpkg'],
     });
-    expect(Object.keys(result.scanned)).not.toContain('packages');
-    expect(fetchedFor).toBe('ZPKG');
+    assert.ok(!Object.keys(result.scanned).includes('packages'));
+    assert.equal(fetchedFor, 'ZPKG');
   });
 });
 
@@ -347,8 +355,8 @@ describe('runSearchSource — max_hits_per_object absent: no limit (DO20)', () =
       packages: ['ZPKG'],
       object_types: ['PROG'],
     });
-    expect(result.results).toHaveLength(120);
-    expect(result.truncated.by_object_cap).toBe(false);
+    assert.equal(result.results.length, 120);
+    assert.equal(result.truncated.by_object_cap, false);
   });
 });
 
@@ -372,7 +380,7 @@ describe('runSearchSource — an object of any number of hits', () => {
       packages: ['ZPKG'],
       object_types: ['PROG'],
     });
-    expect(result.results).toHaveLength(300_000);
+    assert.equal(result.results.length, 300_000);
   });
 });
 
@@ -408,25 +416,38 @@ describe('runSearchSourceWithContext — the packages walked are exactly those n
       .map((url) => url.searchParams.get('parent_name') ?? '')
       .sort();
 
-  it.each([
+  for (const [_path, absent] of [
     ['served', false],
     ['absent', true],
-  ] as const)(
-    'node structures are requested for the resolved and the exact names only, each once (%s)',
-    async (_path, absent) => {
-      const fake = standOn(REPO, { emptyBody: [nodeKey('ZMISSING')] });
-      const result = await runSearchSourceWithContext(
-        contextOn(fake, absent ? 'absent' : 'served'),
-        {
-          query: 'marker',
-          packages: ['ZQ*', 'ZEMPTY', 'ZMISSING'],
-          include_subpackages: false,
-        },
-        { lineMatch: substringLineMatch, sapAnswers: skipSapAnswers },
-      );
-      expect(rootsOf(fake)).toEqual(['ZEMPTY', 'ZMISSING', 'ZQA', 'ZQB']);
-      expect(result.results.map((h) => h.object_name)).toEqual(['ZQAP']);
-      expect(Object.keys(result.scanned)).not.toContain('packages');
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        'node structures are requested for the resolved and the exact names only, each once (%s)',
+        _path,
+      ),
+      async () => {
+        const fake = standOn(REPO, { emptyBody: [nodeKey('ZMISSING')] });
+        const result = await runSearchSourceWithContext(
+          contextOn(fake, absent ? 'absent' : 'served'),
+          {
+            query: 'marker',
+            packages: ['ZQ*', 'ZEMPTY', 'ZMISSING'],
+            include_subpackages: false,
+          },
+          { lineMatch: substringLineMatch, sapAnswers: skipSapAnswers },
+        );
+        assert.deepStrictEqual(rootsOf(fake), [
+          'ZEMPTY',
+          'ZMISSING',
+          'ZQA',
+          'ZQB',
+        ]);
+        assert.deepStrictEqual(
+          result.results.map((h) => h.object_name),
+          ['ZQAP'],
+        );
+        assert.ok(!Object.keys(result.scanned).includes('packages'));
+      },
+    );
+  }
 });

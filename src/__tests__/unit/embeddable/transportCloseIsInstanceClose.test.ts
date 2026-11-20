@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 /**
  * A transport close that ends the session is the instance's close: an
@@ -31,8 +33,6 @@ import {
   probeGroup,
 } from '../../helpers/adtStandIn';
 import { StandServer, silent, until } from '../backgroundRuns/harness';
-
-jest.setTimeout(30_000);
 
 const MAIN_READ = '/sap/bc/adt/mainread/one';
 const LISTEN = '/sap/bc/adt/debugger/listen/one';
@@ -141,41 +141,45 @@ it('the client disconnects: the logoff at once for the instance’s own and the 
   const freshSession = standIn.requests.find((r) =>
     r.url.startsWith(LISTEN),
   )?.session;
-  expect(mainSession).toBeDefined();
-  expect(freshSession).toBeDefined();
-  expect(freshSession).not.toBe(mainSession);
-  expect(ownedConnections(server)).toHaveLength(2);
+  assert.notEqual(mainSession, undefined);
+  assert.notEqual(freshSession, undefined);
+  assert.notEqual(freshSession, mainSession);
+  assert.equal(ownedConnections(server).length, 2);
   const sessionsBefore = new Set(standIn.requests.map((r) => r.session));
 
   await client.close();
   // In the close's tick: latched, nothing owned any more.
-  expect(isLatched(server)).toBe(true);
-  expect(ownedConnections(server)).toEqual([]);
-  expect(await call).toBe('the transport closed');
+  assert.equal(isLatched(server), true);
+  assert.deepStrictEqual(ownedConnections(server), []);
+  assert.equal(await call, 'the transport closed');
   // Both logoffs reach the system while the tool's request is still held.
   await until(
     () =>
       standIn.loggedOff().includes(mainSession as string) &&
       standIn.loggedOff().includes(freshSession as string),
   );
-  expect(standIn.logoffs()).toBe(2);
+  assert.equal(standIn.logoffs(), 2);
 
   held.release();
   await until(() => seen.second !== undefined);
-  expect(isClosedInstanceRefusal(seen.second)).toBe(true);
+  assert.equal(isClosedInstanceRefusal(seen.second), true);
   await server.idle();
   // Nothing was sent for the second fresh connection: no new session, no request.
-  expect(standIn.requests.some((r) => r.url.startsWith(SECOND))).toBe(false);
-  expect(
+  assert.equal(
+    standIn.requests.some((r) => r.url.startsWith(SECOND)),
+    false,
+  );
+  assert.deepStrictEqual(
     standIn.requests.filter(
       (r) => !sessionsBefore.has(r.session) && !isLogoff(r.url),
     ),
-  ).toEqual([]);
-  expect(ownedConnections(server)).toEqual([]);
+    [],
+  );
+  assert.deepStrictEqual(ownedConnections(server), []);
   // The state was let go: the call's end does not arm the idle bound.
-  expect(server.holdsState()).toBe(true);
-  expect(idleTimerOf(server)).toBeUndefined();
+  assert.equal(server.holdsState(), true);
+  assert.equal(idleTimerOf(server), undefined);
   // One logoff each, whoever closes again.
   await server.close();
-  expect(standIn.logoffs()).toBe(2);
+  assert.equal(standIn.logoffs(), 2);
 });

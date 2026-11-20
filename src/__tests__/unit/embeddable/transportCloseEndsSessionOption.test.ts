@@ -4,6 +4,8 @@
  * `false` — a host with a transport per request — wires nothing.
  */
 
+import assert from 'node:assert/strict';
+import { beforeEach, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { stateSystemKind } from '../../helpers/systemKind';
@@ -25,7 +27,7 @@ it('wires the session-end hook by default', () => {
     connection,
     exposition: ['readonly'],
   });
-  expect(typeof onCloseOf(server)).toBe('function');
+  assert.equal(typeof onCloseOf(server), 'function');
 });
 
 it('wires nothing when the host states transportCloseEndsSession: false', () => {
@@ -34,5 +36,5 @@ it('wires nothing when the host states transportCloseEndsSession: false', () => 
     exposition: ['readonly'],
     transportCloseEndsSession: false,
   });
-  expect(onCloseOf(server)).toBeUndefined();
+  assert.equal(onCloseOf(server), undefined);
 });

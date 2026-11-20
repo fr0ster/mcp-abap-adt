@@ -3,11 +3,20 @@
  * scripts/portable/elf.cjs (the RUNPATH rewritten or added) and tools.cjs (how npm and
  * tar are started, and the search path the smoke check runs with).
  */
+
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { assertThrows } from '../../helpers/assertions';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const elf = require('../../../../scripts/portable/elf.cjs');
-const tools = require('../../../../scripts/portable/tools.cjs');
+const elf = require(
+  path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'elf.cjs'),
+);
+const tools = require(
+  path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'tools.cjs'),
+);
 
 const image = (...strings: string[]) =>
   Buffer.concat([
@@ -20,36 +29,42 @@ describe('RUNPATH rewrite', () => {
   it('replaces the whole string and pads it with NULs', () => {
     const before = image('libsapnwrfc.so', '/opt/sdk/lib', 'libc.so.6');
     const after = elf.patchRunpath(before, '/opt/sdk/lib', '$ORIGIN');
-    expect(after.length).toBe(before.length);
-    expect(after.toString('latin1')).toContain('\0$ORIGIN\0');
-    expect(after.toString('latin1')).not.toContain('/opt/sdk/lib');
-    expect(after.toString('latin1')).toContain('\0libc.so.6\0');
+    assert.equal(after.length, before.length);
+    assert.ok(after.toString('latin1').includes('\0$ORIGIN\0'));
+    assert.ok(!after.toString('latin1').includes('/opt/sdk/lib'));
+    assert.ok(after.toString('latin1').includes('\0libc.so.6\0'));
   });
 
   it('refuses when the path is not there', () => {
-    expect(() =>
-      elf.patchRunpath(image('/other/lib'), '/opt/sdk/lib', '$ORIGIN'),
-    ).toThrow(/not found/);
+    assertThrows(
+      () => elf.patchRunpath(image('/other/lib'), '/opt/sdk/lib', '$ORIGIN'),
+      /not found/,
+    );
   });
 
   it('refuses when it occurs more than once', () => {
-    expect(() =>
-      elf.patchRunpath(
-        image('/opt/sdk/lib', '/opt/sdk/lib'),
-        '/opt/sdk/lib',
-        '$ORIGIN',
-      ),
-    ).toThrow(/more than once/);
+    assertThrows(
+      () =>
+        elf.patchRunpath(
+          image('/opt/sdk/lib', '/opt/sdk/lib'),
+          '/opt/sdk/lib',
+          '$ORIGIN',
+        ),
+      /more than once/,
+    );
   });
 
   it('refuses a match that is only the tail of a longer string', () => {
-    expect(() =>
-      elf.patchRunpath(image('/x/opt/sdk/lib'), '/opt/sdk/lib', '$ORIGIN'),
-    ).toThrow(/not found/);
+    assertThrows(
+      () =>
+        elf.patchRunpath(image('/x/opt/sdk/lib'), '/opt/sdk/lib', '$ORIGIN'),
+      /not found/,
+    );
   });
 
   it('refuses a replacement longer than the original', () => {
-    expect(() => elf.patchRunpath(image('/l'), '/l', '$ORIGIN')).toThrow(
+    assertThrows(
+      () => elf.patchRunpath(image('/l'), '/l', '$ORIGIN'),
       /longer/,
     );
   });
@@ -103,33 +118,36 @@ describe('RUNPATH read', () => {
       [1, 'libsapnwrfc.so'],
       [29, '/publisher/sdk/lib'],
     ]);
-    expect(elf.readRunpath(image)).toBe('/publisher/sdk/lib');
-    expect(
-      elf.patchRunpath(image, elf.readRunpath(image), '$ORIGIN'),
-    ).toHaveLength(image.length);
+    assert.equal(elf.readRunpath(image), '/publisher/sdk/lib');
+    assert.equal(
+      elf.patchRunpath(image, elf.readRunpath(image), '$ORIGIN').length,
+      image.length,
+    );
   });
 
   it('reads an RPATH when there is no RUNPATH', () => {
-    expect(elf.readRunpath(elfImage([[15, '/old/lib']]))).toBe('/old/lib');
+    assert.equal(elf.readRunpath(elfImage([[15, '/old/lib']])), '/old/lib');
   });
 
   it('reads none from an image that carries none (a prebuilt binding)', () => {
-    expect(elf.readRunpath(elfImage([[1, 'libc.so.6']]))).toBeUndefined();
+    assert.equal(elf.readRunpath(elfImage([[1, 'libc.so.6']])), undefined);
   });
 
   it('refuses an image with two', () => {
-    expect(() =>
-      elf.readRunpath(
-        elfImage([
-          [29, '/a'],
-          [15, '/b'],
-        ]),
-      ),
-    ).toThrow(/more than one/);
+    assertThrows(
+      () =>
+        elf.readRunpath(
+          elfImage([
+            [29, '/a'],
+            [15, '/b'],
+          ]),
+        ),
+      /more than one/,
+    );
   });
 
   it('refuses what is not a 64-bit little-endian ELF', () => {
-    expect(() => elf.readRunpath(Buffer.alloc(64))).toThrow(/not a 64-bit/);
+    assertThrows(() => elf.readRunpath(Buffer.alloc(64)), /not a 64-bit/);
   });
 });
 
@@ -143,33 +161,37 @@ describe('RUNPATH added in place of the SONAME', () => {
       [14, 'sapnwrfc.node'],
     ]);
     const after = elf.addRunpath(before, '$ORIGIN');
-    expect(after).toHaveLength(before.length);
-    expect(elf.readRunpath(after)).toBe('$ORIGIN');
-    expect(after.readBigInt64LE(entryAt(1))).toBe(29n);
-    expect(after.toString('latin1')).not.toContain('sapnwrfc.node');
-    expect(after.toString('latin1')).toContain('\0libsapnwrfc.so\0');
+    assert.equal(after.length, before.length);
+    assert.equal(elf.readRunpath(after), '$ORIGIN');
+    assert.equal(after.readBigInt64LE(entryAt(1)), 29n);
+    assert.ok(!after.toString('latin1').includes('sapnwrfc.node'));
+    assert.ok(after.toString('latin1').includes('\0libsapnwrfc.so\0'));
   });
 
   it('refuses an image that already carries one: it is rewritten instead', () => {
-    expect(() =>
-      elf.addRunpath(
-        elfImage([
-          [14, 'sapnwrfc.node'],
-          [29, '/opt/sdk/lib'],
-        ]),
-        '$ORIGIN',
-      ),
-    ).toThrow(/already carries/);
+    assertThrows(
+      () =>
+        elf.addRunpath(
+          elfImage([
+            [14, 'sapnwrfc.node'],
+            [29, '/opt/sdk/lib'],
+          ]),
+          '$ORIGIN',
+        ),
+      /already carries/,
+    );
   });
 
   it('refuses an image with no SONAME to put it in place of', () => {
-    expect(() =>
-      elf.addRunpath(elfImage([[1, 'libc.so.6']]), '$ORIGIN'),
-    ).toThrow(/no SONAME/);
+    assertThrows(
+      () => elf.addRunpath(elfImage([[1, 'libc.so.6']]), '$ORIGIN'),
+      /no SONAME/,
+    );
   });
 
   it('refuses a path longer than the SONAME', () => {
-    expect(() => elf.addRunpath(elfImage([[14, 'a.node']]), '$ORIGIN')).toThrow(
+    assertThrows(
+      () => elf.addRunpath(elfImage([[14, 'a.node']]), '$ORIGIN'),
       /longer than the SONAME/,
     );
   });
@@ -184,10 +206,10 @@ describe('RUNPATH added in place of the SONAME', () => {
         'prebuilds/linux-x64/@mcp-abap-adt+sap-rfc-lite.glibc.node',
       ),
     );
-    expect(elf.readRunpath(before)).toBeUndefined();
+    assert.equal(elf.readRunpath(before), undefined);
     const after = elf.addRunpath(before, '$ORIGIN');
-    expect(elf.readRunpath(after)).toBe('$ORIGIN');
-    expect(after).toHaveLength(before.length);
+    assert.equal(elf.readRunpath(after), '$ORIGIN');
+    assert.equal(after.length, before.length);
   });
 
   it('refuses a SONAME whose string another name shares', () => {
@@ -199,7 +221,7 @@ describe('RUNPATH added in place of the SONAME', () => {
     // tail-merges strings would leave it.
     const sonameValue = image.readBigUInt64LE(entryAt(1) + 8);
     image.writeBigUInt64LE(sonameValue + 3n, entryAt(0) + 8);
-    expect(() => elf.addRunpath(image, '$ORIGIN')).toThrow(/shares its string/);
+    assertThrows(() => elf.addRunpath(image, '$ORIGIN'), /shares its string/);
   });
 
   it('refuses a SONAME that is the tail of another name', () => {
@@ -211,23 +233,24 @@ describe('RUNPATH added in place of the SONAME', () => {
     // tail-merges strings would leave it: overwriting it would change that name.
     const neededValue = image.readBigUInt64LE(entryAt(0) + 8);
     image.writeBigUInt64LE(neededValue + 3n, entryAt(1) + 8);
-    expect(() => elf.addRunpath(image, '$ORIGIN')).toThrow(/shares its string/);
+    assertThrows(() => elf.addRunpath(image, '$ORIGIN'), /shares its string/);
   });
 });
 
 describe('npm without a shell', () => {
   it('runs npm-cli.js through node when npm started us', () => {
-    expect(
+    assert.deepStrictEqual(
       tools.npmCommand({
         env: { npm_execpath: '/usr/lib/node_modules/npm/bin/npm-cli.js' },
         execPath: '/usr/bin/node',
         platform: 'linux',
         exists: () => true,
       }),
-    ).toEqual({
-      cmd: '/usr/bin/node',
-      args: ['/usr/lib/node_modules/npm/bin/npm-cli.js'],
-    });
+      {
+        cmd: '/usr/bin/node',
+        args: ['/usr/lib/node_modules/npm/bin/npm-cli.js'],
+      },
+    );
   });
 
   it('finds npm-cli.js beside node.exe on Windows', () => {
@@ -239,54 +262,59 @@ describe('npm without a shell', () => {
       'bin',
       'npm-cli.js',
     );
-    expect(
+    assert.deepStrictEqual(
       tools.npmCommand({
         env: {},
         execPath,
         platform: 'win32',
         exists: (p: string) => p === cli,
       }),
-    ).toEqual({ cmd: execPath, args: [cli] });
+      { cmd: execPath, args: [cli] },
+    );
   });
 
   it('falls back to npm on the PATH elsewhere', () => {
-    expect(
+    assert.deepStrictEqual(
       tools.npmCommand({
         env: {},
         execPath: '/usr/bin/node',
         platform: 'linux',
         exists: () => false,
       }),
-    ).toEqual({ cmd: 'npm', args: [] });
+      { cmd: 'npm', args: [] },
+    );
   });
 });
 
 describe('tar', () => {
   it('is the system bsdtar on Windows, not a tar earlier on the PATH', () => {
-    expect(tools.tarCommand('win32', { SystemRoot: 'C:\\Windows' })).toBe(
+    assert.equal(
+      tools.tarCommand('win32', { SystemRoot: 'C:\\Windows' }),
       path.join('C:\\Windows', 'System32', 'tar.exe'),
     );
   });
 
   it('is tar from the PATH elsewhere', () => {
-    expect(tools.tarCommand('linux', {})).toBe('tar');
+    assert.equal(tools.tarCommand('linux', {}), 'tar');
   });
 });
 
 describe('the search path the smoke check runs with', () => {
   it('drops every entry that holds an SDK library', () => {
     const value = ['/usr/bin', '/opt/sdk/lib', '/bin'].join(path.delimiter);
-    expect(
+    assert.equal(
       tools.withoutSdk(
         value,
         'libsapnwrfc.so',
         (p: string) => p === path.join('/opt/sdk/lib', 'libsapnwrfc.so'),
       ),
-    ).toBe(['/usr/bin', '/bin'].join(path.delimiter));
+      ['/usr/bin', '/bin'].join(path.delimiter),
+    );
   });
 
   it('leaves an unset variable unset', () => {
-    expect(tools.withoutSdk(undefined, 'libsapnwrfc.so', () => true)).toBe(
+    assert.equal(
+      tools.withoutSdk(undefined, 'libsapnwrfc.so', () => true),
       undefined,
     );
   });
@@ -319,34 +347,38 @@ describe('the environment the smoke check runs every executable with', () => {
 
   it('carries no SAP_*, MCP_*, AUTH_BROKER_PATH or SAPNWRFC_HOME of the caller', () => {
     const env = tools.smokeEnv(parent, 'libsapnwrfc.so', sdkHere);
-    expect(
+    assert.deepStrictEqual(
       Object.keys(env).filter((key) =>
         /^(SAP|MCP)_|^AUTH_BROKER_PATH$|^SAPNWRFC_HOME$/i.test(key),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('keeps the rest, the search paths without an SDK folder', () => {
     const env = tools.smokeEnv(parent, 'libsapnwrfc.so', sdkHere);
-    expect(env.HOME).toBe('/home/someone');
-    expect(env.PATH).toBe('/usr/bin');
-    expect(env.LD_LIBRARY_PATH).toBe('');
+    assert.equal(env.HOME, '/home/someone');
+    assert.equal(env.PATH, '/usr/bin');
+    assert.equal(env.LD_LIBRARY_PATH, '');
   });
 
   it('is the one environment smoke.mjs gives every child', () => {
     const source = readFileSync(
-      path.join(__dirname, '../../../../scripts/portable/smoke.mjs'),
+      path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'smoke.mjs'),
       'utf8',
     );
-    expect(source).toContain('const env = smokeEnv(process.env, sdkLib);');
+    assert.ok(source.includes('const env = smokeEnv(process.env, sdkLib);'));
     // process.env is read once more, for SystemRoot only; no child gets it.
     const reads = source.split('process.env').length - 1;
-    expect(reads).toBe(2);
-    expect(source).toContain('process.env.SystemRoot');
+    assert.equal(reads, 2);
+    assert.ok(source.includes('process.env.SystemRoot'));
     // Every child: spawnSync, spawn and the MCP transport take `env` alone.
-    expect(source.match(/\benv: (?!process)[^,}\n]+/g) ?? []).toEqual([]);
-    expect((source.match(/\{ env, encoding/g) ?? []).length).toBe(1);
-    expect((source.match(/^\s+env,$/gm) ?? []).length).toBe(2);
+    assert.deepStrictEqual(
+      source.match(/\benv: (?!process)[^,}\n]+/g) ?? [],
+      [],
+    );
+    assert.equal((source.match(/\{ env, encoding/g) ?? []).length, 1);
+    assert.equal((source.match(/^\s+env,$/gm) ?? []).length, 2);
   });
 });
 
@@ -360,16 +392,17 @@ describe('build tools installed apart from the repository', () => {
   };
 
   it('takes esbuild and postject at the ranges the repository declares, nothing else', () => {
-    expect(tools.buildToolSpecs(manifest)).toEqual([
+    assert.deepStrictEqual(tools.buildToolSpecs(manifest), [
       'esbuild@^0.28.2',
       'postject@^1.0.0-alpha.6',
     ]);
   });
 
   it('refuses a manifest that lost one of them', () => {
-    expect(() =>
-      tools.buildToolSpecs({ devDependencies: { esbuild: '^0.28.2' } }),
-    ).toThrow(/postject/);
+    assertThrows(
+      () => tools.buildToolSpecs({ devDependencies: { esbuild: '^0.28.2' } }),
+      /postject/,
+    );
   });
 
   it('reuses the tools folder only for the same specs', () => {
@@ -377,12 +410,13 @@ describe('build tools installed apart from the repository', () => {
     const os = require('node:os');
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portable-tools-'));
     const specs = tools.buildToolSpecs(manifest);
-    expect(tools.toolsInstalled(dir, specs)).toBe(false);
+    assert.equal(tools.toolsInstalled(dir, specs), false);
     tools.markToolsInstalled(dir, specs);
-    expect(tools.toolsInstalled(dir, specs)).toBe(true);
-    expect(
+    assert.equal(tools.toolsInstalled(dir, specs), true);
+    assert.equal(
       tools.toolsInstalled(dir, ['esbuild@^0.29.0', 'postject@^1.0.0-alpha.6']),
-    ).toBe(false);
+      false,
+    );
     fs.rmSync(dir, { recursive: true, force: true });
   });
 });

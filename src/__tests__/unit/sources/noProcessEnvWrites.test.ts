@@ -9,8 +9,11 @@
  * write and must be reported; the one under `clean` must not be.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { REPO } from './helpers/failureScan';
 import { envWritesIn } from './helpers/processEnvWriteScan';
 import { productionSources } from './helpers/regexScan';
@@ -24,19 +27,21 @@ function packageSources(): string[] {
 
 it("scans src and server-runtime's src", () => {
   const files = packageSources();
-  expect(files).toContain('server-runtime/src/stdio/launcher.ts');
-  expect(files).toContain('src/lib/connectionFactory.ts');
-  expect(files.some((file) => file.split('/').includes('__tests__'))).toBe(
+  assert.ok(files.includes('server-runtime/src/stdio/launcher.ts'));
+  assert.ok(files.includes('src/lib/connectionFactory.ts'));
+  assert.equal(
+    files.some((file) => file.split('/').includes('__tests__')),
     false,
   );
 });
 
 it('finds no write to process.env', () => {
-  expect(
+  assert.deepStrictEqual(
     envWritesIn(packageSources(), REPO).map(
       (write) => `${write.where} ${write.form}`,
     ),
-  ).toEqual([]);
+    [],
+  );
 });
 
 describe('fixtures', () => {
@@ -52,11 +57,15 @@ describe('fixtures', () => {
   const listed = (dir: string) =>
     fs.readdirSync(path.join(root, dir)).map((name) => `${dir}/${name}`);
 
-  it.each(listed('refused'))('refuses %s', (file) => {
-    expect(envWritesIn([file], root)).toHaveLength(1);
-  });
+  for (const file of listed('refused')) {
+    it(format('refuses %s', file), () => {
+      assert.equal(envWritesIn([file], root).length, 1);
+    });
+  }
 
-  it.each(listed('clean'))('accepts %s', (file) => {
-    expect(envWritesIn([file], root)).toEqual([]);
-  });
+  for (const file of listed('clean')) {
+    it(format('accepts %s', file), () => {
+      assert.deepStrictEqual(envWritesIn([file], root), []);
+    });
+  }
 });

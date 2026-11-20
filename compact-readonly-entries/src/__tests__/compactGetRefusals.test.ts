@@ -5,6 +5,9 @@
  * answers otherwise.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   CONTENTS_REFUSALS,
   draftRefusals,
@@ -30,26 +33,29 @@ describe('HandlerGet: every route has its refusal', () => {
       .filter(([, operations]) => operations.get !== undefined)
       .map(([member]) => member)
       .sort();
-    expect(keys(SOURCE_REFUSALS)).toEqual(routed);
+    assert.deepStrictEqual(keys(SOURCE_REFUSALS), routed);
   });
 
-  it.each([
+  for (const [_part, refusals, routes] of [
     ['metadata', METADATA_REFUSALS, compactMetadataRoutes],
     ['urls', URL_REFUSALS, compactUrlRoutes],
     ['contents', CONTENTS_REFUSALS, compactContentsRoutes],
-  ] as const)('%s', (_part, refusals, routes) => {
-    expect(keys(refusals)).toEqual(keys(routes));
-  });
+  ] as const) {
+    it(format('%s', _part), () => {
+      assert.deepStrictEqual(keys(refusals), keys(routes));
+    });
+  }
 
-  it.each(['onprem', 'cloud'] as const)(
-    'main_programs and draft on %s',
-    (variant) => {
-      expect(keys(mainProgramsRefusals(variant))).toEqual(
+  for (const variant of ['onprem', 'cloud'] as const) {
+    it(format('main_programs and draft on %s', variant), () => {
+      assert.deepStrictEqual(
+        keys(mainProgramsRefusals(variant)),
         keys(compactMainProgramsRoutes(variant)),
       );
-      expect(keys(draftRefusals(variant))).toEqual(
+      assert.deepStrictEqual(
+        keys(draftRefusals(variant)),
         keys(compactDraftRoutes(variant)),
       );
-    },
-  );
+    });
+  }
 });

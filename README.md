@@ -584,7 +584,7 @@ See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete
 
 ### Testing
 ```bash
-npm test                  # the unit run: Jest, then node:test — no SAP system, no outside service
+npm test                  # the unit run on node:test — no SAP system, no outside service
 npm run test:install      # packs and installs the release (the npm registry): the install suites
 npm run test:retrieval    # vector tool retrieval through a local Ollama
 npm run test:integration  # the live suites, against the system tests/test-config.yaml names

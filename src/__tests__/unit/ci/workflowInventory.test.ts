@@ -13,8 +13,12 @@
  *
  * Plain line parsing over the workflow text: no YAML parser in the repository.
  */
+
+import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { RELEASE_DIRS, ROOT } from '../../helpers/installedRelease';
 
 const WORKFLOWS = ['ci.yml', 'release.yml'] as const;
@@ -50,7 +54,7 @@ function packed(lines: string[]): string[] {
 /** The names in the install step's `const ours=[...]`. */
 function ours(lines: string[]): string[] {
   const found = lines.filter((line) => line.includes('const ours=['));
-  expect(found).toHaveLength(1);
+  assert.equal(found.length, 1);
   const list = (found[0] as string).split('const ours=[')[1]?.split(']')[0];
   return (list ?? '')
     .split(',')
@@ -79,38 +83,47 @@ function prefixed(lines: string[], script: string): string[] {
 const hasStep = (lines: string[], command: string): boolean =>
   lines.some((line) => line.trim() === `run: ${command}`);
 
-describe.each(WORKFLOWS)('%s names every package of the release', (file) => {
-  const lines = read(file);
-  const packages = RELEASE_DIRS.filter((dir) => dir !== '.');
+for (const file of WORKFLOWS) {
+  describe(format('%s names every package of the release', file), () => {
+    const lines = read(file);
+    const packages = RELEASE_DIRS.filter((dir) => dir !== '.');
 
-  it('packs each of them once, the root included', () => {
-    const dirs = packed(lines);
-    expect(sorted(dirs)).toEqual(sorted(RELEASE_DIRS));
-    expect(new Set(dirs).size).toBe(dirs.length);
-  });
+    it('packs each of them once, the root included', () => {
+      const dirs = packed(lines);
+      assert.deepStrictEqual(sorted(dirs), sorted(RELEASE_DIRS));
+      assert.equal(new Set(dirs).size, dirs.length);
+    });
 
-  it("checks each of them in the install step's nested-copy list", () => {
-    const names = ours(lines);
-    expect(sorted(names)).toEqual(sorted(RELEASE_DIRS.map(nameOf)));
-    expect(new Set(names).size).toBe(names.length);
-  });
+    it("checks each of them in the install step's nested-copy list", () => {
+      const names = ours(lines);
+      assert.deepStrictEqual(sorted(names), sorted(RELEASE_DIRS.map(nameOf)));
+      assert.equal(new Set(names).size, names.length);
+    });
 
-  it('lints each of them: the root its src, every other package its own', () => {
-    expect(
-      hasStep(lines, 'npm run lint:check -- --diagnostic-level=error'),
-    ).toBe(true);
-    expect(sorted(prefixed(lines, 'lint:check'))).toEqual(sorted(packages));
-  });
+    it('lints each of them: the root its src, every other package its own', () => {
+      assert.equal(
+        hasStep(lines, 'npm run lint:check -- --diagnostic-level=error'),
+        true,
+      );
+      assert.deepStrictEqual(
+        sorted(prefixed(lines, 'lint:check')),
+        sorted(packages),
+      );
+    });
 
-  it('type-checks the tests of each package that has a tsconfig.test.json', () => {
-    expect(hasStep(lines, 'npm run test:check')).toBe(true);
-    const withTests = packages.filter((dir) =>
-      existsSync(join(ROOT, dir, 'tsconfig.test.json')),
-    );
-    expect(withTests.length).toBeGreaterThan(0);
-    expect(sorted(prefixed(lines, 'test:check'))).toEqual(sorted(withTests));
+    it('type-checks the tests of each package that has a tsconfig.test.json', () => {
+      assert.equal(hasStep(lines, 'npm run test:check'), true);
+      const withTests = packages.filter((dir) =>
+        existsSync(join(ROOT, dir, 'tsconfig.test.json')),
+      );
+      assert.ok(withTests.length > 0);
+      assert.deepStrictEqual(
+        sorted(prefixed(lines, 'test:check')),
+        sorted(withTests),
+      );
+    });
   });
-});
+}
 
 /**
  * The install matrix runs in one CI cell: ubuntu-latest + Node 22. It runs
@@ -140,59 +153,68 @@ const TEST_RUN = {
 /** The lines of the step named `name`, up to the next step. */
 function step(lines: string[], name: string): string[] {
   const start = lines.findIndex((line) => line.trim() === `- name: ${name}`);
-  expect(start).toBeGreaterThanOrEqual(0);
+  assert.ok(start >= 0);
   const rest = lines.slice(start + 1);
   const end = rest.findIndex((line) => line.trim().startsWith('- name: '));
   return end === -1 ? rest : rest.slice(0, end);
 }
 
-describe.each(WORKFLOWS)('%s runs the install matrix in one cell', (file) => {
-  const lines = read(file);
+for (const file of WORKFLOWS) {
+  describe(format('%s runs the install matrix in one cell', file), () => {
+    const lines = read(file);
 
-  it("the install step's SKIP_INSTALL_MATRIX: 'false' only on ubuntu-latest + Node 22; the npm test step sets none", () => {
-    const run = step(lines, 'Run tests').map((line) => line.trim());
-    expect(run).toContain(TEST_RUN[file]);
-    expect(
-      run.filter((line) => line.startsWith('SKIP_INSTALL_MATRIX:')),
-    ).toEqual([]);
-    const install = step(lines, 'Run install tests').map((line) => line.trim());
-    expect(install).toContain('run: npm run test:install');
-    expect(install).toContain('env:');
-    expect(
-      install.filter((line) => line.startsWith('SKIP_INSTALL_MATRIX:')),
-    ).toEqual([INSTALL_MATRIX_GATE[file]]);
-  });
-
-  it('the job runs where the gate assumes', () => {
-    const text = lines.join('\n');
-    if (file === 'ci.yml') {
-      expect(text).toContain(`runs-on: ${expression('matrix.os')}`);
-      expect(text).toContain(
-        'os: [ubuntu-latest, macos-latest, windows-latest]',
+    it("the install step's SKIP_INSTALL_MATRIX: 'false' only on ubuntu-latest + Node 22; the npm test step sets none", () => {
+      const run = step(lines, 'Run tests').map((line) => line.trim());
+      assert.ok(run.includes(TEST_RUN[file]));
+      assert.deepStrictEqual(
+        run.filter((line) => line.startsWith('SKIP_INSTALL_MATRIX:')),
+        [],
       );
-      // Every runner kind sets the concurrency its npm test passes.
-      for (const os of ['ubuntu-latest', 'macos-latest', 'windows-latest']) {
-        const at = lines.findIndex((line) => line.trim() === `- os: ${os}`);
-        expect(at).toBeGreaterThanOrEqual(0);
-        expect(lines[at + 1]?.trim()).toBe('test-concurrency: 2');
+      const install = step(lines, 'Run install tests').map((line) =>
+        line.trim(),
+      );
+      assert.ok(install.includes('run: npm run test:install'));
+      assert.ok(install.includes('env:'));
+      assert.deepStrictEqual(
+        install.filter((line) => line.startsWith('SKIP_INSTALL_MATRIX:')),
+        [INSTALL_MATRIX_GATE[file]],
+      );
+    });
+
+    it('the job runs where the gate assumes', () => {
+      const text = lines.join('\n');
+      if (file === 'ci.yml') {
+        assert.ok(text.includes(`runs-on: ${expression('matrix.os')}`));
+        assert.ok(
+          text.includes('os: [ubuntu-latest, macos-latest, windows-latest]'),
+        );
+        // Every runner kind sets the concurrency its npm test passes.
+        for (const os of ['ubuntu-latest', 'macos-latest', 'windows-latest']) {
+          const at = lines.findIndex((line) => line.trim() === `- os: ${os}`);
+          assert.ok(at >= 0);
+          assert.equal(lines[at + 1]?.trim(), 'test-concurrency: 2');
+        }
+      } else {
+        // The test job, the first of the file.
+        assert.equal(
+          lines.find((line) => line.trim().startsWith('runs-on:'))?.trim(),
+          'runs-on: ubuntu-latest',
+        );
       }
-    } else {
-      // The test job, the first of the file.
-      expect(
-        lines.find((line) => line.trim().startsWith('runs-on:'))?.trim(),
-      ).toBe('runs-on: ubuntu-latest');
-    }
-    expect(text).toContain('node-version: [22, 24]');
+      assert.ok(text.includes('node-version: [22, 24]'));
+    });
   });
-});
+}
 
 it('the install matrix suite skips only on SKIP_INSTALL_MATRIX=true', () => {
   const source = readFileSync(
     join(ROOT, 'src', '__tests__', 'unit', 'installMatrix.test.ts'),
     'utf8',
   );
-  expect(source).toContain(
-    "const SKIPPED = process.env.SKIP_INSTALL_MATRIX === 'true';",
+  assert.ok(
+    source.includes(
+      "const SKIPPED = process.env.SKIP_INSTALL_MATRIX === 'true';",
+    ),
   );
 });
 
@@ -203,63 +225,73 @@ it('the install matrix suite skips only on SKIP_INSTALL_MATRIX=true', () => {
  * neither, so the workflows install with `--ignore-scripts`. Nothing calls
  * `npx`, which fetches from the registry whatever it does not find installed.
  */
-describe.each(WORKFLOWS)('%s installs and runs nothing unreviewed', (file) => {
-  const lines = read(file);
+for (const file of WORKFLOWS) {
+  describe(format('%s installs and runs nothing unreviewed', file), () => {
+    const lines = read(file);
 
-  it('installs with npm ci --ignore-scripts, and only so', () => {
-    const installs = lines
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith('run: npm ci'));
-    expect(installs.length).toBeGreaterThan(0);
-    for (const line of installs)
-      expect(line).toBe('run: npm ci --ignore-scripts');
-  });
+    it('installs with npm ci --ignore-scripts, and only so', () => {
+      const installs = lines
+        .map((line) => line.trim())
+        .filter((line) => line.startsWith('run: npm ci'));
+      assert.ok(installs.length > 0);
+      for (const line of installs)
+        assert.equal(line, 'run: npm ci --ignore-scripts');
+    });
 
-  it('runs no install script in any install, a run block line included', () => {
-    // The tarball install in /tmp/install-check is outside the checkout and
-    // its .npmrc, so only the flag keeps a dependency's script from running.
-    // A release's notes (`body: |`) are text for its readers, not commands.
-    const commands: string[] = [];
-    let body = -1;
-    for (const line of lines) {
-      const indent = line.length - line.trimStart().length;
-      if (body >= 0 && (line.trim() === '' || indent > body)) continue;
-      body = line.trim() === 'body: |' ? indent : -1;
-      commands.push(line);
-    }
-    const installs = commands
-      .map((line) => line.trim().replace(/^run:\s*/, ''))
-      .filter((line) => /^npm (ci|install|i)(\s|$)/.test(line));
-    expect(installs.some((line) => line.startsWith('npm install'))).toBe(true);
-    expect(
-      installs.filter((line) => !line.includes('--ignore-scripts')),
-    ).toEqual([]);
-  });
+    it('runs no install script in any install, a run block line included', () => {
+      // The tarball install in /tmp/install-check is outside the checkout and
+      // its .npmrc, so only the flag keeps a dependency's script from running.
+      // A release's notes (`body: |`) are text for its readers, not commands.
+      const commands: string[] = [];
+      let body = -1;
+      for (const line of lines) {
+        const indent = line.length - line.trimStart().length;
+        if (body >= 0 && (line.trim() === '' || indent > body)) continue;
+        body = line.trim() === 'body: |' ? indent : -1;
+        commands.push(line);
+      }
+      const installs = commands
+        .map((line) => line.trim().replace(/^run:\s*/, ''))
+        .filter((line) => /^npm (ci|install|i)(\s|$)/.test(line));
+      assert.equal(
+        installs.some((line) => line.startsWith('npm install')),
+        true,
+      );
+      assert.deepStrictEqual(
+        installs.filter((line) => !line.includes('--ignore-scripts')),
+        [],
+      );
+    });
 
-  it('gates on every known advisory of moderate severity or above in a production dependency (dev again once #361 removes Jest)', () => {
-    const audit = step(lines, 'Security audit (moderate+)').map((line) =>
-      line.trim(),
-    );
-    expect(audit).toContain('run: npm audit --omit=dev --audit-level=moderate');
-    expect(
-      lines.filter((line) => line.trim().startsWith('continue-on-error')),
-    ).toEqual([]);
-  });
+    it('gates on every known advisory of moderate severity or above in the whole tree', () => {
+      const audit = step(lines, 'Security audit (moderate+)').map((line) =>
+        line.trim(),
+      );
+      assert.ok(audit.includes('run: npm audit --audit-level=moderate'));
+      assert.deepStrictEqual(
+        lines.filter((line) => line.trim().startsWith('continue-on-error')),
+        [],
+      );
+    });
 
-  it('caps every job', () => {
-    const body = lines.slice(lines.indexOf('jobs:') + 1);
-    const jobs = body.filter((line) => /^ {2}[a-z-]+:$/.test(line)).length;
-    const caps = body.filter((line) =>
-      /^ {4}timeout-minutes: \d+$/.test(line),
-    ).length;
-    expect(jobs).toBeGreaterThan(0);
-    expect(caps).toBe(jobs);
-  });
+    it('caps every job', () => {
+      const body = lines.slice(lines.indexOf('jobs:') + 1);
+      const jobs = body.filter((line) => /^ {2}[a-z-]+:$/.test(line)).length;
+      const caps = body.filter((line) =>
+        /^ {4}timeout-minutes: \d+$/.test(line),
+      ).length;
+      assert.ok(jobs > 0);
+      assert.equal(caps, jobs);
+    });
 
-  it('calls no npx', () => {
-    expect(lines.filter((line) => /\bnpx\b/.test(line))).toEqual([]);
+    it('calls no npx', () => {
+      assert.deepStrictEqual(
+        lines.filter((line) => /\bnpx\b/.test(line)),
+        [],
+      );
+    });
   });
-});
+}
 
 it('no package script and no git hook calls npx', () => {
   const offenders: string[] = [];
@@ -272,7 +304,18 @@ it('no package script and no git hook calls npx', () => {
   }
   const hook = readFileSync(join(ROOT, '.husky', 'pre-commit'), 'utf8');
   if (/\bnpx\b/.test(hook)) offenders.push('.husky/pre-commit');
-  expect(offenders).toEqual([]);
+  assert.deepStrictEqual(offenders, []);
+});
+
+it('the pre-commit hook checks the staged files then builds', () => {
+  const hook = readFileSync(join(ROOT, '.husky', 'pre-commit'), 'utf8')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== '' && !line.startsWith('#'));
+  assert.deepStrictEqual(hook, [
+    'biome check --staged --diagnostic-level=error --no-errors-on-unmatched',
+    'npm run build',
+  ]);
 });
 
 it('every dependency install script is decided, and the policy is strict', () => {
@@ -287,16 +330,23 @@ it('every dependency install script is decided, and the policy is strict', () =>
   const { allowScripts = {} } = JSON.parse(
     readFileSync(join(ROOT, 'package.json'), 'utf8'),
   ) as { allowScripts?: Record<string, boolean> };
-  expect(sorted(Object.keys(allowScripts))).toEqual(sorted(withScripts));
-  expect(
+  assert.deepStrictEqual(
+    sorted(Object.keys(allowScripts)),
+    sorted(withScripts),
+  );
+  assert.equal(
     Object.values(allowScripts).every((allowed) => allowed === false),
-  ).toBe(true);
+    true,
+  );
   const npmrc = readFileSync(join(ROOT, '.npmrc'), 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim());
-  expect(npmrc).toContain('strict-allow-scripts=true');
+  assert.ok(npmrc.includes('strict-allow-scripts=true'));
   // The 7-day release age was dropped: it conflicted with the gating audit.
-  expect(npmrc.some((line) => line.includes('min-release-age'))).toBe(false);
+  assert.equal(
+    npmrc.some((line) => line.includes('min-release-age')),
+    false,
+  );
 });
 
 it('every Dockerfile installs with --ignore-scripts', () => {
@@ -306,7 +356,7 @@ it('every Dockerfile installs with --ignore-scripts', () => {
   const files = readdirSync(dir).filter((name) =>
     name.startsWith('Dockerfile'),
   );
-  expect(sorted(files)).toEqual([
+  assert.deepStrictEqual(sorted(files), [
     'Dockerfile',
     'Dockerfile.inspect.cloud',
     'Dockerfile.inspect.onprem',
@@ -318,8 +368,9 @@ it('every Dockerfile installs with --ignore-scripts', () => {
       .filter((line) => /\bnpm (ci|install|i)\b/.test(line))
       .map((line) => `${name}: ${line.trim()}`),
   );
-  expect(installs.length).toBe(4);
-  expect(installs.filter((line) => !line.includes('--ignore-scripts'))).toEqual(
+  assert.equal(installs.length, 4);
+  assert.deepStrictEqual(
+    installs.filter((line) => !line.includes('--ignore-scripts')),
     [],
   );
 });

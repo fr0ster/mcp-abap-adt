@@ -4,6 +4,8 @@
  * client secret, long or short.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { formatAuthConfigForDisplay } from '@mcp-abap-adt/lib/utils';
 
 const SECRETS = {
@@ -29,13 +31,14 @@ describe('the startup summary shows presence only', () => {
         },
         'service-key: dest',
       );
-      expect(row(summary, 'Password:')).toBe(
+      assert.equal(
+        row(summary, 'Password:'),
         `║  Password:      ${'set'.padEnd(45)}║`,
       );
-      expect(summary).not.toContain(password);
-      expect(summary).not.toContain(password.slice(0, 4));
-      expect(summary).not.toContain(password.slice(-4));
-      expect(summary).not.toContain('*');
+      assert.ok(!summary.includes(password));
+      assert.ok(!summary.includes(password.slice(0, 4)));
+      assert.ok(!summary.includes(password.slice(-4)));
+      assert.ok(!summary.includes('*'));
     }
   });
 
@@ -48,17 +51,17 @@ describe('the startup summary shows presence only', () => {
       uaaClientId: 'client-id-0123456789-abcdefghij',
       uaaClientSecret: SECRETS.uaaClientSecret,
     });
-    expect(row(summary, 'JWT Token:')).toContain('set');
-    expect(row(summary, 'Refresh Token:')).toContain('set');
-    expect(row(summary, 'UAA Secret:')).toContain('set');
+    assert.ok(row(summary, 'JWT Token:').includes('set'));
+    assert.ok(row(summary, 'Refresh Token:').includes('set'));
+    assert.ok(row(summary, 'UAA Secret:').includes('set'));
     for (const secret of [
       SECRETS.jwtToken,
       SECRETS.refreshToken,
       SECRETS.uaaClientSecret,
     ]) {
-      expect(summary).not.toContain(secret);
-      expect(summary).not.toContain(secret.slice(0, 4));
-      expect(summary).not.toContain(secret.slice(-4));
+      assert.ok(!summary.includes(secret));
+      assert.ok(!summary.includes(secret.slice(0, 4)));
+      assert.ok(!summary.includes(secret.slice(-4)));
     }
   });
 
@@ -67,6 +70,6 @@ describe('the startup summary shows presence only', () => {
       authType: 'basic',
       username: 'u',
     });
-    expect(summary).not.toContain('Password:');
+    assert.ok(!summary.includes('Password:'));
   });
 });

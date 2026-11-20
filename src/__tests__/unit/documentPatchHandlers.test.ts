@@ -10,6 +10,8 @@
  * mapping leaves the document's own value and fails its assertion.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { handleCreateDataElement } from '../../handlers/data_element/high/handleCreateDataElement';
 import { handleUpdateDataElement } from '../../handlers/data_element/high/handleUpdateDataElement';
 import { handleUpdateDataElement as handleUpdateDataElementLow } from '../../handlers/data_element/low/handleUpdateDataElement';
@@ -22,11 +24,13 @@ import { handleUpdatePackage } from '../../handlers/package/high/handleUpdatePac
 import { handleUpdatePackage as handleUpdatePackageLow } from '../../handlers/package/low/handleUpdatePackage';
 import { handleCreateTableType } from '../../handlers/table_type/high/handleCreateTableType';
 import { handleUpdateTableType } from '../../handlers/table_type/high/handleUpdateTableType';
+import * as clients from '../../lib/clients';
 import { corpusBody } from '../helpers/adtCorpus';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 // The process declares its system type, as every launcher requires.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
@@ -106,7 +110,7 @@ function rootDescription(document: string | undefined): string | undefined {
 
 /** The failure a tool answered. */
 function failureOf(result: any): Record<string, unknown> {
-  expect(result.isError).toBe(true);
+  assert.equal(result.isError, true);
   return JSON.parse(result.content[0].text);
 }
 
@@ -118,14 +122,17 @@ describe('Domain: the handlers name the changes, adt-clients writes them', () =>
       package_name: '$TMP',
       activate: false,
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe('ZD');
-    expect(textOf(sent.source, 'doma:datatype')).toBe('CHAR');
-    expect(sent.source).toContain(
-      '<doma:typeInformation><doma:datatype>CHAR</doma:datatype><doma:length>000100</doma:length><doma:decimals>000000</doma:decimals>',
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), 'ZD');
+    assert.equal(textOf(sent.source, 'doma:datatype'), 'CHAR');
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes(
+          '<doma:typeInformation><doma:datatype>CHAR</doma:datatype><doma:length>000100</doma:length><doma:decimals>000000</doma:decimals>',
+        ),
     );
-    expect(textOf(sent.source, 'doma:signExists')).toBe('false');
-    expect(textOf(sent.source, 'doma:lowercase')).toBe('false');
+    assert.equal(textOf(sent.source, 'doma:signExists'), 'false');
+    assert.equal(textOf(sent.source, 'doma:lowercase'), 'false');
   });
 
   it('UpdateDomain (high) passes every field it is given', async () => {
@@ -144,18 +151,30 @@ describe('Domain: the handlers name the changes, adt-clients writes them', () =>
       fixed_values: [{ low: 'A', text: 'Alpha' }],
       activate: false,
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     // Passed as given: SAP's answer to a long one is SAP's.
-    expect(rootDescription(sent.source)).toBe(LONG);
-    expect(sent.source).toContain(
-      '<doma:datatype>NUMC</doma:datatype><doma:length>000012</doma:length><doma:decimals>000002</doma:decimals>',
+    assert.equal(rootDescription(sent.source), LONG);
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes(
+          '<doma:datatype>NUMC</doma:datatype><doma:length>000012</doma:length><doma:decimals>000002</doma:decimals>',
+        ),
     );
-    expect(textOf(sent.source, 'doma:conversionExit')).toBe('ALPHA');
-    expect(textOf(sent.source, 'doma:signExists')).toBe('true');
-    expect(textOf(sent.source, 'doma:lowercase')).toBe('true');
-    expect(sent.source).toContain('<doma:valueTableRef adtcore:name="ZTAB"');
-    expect(sent.source).toContain('<doma:low>A</doma:low>');
-    expect(sent.source).toContain('<doma:text>Alpha</doma:text>');
+    assert.equal(textOf(sent.source, 'doma:conversionExit'), 'ALPHA');
+    assert.equal(textOf(sent.source, 'doma:signExists'), 'true');
+    assert.equal(textOf(sent.source, 'doma:lowercase'), 'true');
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes('<doma:valueTableRef adtcore:name="ZTAB"'),
+    );
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes('<doma:low>A</doma:low>'),
+    );
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes('<doma:text>Alpha</doma:text>'),
+    );
   });
 
   it('UpdateDomainLow reads the bag: a length as text is a number, a flag as text a flag', async () => {
@@ -175,16 +194,25 @@ describe('Domain: the handlers name the changes, adt-clients writes them', () =>
       },
       lock_handle: 'h',
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe('after');
-    expect(sent.source).toContain(
-      '<doma:datatype>CHAR</doma:datatype><doma:length>000008</doma:length><doma:decimals>000000</doma:decimals>',
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), 'after');
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes(
+          '<doma:datatype>CHAR</doma:datatype><doma:length>000008</doma:length><doma:decimals>000000</doma:decimals>',
+        ),
     );
-    expect(textOf(sent.source, 'doma:conversionExit')).toBe('');
-    expect(textOf(sent.source, 'doma:signExists')).toBe('true');
-    expect(textOf(sent.source, 'doma:lowercase')).toBe('false');
-    expect(sent.source).toContain('<doma:valueTableRef adtcore:name="ZTAB2"');
-    expect(sent.source).toContain('<doma:low>X</doma:low>');
+    assert.equal(textOf(sent.source, 'doma:conversionExit'), '');
+    assert.equal(textOf(sent.source, 'doma:signExists'), 'true');
+    assert.equal(textOf(sent.source, 'doma:lowercase'), 'false');
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes('<doma:valueTableRef adtcore:name="ZTAB2"'),
+    );
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes('<doma:low>X</doma:low>'),
+    );
   });
 
   it('a read that answered no document is the failure of the step patch; nothing written, the lock released', async () => {
@@ -196,11 +224,11 @@ describe('Domain: the handlers name the changes, adt-clients writes them', () =>
       activate: false,
     });
     const failure = failureOf(result);
-    expect(failure.step).toBe('patch');
-    expect(failure.code).toBe('DOCUMENT_NOT_PATCHED');
-    expect(String(failure.message)).toContain('domain ZD');
-    expect(sent.updates).toBe(0);
-    expect(sent.unlocks).toBe(1);
+    assert.equal(failure.step, 'patch');
+    assert.equal(failure.code, 'DOCUMENT_NOT_PATCHED');
+    assert.ok(String(failure.message).includes('domain ZD'));
+    assert.equal(sent.updates, 0);
+    assert.equal(sent.unlocks, 1);
   });
 });
 
@@ -213,15 +241,15 @@ describe('Data element: the handlers name the changes, adt-clients writes them',
       type_name: 'zdom',
       short_label: 'Short',
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe('ZDE');
-    expect(textOf(sent.source, 'dtel:typeKind')).toBe('domain');
-    expect(textOf(sent.source, 'dtel:typeName')).toBe('ZDOM');
-    expect(textOf(sent.source, 'dtel:dataType')).toBe('CHAR');
-    expect(textOf(sent.source, 'dtel:dataTypeLength')).toBe('000100');
-    expect(textOf(sent.source, 'dtel:dataTypeDecimals')).toBe('000000');
-    expect(textOf(sent.source, 'dtel:shortFieldLabel')).toBe('Short');
-    expect(textOf(sent.source, 'dtel:shortFieldLength')).toBe('05');
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), 'ZDE');
+    assert.equal(textOf(sent.source, 'dtel:typeKind'), 'domain');
+    assert.equal(textOf(sent.source, 'dtel:typeName'), 'ZDOM');
+    assert.equal(textOf(sent.source, 'dtel:dataType'), 'CHAR');
+    assert.equal(textOf(sent.source, 'dtel:dataTypeLength'), '000100');
+    assert.equal(textOf(sent.source, 'dtel:dataTypeDecimals'), '000000');
+    assert.equal(textOf(sent.source, 'dtel:shortFieldLabel'), 'Short');
+    assert.equal(textOf(sent.source, 'dtel:shortFieldLength'), '05');
   });
 
   it('UpdateDataElement (high) passes every field it is given', async () => {
@@ -244,25 +272,25 @@ describe('Data element: the handlers name the changes, adt-clients writes them',
       set_get_parameter: 'ZPID',
       activate: false,
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe(LONG);
-    expect(textOf(sent.source, 'dtel:typeKind')).toBe('predefinedAbapType');
-    expect(textOf(sent.source, 'dtel:typeName')).toBe('IGNORED_CASE');
-    expect(textOf(sent.source, 'dtel:dataType')).toBe('NUMC');
-    expect(textOf(sent.source, 'dtel:dataTypeLength')).toBe('000007');
-    expect(textOf(sent.source, 'dtel:dataTypeDecimals')).toBe('000001');
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), LONG);
+    assert.equal(textOf(sent.source, 'dtel:typeKind'), 'predefinedAbapType');
+    assert.equal(textOf(sent.source, 'dtel:typeName'), 'IGNORED_CASE');
+    assert.equal(textOf(sent.source, 'dtel:dataType'), 'NUMC');
+    assert.equal(textOf(sent.source, 'dtel:dataTypeLength'), '000007');
+    assert.equal(textOf(sent.source, 'dtel:dataTypeDecimals'), '000001');
     // An empty label: its length is the default for its kind.
-    expect(textOf(sent.source, 'dtel:shortFieldLabel')).toBe('');
-    expect(textOf(sent.source, 'dtel:shortFieldLength')).toBe('10');
-    expect(textOf(sent.source, 'dtel:mediumFieldLabel')).toBe('Medium');
-    expect(textOf(sent.source, 'dtel:mediumFieldLength')).toBe('06');
-    expect(textOf(sent.source, 'dtel:longFieldLabel')).toBe('Long label');
-    expect(textOf(sent.source, 'dtel:longFieldLength')).toBe('10');
-    expect(textOf(sent.source, 'dtel:headingFieldLabel')).toBe('Heading');
-    expect(textOf(sent.source, 'dtel:headingFieldLength')).toBe('07');
-    expect(textOf(sent.source, 'dtel:searchHelp')).toBe('ZSH');
-    expect(textOf(sent.source, 'dtel:searchHelpParameter')).toBe('P1');
-    expect(textOf(sent.source, 'dtel:setGetParameter')).toBe('ZPID');
+    assert.equal(textOf(sent.source, 'dtel:shortFieldLabel'), '');
+    assert.equal(textOf(sent.source, 'dtel:shortFieldLength'), '10');
+    assert.equal(textOf(sent.source, 'dtel:mediumFieldLabel'), 'Medium');
+    assert.equal(textOf(sent.source, 'dtel:mediumFieldLength'), '06');
+    assert.equal(textOf(sent.source, 'dtel:longFieldLabel'), 'Long label');
+    assert.equal(textOf(sent.source, 'dtel:longFieldLength'), '10');
+    assert.equal(textOf(sent.source, 'dtel:headingFieldLabel'), 'Heading');
+    assert.equal(textOf(sent.source, 'dtel:headingFieldLength'), '07');
+    assert.equal(textOf(sent.source, 'dtel:searchHelp'), 'ZSH');
+    assert.equal(textOf(sent.source, 'dtel:searchHelpParameter'), 'P1');
+    assert.equal(textOf(sent.source, 'dtel:setGetParameter'), 'ZPID');
   });
 
   it('UpdateDataElementLow reads both spellings of the bag', async () => {
@@ -278,14 +306,14 @@ describe('Data element: the handlers name the changes, adt-clients writes them',
       },
       lock_handle: 'h',
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe('after');
-    expect(textOf(sent.source, 'dtel:typeKind')).toBe('domain');
-    expect(textOf(sent.source, 'dtel:typeName')).toBe('ZDOM2');
-    expect(textOf(sent.source, 'dtel:dataType')).toBe('zdom2');
-    expect(textOf(sent.source, 'dtel:dataTypeLength')).toBe('000004');
-    expect(textOf(sent.source, 'dtel:longFieldLabel')).toBe('Long');
-    expect(textOf(sent.source, 'dtel:longFieldLength')).toBe('04');
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), 'after');
+    assert.equal(textOf(sent.source, 'dtel:typeKind'), 'domain');
+    assert.equal(textOf(sent.source, 'dtel:typeName'), 'ZDOM2');
+    assert.equal(textOf(sent.source, 'dtel:dataType'), 'zdom2');
+    assert.equal(textOf(sent.source, 'dtel:dataTypeLength'), '000004');
+    assert.equal(textOf(sent.source, 'dtel:longFieldLabel'), 'Long');
+    assert.equal(textOf(sent.source, 'dtel:longFieldLength'), '04');
   });
 
   it('UpdateDataElementLow refuses a type kind SAP does not know, before anything is sent', async () => {
@@ -295,9 +323,9 @@ describe('Data element: the handlers name the changes, adt-clients writes them',
       properties: { type_kind: 'table' },
       lock_handle: 'h',
     });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('type_kind');
-    expect(sent.updates).toBe(0);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('type_kind'));
+    assert.equal(sent.updates, 0);
   });
 
   it('a field the document has no place for is the failure of the step patch, naming the field', async () => {
@@ -309,11 +337,11 @@ describe('Data element: the handlers name the changes, adt-clients writes them',
       lock_handle: 'h',
     });
     const failure = failureOf(result);
-    expect(failure.step).toBe('patch');
-    expect(failure.code).toBe('DOCUMENT_NOT_PATCHED');
-    expect(String(failure.message)).toContain('searchHelp');
-    expect(String(failure.message)).toContain('data element ZDE');
-    expect(sent.updates).toBe(0);
+    assert.equal(failure.step, 'patch');
+    assert.equal(failure.code, 'DOCUMENT_NOT_PATCHED');
+    assert.ok(String(failure.message).includes('searchHelp'));
+    assert.ok(String(failure.message).includes('data element ZDE'));
+    assert.equal(sent.updates, 0);
   });
 });
 
@@ -330,14 +358,14 @@ describe('Table type: the handlers name the changes, adt-clients writes them', (
   };
 
   const assertWritten = (source: string | undefined) => {
-    expect(textOf(source, 'ttyp:typeKind')).toBe('predefinedAbapType');
-    expect(textOf(source, 'ttyp:typeName')).toBe('ZROW');
-    expect(textOf(source, 'ttyp:dataType')).toBe('CHAR');
-    expect(textOf(source, 'ttyp:length')).toBe('000020');
-    expect(textOf(source, 'ttyp:decimals')).toBe('000000');
-    expect(textOf(source, 'ttyp:accessType')).toBe('sorted');
-    expect(textOf(source, 'ttyp:definition')).toBe('rowType');
-    expect(textOf(source, 'ttyp:kind')).toBe('unique');
+    assert.equal(textOf(source, 'ttyp:typeKind'), 'predefinedAbapType');
+    assert.equal(textOf(source, 'ttyp:typeName'), 'ZROW');
+    assert.equal(textOf(source, 'ttyp:dataType'), 'CHAR');
+    assert.equal(textOf(source, 'ttyp:length'), '000020');
+    assert.equal(textOf(source, 'ttyp:decimals'), '000000');
+    assert.equal(textOf(source, 'ttyp:accessType'), 'sorted');
+    assert.equal(textOf(source, 'ttyp:definition'), 'rowType');
+    assert.equal(textOf(source, 'ttyp:kind'), 'unique');
   };
 
   it('CreateTableType writes the name as the description by default, and every field', async () => {
@@ -348,8 +376,8 @@ describe('Table type: the handlers name the changes, adt-clients writes them', (
       ...changes,
       activate: false,
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe('ZTT');
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), 'ZTT');
     assertWritten(sent.source);
   });
 
@@ -361,8 +389,8 @@ describe('Table type: the handlers name the changes, adt-clients writes them', (
       ...changes,
       activate: false,
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe(LONG);
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), LONG);
     assertWritten(sent.source);
   });
 });
@@ -374,8 +402,8 @@ describe('Function group, package, message class: the description, as given', ()
       function_group_name: 'ZMCP_SHR_FGRP',
       description: LONG,
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe(LONG);
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), LONG);
   });
 
   it('UpdatePackage (high)', async () => {
@@ -384,8 +412,8 @@ describe('Function group, package, message class: the description, as given', ()
       package_name: 'ZMCP_SHR_PKG',
       description: LONG,
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe(LONG);
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), LONG);
   });
 
   it('UpdatePackageLow', async () => {
@@ -395,8 +423,8 @@ describe('Function group, package, message class: the description, as given', ()
       updated_description: LONG,
       lock_handle: 'h',
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe(LONG);
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), LONG);
   });
 
   it('UpdateMessageClass writes the class description, never a message one', async () => {
@@ -405,9 +433,12 @@ describe('Function group, package, message class: the description, as given', ()
       message_class_name: 'zmy_msgs',
       description: LONG,
     });
-    expect(result.isError).toBe(false);
-    expect(rootDescription(sent.source)).toBe(LONG);
-    expect(sent.source).toContain('adtcore:description="a message"');
+    assert.equal(result.isError, false);
+    assert.equal(rootDescription(sent.source), LONG);
+    assert.ok(
+      sent.source !== undefined &&
+        sent.source.includes('adtcore:description="a message"'),
+    );
   });
 
   it("UpdateMessageClass answers another type's document as the failure of the step patch, and takes no lock", async () => {
@@ -417,9 +448,9 @@ describe('Function group, package, message class: the description, as given', ()
       description: 'after',
     });
     const failure = failureOf(result);
-    expect(failure.step).toBe('patch');
-    expect(String(failure.message)).toContain('pak:package');
-    expect(sent.updates).toBe(0);
-    expect(sent.unlocks).toBe(0);
+    assert.equal(failure.step, 'patch');
+    assert.ok(String(failure.message).includes('pak:package'));
+    assert.equal(sent.updates, 0);
+    assert.equal(sent.unlocks, 0);
   });
 });

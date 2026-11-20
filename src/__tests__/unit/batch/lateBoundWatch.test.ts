@@ -9,10 +9,15 @@
  * `getSessionType?.() ?? getSessionMode?.() ?? 'stateless'` reads the
  * session in force.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { EnvelopeWatch } from '../../../lib/batch/envelopeWatch';
 import { LateBoundConnection } from '../../../lib/batch/lateBound';
 import { communicationBatch } from '../../../lib/batch/tools';
+import { rejectionOf } from '../../helpers/assertions';
 
 type Session = 'stateful' | 'stateless';
 
@@ -49,58 +54,58 @@ describe('EnvelopeWatch over a LateBoundConnection', () => {
     const target = new LateBoundConnection();
     const watched = new EnvelopeWatch().over(target);
     target.point(connectionWith({ type: 'stateful', mode: 'stateful' }));
-    expect(watched.getSessionType?.()).toBe('stateful');
-    expect(watched.getSessionMode?.()).toBe('stateful');
-    expect(wrappedSession(watched)).toBe('stateful');
+    assert.equal(watched.getSessionType?.(), 'stateful');
+    assert.equal(watched.getSessionMode?.(), 'stateful');
+    assert.equal(wrappedSession(watched), 'stateful');
   });
 
   it('pointed, then wrapped: answers the pointed connection', () => {
     const target = new LateBoundConnection();
     target.point(connectionWith({ type: 'stateful' }));
     const watched = new EnvelopeWatch().over(target);
-    expect(watched.getSessionType?.()).toBe('stateful');
-    expect(watched.getSessionMode?.()).toBeUndefined();
+    assert.equal(watched.getSessionType?.(), 'stateful');
+    assert.equal(watched.getSessionMode?.(), undefined);
   });
 
   it('repointed: answers the connection pointed at now', () => {
     const target = new LateBoundConnection();
     const watched = new EnvelopeWatch().over(target);
     target.point(connectionWith({ type: 'stateful' }));
-    expect(watched.getSessionType?.()).toBe('stateful');
+    assert.equal(watched.getSessionType?.(), 'stateful');
     target.point(connectionWith({ type: 'stateless' }));
-    expect(watched.getSessionType?.()).toBe('stateless');
+    assert.equal(watched.getSessionType?.(), 'stateless');
     target.point(connectionWith({ mode: 'stateful' }));
-    expect(watched.getSessionType?.()).toBeUndefined();
-    expect(watched.getSessionMode?.()).toBe('stateful');
-    expect(wrappedSession(watched)).toBe('stateful');
+    assert.equal(watched.getSessionType?.(), undefined);
+    assert.equal(watched.getSessionMode?.(), 'stateful');
+    assert.equal(wrappedSession(watched), 'stateful');
   });
 
   it('unpointed, cleared or sealed: answers no session', () => {
     const target = new LateBoundConnection();
     const watched = new EnvelopeWatch().over(target);
-    expect(watched.getSessionType?.()).toBeUndefined();
-    expect(watched.getSessionMode?.()).toBeUndefined();
+    assert.equal(watched.getSessionType?.(), undefined);
+    assert.equal(watched.getSessionMode?.(), undefined);
     target.point(connectionWith({ type: 'stateful', mode: 'stateful' }));
     target.point(undefined);
-    expect(watched.getSessionType?.()).toBeUndefined();
-    expect(watched.getSessionMode?.()).toBeUndefined();
+    assert.equal(watched.getSessionType?.(), undefined);
+    assert.equal(watched.getSessionMode?.(), undefined);
     target.point(connectionWith({ type: 'stateful', mode: 'stateful' }));
     target.seal();
-    expect(watched.getSessionType?.()).toBeUndefined();
-    expect(watched.getSessionMode?.()).toBeUndefined();
-    expect(wrappedSession(watched)).toBe('stateless');
+    assert.equal(watched.getSessionType?.(), undefined);
+    assert.equal(watched.getSessionMode?.(), undefined);
+    assert.equal(wrappedSession(watched), 'stateless');
   });
 
   it('answers nothing for each member the pointed connection lacks', () => {
     const target = new LateBoundConnection();
     const watched = new EnvelopeWatch().over(target);
     target.point(connectionWith({ type: 'stateful' }));
-    expect(watched.getSessionMode?.()).toBeUndefined();
+    assert.equal(watched.getSessionMode?.(), undefined);
     target.point(connectionWith({ mode: 'stateful' }));
-    expect(watched.getSessionType?.()).toBeUndefined();
+    assert.equal(watched.getSessionType?.(), undefined);
     target.point(connectionWith({}));
-    expect(watched.getSessionType?.()).toBeUndefined();
-    expect(watched.getSessionMode?.()).toBeUndefined();
+    assert.equal(watched.getSessionType?.(), undefined);
+    assert.equal(watched.getSessionMode?.(), undefined);
   });
 
   it('answers at the call, from the member the connection has then', () => {
@@ -111,39 +116,46 @@ describe('EnvelopeWatch over a LateBoundConnection', () => {
       ...connectionWith({}),
       getSessionType: () => session,
     });
-    expect(watched.getSessionType?.()).toBe('stateless');
+    assert.equal(watched.getSessionType?.(), 'stateless');
     session = 'stateful';
-    expect(watched.getSessionType?.()).toBe('stateful');
+    assert.equal(watched.getSessionType?.(), 'stateful');
   });
 });
 
 describe('communicationBatch', () => {
-  it.each<[string, { type?: Session; mode?: Session }, Session]>([
+  for (const [_, members, restored] of [
     ['getSessionType', { type: 'stateful' }, 'stateful'],
     ['getSessionMode', { mode: 'stateful' }, 'stateful'],
     ['neither', {}, 'stateless'],
-  ])(
-    'restores the session of the connection its target points at (%s)',
-    async (_, members, restored) => {
-      const open = communicationBatch();
-      const sessions: Session[] = [];
-      const refused = new Error('envelope refused');
-      open.target?.point({
-        ...connectionWith(members),
-        setSessionType: (type) => {
-          sessions.push(type);
-        },
-        makeAdtRequest: async () => {
-          throw refused;
-        },
-      });
-      const part = open.connection
-        .makeAdtRequest({ url: '/sap/bc/adt/x', method: 'GET', timeout: 0 })
-        .catch((error: unknown) => error);
-      await expect(open.connection.execute()).rejects.toBe(refused);
-      await part;
-      // The envelope's mode, then the wrapped connection's, restored.
-      expect(sessions).toEqual(['stateless', restored]);
-    },
-  );
+  ] satisfies ReadonlyArray<
+    [string, { type?: Session; mode?: Session }, Session]
+  >) {
+    it(
+      format(
+        'restores the session of the connection its target points at (%s)',
+        _,
+      ),
+      async () => {
+        const open = communicationBatch();
+        const sessions: Session[] = [];
+        const refused = new Error('envelope refused');
+        open.target?.point({
+          ...connectionWith(members),
+          setSessionType: (type) => {
+            sessions.push(type);
+          },
+          makeAdtRequest: async () => {
+            throw refused;
+          },
+        });
+        const part = open.connection
+          .makeAdtRequest({ url: '/sap/bc/adt/x', method: 'GET', timeout: 0 })
+          .catch((error: unknown) => error);
+        assert.equal(await rejectionOf(open.connection.execute()), refused);
+        await part;
+        // The envelope's mode, then the wrapped connection's, restored.
+        assert.deepStrictEqual(sessions, ['stateless', restored]);
+      },
+    );
+  }
 });

@@ -6,7 +6,7 @@
  * `IAdtClientOptions.signal` and no `IAdtError.refusal`. The 2.1 / 15.x
  * releases carried all three, so against them this file does not compile.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 import type {

@@ -1,4 +1,6 @@
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { it } from 'node:test';
 import ts from 'typescript';
 import { analyseOmissions } from '../../../scripts/lib/analyseOmissions';
 import { globSync } from '../helpers/platform';
@@ -67,7 +69,7 @@ it('no handler reads an envelope property', () => {
   // vacuously true — the same failure mode `analyseOmissions`'s own
   // `inspected` bound guards against, three tests down. 326 handler files
   // exist today; 200 is comfortably below that and well above zero.
-  expect(handlers.length).toBeGreaterThan(200);
+  assert.ok(handlers.length > 200);
 
   const ENVELOPE_NAMES = new Set([
     'readResult',
@@ -80,11 +82,12 @@ it('no handler reads an envelope property', () => {
     'validationResponse',
     'checkResult',
   ]);
-  expect(
+  assert.deepStrictEqual(
     handlers.filter((f) =>
       readsAnyPropertyNamed(readFileSync(f, 'utf8'), ENVELOPE_NAMES),
     ),
-  ).toEqual([]);
+    [],
+  );
 });
 
 /**
@@ -106,7 +109,7 @@ it('no handler reads an envelope property', () => {
  * strategy tests are what stand behind that case.
  */
 it('no handler decides a refusal for itself', () => {
-  expect(handlers.length).toBeGreaterThan(200);
+  assert.ok(handlers.length > 200);
 
   const VERDICT_NAMES = new Set([
     'exc:exception',
@@ -117,11 +120,12 @@ it('no handler decides a refusal for itself', () => {
     'chkrun:status',
     'CHECK_RESULT',
   ]);
-  expect(
+  assert.deepStrictEqual(
     handlers.filter((f) =>
       readsAnyPropertyNamed(readFileSync(f, 'utf8'), VERDICT_NAMES),
     ),
-  ).toEqual([]);
+    [],
+  );
 });
 
 /**
@@ -162,7 +166,7 @@ it('every client call that accepts an analyse is given one', () => {
   // release gave 79 more members an `analyse` and took every default away. The
   // floor stays well under that count, because it guards against a run that
   // resolved nothing, not against the number changing.
-  expect(inspected).toBeGreaterThan(200);
+  assert.ok(inspected > 200);
 
-  expect(offenders).toEqual([]);
+  assert.deepStrictEqual(offenders, []);
 });

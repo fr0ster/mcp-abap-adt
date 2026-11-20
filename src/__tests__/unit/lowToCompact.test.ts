@@ -33,8 +33,11 @@
  *   attributes are taken out of both, and the compact body writing both.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
@@ -43,6 +46,7 @@ import type {
   HandlerEntry,
 } from '../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../lib/systemContext';
+import { assertNoProperty } from '../helpers/assertions';
 import { holdingLockOf } from '../helpers/heldLocks';
 import { listedJson } from '../helpers/listedJson';
 import {
@@ -57,6 +61,7 @@ import {
 } from '../helpers/lowToCompact';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { REQUEST_ID } from '../helpers/recordingConnection';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -64,7 +69,7 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 const TABLE = JSON.parse(
   fs.readFileSync(
-    path.join(__dirname, '..', '..', '..', 'tools', 'low-to-compact.json'),
+    path.join(repositoryRoot(__dirname), 'tools', 'low-to-compact.json'),
     'utf-8',
   ),
 ) as { rows: LowToCompactRow[] };
@@ -245,16 +250,17 @@ describe('the low set → compact mapping table', () => {
   afterEach(() => resetSystemContextCache());
 
   it('has one row for every tool the low set registered, and no other', () => {
-    expect(TABLE.rows.map((r) => r.tool).sort()).toEqual(
+    assert.deepStrictEqual(
+      TABLE.rows.map((r) => r.tool).sort(),
       [...LOW_TOOLS_BEFORE_REMOVAL].sort(),
     );
   });
 
   it('keeps no finding: every row names its compact call and the low requests', () => {
     for (const row of TABLE.rows) {
-      expect(row.compact.length).toBeGreaterThan(0);
-      expect(row.low_requests?.length).toBeGreaterThan(0);
-      expect(row).not.toHaveProperty('finding');
+      assert.ok(row.compact.length > 0);
+      assert.ok((row.low_requests?.length ?? 0) > 0);
+      assertNoProperty(row, 'finding');
     }
   });
 
@@ -274,90 +280,126 @@ describe('the low set → compact mapping table', () => {
   });
 
   const mapped = TABLE.rows.filter((r) => !r.accepted);
-  it.each(mapped.map((r) => [r.tool, r] as const))(
-    '%s: the compact call sends the same requests',
-    async (_tool, row) => {
-      expect(await compactRequests(row)).toEqual(row.low_requests);
-    },
-  );
+  for (const [_tool, row] of mapped.map((r) => [r.tool, r] as const)) {
+    it(
+      format('%s: the compact call sends the same requests', _tool),
+      async () => {
+        assert.deepStrictEqual(await compactRequests(row), row.low_requests);
+      },
+    );
+  }
 
   const runs = TABLE.rows.filter((r) => r.accepted?.kind === 'activation-run');
-  it.each(runs.map((r) => [r.tool, r] as const))(
-    '%s (accepted, activation run): the same object through the activation run',
-    async (_tool, row) => {
-      const [low] = row.low_requests ?? [];
-      expect(low?.url).toBe(
-        '/sap/bc/adt/activation?method=activate&preauditRequested=true',
-      );
-      // A function module's metadata is read first (#2), the run after it.
-      const all = await compactRequests(row);
-      const checked = GROUP_READ_FIRST.has(row.tool);
-      if (checked) expect(all[0]).toEqual(groupRead('FUGR_A', 'FM_A'));
-      const sent = checked ? all.slice(1) : all;
-      expect(sent[0]?.method).toBe('POST');
-      expect(sent[0]?.url.startsWith('/sap/bc/adt/activation/runs?')).toBe(
-        true,
-      );
-      const name = String(low?.data).match(/adtcore:name="([^"]+)"/)?.[1];
-      expect(name).toBeDefined();
-      expect(String(sent[0]?.data)).toContain(`adtcore:name="${name}"`);
-      expect(sent.some((r) => r.url === low?.url)).toBe(false);
-    },
-  );
+  for (const [_tool, row] of runs.map((r) => [r.tool, r] as const)) {
+    it(
+      format(
+        '%s (accepted, activation run): the same object through the activation run',
+        _tool,
+      ),
+      async () => {
+        const [low] = row.low_requests ?? [];
+        assert.equal(
+          low?.url,
+          '/sap/bc/adt/activation?method=activate&preauditRequested=true',
+        );
+        // A function module's metadata is read first (#2), the run after it.
+        const all = await compactRequests(row);
+        const checked = GROUP_READ_FIRST.has(row.tool);
+        if (checked)
+          assert.deepStrictEqual(all[0], groupRead('FUGR_A', 'FM_A'));
+        const sent = checked ? all.slice(1) : all;
+        assert.equal(sent[0]?.method, 'POST');
+        assert.equal(
+          sent[0]?.url.startsWith('/sap/bc/adt/activation/runs?'),
+          true,
+        );
+        const name = String(low?.data).match(/adtcore:name="([^"]+)"/)?.[1];
+        assert.notEqual(name, undefined);
+        assert.ok(String(sent[0]?.data).includes(`adtcore:name="${name}"`));
+        assert.equal(
+          sent.some((r) => r.url === low?.url),
+          false,
+        );
+      },
+    );
+  }
 
   const discoveryRead = TABLE.rows.filter(
     (r) => r.accepted?.kind === 'discovery-read',
   );
-  it.each(discoveryRead.map((r) => [r.tool, r] as const))(
-    '%s (accepted, discovery read): the low handler reads discovery first; the compact call sends the rest',
-    async (_tool, row) => {
-      const [discovery, ...rest] = row.low_requests ?? [];
-      expect(discovery).toEqual({
-        method: 'GET',
-        url: '/sap/bc/adt/discovery',
-        headers: {
-          Accept: 'application/atomsvc+xml',
-          'sap-adt-request-id': REQUEST_ID,
-        },
-      });
-      // The low handler as it is today, on the same stand-in.
-      const connection = parityConnection();
-      await handleActivateObject(
-        { connection, logger: silentLogger },
-        { objects: [...ACTIVATED_OBJECTS], preaudit: true },
-      );
-      expect(parityRequests(connection.requests)).toEqual(row.low_requests);
-      expect(await compactRequests(row)).toEqual(rest);
-    },
-  );
+  for (const [_tool, row] of discoveryRead.map((r) => [r.tool, r] as const)) {
+    it(
+      format(
+        '%s (accepted, discovery read): the low handler reads discovery first; the compact call sends the rest',
+        _tool,
+      ),
+      async () => {
+        const [discovery, ...rest] = row.low_requests ?? [];
+        assert.deepStrictEqual(discovery, {
+          method: 'GET',
+          url: '/sap/bc/adt/discovery',
+          headers: {
+            Accept: 'application/atomsvc+xml',
+            'sap-adt-request-id': REQUEST_ID,
+          },
+        });
+        // The low handler as it is today, on the same stand-in.
+        const connection = parityConnection();
+        await handleActivateObject(
+          { connection, logger: silentLogger },
+          { objects: [...ACTIVATED_OBJECTS], preaudit: true },
+        );
+        assert.deepStrictEqual(
+          parityRequests(connection.requests),
+          row.low_requests,
+        );
+        assert.deepStrictEqual(await compactRequests(row), rest);
+      },
+    );
+  }
 
   const checkedFirst = TABLE.rows.filter(
     (r) => r.accepted?.kind === 'group-checked',
   );
-  it.each(checkedFirst.map((r): [string, LowToCompactRow] => [r.tool, r]))(
-    "%s (accepted, group checked): the module's metadata read, then the low requests",
-    async (_tool, row) => {
-      expect(await compactRequests(row)).toEqual([
-        groupRead('FUGR_A', 'FM_A'),
-        ...(row.low_requests ?? []),
-      ]);
-    },
-  );
+  for (const [_tool, row] of checkedFirst.map(
+    (r): [string, LowToCompactRow] => [r.tool, r],
+  )) {
+    it(
+      format(
+        "%s (accepted, group checked): the module's metadata read, then the low requests",
+        _tool,
+      ),
+      async () => {
+        assert.deepStrictEqual(await compactRequests(row), [
+          groupRead('FUGR_A', 'FM_A'),
+          ...(row.low_requests ?? []),
+        ]);
+      },
+    );
+  }
 
   const stated = TABLE.rows.filter(
     (r) => r.accepted?.kind === 'version-stated',
   );
-  it.each(stated.map((r): [string, LowToCompactRow] => [r.tool, r]))(
-    '%s (accepted, version stated): the low requests, each read with version=active',
-    async (_tool, row) => {
-      const withVersion = (row.low_requests ?? []).map((request) =>
-        request.method === 'GET' && !request.url.includes('?')
-          ? { ...request, url: `${request.url}?version=active` }
-          : request,
-      );
-      expect(await compactRequests(row)).toEqual(withVersion);
-    },
-  );
+  for (const [_tool, row] of stated.map((r): [string, LowToCompactRow] => [
+    r.tool,
+    r,
+  ])) {
+    it(
+      format(
+        '%s (accepted, version stated): the low requests, each read with version=active',
+        _tool,
+      ),
+      async () => {
+        const withVersion = (row.low_requests ?? []).map((request) =>
+          request.method === 'GET' && !request.url.includes('?')
+            ? { ...request, url: `${request.url}?version=active` }
+            : request,
+        );
+        assert.deepStrictEqual(await compactRequests(row), withVersion);
+      },
+    );
+  }
 
   /**
    * `data` without the attribute `name="…"` and the space before it, when it
@@ -383,63 +425,94 @@ describe('the low set → compact mapping table', () => {
   const unstated = TABLE.rows.filter(
     (r) => r.accepted?.kind === 'language-unstated',
   );
-  it.each(unstated.map((r): [string, LowToCompactRow] => [r.tool, r]))(
-    '%s (accepted, language unstated): the low requests without the language attributes',
-    async (_tool, row) => {
-      expect(await compactRequests(row)).toEqual(
-        withoutAttributes(row, LANGUAGE),
-      );
-    },
-  );
+  for (const [_tool, row] of unstated.map((r): [string, LowToCompactRow] => [
+    r.tool,
+    r,
+  ])) {
+    it(
+      format(
+        '%s (accepted, language unstated): the low requests without the language attributes',
+        _tool,
+      ),
+      async () => {
+        assert.deepStrictEqual(
+          await compactRequests(row),
+          withoutAttributes(row, LANGUAGE),
+        );
+      },
+    );
+  }
 
   const untyped = TABLE.rows.filter(
     (r) => r.accepted?.kind === 'program-type-removed',
   );
-  it.each(untyped.map((r): [string, LowToCompactRow] => [r.tool, r]))(
-    '%s (accepted, program type removed): the low requests without the program type and the language attributes',
-    async (_tool, row) => {
-      expect(await compactRequests(row)).toEqual(
-        withoutAttributes(row, [...LANGUAGE, 'program:programType']),
-      );
-    },
-  );
+  for (const [_tool, row] of untyped.map((r): [string, LowToCompactRow] => [
+    r.tool,
+    r,
+  ])) {
+    it(
+      format(
+        '%s (accepted, program type removed): the low requests without the program type and the language attributes',
+        _tool,
+      ),
+      async () => {
+        assert.deepStrictEqual(
+          await compactRequests(row),
+          withoutAttributes(row, [...LANGUAGE, 'program:programType']),
+        );
+      },
+    );
+  }
 
   const sent = TABLE.rows.filter((r) => r.accepted?.kind === 'language-sent');
-  it.each(sent.map((r): [string, LowToCompactRow] => [r.tool, r]))(
-    '%s (accepted, language sent): the low requests with sap-language, the attributes together',
-    async (_tool, row) => {
-      const given = row.compact[0]?.args.master_language;
-      expect(typeof given).toBe('string');
-      const compact = await compactRequests(row);
-      const low = row.low_requests ?? [];
-      expect(compact).toHaveLength(low.length);
-      for (const [at, request] of compact.entries()) {
-        const before = low[at];
-        expect({
-          ...request,
-          data: withoutAttributes(
-            { ...row, low_requests: [request] },
-            LANGUAGE,
-          )[0]?.data,
-          headers: undefined,
-        }).toEqual({
-          ...before,
-          data: withoutAttributes(
-            { ...row, low_requests: before ? [before] : [] },
-            LANGUAGE,
-          )[0]?.data,
-          headers: undefined,
-        });
-        expect(request.headers).toEqual({
-          ...before?.headers,
-          'sap-language': given,
-        });
-        expect(String(request.data)).toContain(
-          ` adtcore:language="${String(given)}" adtcore:masterLanguage="${String(given)}"`,
-        );
-      }
-    },
-  );
+  for (const [_tool, row] of sent.map((r): [string, LowToCompactRow] => [
+    r.tool,
+    r,
+  ])) {
+    it(
+      format(
+        '%s (accepted, language sent): the low requests with sap-language, the attributes together',
+        _tool,
+      ),
+      async () => {
+        const given = row.compact[0]?.args.master_language;
+        assert.equal(typeof given, 'string');
+        const compact = await compactRequests(row);
+        const low = row.low_requests ?? [];
+        assert.equal(compact.length, low.length);
+        for (const [at, request] of compact.entries()) {
+          const before = low[at];
+          assert.deepStrictEqual(
+            {
+              ...request,
+              data: withoutAttributes(
+                { ...row, low_requests: [request] },
+                LANGUAGE,
+              )[0]?.data,
+              headers: undefined,
+            },
+            {
+              ...before,
+              data: withoutAttributes(
+                { ...row, low_requests: before ? [before] : [] },
+                LANGUAGE,
+              )[0]?.data,
+              headers: undefined,
+            },
+          );
+          assert.deepStrictEqual(request.headers, {
+            ...before?.headers,
+            'sap-language': given,
+          });
+          assert.ok(
+            String(request.data).includes(
+              ` adtcore:language="${String(given)}" adtcore:masterLanguage="${String(given)}"`,
+            ),
+          );
+        }
+      },
+    );
+  }
 
   /**
    * The rows the owner accepted (2026-10-13), each with its kind — fixed
@@ -488,8 +561,9 @@ describe('the low set → compact mapping table', () => {
       .filter((r) => r.accepted)
       .map((r) => [r.tool, r.accepted?.kind] as [string, string | undefined])
       .sort((x, y) => x[0].localeCompare(y[0]));
-    expect(ACCEPTED).toHaveLength(24);
-    expect(accepted).toEqual(
+    assert.equal(ACCEPTED.length, 24);
+    assert.deepStrictEqual(
+      accepted,
       [...ACCEPTED].sort((x, y) => x[0].localeCompare(y[0])),
     );
   });
@@ -498,7 +572,7 @@ describe('the low set → compact mapping table', () => {
     const kinds = new Set(
       TABLE.rows.flatMap((r) => (r.accepted ? [r.accepted.kind] : [])),
     );
-    expect([...kinds].sort()).toEqual([
+    assert.deepStrictEqual([...kinds].sort(), [
       'activation-run',
       'discovery-read',
       'group-checked',
@@ -517,10 +591,7 @@ describe('the low set → compact mapping table', () => {
  */
 describe('docs/MIGRATION-24.0.md', () => {
   const file = path.join(
-    __dirname,
-    '..',
-    '..',
-    '..',
+    repositoryRoot(__dirname),
     'docs',
     'MIGRATION-24.0.md',
   );
@@ -528,8 +599,8 @@ describe('docs/MIGRATION-24.0.md', () => {
     const text = fs.readFileSync(file, 'utf-8');
     const start = text.indexOf(TABLE_START);
     const end = text.indexOf(TABLE_END);
-    expect(start).toBeGreaterThan(-1);
-    expect(end).toBeGreaterThan(start);
+    assert.ok(start > -1);
+    assert.ok(end > start);
     const rendered = renderLowToCompactTable(TABLE.rows);
     if (process.env.WRITE_LOW_TO_COMPACT_TABLE === '1' && !process.env.CI) {
       fs.writeFileSync(
@@ -538,6 +609,6 @@ describe('docs/MIGRATION-24.0.md', () => {
       );
       return;
     }
-    expect(text.slice(start, end + TABLE_END.length)).toBe(rendered);
+    assert.equal(text.slice(start, end + TABLE_END.length), rendered);
   });
 });

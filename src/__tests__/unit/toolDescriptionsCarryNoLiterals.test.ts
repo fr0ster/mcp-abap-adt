@@ -34,6 +34,9 @@
  * and where no RAG runs; without it the next `$TMP` returns and nothing notices
  * until a consumer's retrieval degrades.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { compactDebugEntries } from '../../lib/compact/debug/group';
 import { BackgroundRunHandlersGroup } from '../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { DebugHandlersGroup } from '../../lib/handlers/groups/DebugHandlersGroup';
@@ -167,10 +170,10 @@ describe('descriptions carry no incidental literals', () => {
       'transport SIDK905635',
       'transport ER121235',
     ]) {
-      expect([literal, literalsIn(literal).length > 0]).toEqual([
-        literal,
-        true,
-      ]);
+      assert.deepStrictEqual(
+        [literal, literalsIn(literal).length > 0],
+        [literal, true],
+      );
     }
     for (const generic of [
       "wildcard pattern (e.g. 'Z*')",
@@ -187,13 +190,13 @@ describe('descriptions carry no incidental literals', () => {
       'measured on BASIS 816',
       'answers TK127 on premise',
     ]) {
-      expect([generic, literalsIn(generic)]).toEqual([generic, []]);
+      assert.deepStrictEqual([generic, literalsIn(generic)], [generic, []]);
     }
   });
 
   it('sees every tool group', () => {
     // 19.0.0: the low set's tools left; compact's are read here too.
-    expect(tools.length).toBeGreaterThan(250);
+    assert.ok(tools.length > 250);
   });
 
   it('reads the parameter descriptions it claims to read', () => {
@@ -201,8 +204,9 @@ describe('descriptions carry no incidental literals', () => {
     // pass over no text at all, which is how a probe once reported "0
     // violations" from a scan of 0 tools.
     const all = tools.flatMap(parametersOf);
-    expect(all.length).toBeGreaterThan(500);
-    expect(all.some((text) => /transport request number/i.test(text))).toBe(
+    assert.ok(all.length > 500);
+    assert.equal(
+      all.some((text) => /transport request number/i.test(text)),
       true,
     );
     // The gap this replaced was invisible to a total: a whole shape of schema
@@ -213,7 +217,7 @@ describe('descriptions carry no incidental literals', () => {
       .filter((t) => parametersOf(t).length === 0)
       .map((t) => t.name)
       .sort();
-    expect(silent).toEqual(TAKES_NO_PARAMETERS);
+    assert.deepStrictEqual(silent, TAKES_NO_PARAMETERS);
   });
 
   for (const { name } of INCIDENTAL) {
@@ -221,7 +225,7 @@ describe('descriptions carry no incidental literals', () => {
       const offenders = tools
         .filter((t) => literalsIn(t.description).includes(name))
         .map((t) => t.name);
-      expect(offenders).toEqual([]);
+      assert.deepStrictEqual(offenders, []);
     });
 
     it(`no parameter description names ${name}`, () => {
@@ -229,7 +233,7 @@ describe('descriptions carry no incidental literals', () => {
         .flatMap((t) => parametersOf(t).map((text) => [t.name, text] as const))
         .filter(([, text]) => literalsIn(text).includes(name))
         .map(([tool, text]) => `${tool}: ${text.slice(0, 80)}`);
-      expect(offenders).toEqual([]);
+      assert.deepStrictEqual(offenders, []);
     });
   }
 });

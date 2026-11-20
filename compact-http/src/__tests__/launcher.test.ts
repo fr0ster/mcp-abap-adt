@@ -4,9 +4,11 @@
  * `src/__tests__/parity/toolSetParity.test.ts`'s.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
 import { compactToolSet, main } from '../launcher';
 
 const manifest = JSON.parse(
@@ -32,7 +34,7 @@ async function stopped(argv: string[]) {
 
 describe('mcp-abap-adt-compact-http', () => {
   it('answers this package’s version, on stdout', async () => {
-    expect(await stopped(['--version'])).toEqual({
+    assert.deepStrictEqual(await stopped(['--version']), {
       stdout: [manifest.version],
       stderr: [],
       exits: [0],
@@ -41,14 +43,20 @@ describe('mcp-abap-adt-compact-http', () => {
 
   it('names itself in USAGE, and lists its tools, not an exposition', async () => {
     const { stderr, exits } = await stopped(['--help']);
-    expect(exits).toEqual([0]);
-    expect(stderr.join('\n')).toContain(
-      'USAGE:\n  mcp-abap-adt-compact-http [options]',
+    assert.deepStrictEqual(exits, [0]);
+    assert.ok(
+      stderr
+        .join('\n')
+        .includes('USAGE:\n  mcp-abap-adt-compact-http [options]'),
     );
-    expect(stderr.join('\n')).toContain(
-      '\nTOOLS:\n  mcp-abap-adt-compact-http serves one fixed tool set',
+    assert.ok(
+      stderr
+        .join('\n')
+        .includes(
+          '\nTOOLS:\n  mcp-abap-adt-compact-http serves one fixed tool set',
+        ),
     );
-    expect(stderr.join('\n')).not.toContain('--exposition=<');
+    assert.ok(!stderr.join('\n').includes('--exposition=<'));
   });
 
   it("serves the compact tool set without the data tool: 27 of the 28 tools, the four debugger tools, HandlerDebugBatch, the three background-run tools, HandlerBatch and HandlerSession — no leftover-session tool, which is stdio's", () => {
@@ -57,19 +65,22 @@ describe('mcp-abap-adt-compact-http', () => {
         dataTools: false,
       })
       .flatMap((group) => group.getHandlers());
-    expect(tools).toHaveLength(37);
-    expect(
-      tools.filter((entry) => entry.toolDefinition.name === 'HandlerSession'),
-    ).toHaveLength(1);
-    expect(
+    assert.equal(tools.length, 37);
+    assert.equal(
+      tools.filter((entry) => entry.toolDefinition.name === 'HandlerSession')
+        .length,
+      1,
+    );
+    assert.deepStrictEqual(
       tools
         .map((entry) => entry.toolDefinition.name)
         .filter((name) => name.includes('LeftoverSession')),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('stops on --exposition, naming the binary its words ask for', async () => {
-    expect(await stopped(['--exposition=ro'])).toEqual({
+    assert.deepStrictEqual(await stopped(['--exposition=ro']), {
       stdout: [],
       stderr: [
         `[MCP] --exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the compact tools that change nothing are served by \`mcp-abap-adt-compact-http-ro\` (\`@mcp-abap-adt/compact-http-ro\`)`,

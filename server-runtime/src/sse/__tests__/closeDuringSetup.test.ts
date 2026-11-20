@@ -6,7 +6,9 @@
  * entry is left, and the instance is never routed to.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
@@ -34,11 +36,11 @@ const turns = async (n = 10) => {
 function fakeRes() {
   const res: any = new EventEmitter();
   res.headersSent = false;
-  res.writeHead = jest.fn(() => res);
-  res.write = jest.fn(() => true);
-  res.end = jest.fn(() => res);
-  res.status = jest.fn(() => res);
-  res.send = jest.fn(() => res);
+  res.writeHead = mock.fn(() => res);
+  res.write = mock.fn(() => true);
+  res.end = mock.fn(() => res);
+  res.status = mock.fn(() => res);
+  res.send = mock.fn(() => res);
   res.on = res.on.bind(res);
   return res;
 }
@@ -64,55 +66,58 @@ function external() {
 const sessionsOf = (sse: SseServer) =>
   (sse as unknown as { sessions: Map<string, unknown> }).sessions;
 
-let letGoOfState: jest.SpyInstance;
-let connect: jest.SpyInstance;
+let letGoOfState: Mock<BaseMcpServer['letGoOfState']>;
+let connect: Mock<BaseMcpServer['connect']>;
 
 beforeEach(() => {
   resetProcessLatchForTests();
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  letGoOfState = jest.spyOn(BaseMcpServer.prototype, 'letGoOfState');
-  connect = jest.spyOn(BaseMcpServer.prototype, 'connect');
+  mock.method(console, 'error', () => {});
+  letGoOfState = mock.method(BaseMcpServer.prototype, 'letGoOfState');
+  connect = mock.method(BaseMcpServer.prototype, 'connect');
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 it('the response closes while connect() is held: one instance close, never routed to', async () => {
   const held = deferred();
-  connect.mockReturnValue(held.promise);
+  connect.mock.mockImplementation(() => held.promise);
   const { sse, routes } = external();
   const res = fakeRes();
   const getting = routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
   await turns();
   res.emit('close');
   await turns();
-  expect(letGoOfState).toHaveBeenCalledTimes(1);
+  assert.equal(letGoOfState.mock.callCount(), 1);
   held.resolve();
   await getting;
   await turns();
-  expect(sessionsOf(sse).size).toBe(0);
-  expect(letGoOfState).toHaveBeenCalledTimes(1);
+  assert.equal(sessionsOf(sse).size, 0);
+  assert.equal(letGoOfState.mock.callCount(), 1);
   await sse.stop();
-  expect(letGoOfState).toHaveBeenCalledTimes(1);
+  assert.equal(letGoOfState.mock.callCount(), 1);
 });
 
 it('connect() rejects: the instance close runs once (the state is let go), no entry is left', async () => {
-  connect.mockRejectedValue(new Error('transport broke'));
+  const broke = new Error('transport broke');
+  connect.mock.mockImplementation(async () => {
+    throw broke;
+  });
   const { sse, routes } = external();
   const res = fakeRes();
   await routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
   await turns();
-  expect(letGoOfState).toHaveBeenCalledTimes(1);
-  expect(sessionsOf(sse).size).toBe(0);
+  assert.equal(letGoOfState.mock.callCount(), 1);
+  assert.equal(sessionsOf(sse).size, 0);
   res.emit('close');
   await turns();
-  expect(letGoOfState).toHaveBeenCalledTimes(1);
+  assert.equal(letGoOfState.mock.callCount(), 1);
   await sse.stop();
-  expect(letGoOfState).toHaveBeenCalledTimes(1);
+  assert.equal(letGoOfState.mock.callCount(), 1);
 });
 
 it('a stop during setup awaits the same cleanup: one instance close', async () => {
   const held = deferred();
-  connect.mockReturnValue(held.promise);
+  connect.mock.mockImplementation(() => held.promise);
   const { sse, routes } = external();
   const res = fakeRes();
   const getting = routes['/sse']({ headers: CREDENTIALS, query: {} }, res);
@@ -122,13 +127,13 @@ it('a stop during setup awaits the same cleanup: one instance close', async () =
     stopped = true;
   });
   await turns();
-  expect(letGoOfState).toHaveBeenCalledTimes(1);
+  assert.equal(letGoOfState.mock.callCount(), 1);
   held.resolve();
   await getting;
   await stopping;
-  expect(stopped).toBe(true);
+  assert.equal(stopped, true);
   res.emit('close');
   await turns();
-  expect(letGoOfState).toHaveBeenCalledTimes(1);
-  expect(sessionsOf(sse).size).toBe(0);
+  assert.equal(letGoOfState.mock.callCount(), 1);
+  assert.equal(sessionsOf(sse).size, 0);
 });

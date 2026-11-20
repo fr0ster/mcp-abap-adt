@@ -16,8 +16,7 @@
     "declarationMap": true,
     "sourceMap": true,
     "types": [
-      "node",
-      "jest"
+      "node"
     ],
     "rootDir": "..",
     "outDir": "./dist",

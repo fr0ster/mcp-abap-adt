@@ -10,6 +10,8 @@
  * Another instance is untouched.
  */
 
+import assert from 'node:assert/strict';
+import { after, beforeEach, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   latch,
@@ -33,6 +35,7 @@ import {
   openFreshConnection,
   registerFreshConnectionFactory,
 } from '../../lib/packageSessions';
+import { assertThrows, rejectionOf } from '../helpers/assertions';
 
 const turns = async (n = 10) => {
   for (let i = 0; i < n; i += 1) await new Promise((r) => setImmediate(r));
@@ -86,7 +89,7 @@ function injected(make: () => Promise<IAbapConnection>) {
 }
 
 beforeEach(() => resetProcessLatchForTests());
-afterAll(() => resetProcessLatchForTests());
+after(() => resetProcessLatchForTests());
 
 it('after the instance close: refused before the factory is called, nothing owned; answered as instance_closed', async () => {
   const instance = closable();
@@ -102,19 +105,20 @@ it('after the instance close: refused before the factory is called, nothing owne
       thrown = error;
     }
   });
-  expect(isClosedInstanceRefusal(thrown)).toBe(true);
-  expect(calls.count).toBe(0);
-  expect(fresh.connects).toBe(0);
-  expect(ownedConnections(instance)).toEqual([]);
+  assert.equal(isClosedInstanceRefusal(thrown), true);
+  assert.equal(calls.count, 0);
+  assert.equal(fresh.connects, 0);
+  assert.deepStrictEqual(ownedConnections(instance), []);
   // The server keeps running: its own refusal, not the shutdown's.
-  expect(failureOf(thrown)).toEqual({
+  assert.deepStrictEqual(failureOf(thrown), {
     error: 'instance_closed',
     message: INSTANCE_CLOSED_WORDS,
   });
   // Forged: the same name and message are not the refusal.
-  expect(
+  assert.equal(
     isClosedInstanceRefusal(Object.assign(new Error(''), { name: 'x' })),
-  ).toBe(false);
+    false,
+  );
 });
 
 it('after the process latch: refused, outside a call and inside one', async () => {
@@ -122,7 +126,7 @@ it('after the process latch: refused, outside a call and inside one', async () =
   const fresh = fake();
   const { main, calls } = injected(async () => fresh.connection);
   latch();
-  expect(() => refuseIfClosed()).toThrow(ClosedInstanceRefusal);
+  assertThrows(() => refuseIfClosed(), ClosedInstanceRefusal);
   // A real shutdown keeps the shutdown refusal.
   let thrown: unknown;
   try {
@@ -130,12 +134,14 @@ it('after the process latch: refused, outside a call and inside one', async () =
   } catch (error) {
     thrown = error;
   }
-  expect(failureOf(thrown)).toEqual(shutdownRefusal());
-  await expect(
-    runAsOwner(instance, () => openFreshConnection(main, undefined)),
-  ).rejects.toBeInstanceOf(ClosedInstanceRefusal);
-  expect(calls.count).toBe(0);
-  expect(ownedConnections()).toEqual([]);
+  assert.deepStrictEqual(failureOf(thrown), shutdownRefusal());
+  assert.ok(
+    (await rejectionOf(
+      runAsOwner(instance, () => openFreshConnection(main, undefined)),
+    )) instanceof ClosedInstanceRefusal,
+  );
+  assert.equal(calls.count, 0);
+  assert.deepStrictEqual(ownedConnections(), []);
 });
 
 it('the close comes while the factory runs: the handed connection is logged off, never connected, never owned', async () => {
@@ -152,15 +158,15 @@ it('the close comes while the factory runs: the handed connection is logged off,
   const opening = runAsOwner(instance, () =>
     openFreshConnection(main, undefined),
   );
-  const refused = expect(opening).rejects.toBeInstanceOf(ClosedInstanceRefusal);
+  const refused = rejectionOf(opening);
   await turns();
-  expect(calls.count).toBe(1);
+  assert.equal(calls.count, 1);
   await closeInstance(instance);
   hand();
-  await refused;
-  expect(fresh.connects).toBe(0);
-  expect(fresh.logoffs).toBe(1);
-  expect(ownedConnections(instance)).toEqual([]);
+  assert.ok((await refused) instanceof ClosedInstanceRefusal);
+  assert.equal(fresh.connects, 0);
+  assert.equal(fresh.logoffs, 1);
+  assert.deepStrictEqual(ownedConnections(instance), []);
 });
 
 it('the close comes while the connect runs: swept with the rest, one logoff, the caller refused once it settles', async () => {
@@ -170,17 +176,17 @@ it('the close comes while the connect runs: swept with the rest, one logoff, the
   const opening = runAsOwner(instance, () =>
     openFreshConnection(main, undefined),
   );
-  const refused = expect(opening).rejects.toBeInstanceOf(ClosedInstanceRefusal);
+  const refused = rejectionOf(opening);
   await turns();
-  expect(fresh.connects).toBe(1);
-  expect(ownedConnections(instance)).toEqual([fresh.connection]);
+  assert.equal(fresh.connects, 1);
+  assert.deepStrictEqual(ownedConnections(instance), [fresh.connection]);
   await closeInstance(instance);
-  expect(fresh.logoffs).toBe(1);
+  assert.equal(fresh.logoffs, 1);
   fresh.connected();
-  await refused;
+  assert.ok((await refused) instanceof ClosedInstanceRefusal);
   // Joined, never a second `disconnect()`.
-  expect(fresh.logoffs).toBe(1);
-  expect(ownedConnections(instance)).toEqual([]);
+  assert.equal(fresh.logoffs, 1);
+  assert.deepStrictEqual(ownedConnections(instance), []);
 });
 
 it('the close comes while the connect runs and the connect then REJECTS (connection 17 abandons it): the caller gets the refusal, not the connect error; one logoff', async () => {
@@ -190,26 +196,27 @@ it('the close comes while the connect runs and the connect then REJECTS (connect
   const opening = runAsOwner(instance, () =>
     openFreshConnection(main, undefined),
   );
-  const refused = expect(opening).rejects.toBeInstanceOf(ClosedInstanceRefusal);
+  const refused = rejectionOf(opening);
   await turns();
-  expect(fresh.connects).toBe(1);
+  assert.equal(fresh.connects, 1);
   await closeInstance(instance);
   fresh.connected();
-  await refused;
-  expect(fresh.logoffs).toBe(1);
-  expect(ownedConnections(instance)).toEqual([]);
+  assert.ok((await refused) instanceof ClosedInstanceRefusal);
+  assert.equal(fresh.logoffs, 1);
+  assert.deepStrictEqual(ownedConnections(instance), []);
 });
 
 it('own() of a new connection for a closed instance: ended at once and refused', async () => {
   const instance = closable();
   const late = fake();
   await closeInstance(instance);
-  expect(() =>
-    own(late.connection, { owner: instance, role: 'state' }),
-  ).toThrow(ClosedInstanceRefusal);
+  assertThrows(
+    () => own(late.connection, { owner: instance, role: 'state' }),
+    ClosedInstanceRefusal,
+  );
   await turns();
-  expect(late.logoffs).toBe(1);
-  expect(ownedConnections(instance)).toEqual([]);
+  assert.equal(late.logoffs, 1);
+  assert.deepStrictEqual(ownedConnections(instance), []);
 });
 
 it('another instance still opens its fresh connection', async () => {
@@ -221,7 +228,7 @@ it('another instance still opens its fresh connection', async () => {
   const got = await runAsOwner(open, () =>
     openFreshConnection(main, undefined),
   );
-  expect(got).toBe(fresh.connection);
-  expect(fresh.connects).toBe(1);
-  expect(ownedConnections(open)).toEqual([fresh.connection]);
+  assert.equal(got, fresh.connection);
+  assert.equal(fresh.connects, 1);
+  assert.deepStrictEqual(ownedConnections(open), [fresh.connection]);
 });

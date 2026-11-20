@@ -17,6 +17,9 @@
  * - `HandlerUnitTestResult`: the compact result tool, which reads only the
  *   result.
  */
+
+import assert from 'node:assert/strict';
+import { describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { type McpResult, pinCases } from '../../helpers/pinCases';
 
@@ -72,18 +75,18 @@ function member(value: unknown, key: string): unknown {
 /** The answer of a run SAP answered finished: its id and a result. */
 function expectFinished(runId: string) {
   return (answer: McpResult) => {
-    expect(answer.isError).toBe(false);
+    assert.equal(answer.isError, false);
     const value = answered(answer);
-    expect(member(value, 'run_id')).toBe(runId);
-    expect(member(value, 'finished')).toBe(true);
-    expect(member(value, 'run_result')).toBeDefined();
+    assert.equal(member(value, 'run_id'), runId);
+    assert.equal(member(value, 'finished'), true);
+    assert.notEqual(member(value, 'run_result'), undefined);
   };
 }
 
 /** The answer of a run SAP answered `NOT_STARTED`: its id and that status. */
 function expectNotStarted(answer: McpResult) {
-  expect(answer.isError).toBe(false);
-  expect(answered(answer)).toEqual({
+  assert.equal(answer.isError, false);
+  assert.deepStrictEqual(answered(answer), {
     success: true,
     run_id: RUN,
     status: 'NOT_STARTED',

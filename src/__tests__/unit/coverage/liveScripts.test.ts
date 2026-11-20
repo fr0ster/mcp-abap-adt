@@ -77,7 +77,7 @@ describe('the live scripts', () => {
       ),
       undefined,
     );
-    assert.equal(runnerConcurrency('jest --runInBand'), undefined);
+    assert.equal(runnerConcurrency('tsc --noEmit'), undefined);
   });
 
   it('the family script takes the files named after it and carries the ledger reporter', () => {

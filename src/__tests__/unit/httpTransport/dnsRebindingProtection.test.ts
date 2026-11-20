@@ -1,40 +1,47 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   checkDnsRebinding,
   withDnsRebindingProtection,
 } from '../../../lib/httpTransport/dnsRebindingProtection';
+import { assertMatchObject } from '../../helpers/assertions';
 
 describe('checkDnsRebinding', () => {
   it('returns null when protection is disabled', () => {
-    expect(
+    assert.equal(
       checkDnsRebinding(
         { host: 'evil.com' },
         { enable: false, allowedHosts: ['localhost:3000'] },
       ),
-    ).toBeNull();
+      null,
+    );
   });
 
   it('enabled + allowedHosts: rejects missing/other host, accepts exact host:port', () => {
     const opts = { enable: true, allowedHosts: ['localhost:3000'] };
-    expect(checkDnsRebinding({ host: 'localhost:3000' }, opts)).toBeNull();
-    expect(checkDnsRebinding({ host: 'localhost' }, opts)?.status).toBe(403);
-    expect(checkDnsRebinding({}, opts)?.status).toBe(403);
+    assert.equal(checkDnsRebinding({ host: 'localhost:3000' }, opts), null);
+    assert.equal(checkDnsRebinding({ host: 'localhost' }, opts)?.status, 403);
+    assert.equal(checkDnsRebinding({}, opts)?.status, 403);
   });
 
   it('enabled + allowedOrigins: matching passes, absent passes, other rejects', () => {
     const opts = { enable: true, allowedOrigins: ['https://app.example.com'] };
-    expect(
+    assert.equal(
       checkDnsRebinding({ origin: 'https://app.example.com' }, opts),
-    ).toBeNull();
-    expect(checkDnsRebinding({}, opts)).toBeNull();
-    expect(
+      null,
+    );
+    assert.equal(checkDnsRebinding({}, opts), null);
+    assert.equal(
       checkDnsRebinding({ origin: 'https://evil.com' }, opts)?.status,
-    ).toBe(403);
+      403,
+    );
   });
 
   it('enabled with empty lists fails closed (D26 F1: refused at construction)', () => {
-    expect(
+    assertMatchObject(
       checkDnsRebinding({ host: 'x', origin: 'y' }, { enable: true }),
-    ).toMatchObject({ status: 403 });
+      { status: 403 },
+    );
   });
 });
 
@@ -62,8 +69,8 @@ describe('withDnsRebindingProtection', () => {
     );
     const res = makeRes();
     wrapped({ headers: { host: 'evil.com' } } as any, res, () => {});
-    expect(res.statusCode).toBe(403);
-    expect(called).toBe(false);
+    assert.equal(res.statusCode, 403);
+    assert.equal(called, false);
   });
 
   it('delegates to the handler when validation passes', () => {
@@ -76,7 +83,7 @@ describe('withDnsRebindingProtection', () => {
     );
     const res = makeRes();
     wrapped({ headers: { host: 'localhost:3000' } } as any, res, () => {});
-    expect(called).toBe(true);
-    expect(res.statusCode).toBe(0);
+    assert.equal(called, true);
+    assert.equal(res.statusCode, 0);
   });
 });

@@ -178,11 +178,7 @@ function built(
   name: string,
   sources: Readonly<Record<string, string>>,
 ): string {
-  const repo = fixtureRepo(
-    path.join(scratch.dir, name),
-    Object.keys(sources),
-    sources,
-  );
+  const repo = fixtureRepo(path.join(scratch.dir, name), sources);
   const build = runTool('build-node-tests.mjs', ['--repo', repo]);
   assert.equal(build.status, 0, build.stderr);
   return repo;

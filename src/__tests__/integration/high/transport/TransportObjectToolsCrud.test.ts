@@ -119,7 +119,7 @@ import { stated } from '../../helpers/testConfigSchema';
  *   - SAP_USERNAME must be set in the configured env file — CreateTransportTask
  *     requires a target_user and the server will not choose one
  *
- * Run: npm test -- --testPathPattern=TransportObjectToolsCrud
+ * Run: npm run test:integration -- src/__tests__/integration/high/transport/TransportObjectToolsCrud.test.ts
  */
 
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
@@ -306,7 +306,7 @@ systemsDescribe(['onprem'], SUITE, () => {
     // **A skip that reads as a pass is the failure this block is about.**
     //
     // This warned and returned for a missing transport, package or user, and
-    // jest printed `1 passed` for a run that had done nothing. Measured on a
+    // the runner reported `1 passed` for a run that had done nothing. Measured on a
     // cloud session, where the suite is structurally unable to run at all —
     // step 2 creates a PROGRAM and ABAP Cloud has none — it reported green.
     //

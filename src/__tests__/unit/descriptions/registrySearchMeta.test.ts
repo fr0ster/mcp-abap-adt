@@ -6,6 +6,9 @@
  * one without; a tool the table does not name carries none.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -63,20 +66,22 @@ async function listed(withBatch: boolean) {
 }
 
 describe("a registry's own tools carry their search texts", () => {
-  it.each([
+  for (const [_label, withBatch] of [
     ['without a batch owner', false],
     ['with a batch owner', true],
-  ])('%s', async (_label, withBatch) => {
-    const meta = await listed(withBatch);
-    for (const name of ['GetDdl', 'GetClass']) {
-      const text = toolSearchText(name);
-      expect(meta.get(name)?.[TOOL_SEARCH_META_KEY]).toEqual({
-        keywords: text?.keywords,
-        semantic: text?.semantic,
-      });
-    }
-    // What the registry gave its tool stays beside it.
-    expect(meta.get('GetDdl')?.['vendor/own']).toBe(1);
-    expect(meta.get('OwnTool')?.[TOOL_SEARCH_META_KEY]).toBeUndefined();
-  });
+  ] satisfies [string, boolean][]) {
+    it(format('%s', _label), async () => {
+      const meta = await listed(withBatch);
+      for (const name of ['GetDdl', 'GetClass']) {
+        const text = toolSearchText(name);
+        assert.deepStrictEqual(meta.get(name)?.[TOOL_SEARCH_META_KEY], {
+          keywords: text?.keywords,
+          semantic: text?.semantic,
+        });
+      }
+      // What the registry gave its tool stays beside it.
+      assert.equal(meta.get('GetDdl')?.['vendor/own'], 1);
+      assert.equal(meta.get('OwnTool')?.[TOOL_SEARCH_META_KEY], undefined);
+    });
+  }
 });

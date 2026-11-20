@@ -10,6 +10,10 @@
  * connection is a fake, answering from a small repository model — the same
  * model for an envelope's parts and for the sequential version's requests.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -24,6 +28,7 @@ import {
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { createBatchAvailability } from '../../../lib/batch/availability';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -323,11 +328,12 @@ function expectEnvelopeFailure(
     JSON.stringify(request) === JSON.stringify(ENVELOPE_REQUEST);
   const own = requestsOf(sequential);
   const named = requestsOf(result);
-  expect(own.filter(isEnvelope)).toHaveLength(0);
-  expect(named).toHaveLength(own.length);
-  expect(named.filter(isEnvelope)).toHaveLength(failures);
+  assert.equal(own.filter(isEnvelope).length, 0);
+  assert.equal(named.length, own.length);
+  assert.equal(named.filter(isEnvelope).length, failures);
   let at = 0;
-  expect(wholeOf(result)).toEqual(
+  assert.deepStrictEqual(
+    wholeOf(result),
     wholeOf(sequential, (key, value) => {
       if (key !== 'request') return value;
       return isEnvelope(named[at++]) ? ENVELOPE_REQUEST : value;
@@ -474,7 +480,7 @@ const UNAUTHORIZED: PartAnswer = {
 // ---------------------------------------------------------------------------
 
 describe('GetIncludesList', () => {
-  it.each([
+  for (const [args] of [
     [{ object_name: 'ZPROG', object_type: 'PROG/P' }],
     [{ object_name: 'ZINC_A', object_type: 'PROG/I' }],
     [{ object_name: 'ZFG', object_type: 'FUGR/F' }],
@@ -489,16 +495,18 @@ describe('GetIncludesList', () => {
         ],
       },
     ],
-  ])('same answer as the sequential version: %j', async (args) => {
-    const { a, b, batched, sequential } = await bothWays(
-      handleGetIncludesList,
-      args,
-    );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(batched.directs).toHaveLength(0);
-    expect(batched.envelopes.length).toBeGreaterThan(0);
-    expect(sequential.envelopes).toHaveLength(0);
-  });
+  ]) {
+    it(format('same answer as the sequential version: %j', args), async () => {
+      const { a, b, batched, sequential } = await bothWays(
+        handleGetIncludesList,
+        args,
+      );
+      assert.equal(textOf(a), textOf(b));
+      assert.equal(batched.directs.length, 0);
+      assert.ok(batched.envelopes.length > 0);
+      assert.equal(sequential.envelopes.length, 0);
+    });
+  }
 
   it('the tree is the depth-first walk: cycles and duplicates marked where the sequential walk marks them', async () => {
     const { a } = await bothWays(handleGetIncludesList, {
@@ -506,18 +514,18 @@ describe('GetIncludesList', () => {
       object_type: 'PROG/P',
     });
     const tree = payloadOf(a).tree;
-    expect(tree.children.map((c: { name: string }) => c.name)).toEqual([
-      'ZINC_A',
-      'ZINC_B',
-    ]);
+    assert.deepStrictEqual(
+      tree.children.map((c: { name: string }) => c.name),
+      ['ZINC_A', 'ZINC_B'],
+    );
     const [incA, incB] = tree.children;
-    expect(incA.children[0]).toMatchObject({ name: 'ZINC_C' });
-    expect(incA.children[0].children[0]).toMatchObject({
+    assertMatchObject(incA.children[0], { name: 'ZINC_C' });
+    assertMatchObject(incA.children[0].children[0], {
       name: 'ZINC_A',
       cyclic: true,
     });
-    expect(incA.children[1].children[0]).toMatchObject({ name: 'ZINC_D' });
-    expect(incB).toMatchObject({ name: 'ZINC_B', duplicate: true });
+    assertMatchObject(incA.children[1].children[0], { name: 'ZINC_D' });
+    assertMatchObject(incB, { name: 'ZINC_B', duplicate: true });
   });
 
   it('a class is its one metadata read, sent as itself', async () => {
@@ -528,11 +536,12 @@ describe('GetIncludesList', () => {
         object_type: 'CLAS/OC',
       }),
     );
-    expect(fake.envelopes).toHaveLength(0);
-    expect(directsOf(fake)).toEqual(['meta:class:ZCL']);
-    expect(
+    assert.equal(fake.envelopes.length, 0);
+    assert.deepStrictEqual(directsOf(fake), ['meta:class:ZCL']);
+    assert.deepStrictEqual(
       payloadOf(result).tree.children.map((c: { name: string }) => c.name),
-    ).toEqual(['definitions', 'main']);
+      ['definitions', 'main'],
+    );
   });
 
   it('phases: the root source, then the includes of each depth, each read once', async () => {
@@ -544,7 +553,7 @@ describe('GetIncludesList', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['src:prog:ZPROG'],
       ['src:incl:ZINC_A', 'src:incl:ZINC_B'],
       ['src:incl:ZINC_C', 'src:incl:ZINC_D'],
@@ -560,7 +569,7 @@ describe('GetIncludesList', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['ns:FUGR/F:ZFG:'],
       ['ns:FUGR/F:ZFG:5'],
       ['src:incl:LZFGTOP', 'src:incl:LZFGUXX', 'src:incl:LZFGU01'],
@@ -585,11 +594,15 @@ describe('GetIncludesList', () => {
       }),
       TURNS,
     );
-    expect(two.envelopes).toHaveLength(one.envelopes.length);
-    expect(phasesOf(two)[0]).toEqual(['src:prog:ZPROG', 'src:prog:ZPROG2']);
-    expect(
+    assert.equal(two.envelopes.length, one.envelopes.length);
+    assert.deepStrictEqual(phasesOf(two)[0], [
+      'src:prog:ZPROG',
+      'src:prog:ZPROG2',
+    ]);
+    assert.deepStrictEqual(
       payloadOf(result).map((e: { object_name: string }) => e.object_name),
-    ).toEqual(['ZPROG', 'ZPROG2']);
+      ['ZPROG', 'ZPROG2'],
+    );
   });
 
   it('depth: up to 20 levels, one envelope each; the answer is the sequential version’s', async () => {
@@ -599,10 +612,10 @@ describe('GetIncludesList', () => {
       { object_name: 'ZDEEP', object_type: 'PROG/P' },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(batched.envelopes).toHaveLength(21);
+    assert.equal(textOf(a), textOf(b));
+    assert.equal(batched.envelopes.length, 21);
     for (const phase of phasesOf(batched).slice(1)) {
-      expect(phase).toHaveLength(1);
+      assert.equal(phase.length, 1);
     }
   });
 
@@ -621,9 +634,9 @@ describe('GetIncludesList', () => {
       { object_name: 'ZPROG', object_type: 'PROG/P' },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a).unreadable).toEqual([
-      expect.objectContaining({ name: 'ZINC_B', status: 403 }),
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a).unreadable, [
+      { name: 'ZINC_B', status: 403 },
     ]);
   });
 
@@ -634,9 +647,9 @@ describe('GetIncludesList', () => {
       { object_name: 'ZPROG', object_type: 'PROG/P' },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401, step: 'read source' });
-    expect(batched.envelopes).toHaveLength(2);
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a), { status: 401, step: 'read source' });
+    assert.equal(batched.envelopes.length, 2);
   });
 
   it('a 401 in a list call ends the whole call, as in the sequential version', async () => {
@@ -651,8 +664,8 @@ describe('GetIncludesList', () => {
       },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a), { status: 401 });
   });
 
   it("the connection's credential refusal ends the call as it came", async () => {
@@ -665,8 +678,8 @@ describe('GetIncludesList', () => {
         object_type: 'PROG/P',
       }),
     );
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(fake.envelopes.length, 1);
   });
 
   it("an envelope that fails is every part's failure, the envelope's error as it came; nothing after it is read", async () => {
@@ -689,19 +702,19 @@ describe('GetIncludesList', () => {
       phasesOf(fake)[1] as string[],
     );
     expectEnvelopeFailure(result, expected, 2);
-    expect(payloadOf(result).unreadable).toEqual([
-      expect.objectContaining({
+    assertMatchObject(payloadOf(result).unreadable, [
+      {
         name: 'ZINC_A',
         status: 500,
         step: 'read source',
-      }),
-      expect.objectContaining({
+      },
+      {
         name: 'ZINC_B',
         status: 500,
         step: 'read source',
-      }),
+      },
     ]);
-    expect(fake.envelopes).toHaveLength(2);
+    assert.equal(fake.envelopes.length, 2);
   });
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
@@ -724,19 +737,21 @@ describe('GetIncludesList', () => {
       }),
       TURNS,
     );
-    expect(textOf(result)).toBe(textOf(expected));
-    expect(fake.envelopes).toHaveLength(1);
-    expect(context.batchAvailability?.available()).toBe(false);
+    assert.equal(textOf(result), textOf(expected));
+    assert.equal(fake.envelopes.length, 1);
+    assert.equal(context.batchAvailability?.available(), false);
   });
 
   it('exactly one of object_name/object_type or objects: its schema', () => {
-    expect(
+    assert.ok(
       schemaWords(GetIncludesList, {
         object_name: 'ZPROG',
         object_type: 'PROG/P',
         objects: [{ object_name: 'ZFG', object_type: 'FUGR/F' }],
-      }),
-    ).toContain('Give exactly one of object_name and object_type, or objects');
+      }).includes(
+        'Give exactly one of object_name and object_type, or objects',
+      ),
+    );
   });
 });
 
@@ -745,39 +760,42 @@ describe('GetIncludesList', () => {
 // ---------------------------------------------------------------------------
 
 describe('GetStructuresList', () => {
-  it.each([
+  for (const [args] of [
     [{ structure_name: 'ZS', include_extensions: false }],
     [{ structure_name: 'ZS' }],
     [{ structure_name: 'ZINC2' }],
     [{ structure_name: 'ZMISSING' }],
     [{ structure_names: ['ZS', 'ZS2', 'ZMISSING'] }],
-  ])('same answer as the sequential version: %j', async (args) => {
-    const { a, b, batched, sequential } = await bothWays(
-      handleGetStructuresList,
-      args,
-    );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(batched.directs).toHaveLength(0);
-    expect(sequential.envelopes).toHaveLength(0);
-  });
+  ]) {
+    it(format('same answer as the sequential version: %j', args), async () => {
+      const { a, b, batched, sequential } = await bothWays(
+        handleGetStructuresList,
+        args,
+      );
+      assert.equal(textOf(a), textOf(b));
+      assert.equal(batched.directs.length, 0);
+      assert.equal(sequential.envelopes.length, 0);
+    });
+  }
 
   it('the tree: includes from the source, appends from where-used, a repeated structure marked cyclic', async () => {
     const { a } = await bothWays(handleGetStructuresList, {
       structure_name: 'ZS',
     });
     const tree = payloadOf(a).tree;
-    expect(
+    assert.deepStrictEqual(
       tree.children.map((c: { structure: string; kind: string }) => [
         c.structure,
         c.kind,
       ]),
-    ).toEqual([
-      ['ZINC1', 'include'],
-      ['ZINC2', 'include'],
-      ['ZAPP', 'append'],
-    ]);
-    expect(tree.children[0].children[0]).toMatchObject({ structure: 'ZINC3' });
-    expect(tree.children[1].children[0]).toMatchObject({
+      [
+        ['ZINC1', 'include'],
+        ['ZINC2', 'include'],
+        ['ZAPP', 'append'],
+      ],
+    );
+    assertMatchObject(tree.children[0].children[0], { structure: 'ZINC3' });
+    assertMatchObject(tree.children[1].children[0], {
       structure: 'ZINC3',
       cyclic: true,
     });
@@ -792,7 +810,7 @@ describe('GetStructuresList', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['ddl:structure:ZS'],
       ['ddl:structure:ZINC1', 'ddl:structure:ZINC2'],
       ['ddl:table:ZINC2'],
@@ -806,7 +824,7 @@ describe('GetStructuresList', () => {
       handleGetStructuresList(contextOn(fake), { structure_name: 'ZS' }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['ddl:structure:ZS'],
       ['scope:structure:ZS', 'scope:table:ZS'],
       ['wu:structure:ZS'],
@@ -841,10 +859,10 @@ describe('GetStructuresList', () => {
     const notFound = new Set<string>();
     for (const phase of phases) {
       const kinds = new Set(phase.map((label) => label.split(':')[1]));
-      expect(kinds.size).toBe(1);
+      assert.equal(kinds.size, 1);
       for (const label of phase) {
         const [, kind, name] = label.split(':');
-        if (kind === 'table') expect(notFound.has(name as string)).toBe(true);
+        if (kind === 'table') assert.equal(notFound.has(name as string), true);
         if (kind === 'structure' && answerOf({}, label).status === 404) {
           notFound.add(name as string);
         }
@@ -869,13 +887,17 @@ describe('GetStructuresList', () => {
       }),
       TURNS,
     );
-    expect(two.envelopes).toHaveLength(one.envelopes.length);
-    expect(phasesOf(two)[0]).toEqual(['ddl:structure:ZS', 'ddl:structure:ZS2']);
-    expect(
+    assert.equal(two.envelopes.length, one.envelopes.length);
+    assert.deepStrictEqual(phasesOf(two)[0], [
+      'ddl:structure:ZS',
+      'ddl:structure:ZS2',
+    ]);
+    assert.deepStrictEqual(
       payloadOf(result).map(
         (e: { structure_name: string }) => e.structure_name,
       ),
-    ).toEqual(['ZS', 'ZS2']);
+      ['ZS', 'ZS2'],
+    );
   });
 
   it("a part's failure is that node's: its error, the rest answers, as the sequential version", async () => {
@@ -898,8 +920,8 @@ describe('GetStructuresList', () => {
       { structure_name: 'ZS', include_extensions: false },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a).tree.children[0].error).toHaveLength(2);
+    assert.equal(textOf(a), textOf(b));
+    assert.equal(payloadOf(a).tree.children[0].error.length, 2);
   });
 
   it('a 401 SAP answered to a node ends the call as it came; no later phase is read', async () => {
@@ -909,12 +931,12 @@ describe('GetStructuresList', () => {
       { structure_name: 'ZS', include_extensions: false },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a), {
       status: 401,
       step: 'read structure',
     });
-    expect(batched.envelopes).toHaveLength(2);
+    assert.equal(batched.envelopes.length, 2);
   });
 
   it('a 401 SAP answered to a where-used scope ends the call as it came', async () => {
@@ -924,9 +946,9 @@ describe('GetStructuresList', () => {
       { structure_name: 'ZS' },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
-    expect(batched.envelopes).toHaveLength(2);
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a), { status: 401 });
+    assert.equal(batched.envelopes.length, 2);
   });
 
   it("the connection's credential refusal ends the call as it came", async () => {
@@ -936,8 +958,8 @@ describe('GetStructuresList', () => {
     const result = await withinTurns(
       handleGetStructuresList(contextOn(fake), { structure_name: 'ZS' }),
     );
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(fake.envelopes.length, 1);
   });
 
   it("an envelope that fails is every part's failure; the answer is the sequential one with those reads failed", async () => {
@@ -948,16 +970,19 @@ describe('GetStructuresList', () => {
       TURNS,
     );
     const failed = phasesOf(fake)[1] as string[];
-    expect(failed).toEqual(['ddl:structure:ZINC1', 'ddl:structure:ZINC2']);
+    assert.deepStrictEqual(failed, [
+      'ddl:structure:ZINC1',
+      'ddl:structure:ZINC2',
+    ]);
     const expected = await sequentialWithFailed(
       handleGetStructuresList,
       args,
       failed,
     );
     expectEnvelopeFailure(result, expected, 1);
-    expect(payloadOf(result).tree.children[0].error).toEqual([
-      expect.objectContaining({ status: 500, step: 'read structure' }),
-      expect.objectContaining({ step: 'read table' }),
+    assertMatchObject(payloadOf(result).tree.children[0].error, [
+      { status: 500, step: 'read structure' },
+      { step: 'read table' },
     ]);
   });
 
@@ -977,8 +1002,8 @@ describe('GetStructuresList', () => {
       }),
       TURNS,
     );
-    expect(textOf(result)).toBe(textOf(expected));
-    expect(context.batchAvailability?.available()).toBe(false);
+    assert.equal(textOf(result), textOf(expected));
+    assert.equal(context.batchAvailability?.available(), false);
   });
 });
 
@@ -987,7 +1012,7 @@ describe('GetStructuresList', () => {
 // ---------------------------------------------------------------------------
 
 describe('GetEnhancements', () => {
-  it.each([
+  for (const [args] of [
     [{ object_name: 'ZPROGE', object_type: 'unknown', include_nested: true }],
     [
       {
@@ -1011,15 +1036,17 @@ describe('GetEnhancements', () => {
         include_nested: true,
       },
     ],
-  ])('same answer as the sequential version: %j', async (args) => {
-    const { a, b, batched, sequential } = await bothWays(
-      handleGetEnhancements,
-      args,
-    );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(batched.directs).toHaveLength(0);
-    expect(sequential.envelopes).toHaveLength(0);
-  });
+  ]) {
+    it(format('same answer as the sequential version: %j', args), async () => {
+      const { a, b, batched, sequential } = await bothWays(
+        handleGetEnhancements,
+        args,
+      );
+      assert.equal(textOf(a), textOf(b));
+      assert.equal(batched.directs.length, 0);
+      assert.equal(sequential.envelopes.length, 0);
+    });
+  }
 
   it('phases: the probes one per phase, the enhancements with the root node structure, the includes node, the includes’ metadata, their enhancements', async () => {
     const fake = system();
@@ -1031,7 +1058,7 @@ describe('GetEnhancements', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['meta:class:ZPROGE'],
       ['meta:prog:ZPROGE'],
       ['elements:prog:ZPROGE', 'ns:PROG/P:ZPROGE:'],
@@ -1040,9 +1067,9 @@ describe('GetEnhancements', () => {
       ['elements:incl:ZEI1'],
     ]);
     const body = payloadOf(result);
-    expect(body.total_objects_analyzed).toBe(2);
-    expect(body.includes_unread).toEqual([
-      expect.objectContaining({ include: 'ZEI2', step: 'read enhancements' }),
+    assert.equal(body.total_objects_analyzed, 2);
+    assertMatchObject(body.includes_unread, [
+      { include: 'ZEI2', step: 'read enhancements' },
     ]);
   });
 
@@ -1054,8 +1081,8 @@ describe('GetEnhancements', () => {
         object_type: 'CLAS/OC',
       }),
     );
-    expect(fake.envelopes).toHaveLength(0);
-    expect(directsOf(fake)).toEqual(['elements:class:ZCLE']);
+    assert.equal(fake.envelopes.length, 0);
+    assert.deepStrictEqual(directsOf(fake), ['elements:class:ZCLE']);
   });
 
   it('several objects share the envelopes: their count does not grow with the number of objects', async () => {
@@ -1078,16 +1105,17 @@ describe('GetEnhancements', () => {
       }),
       TURNS,
     );
-    expect(two.envelopes).toHaveLength(one.envelopes.length);
-    expect(phasesOf(two)[0]).toEqual([
+    assert.equal(two.envelopes.length, one.envelopes.length);
+    assert.deepStrictEqual(phasesOf(two)[0], [
       'meta:class:ZPROGE',
       'meta:class:ZPROGF',
     ]);
-    expect(
+    assert.deepStrictEqual(
       payloadOf(result).map(
         (e: { main_object: { name: string } }) => e.main_object.name,
       ),
-    ).toEqual(['ZPROGE', 'ZPROGF']);
+      ['ZPROGE', 'ZPROGF'],
+    );
   });
 
   it("a part's failure is that object's: the rest answers, as the sequential version", async () => {
@@ -1110,12 +1138,12 @@ describe('GetEnhancements', () => {
       },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
+    assert.equal(textOf(a), textOf(b));
     const [first, second] = payloadOf(a);
-    expect(first.enhancements).toHaveLength(1);
-    expect(second).toMatchObject({
+    assert.equal(first.enhancements.length, 1);
+    assertMatchObject(second, {
       object_name: 'ZPROGF',
-      error: expect.objectContaining({ status: 403 }),
+      error: { status: 403 },
     });
   });
 
@@ -1126,12 +1154,12 @@ describe('GetEnhancements', () => {
       { object_name: 'ZPROGE', object_type: 'unknown', include_nested: true },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a), {
       status: 401,
       step: 'read class metadata',
     });
-    expect(batched.envelopes).toHaveLength(1);
+    assert.equal(batched.envelopes.length, 1);
   });
 
   it("a 401 SAP answered to an include's enhancements ends the call as it came", async () => {
@@ -1141,8 +1169,8 @@ describe('GetEnhancements', () => {
       { object_name: 'ZPROGE', object_type: 'PROG/P', include_nested: true },
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
+    assert.equal(textOf(a), textOf(b));
+    assertMatchObject(payloadOf(a), { status: 401 });
   });
 
   it("the connection's credential refusal ends the call as it came", async () => {
@@ -1155,8 +1183,8 @@ describe('GetEnhancements', () => {
         object_type: 'unknown',
       }),
     );
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(fake.envelopes.length, 1);
   });
 
   it('max_includes: only the first includes are read, as the sequential version reads them', async () => {
@@ -1167,14 +1195,14 @@ describe('GetEnhancements', () => {
       max_includes: 1,
     };
     const { a, b, batched } = await bothWays(handleGetEnhancements, args);
-    expect(textOf(a)).toBe(textOf(b));
-    expect(phasesOf(batched)).toEqual([
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(phasesOf(batched), [
       ['elements:prog:ZPROGE', 'ns:PROG/P:ZPROGE:'],
       ['ns:PROG/P:ZPROGE:7'],
       ['meta:incl:ZEI1'],
       ['elements:incl:ZEI1'],
     ]);
-    expect(payloadOf(a).total_objects_analyzed).toBe(2);
+    assert.equal(payloadOf(a).total_objects_analyzed, 2);
   });
 
   it('a refused class probe, then the program found: the refusal beside the enhancements, as the sequential version', async () => {
@@ -1189,36 +1217,45 @@ describe('GetEnhancements', () => {
       args,
       model,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(phasesOf(batched)).toEqual([
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(phasesOf(batched), [
       ['meta:class:ZPROGE'],
       ['meta:prog:ZPROGE'],
       ['elements:prog:ZPROGE'],
     ]);
     const body = payloadOf(a);
-    expect(body.object_type).toBe('program');
-    expect(body.unreadable).toEqual([
-      expect.objectContaining({ status: 403, step: 'read class metadata' }),
+    assert.equal(body.object_type, 'program');
+    assertMatchObject(body.unreadable, [
+      { status: 403, step: 'read class metadata' },
     ]);
   });
 
-  it.each([
+  for (const [args] of [
     [{ object_name: 'SAPLZFGE', object_type: 'unknown' }],
     [{ object_name: 'SAPLZFGE', include_nested: true }],
-  ])(
-    'an untyped SAPL<fg> is read as its group, without probing: %j',
-    async (args) => {
-      const { a, b, batched } = await bothWays(handleGetEnhancements, args);
-      expect(textOf(a)).toBe(textOf(b));
-      expect(phasesOf(batched)[0]).toContain('elements:fugr:ZFGE');
-      expect(
-        phasesOf(batched)
-          .flat()
-          .some((label) => label.startsWith('meta:')),
-      ).toBe(false);
-      expect(payloadOf(a).enhancements ?? payloadOf(a).objects).toBeDefined();
-    },
-  );
+  ]) {
+    it(
+      format(
+        'an untyped SAPL<fg> is read as its group, without probing: %j',
+        args,
+      ),
+      async () => {
+        const { a, b, batched } = await bothWays(handleGetEnhancements, args);
+        assert.equal(textOf(a), textOf(b));
+        assert.ok(phasesOf(batched)[0].includes('elements:fugr:ZFGE'));
+        assert.equal(
+          phasesOf(batched)
+            .flat()
+            .some((label) => label.startsWith('meta:')),
+          false,
+        );
+        assert.notEqual(
+          payloadOf(a).enhancements ?? payloadOf(a).objects,
+          undefined,
+        );
+      },
+    );
+  }
 
   it("an envelope that fails is every part's failure; the answer is the sequential one with those reads failed", async () => {
     const args = {
@@ -1232,15 +1269,18 @@ describe('GetEnhancements', () => {
       TURNS,
     );
     const failed = phasesOf(fake)[0] as string[];
-    expect(failed).toEqual(['elements:prog:ZPROGE', 'ns:PROG/P:ZPROGE:']);
-    expect(fake.envelopes).toHaveLength(1);
+    assert.deepStrictEqual(failed, [
+      'elements:prog:ZPROGE',
+      'ns:PROG/P:ZPROGE:',
+    ]);
+    assert.equal(fake.envelopes.length, 1);
     const expected = await sequentialWithFailed(
       handleGetEnhancements,
       args,
       failed,
     );
     expectEnvelopeFailure(result, expected, 1);
-    expect(payloadOf(result)).toMatchObject({
+    assertMatchObject(payloadOf(result), {
       status: 500,
       step: 'read enhancements',
     });
@@ -1265,7 +1305,7 @@ describe('GetEnhancements', () => {
       handleGetEnhancements(contextOn(reference, 'absent'), args),
       TURNS,
     );
-    expect(textOf(result)).toBe(textOf(expected));
-    expect(context.batchAvailability?.available()).toBe(false);
+    assert.equal(textOf(result), textOf(expected));
+    assert.equal(context.batchAvailability?.available(), false);
   });
 });

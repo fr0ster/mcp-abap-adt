@@ -6,7 +6,16 @@
  * sends nothing.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import type { BrokerCallOptions } from '@mcp-abap-adt/auth-broker';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
@@ -35,8 +44,8 @@ const savedEnv = { ...process.env };
 const savedCwd = process.cwd();
 
 let base: BrokerBase;
-let stdioStart: jest.SpyInstance;
-let getProvider: jest.SpyInstance;
+let stdioStart: Mock<StdioServer['start']>;
+let getProvider: Mock<AuthBrokerFactory['getProvider']>;
 
 beforeEach(() => {
   base = brokerBase('startup-check');
@@ -57,18 +66,21 @@ beforeEach(() => {
   // The system kind is required: the stand-in's is stated for every case
   // (a case about the type itself deletes or restates it).
   process.env.SAP_SYSTEM_TYPE = 'onprem';
-  stdioStart = jest
-    .spyOn(StdioServer.prototype, 'start')
-    .mockResolvedValue(undefined);
+  stdioStart = mock.method(
+    StdioServer.prototype,
+    'start',
+    async () => undefined,
+  );
   // The connection at start is the launcher's own step: not made here.
-  jest
-    .spyOn(StdioServer.prototype, 'connectAtStart')
-    .mockResolvedValue({ session: 'logged_on' });
-  getProvider = jest.spyOn(AuthBrokerFactory.prototype, 'getProvider');
+  const atStart: Awaited<ReturnType<StdioServer['connectAtStart']>> = {
+    session: 'logged_on',
+  };
+  mock.method(StdioServer.prototype, 'connectAtStart', async () => atStart);
+  getProvider = mock.method(AuthBrokerFactory.prototype, 'getProvider');
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   process.argv = savedArgv;
   process.env = { ...savedEnv };
   process.chdir(savedCwd);
@@ -95,7 +107,9 @@ async function run(argv: string[], platform = 'linux') {
 
 function startupSignals(): AbortSignal[] {
   return getProvider.mock.calls.map(
-    (call) => (call[1] as BrokerCallOptions | undefined)?.signal as AbortSignal,
+    (call) =>
+      (call.arguments[1] as BrokerCallOptions | undefined)
+        ?.signal as AbortSignal,
   );
 }
 
@@ -109,23 +123,23 @@ describe('the startup check', () => {
       'SAP_GRANT_TYPE=authorization_code',
     ]);
     const { stderr, exits } = await run([`--env-path=${file}`]);
-    expect(exits).toEqual([1]);
-    expect(stdioStart).not.toHaveBeenCalled();
-    expect(stderr.join('\n')).toContain('Destination "default"');
+    assert.deepStrictEqual(exits, [1]);
+    assert.equal(stdioStart.mock.callCount(), 0);
+    assert.ok(stderr.join('\n').includes('Destination "default"'));
     const signals = startupSignals();
-    expect(signals).toHaveLength(1);
-    expect(signals[0]).toBeInstanceOf(AbortSignal);
-    expect(signals[0].aborted).toBe(true);
+    assert.equal(signals.length, 1);
+    assert.ok(signals[0] instanceof AbortSignal);
+    assert.equal(signals[0].aborted, true);
   });
 
   it('a destination the broker serves starts; the startup signal is aborted once the check ended', async () => {
     const file = base.writeFile('conn.env', basicLines());
     const { exits } = await run([`--env-path=${file}`]);
-    expect(exits).toEqual([]);
-    expect(stdioStart).toHaveBeenCalledTimes(1);
+    assert.deepStrictEqual(exits, []);
+    assert.equal(stdioStart.mock.callCount(), 1);
     const signals = startupSignals();
-    expect(signals).toHaveLength(1);
-    expect(signals[0].aborted).toBe(true);
+    assert.equal(signals.length, 1);
+    assert.equal(signals[0].aborted, true);
   });
 
   describe('a platform with no browser: only a destination that logs in is refused', () => {
@@ -134,28 +148,30 @@ describe('the startup check', () => {
     it('basic starts on freebsd with the default --browser', async () => {
       const file = base.writeFile('conn.env', basicLines());
       const { exits, stderr } = await run([`--env-path=${file}`], 'freebsd');
-      expect(stderr.join('\n')).not.toContain('browser');
-      expect(exits).toEqual([]);
-      expect(stdioStart).toHaveBeenCalledTimes(1);
+      assert.ok(!stderr.join('\n').includes('browser'));
+      assert.deepStrictEqual(exits, []);
+      assert.equal(stdioStart.mock.callCount(), 1);
     });
 
     it('inspection-only starts on freebsd', async () => {
       const { exits } = await run([], 'freebsd');
-      expect(exits).toEqual([]);
-      expect(stdioStart).toHaveBeenCalledTimes(1);
+      assert.deepStrictEqual(exits, []);
+      assert.equal(stdioStart.mock.callCount(), 1);
     });
 
     it('jwt / authorization_code on freebsd: refused at the startup check, naming browser', async () => {
       const file = base.writeFile('conn.env', authorizationCodeLines());
       const { exits, stderr } = await run([`--env-path=${file}`], 'freebsd');
-      expect(exits).toEqual([1]);
-      expect(stdioStart).not.toHaveBeenCalled();
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(stdioStart.mock.callCount(), 0);
       const said = stderr.join('\n');
-      expect(said).toContain(
-        '[MCP] Destination "default" logs in through a browser, and none is known on this platform (freebsd)\nStart with --browser=none and open the URL the login prints on stderr, or give --browser-program=<program>.',
+      assert.ok(
+        said.includes(
+          '[MCP] Destination "default" logs in through a browser, and none is known on this platform (freebsd)\nStart with --browser=none and open the URL the login prints on stderr, or give --browser-program=<program>.',
+        ),
       );
       // The browser headline replaces the generic one; no second line has it.
-      expect(said).not.toContain('cannot be used');
+      assert.ok(!said.includes('cannot be used'));
     });
 
     it('jwt / authorization_code on freebsd with --browser=none: starts', async () => {
@@ -164,8 +180,8 @@ describe('the startup check', () => {
         [`--env-path=${file}`, '--browser=none'],
         'freebsd',
       );
-      expect(exits).toEqual([]);
-      expect(stdioStart).toHaveBeenCalledTimes(1);
+      assert.deepStrictEqual(exits, []);
+      assert.equal(stdioStart.mock.callCount(), 1);
     });
 
     it('an unknown --browser name is refused on freebsd too, for a basic destination', async () => {
@@ -174,9 +190,9 @@ describe('the startup check', () => {
         [`--env-path=${file}`, '--browser=opera'],
         'freebsd',
       );
-      expect(exits).toEqual([1]);
-      expect(stderr.join('\n')).toContain('--browser=none');
-      expect(stdioStart).not.toHaveBeenCalled();
+      assert.deepStrictEqual(exits, [1]);
+      assert.ok(stderr.join('\n').includes('--browser=none'));
+      assert.equal(stdioStart.mock.callCount(), 0);
     });
   });
 });

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import {
   analyseActivation,
   analyseException,
@@ -6,6 +8,7 @@ import { handleActivateDomain } from '../../handlers/domain/low/handleActivateDo
 import { handleCheckDomain } from '../../handlers/domain/low/handleCheckDomain';
 import { handleUpdateDomain } from '../../handlers/domain/low/handleUpdateDomain';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import * as clients from '../../lib/clients';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured, verbatim } from '../../lib/strategies/reading';
@@ -17,11 +20,12 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 // The recorder IS the client, or it records nothing. Every test in this file
 // that reads `seen.last` needs this wiring.
 const seen = recordAnalyse();
 let fakeClient: unknown = seen.client;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 // Nothing in this file asserts that a handler injects `resultsFor(domainDocuments)`
 // into `getDomain(...)` — both `fakeClientOf` and `recordAnalyse` ignore the
@@ -50,8 +54,8 @@ describe('CheckDomainLow', () => {
       domain_name: 'zd',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       ran: true,
       status_text: 'Object ZBP_MCP_SHR_I_ROOT has been checked',
     });
@@ -61,9 +65,9 @@ describe('CheckDomainLow', () => {
     fakeClient = seen.client;
     await handleCheckDomain(context as any, { domain_name: 'ZD' });
     const call = seen.calls.filter((c) => c.member === 'check').at(-1);
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.equal(call?.args[1], 'active');
   });
 });
 
@@ -79,8 +83,8 @@ describe('ActivateDomainLow', () => {
       domain_name: 'zd',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -114,23 +118,26 @@ describe('UpdateDomainLow', () => {
       lock_handle: 'h',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
 
     // The request the member actually builds from this: options carries the
     // whole patched document beside the lock handle and the strategy; config
-    // names the object and nothing else.
-    expect(updateCall?.config).toEqual({
+    // names the object and nothing else (its transport key present, unset).
+    assert.deepStrictEqual(updateCall?.config, {
       domainName: 'ZD',
+      transportRequest: undefined,
     });
-    expect(updateCall?.options).toEqual({
+    const { source, ...options } = updateCall?.options ?? {};
+    assert.ok(source.includes('adtcore:description="after"'));
+    assert.deepStrictEqual(options, {
       headers: DEFAULT_ADT_HEADERS['domain.updateMetadata'],
-      source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'h',
       analyse: analyseException,
     });
-    expect(
+    assert.equal(
       (updateCall?.config as { document?: unknown })?.document,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   // Task 22, fix round 1: the ledger named this domain gap explicitly —
@@ -157,8 +164,8 @@ describe('UpdateDomainLow', () => {
       lock_handle: 'h',
     });
 
-    expect(result.isError).toBe(false);
-    expect(updateCall?.config?.transportRequest).toBe('SIDK900123');
+    assert.equal(result.isError, false);
+    assert.equal(updateCall?.config?.transportRequest, 'SIDK900123');
   });
 
   // The bag is the model's own object: a flag given as null is no flag, and
@@ -181,8 +188,8 @@ describe('UpdateDomainLow', () => {
       lock_handle: 'h',
     });
 
-    expect(result.isError).toBe(false);
-    expect(source).toContain('<doma:signExists>false</doma:signExists>');
+    assert.equal(result.isError, false);
+    assert.ok(source.includes('<doma:signExists>false</doma:signExists>'));
   });
 
   it('accepts the camelCase alias too, the same fallback UpdateDataElementLow reads', async () => {
@@ -203,6 +210,6 @@ describe('UpdateDomainLow', () => {
       lock_handle: 'h',
     });
 
-    expect(updateCall?.config?.transportRequest).toBe('SIDK900456');
+    assert.equal(updateCall?.config?.transportRequest, 'SIDK900456');
   });
 });

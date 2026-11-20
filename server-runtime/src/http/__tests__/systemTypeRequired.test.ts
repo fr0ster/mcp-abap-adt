@@ -8,10 +8,12 @@
  * `system_type_required`, before anything is sent.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, it } from 'node:test';
+import { format } from 'node:util';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../../src/lib/auth/serverRefusal';
 import { type HttpStand, httpStand, turns } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 let s: HttpStand;
 afterEach(async () => {
@@ -19,28 +21,33 @@ afterEach(async () => {
   await s.close();
 });
 
-it.each([
+for (const [_what, value] of [
   ['no SAP_SYSTEM_TYPE', null],
   ['an SAP_SYSTEM_TYPE of no kind', 'abap-cloud'],
-])(
-  '%s at construction: the call is refused system_type_required, nothing sent',
-  async (_what, value) => {
-    s = await httpStand({ systemTypeEnv: value });
-    // Stated after construction: not read — one kind for the server's life.
-    process.env.SAP_SYSTEM_TYPE = 'onprem';
-    const answer = await s.call('ProbeAdt', { id: 'NO_KIND' });
-    expect(answer.isError).toBe(true);
-    expect(JSON.parse(answer.text)).toMatchObject({
-      error: 'system_type_required',
-      message: SYSTEM_TYPE_REQUIRED_WORDS,
-    });
-    expect(s.standIn.requests).toEqual([]);
-  },
-);
+]) {
+  it(
+    format(
+      '%s at construction: the call is refused system_type_required, nothing sent',
+      _what,
+    ),
+    async () => {
+      s = await httpStand({ systemTypeEnv: value });
+      // Stated after construction: not read — one kind for the server's life.
+      process.env.SAP_SYSTEM_TYPE = 'onprem';
+      const answer = await s.call('ProbeAdt', { id: 'NO_KIND' });
+      assert.equal(answer.isError, true);
+      assertMatchObject(JSON.parse(answer.text), {
+        error: 'system_type_required',
+        message: SYSTEM_TYPE_REQUIRED_WORDS,
+      });
+      assert.deepStrictEqual(s.standIn.requests, []);
+    },
+  );
+}
 
 it('stated: the same call reaches the system', async () => {
   s = await httpStand({ systemTypeEnv: 'onprem' });
   const answer = await s.call('ProbeAdt', { id: 'WITH_KIND' });
-  expect(answer.isError).toBe(false);
-  expect(s.standIn.requests.length).toBeGreaterThan(0);
+  assert.equal(answer.isError, false);
+  assert.ok(s.standIn.requests.length > 0);
 });

@@ -9,7 +9,7 @@
  * works in a realistic embedder scenario, even though the filter itself
  * doesn't touch the connection.
  *
- * Run: npm test -- --testPathPattern=integration/server
+ * Run: npm run test:integration -- src/__tests__/integration/server/EmbeddableMcpServer.systemType.test.ts
  */
 
 import assert from 'node:assert/strict';

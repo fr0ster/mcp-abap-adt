@@ -6,15 +6,19 @@
  * available again, as any dead process's file.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { LEFTOVER_SESSION_NOT_AVAILABLE_WORDS } from '../../../lib/auth/serverRefusal';
 import {
   LeftoverSessions,
   type SessionIdentity,
 } from '../../../lib/leftoverSessions/LeftoverSessions';
+import { rejectionOf } from '../../helpers/assertions';
 import { fakeProbe } from '../../helpers/leftoverSession';
 import {
   DESTINATION,
@@ -22,8 +26,6 @@ import {
   type LeftoverStand,
   leftoverStand,
 } from './harness';
-
-jest.setTimeout(30_000);
 
 const HANDLE = '0123456789abcdef0123456789abcdef';
 const IDENTITY: SessionIdentity = {
@@ -86,12 +88,12 @@ describe('the owner', () => {
     const a = owner(222);
     const b = owner(333);
     const won = a.claim(HANDLE, IDENTITY);
-    expect(won).toBeDefined();
-    expect(b.claim(HANDLE, IDENTITY)).toBeUndefined();
-    expect(b.list(IDENTITY)).toEqual([]);
+    assert.notEqual(won, undefined);
+    assert.equal(b.claim(HANDLE, IDENTITY), undefined);
+    assert.deepStrictEqual(b.list(IDENTITY), []);
     // The claimed file carries its claimer.
-    expect(fs.readdirSync(dir)).toEqual([won?.file]);
-    expect(won?.file.startsWith(`${HANDLE}.claimed.222.`)).toBe(true);
+    assert.deepStrictEqual(fs.readdirSync(dir), [won?.file]);
+    assert.equal(won?.file.startsWith(`${HANDLE}.claimed.222.`), true);
   });
 
   it('released, the file is a leftover again, and the other may claim it', () => {
@@ -100,22 +102,25 @@ describe('the owner', () => {
     const won = a.claim(HANDLE, IDENTITY);
     if (!won) throw new Error('not claimed');
     a.release(won);
-    expect(fs.readdirSync(dir)).toEqual([HANDLE]);
-    expect(b.claim(HANDLE, IDENTITY)).toBeDefined();
+    assert.deepStrictEqual(fs.readdirSync(dir), [HANDLE]);
+    assert.notEqual(b.claim(HANDLE, IDENTITY), undefined);
   });
 
   it('a file whose claimer died is listed and claimable again', () => {
     alive.add(555);
     const died = owner(555);
-    expect(died.claim(HANDLE, IDENTITY)).toBeDefined();
+    assert.notEqual(died.claim(HANDLE, IDENTITY), undefined);
     const a = owner(222);
-    expect(a.list(IDENTITY)).toEqual([]);
+    assert.deepStrictEqual(a.list(IDENTITY), []);
     alive.delete(555);
-    expect(a.list(IDENTITY).map((s) => s.handle)).toEqual([HANDLE]);
+    assert.deepStrictEqual(
+      a.list(IDENTITY).map((s) => s.handle),
+      [HANDLE],
+    );
     const taken = a.claim(HANDLE, IDENTITY);
-    expect(taken?.file.startsWith(`${HANDLE}.claimed.222.`)).toBe(true);
+    assert.equal(taken?.file.startsWith(`${HANDLE}.claimed.222.`), true);
     if (taken) a.forget(taken);
-    expect(fs.readdirSync(dir)).toEqual([]);
+    assert.deepStrictEqual(fs.readdirSync(dir), []);
   });
 
   describe('adopt', () => {
@@ -139,10 +144,11 @@ describe('the owner', () => {
       const claimed = a.claim(HANDLE, IDENTITY);
       if (!claimed) throw new Error('not claimed');
       a.adopt(claimed, connection('SAP_SESSIONID_X01_100=fresh'), IDENTITY);
-      expect(fs.readdirSync(dir)).toEqual([HANDLE]);
-      expect(
+      assert.deepStrictEqual(fs.readdirSync(dir), [HANDLE]);
+      assert.equal(
         JSON.parse(fs.readFileSync(path.join(dir, HANDLE), 'utf8')).pid,
-      ).toBe(222);
+        222,
+      );
     });
 
     it('keeps the claimed file while the connection holds no cookie, and removes it when the first write lands', async () => {
@@ -151,10 +157,10 @@ describe('the owner', () => {
       if (!claimed) throw new Error('not claimed');
       const adopted = connection(null);
       a.adopt(claimed, adopted, IDENTITY);
-      expect(fs.readdirSync(dir)).toEqual([claimed.file]);
+      assert.deepStrictEqual(fs.readdirSync(dir), [claimed.file]);
       adopted.held.cookies = 'SAP_SESSIONID_X01_100=fresh';
       await adopted.makeAdtRequest();
-      expect(fs.readdirSync(dir)).toEqual([HANDLE]);
+      assert.deepStrictEqual(fs.readdirSync(dir), [HANDLE]);
     });
 
     it('keeps the claimed file when the write failed', () => {
@@ -164,7 +170,8 @@ describe('the owner', () => {
       // A directory where the partial file goes: the write cannot succeed.
       fs.mkdirSync(path.join(dir, `${HANDLE}.partial`));
       a.adopt(claimed, connection('SAP_SESSIONID_X01_100=fresh'), IDENTITY);
-      expect(fs.readdirSync(dir).sort()).toEqual(
+      assert.deepStrictEqual(
+        fs.readdirSync(dir).sort(),
         [claimed.file, `${HANDLE}.partial`].sort(),
       );
     });
@@ -175,54 +182,60 @@ describe('through the tools', () => {
   let stand: LeftoverStand;
 
   beforeEach(() => {
-    jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    mock.method(process.stderr, 'write', () => true);
   });
   afterEach(async () => {
     await stand?.close();
-    jest.restoreAllMocks();
+    mock.restoreAll();
   });
 
-  it.each(['LogoffLeftoverSession'])(
-    '%s: a file another live process claimed is not available, and nothing is sent',
-    async (tool) => {
-      stand = await leftoverStand();
-      const { handle } = await stand.leftover();
-      stand.alive.add(333);
-      const other = new LeftoverSessions({
-        directory: stand.dir,
-        probe: fakeProbe(333, stand.alive),
-        report: () => {},
-      });
-      const identity = {
-        destination: DESTINATION,
-        url: stand.standIn.url,
-        client: '100',
-        system: 'onprem' as const,
-        wire: 'http' as const,
-        user: 'LEFT_USER',
-      };
-      expect(other.claim(handle, identity)).toBeDefined();
-      const from = stand.standIn.requests.length;
-      const answer = await stand.call(tool, { handle });
-      expect(answer.isError).toBe(true);
-      expect(json(answer.text).message).toBe(
-        LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
-      );
-      expect(stand.standIn.requests.length).toBe(from);
-      // The other process dies with its claim: the session is the user's again.
-      stand.alive.delete(333);
-      const off = await stand.call('LogoffLeftoverSession', { handle });
-      expect(json(off.text)).toEqual({ handle, state: 'logged_off' });
-      expect(stand.files()).toEqual([]);
-    },
-  );
+  for (const tool of ['LogoffLeftoverSession']) {
+    it(
+      format(
+        '%s: a file another live process claimed is not available, and nothing is sent',
+        tool,
+      ),
+      async () => {
+        stand = await leftoverStand();
+        const { handle } = await stand.leftover();
+        stand.alive.add(333);
+        const other = new LeftoverSessions({
+          directory: stand.dir,
+          probe: fakeProbe(333, stand.alive),
+          report: () => {},
+        });
+        const identity = {
+          destination: DESTINATION,
+          url: stand.standIn.url,
+          client: '100',
+          system: 'onprem' as const,
+          wire: 'http' as const,
+          user: 'LEFT_USER',
+        };
+        assert.notEqual(other.claim(handle, identity), undefined);
+        const from = stand.standIn.requests.length;
+        const answer = await stand.call(tool, { handle });
+        assert.equal(answer.isError, true);
+        assert.equal(
+          json(answer.text).message,
+          LEFTOVER_SESSION_NOT_AVAILABLE_WORDS,
+        );
+        assert.equal(stand.standIn.requests.length, from);
+        // The other process dies with its claim: the session is the user's again.
+        stand.alive.delete(333);
+        const off = await stand.call('LogoffLeftoverSession', { handle });
+        assert.deepStrictEqual(json(off.text), { handle, state: 'logged_off' });
+        assert.deepStrictEqual(stand.files(), []);
+      },
+    );
+  }
 
   it('a start whose resume failed gives the file back under its handle', async () => {
     stand = await leftoverStand();
     const { handle, session } = await stand.leftover();
     stand.standIn.answer((r) => r.session === session, 500);
-    await expect(stand.start()).rejects.toBeDefined();
-    expect(stand.files()).toEqual([handle]);
+    assert.notEqual(await rejectionOf(stand.start()), undefined);
+    assert.deepStrictEqual(stand.files(), [handle]);
   });
 
   it('a start claims nothing another live process claimed: a normal logon', async () => {
@@ -242,8 +255,9 @@ describe('through the tools', () => {
       wire: 'http',
       user: 'LEFT_USER',
     });
-    expect(claimed).toBeDefined();
-    expect(await stand.start()).toEqual({ session: 'logged_on' });
-    expect(stand.files()).toContain(claimed?.file);
+    assert.notEqual(claimed, undefined);
+    assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
+    const files: (string | undefined)[] = stand.files();
+    assert.ok(files.includes(claimed?.file));
   });
 });

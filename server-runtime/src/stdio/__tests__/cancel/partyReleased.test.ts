@@ -7,9 +7,9 @@
  * login ends `aborted`, R2's call settles, and the callback port is free.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import { bindsFree, type Stand, stand, until } from '../helpers/loginStand';
-
-jest.setTimeout(30_000);
 
 let s: Stand;
 
@@ -22,9 +22,12 @@ afterEach(async () => {
 });
 
 it("after R1 completes, R2's login ends with the session", async () => {
-  expect(await s.call('r1').done).toEqual({ text: 'r1', isError: false });
-  expect(s.logins).toEqual(['ok']);
-  expect(s.active()).toBe(0);
+  assert.deepStrictEqual(await s.call('r1').done, {
+    text: 'r1',
+    isError: false,
+  });
+  assert.deepStrictEqual(s.logins, ['ok']);
+  assert.equal(s.active(), 0);
 
   s.adt.refuse(true);
   s.tokens.refuseRefresh(true);
@@ -35,7 +38,7 @@ it("after R1 completes, R2's login ends with the session", async () => {
 
   // The login ends with R2: nobody else holds it.
   await until(() => s.logins.length === 2, 5_000);
-  expect(s.logins).toEqual(['ok', 'aborted']);
+  assert.deepStrictEqual(s.logins, ['ok', 'aborted']);
   await until(() => s.active() === 0, 5_000);
   await bindsFree(s.browser.ports[1]);
 });

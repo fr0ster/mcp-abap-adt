@@ -7,6 +7,8 @@
  * process — so the next request tries again, once.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
@@ -37,7 +39,7 @@ const REFUSAL = authError['credential-refused']({ credential: 'token' });
 const REASON = REFUSAL.reason;
 
 function refusingProvider() {
-  const prepare = jest.fn(async () => ({
+  const prepare = mock.fn(async () => ({
     ok: false as const,
     refusal: REFUSAL,
   }));
@@ -99,16 +101,16 @@ afterEach(() => {
 });
 
 describe('setting the context up', () => {
-  it('builds no connection and presents nothing', async () => {
-    const build = jest.spyOn(connectionFactory, 'createAbapConnection');
+  it('builds no connection and presents nothing', async (t) => {
+    const build = t.mock.method(connectionFactory, 'createAbapConnection');
     try {
       const { provider, prepare } = refusingProvider();
       const server = new TestServer();
       server.fromSource(sourceOf(provider));
-      expect(build).not.toHaveBeenCalled();
-      expect(prepare).not.toHaveBeenCalled();
+      assert.equal(build.mock.callCount(), 0);
+      assert.equal(prepare.mock.callCount(), 0);
     } finally {
-      build.mockRestore();
+      build.mock.restore();
     }
   });
 });
@@ -119,14 +121,14 @@ describe('a refused credential', () => {
     const source = sourceOf(provider);
 
     const first = await request(source);
-    expect(first).toBeInstanceOf(AuthRefusedError);
-    expect(prepare).toHaveBeenCalledTimes(1);
-    expect(getSystemContext()).toStrictEqual({});
+    assert.ok(first instanceof AuthRefusedError);
+    assert.equal(prepare.mock.callCount(), 1);
+    assert.deepStrictEqual(getSystemContext(), {});
 
     const second = await request(source);
-    expect(second).toBeInstanceOf(AuthRefusedError);
-    expect(prepare).toHaveBeenCalledTimes(2);
-    expect(getSystemContext()).toStrictEqual({});
+    assert.ok(second instanceof AuthRefusedError);
+    assert.equal(prepare.mock.callCount(), 2);
+    assert.deepStrictEqual(getSystemContext(), {});
   });
 
   it('is answered in its own fixed words', async () => {
@@ -134,8 +136,8 @@ describe('a refused credential', () => {
     const error = await request(sourceOf(provider));
     // The refusal's own words, as auth-errors rendered them: reason, then hint.
     const read = failureOf(error);
-    expect(read?.error).toBe('authentication_failed');
-    expect(read?.message).toBe(REASON);
-    expect(read?.hint).toBe(REFUSAL.hint);
+    assert.equal(read?.error, 'authentication_failed');
+    assert.equal(read?.message, REASON);
+    assert.equal(read?.hint, REFUSAL.hint);
   });
 });

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { candidatesWorthOpening } from '../integration/helpers/dumpFeed';
 
 /**
@@ -31,14 +33,20 @@ describe('choosing which dumps to open', () => {
       5,
     );
 
-    expect(narrowed).toBe(true);
-    expect(chosen.map((c) => c.id)).toEqual(['3', '1']);
+    assert.equal(narrowed, true);
+    assert.deepStrictEqual(
+      chosen.map((c) => c.id),
+      ['3', '1'],
+    );
   });
 
   it('caps how many it opens, however many matched', () => {
     const { chosen } = candidatesWorthOpening(feed, 'division by 0', 1);
 
-    expect(chosen.map((c) => c.id)).toEqual(['3']);
+    assert.deepStrictEqual(
+      chosen.map((c) => c.id),
+      ['3'],
+    );
   });
 
   /**
@@ -59,25 +67,29 @@ describe('choosing which dumps to open', () => {
       5,
     );
 
-    expect(narrowed).toBe(false);
-    expect(chosen.map((c) => c.id)).toEqual(['9', '8']);
+    assert.equal(narrowed, false);
+    assert.deepStrictEqual(
+      chosen.map((c) => c.id),
+      ['9', '8'],
+    );
   });
 
   it('still opens nothing when the feed itself is empty', () => {
     const { chosen, narrowed } = candidatesWorthOpening([], 'division by 0', 5);
 
-    expect(narrowed).toBe(false);
-    expect(chosen).toEqual([]);
+    assert.equal(narrowed, false);
+    assert.deepStrictEqual(chosen, []);
   });
 
   /** Case is the server's business, not the caller's. */
   it('matches a title regardless of case', () => {
     const shouting = [entry('7', 'DIVISION BY 0 (TYPE I OR INT8)')];
 
-    expect(
+    assert.deepStrictEqual(
       candidatesWorthOpening(shouting, 'Division By 0', 5).chosen.map(
         (c) => c.id,
       ),
-    ).toEqual(['7']);
+      ['7'],
+    );
   });
 });

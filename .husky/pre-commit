@@ -1,2 +1,2 @@
-lint-staged
+biome check --staged --diagnostic-level=error --no-errors-on-unmatched
 npm run build

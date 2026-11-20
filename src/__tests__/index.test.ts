@@ -1,32 +1,16 @@
-describe('MCP ABAP ADT Server', () => {
-  it('should be a valid test suite', () => {
-    expect(true).toBe(true);
-  });
+import { describe, it } from 'node:test';
 
+describe('MCP ABAP ADT Server', () => {
   describe('Module Imports', () => {
     it('should require handler modules without errors', () => {
-      expect(() =>
-        require('../handlers/program/high/handleGetProgram'),
-      ).not.toThrow();
-      expect(() =>
-        require('../handlers/class/high/handleGetClass'),
-      ).not.toThrow();
-      expect(() =>
-        require('../handlers/function_module/high/handleGetFunctionModule'),
-      ).not.toThrow();
+      require('../handlers/program/high/handleGetProgram');
+      require('../handlers/class/high/handleGetClass');
+      require('../handlers/function_module/high/handleGetFunctionModule');
     });
 
     it('should require utility modules without errors', () => {
-      expect(() => require('../lib/utils')).not.toThrow();
-      expect(() => require('../lib/logger')).not.toThrow();
-    });
-  });
-
-  describe('Configuration', () => {
-    it('should have valid Node.js version', () => {
-      const nodeVersion = process.version;
-      const majorVersion = parseInt(nodeVersion.split('.')[0].slice(1), 10);
-      expect(majorVersion).toBeGreaterThanOrEqual(18);
+      require('../lib/utils');
+      require('../lib/logger');
     });
   });
 });

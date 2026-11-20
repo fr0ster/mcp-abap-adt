@@ -11,6 +11,9 @@
  * the message names the parts the type does offer, which is what lets a caller
  * correct itself in one step.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   compactMetadataRoutes,
   compactUrlRoutes,
@@ -39,47 +42,50 @@ const context = {
 describe('the parts a compact read can answer', () => {
   it('routes urls only where a service URL exists', () => {
     // One entry, and that is the honest size of it.
-    expect(Object.keys(compactUrlRoutes)).toEqual(['SERVICE_BINDING']);
+    assert.deepStrictEqual(Object.keys(compactUrlRoutes), ['SERVICE_BINDING']);
   });
 
   it('routes metadata for the types whose documents carry one', () => {
-    expect(compactMetadataRoutes.CLASS).toBeDefined();
-    expect(compactMetadataRoutes.SERVICE_BINDING).toBeDefined();
+    assert.notEqual(compactMetadataRoutes.CLASS, undefined);
+    assert.notEqual(compactMetadataRoutes.SERVICE_BINDING, undefined);
     // A transport and a test run have no metadata document, and the map saying so
     // is what produces the refusal.
-    expect(compactMetadataRoutes.TRANSPORT).toBeUndefined();
-    expect(compactMetadataRoutes.UNIT_TEST).toBeUndefined();
+    assert.equal(compactMetadataRoutes.TRANSPORT, undefined);
+    assert.equal(compactMetadataRoutes.UNIT_TEST, undefined);
   });
 
   it('lists what a type offers, so a refusal is actionable', () => {
-    expect(partsFor('SERVICE_BINDING' as never, true, 'onprem')).toEqual([
-      'source',
-      'metadata',
-      'urls',
-    ]);
-    expect(partsFor('CLASS' as never, true, 'onprem')).toEqual([
+    assert.deepStrictEqual(
+      partsFor('SERVICE_BINDING' as never, true, 'onprem'),
+      ['source', 'metadata', 'urls'],
+    );
+    assert.deepStrictEqual(partsFor('CLASS' as never, true, 'onprem'), [
       'source',
       'metadata',
       'draft',
     ]);
-    expect(partsFor('TRANSPORT' as never, true, 'onprem')).toEqual(['source']);
+    assert.deepStrictEqual(partsFor('TRANSPORT' as never, true, 'onprem'), [
+      'source',
+    ]);
   });
 
   it("offers an include's main programs on premise only", () => {
-    expect(partsFor('INCLUDE', true, 'onprem')).toEqual([
+    assert.deepStrictEqual(partsFor('INCLUDE', true, 'onprem'), [
       'source',
       'metadata',
       'main_programs',
       'draft',
     ]);
-    expect(partsFor('INCLUDE', true, 'cloud')).toEqual(['source', 'metadata']);
+    assert.deepStrictEqual(partsFor('INCLUDE', true, 'cloud'), [
+      'source',
+      'metadata',
+    ]);
   });
 
   it('refuses a part the type does not have, naming the ones it does', async () => {
     // A class has a source and a metadata document, and no service URL.
-    expect(
+    assert.match(
       await refusalOf({ object_type: 'CLASS', part: 'urls', class_name: 'X' }),
-    ).toMatch(
       /part=urls is not available[\s\S]*CLASS[\s\S]*offers: source, metadata/,
     );
   });
@@ -88,38 +94,38 @@ describe('the parts a compact read can answer', () => {
     // A runtime dump has no read route (`COMPACT_READ_ROUTES`), so it is no
     // member of HandlerGet's object_type: refused before any part is asked,
     // with the members the declared variant reads.
-    expect(
+    assert.match(
       await refusalOf({ object_type: 'RUNTIME_DUMP', part: 'urls' }),
-    ).toMatch(
       /Unsupported read for object_type: RUNTIME_DUMP\. Supported: PACKAGE,/,
     );
   });
 
   it('refuses the source of a table type, naming its metadata', async () => {
-    expect(
+    assert.equal(
       await refusalOf({
         object_type: 'TABLE_TYPE',
         part: 'source',
         table_type_name: 'X',
       }),
-    ).toBe(
       'part=source is not available for object_type=TABLE_TYPE. It offers: metadata, draft.',
     );
   });
 
   it('refuses metadata where there is none', async () => {
-    expect(
+    assert.match(
       await refusalOf({
         object_type: 'UNIT_TEST',
         part: 'metadata',
         run_id: 'X',
       }),
-    ).toMatch(/part=metadata is not available[\s\S]*UNIT_TEST/);
+      /part=metadata is not available[\s\S]*UNIT_TEST/,
+    );
   });
 
   it('never silently answers a different part', async () => {
-    expect(
+    assert.match(
       await refusalOf({ object_type: 'UNIT_TEST', part: 'urls', run_id: 'X' }),
-    ).toMatch(/not available/);
+      /not available/,
+    );
   });
 });

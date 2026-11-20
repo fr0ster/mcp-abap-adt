@@ -5,6 +5,9 @@
  * is sent: the connect is a stand-in.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   AdtCloudConnector,
@@ -22,7 +25,7 @@ import { openFreshConnection } from '../../lib/packageSessions';
 const previous = process.env.SAP_SYSTEM_TYPE;
 beforeEach(() => resetProcessLatchForTests());
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previous;
 });
@@ -41,9 +44,11 @@ function sendNothing(connection: object): void {
       proto = Object.getPrototypeOf(proto);
     }
     if (!proto) throw new Error(`no ${method}`);
-    jest
-      .spyOn(proto as Record<string, () => Promise<void>>, method)
-      .mockResolvedValue(undefined);
+    mock.method(
+      proto as Record<string, () => Promise<void>>,
+      method,
+      async () => undefined,
+    );
   }
 }
 
@@ -52,23 +57,33 @@ async function endStandIn(connection: object): Promise<void> {
   await (connection as { disconnect: () => Promise<void> }).disconnect();
 }
 
-it.each([
+for (const [built, now, connector] of [
   ['cloud', 'onprem', AdtCloudConnector],
   ['onprem', 'cloud', AdtOnPremConnector],
-] as const)(
-  'built for %s, opened while SAP_SYSTEM_TYPE says %s: the sibling is %s',
-  async (built, now, connector) => {
-    process.env.SAP_SYSTEM_TYPE = built;
-    const credential = new BasicAuthProvider('user', 'secret') as IAuthProvider;
-    const main = createAbapConnection(settings, credential);
-    sendNothing(main);
-    process.env.SAP_SYSTEM_TYPE = now;
-    const sibling = await openFreshConnection(main, undefined as never);
-    expect(sibling).toBeInstanceOf(connector);
-    expect(systemKindOf(sibling)).toBe(built);
-    await endStandIn(sibling);
-  },
-);
+] as const) {
+  it(
+    format(
+      'built for %s, opened while SAP_SYSTEM_TYPE says %s: the sibling is %s',
+      built,
+      now,
+      connector,
+    ),
+    async () => {
+      process.env.SAP_SYSTEM_TYPE = built;
+      const credential = new BasicAuthProvider(
+        'user',
+        'secret',
+      ) as IAuthProvider;
+      const main = createAbapConnection(settings, credential);
+      sendNothing(main);
+      process.env.SAP_SYSTEM_TYPE = now;
+      const sibling = await openFreshConnection(main, undefined as never);
+      assert.ok(sibling instanceof connector);
+      assert.equal(systemKindOf(sibling), built);
+      await endStandIn(sibling);
+    },
+  );
+}
 
 it('opened with SAP_SYSTEM_TYPE gone: still the recorded kind, not refused', async () => {
   process.env.SAP_SYSTEM_TYPE = 'cloud';
@@ -79,6 +94,6 @@ it('opened with SAP_SYSTEM_TYPE gone: still the recorded kind, not refused', asy
   sendNothing(main);
   delete process.env.SAP_SYSTEM_TYPE;
   const sibling = await openFreshConnection(main, undefined as never);
-  expect(sibling).toBeInstanceOf(AdtCloudConnector);
+  assert.ok(sibling instanceof AdtCloudConnector);
   await endStandIn(sibling);
 });

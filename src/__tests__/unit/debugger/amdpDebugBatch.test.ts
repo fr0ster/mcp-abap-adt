@@ -13,6 +13,10 @@
  * over the batch's recorder. Every envelope and every direct request is
  * counted. Nothing reaches a system.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { AbapDebugger, AmdpDebugger } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -41,6 +45,7 @@ import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGr
 import type { IHandlerGroup } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   type EnvelopeAnswer,
   envelopeConnection,
@@ -357,174 +362,203 @@ function previewStepContinue(set: SetKind, handle: string) {
 
 const SETS: SetKind[] = ['full', 'compact'];
 
-describe.each(SETS)('the AMDP debugger batch, %s set', (set) => {
-  let s: Stand;
-  beforeEach(async () => {
-    s = await stand(set);
-  });
-  afterEach(async () => {
-    await s.close();
-  });
-
-  it('begin at an AMDP break opens the debugger batch', async () => {
-    await s.breakAt();
-    const begun = await s.call(NAMES.begin[set], beginArgs(set));
-    expect(begun.isError).not.toBe(true);
-    expect(jsonOf(begun)).toEqual({
-      debug_batch: 'on',
-      state_handle: s.handle(),
+for (const set of SETS) {
+  describe(format('the AMDP debugger batch, %s set', set), () => {
+    let s: Stand;
+    beforeEach(async () => {
+      s = await stand(set);
     });
-    expect(s.owner.mode()).toBe('debugger');
-  });
+    afterEach(async () => {
+      await s.close();
+    });
 
-  it('begin with no stop is refused as before', async () => {
-    const answer = await s.call(NAMES.begin[set], beginArgs(set));
-    expect(answer.isError).toBe(true);
-    expect(textOf(answer)).toContain('no debuggee is stopped');
-    expect(s.owner.mode()).toBe('off');
-  });
-
-  it('data preview, step over and continue recorded, one number each, into one envelope on the AMDP command connection; answers by number', async () => {
-    await s.breakAt();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const directsBefore = s.opened.map((fake) => fake.directs.length);
-    for (const [tool, args] of previewStepContinue(set, s.handle())) {
-      expect(await within(s.call(tool, args))).toEqual({ content: [] });
-    }
-    // Recorded, never sent: nothing left any connection, nothing reached
-    // the session's own debugger.
-    expect(s.opened.map((fake) => fake.directs.length)).toEqual(directsBefore);
-    expect(s.opened.flatMap((fake) => fake.envelopes)).toHaveLength(0);
-    expect(s.scripted.direct).toEqual([]);
-
-    const summary = jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))));
-    expect(summary).toEqual({ recorded: 3, sent: 3, received: 3 });
-    expect(s.owner.mode()).toBe('off');
-
-    const commands = s.commands();
-    expect(commands.envelopes).toHaveLength(1);
-    const [envelope] = commands.envelopes;
-    expect(envelope?.url).toBe('/sap/bc/adt/debugger/batch');
-    const parts = (envelope?.parts ?? []).map((p) => `${p.method} ${p.url}`);
-    expect(parts).toHaveLength(3);
-    expect(parts[0]).toMatch(
-      /^POST \/sap\/bc\/adt\/datapreview\/amdpdebugger\?.*variableName=LT_ROWS/,
-    );
-    expect(parts[0]).toContain('D1');
-    expect(parts[1]).toMatch(/^POST .*D1.*over/);
-    expect(parts[2]).toMatch(/^POST .*D1.*continue/);
-    // The command connection alone: no other connection got an envelope.
-    for (const fake of s.opened)
-      if (fake !== commands) expect(fake.envelopes).toHaveLength(0);
-    expect(s.main.envelopes).toHaveLength(0);
-    expect(s.scripted.direct).toEqual([]);
-
-    const answers = await answersOf(s, set, [1, 2, 3]);
-    expect(answers.map((a) => a.number)).toEqual([1, 2, 3]);
-    expect(answers.every((a) => a.isError !== true)).toBe(true);
-    const preview = JSON.parse(answers[0]?.content[0].text);
-    // The full set answers the rows; the compact set its value beside the handle.
-    const rows = set === 'full' ? preview : preview.value;
-    expect(Array.isArray(rows)).toBe(true);
-    expect(rows.length).toBeGreaterThan(0);
-    if (set === 'full') {
-      expect(JSON.parse(answers[1]?.content[0].text)).toMatchObject({
-        state: 'moving',
+    it('begin at an AMDP break opens the debugger batch', async () => {
+      await s.breakAt();
+      const begun = await s.call(NAMES.begin[set], beginArgs(set));
+      assert.notEqual(begun.isError, true);
+      assert.deepStrictEqual(jsonOf(begun), {
+        debug_batch: 'on',
+        state_handle: s.handle(),
       });
-    } else {
-      expect(JSON.parse(answers[1]?.content[0].text)).toMatchObject({
-        requestId: 'Q9',
-      });
-    }
-  });
-
-  it('the end answered with fewer parts than requests: batch_parts_mismatch, no map, every number answers it', async () => {
-    await s.breakAt();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    for (const [tool, args] of previewStepContinue(set, s.handle())) {
-      expect(await within(s.call(tool, args))).toEqual({ content: [] });
-    }
-    s.envelope.answer = (parts) =>
-      envelopeResponse(parts.slice(0, 1).map(amdpPart));
-    const ended = await settled(s.call(NAMES.end[set], endArgs(set)));
-    expect(ended.isError).toBe(true);
-    expect(jsonOf(ended)).toEqual({
-      error: 'batch_parts_mismatch',
-      message: refusals.batchPartsMismatchWords(1, 3),
+      assert.equal(s.owner.mode(), 'debugger');
     });
-    for (const entry of await answersOf(s, set, [1, 2, 3])) {
-      expect(entry.content).toEqual(ended.content);
-    }
-  });
 
-  it('the second recorded call is recorded while the first waits', async () => {
-    await s.breakAt();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const [first, second] = previewStepContinue(set, s.handle());
-    expect(await within(s.call(first[0], first[1]))).toEqual({ content: [] });
-    expect(await within(s.call(second[0], second[1]))).toEqual({
-      content: [],
+    it('begin with no stop is refused as before', async () => {
+      const answer = await s.call(NAMES.begin[set], beginArgs(set));
+      assert.equal(answer.isError, true);
+      assert.ok(textOf(answer).includes('no debuggee is stopped'));
+      assert.equal(s.owner.mode(), 'off');
     });
-    const summary = jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))));
-    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
-    expect(s.commands().envelopes[0]?.parts).toHaveLength(2);
-  });
 
-  it('every record path records exactly its one request', async () => {
-    await s.breakAt();
-    for (const [tool, args] of previewStepContinue(set, s.handle())) {
+    it('data preview, step over and continue recorded, one number each, into one envelope on the AMDP command connection; answers by number', async () => {
+      await s.breakAt();
       await s.call(NAMES.begin[set], beginArgs(set));
-      expect(await within(s.call(tool, args))).toEqual({ content: [] });
+      const directsBefore = s.opened.map((fake) => fake.directs.length);
+      for (const [tool, args] of previewStepContinue(set, s.handle())) {
+        assert.deepStrictEqual(await within(s.call(tool, args)), {
+          content: [],
+        });
+      }
+      // Recorded, never sent: nothing left any connection, nothing reached
+      // the session's own debugger.
+      assert.deepStrictEqual(
+        s.opened.map((fake) => fake.directs.length),
+        directsBefore,
+      );
+      assert.equal(s.opened.flatMap((fake) => fake.envelopes).length, 0);
+      assert.deepStrictEqual(s.scripted.direct, []);
+
       const summary = jsonOf(
         await settled(s.call(NAMES.end[set], endArgs(set))),
       );
-      expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
-      expect(s.commands().envelopes.at(-1)?.parts).toHaveLength(1);
-    }
-    expect(s.commands().envelopes).toHaveLength(3);
-    expect(s.scripted.direct).toEqual([]);
-  });
+      assert.deepStrictEqual(summary, { recorded: 3, sent: 3, received: 3 });
+      assert.equal(s.owner.mode(), 'off');
 
-  it('an ABAP debugger call is refused in the AMDP debugger batch and takes no number', async () => {
-    await s.breakAt();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const [tool, args]: [string, Record<string, unknown>] =
-      set === 'full'
-        ? ['DebugGetStack', { state_handle: s.handle() }]
-        : [
-            'HandlerDebugMaintain',
-            { state_handle: s.handle(), kind: 'abap', operation: 'getStack' },
-          ];
-    const answer = await s.call(tool, args);
-    expect(answer.isError).toBe(true);
-    expect(jsonOf(answer)).toEqual({
-      error: 'batch_not_recordable',
-      message: batchNotServedWords(tool),
-    });
-    expect(jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))))).toEqual(
-      { recorded: 0, sent: 0, received: 0 },
-    );
-  });
+      const commands = s.commands();
+      assert.equal(commands.envelopes.length, 1);
+      const [envelope] = commands.envelopes;
+      assert.equal(envelope?.url, '/sap/bc/adt/debugger/batch');
+      const parts = (envelope?.parts ?? []).map((p) => `${p.method} ${p.url}`);
+      assert.equal(parts.length, 3);
+      assert.match(
+        parts[0],
+        /^POST \/sap\/bc\/adt\/datapreview\/amdpdebugger\?.*variableName=LT_ROWS/,
+      );
+      assert.ok(parts[0].includes('D1'));
+      assert.match(parts[1], /^POST .*D1.*over/);
+      assert.match(parts[2], /^POST .*D1.*continue/);
+      // The command connection alone: no other connection got an envelope.
+      for (const fake of s.opened)
+        if (fake !== commands) assert.equal(fake.envelopes.length, 0);
+      assert.equal(s.main.envelopes.length, 0);
+      assert.deepStrictEqual(s.scripted.direct, []);
 
-  it('the AMDP session tools outside the table are refused while it is open', async () => {
-    await s.breakAt();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const [tool, args]: [string, Record<string, unknown>] =
-      set === 'full'
-        ? ['AmdpDebugCancel', { state_handle: s.handle() }]
-        : [
-            'HandlerDebugSession',
-            { state_handle: s.handle(), kind: 'amdp', operation: 'getEvents' },
-          ];
-    const answer = await s.call(tool, args);
-    expect(answer.isError).toBe(true);
-    expect(jsonOf(answer)).toEqual({
-      error: 'batch_not_recordable',
-      message: batchNotServedWords(tool),
+      const answers = await answersOf(s, set, [1, 2, 3]);
+      assert.deepStrictEqual(
+        answers.map((a) => a.number),
+        [1, 2, 3],
+      );
+      assert.equal(
+        answers.every((a) => a.isError !== true),
+        true,
+      );
+      const preview = JSON.parse(answers[0]?.content[0].text);
+      // The full set answers the rows; the compact set its value beside the handle.
+      const rows = set === 'full' ? preview : preview.value;
+      assert.equal(Array.isArray(rows), true);
+      assert.ok(rows.length > 0);
+      if (set === 'full') {
+        assertMatchObject(JSON.parse(answers[1]?.content[0].text), {
+          state: 'moving',
+        });
+      } else {
+        assertMatchObject(JSON.parse(answers[1]?.content[0].text), {
+          requestId: 'Q9',
+        });
+      }
     });
-    await settled(s.call(NAMES.end[set], endArgs(set)));
+
+    it('the end answered with fewer parts than requests: batch_parts_mismatch, no map, every number answers it', async () => {
+      await s.breakAt();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      for (const [tool, args] of previewStepContinue(set, s.handle())) {
+        assert.deepStrictEqual(await within(s.call(tool, args)), {
+          content: [],
+        });
+      }
+      s.envelope.answer = (parts) =>
+        envelopeResponse(parts.slice(0, 1).map(amdpPart));
+      const ended = await settled(s.call(NAMES.end[set], endArgs(set)));
+      assert.equal(ended.isError, true);
+      assert.deepStrictEqual(jsonOf(ended), {
+        error: 'batch_parts_mismatch',
+        message: refusals.batchPartsMismatchWords(1, 3),
+      });
+      for (const entry of await answersOf(s, set, [1, 2, 3])) {
+        assert.deepStrictEqual(entry.content, ended.content);
+      }
+    });
+
+    it('the second recorded call is recorded while the first waits', async () => {
+      await s.breakAt();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      const [first, second] = previewStepContinue(set, s.handle());
+      assert.deepStrictEqual(await within(s.call(first[0], first[1])), {
+        content: [],
+      });
+      assert.deepStrictEqual(await within(s.call(second[0], second[1])), {
+        content: [],
+      });
+      const summary = jsonOf(
+        await settled(s.call(NAMES.end[set], endArgs(set))),
+      );
+      assert.deepStrictEqual(summary, { recorded: 2, sent: 2, received: 2 });
+      assert.equal(s.commands().envelopes[0]?.parts.length, 2);
+    });
+
+    it('every record path records exactly its one request', async () => {
+      await s.breakAt();
+      for (const [tool, args] of previewStepContinue(set, s.handle())) {
+        await s.call(NAMES.begin[set], beginArgs(set));
+        assert.deepStrictEqual(await within(s.call(tool, args)), {
+          content: [],
+        });
+        const summary = jsonOf(
+          await settled(s.call(NAMES.end[set], endArgs(set))),
+        );
+        assert.deepStrictEqual(summary, { recorded: 1, sent: 1, received: 1 });
+        assert.equal(s.commands().envelopes.at(-1)?.parts.length, 1);
+      }
+      assert.equal(s.commands().envelopes.length, 3);
+      assert.deepStrictEqual(s.scripted.direct, []);
+    });
+
+    it('an ABAP debugger call is refused in the AMDP debugger batch and takes no number', async () => {
+      await s.breakAt();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      const [tool, args]: [string, Record<string, unknown>] =
+        set === 'full'
+          ? ['DebugGetStack', { state_handle: s.handle() }]
+          : [
+              'HandlerDebugMaintain',
+              { state_handle: s.handle(), kind: 'abap', operation: 'getStack' },
+            ];
+      const answer = await s.call(tool, args);
+      assert.equal(answer.isError, true);
+      assert.deepStrictEqual(jsonOf(answer), {
+        error: 'batch_not_recordable',
+        message: batchNotServedWords(tool),
+      });
+      assert.deepStrictEqual(
+        jsonOf(await settled(s.call(NAMES.end[set], endArgs(set)))),
+        { recorded: 0, sent: 0, received: 0 },
+      );
+    });
+
+    it('the AMDP session tools outside the table are refused while it is open', async () => {
+      await s.breakAt();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      const [tool, args]: [string, Record<string, unknown>] =
+        set === 'full'
+          ? ['AmdpDebugCancel', { state_handle: s.handle() }]
+          : [
+              'HandlerDebugSession',
+              {
+                state_handle: s.handle(),
+                kind: 'amdp',
+                operation: 'getEvents',
+              },
+            ];
+      const answer = await s.call(tool, args);
+      assert.equal(answer.isError, true);
+      assert.deepStrictEqual(jsonOf(answer), {
+        error: 'batch_not_recordable',
+        message: batchNotServedWords(tool),
+      });
+      await settled(s.call(NAMES.end[set], endArgs(set)));
+    });
   });
-});
+}
 
 describe('a complete stop ends the debugger batch answers with the debug state (full set)', () => {
   let s: Stand;
@@ -543,7 +577,7 @@ describe('a complete stop ends the debugger batch answers with the debug state (
       s.call('AmdpDebugStep', { state_handle: handle, action: 'over' }),
     );
     await settled(s.call('DebugBatchEnd', {}));
-    expect(s.owner.holdsState()).toBe(true); // the answers are kept
+    assert.equal(s.owner.holdsState(), true); // the answers are kept
     return handle;
   }
 
@@ -554,26 +588,26 @@ describe('a complete stop ends the debugger batch answers with the debug state (
     await until(() => s.scripted.reads.length >= 3);
     s.scripted.reads[2]?.resolve(okResponse(amdpEnd('D1')));
     const stopped = await stopping;
-    expect(stopped.isError).not.toBe(true);
-    expect(s.owner.holdsState()).toBe(false);
-    expect(s.holds()).toBe(false);
+    assert.notEqual(stopped.isError, true);
+    assert.equal(s.owner.holdsState(), false);
+    assert.equal(s.holds(), false);
     const after = await s.call('AmdpDebugWait', {
       state_handle: handle,
       hold_seconds: 0,
     });
-    expect(after.isError).toBe(true);
-    expect(textOf(after)).toContain('state is not available');
+    assert.equal(after.isError, true);
+    assert.ok(textOf(after).includes('state is not available'));
   });
 
   it('a stop that is refused keeps the answers: the state stays', async () => {
     const handle = await batchAtBreak();
     s.scripted.dbg.deleteDebuggee = async () => refusedResponse('busy');
     const stopped = await s.call('AmdpDebugStop', { state_handle: handle });
-    expect(stopped.isError).toBe(true);
-    expect(s.owner.holdsState()).toBe(true);
-    expect(s.holds()).toBe(true);
+    assert.equal(stopped.isError, true);
+    assert.equal(s.owner.holdsState(), true);
+    assert.equal(s.holds(), true);
     const answers = jsonOf(await s.call('DebugBatchAnswers', { numbers: [1] }));
-    expect(answers[0]?.number).toBe(1);
+    assert.equal(answers[0]?.number, 1);
   });
 });
 
@@ -597,16 +631,16 @@ describe('InstanceBatch: the kept map by the kind of its batch', () => {
     debug.begin('debugger', debugged);
     debug.end(debugged);
     debug.dropDebuggerAnswers();
-    expect(debug.holdsState()).toBe(false);
-    expect(debug.answer(1)).toBeUndefined();
+    assert.equal(debug.holdsState(), false);
+    assert.equal(debug.answer(1), undefined);
 
     const communication = new InstanceBatch({ keepRawParts: false });
     const communicated = recordedOne();
     communication.begin('communication', communicated);
     communication.end(communicated);
     communication.dropDebuggerAnswers();
-    expect(communication.holdsState()).toBe(true);
-    await expect(communication.answer(1)).resolves.toBe(answer);
+    assert.equal(communication.holdsState(), true);
+    assert.equal(await communication.answer(1), answer);
   });
 });
 
@@ -616,13 +650,15 @@ describe('the AMDP refusal of the debugger batch', () => {
     const refusal: ServerRefusalCode = 'debug_batch_amdp_unmeasured';
     // @ts-expect-error the code is out of the closed list of failures
     const failure: FailureCode = 'debug_batch_amdp_unmeasured';
-    expect([refusal, failure]).toHaveLength(2);
-    expect(
+    assert.equal([refusal, failure].length, 2);
+    assert.deepStrictEqual(
       Object.keys(refusals).filter((name) => name.includes('AMDP_UNMEASURED')),
-    ).toEqual([]);
-    expect(
+      [],
+    );
+    assert.equal(
       new refusals.ServerRefusal('debug_batch_amdp_unmeasured' as never)
         .message,
-    ).toBe('');
+      '',
+    );
   });
 });

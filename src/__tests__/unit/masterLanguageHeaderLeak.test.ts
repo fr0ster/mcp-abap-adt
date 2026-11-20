@@ -5,14 +5,34 @@
  * masterLanguage from the request scope when one is active (HTTP/SSE) and only
  * falls back to the process context outside any scope (stdio).
  */
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  AdtClientOnPrem: jest.fn(),
-  AdtClientCloud: jest.fn(),
-  AdtClientLegacy: jest.fn(),
-  getSystemInformation: jest.fn(),
-}));
 
-import { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { mockModuleExports } from '../helpers/moduleMock';
+
+// adt-clients replaced for this file before any module under test loads: the
+// handlers and src/lib/clients bind it when they load (node:test mock.module,
+// helpers/moduleMock.ts; its other exports stay the real ones).
+const AdtClientOnPremMock = mock.fn<(...args: any[]) => any>(
+  function AdtClientOnPrem() {},
+);
+const AdtClientCloudMock = mock.fn<(...args: any[]) => any>(
+  function AdtClientCloud() {},
+);
+const AdtClientLegacyMock = mock.fn<(...args: any[]) => any>(
+  function AdtClientLegacy() {},
+);
+const getSystemInformationMock = mock.fn<(...args: any[]) => any>(
+  function getSystemInformation() {},
+);
+mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
+  AdtClientOnPrem: AdtClientOnPremMock,
+  AdtClientCloud: AdtClientCloudMock,
+  AdtClientLegacy: AdtClientLegacyMock,
+  getSystemInformation: getSystemInformationMock,
+});
+
+import type { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../lib/clients';
 import { runWithRequestContext } from '../../lib/requestContext';
@@ -26,14 +46,14 @@ process.env.SAP_SYSTEM_TYPE = 'onprem';
 const conn = {} as IAbapConnection;
 
 function lastOptions(): ConstructorParameters<typeof AdtClientOnPrem>[2] {
-  const calls = jest.mocked(AdtClientOnPrem).mock.calls;
-  return calls.at(-1)?.[2];
+  const calls = AdtClientOnPremMock.mock.calls;
+  return calls.at(-1)?.arguments[2];
 }
 
 describe('masterLanguage does not leak across requests/modes (#110)', () => {
   beforeEach(() => {
     resetSystemContextCache();
-    jest.mocked(AdtClientOnPrem).mockClear();
+    AdtClientOnPremMock.mock.resetCalls();
     // Process-global context: a stale masterLanguage 'EN' plus a system id.
     setSystemContext({
       masterSystem: 'SYS',
@@ -43,14 +63,14 @@ describe('masterLanguage does not leak across requests/modes (#110)', () => {
 
   it('stdio (no request scope): falls back to process context', () => {
     createAdtClient(conn);
-    expect(lastOptions()?.masterLanguage).toBe('EN');
+    assert.equal(lastOptions()?.masterLanguage, 'EN');
   });
 
   it('request scope with x-sap-language: uses the request value', () => {
     runWithRequestContext({ masterLanguage: 'DE' }, () => {
       createAdtClient(conn);
     });
-    expect(lastOptions()?.masterLanguage).toBe('DE');
+    assert.equal(lastOptions()?.masterLanguage, 'DE');
   });
 
   it('request scope WITHOUT the header: does NOT inherit the global value', () => {
@@ -59,7 +79,7 @@ describe('masterLanguage does not leak across requests/modes (#110)', () => {
     runWithRequestContext({ masterLanguage: undefined }, () => {
       createAdtClient(conn);
     });
-    expect(lastOptions()?.masterLanguage).toBeUndefined();
+    assert.equal(lastOptions()?.masterLanguage, undefined);
   });
 
   it('scope does not persist after it ends', () => {
@@ -68,6 +88,6 @@ describe('masterLanguage does not leak across requests/modes (#110)', () => {
     });
     // back outside any scope → process context again, no 'DE' leak
     createAdtClient(conn);
-    expect(lastOptions()?.masterLanguage).toBe('EN');
+    assert.equal(lastOptions()?.masterLanguage, 'EN');
   });
 });

@@ -11,6 +11,8 @@
  * stateless.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import type { StandInRequest } from '../../helpers/adtStandIn';
 import {
   carriesContext,
@@ -23,8 +25,6 @@ import {
   statefulStand,
   toolRequests,
 } from './harness';
-
-jest.setTimeout(30_000);
 
 const NAME = 'ZCL_PLACEHOLDER';
 const SOURCE = 'CLASS zcl_placeholder DEFINITION. ENDCLASS.';
@@ -52,9 +52,9 @@ async function expectTheNextReadStateless(): Promise<void> {
   const sent = toolRequests(
     await s.during(() => s.call('GetClass', { class_name: NAME })),
   );
-  expect(sent.length).toBeGreaterThan(0);
-  expect(shown(sent.filter(isStateful))).toEqual([]);
-  expect(sent.some(carriesContext)).toBe(false);
+  assert.ok(sent.length > 0);
+  assert.deepStrictEqual(shown(sent.filter(isStateful)), []);
+  assert.equal(sent.some(carriesContext), false);
 }
 
 /**
@@ -67,7 +67,7 @@ async function ran(
   opened: (r: StandInRequest) => boolean,
 ): Promise<void> {
   const sent = toolRequests(await s.during(() => s.call(name, args)));
-  expect(sent.filter(opened).length).toBeGreaterThan(0);
+  assert.ok(sent.filter(opened).length > 0);
 }
 
 const statefulLock = (r: StandInRequest) => isLock(r) && isStateful(r);

@@ -5,19 +5,20 @@
  * red here; `WRITE_BATCH_MODE_PAGE=1 npm test -- src/__tests__/unit/batchModePage.test.ts`
  * writes the region first (refused under CI).
  */
+
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import {
   PAGE_END,
   PAGE_START,
   renderEligibility,
 } from '../helpers/batchModePage';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 const PAGE = path.join(
-  __dirname,
-  '..',
-  '..',
-  '..',
+  repositoryRoot(__dirname),
   'docs',
   'user-guide',
   'BATCH_MODE.md',
@@ -45,7 +46,8 @@ describe('the batch-mode page lists the eligibility table (npm test -- src/__tes
   }
 
   it('holds exactly the rendering of tools/batch-handlers.json', () => {
-    expect(region(fs.readFileSync(PAGE, 'utf8'))).toBe(
+    assert.equal(
+      region(fs.readFileSync(PAGE, 'utf8')),
       renderEligibility().trim(),
     );
   });

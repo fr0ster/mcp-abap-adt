@@ -8,6 +8,9 @@
  * src/__tests__/typecheck/handlerExporterGuide.typecheck.ts).
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -70,36 +73,58 @@ const PATHS: Readonly<
   },
 };
 
-describe.each(Object.entries(PATHS))('HandlerExporter %s', (_path, shown) => {
-  it.each<SapEnvironment | undefined>(['onprem', 'cloud', undefined])(
-    'where %s is stated: no background-run or debugger tool, run tools without background',
-    async (systemType) => {
-      const tools = await shown(systemType);
-      const names = tools.map((tool) => tool.name);
-      // Not vacuous: a run tool is there to look at (cloud lists the class run alone).
-      expect(names).toContain('RuntimeRunClass');
-      expect(names.filter((name) => LEFT_OUT.includes(name))).toEqual([]);
-      for (const tool of tools.filter((t) => RUN_TOOLS.includes(t.name))) {
-        expect(Object.keys(tool.inputSchema.properties ?? {})).not.toContain(
-          'background',
-        );
-        expect(Object.keys(tool.inputSchema.properties ?? {})).toContain(
-          'profile',
-        );
-      }
-    },
-  );
-});
+for (const [_path, shown] of Object.entries(PATHS)) {
+  describe(format('HandlerExporter %s', _path), () => {
+    for (const systemType of [
+      'onprem',
+      'cloud',
+      undefined,
+    ] satisfies ReadonlyArray<SapEnvironment | undefined>) {
+      it(
+        format(
+          'where %s is stated: no background-run or debugger tool, run tools without background',
+          systemType,
+        ),
+        async () => {
+          const tools = await shown(systemType);
+          const names = tools.map((tool) => tool.name);
+          // Not vacuous: a run tool is there to look at (cloud lists the class run alone).
+          assert.ok(names.includes('RuntimeRunClass'));
+          assert.deepStrictEqual(
+            names.filter((name) => LEFT_OUT.includes(name)),
+            [],
+          );
+          for (const tool of tools.filter((t) => RUN_TOOLS.includes(t.name))) {
+            assert.ok(
+              !Object.keys(tool.inputSchema.properties ?? {}).includes(
+                'background',
+              ),
+            );
+            assert.ok(
+              Object.keys(tool.inputSchema.properties ?? {}).includes(
+                'profile',
+              ),
+            );
+          }
+        },
+      );
+    }
+  });
+}
 
 describe('HandlerExporter getToolNames', () => {
   it('names no background-run or debugger tool', () => {
-    expect(
+    assert.deepStrictEqual(
       exporterFor('onprem')
         .getToolNames()
         .filter((name) => LEFT_OUT.includes(name)),
-    ).toEqual([]);
-    expect(LEFT_OUT).toEqual(
-      expect.arrayContaining(['GetBackgroundRun', 'DebugStartListener']),
+      [],
     );
+    {
+      const actual = LEFT_OUT;
+      for (const expected of ['GetBackgroundRun', 'DebugStartListener']) {
+        assert.ok(actual.some((e) => isDeepStrictEqual(e, expected)));
+      }
+    }
   });
 });

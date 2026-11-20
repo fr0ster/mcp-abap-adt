@@ -9,6 +9,9 @@
  * ADT for one — and it is why the fixture stays here verbatim rather than being
  * paraphrased into a "pattern".
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   annotationServiceOf,
   browserHostOf,
@@ -29,27 +32,27 @@ const DESCRIPTOR =
 
 describe('the ADT preview segment', () => {
   it('decodes to a readable descriptor', () => {
-    expect(decodeFeapSegment(ECLIPSE_SEGMENT)).toBe(DESCRIPTOR);
+    assert.equal(decodeFeapSegment(ECLIPSE_SEGMENT), DESCRIPTOR);
   });
 
   it('re-encodes to the very segment Eclipse produced', () => {
-    expect(encodeFeapSegment(DESCRIPTOR)).toBe(ECLIPSE_SEGMENT);
+    assert.equal(encodeFeapSegment(DESCRIPTOR), ECLIPSE_SEGMENT);
   });
 
   it('keeps the three encoding ranges apart', () => {
     // `#` (0x23) shifts to `7`, a digit shifts into letters, `_` shifts to `s`,
     // and a lowercase letter from `l` on leaves ASCII and needs the two UTF-8
     // bytes. A rule that treats them alike produces a URL that opens nothing.
-    expect(encodeFeapSegment('#')).toBe('7');
-    expect(encodeFeapSegment('0001')).toBe('DDDE');
-    expect(encodeFeapSegment('_')).toBe('s');
-    expect(encodeFeapSegment('k')).toBe('%7F');
-    expect(encodeFeapSegment('l')).toBe('%C2%80');
-    expect(encodeFeapSegment('z')).toBe('%C2%8E');
+    assert.equal(encodeFeapSegment('#'), '7');
+    assert.equal(encodeFeapSegment('0001'), 'DDDE');
+    assert.equal(encodeFeapSegment('_'), 's');
+    assert.equal(encodeFeapSegment('k'), '%7F');
+    assert.equal(encodeFeapSegment('l'), '%C2%80');
+    assert.equal(encodeFeapSegment('z'), '%C2%8E');
   });
 
   it('joins the descriptor in the order the preview expects', () => {
-    expect(
+    assert.equal(
       feapDescriptor({
         service: 'ZSB_STUDENT_V2',
         entitySet: 'student_data',
@@ -58,26 +61,30 @@ describe('the ADT preview segment', () => {
         annotationService: 'ZSB_STUDENT_V2_VAN',
         version: '0001',
       }),
-    ).toBe(DESCRIPTOR);
+      DESCRIPTOR,
+    );
   });
 
   it('names the annotation service after the service', () => {
-    expect(annotationServiceOf('ZSB_STUDENT_V2')).toBe('ZSB_STUDENT_V2_VAN');
-    expect(annotationServiceOf('zsb_student_v2')).toBe('ZSB_STUDENT_V2_VAN');
+    assert.equal(annotationServiceOf('ZSB_STUDENT_V2'), 'ZSB_STUDENT_V2_VAN');
+    assert.equal(annotationServiceOf('zsb_student_v2'), 'ZSB_STUDENT_V2_VAN');
   });
 
   it('moves a BTP preview onto the browser host, and leaves on premise alone', () => {
     // Measured: the ADT host answers 401 Basic for this path and a trial user has
     // no password; the `abap-web` host answers the BTP logon bootstrap.
-    expect(browserHostOf('https://abc123.abap.us10.hana.ondemand.com')).toBe(
+    assert.equal(
+      browserHostOf('https://abc123.abap.us10.hana.ondemand.com'),
       'https://abc123.abap-web.us10.hana.ondemand.com',
     );
     // On premise there is no such split.
-    expect(browserHostOf('https://host.example.com:44300')).toBe(
+    assert.equal(
+      browserHostOf('https://host.example.com:44300'),
       'https://host.example.com:44300',
     );
     // And a host that merely contains the word is not rewritten.
-    expect(browserHostOf('https://abap.example.com')).toBe(
+    assert.equal(
+      browserHostOf('https://abap.example.com'),
       'https://abap.example.com',
     );
   });
@@ -96,7 +103,8 @@ describe('the ADT preview segment', () => {
         version: '0001',
       },
     });
-    expect(url).toBe(
+    assert.equal(
+      url,
       'https://host.example.com:44300/sap/bc/adt/businessservices/odatav2/feap/' +
         `${ECLIPSE_SEGMENT}/flp.html?sap-ui-xx-viewCache=false&sap-ui-language=EN&sap-client=100`,
     );
@@ -132,25 +140,27 @@ describe('the V4 descriptor Eclipse produces', () => {
     }) satisfies FeapV4Descriptor;
 
   it('decodes the root capture', () => {
-    expect(decodeFeapSegment(ROOT_SEGMENT)).toBe(ROOT_DESCRIPTOR);
+    assert.equal(decodeFeapSegment(ROOT_SEGMENT), ROOT_DESCRIPTOR);
   });
 
   it('decodes the child capture, which differs only in parts 2 to 4', () => {
-    expect(decodeFeapSegment(CHILD_SEGMENT)).toBe(CHILD_DESCRIPTOR);
+    assert.equal(decodeFeapSegment(CHILD_SEGMENT), CHILD_DESCRIPTOR);
   });
 
   it('joins seven parts in the order the preview expects', () => {
-    expect(feapV4Descriptor(parts('Root', '_children', 'Child'))).toBe(
+    assert.equal(
+      feapV4Descriptor(parts('Root', '_children', 'Child')),
       ROOT_DESCRIPTOR,
     );
-    expect(feapV4Descriptor(parts('Child', '_parent', 'Root'))).toBe(
+    assert.equal(
+      feapV4Descriptor(parts('Child', '_parent', 'Root')),
       CHILD_DESCRIPTOR,
     );
   });
 
   it('re-encodes to the very segments Eclipse produced', () => {
-    expect(encodeFeapSegment(ROOT_DESCRIPTOR)).toBe(ROOT_SEGMENT);
-    expect(encodeFeapSegment(CHILD_DESCRIPTOR)).toBe(CHILD_SEGMENT);
+    assert.equal(encodeFeapSegment(ROOT_DESCRIPTOR), ROOT_SEGMENT);
+    assert.equal(encodeFeapSegment(CHILD_DESCRIPTOR), CHILD_SEGMENT);
   });
 
   it('builds the V4 preview URL from the V4 parts', () => {
@@ -160,7 +170,8 @@ describe('the V4 descriptor Eclipse produces', () => {
       descriptor: parts('Root', '_children', 'Child'),
       client: '100',
     });
-    expect(url).toBe(
+    assert.equal(
+      url,
       'https://abc123.abap-web.us10.hana.ondemand.com' +
         `/sap/bc/adt/businessservices/odatav4/feap/${ROOT_SEGMENT}` +
         '/flp.html?sap-ui-xx-viewCache=false&sap-ui-language=EN&sap-client=100',

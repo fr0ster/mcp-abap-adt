@@ -10,6 +10,9 @@
  * the variant — real adt-clients code, no SAP — and compares the requests.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleActivateObject } from '../../../handlers/common/low/handleActivateObject';
@@ -28,8 +31,6 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from '../../helpers/recordingConnection';
-
-jest.setTimeout(60_000);
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
@@ -126,7 +127,7 @@ describe('one object of a friendly name is activated exactly as one object of it
 
   /** The names standing for a single-activation code, per variant. */
   it('names exactly the names whose code is a single-activation code', () => {
-    expect(SINGLE_ACTIVATION_NAMES).toEqual({
+    assert.deepStrictEqual(SINGLE_ACTIVATION_NAMES, {
       onprem: [
         'class',
         'program',
@@ -153,11 +154,12 @@ describe('one object of a friendly name is activated exactly as one object of it
     });
     for (const variant of VARIANTS) {
       const single = new Set<string>(SINGLE_ACTIVATION[variant]);
-      expect(
+      assert.deepStrictEqual(
         ACTIVATION_NAMES[variant].filter((name) =>
           single.has(TYPE_NAMES[name]),
         ),
-      ).toEqual(SINGLE_ACTIVATION_NAMES[variant]);
+        SINGLE_ACTIVATION_NAMES[variant],
+      );
     }
   });
 
@@ -172,26 +174,34 @@ describe('one object of a friendly name is activated exactly as one object of it
     ),
   );
 
-  it.each(cases)(
-    '%s on %s: %s sends exactly what %s sends, in either case',
-    async (_tool, variant, name, code, route) => {
-      const byCode = await requestsOf(route, variant, code);
-      const byName = await requestsOf(route, variant, name);
-      const capitalised = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
-      const byMixed = await requestsOf(route, variant, capitalised);
-      expect(byCode.length).toBeGreaterThan(0);
-      expect(byName).toEqual(byCode);
-      expect(byMixed).toEqual(byCode);
-      // In upper case a name is read as itself only where it is no other
-      // word of the tables: `VIEW` is the dictionary view's search name
-      // (`VIEW/DV`; caseRule.test.ts), `STRU` and `FUNC` list the code
-      // their names stand for.
-      if (name !== 'view') {
-        const byUpper = await requestsOf(route, variant, name.toUpperCase());
-        expect(byUpper).toEqual(byCode);
-      }
-    },
-  );
+  for (const [_tool, variant, name, code, route] of cases) {
+    it(
+      format(
+        '%s on %s: %s sends exactly what %s sends, in either case',
+        _tool,
+        variant,
+        name,
+        code,
+      ),
+      async () => {
+        const byCode = await requestsOf(route, variant, code);
+        const byName = await requestsOf(route, variant, name);
+        const capitalised = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+        const byMixed = await requestsOf(route, variant, capitalised);
+        assert.ok(byCode.length > 0);
+        assert.deepStrictEqual(byName, byCode);
+        assert.deepStrictEqual(byMixed, byCode);
+        // In upper case a name is read as itself only where it is no other
+        // word of the tables: `VIEW` is the dictionary view's search name
+        // (`VIEW/DV`; caseRule.test.ts), `STRU` and `FUNC` list the code
+        // their names stand for.
+        if (name !== 'view') {
+          const byUpper = await requestsOf(route, variant, name.toUpperCase());
+          assert.deepStrictEqual(byUpper, byCode);
+        }
+      },
+    );
+  }
 
   const singleCases = VARIANTS.flatMap((variant) =>
     ROUTES.flatMap((route) =>
@@ -201,12 +211,19 @@ describe('one object of a friendly name is activated exactly as one object of it
     ),
   );
 
-  it.each(singleCases)(
-    "%s on %s: %s is activated through its family's own activation, no group run",
-    async (_tool, variant, name, route) => {
-      const byName = await requestsOf(route, variant, name);
-      expect(byName.length).toBeGreaterThan(0);
-      expect(grouped(byName)).toBe(false);
-    },
-  );
+  for (const [_tool, variant, name, route] of singleCases) {
+    it(
+      format(
+        "%s on %s: %s is activated through its family's own activation, no group run",
+        _tool,
+        variant,
+        name,
+      ),
+      async () => {
+        const byName = await requestsOf(route, variant, name);
+        assert.ok(byName.length > 0);
+        assert.equal(grouped(byName), false);
+      },
+    );
+  }
 });

@@ -1,6 +1,10 @@
 /**
  * Two of the three provider sources: request headers and a caller's SapConfig.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   BasicAuthProvider,
   CertificateAuthProvider,
@@ -12,6 +16,7 @@ import {
   credentialFromHeaders,
   credentialFromSapConfig,
 } from '../../lib/credentialSources';
+import { assertNoProperty, assertThrows } from '../helpers/assertions';
 
 describe('credentialFromHeaders', () => {
   it('gives a token provider and jwt settings for a JWT header', () => {
@@ -20,8 +25,8 @@ describe('credentialFromHeaders', () => {
       'x-sap-client': '000',
       'x-sap-jwt-token': 'a-token',
     });
-    expect(credential).toBeInstanceOf(TokenAuthProvider);
-    expect(settings).toEqual({
+    assert.ok(credential instanceof TokenAuthProvider);
+    assert.deepStrictEqual(settings, {
       url: 'https://sap.example.invalid',
       client: '000',
       authType: 'jwt',
@@ -34,8 +39,8 @@ describe('credentialFromHeaders', () => {
       'x-sap-login': 'user',
       'x-sap-password': 'secret',
     });
-    expect(credential).toBeInstanceOf(BasicAuthProvider);
-    expect(settings.authType).toBe('basic');
+    assert.ok(credential instanceof BasicAuthProvider);
+    assert.equal(settings.authType, 'basic');
   });
 
   it('carries no password and no token in the settings', () => {
@@ -45,21 +50,23 @@ describe('credentialFromHeaders', () => {
     ]) {
       const { settings } = credentialFromHeaders(headers);
       const text = JSON.stringify(settings);
-      expect(text).not.toContain('a-token');
-      expect(text).not.toContain('secret');
-      expect(settings).not.toHaveProperty('password');
-      expect(settings).not.toHaveProperty('jwtToken');
+      assert.ok(!text.includes('a-token'));
+      assert.ok(!text.includes('secret'));
+      assertNoProperty(settings, 'password');
+      assertNoProperty(settings, 'jwtToken');
     }
   });
 
   it('refuses a request with no url', () => {
-    expect(() => credentialFromHeaders({ 'x-sap-jwt-token': 't' })).toThrow(
+    assertThrows(
+      () => credentialFromHeaders({ 'x-sap-jwt-token': 't' }),
       'x-sap-url header is required for direct SAP connection',
     );
   });
 
   it('refuses a request with neither a token nor a login and password', () => {
-    expect(() => credentialFromHeaders({ 'x-sap-url': 'u' })).toThrow(
+    assertThrows(
+      () => credentialFromHeaders({ 'x-sap-url': 'u' }),
       'Either x-sap-jwt-token or x-sap-login+x-sap-password headers are required',
     );
   });
@@ -72,71 +79,82 @@ describe('credentialFromHeaders', () => {
 describe('credentialFromSapConfig', () => {
   const base = { url: 'https://sap.example.invalid', client: '000' };
 
-  it.each([
+  for (const [authType, extra, Provider] of [
     ['basic', { username: 'u', password: 'p' }, BasicAuthProvider],
     ['jwt', { jwtToken: 't' }, TokenAuthProvider],
     ['saml', { sessionCookies: 'a=b' }, SamlAuthProvider],
     ['certificate', {}, CertificateAuthProvider],
-  ] as const)('gives the provider for %s', (authType, extra, Provider) => {
-    expect(
-      credentialFromSapConfig({ ...base, authType, ...extra } as any),
-    ).toBeInstanceOf(Provider);
-  });
+  ] as const) {
+    it(format('gives the provider for %s', authType), () => {
+      assert.ok(
+        credentialFromSapConfig({
+          ...base,
+          authType,
+          ...extra,
+        } as any) instanceof Provider,
+      );
+    });
+  }
 
   it('refuses a client certificate over RFC before any provider is built', () => {
-    expect(() =>
-      credentialFromSapConfig({
-        authType: 'certificate',
-        certPath: '/placeholder/cert.pem',
-        connectionType: 'rfc',
-        client: '100',
-        language: 'EN',
-        ashost: 'host.example.invalid',
-        sysnr: '00',
-      }),
-    ).toThrow(CERTIFICATE_OVER_RFC_WORDS);
-    expect(CERTIFICATE_OVER_RFC_WORDS).toContain(
-      'SAP_AUTH_TYPE, SAP_CONNECTION_TYPE',
+    assertThrows(
+      () =>
+        credentialFromSapConfig({
+          authType: 'certificate',
+          certPath: '/placeholder/cert.pem',
+          connectionType: 'rfc',
+          client: '100',
+          language: 'EN',
+          ashost: 'host.example.invalid',
+          sysnr: '00',
+        }),
+      CERTIFICATE_OVER_RFC_WORDS,
+    );
+    assert.ok(
+      CERTIFICATE_OVER_RFC_WORDS.includes('SAP_AUTH_TYPE, SAP_CONNECTION_TYPE'),
     );
   });
 
   it('refuses kerberos', () => {
-    expect(() =>
-      credentialFromSapConfig({ ...base, authType: 'kerberos' } as any),
-    ).toThrow('Kerberos authentication is not available');
+    assertThrows(
+      () => credentialFromSapConfig({ ...base, authType: 'kerberos' } as any),
+      'Kerberos authentication is not available',
+    );
   });
 
   it('refuses snc: it is served through a destination of mcp-abap-adt (stdio)', () => {
-    expect(() =>
-      credentialFromSapConfig({ ...base, authType: 'snc' } as any),
-    ).toThrow(
+    assertThrows(
+      () => credentialFromSapConfig({ ...base, authType: 'snc' } as any),
       'The SapConfig `authType` snc is served through a destination of mcp-abap-adt (stdio)',
     );
   });
 
-  it.each([
+  for (const [_label, extra] of [
     ['an unknown authType', { authType: 'oauth-magic-secret' }],
     ['no authType', {}],
     ['an authType that is not a string', { authType: 42 }],
-  ])('refuses %s naming authType, never its value', (_label, extra) => {
-    let thrown: unknown;
-    try {
-      credentialFromSapConfig({
-        ...base,
-        username: 'u',
-        password: 'p',
-        ...extra,
-      } as any);
-    } catch (error) {
-      thrown = error;
-    }
-    expect((thrown as Error).message).toBe(
-      'The SapConfig `authType` must be basic, jwt, saml or certificate',
-    );
-    expect((thrown as Error).message).not.toContain('oauth-magic-secret');
-  });
+  ] satisfies Array<[string, Record<string, unknown>]>) {
+    it(format('refuses %s naming authType, never its value', _label), () => {
+      let thrown: unknown;
+      try {
+        credentialFromSapConfig({
+          ...base,
+          username: 'u',
+          password: 'p',
+          ...extra,
+        } as any);
+      } catch (error) {
+        thrown = error;
+      }
+      assert.equal(
+        (thrown as Error).message,
+        'The SapConfig `authType` must be basic, jwt, saml or certificate',
+      );
+      assert.ok(!(thrown as Error).message.includes('oauth-magic-secret'));
+    });
+  }
 
-  it.each([
+  for (const [authType, extra, field] of [
     ['basic', { password: 'the-password' }, 'username'],
     ['basic', { username: 'u', password: '' }, 'password'],
     ['basic', { username: '', password: 'the-password' }, 'username'],
@@ -145,17 +163,20 @@ describe('credentialFromSapConfig', () => {
     ['jwt', { jwtToken: '' }, 'jwtToken'],
     ['saml', {}, 'sessionCookies'],
     ['saml', { sessionCookies: '' }, 'sessionCookies'],
-  ] as const)('refuses %s with %j naming %s', (authType, extra, field) => {
-    let thrown: unknown;
-    try {
-      credentialFromSapConfig({ ...base, authType, ...extra } as any);
-    } catch (error) {
-      thrown = error;
-    }
-    const message = (thrown as Error).message;
-    expect(message).toBe(
-      `The SapConfig for ${authType} authentication has no \`${field}\``,
-    );
-    expect(message).not.toContain('the-password');
-  });
+  ] as const) {
+    it(format('refuses %s with %j naming %s', authType, extra, field), () => {
+      let thrown: unknown;
+      try {
+        credentialFromSapConfig({ ...base, authType, ...extra } as any);
+      } catch (error) {
+        thrown = error;
+      }
+      const message = (thrown as Error).message;
+      assert.equal(
+        message,
+        `The SapConfig for ${authType} authentication has no \`${field}\``,
+      );
+      assert.ok(!message.includes('the-password'));
+    });
+  }
 });

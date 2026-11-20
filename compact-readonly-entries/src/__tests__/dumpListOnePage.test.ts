@@ -9,7 +9,12 @@
  *
  * Real adt-clients code runs over the batch proof's counting connection.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { defineTool, type HandlerContext } from '@mcp-abap-adt/lib/handlers';
+import { assertNoProperty } from '../../../src/__tests__/helpers/assertions';
 import {
   type Answer,
   countingConnection,
@@ -77,57 +82,57 @@ const IS_DUMPS = (line: string) =>
   line.startsWith('GET ') && line.includes('/sap/bc/adt/runtime/dumps');
 
 describe('HandlerDumpList reads one page', () => {
-  it.each([undefined, 1, 10, 100])(
-    'exactly one request for top %s',
-    async (top) => {
-      const timer = jest.spyOn(global, 'setTimeout');
+  for (const top of [undefined, 1, 10, 100]) {
+    it(format('exactly one request for top %s', top), async (t) => {
+      const timer = t.mock.method(global, 'setTimeout');
       try {
         const args = top === undefined ? {} : { top };
         const [held, documented, refused] = await Promise.all(
           MODES.map((mode) => runWith(mode, args, FEED)),
         );
-        expect(held.sent).toHaveLength(1);
-        expect(IS_DUMPS(held.sent[0] ?? '')).toBe(true);
-        expect(documented.sent).toEqual(held.sent);
-        expect(refused.sent).toEqual(held.sent);
+        assert.equal(held.sent.length, 1);
+        assert.equal(IS_DUMPS(held.sent[0] ?? ''), true);
+        assert.deepStrictEqual(documented.sent, held.sent);
+        assert.deepStrictEqual(refused.sent, held.sent);
         if (top !== undefined) {
-          expect(held.sent[0]).toContain(`%24top=${top}`);
+          assert.ok(held.sent[0].includes(`%24top=${top}`));
         }
-        expect(timer).not.toHaveBeenCalled();
+        assert.equal(timer.mock.callCount(), 0);
 
-        expect(documented.answer?.isError).not.toBe(true);
-        expect(jsonOf(documented.answer).count).toBe(2);
+        assert.notEqual(documented.answer?.isError, true);
+        assert.equal(jsonOf(documented.answer).count, 2);
 
-        expect(refused.answer?.isError).toBe(true);
-        expect(jsonOf(refused.answer).status).toBe(404);
-        expect(jsonOf(refused.answer).step).toBe('read dumps');
+        assert.equal(refused.answer?.isError, true);
+        assert.equal(jsonOf(refused.answer).status, 404);
+        assert.equal(jsonOf(refused.answer).step, 'read dumps');
       } finally {
-        timer.mockRestore();
+        timer.mock.restore();
       }
-    },
-  );
+    });
+  }
 
   it('top 101 is refused before any request, naming the cap', async () => {
     const { sent, answer } = await runWith('document', { top: 101 }, FEED);
-    expect(sent).toEqual([]);
-    expect(answer?.isError).toBe(true);
-    expect(textOf(answer)).toContain('100');
+    assert.deepStrictEqual(sent, []);
+    assert.equal(answer?.isError, true);
+    assert.ok(textOf(answer).includes('100'));
   });
 
   it('the next link is answered as SAP sent it', async () => {
     const { sent, answer } = await runWith('document', { top: 100 }, FEED);
-    expect(sent).toHaveLength(1);
+    assert.equal(sent.length, 1);
     const answered = jsonOf(answer);
-    expect(answered.next_to).toBe('20260930043748');
-    expect(answered.count).toBe(2);
-    expect(
+    assert.equal(answered.next_to, '20260930043748');
+    assert.equal(answered.count, 2);
+    assert.deepStrictEqual(
       (answered.entries as Array<{ dump_id: string }>).map((e) => e.dump_id),
-    ).toEqual(['ID1', 'ID2']);
+      ['ID1', 'ID2'],
+    );
   });
 
   it('a feed without a next link answers none', async () => {
     const { answer } = await runWith('document', {}, FEED_END);
-    expect(jsonOf(answer)).not.toHaveProperty('next_to');
+    assertNoProperty(jsonOf(answer), 'next_to');
   });
 
   it('a given to reaches the one request', async () => {
@@ -136,19 +141,21 @@ describe('HandlerDumpList reads one page', () => {
       { top: 10, to: '20260930043748' },
       FEED,
     );
-    expect(sent).toHaveLength(1);
-    expect(sent[0]).toContain('to=20260930043748');
+    assert.equal(sent.length, 1);
+    assert.ok(sent[0].includes('to=20260930043748'));
   });
 
   it('the description says the next page starts at the boundary second, inclusive', () => {
-    expect(TOOL_DEFINITION.description).toContain(
-      "The next link's page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id.",
+    assert.ok(
+      TOOL_DEFINITION.description.includes(
+        "The next link's page starts at the boundary second, inclusive: entries of that second may repeat; match them by dump_id.",
+      ),
     );
-    expect(TOOL_DEFINITION.description).toMatch(/\b100\b/);
+    assert.match(TOOL_DEFINITION.description, /\b100\b/);
     const schema = listedJson(TOOL_DEFINITION.inputSchema);
-    expect(jsonAt(schema, 'top').description).toContain('100');
-    expect(jsonAt(schema, 'to').description).toContain(
-      'boundary second, inclusive',
+    assert.ok(jsonAt(schema, 'top').description?.includes('100'));
+    assert.ok(
+      jsonAt(schema, 'to').description?.includes('boundary second, inclusive'),
     );
   });
 });

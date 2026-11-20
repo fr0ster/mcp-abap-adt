@@ -5,6 +5,8 @@
  * connection's batch is untouched.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { CompactReadOnlyHandlersGroup } from '../../../../compact-readonly-entries/src/group';
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
@@ -12,24 +14,23 @@ import { InstanceBatch } from '../../../../src/lib/batch/InstanceBatch';
 import { CompactBatchHandlersGroup } from '../../../../src/lib/compact/batch/group';
 import { type SseStand, sseStand, turns, until } from './shutdown/harness';
 
-jest.setTimeout(30_000);
-
 const placeholder = { connection: undefined } as unknown as HandlerContext;
 
 let s: SseStand;
 let owners: InstanceBatch[];
 
 beforeEach(async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
   owners = [];
   const begin = InstanceBatch.prototype.begin;
-  jest.spyOn(InstanceBatch.prototype, 'begin').mockImplementation(function (
-    this: InstanceBatch,
-    ...args
-  ) {
-    if (!owners.includes(this)) owners.push(this);
-    return begin.apply(this, args);
-  });
+  mock.method(
+    InstanceBatch.prototype,
+    'begin',
+    function (this: InstanceBatch, ...args: Parameters<typeof begin>) {
+      if (!owners.includes(this)) owners.push(this);
+      return begin.apply(this, args);
+    },
+  );
   s = await sseStand({
     server: { batch: { keepRawParts: false } },
     groups: [
@@ -41,7 +42,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const envelopes = () =>
@@ -52,41 +53,41 @@ it("an SSE close drops the connection's batch with nothing sent; another connect
   const other = await s.open();
 
   await closing.call('HandlerBatch', { action: 'begin' }, 1);
-  expect((await closing.answer(1)).isError).toBe(false);
+  assert.equal((await closing.answer(1)).isError, false);
   await other.call('HandlerBatch', { action: 'begin' }, 1);
-  expect((await other.answer(1)).isError).toBe(false);
+  assert.equal((await other.answer(1)).isError, false);
   // One owner per connection's instance.
-  expect(owners).toHaveLength(2);
+  assert.equal(owners.length, 2);
   const [closingOwner, otherOwner] = owners as [InstanceBatch, InstanceBatch];
-  expect(closingOwner).not.toBe(otherOwner);
+  assert.notEqual(closingOwner, otherOwner);
 
   await closing.call(
     'HandlerGet',
     { object_type: 'PROGRAM', program_name: 'PROG_A' },
     2,
   );
-  expect(await closing.answer(2)).toEqual({ text: '', isError: false });
+  assert.deepStrictEqual(await closing.answer(2), { text: '', isError: false });
   await other.call(
     'HandlerGet',
     { object_type: 'PROGRAM', program_name: 'PROG_B' },
     2,
   );
-  expect(await other.answer(2)).toEqual({ text: '', isError: false });
-  expect(closingOwner.opened()?.recorded).toHaveLength(1);
+  assert.deepStrictEqual(await other.answer(2), { text: '', isError: false });
+  assert.equal(closingOwner.opened()?.recorded.length, 1);
   const signal = closingOwner.signal();
 
   closing.close();
   await until(() => s.standIn.logoffs() === 1);
   await until(() => closingOwner.mode() === 'off');
-  expect(signal.aborted).toBe(true);
-  expect(closingOwner.holdsState()).toBe(false);
+  assert.equal(signal.aborted, true);
+  assert.equal(closingOwner.holdsState(), false);
   await turns(20);
-  expect(envelopes()).toEqual([]);
+  assert.deepStrictEqual(envelopes(), []);
   // The logoff is the only request after the recording.
-  expect(s.standIn.requests.filter((r) => isLogoff(r.url))).toHaveLength(1);
+  assert.equal(s.standIn.requests.filter((r) => isLogoff(r.url)).length, 1);
 
   // The other connection's batch is still open, its call still recorded.
-  expect(otherOwner.mode()).toBe('communication');
-  expect(otherOwner.opened()?.recorded).toHaveLength(1);
-  expect(otherOwner.signal().aborted).toBe(false);
+  assert.equal(otherOwner.mode(), 'communication');
+  assert.equal(otherOwner.opened()?.recorded.length, 1);
+  assert.equal(otherOwner.signal().aborted, false);
 });

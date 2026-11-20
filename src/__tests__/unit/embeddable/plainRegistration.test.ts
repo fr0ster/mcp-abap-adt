@@ -1,4 +1,8 @@
+import assert from 'node:assert/strict';
+import { after, afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
+import { assertThrows } from '../../helpers/assertions';
 /**
  * A plain registration (`registry.registerAllTools(mcpServer)` on an SDK
  * `McpServer`, the `./handlers` export) lists the variant its groups state
@@ -54,8 +58,6 @@ import { isLongTool } from '../../../lib/longTools';
 import { adtStandIn } from '../../helpers/adtStandIn';
 import { type Counting, countingConnection } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
-
-jest.setTimeout(120_000);
 
 type Listed = Awaited<ReturnType<Client['listTools']>>['tools'];
 
@@ -150,9 +152,8 @@ const REGISTRIES: Readonly<
   },
 };
 
-describe.each(Object.entries(REGISTRIES))(
-  'a plain registration of %s',
-  (label, registeredFor) => {
+for (const [label, registeredFor] of Object.entries(REGISTRIES)) {
+  describe(format('a plain registration of %s', label), () => {
     const exported = label.startsWith('HandlerExporter');
     const registryFor = (systemType?: SapEnvironment) =>
       registeredFor(systemType).registry;
@@ -160,38 +161,53 @@ describe.each(Object.entries(REGISTRIES))(
     beforeEach(() => {
       delete process.env.SAP_SYSTEM_TYPE;
     });
-    afterAll(() => {
+    after(() => {
       if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
       else process.env.SAP_SYSTEM_TYPE = previous;
       resetProcessLatchForTests();
     });
 
-    it.each<SapEnvironment>(['cloud', 'onprem'])(
-      'stating %s lists what a BaseMcpServer stating it lists: tools, descriptions, schemas, search members',
-      async (systemType) => {
-        const plain = await plainListing(registryFor(systemType));
-        const stated = await servedListing(
-          new StatedServer(registryFor(systemType), systemType),
-          exported,
-        );
-        expect(plain).toEqual(stated);
-      },
-    );
+    for (const systemType of [
+      'cloud',
+      'onprem',
+    ] satisfies ReadonlyArray<SapEnvironment>) {
+      it(
+        format(
+          'stating %s lists what a BaseMcpServer stating it lists: tools, descriptions, schemas, search members',
+          systemType,
+        ),
+        async () => {
+          const plain = await plainListing(registryFor(systemType));
+          const stated = await servedListing(
+            new StatedServer(registryFor(systemType), systemType),
+            exported,
+          );
+          assert.deepStrictEqual(plain, stated);
+        },
+      );
+    }
 
     it('cloud and onprem list differently (the comparison is not vacuous)', async () => {
       const cloud = await plainListing(registryFor('cloud'));
       const onprem = await plainListing(registryFor('onprem'));
-      expect(cloud).not.toEqual(onprem);
+      // Compared as JSON data: a key present as `undefined`, or a prototype,
+      // is no difference here.
+      assert.notDeepStrictEqual(
+        JSON.parse(JSON.stringify(cloud)),
+        JSON.parse(JSON.stringify(onprem)),
+      );
     });
 
     it('stating none lists the definitions as they are', async () => {
       const { registry, definitions } = registeredFor();
       const plain = await plainListing(registry);
-      expect(plain).toEqual(
+      assert.deepStrictEqual(
+        plain,
         await servedListing(new StatedServer(registryFor()), exported),
       );
       // A plain registration keeps no background runs: no background-run tool.
-      expect(plain.map((tool) => tool.name)).toEqual(
+      assert.deepStrictEqual(
+        plain.map((tool) => tool.name),
         definitions
           .map((definition) => definition.name)
           .filter((name) => !isBackgroundRunTool(name))
@@ -208,49 +224,70 @@ describe.each(Object.entries(REGISTRIES))(
         ]),
       );
       for (const tool of plain) {
-        expect(tool.description).toBe(described.get(tool.name));
+        assert.equal(tool.description, described.get(tool.name));
       }
     });
 
-    it.each<SapEnvironment | undefined>(['cloud', 'onprem', undefined])(
-      'registerTool lists each tool as registerAllTools does where the groups state %s',
-      async (systemType) => {
-        const { registry, definitions } = registeredFor(systemType);
-        const all = await plainListing(registry);
-        const server = new McpServer({ name: 'single', version: '1.0.0' });
-        for (const definition of definitions) {
-          registry.registerTool(server, {
-            toolDefinition: definition,
-            call: async () => ({ content: [] }),
-          });
-        }
-        const single = await listedOn(server);
-        const shown = (tools: Listed) =>
-          tools.map((tool) => [tool.name, tool.description, tool._meta]);
-        expect(shown(single)).toEqual(shown(all));
-      },
-    );
+    for (const systemType of [
+      'cloud',
+      'onprem',
+      undefined,
+    ] satisfies ReadonlyArray<SapEnvironment | undefined>) {
+      it(
+        format(
+          'registerTool lists each tool as registerAllTools does where the groups state %s',
+          systemType,
+        ),
+        async () => {
+          const { registry, definitions } = registeredFor(systemType);
+          const all = await plainListing(registry);
+          const server = new McpServer({ name: 'single', version: '1.0.0' });
+          for (const definition of definitions) {
+            registry.registerTool(server, {
+              toolDefinition: definition,
+              call: async () => ({ content: [] }),
+            });
+          }
+          const single = await listedOn(server);
+          const shown = (tools: Listed) =>
+            tools.map((tool) => [tool.name, tool.description, tool._meta]);
+          assert.deepStrictEqual(shown(single), shown(all));
+        },
+      );
+    }
 
-    it.each<SapEnvironment | undefined>(['cloud', 'onprem', undefined])(
-      'getRegisteredTools names exactly the tools listed where %s is stated',
-      async (systemType) => {
-        const { registry } = registeredFor(systemType);
-        const listed = await plainListing(registry);
-        expect(
-          [...registry.getRegisteredTools()].sort((a, b) => a.localeCompare(b)),
-        ).toEqual(listed.map((tool) => tool.name));
-      },
-    );
+    for (const systemType of [
+      'cloud',
+      'onprem',
+      undefined,
+    ] satisfies ReadonlyArray<SapEnvironment | undefined>) {
+      it(
+        format(
+          'getRegisteredTools names exactly the tools listed where %s is stated',
+          systemType,
+        ),
+        async () => {
+          const { registry } = registeredFor(systemType);
+          const listed = await plainListing(registry);
+          assert.deepStrictEqual(
+            [...registry.getRegisteredTools()].sort((a, b) =>
+              a.localeCompare(b),
+            ),
+            listed.map((tool) => tool.name),
+          );
+        },
+      );
+    }
 
     it('SAP_SYSTEM_TYPE changes nothing on the plain path', async () => {
       const unstated = await plainListing(registryFor());
       const stated = await plainListing(registryFor('onprem'));
       process.env.SAP_SYSTEM_TYPE = 'cloud';
-      expect(await plainListing(registryFor())).toEqual(unstated);
-      expect(await plainListing(registryFor('onprem'))).toEqual(stated);
+      assert.deepStrictEqual(await plainListing(registryFor()), unstated);
+      assert.deepStrictEqual(await plainListing(registryFor('onprem')), stated);
     });
-  },
-);
+  });
+}
 
 /**
  * Groups that state different variants are refused at registration, before
@@ -290,13 +327,15 @@ describe('a plain registration of groups that state different variants', () => {
       systemOn('onprem'),
     ]);
     const server = withSentinel();
-    expect(() => registry.registerAllTools(server)).toThrow(
+    assertThrows(
+      () => registry.registerAllTools(server),
       'The handler groups state different system types: SearchHandlers states cloud, SystemHandlers states onprem',
     );
-    expect((await listedOn(server)).map((tool) => tool.name)).toEqual([
-      'Sentinel',
-    ]);
-    expect(registry.getRegisteredTools()).toEqual([]);
+    assert.deepStrictEqual(
+      (await listedOn(server)).map((tool) => tool.name),
+      ['Sentinel'],
+    );
+    assert.deepStrictEqual(registry.getRegisteredTools(), []);
   });
 
   it('registerAllTools refuses cloud beside none, naming each group and its variant, and registers nothing', async () => {
@@ -305,29 +344,31 @@ describe('a plain registration of groups that state different variants', () => {
       systemOn(),
     ]);
     const server = withSentinel();
-    expect(() => registry.registerAllTools(server)).toThrow(
+    assertThrows(
+      () => registry.registerAllTools(server),
       'The handler groups state different system types: SearchHandlers states cloud, SystemHandlers states none',
     );
-    expect((await listedOn(server)).map((tool) => tool.name)).toEqual([
-      'Sentinel',
-    ]);
-    expect(registry.getRegisteredTools()).toEqual([]);
+    assert.deepStrictEqual(
+      (await listedOn(server)).map((tool) => tool.name),
+      ['Sentinel'],
+    );
+    assert.deepStrictEqual(registry.getRegisteredTools(), []);
   });
 
-  it.each<[string, SapEnvironment | undefined]>([
+  for (const [_label, systemType] of [
     ['none stated by any group', undefined],
     ['cloud stated by every group', 'cloud'],
-  ])('registerAllTools takes %s', (_label, systemType) => {
-    const registry = new CompositeHandlersRegistry([
-      searchOn(systemType),
-      systemOn(systemType),
-    ]);
-    expect(() => registry.registerAllTools(withSentinel())).not.toThrow();
-  });
+  ] satisfies ReadonlyArray<[string, SapEnvironment | undefined]>) {
+    it(format('registerAllTools takes %s', _label), () => {
+      const registry = new CompositeHandlersRegistry([
+        searchOn(systemType),
+        systemOn(systemType),
+      ]);
+      registry.registerAllTools(withSentinel());
+    });
+  }
 
-  it.each<
-    [string, SapEnvironment | undefined, SapEnvironment | undefined, string]
-  >([
+  for (const [_label, search, system, words] of [
     [
       'cloud beside onprem',
       'cloud',
@@ -340,43 +381,53 @@ describe('a plain registration of groups that state different variants', () => {
       undefined,
       'The handler groups state different system types: SearchHandlers states cloud, SystemHandlers states none',
     ],
-  ])(
-    'registerTool refuses %s, naming each group, and registers nothing',
-    async (_label, search, system, words) => {
-      const registry = new CompositeHandlersRegistry([
-        searchOn(search),
-        systemOn(system),
-      ]);
-      const definition = someDefinition();
-      const server = withSentinel();
-      expect(() =>
-        registry.registerTool(server, {
-          toolDefinition: definition,
-          call: async () => ({ content: [] }),
-        }),
-      ).toThrow(words);
-      expect((await listedOn(server)).map((tool) => tool.name)).toEqual([
-        'Sentinel',
-      ]);
-    },
-  );
+  ] satisfies ReadonlyArray<
+    [string, SapEnvironment | undefined, SapEnvironment | undefined, string]
+  >) {
+    it(
+      format(
+        'registerTool refuses %s, naming each group, and registers nothing',
+        _label,
+      ),
+      async () => {
+        const registry = new CompositeHandlersRegistry([
+          searchOn(search),
+          systemOn(system),
+        ]);
+        const definition = someDefinition();
+        const server = withSentinel();
+        assertThrows(
+          () =>
+            registry.registerTool(server, {
+              toolDefinition: definition,
+              call: async () => ({ content: [] }),
+            }),
+          words,
+        );
+        assert.deepStrictEqual(
+          (await listedOn(server)).map((tool) => tool.name),
+          ['Sentinel'],
+        );
+      },
+    );
+  }
 
-  it.each<[string, SapEnvironment | undefined]>([
+  for (const [_label, systemType] of [
     ['none stated by any group', undefined],
     ['cloud stated by every group', 'cloud'],
-  ])('registerTool takes %s', (_label, systemType) => {
-    const registry = new CompositeHandlersRegistry([
-      searchOn(systemType),
-      systemOn(systemType),
-    ]);
-    const definition = someDefinition();
-    expect(() =>
+  ] satisfies ReadonlyArray<[string, SapEnvironment | undefined]>) {
+    it(format('registerTool takes %s', _label), () => {
+      const registry = new CompositeHandlersRegistry([
+        searchOn(systemType),
+        systemOn(systemType),
+      ]);
+      const definition = someDefinition();
       registry.registerTool(withSentinel(), {
         toolDefinition: definition,
         call: async () => ({ content: [] }),
-      }),
-    ).not.toThrow();
-  });
+      });
+    });
+  }
 });
 
 /**
@@ -439,24 +490,30 @@ describe('a call on the plain path', () => {
   it('with no systemType stated and SAP_SYSTEM_TYPE=cloud, is refused system_type_required, nothing sent', async () => {
     process.env.SAP_SYSTEM_TYPE = 'cloud';
     const { answer, sent } = await probe(undefined);
-    expect(answer).toContain(SYSTEM_TYPE_REQUIRED_WORDS);
-    expect(answer).toContain('"isError":true');
-    expect(sent).toEqual([]);
+    assert.ok(answer.includes(SYSTEM_TYPE_REQUIRED_WORDS));
+    assert.ok(answer.includes('"isError":true'));
+    assert.deepStrictEqual(sent, []);
   });
 
-  it.each<[SapEnvironment, string]>([
+  for (const [systemType, environment] of [
     ['cloud', 'onprem'],
     ['onprem', 'cloud'],
-  ])(
-    'with systemType %s stated, runs on it whatever SAP_SYSTEM_TYPE (%s) says',
-    async (systemType, environment) => {
-      process.env.SAP_SYSTEM_TYPE = environment;
-      const { answer } = await probe(systemType);
-      expect(JSON.parse(answer)).toEqual({
-        content: [{ type: 'text', text: systemType }],
-      });
-    },
-  );
+  ] satisfies ReadonlyArray<[SapEnvironment, string]>) {
+    it(
+      format(
+        'with systemType %s stated, runs on it whatever SAP_SYSTEM_TYPE (%s) says',
+        systemType,
+        environment,
+      ),
+      async () => {
+        process.env.SAP_SYSTEM_TYPE = environment;
+        const { answer } = await probe(systemType);
+        assert.deepStrictEqual(JSON.parse(answer), {
+          content: [{ type: 'text', text: systemType }],
+        });
+      },
+    );
+  }
 });
 
 /**
@@ -516,7 +573,7 @@ describe('a plain registration calls each entry with the call’s context', () =
     };
   }
 
-  it.each<[string, string, Record<string, unknown>]>([
+  for (const [_label, name, args] of [
     [
       'a compact tool',
       'HandlerCheckRun',
@@ -524,12 +581,14 @@ describe('a plain registration calls each entry with the call’s context', () =
     ],
     ['a readonly tool', 'GetProgram', { program_name: 'ZPLACEHOLDER' }],
     ['a background-run tool', 'ListBackgroundRuns', {}],
-  ])('%s answers as through a BaseMcpServer', async (_label, name, args) => {
-    const plain = await onPlain(name, args);
-    const served = await onServer(name, args);
-    expect(plain).toEqual(served);
-    expect(plain.answer).not.toContain('Cannot read properties');
-  });
+  ] satisfies ReadonlyArray<[string, string, Record<string, unknown>]>) {
+    it(format('%s answers as through a BaseMcpServer', _label), async () => {
+      const plain = await onPlain(name, args);
+      const served = await onServer(name, args);
+      assert.deepStrictEqual(plain, served);
+      assert.ok(!plain.answer.includes('Cannot read properties'));
+    });
+  }
 });
 
 /**
@@ -582,27 +641,33 @@ describe('a handler getHandlerEntries hands out', () => {
     const { answer, sent } = await embedderCall(undefined, 'GetProgram', {
       program_name: 'ZPLACEHOLDER',
     });
-    expect(answer).toContain(SYSTEM_TYPE_REQUIRED_WORDS);
-    expect(sent).toEqual([]);
+    assert.ok(answer.includes(SYSTEM_TYPE_REQUIRED_WORDS));
+    assert.deepStrictEqual(sent, []);
   });
 
-  it.each<[SapEnvironment, string]>([
+  for (const [systemType, environment] of [
     ['cloud', 'onprem'],
     ['onprem', 'cloud'],
-  ])(
-    'with systemType %s stated, runs on it whatever SAP_SYSTEM_TYPE (%s) says',
-    async (systemType, environment) => {
-      process.env.SAP_SYSTEM_TYPE = environment;
-      // The kind the call's ADT client is built for (`variantOf` reads it).
-      const program = await embedderCall(systemType, 'GetProgram', {
-        program_name: 'ZPLACEHOLDER',
-      });
-      expect(program.kind).toBe(systemType);
-      expect(program.sent).toEqual([
-        'GET /sap/bc/adt/programs/programs/zplaceholder/source/main?version=active',
-      ]);
-    },
-  );
+  ] satisfies ReadonlyArray<[SapEnvironment, string]>) {
+    it(
+      format(
+        'with systemType %s stated, runs on it whatever SAP_SYSTEM_TYPE (%s) says',
+        systemType,
+        environment,
+      ),
+      async () => {
+        process.env.SAP_SYSTEM_TYPE = environment;
+        // The kind the call's ADT client is built for (`variantOf` reads it).
+        const program = await embedderCall(systemType, 'GetProgram', {
+          program_name: 'ZPLACEHOLDER',
+        });
+        assert.equal(program.kind, systemType);
+        assert.deepStrictEqual(program.sent, [
+          'GET /sap/bc/adt/programs/programs/zplaceholder/source/main?version=active',
+        ]);
+      },
+    );
+  }
 });
 
 /**
@@ -663,7 +728,7 @@ describe('a long read on the plain path', () => {
   }
 
   it('a listed long read answers as through a BaseMcpServer', async () => {
-    expect(isLongTool('SearchObject')).toBe(true);
+    assert.equal(isLongTool('SearchObject'), true);
     const plain = await searched((context) => {
       const server = new McpServer({ name: 'plain-long', version: '1.0.0' });
       new CompositeHandlersRegistry([
@@ -682,9 +747,9 @@ describe('a long read on the plain path', () => {
           ]),
         }),
     );
-    expect(plain).toEqual(served);
-    expect(plain.requests.length).toBeGreaterThan(0);
-    expect(plain.answer).not.toContain('Cannot read properties');
+    assert.deepStrictEqual(plain, served);
+    assert.ok(plain.requests.length > 0);
+    assert.ok(!plain.answer.includes('Cannot read properties'));
   });
 });
 
@@ -767,17 +832,22 @@ describe('registerTool calls a tool as registerAllTools does', () => {
 
   const probes = (context: HandlerContext) => [new FormProbeGroup(context)];
 
-  it.each(['ContextProbe'])(
-    'groups stating cloud, SAP_SYSTEM_TYPE=onprem: %s runs as cloud, as registerAllTools runs it',
-    async (name) => {
-      process.env.SAP_SYSTEM_TYPE = 'onprem';
-      const one = await answered(viaOne, probes, name, {});
-      expect(JSON.parse(one.answer)).toEqual({
-        content: [{ type: 'text', text: 'cloud' }],
-      });
-      expect(one).toEqual(await answered(viaAll, probes, name, {}));
-    },
-  );
+  for (const name of ['ContextProbe']) {
+    it(
+      format(
+        'groups stating cloud, SAP_SYSTEM_TYPE=onprem: %s runs as cloud, as registerAllTools runs it',
+        name,
+      ),
+      async () => {
+        process.env.SAP_SYSTEM_TYPE = 'onprem';
+        const one = await answered(viaOne, probes, name, {});
+        assert.deepStrictEqual(JSON.parse(one.answer), {
+          content: [{ type: 'text', text: 'cloud' }],
+        });
+        assert.deepStrictEqual(one, await answered(viaAll, probes, name, {}));
+      },
+    );
+  }
 
   it('a shipped readonly tool answers and sends as registerAllTools', async () => {
     const readonly = (context: HandlerContext) => [
@@ -785,8 +855,11 @@ describe('registerTool calls a tool as registerAllTools does', () => {
     ];
     const args = { program_name: 'ZPLACEHOLDER' };
     const one = await answered(viaOne, readonly, 'GetProgram', args);
-    expect(one).toEqual(await answered(viaAll, readonly, 'GetProgram', args));
-    expect(one.sent).toEqual([
+    assert.deepStrictEqual(
+      one,
+      await answered(viaAll, readonly, 'GetProgram', args),
+    );
+    assert.deepStrictEqual(one.sent, [
       'GET /sap/bc/adt/programs/programs/zplaceholder/source/main?version=active',
     ]);
   });
@@ -795,18 +868,20 @@ describe('registerTool calls a tool as registerAllTools does', () => {
     const registry = new CompositeHandlersRegistry(
       probes({ ...noConnectionContext(), systemType: 'cloud' }),
     );
-    expect(() =>
-      registry.registerTool(
-        new McpServer({ name: 'register-tool', version: '1.0.0' }),
-        {
-          toolDefinition: {
-            name: 'Elsewhere',
-            description: 'Held by no group.',
-            inputSchema: z.object({}),
+    assertThrows(
+      () =>
+        registry.registerTool(
+          new McpServer({ name: 'register-tool', version: '1.0.0' }),
+          {
+            toolDefinition: {
+              name: 'Elsewhere',
+              description: 'Held by no group.',
+              inputSchema: z.object({}),
+            },
+            call: async () => ({ content: [] }),
           },
-          call: async () => ({ content: [] }),
-        },
-      ),
-    ).toThrow(REGISTER_TOOL_UNHELD_WORDS('Elsewhere'));
+        ),
+      REGISTER_TOOL_UNHELD_WORDS('Elsewhere'),
+    );
   });
 });

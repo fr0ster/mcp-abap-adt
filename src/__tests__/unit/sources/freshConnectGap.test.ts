@@ -4,6 +4,8 @@
  * in that gap) is never connected: the open answers the close's refusal.
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { isClosedInstanceRefusal } from '../../../lib/auth/failures';
 import { endConnection } from '../../../lib/ownedConnections';
@@ -34,7 +36,7 @@ it('a connection ended between its recording and its connect is never connected'
     (error: unknown) => error,
   );
   const error = await refused;
-  expect(isClosedInstanceRefusal(error)).toBe(true);
-  expect(events).toEqual(['disconnect']);
+  assert.equal(isClosedInstanceRefusal(error), true);
+  assert.deepStrictEqual(events, ['disconnect']);
   registerFreshConnectionFactory(caller, undefined);
 });

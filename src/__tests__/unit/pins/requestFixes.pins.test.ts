@@ -16,6 +16,8 @@
  * row yet — their family tasks (C3–C16) add the row with its live case.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { type PinCase, pinKey, runPinCase } from '../../helpers/pinCases';
@@ -128,7 +130,7 @@ const CASES: readonly PinCase[] = [
     refusal: 'answer',
     expected: 'none',
     ran: (answer) => {
-      expect(answer.content[0]?.text).toContain('description');
+      assert.ok(answer.content[0]?.text.includes('description'));
     },
   },
   {

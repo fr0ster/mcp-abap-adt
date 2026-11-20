@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it, type Mock, mock } from 'node:test';
 import type { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { serverRefusalOf } from '../../../lib/auth/serverRefusal';
@@ -13,9 +15,9 @@ import { InstanceState } from '../../../lib/state/InstanceState';
 /** A batch connection that only counts what would be sent: the owner sends nothing. */
 function fakeBatch(): {
   open: OpenBatch & { target: LateBoundConnection };
-  execute: jest.Mock;
+  execute: Mock<() => Promise<undefined>>;
 } {
-  const execute = jest.fn(async () => undefined);
+  const execute = mock.fn(async () => undefined);
   const connection = { execute } as unknown as AdtBatchConnection;
   return {
     open: { connection, target: new LateBoundConnection(), recorded: [] },
@@ -64,28 +66,28 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
   it('numbers start at 1 and follow nextNumber calls', () => {
     const batch = new InstanceBatch({ keepRawParts: false });
     batch.begin('communication', fakeBatch().open);
-    expect(batch.nextNumber()).toBe(1);
-    expect(batch.nextNumber()).toBe(2);
-    expect(batch.nextNumber()).toBe(3);
+    assert.equal(batch.nextNumber(), 1);
+    assert.equal(batch.nextNumber(), 2);
+    assert.equal(batch.nextNumber(), 3);
     batch.end();
     batch.begin('debugger', fakeBatch().open);
-    expect(batch.nextNumber()).toBe(1); // each batch counts from 1
+    assert.equal(batch.nextNumber(), 1); // each batch counts from 1
   });
 
   it('holdsState is true while open or while answers are kept, false after drop', () => {
     const batch = new InstanceBatch({ keepRawParts: false });
-    expect(batch.holdsState()).toBe(false);
+    assert.equal(batch.holdsState(), false);
     batch.begin('communication', fakeBatch().open);
-    expect(batch.holdsState()).toBe(true); // open, no answers
+    assert.equal(batch.holdsState(), true); // open, no answers
     endWith(batch, [answerOf(1)]);
-    expect(batch.mode()).toBe('off');
-    expect(batch.holdsState()).toBe(true); // closed, answers kept
+    assert.equal(batch.mode(), 'off');
+    assert.equal(batch.holdsState(), true); // closed, answers kept
     batch.drop();
-    expect(batch.holdsState()).toBe(false);
+    assert.equal(batch.holdsState(), false);
     // An executed empty batch keeps no answers.
     batch.begin('communication', fakeBatch().open);
     batch.end();
-    expect(batch.holdsState()).toBe(false);
+    assert.equal(batch.holdsState(), false);
   });
 
   it('holdsState reaches the instance state it is attached to', () => {
@@ -97,53 +99,63 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
     batch.begin('communication', fakeBatch().open);
     endWith(batch, [answerOf(1)]);
     batch.drop();
-    expect(seen).toEqual([true, true, false]);
+    assert.deepStrictEqual(seen, [true, true, false]);
     void state.shutdown();
   });
 
   it('begin while a batch is open throws batch_mode_on / batch_mode_other by kind', () => {
     const batch = new InstanceBatch({ keepRawParts: false });
     batch.begin('communication', fakeBatch().open);
-    expect(codeOf(() => batch.begin('communication', fakeBatch().open))).toBe(
+    assert.equal(
+      codeOf(() => batch.begin('communication', fakeBatch().open)),
       'batch_mode_on',
     );
-    expect(codeOf(() => batch.begin('debugger', fakeBatch().open))).toBe(
+    assert.equal(
+      codeOf(() => batch.begin('debugger', fakeBatch().open)),
       'batch_mode_other',
     );
-    expect(batch.mode()).toBe('communication');
+    assert.equal(batch.mode(), 'communication');
     batch.drop();
     batch.begin('debugger', fakeBatch().open);
-    expect(codeOf(() => batch.begin('debugger', fakeBatch().open))).toBe(
+    assert.equal(
+      codeOf(() => batch.begin('debugger', fakeBatch().open)),
       'batch_mode_on',
     );
-    expect(codeOf(() => batch.begin('communication', fakeBatch().open))).toBe(
+    assert.equal(
+      codeOf(() => batch.begin('communication', fakeBatch().open)),
       'batch_mode_other',
     );
-    expect(batch.mode()).toBe('debugger');
+    assert.equal(batch.mode(), 'debugger');
   });
 
   it('nextNumber and signal with no batch open are refused batch_mode_off', () => {
     const batch = new InstanceBatch({ keepRawParts: false });
-    expect(codeOf(() => batch.nextNumber())).toBe('batch_mode_off');
-    expect(codeOf(() => batch.signal())).toBe('batch_mode_off');
+    assert.equal(
+      codeOf(() => batch.nextNumber()),
+      'batch_mode_off',
+    );
+    assert.equal(
+      codeOf(() => batch.signal()),
+      'batch_mode_off',
+    );
   });
 
   it('end replaces the map; its numbers stay readable until the next end', async () => {
     const batch = new InstanceBatch({ keepRawParts: false });
-    expect(batch.answer(1)).toBeUndefined();
+    assert.equal(batch.answer(1), undefined);
     batch.begin('communication', fakeBatch().open);
     endWith(batch, [answerOf(1), answerOf(2)]);
-    await expect(batch.answer(1)).resolves.toEqual(answerOf(1));
-    await expect(batch.answer(2)).resolves.toEqual(answerOf(2));
+    assert.deepStrictEqual(await batch.answer(1), answerOf(1));
+    assert.deepStrictEqual(await batch.answer(2), answerOf(2));
     // Readable while the next batch is open, until its end.
     batch.begin('debugger', fakeBatch().open);
-    await expect(batch.answer(2)).resolves.toEqual(answerOf(2));
+    assert.deepStrictEqual(await batch.answer(2), answerOf(2));
     endWith(batch, [{ ...answerOf(10), number: 1 }]);
-    await expect(batch.answer(1)).resolves.toEqual({
+    assert.deepStrictEqual(await batch.answer(1), {
       ...answerOf(10),
       number: 1,
     });
-    expect(batch.answer(2)).toBeUndefined(); // replaced, not merged
+    assert.equal(batch.answer(2), undefined); // replaced, not merged
   });
 
   it('a number is resumed when first read, once: read again, it answers the same', async () => {
@@ -153,12 +165,12 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
     open.recorded.push(callOf(answerOf(1), runs));
     batch.begin('communication', open);
     batch.end(open);
-    expect(runs.count).toBe(0); // the end resumes nothing
+    assert.equal(runs.count, 0); // the end resumes nothing
     const first = batch.answer(1);
     const second = batch.answer(1);
-    expect(second).toBe(first);
-    await expect(first).resolves.toEqual(answerOf(1));
-    expect(runs.count).toBe(1);
+    assert.equal(second, first);
+    assert.deepStrictEqual(await first, answerOf(1));
+    assert.equal(runs.count, 1);
   });
 
   it("fail: no map, every recorded number answers the failure, the batch's signal aborted; a later fail of the same batch replaces the failure", async () => {
@@ -173,18 +185,18 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
       isError: true,
     };
     batch.fail(failure, open);
-    expect(batch.mode()).toBe('off');
-    expect(signal.aborted).toBe(true);
-    await expect(batch.answer(2)).resolves.toEqual({ number: 2, ...failure });
-    expect(batch.answer(3)).toBeUndefined();
+    assert.equal(batch.mode(), 'off');
+    assert.equal(signal.aborted, true);
+    assert.deepStrictEqual(await batch.answer(2), { number: 2, ...failure });
+    assert.equal(batch.answer(3), undefined);
     const answered = {
       content: [{ type: 'text' as const, text: 'as the dispatch answered' }],
       isError: true,
     };
     batch.fail(answered, open);
-    await expect(batch.answer(1)).resolves.toEqual({ number: 1, ...answered });
-    expect(runs.count).toBe(0);
-    expect(batch.holdsState()).toBe(true);
+    assert.deepStrictEqual(await batch.answer(1), { number: 1, ...answered });
+    assert.equal(runs.count, 0);
+    assert.equal(batch.holdsState(), true);
   });
 
   it("replacing, dropping or disposing a map aborts its batch's signal: its handlers never read are let go", async () => {
@@ -199,14 +211,14 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
       batch.begin(kind, fakeBatch().open);
       const signal = batch.signal();
       endWith(batch, [answerOf(1)]);
-      expect(signal.aborted).toBe(false);
+      assert.equal(signal.aborted, false);
       if (ends === 'replace') {
         batch.begin('communication', fakeBatch().open);
         batch.end();
       } else if (ends === 'drop') batch.drop();
       else if (ends === 'dispose') await batch.dispose();
       else batch.dropDebuggerAnswers();
-      expect(signal.aborted).toBe(true);
+      assert.equal(signal.aborted, true);
     }
   });
 
@@ -218,14 +230,14 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
     const second = fakeBatch();
     batch.begin('communication', second.open);
     batch.nextNumber();
-    expect(batch.opened()).toBe(second.open);
+    assert.equal(batch.opened(), second.open);
     await batch.dispose();
-    expect(batch.mode()).toBe('off');
-    expect(batch.opened()).toBeUndefined();
-    expect(batch.answer(1)).toBeUndefined();
-    expect(batch.holdsState()).toBe(false);
-    expect(first.execute).not.toHaveBeenCalled();
-    expect(second.execute).not.toHaveBeenCalled();
+    assert.equal(batch.mode(), 'off');
+    assert.equal(batch.opened(), undefined);
+    assert.equal(batch.answer(1), undefined);
+    assert.equal(batch.holdsState(), false);
+    assert.equal(first.execute.mock.callCount(), 0);
+    assert.equal(second.execute.mock.callCount(), 0);
   });
 
   it('end after a drop leaves the dropped state: no answers re-installed, the target sealed', () => {
@@ -234,12 +246,12 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
     batch.begin('communication', dropped.open);
     batch.drop();
     endWith(batch, [answerOf(1)], dropped.open);
-    expect(batch.mode()).toBe('off');
-    expect(batch.answer(1)).toBeUndefined();
-    expect(batch.holdsState()).toBe(false);
+    assert.equal(batch.mode(), 'off');
+    assert.equal(batch.answer(1), undefined);
+    assert.equal(batch.holdsState(), false);
     // Sealed: pointing it again changes nothing.
     dropped.open.target.point({} as never);
-    expect(dropped.open.target.getSessionId()).toBeNull();
+    assert.equal(dropped.open.target.getSessionId(), null);
   });
 
   it('end of a dropped batch does not end the batch begun since', () => {
@@ -250,9 +262,9 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
     const next = fakeBatch();
     batch.begin('communication', next.open);
     endWith(batch, [answerOf(1)], dropped.open);
-    expect(batch.mode()).toBe('communication');
-    expect(batch.opened()).toBe(next.open);
-    expect(batch.answer(1)).toBeUndefined();
+    assert.equal(batch.mode(), 'communication');
+    assert.equal(batch.opened(), next.open);
+    assert.equal(batch.answer(1), undefined);
   });
 
   it('signal aborts on drop and dispose, not on an end that keeps the map', async () => {
@@ -260,26 +272,29 @@ describe('InstanceBatch — the per-instance owner of batch state', () => {
     batch.begin('communication', fakeBatch().open);
     const ended = batch.signal();
     batch.end();
-    expect(ended.aborted).toBe(false);
+    assert.equal(ended.aborted, false);
 
     batch.begin('communication', fakeBatch().open);
     const dropped = batch.signal();
-    expect(dropped).not.toBe(ended); // each batch its own signal
-    expect(ended.aborted).toBe(false); // its map is still kept
+    assert.notEqual(dropped, ended); // each batch its own signal
+    assert.equal(ended.aborted, false); // its map is still kept
     batch.drop();
-    expect(dropped.aborted).toBe(true);
-    expect(ended.aborted).toBe(true); // the drop let its map go too
+    assert.equal(dropped.aborted, true);
+    assert.equal(ended.aborted, true); // the drop let its map go too
 
     batch.begin('debugger', fakeBatch().open);
     const disposed = batch.signal();
-    expect(disposed.aborted).toBe(false);
+    assert.equal(disposed.aborted, false);
     await batch.dispose();
-    expect(disposed.aborted).toBe(true);
+    assert.equal(disposed.aborted, true);
   });
 
   it('keepRawParts is what the host gave', () => {
-    expect(new InstanceBatch({ keepRawParts: true }).keepRawParts).toBe(true);
-    expect(new InstanceBatch({ keepRawParts: false }).keepRawParts).toBe(false);
+    assert.equal(new InstanceBatch({ keepRawParts: true }).keepRawParts, true);
+    assert.equal(
+      new InstanceBatch({ keepRawParts: false }).keepRawParts,
+      false,
+    );
   });
 });
 
@@ -300,18 +315,18 @@ describe('BaseMcpServer — the batch option', () => {
   it("is the host's owner, attached to the instance's state at construction", async () => {
     const batch = new InstanceBatch({ keepRawParts: false });
     const server = new Server(batch);
-    expect(server.owner()).toBe(batch);
-    expect(server.holdsState()).toBe(false);
+    assert.equal(server.owner(), batch);
+    assert.equal(server.holdsState(), false);
     batch.begin('communication', fakeBatch().open);
-    expect(server.holdsState()).toBe(true);
+    assert.equal(server.holdsState(), true);
     const signal = batch.signal();
     await server.dispose(); // the state's undo drops the batch
-    expect(signal.aborted).toBe(true);
-    expect(server.holdsState()).toBe(false);
+    assert.equal(signal.aborted, true);
+    assert.equal(server.holdsState(), false);
     await server.shutdownState();
   });
 
   it('absent: the instance has none', () => {
-    expect(new Server().owner()).toBeUndefined();
+    assert.equal(new Server().owner(), undefined);
   });
 });

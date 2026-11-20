@@ -16,6 +16,9 @@
  *   connection of its own.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,8 +29,6 @@ import { DEBUGGER_OWN_CONNECTION_TOOLS } from '../../../lib/debugger/ownConnecti
 import type { IHandlersRegistry } from '../../../lib/handlers/interfaces';
 import { STAND_IN_SYSTEM } from '../../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
-
-jest.setTimeout(30_000);
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
@@ -189,41 +190,46 @@ async function serve(name: string, via: 'handed-server' | 'main-connection') {
 beforeEach(() => {
   // The system kind is required: the stand-in is on-premise.
   stateSystemKind();
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
-it.each<['handed-server' | 'main-connection']>([
+for (const [via] of [
   ['handed-server'],
   ['main-connection'],
-])(
-  'two calls sent at once to a self-registered tool (%s): the second sends only after the first settled',
-  async (via) => {
-    const s = await serve('OwnSend', via);
-    try {
-      await Promise.all([s.call(1, 'first'), s.call(2, 'second')]);
-      await s.held.arrived('first');
-      await settleWhile();
-      // The first holds the flow: nothing of the second was sent.
-      expect(s.log).toEqual(['start first']);
-      s.held.release('first');
-      await s.held.arrived('second');
-      s.held.release('second');
-      await until(() => s.answers.length === 2);
-      expect(s.log).toEqual([
-        'start first',
-        'end first',
-        'start second',
-        'end second',
-      ]);
-    } finally {
-      await s.server.close();
-    }
-  },
-);
+] satisfies ReadonlyArray<['handed-server' | 'main-connection']>) {
+  it(
+    format(
+      'two calls sent at once to a self-registered tool (%s): the second sends only after the first settled',
+      via,
+    ),
+    async () => {
+      const s = await serve('OwnSend', via);
+      try {
+        await Promise.all([s.call(1, 'first'), s.call(2, 'second')]);
+        await s.held.arrived('first');
+        await settleWhile();
+        // The first holds the flow: nothing of the second was sent.
+        assert.deepStrictEqual(s.log, ['start first']);
+        s.held.release('first');
+        await s.held.arrived('second');
+        s.held.release('second');
+        await until(() => s.answers.length === 2);
+        assert.deepStrictEqual(s.log, [
+          'start first',
+          'end first',
+          'start second',
+          'end second',
+        ]);
+      } finally {
+        await s.server.close();
+      }
+    },
+  );
+}
 
 it('a self-registered tool named like a debugger tool on its own connection still takes its turn', async () => {
   const name = DEBUGGER_OWN_CONNECTION_TOOLS[0];
@@ -233,12 +239,12 @@ it('a self-registered tool named like a debugger tool on its own connection stil
     await Promise.all([s.call(1, 'first'), s.call(2, 'second')]);
     await s.held.arrived('first');
     await settleWhile();
-    expect(s.log).toEqual(['start first']);
+    assert.deepStrictEqual(s.log, ['start first']);
     s.held.release('first');
     await s.held.arrived('second');
     s.held.release('second');
     await until(() => s.answers.length === 2);
-    expect(s.log).toEqual([
+    assert.deepStrictEqual(s.log, [
       'start first',
       'end first',
       'start second',
@@ -257,16 +263,20 @@ it('a self-registered run tool called with background: true takes its turn, as i
     await s.call(2, 'background', { background: true });
     await s.call(3, 'foreground');
     await settleWhile();
-    expect(s.log).toEqual(['start holder']);
+    assert.deepStrictEqual(s.log, ['start holder']);
     s.held.release('holder');
     await s.held.arrived('background');
     await settleWhile();
-    expect(s.log).toEqual(['start holder', 'end holder', 'start background']);
+    assert.deepStrictEqual(s.log, [
+      'start holder',
+      'end holder',
+      'start background',
+    ]);
     s.held.release('background');
     await s.held.arrived('foreground');
     s.held.release('foreground');
     await until(() => s.answers.length === 3);
-    expect(s.log).toEqual([
+    assert.deepStrictEqual(s.log, [
       'start holder',
       'end holder',
       'start background',

@@ -9,6 +9,10 @@
  * argument, so no assertion here proves a handler injected
  * `resultsFor(xDocuments)` — `tsc` guards that.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import {
   TOOL_DEFINITION as GetBehaviorDefinitionDefinition,
   handleGetBehaviorDefinition,
@@ -61,10 +65,12 @@ import {
   TOOL_DEFINITION as GetTableDefinition,
   handleGetTable,
 } from '../../../handlers/table/high/handleGetTable';
+import * as clients from '../../../lib/clients';
 import {
   defineTool,
   type ToolDefinition,
 } from '../../../lib/handlers/interfaces';
+import { assertNoProperty, assertRejects } from '../../helpers/assertions';
 import {
   okResponse,
   reading,
@@ -74,10 +80,9 @@ import {
 } from '../../helpers/fakeClient';
 import { moduleMetadataDocument } from '../../helpers/functionModuleMetadata';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 let fakeClient: any;
-jest.mock('../../../lib/clients', () => ({
-  createAdtClient: () => fakeClient,
-}));
 
 const context = { connection: {} as any, logger: undefined };
 
@@ -197,90 +202,103 @@ const METADATA = 'METADATA MARKER';
 const metadataOf = (row: Row): string =>
   row.metadataFirst ? moduleMetadataDocument('ZFM', 'ZFG') : METADATA;
 
-describe.each(rows.map((r) => [r.name, r] as const))('%s', (_name, row) => {
-  it('part source answers the source from read, and nothing of the metadata', async () => {
-    const seen = recordAnalyse({
-      read: () => reading(SOURCE),
-      readMetadata: () => reading(metadataOf(row)),
-    });
-    fakeClient = seen.client;
-    const result = await row.handler(context, { ...row.args, part: 'source' });
-    expect(result.isError).toBe(false);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.source).toBe(SOURCE);
-    expect(payload.part).toBe('source');
-    expect(payload).not.toHaveProperty('metadata');
-    for (const [field, value] of Object.entries(row.identity)) {
-      expect(payload[field]).toBe(value);
-    }
-    expect([seen.countOf('read'), seen.countOf('readMetadata')]).toEqual([
-      1,
-      row.metadataFirst ? 1 : 0,
-    ]);
-    expect(seen.calls[0]?.carriedAnalyse).toBe(true);
-  });
-
-  it('part metadata answers the metadata from readMetadata, and nothing of the source', async () => {
-    const seen = recordAnalyse({
-      read: () => reading(SOURCE),
-      readMetadata: () => reading(metadataOf(row)),
-    });
-    fakeClient = seen.client;
-    const result = await row.handler(context, {
-      ...row.args,
-      part: 'metadata',
-    });
-    expect(result.isError).toBe(false);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.metadata).toBe(metadataOf(row));
-    expect(payload.part).toBe('metadata');
-    expect(payload).not.toHaveProperty('source');
-    for (const [field, value] of Object.entries(row.identity)) {
-      expect(payload[field]).toBe(value);
-    }
-    expect([seen.countOf('read'), seen.countOf('readMetadata')]).toEqual([
-      0, 1,
-    ]);
-    expect(seen.calls[0]?.carriedAnalyse).toBe(true);
-  });
-
-  it("a part other than source or metadata is refused by the tool's schema, before any call", async () => {
-    const seen = recordAnalyse();
-    fakeClient = seen.client;
-    const refused = expect(
-      defineTool(row.definition, row.handler).call(context, {
+for (const [_name, row] of rows.map((r) => [r.name, r] as const)) {
+  describe(format('%s', _name), () => {
+    it('part source answers the source from read, and nothing of the metadata', async () => {
+      const seen = recordAnalyse({
+        read: () => reading(SOURCE),
+        readMetadata: () => reading(metadataOf(row)),
+      });
+      fakeClient = seen.client;
+      const result = await row.handler(context, {
         ...row.args,
-        part: 'urls',
-      }),
-    ).rejects.toThrow('part');
-    await refused;
-    expect([seen.countOf('read'), seen.countOf('readMetadata')]).toEqual([
-      0, 0,
-    ]);
-    expect(seen.calls).toEqual([]);
-  });
-
-  it.each(['source', 'metadata'])(
-    'part %s reports a refusal as an error',
-    async (part) => {
-      fakeClient = refusingClient('Resource not found');
-      const result = await row.handler(context, { ...row.args, part });
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text).message).toBe(
-        'Resource not found',
-      );
-    },
-  );
-
-  it.each(['source', 'metadata'])(
-    'part %s names a thrown failure client_threw, carrying its own tool',
-    async (part) => {
-      fakeClient = throwingClient('boom');
-      const result = await row.handler(context, { ...row.args, part });
-      expect(result.isError).toBe(true);
+        part: 'source',
+      });
+      assert.equal(result.isError, false);
       const payload = JSON.parse(result.content[0].text);
-      expect(payload.error).toBe('client_threw');
-      expect(payload.tool).toBe(row.name);
-    },
-  );
-});
+      assert.equal(payload.source, SOURCE);
+      assert.equal(payload.part, 'source');
+      assertNoProperty(payload, 'metadata');
+      for (const [field, value] of Object.entries(row.identity)) {
+        assert.equal(payload[field], value);
+      }
+      assert.deepStrictEqual(
+        [seen.countOf('read'), seen.countOf('readMetadata')],
+        [1, row.metadataFirst ? 1 : 0],
+      );
+      assert.equal(seen.calls[0]?.carriedAnalyse, true);
+    });
+
+    it('part metadata answers the metadata from readMetadata, and nothing of the source', async () => {
+      const seen = recordAnalyse({
+        read: () => reading(SOURCE),
+        readMetadata: () => reading(metadataOf(row)),
+      });
+      fakeClient = seen.client;
+      const result = await row.handler(context, {
+        ...row.args,
+        part: 'metadata',
+      });
+      assert.equal(result.isError, false);
+      const payload = JSON.parse(result.content[0].text);
+      assert.equal(payload.metadata, metadataOf(row));
+      assert.equal(payload.part, 'metadata');
+      assertNoProperty(payload, 'source');
+      for (const [field, value] of Object.entries(row.identity)) {
+        assert.equal(payload[field], value);
+      }
+      assert.deepStrictEqual(
+        [seen.countOf('read'), seen.countOf('readMetadata')],
+        [0, 1],
+      );
+      assert.equal(seen.calls[0]?.carriedAnalyse, true);
+    });
+
+    it("a part other than source or metadata is refused by the tool's schema, before any call", async () => {
+      const seen = recordAnalyse();
+      fakeClient = seen.client;
+      const refused = assertRejects(
+        defineTool(row.definition, row.handler).call(context, {
+          ...row.args,
+          part: 'urls',
+        }),
+        'part',
+      );
+      await refused;
+      assert.deepStrictEqual(
+        [seen.countOf('read'), seen.countOf('readMetadata')],
+        [0, 0],
+      );
+      assert.deepStrictEqual(seen.calls, []);
+    });
+
+    for (const part of ['source', 'metadata']) {
+      it(format('part %s reports a refusal as an error', part), async () => {
+        fakeClient = refusingClient('Resource not found');
+        const result = await row.handler(context, { ...row.args, part });
+        assert.equal(result.isError, true);
+        assert.equal(
+          JSON.parse(result.content[0].text).message,
+          'Resource not found',
+        );
+      });
+    }
+
+    for (const part of ['source', 'metadata']) {
+      it(
+        format(
+          'part %s names a thrown failure client_threw, carrying its own tool',
+          part,
+        ),
+        async () => {
+          fakeClient = throwingClient('boom');
+          const result = await row.handler(context, { ...row.args, part });
+          assert.equal(result.isError, true);
+          const payload = JSON.parse(result.content[0].text);
+          assert.equal(payload.error, 'client_threw');
+          assert.equal(payload.tool, row.name);
+        },
+      );
+    }
+  });
+}

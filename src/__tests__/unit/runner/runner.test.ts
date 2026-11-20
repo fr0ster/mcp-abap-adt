@@ -40,7 +40,7 @@ function recordingFixture(name: string, tests: readonly string[]): string {
 
 describe('the node:test runner', () => {
   it('the runner refuses an empty run', () => {
-    const repo = fixtureRepo(path.join(scratch.dir, 'empty'), [], {});
+    const repo = fixtureRepo(path.join(scratch.dir, 'empty'), {});
     fs.mkdirSync(path.join(repo, '.test-build', 'tree'), { recursive: true });
     const run = runTool('run-tests.mjs', [
       '--repo',
@@ -50,7 +50,7 @@ describe('the node:test runner', () => {
     ]);
     assert.equal(run.status, 1);
     assert.ok(
-      run.stderr.includes('the node:test list is empty: no test file to run'),
+      run.stderr.includes('no test file found: no test file to run'),
       run.stderr,
     );
   });
@@ -62,7 +62,7 @@ describe('the node:test runner', () => {
     assert.ok(run.stderr.includes(`${missing} does not exist`), run.stderr);
 
     // A source is run as its compiled file, which must exist too.
-    const repo = fixtureRepo(path.join(scratch.dir, 'uncompiled'), [], {
+    const repo = fixtureRepo(path.join(scratch.dir, 'uncompiled'), {
       'src/__tests__/a.test.ts': 'export {};\n',
     });
     const source = path.join(repo, 'src', '__tests__', 'a.test.ts');
@@ -95,6 +95,73 @@ describe('the node:test runner', () => {
     ]);
     assert.equal(run.status, 0, run.stdout + run.stderr);
     assert.deepEqual(recorded(record), ['keep']);
+  });
+
+  it('an option or its value is never a file, whatever it ends with', () => {
+    const file = recordingFixture('pattern', ['run.test.ts', 'other']);
+    for (const pattern of [
+      ['--test-name-pattern=run.test.ts'],
+      ['--test-name-pattern', 'run.test.ts'],
+    ]) {
+      const record = path.join(scratch.dir, `pattern-${pattern.length}.record`);
+      const run = runTool('run-tests.mjs', [
+        '--concurrency',
+        '1',
+        '--env',
+        `RECORD=${record}`,
+        ...pattern,
+        file,
+      ]);
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      // The pattern reached node --test: only the matching test ran.
+      assert.deepEqual(recorded(record), ['run.test.ts'], pattern.join(' '));
+    }
+  });
+
+  it('a directory named like a test file is refused, not expanded', () => {
+    const record = path.join(scratch.dir, 'box.record');
+    // Inside it, a file node --test would run if handed the directory.
+    writeAt(
+      scratch.dir,
+      'box.test.js/inner.test.js',
+      [
+        "const { appendFileSync } = require('node:fs');",
+        "require('node:test').test('inner', () => { appendFileSync(process.env.RECORD, 'inner\\n'); });",
+        '',
+      ].join('\n'),
+    );
+    const box = path.join(scratch.dir, 'box.test.js');
+    const run = runTool('run-tests.mjs', [
+      '--concurrency',
+      '1',
+      '--env',
+      `RECORD=${record}`,
+      box,
+    ]);
+    assert.equal(run.status, 1, run.stdout + run.stderr);
+    assert.ok(run.stderr.includes(`${box} is not a file`), run.stderr);
+    assert.deepEqual(recorded(record), []);
+  });
+
+  it('an unknown positional argument or option is refused before anything runs', () => {
+    const file = recordingFixture('unknown', ['ran']);
+    const record = path.join(scratch.dir, 'unknown.record');
+    for (const [arg, words] of [
+      ['stray', 'stray: not a test file'],
+      ['--inspect', '--inspect: not an option of the runner'],
+    ] as const) {
+      const run = runTool('run-tests.mjs', [
+        '--concurrency',
+        '1',
+        '--env',
+        `RECORD=${record}`,
+        file,
+        arg,
+      ]);
+      assert.equal(run.status, 1, run.stdout + run.stderr);
+      assert.ok(run.stderr.includes(words), run.stderr);
+    }
+    assert.deepEqual(recorded(record), []);
   });
 
   it('--env sets a variable without a shell', () => {
@@ -160,6 +227,107 @@ describe('the node:test runner', () => {
     );
     assert.equal(byVariable.status, 0, byVariable.stdout + byVariable.stderr);
     assert.deepEqual(recorded(record), ['ran']);
+  });
+
+  describe("a stdout spy sees the runner's report unless it is synchronous", () => {
+    // A test file's process reports to the runner through its own
+    // `process.stdout.write`, while its tests take turns. Measured on the
+    // moved stdout suites: a spy held across a turn records the report's
+    // frames (a "nothing reaches stdout" check then fails), one that throws
+    // loses the file's result, one that swallows loses earlier results and
+    // the run still exits 0. A spy made and restored in one synchronous body
+    // cannot see a frame: nothing else runs between. Each fixture test writes
+    // nothing itself, so every write its spy records is the runner's.
+
+    /** The counted lines of a run's report. */
+    const counts = (stdout: string) =>
+      stdout
+        .split('\n')
+        .filter((line) =>
+          ['ℹ tests ', 'ℹ pass ', 'ℹ fail '].some((head) =>
+            line.startsWith(head),
+          ),
+        );
+
+    it("a recording spy held across a turn records the runner's frames, and the counts still arrive", () => {
+      const record = path.join(scratch.dir, 'stdout-held.record');
+      const file = writeAt(
+        scratch.dir,
+        'stdout-held.test.js',
+        [
+          "const { appendFileSync } = require('node:fs');",
+          "const { afterEach, beforeEach, mock, test } = require('node:test');",
+          'let spy;',
+          "beforeEach(() => { spy = mock.method(process.stdout, 'write'); });",
+          'afterEach(() => {',
+          '  const seen = spy.mock.callCount();',
+          '  spy.mock.restore();',
+          '  appendFileSync(process.env.RECORD, `${seen}\\n`);',
+          '});',
+          ...['one', 'two', 'three'].map(
+            (word) =>
+              `test('${word}', async () => { await new Promise((turn) => setImmediate(turn)); });`,
+          ),
+          '',
+        ].join('\n'),
+      );
+      const run = runTool('run-tests.mjs', [
+        '--concurrency',
+        '1',
+        '--env',
+        `RECORD=${record}`,
+        // The reporter stated: Node 22 reports in TAP to a pipe, 23 and
+        // later in spec; the counts are read in spec's words.
+        '--test-reporter=spec',
+        file,
+      ]);
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.deepEqual(counts(run.stdout), [
+        'ℹ tests 3',
+        'ℹ pass 3',
+        'ℹ fail 0',
+      ]);
+      const seen = recorded(record).map(Number);
+      assert.equal(seen.length, 3);
+      assert.ok(
+        seen.reduce((sum, n) => sum + n, 0) > 0,
+        `writes seen per test: ${seen.join(', ')}`,
+      );
+    });
+
+    it('a spy made and restored inside one synchronous test body records no write, and the counts arrive', () => {
+      const record = path.join(scratch.dir, 'stdout-sync.record');
+      const file = writeAt(
+        scratch.dir,
+        'stdout-sync.test.js',
+        [
+          "const { appendFileSync } = require('node:fs');",
+          "const { mock, test } = require('node:test');",
+          ...['one', 'two', 'three'].map(
+            (word) =>
+              `test('${word}', () => { const spy = mock.method(process.stdout, 'write'); const seen = spy.mock.callCount(); spy.mock.restore(); appendFileSync(process.env.RECORD, \`\${seen}\\n\`); });`,
+          ),
+          '',
+        ].join('\n'),
+      );
+      const run = runTool('run-tests.mjs', [
+        '--concurrency',
+        '1',
+        '--env',
+        `RECORD=${record}`,
+        // The reporter stated: Node 22 reports in TAP to a pipe, 23 and
+        // later in spec; the counts are read in spec's words.
+        '--test-reporter=spec',
+        file,
+      ]);
+      assert.equal(run.status, 0, run.stdout + run.stderr);
+      assert.deepEqual(counts(run.stdout), [
+        'ℹ tests 3',
+        'ℹ pass 3',
+        'ℹ fail 0',
+      ]);
+      assert.deepEqual(recorded(record), ['0', '0', '0']);
+    });
   });
 
   describe('every file runs in its own process', () => {

@@ -9,8 +9,11 @@
  * (`streamableHttpSurface`); the stdio and SSE parts claim none of it. A page
  * left stale after the surface changed goes red here.
  */
+
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import { compactToolSet as compactHttpSet } from '../../../../compact-http/src/launcher';
 import { readOnlyToolSet as compactHttpRoSet } from '../../../../compact-http-ro/src/launcher';
 import { STATE_HANDLE_ARGUMENT_WORDS } from '../../../lib/state/stateHandleArgument';
@@ -21,11 +24,16 @@ import {
   type ToolSet,
 } from '../../../lib/toolSet';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const generator = require('../../../../tools/generate-tools-docs.js');
-const compactGenerator = require('../../../../compact/tools/generate-docs.js');
+const generator = require(
+  path.join(repositoryRoot(__dirname), 'tools', 'generate-tools-docs.js'),
+);
+const compactGenerator = require(
+  path.join(repositoryRoot(__dirname), 'compact', 'tools', 'generate-docs.js'),
+);
 
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 const read = (...parts: string[]) =>
   fs.readFileSync(path.join(REPO, ...parts), 'utf8');
 
@@ -39,7 +47,7 @@ const HTTP_HEADING = '## Streamable HTTP Binaries';
 /** The page before its Streamable HTTP section: the stdio and SSE part. */
 function stdioPart(page: string): string {
   const at = page.indexOf(HTTP_HEADING);
-  expect(at).toBeGreaterThan(0);
+  assert.ok(at > 0);
   return page.slice(0, at);
 }
 
@@ -52,28 +60,32 @@ describe('the surface a Streamable HTTP binary adds', () => {
     ];
     for (const [set, stdioOnly] of cases) {
       const surface = streamableHttpSurface(set, { dataTools: true });
-      expect(surface.sessionTools.map((tool) => tool.name)).toEqual([
-        'SessionOpen',
-        'SessionClose',
-      ]);
-      expect([...surface.stdioOnly].sort()).toEqual(stdioOnly);
-      expect(surface.stateHandleWords).toBe(STATE_HANDLE_ARGUMENT_WORDS);
+      assert.deepStrictEqual(
+        surface.sessionTools.map((tool) => tool.name),
+        ['SessionOpen', 'SessionClose'],
+      );
+      assert.deepStrictEqual([...surface.stdioOnly].sort(), stdioOnly);
+      assert.equal(surface.stateHandleWords, STATE_HANDLE_ARGUMENT_WORDS);
       for (const tool of surface.sessionTools) {
-        expect(jsonAt(listedJson(tool.inputSchema), 'state_handle')).toEqual({
-          type: 'string',
-          description: STATE_HANDLE_ARGUMENT_WORDS,
-        });
+        assert.deepStrictEqual(
+          jsonAt(listedJson(tool.inputSchema), 'state_handle'),
+          {
+            type: 'string',
+            description: STATE_HANDLE_ARGUMENT_WORDS,
+          },
+        );
       }
     }
   });
 
   it('the compact sets add HandlerSession', () => {
     for (const set of [compactHttpSet, compactHttpRoSet]) {
-      expect(
+      assert.deepStrictEqual(
         streamableHttpSurface(set, { dataTools: true }).sessionTools.map(
           (tool) => tool.name,
         ),
-      ).toEqual(['HandlerSession']);
+        ['HandlerSession'],
+      );
     }
   });
 });
@@ -83,49 +95,55 @@ describe('the full tool pages (npm run docs:tools)', () => {
     const section = generator.httpSectionMarkdown(
       streamableHttpSurface(fullToolSet, { dataTools: true }),
     );
-    expect(section).toContain('`state_handle`');
-    expect(section).toContain(STATE_HANDLE_ARGUMENT_WORDS);
-    expect(section).toContain('SessionOpen');
-    expect(section).toContain('SessionClose');
-    expect(section).toContain('mcp-abap-adt-http');
-    expect(ALL).toContain(section);
+    assert.ok(section.includes('`state_handle`'));
+    assert.ok(section.includes(STATE_HANDLE_ARGUMENT_WORDS));
+    assert.ok(section.includes('SessionOpen'));
+    assert.ok(section.includes('SessionClose'));
+    assert.ok(section.includes('mcp-abap-adt-http'));
+    assert.ok(ALL.includes(section));
   });
 
   it('AVAILABLE_TOOLS_READONLY.md carries the section of mcp-abap-adt-http-ro', () => {
     const section = generator.httpSectionMarkdown(
       streamableHttpSurface(fullReadOnlyToolSet, { dataTools: true }),
     );
-    expect(section).toContain('mcp-abap-adt-http-ro');
-    expect(READONLY).toContain(section);
+    assert.ok(section.includes('mcp-abap-adt-http-ro'));
+    assert.ok(READONLY.includes(section));
   });
 
   it('each page lists its Streamable HTTP section in its navigation, the long-session tools under it', () => {
     const navigation = (page: string) => {
       const start = page.indexOf('## Navigation');
-      expect(start).toBeGreaterThan(0);
+      assert.ok(start > 0);
       return page.slice(start, page.indexOf('\n---\n', start));
     };
     const all = generator.httpNavigationMarkdown(
       streamableHttpSurface(fullToolSet, { dataTools: true }),
     );
-    expect(all).toContain('[SessionOpen](#sessionopen-streamable-http)');
-    expect(all).toContain('[SessionClose](#sessionclose-streamable-http)');
-    expect(navigation(ALL)).toContain(all);
-    expect(ALL).toContain('<a id="sessionopen-streamable-http"></a>');
-    expect(navigation(READONLY)).toContain(
-      generator.httpNavigationMarkdown(
-        streamableHttpSurface(fullReadOnlyToolSet, { dataTools: true }),
+    assert.ok(all.includes('[SessionOpen](#sessionopen-streamable-http)'));
+    assert.ok(all.includes('[SessionClose](#sessionclose-streamable-http)'));
+    assert.ok(navigation(ALL).includes(all));
+    assert.ok(ALL.includes('<a id="sessionopen-streamable-http"></a>'));
+    assert.ok(
+      navigation(READONLY).includes(
+        generator.httpNavigationMarkdown(
+          streamableHttpSurface(fullReadOnlyToolSet, { dataTools: true }),
+        ),
       ),
     );
-    expect(navigation(HIGH)).toContain(
-      '- [Streamable HTTP Binaries](#streamable-http-binaries)',
+    assert.ok(
+      navigation(HIGH).includes(
+        '- [Streamable HTTP Binaries](#streamable-http-binaries)',
+      ),
     );
   });
 
   it('AVAILABLE_TOOLS_HIGH.md names the state_handle rule of mcp-abap-adt-http', () => {
-    expect(HIGH).toContain(
-      generator.stateHandleRule(
-        streamableHttpSurface(fullToolSet, { dataTools: true }),
+    assert.ok(
+      HIGH.includes(
+        generator.stateHandleRule(
+          streamableHttpSurface(fullToolSet, { dataTools: true }),
+        ),
       ),
     );
   });
@@ -133,12 +151,14 @@ describe('the full tool pages (npm run docs:tools)', () => {
   it('the stdio and SSE part of each page lists no session tool, declares no state_handle and no longer says HTTP serves the stdio set minus the leftover tools alone', () => {
     for (const page of [ALL, READONLY]) {
       const part = stdioPart(page);
-      expect(part).not.toContain('#### SessionOpen');
-      expect(part).not.toContain('#### SessionClose');
-      expect(part).not.toContain(STATE_HANDLE_ARGUMENT_WORDS);
+      assert.ok(!part.includes('#### SessionOpen'));
+      assert.ok(!part.includes('#### SessionClose'));
+      assert.ok(!part.includes(STATE_HANDLE_ARGUMENT_WORDS));
     }
-    expect(READONLY).not.toContain(
-      '(and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set without',
+    assert.ok(
+      !READONLY.includes(
+        '(and `mcp-abap-adt-http-ro`, `mcp-abap-adt-sse-ro`: the same set without',
+      ),
     );
   });
 });
@@ -149,20 +169,22 @@ describe('the compact tool page (compact docs:tools)', () => {
       streamableHttpSurface(compactHttpSet, { dataTools: true }),
       streamableHttpSurface(compactHttpRoSet, { dataTools: true }),
     ]);
-    expect(section).toContain('`state_handle`');
-    expect(section).toContain(STATE_HANDLE_ARGUMENT_WORDS);
-    expect(section).toContain('HandlerSession');
-    expect(section).toContain('mcp-abap-adt-compact-http');
-    expect(section).toContain('mcp-abap-adt-compact-http-ro');
-    expect(COMPACT).toContain(section);
+    assert.ok(section.includes('`state_handle`'));
+    assert.ok(section.includes(STATE_HANDLE_ARGUMENT_WORDS));
+    assert.ok(section.includes('HandlerSession'));
+    assert.ok(section.includes('mcp-abap-adt-compact-http'));
+    assert.ok(section.includes('mcp-abap-adt-compact-http-ro'));
+    assert.ok(COMPACT.includes(section));
   });
 
   it('its stdio and SSE part lists no HandlerSession and no longer says HTTP serves the stdio set minus the leftover tools alone', () => {
     const part = stdioPart(COMPACT);
-    expect(part).not.toContain('### HandlerSession');
-    expect(part).not.toContain(STATE_HANDLE_ARGUMENT_WORDS);
-    expect(COMPACT).not.toContain(
-      'each with its `-ro`, the same without the leftover-session tools)',
+    assert.ok(!part.includes('### HandlerSession'));
+    assert.ok(!part.includes(STATE_HANDLE_ARGUMENT_WORDS));
+    assert.ok(
+      !COMPACT.includes(
+        'each with its `-ro`, the same without the leftover-session tools)',
+      ),
     );
   });
 });

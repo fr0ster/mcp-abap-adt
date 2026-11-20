@@ -2,7 +2,7 @@
  * Integration tests for a class's ABAP Unit tools: CreateUnitTest, RunUnitTest,
  * UpdateUnitTest, DeleteUnitTest. The suite builds its own class and deletes it.
  *
- * Run: npm test -- --testPathPatterns=integration/high/unitTest/ClassUnitTestHighHandlers
+ * Run: npm run test:integration -- src/__tests__/integration/high/unitTest/ClassUnitTestHighHandlers.test.ts
  */
 
 import { after, afterEach, before, beforeEach, it } from 'node:test';

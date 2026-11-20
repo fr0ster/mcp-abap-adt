@@ -4,7 +4,10 @@
  * the argument, and nothing is sent — it is never read as another part (a
  * service binding's URLs, say).
  */
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { defineTool, noConnectionContext } from '@mcp-abap-adt/lib/handlers';
+import { assertRejects } from '../../../src/__tests__/helpers/assertions';
 import {
   handleHandlerGet,
   TOOL_DEFINITION,
@@ -14,20 +17,23 @@ import {
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 describe('HandlerGet: a part it does not read', () => {
-  it.each([['nonsense'], [5]])(
-    'refuses part %j at its schema, naming the argument',
-    async (part) => {
-      const refused = expect(
-        defineTool(TOOL_DEFINITION, handleHandlerGet).call(
-          noConnectionContext(),
-          {
-            object_type: 'SERVICE_BINDING',
-            service_binding_name: 'ZSB',
-            part,
-          },
-        ),
-      ).rejects.toThrow(/Invalid arguments for tool HandlerGet: .* at part/);
-      await refused;
-    },
-  );
+  for (const [part] of [['nonsense'], [5]]) {
+    it(
+      format('refuses part %j at its schema, naming the argument', part),
+      async () => {
+        const refused = assertRejects(
+          defineTool(TOOL_DEFINITION, handleHandlerGet).call(
+            noConnectionContext(),
+            {
+              object_type: 'SERVICE_BINDING',
+              service_binding_name: 'ZSB',
+              part,
+            },
+          ),
+          /Invalid arguments for tool HandlerGet: .* at part/,
+        );
+        await refused;
+      },
+    );
+  }
 });

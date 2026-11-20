@@ -1,4 +1,7 @@
+import assert from 'node:assert/strict';
 import { dirname, join } from 'node:path';
+import { describe, it } from 'node:test';
+import { assertThrows } from '../helpers/assertions';
 
 /**
  * What address the activation request actually carries.
@@ -33,7 +36,8 @@ const { buildObjectUri } = require(activationUtils) as {
 
 describe('the URI an activation carries for a function module', () => {
   it('is built from the parent group, which is why parentName is offered', () => {
-    expect(buildObjectUri('Z_AC_FM01', 'FUGR/FF', 'ZAC_FGR01')).toBe(
+    assert.equal(
+      buildObjectUri('Z_AC_FM01', 'FUGR/FF', 'ZAC_FGR01'),
       '/sap/bc/adt/functions/groups/zac_fgr01/fmodules/z_ac_fm01',
     );
   });
@@ -45,21 +49,24 @@ describe('the URI an activation carries for a function module', () => {
    * request.
    */
   it('throws when nothing names the group', () => {
-    expect(() => buildObjectUri('Z_AC_FM01', 'FUGR/FF')).toThrow(
+    assertThrows(
+      () => buildObjectUri('Z_AC_FM01', 'FUGR/FF'),
       /is addressed under its parent \(functionGroup\); pass the parent's name as parentName/,
     );
   });
 
   /** The recommendation this file replaced, kept so it cannot come back. */
   it('does not read a GROUP|MODULE name as the group — that convention is another builder’s', () => {
-    expect(() => buildObjectUri('ZAC_FGR01|Z_AC_FM01', 'FUGR/FF')).toThrow(
+    assertThrows(
+      () => buildObjectUri('ZAC_FGR01|Z_AC_FM01', 'FUGR/FF'),
       /pass the parent's name as parentName/,
     );
   });
 
   /** An object addressable from its name is unaffected by any of this. */
   it('needs no parent for a class', () => {
-    expect(buildObjectUri('ZCL_X', 'CLAS/OC')).toBe(
+    assert.equal(
+      buildObjectUri('ZCL_X', 'CLAS/OC'),
       '/sap/bc/adt/oo/classes/zcl_x',
     );
   });

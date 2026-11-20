@@ -15,6 +15,9 @@
  * Real adt-clients over a recording connection; no SAP.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   TOOL_DEFINITION as HandlerServiceBindingValidate_Tool,
   handleHandlerServiceBindingValidate,
@@ -179,47 +182,67 @@ function isAnswered(value: unknown): value is Answered {
   );
 }
 
-describe.each(['onprem', 'cloud'] as const)('on %s', (variant) => {
-  describe.each(TOOLS)('$name', (tool) => {
-    it.each(CASES)('$name', async ({ body, answer }) => {
-      const connection = recordingConnection([{ data: body }]);
-      declareSystemKind(connection, variant);
-      const answered = await tool.call(connection);
-      expect(connection.requests).toHaveLength(1);
-      expect(connection.requests[0]?.method).toBe('POST');
-      expect(connection.requests[0]?.url).toBe(
-        '/sap/bc/adt/cts/transportchecks',
-      );
-      if (!isAnswered(answered)) throw new Error('no MCP answer');
-      expect(answered.isError).toBe(false);
-      expect(JSON.parse(answered.content[0]?.text ?? '')).toEqual(answer);
-    });
+for (const variant of ['onprem', 'cloud'] as const) {
+  describe(format('on %s', variant), () => {
+    for (const tool of TOOLS) {
+      describe(`${tool.name}`, () => {
+        for (const { name, body, answer } of CASES) {
+          it(`${name}`, async () => {
+            const connection = recordingConnection([{ data: body }]);
+            declareSystemKind(connection, variant);
+            const answered = await tool.call(connection);
+            assert.equal(connection.requests.length, 1);
+            assert.equal(connection.requests[0]?.method, 'POST');
+            assert.equal(
+              connection.requests[0]?.url,
+              '/sap/bc/adt/cts/transportchecks',
+            );
+            if (!isAnswered(answered)) throw new Error('no MCP answer');
+            assert.equal(answered.isError, false);
+            assert.deepStrictEqual(
+              JSON.parse(answered.content[0]?.text ?? ''),
+              answer,
+            );
+          });
+        }
+      });
+    }
   });
-});
+}
 
 describe("HandlerServiceBindingValidate states package_name, the binding's package, as required", () => {
   it('lists package_name among the required arguments in the description', () => {
-    expect(HandlerServiceBindingValidate_Tool.description).toContain(
-      "Required: service_binding_name*, service_definition_name*, package_name* (the binding's package).",
+    assert.ok(
+      HandlerServiceBindingValidate_Tool.description.includes(
+        "Required: service_binding_name*, service_definition_name*, package_name* (the binding's package).",
+      ),
     );
   });
 
   it('says the answer is the transport check verdict', () => {
-    expect(HandlerServiceBindingValidate_Tool.description).toContain(
-      "The answer is the verdict of SAP's transport check for the binding's name and package",
+    assert.ok(
+      HandlerServiceBindingValidate_Tool.description.includes(
+        "The answer is the verdict of SAP's transport check for the binding's name and package",
+      ),
     );
-    expect(ValidateServiceBinding_Tool.description).toContain(
-      "The answer is the verdict of SAP's transport check for the binding's name and package",
+    assert.ok(
+      ValidateServiceBinding_Tool.description.includes(
+        "The answer is the verdict of SAP's transport check for the binding's name and package",
+      ),
     );
-    expect(compactValidateDescription('onprem')).toContain(
-      "For SERVICE_BINDING the answer is the verdict of SAP's transport check",
+    assert.ok(
+      compactValidateDescription('onprem').includes(
+        "For SERVICE_BINDING the answer is the verdict of SAP's transport check",
+      ),
     );
   });
 
   it('marks package_name required in the schema', () => {
-    expect(
-      declaredRequired(HandlerServiceBindingValidate_Tool.inputSchema),
-    ).toContain('package_name');
+    assert.ok(
+      declaredRequired(HandlerServiceBindingValidate_Tool.inputSchema).includes(
+        'package_name',
+      ),
+    );
   });
 
   it('refuses a call without package_name before anything is sent', async () => {
@@ -230,9 +253,9 @@ describe("HandlerServiceBindingValidate states package_name, the binding's packa
         '{"service_binding_name":"zsrvb_a","service_definition_name":"zsrvd_a"}',
       ),
     );
-    expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain('package_name is required');
-    expect(connection.requests).toEqual([]);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0]?.text.includes('package_name is required'));
+    assert.deepStrictEqual(connection.requests, []);
   });
 });
 

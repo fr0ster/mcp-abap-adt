@@ -5,14 +5,15 @@
  * destination alone: SAP is asked nothing to keep, list or log off.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   DESTINATION,
   json,
   type LeftoverStand,
   leftoverStand,
 } from './harness';
-
-jest.setTimeout(30_000);
 
 const isLookup = (r: { url: string }) => r.url.includes('systeminformation');
 
@@ -21,14 +22,14 @@ let previousType: string | undefined;
 
 beforeEach(() => {
   previousType = process.env.SAP_SYSTEM_TYPE;
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 
 afterEach(async () => {
   await stand?.close();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 it('writes the file under the destination, with no user, asking SAP no user', async () => {
@@ -38,7 +39,7 @@ it('writes the file under the destination, with no user, asking SAP no user', as
   stand = await leftoverStand({ token: { tokenUser: 'TOKEN_USER' } });
   await stand.call('ProbeAdt', { id: 'one' });
   const [handle] = stand.files();
-  expect(stand.file(handle ?? '')).toMatchObject({
+  assertMatchObject(stand.file(handle ?? ''), {
     role: 'built',
     user: null,
     destination: {
@@ -48,7 +49,7 @@ it('writes the file under the destination, with no user, asking SAP no user', as
       system: 'onprem',
     },
   });
-  expect(stand.standIn.requests.filter(isLookup)).toHaveLength(1);
+  assert.equal(stand.standIn.requests.filter(isLookup).length, 1);
 });
 
 it("lists and logs off the destination's leftover without a request to SAP but the logoff", async () => {
@@ -59,15 +60,21 @@ it("lists and logs off the destination's leftover without a request to SAP but t
   const from = stand.standIn.requests.length;
   const listed = json((await stand.call('ListLeftoverSessions')).text)
     .sessions as Array<{ handle: string }>;
-  expect(listed.map((s) => s.handle)).toEqual([mine.handle]);
+  assert.deepStrictEqual(
+    listed.map((s) => s.handle),
+    [mine.handle],
+  );
   const foreign = await stand.call('LogoffLeftoverSession', {
     handle: other.handle,
   });
-  expect(json(foreign.text).error).toBe('leftover_session_not_available');
-  expect(stand.standIn.requests.length).toBe(from);
+  assert.equal(json(foreign.text).error, 'leftover_session_not_available');
+  assert.equal(stand.standIn.requests.length, from);
   const off = await stand.call('LogoffLeftoverSession', {
     handle: mine.handle,
   });
-  expect(json(off.text)).toEqual({ handle: mine.handle, state: 'logged_off' });
-  expect(stand.files()).toEqual([other.handle]);
+  assert.deepStrictEqual(json(off.text), {
+    handle: mine.handle,
+    state: 'logged_off',
+  });
+  assert.deepStrictEqual(stand.files(), [other.handle]);
 });

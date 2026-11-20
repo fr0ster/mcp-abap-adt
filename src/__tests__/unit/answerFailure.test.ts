@@ -1,6 +1,10 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer, return_answer } from '../../lib/answer';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 
 function failure(
   error: Partial<IAdtError> & { messages?: unknown },
@@ -28,8 +32,8 @@ describe('return_answer — failure', () => {
       { tool: 'UpdateClass', detail: 'terse' },
     );
 
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       message: 'Object is locked',
       origin: 'refusal',
       code: 'LOCK_FAILED',
@@ -50,9 +54,9 @@ describe('return_answer — failure', () => {
     );
 
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.adt_type).toBe('CLAS/OC');
-    expect(payload.namespace).toBe('/SAP/');
-    expect(payload.request).toEqual({
+    assert.equal(payload.adt_type, 'CLAS/OC');
+    assert.equal(payload.namespace, '/SAP/');
+    assert.deepStrictEqual(payload.request, {
       method: 'POST',
       url: '/sap/bc/adt/oo/classes',
     });
@@ -79,12 +83,12 @@ describe('return_answer — failure', () => {
 
     // Not on the object, and not anywhere in the text either: a nested leak that
     // toEqual would catch on request alone could still ride out on another field.
-    expect(JSON.parse(result.content[0].text).request).toEqual({
+    assert.deepStrictEqual(JSON.parse(result.content[0].text).request, {
       method: 'POST',
       url: '/sap/bc/adt/oo/classes',
     });
-    expect(result.content[0].text).not.toContain('Bearer');
-    expect(result.content[0].text).not.toContain('SAP_SESSIONID');
+    assert.ok(!result.content[0].text.includes('Bearer'));
+    assert.ok(!result.content[0].text.includes('SAP_SESSIONID'));
   });
 
   it('names no lock handle: the url of a write under a lock goes without it', () => {
@@ -102,8 +106,8 @@ describe('return_answer — failure', () => {
       { tool: 'UpdateDomain', detail: 'full' },
     );
 
-    expect(result.content[0].text).not.toContain(handle);
-    expect(JSON.parse(result.content[0].text).request).toEqual({
+    assert.ok(!result.content[0].text.includes(handle));
+    assert.deepStrictEqual(JSON.parse(result.content[0].text).request, {
       method: 'PUT',
       url: '/sap/bc/adt/ddic/domains/zd?corrNr=SYSK900001',
     });
@@ -121,8 +125,8 @@ describe('return_answer — failure', () => {
     );
 
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.request).toBeUndefined();
-    expect(result.content[0].text).not.toContain('Bearer');
+    assert.equal(payload.request, undefined);
+    assert.ok(!result.content[0].text.includes('Bearer'));
   });
 
   it('never serialises the response object', () => {
@@ -137,8 +141,8 @@ describe('return_answer — failure', () => {
       project,
       { tool: 'GetClass', detail: 'terse' },
     );
-    expect(result.content[0].text).not.toContain('cookie');
-    expect(JSON.parse(result.content[0].text).response).toBeUndefined();
+    assert.ok(!result.content[0].text.includes('cookie'));
+    assert.equal(JSON.parse(result.content[0].text).response, undefined);
   });
 
   it('includes raw_body for a string body, at every detail', () => {
@@ -157,7 +161,8 @@ describe('return_answer — failure', () => {
         tool: 'GetClass',
         detail,
       });
-      expect(JSON.parse(result.content[0].text).raw_body).toBe(
+      assert.equal(
+        JSON.parse(result.content[0].text).raw_body,
         '<exc:exception/>',
       );
     }
@@ -171,7 +176,7 @@ describe('return_answer — failure', () => {
       project,
       { tool: 'GetClass', detail: 'raw' },
     );
-    expect(JSON.parse(parsed.content[0].text).raw_body).toBeUndefined();
+    assert.equal(JSON.parse(parsed.content[0].text).raw_body, undefined);
   });
 
   it('passes messages through when the strategy supplied them', () => {
@@ -184,7 +189,7 @@ describe('return_answer — failure', () => {
       project,
       { tool: 'CheckClass', detail: 'terse' },
     );
-    expect(JSON.parse(result.content[0].text).messages).toEqual([
+    assert.deepStrictEqual(JSON.parse(result.content[0].text).messages, [
       { type: 'E', text: 'Syntax error in line 3' },
     ]);
   });
@@ -217,16 +222,16 @@ describe('return_answer — failure', () => {
     );
 
     const [first] = JSON.parse(result.content[0].text).messages;
-    expect(first.t100).toEqual({
+    assert.deepStrictEqual(first.t100, {
       id: 'SADT_RESOURCE',
       no: '026',
       values: ['CLASS', 'ZMCP_BLD_ANSCH01', 'ZZ'],
     });
-    expect(first.code).toBe('ExceptionResourceInvalidLockHandle');
+    assert.equal(first.code, 'ExceptionResourceInvalidLockHandle');
     // The number is a zero-padded string, not a number: SADT_RESOURCE/26 is a
     // key no system knows.
-    expect(typeof first.t100.no).toBe('string');
-    expect(first.t100.no).toBe('026');
+    assert.equal(typeof first.t100.no, 'string');
+    assert.equal(first.t100.no, '026');
   });
 });
 
@@ -250,36 +255,39 @@ describe('raw_body, by who said no', () => {
       }).content[0].text,
     );
 
-  it.each(['terse', 'full'] as const)(
-    'a 2xx a strategy refused: no raw_body at detail=%s, the rest as it was',
-    (detail) => {
-      expect(payloadAt(200, detail)).toEqual({
-        message: 'Message 999 not found in class ZX',
-        origin: 'refusal',
-        status: 200,
-        code: 'ADT_OBJECT_NOT_FOUND',
-      });
-    },
-  );
+  for (const detail of ['terse', 'full'] as const) {
+    it(
+      format(
+        'a 2xx a strategy refused: no raw_body at detail=%s, the rest as it was',
+        detail,
+      ),
+      () => {
+        assert.deepStrictEqual(payloadAt(200, detail), {
+          message: 'Message 999 not found in class ZX',
+          origin: 'refusal',
+          status: 200,
+          code: 'ADT_OBJECT_NOT_FOUND',
+        });
+      },
+    );
+  }
 
   it('a 2xx a strategy refused: raw_body at detail=raw', () => {
-    expect(payloadAt(200, 'raw').raw_body).toBe(DOCUMENT);
+    assert.equal(payloadAt(200, 'raw').raw_body, DOCUMENT);
   });
 
-  it.each(['terse', 'full', 'raw'] as const)(
-    "SAP's own refusal (404): raw_body at detail=%s",
-    (detail) => {
-      expect(payloadAt(404, detail).raw_body).toBe(DOCUMENT);
-    },
-  );
+  for (const detail of ['terse', 'full', 'raw'] as const) {
+    it(format("SAP's own refusal (404): raw_body at detail=%s", detail), () => {
+      assert.equal(payloadAt(404, detail).raw_body, DOCUMENT);
+    });
+  }
 });
 
 describe('the failure payload carries everything it has', () => {
   const document = corpusBody('refusal-object-not-found--01-read-source');
 
-  it.each(['terse', 'full', 'raw'] as const)(
-    'carries raw_body at detail=%s',
-    (detail) => {
+  for (const detail of ['terse', 'full', 'raw'] as const) {
+    it(format('carries raw_body at detail=%s', detail), () => {
       // `detail` is a parameter of the RESULT projection, and a failure is not
       // a projection: on this path the consumer wants everything.
       const result = return_answer(
@@ -291,24 +299,26 @@ describe('the failure payload carries everything it has', () => {
         project,
         { tool: 'GetClass', detail },
       );
-      expect(JSON.parse(result.content[0].text).raw_body).toBe(document);
-    },
-  );
+      assert.equal(JSON.parse(result.content[0].text).raw_body, document);
+    });
+  }
 
-  it.each([
+  for (const [_name, extra] of [
     ['a connection failure', {}],
     ['an empty answer', { response: { data: '' } }],
     ['a parsed body', { response: { data: { a: 1 } } }],
-  ])('leaves raw_body absent for %s', (_name, extra) => {
-    // The empty string is not a document: emitting `raw_body: ""` would read as
-    // "SAP sent an empty body" when nothing was sent at all.
-    const result = return_answer(
-      failure({ message: 'Nope', origin: 'refusal', ...extra } as never),
-      project,
-      { tool: 'GetClass', detail: 'raw' },
-    );
-    expect('raw_body' in JSON.parse(result.content[0].text)).toBe(false);
-  });
+  ] satisfies Array<[string, Record<string, unknown>]>) {
+    it(format('leaves raw_body absent for %s', _name), () => {
+      // The empty string is not a document: emitting `raw_body: ""` would read as
+      // "SAP sent an empty body" when nothing was sent at all.
+      const result = return_answer(
+        failure({ message: 'Nope', origin: 'refusal', ...extra } as never),
+        project,
+        { tool: 'GetClass', detail: 'raw' },
+      );
+      assert.equal('raw_body' in JSON.parse(result.content[0].text), false);
+    });
+  }
 
   it('carries cleanup, narrowed, on a refusal', () => {
     const SECRET = 'Bearer eyJhbGciOiJIUzI1NiJ9.tolkien';
@@ -329,8 +339,8 @@ describe('the failure payload carries everything it has', () => {
       project,
       { tool: 'UpdateDomain', detail: 'terse' },
     );
-    expect(result.content[0].text).not.toContain(SECRET);
-    expect(JSON.parse(result.content[0].text).cleanup).toEqual({
+    assert.ok(!result.content[0].text.includes(SECRET));
+    assert.deepStrictEqual(JSON.parse(result.content[0].text).cleanup, {
       message: 'Unlock refused',
       origin: 'refusal',
       request: { method: 'POST', url: '/u' },
@@ -347,7 +357,7 @@ describe('the failure payload carries everything it has', () => {
       project,
       { tool: 'UpdateDomain', detail: 'terse' },
     );
-    expect(JSON.parse(result.content[0].text).operation).toBe('succeeded');
+    assert.equal(JSON.parse(result.content[0].text).operation, 'succeeded');
   });
 
   it('carries cleanup and operation on the client_threw payload', async () => {
@@ -367,14 +377,14 @@ describe('the failure payload carries everything it has', () => {
       project,
     );
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.error).toBe('client_threw');
-    expect(payload.operation).toBe('succeeded');
-    expect(payload.cleanup).toEqual({
+    assert.equal(payload.error, 'client_threw');
+    assert.equal(payload.operation, 'succeeded');
+    assert.deepStrictEqual(payload.cleanup, {
       error: 'client_threw',
       message: 'unlock called with no handle',
     });
     // A local defect borrows no AdtFailureOrigin.
-    expect(payload.origin).toBeUndefined();
+    assert.equal(payload.origin, undefined);
   });
 });
 
@@ -389,9 +399,9 @@ describe('the facts a handler states beside its answer (AnswerContext.beside)', 
       },
       project,
     );
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const first = result.content[0];
-    expect(JSON.parse(first ? first.text : '{}')).toMatchObject({
+    assertMatchObject(JSON.parse(first ? first.text : '{}'), {
       error: 'client_threw',
       message: 'socket hang up',
       stored_definition: { key_kind: 'unique' },
@@ -405,7 +415,7 @@ describe('the facts a handler states beside its answer (AnswerContext.beside)', 
       { tool: 'CreateTableType', detail: 'terse', beside },
     );
     const first = result.content[0];
-    expect(JSON.parse(first ? first.text : '{}')).toEqual({
+    assert.deepStrictEqual(JSON.parse(first ? first.text : '{}'), {
       message: 'refused',
       origin: 'refusal',
       stored_definition: { key_kind: 'unique' },
@@ -419,7 +429,7 @@ describe('the facts a handler states beside its answer (AnswerContext.beside)', 
       { tool: 'CreateTableType', detail: 'terse', beside: () => undefined },
     );
     const first = result.content[0];
-    expect(JSON.parse(first ? first.text : '{}')).toEqual({
+    assert.deepStrictEqual(JSON.parse(first ? first.text : '{}'), {
       message: 'refused',
       origin: 'refusal',
     });

@@ -4,6 +4,9 @@
  * is reported to the target's logger in fixed words — `point()` and
  * `seal()` themselves never throw it, so a drop seals, then aborts.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { EnvelopeWatch } from '../../../lib/batch/envelopeWatch';
@@ -12,6 +15,7 @@ import {
   LateBoundConnection,
 } from '../../../lib/batch/lateBound';
 import { communicationBatch } from '../../../lib/batch/tools';
+import { assertRejects } from '../../helpers/assertions';
 
 function stateful(): IAbapConnection {
   return {
@@ -47,10 +51,10 @@ describe('LateBoundConnection followers', () => {
     const target = new LateBoundConnection(recordingLogger(errors));
     target.onPoint(thrower);
     const watched = new EnvelopeWatch().over(target);
-    expect(() => target.point(stateful())).not.toThrow();
-    expect(target.getSessionType?.()).toBe('stateful');
-    expect(watched.getSessionType?.()).toBe('stateful');
-    expect(errors).toEqual(['late-bound target: a follower failed']);
+    target.point(stateful());
+    assert.equal(target.getSessionType?.(), 'stateful');
+    assert.equal(watched.getSessionType?.(), 'stateful');
+    assert.deepStrictEqual(errors, ['late-bound target: a follower failed']);
   });
 
   it('seal(): a throwing follower does not keep a later watcher stale', async () => {
@@ -60,13 +64,13 @@ describe('LateBoundConnection followers', () => {
     target.point(stateful());
     target.onPoint(thrower);
     const late = new EnvelopeWatch().over(target);
-    expect(late.getSessionType?.()).toBe('stateful');
-    expect(() => target.seal()).not.toThrow();
-    expect(target.getSessionType).toBeUndefined();
-    expect(watched.getSessionType).toBeUndefined();
-    expect(late.getSessionType).toBeUndefined();
-    await expect(target.connect()).rejects.toThrow(LATE_BOUND_DROPPED_WORDS);
-    expect(errors).toEqual(['late-bound target: a follower failed']);
+    assert.equal(late.getSessionType?.(), 'stateful');
+    target.seal();
+    assert.equal(target.getSessionType, undefined);
+    assert.equal(watched.getSessionType, undefined);
+    assert.equal(late.getSessionType, undefined);
+    await assertRejects(target.connect(), LATE_BOUND_DROPPED_WORDS);
+    assert.deepStrictEqual(errors, ['late-bound target: a follower failed']);
   });
 
   it('without a logger: every follower is still told', () => {
@@ -76,8 +80,8 @@ describe('LateBoundConnection followers', () => {
     target.onPoint(() => told.push('second'));
     target.onPoint(thrower);
     target.onPoint(() => told.push('fourth'));
-    expect(() => target.point(stateful())).not.toThrow();
-    expect(told).toEqual(['second', 'fourth']);
+    target.point(stateful());
+    assert.deepStrictEqual(told, ['second', 'fourth']);
   });
 
   it('communicationBatch: its target reports to the batch logger', () => {
@@ -85,6 +89,6 @@ describe('LateBoundConnection followers', () => {
     const target = communicationBatch(recordingLogger(errors)).target;
     target?.onPoint(thrower);
     target?.point(stateful());
-    expect(errors).toEqual(['late-bound target: a follower failed']);
+    assert.deepStrictEqual(errors, ['late-bound target: a follower failed']);
   });
 });

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   compactCreateSchema,
   compactDeleteSchema,
@@ -13,23 +15,17 @@ import { listedJson } from '../helpers/listedJson';
  */
 describe('compact DDL CRUD schemas expose routed handler args', () => {
   it('create schema exposes ddl_name', () => {
-    expect(listedJson(compactCreateSchema).properties).toHaveProperty(
-      'ddl_name',
-    );
+    assert.ok('ddl_name' in Object(listedJson(compactCreateSchema).properties));
   });
 
   it('update schema exposes ddl_name and ddl_source', () => {
-    expect(listedJson(compactUpdateSchema).properties).toHaveProperty(
-      'ddl_name',
-    );
-    expect(listedJson(compactUpdateSchema).properties).toHaveProperty(
-      'ddl_source',
+    assert.ok('ddl_name' in Object(listedJson(compactUpdateSchema).properties));
+    assert.ok(
+      'ddl_source' in Object(listedJson(compactUpdateSchema).properties),
     );
   });
 
   it('delete schema exposes ddl_name', () => {
-    expect(listedJson(compactDeleteSchema).properties).toHaveProperty(
-      'ddl_name',
-    );
+    assert.ok('ddl_name' in Object(listedJson(compactDeleteSchema).properties));
   });
 });

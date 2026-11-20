@@ -5,12 +5,15 @@
  * nothing there.
  */
 
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
+import { assertThrows } from '../../../src/__tests__/helpers/assertions';
 import { StreamableHttpServer } from '../http/StreamableHttpServer';
 import { SseServer } from '../sse/SseServer';
 
-describe.each([
+for (const [_name, construct] of [
   [
     'StreamableHttpServer',
     (opts: ConstructorParameters<typeof StreamableHttpServer>[1]) =>
@@ -21,23 +24,28 @@ describe.each([
     (opts: ConstructorParameters<typeof SseServer>[1]) =>
       new SseServer(new CompositeHandlersRegistry([]), opts),
   ],
-] as const)('%s', (_name, construct) => {
-  it('host, port and tls beside app are refused, naming each given', () => {
-    expect(() =>
-      construct({
-        app: express(),
-        host: '0.0.0.0',
-        port: 4000,
-        tls: { cert: '/c', key: '/k' },
-      }),
-    ).toThrow('host, port, tls beside app');
-    expect(() => construct({ app: express(), port: 4000 })).toThrow(
-      'port beside app',
-    );
-  });
+] as const) {
+  describe(format('%s', _name), () => {
+    it('host, port and tls beside app are refused, naming each given', () => {
+      assertThrows(
+        () =>
+          construct({
+            app: express(),
+            host: '0.0.0.0',
+            port: 4000,
+            tls: { cert: '/c', key: '/k' },
+          }),
+        'host, port, tls beside app',
+      );
+      assertThrows(
+        () => construct({ app: express(), port: 4000 }),
+        'port beside app',
+      );
+    });
 
-  it('app alone, and the listener options without app, construct', () => {
-    expect(() => construct({ app: express() })).not.toThrow();
-    expect(() => construct({ host: '127.0.0.1', port: 4000 })).not.toThrow();
+    it('app alone, and the listener options without app, construct', () => {
+      construct({ app: express() });
+      construct({ host: '127.0.0.1', port: 4000 });
+    });
   });
-});
+}

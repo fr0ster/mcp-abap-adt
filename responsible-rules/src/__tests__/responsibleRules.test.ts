@@ -5,6 +5,10 @@
  * stated responsible, else the login, else the error); no kind is
  * `system_type_required`.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { serverRefusalOf } from '@mcp-abap-adt/lib/auth';
 import type { SystemCall } from '@mcp-abap-adt/lib/request-context';
 import { responsibleRules } from '../index';
@@ -35,95 +39,107 @@ function refusalOf(fn: () => unknown): string | undefined {
   return undefined;
 }
 
-describe.each(['cloud', 'onprem'] as const)('%s', (kind) => {
-  it('the information wins over everything stated', () => {
-    expect(
-      responsibleRules.parametersFor(
-        INFO,
-        call({
-          kind,
-          responsible: 'STATED',
-          login: 'LOGIN',
-          masterSystem: 'X',
-        }),
-      ),
-    ).toEqual(INFO.system);
+for (const kind of ['cloud', 'onprem'] as const) {
+  describe(format('%s', kind), () => {
+    it('the information wins over everything stated', () => {
+      assert.deepStrictEqual(
+        responsibleRules.parametersFor(
+          INFO,
+          call({
+            kind,
+            responsible: 'STATED',
+            login: 'LOGIN',
+            masterSystem: 'X',
+          }),
+        ),
+        INFO.system,
+      );
+    });
   });
-});
+}
 
 describe('ABAP Cloud without the information: one step to the error', () => {
   it('a 404 is cloud_without_systeminformation, whatever is stated', () => {
-    expect(
+    assert.equal(
       refusalOf(() =>
         responsibleRules.parametersFor(
           ABSENT,
           call({ kind: 'cloud', responsible: 'STATED', login: 'LOGIN' }),
         ),
       ),
-    ).toBe('cloud_without_systeminformation');
+      'cloud_without_systeminformation',
+    );
   });
 
   it('anything else is system_lookup_failed, whatever is stated', () => {
-    expect(
+    assert.equal(
       refusalOf(() =>
         responsibleRules.parametersFor(
           NO_INFO,
           call({ kind: 'cloud', responsible: 'STATED', login: 'LOGIN' }),
         ),
       ),
-    ).toBe('system_lookup_failed');
+      'system_lookup_failed',
+    );
   });
 });
 
-describe.each([
+for (const [_what, lookup] of [
   ['a 404', ABSENT],
   ['no information', NO_INFO],
-])('on-premise, %s: two steps', (_what, lookup) => {
-  it('the stated responsible, with the stated master system', () => {
-    expect(
-      responsibleRules.parametersFor(
-        lookup,
-        call({ responsible: 'RESP', login: 'LOGIN', masterSystem: 'SID' }),
-      ),
-    ).toEqual({ responsible: 'RESP', masterSystem: 'SID' });
-  });
-
-  it('no responsible: the login', () => {
-    expect(
-      responsibleRules.parametersFor(lookup, call({ login: 'LOGIN' })),
-    ).toEqual({ responsible: 'LOGIN', masterSystem: undefined });
-  });
-
-  it('a blank responsible counts as none', () => {
-    expect(
-      responsibleRules.parametersFor(
-        lookup,
-        call({ responsible: ' ', login: 'LOGIN' }),
-      ),
-    ).toEqual({ responsible: 'LOGIN', masterSystem: undefined });
-  });
-
-  it('neither: system_user_unknown', () => {
-    expect(
-      refusalOf(() =>
+] satisfies [string, Parameters<typeof responsibleRules.parametersFor>[0]][]) {
+  describe(format('on-premise, %s: two steps', _what), () => {
+    it('the stated responsible, with the stated master system', () => {
+      assert.deepStrictEqual(
         responsibleRules.parametersFor(
           lookup,
-          call({ responsible: ' ', login: '' }),
+          call({ responsible: 'RESP', login: 'LOGIN', masterSystem: 'SID' }),
         ),
-      ),
-    ).toBe('system_user_unknown');
+        { responsible: 'RESP', masterSystem: 'SID' },
+      );
+    });
+
+    it('no responsible: the login', () => {
+      assert.deepStrictEqual(
+        responsibleRules.parametersFor(lookup, call({ login: 'LOGIN' })),
+        { responsible: 'LOGIN', masterSystem: undefined },
+      );
+    });
+
+    it('a blank responsible counts as none', () => {
+      assert.deepStrictEqual(
+        responsibleRules.parametersFor(
+          lookup,
+          call({ responsible: ' ', login: 'LOGIN' }),
+        ),
+        { responsible: 'LOGIN', masterSystem: undefined },
+      );
+    });
+
+    it('neither: system_user_unknown', () => {
+      assert.equal(
+        refusalOf(() =>
+          responsibleRules.parametersFor(
+            lookup,
+            call({ responsible: ' ', login: '' }),
+          ),
+        ),
+        'system_user_unknown',
+      );
+    });
   });
-});
+}
 
 it('no kind stated: system_type_required, never guessed', () => {
-  expect(
+  assert.equal(
     refusalOf(() =>
       responsibleRules.parametersFor(
         ABSENT,
         call({ kind: undefined, responsible: 'RESP' }),
       ),
     ),
-  ).toBe('system_type_required');
+    'system_type_required',
+  );
 });
 
 it('the refusals log fixed words only, never a stated value', () => {
@@ -141,6 +157,6 @@ it('the refusals log fixed words only, never a stated value', () => {
       ),
     );
   }
-  expect(lines).toHaveLength(3);
-  for (const line of lines) expect(line).not.toContain('SECRET_SID');
+  assert.equal(lines.length, 3);
+  for (const line of lines) assert.ok(!line.includes('SECRET_SID'));
 });

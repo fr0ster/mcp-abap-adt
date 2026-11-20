@@ -1,3 +1,14 @@
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
+
 /**
  * A fresh connection on a host's connection comes from the host.
  *
@@ -18,51 +29,6 @@
  * the request's signal — and still receives none.
  */
 
-/** Every credential provider the server constructs, by class. */
-const constructedProviders: string[] = [];
-jest.mock('@mcp-abap-adt/auth-providers', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/auth-providers');
-  const watched = (name: string) =>
-    new Proxy(actual[name], {
-      construct(target, args, newTarget) {
-        constructedProviders.push(name);
-        return Reflect.construct(target, args, newTarget);
-      },
-      get(target, property, receiver) {
-        const value = Reflect.get(target, property, receiver);
-        if (typeof value === 'function' && property !== 'prototype') {
-          return (...args: unknown[]) => {
-            constructedProviders.push(`${name}.${String(property)}`);
-            return value.apply(target, args);
-          };
-        }
-        return value;
-      },
-    });
-  return {
-    ...actual,
-    BasicAuthProvider: watched('BasicAuthProvider'),
-    TokenAuthProvider: watched('TokenAuthProvider'),
-    SamlAuthProvider: watched('SamlAuthProvider'),
-    CertificateAuthProvider: watched('CertificateAuthProvider'),
-  };
-});
-
-/** Every connection the server's factory builds. */
-const builtConnections: unknown[] = [];
-jest.mock('../../lib/connectionFactory', () => {
-  const actual = jest.requireActual('../../lib/connectionFactory');
-  return {
-    ...actual,
-    createAbapConnection: (...args: unknown[]) => {
-      builtConnections.push(args[0]);
-      return (actual.createAbapConnection as (...a: unknown[]) => unknown)(
-        ...args,
-      );
-    },
-  };
-});
-
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
@@ -72,15 +38,89 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { FRESH_CONNECTION_UNAVAILABLE_WORDS } from '../../lib/auth/serverRefusal';
 import { CompactHandlersGroup } from '../../lib/compact/group';
+import * as connectionFactory from '../../lib/connectionFactory';
 import { liveDebugPorts } from '../../lib/debugger/ports';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
 import { runWithRequestSignal } from '../../lib/requestSignal';
+import { assertMatchObject, rejectionOf } from '../helpers/assertions';
+import {
+  basicAuthProvider as basicProvider,
+  certificateAuthProvider as certificateProvider,
+  samlAuthProvider as samlProvider,
+  tokenAuthProvider as tokenProvider,
+} from '../helpers/packageFiles';
 import {
   type RecordingConnection,
   recordingConnection,
 } from '../helpers/recordingConnection';
+
+/** Every credential provider the server constructs, by class. */
+const constructedProviders: string[] = [];
+/** A provider class that records each construction and each static call. */
+function watched<T extends object>(name: string, actual: T): T {
+  return new Proxy(actual, {
+    construct(target, args, newTarget) {
+      constructedProviders.push(name);
+      return Reflect.construct(target as never, args, newTarget);
+    },
+    get(target, property, receiver) {
+      const value = Reflect.get(target, property, receiver);
+      if (typeof value === 'function' && property !== 'prototype') {
+        return (...args: unknown[]) => {
+          constructedProviders.push(`${name}.${String(property)}`);
+          return value.apply(target, args);
+        };
+      }
+      return value;
+    },
+  });
+}
+
+/** Every connection the server's factory builds. */
+const builtConnections: unknown[] = [];
+// The real factory, read before it is replaced.
+const realCreateAbapConnection = connectionFactory.createAbapConnection;
+
+// The four provider classes replaced on the auth-providers modules that
+// define them (the package index re-exports them by getter, read at call
+// time), and lib/connectionFactory's createAbapConnection on its own module,
+// every other name stays real. Every case
+// restores every mock after it: they are replaced before each.
+function watchConstructions(): void {
+  mock.property(
+    basicProvider,
+    'BasicAuthProvider',
+    watched('BasicAuthProvider', basicProvider.BasicAuthProvider),
+  );
+  mock.property(
+    tokenProvider,
+    'TokenAuthProvider',
+    watched('TokenAuthProvider', tokenProvider.TokenAuthProvider),
+  );
+  mock.property(
+    samlProvider,
+    'SamlAuthProvider',
+    watched('SamlAuthProvider', samlProvider.SamlAuthProvider),
+  );
+  mock.property(
+    certificateProvider,
+    'CertificateAuthProvider',
+    watched(
+      'CertificateAuthProvider',
+      certificateProvider.CertificateAuthProvider,
+    ),
+  );
+  mock.method(
+    connectionFactory,
+    'createAbapConnection',
+    (...args: Parameters<typeof realCreateAbapConnection>) => {
+      builtConnections.push(args[0]);
+      return realCreateAbapConnection(...args);
+    },
+  );
+}
 
 /**
  * A connection whose configuration names RFC and holds no credential: no
@@ -88,19 +128,19 @@ import {
  */
 function rfcConnection(): RecordingConnection & {
   getConfig(): Record<string, unknown>;
-  connect: jest.Mock;
-  setSessionType: jest.Mock;
-  disconnect: jest.Mock;
+  connect: Mock<() => Promise<void>>;
+  setSessionType: Mock<(...args: unknown[]) => void>;
+  disconnect: Mock<() => Promise<void>>;
 } {
   return Object.assign(recordingConnection(), {
-    connect: jest.fn(async () => {}),
-    setSessionType: jest.fn(),
+    connect: mock.fn(async () => {}),
+    setSessionType: mock.fn(),
     getConfig: () => ({
       url: 'https://sap.example.invalid',
       client: '100',
       connectionType: 'rfc',
     }),
-    disconnect: jest.fn(async () => {}),
+    disconnect: mock.fn(async () => {}),
   });
 }
 
@@ -131,11 +171,12 @@ beforeEach(() => {
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   constructedProviders.length = 0;
   builtConnections.length = 0;
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
+  watchConstructions();
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
 });
@@ -210,40 +251,49 @@ const OPERATIONS: Array<[string, string, Record<string, unknown>]> = [
 ];
 
 describe('with the host’s freshConnection', () => {
-  it.each(OPERATIONS)(
-    '%s runs on the factory’s connection, the factory called with no argument',
-    async (_label, tool, args) => {
-      const injected = rfcConnection();
-      const factory = hostFactory();
-      const client = await served(injected, factory);
+  for (const [_label, tool, args] of OPERATIONS) {
+    it(
+      format(
+        '%s runs on the factory’s connection, the factory called with no argument',
+        _label,
+      ),
+      async () => {
+        const injected = rfcConnection();
+        const factory = hostFactory();
+        const client = await served(injected, factory);
 
-      await client.callTool({ name: tool, arguments: args });
+        await client.callTool({ name: tool, arguments: args });
 
-      expect(factory.calls).toEqual([[]]);
-      expect(factory.made).toHaveLength(1);
-      const fresh = factory.made[0];
-      expect(fresh.connect).toHaveBeenCalledTimes(1);
-      expect(fresh.requests.length).toBeGreaterThan(0);
-      expect(injected.requests).toHaveLength(0);
-      expect(injected.connect).not.toHaveBeenCalled();
-      expect(constructedProviders).toEqual([]);
-      expect(builtConnections).toEqual([]);
-      await client.close();
-    },
-  );
+        assert.deepStrictEqual(factory.calls, [[]]);
+        assert.equal(factory.made.length, 1);
+        const fresh = factory.made[0];
+        assert.equal(fresh.connect.mock.callCount(), 1);
+        assert.ok(fresh.requests.length > 0);
+        assert.equal(injected.requests.length, 0);
+        assert.equal(injected.connect.mock.callCount(), 0);
+        assert.deepStrictEqual(constructedProviders, []);
+        assert.deepStrictEqual(builtConnections, []);
+        await client.close();
+      },
+    );
+  }
 
-  it.each(OPERATIONS.filter(([, tool]) => tool !== 'HandlerLock'))(
-    '%s disconnects the factory’s connection when it answers',
-    async (_label, tool, args) => {
-      const factory = hostFactory();
-      const client = await served(rfcConnection(), factory);
+  for (const [_label, tool, args] of OPERATIONS.filter(
+    ([, tool]) => tool !== 'HandlerLock',
+  )) {
+    it(
+      format('%s disconnects the factory’s connection when it answers', _label),
+      async () => {
+        const factory = hostFactory();
+        const client = await served(rfcConnection(), factory);
 
-      await client.callTool({ name: tool, arguments: args });
+        await client.callTool({ name: tool, arguments: args });
 
-      expect(factory.made[0].disconnect).toHaveBeenCalledTimes(1);
-      await client.close();
-    },
-  );
+        assert.equal(factory.made[0].disconnect.mock.callCount(), 1);
+        await client.close();
+      },
+    );
+  }
 
   it('HandlerLock PACKAGE keeps the factory’s connection under its handle until HandlerUnlock disconnects it', async () => {
     const injected = rfcConnection();
@@ -259,9 +309,9 @@ describe('with the host’s freshConnection', () => {
       },
     });
     const lockHandle = JSON.parse(textOf(locked)).lock_handle as string;
-    expect(typeof lockHandle).toBe('string');
+    assert.equal(typeof lockHandle, 'string');
     const fresh = factory.made[0];
-    expect(fresh.disconnect).not.toHaveBeenCalled();
+    assert.equal(fresh.disconnect.mock.callCount(), 0);
     const sentBeforeUnlock = fresh.requests.length;
 
     await client.callTool({
@@ -273,9 +323,9 @@ describe('with the host’s freshConnection', () => {
       },
     });
 
-    expect(fresh.requests.length).toBeGreaterThan(sentBeforeUnlock);
-    expect(fresh.disconnect).toHaveBeenCalledTimes(1);
-    expect(injected.requests).toHaveLength(0);
+    assert.ok(fresh.requests.length > sentBeforeUnlock);
+    assert.equal(fresh.disconnect.mock.callCount(), 1);
+    assert.equal(injected.requests.length, 0);
     await client.close();
   });
 });
@@ -283,7 +333,9 @@ describe('with the host’s freshConnection', () => {
 describe('a handed-over connection that cannot connect', () => {
   it('is closed, the failure answered, nothing sent', async () => {
     const fresh = rfcConnection();
-    fresh.connect.mockRejectedValue(new Error('the system said no'));
+    fresh.connect.mock.mockImplementation(async () => {
+      throw new Error('the system said no');
+    });
     const client = await served(rfcConnection(), async () => fresh);
 
     const result = await client.callTool({
@@ -291,9 +343,9 @@ describe('a handed-over connection that cannot connect', () => {
       arguments: OPERATIONS[1][2],
     });
 
-    expect(result.isError).toBe(true);
-    expect(fresh.disconnect).toHaveBeenCalledTimes(1);
-    expect(fresh.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.equal(fresh.disconnect.mock.callCount(), 1);
+    assert.equal(fresh.requests.length, 0);
     await client.close();
   });
 });
@@ -310,11 +362,12 @@ describe('the same connection injected again', () => {
       arguments: OPERATIONS[1][2],
     });
 
-    expect(JSON.parse(textOf(result)).error).toBe(
+    assert.equal(
+      JSON.parse(textOf(result)).error,
       'fresh_connection_unavailable',
     );
-    expect(factory.calls).toHaveLength(0);
-    expect(injected.requests).toHaveLength(0);
+    assert.equal(factory.calls.length, 0);
+    assert.equal(injected.requests.length, 0);
     await first.close();
     await second.close();
   });
@@ -331,32 +384,37 @@ describe('the same connection injected again', () => {
       arguments: OPERATIONS[1][2],
     });
 
-    expect(earlier.calls).toHaveLength(0);
-    expect(later.calls).toEqual([[]]);
+    assert.equal(earlier.calls.length, 0);
+    assert.deepStrictEqual(later.calls, [[]]);
     await first.close();
     await second.close();
   });
 });
 
 describe('without freshConnection', () => {
-  it.each(OPERATIONS)(
-    '%s is refused fresh_connection_unavailable, nothing sent',
-    async (_label, tool, args) => {
-      const injected = rfcConnection();
-      const client = await served(injected);
+  for (const [_label, tool, args] of OPERATIONS) {
+    it(
+      format(
+        '%s is refused fresh_connection_unavailable, nothing sent',
+        _label,
+      ),
+      async () => {
+        const injected = rfcConnection();
+        const client = await served(injected);
 
-      const result = await client.callTool({ name: tool, arguments: args });
+        const result = await client.callTool({ name: tool, arguments: args });
 
-      expect(result.isError).toBe(true);
-      const answer = JSON.parse(textOf(result));
-      expect(answer.error).toBe('fresh_connection_unavailable');
-      expect(answer.message).toBe(FRESH_CONNECTION_UNAVAILABLE_WORDS);
-      expect(injected.requests).toHaveLength(0);
-      expect(constructedProviders).toEqual([]);
-      expect(builtConnections).toEqual([]);
-      await client.close();
-    },
-  );
+        assert.equal(result.isError, true);
+        const answer = JSON.parse(textOf(result));
+        assert.equal(answer.error, 'fresh_connection_unavailable');
+        assert.equal(answer.message, FRESH_CONNECTION_UNAVAILABLE_WORDS);
+        assert.equal(injected.requests.length, 0);
+        assert.deepStrictEqual(constructedProviders, []);
+        assert.deepStrictEqual(builtConnections, []);
+        await client.close();
+      },
+    );
+  }
 });
 
 /**
@@ -386,14 +444,18 @@ describe('a debug session’s own connection', () => {
 
     const own = await openForDebugSession(injected, request.signal);
 
-    expect(own).toBe(factory.made[0]);
-    expect(factory.calls).toEqual([[]]);
-    expect(factory.made[0].connect).toHaveBeenCalledTimes(1);
-    expect(factory.made[0].setSessionType).toHaveBeenCalledWith('stateful');
-    expect(injected.requests).toHaveLength(0);
-    expect(injected.setSessionType).not.toHaveBeenCalled();
-    expect(constructedProviders).toEqual([]);
-    expect(builtConnections).toEqual([]);
+    assert.equal(own, factory.made[0]);
+    assert.deepStrictEqual(factory.calls, [[]]);
+    assert.equal(factory.made[0].connect.mock.callCount(), 1);
+    assert.ok(
+      factory.made[0].setSessionType.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['stateful']),
+      ),
+    );
+    assert.equal(injected.requests.length, 0);
+    assert.equal(injected.setSessionType.mock.callCount(), 0);
+    assert.deepStrictEqual(constructedProviders, []);
+    assert.deepStrictEqual(builtConnections, []);
     await client.close();
   });
 
@@ -401,18 +463,18 @@ describe('a debug session’s own connection', () => {
     const injected = rfcConnection();
     const client = await served(injected);
 
-    const refused = expect(
+    const refused = rejectionOf(
       openForDebugSession(injected, new AbortController().signal),
-    ).rejects.toMatchObject({
+    );
+    assertMatchObject(await refused, {
       serverRefusal: 'fresh_connection_unavailable',
       message: FRESH_CONNECTION_UNAVAILABLE_WORDS,
     });
-    await refused;
 
-    expect(injected.requests).toHaveLength(0);
-    expect(injected.connect).not.toHaveBeenCalled();
-    expect(constructedProviders).toEqual([]);
-    expect(builtConnections).toEqual([]);
+    assert.equal(injected.requests.length, 0);
+    assert.equal(injected.connect.mock.callCount(), 0);
+    assert.deepStrictEqual(constructedProviders, []);
+    assert.deepStrictEqual(builtConnections, []);
     await client.close();
   });
 });

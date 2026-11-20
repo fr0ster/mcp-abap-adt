@@ -14,7 +14,7 @@
  * Config-driven: skips cleanly when no SAP connection / test case disabled /
  * wrong system type / structure not found.
  *
- * Run: npm test -- --testPathPatterns=readOnly/structure/GetStructuresListHandler
+ * Run: npm run test:integration -- src/__tests__/integration/readOnly/structure/GetStructuresListHandler.test.ts
  */
 
 import assert from 'node:assert/strict';

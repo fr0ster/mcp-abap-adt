@@ -5,8 +5,11 @@
  * by the launcher (`main`); a client opens a stream with `x-sap-*`
  * credentials of the ADT stand-in; the handler records its context.
  */
+
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createServer } from 'node:net';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import {
   skipSapAnswers,
   substringLineMatch,
@@ -17,21 +20,21 @@ import {
   type AdtStandIn,
   adtStandIn,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import * as searchSourceHandler from '../../../../src/handlers/system/readonly/handleSearchSource';
 import { main } from '../launcher';
 
 const seen: HandlerContext[] = [];
-jest.mock('../../../../src/handlers/system/readonly/handleSearchSource', () => {
-  const actual = jest.requireActual(
-    '../../../../src/handlers/system/readonly/handleSearchSource',
-  );
-  return {
-    ...actual,
-    handleSearchSource: async (context: HandlerContext) => {
-      seen.push(context);
-      return { isError: false, content: [{ type: 'text', text: 'recorded' }] };
-    },
-  };
-});
+// handleSearchSource replaced on the module that defines it (the search
+// group reads it at call time); its other names
+// stay real.
+mock.method(
+  searchSourceHandler,
+  'handleSearchSource',
+  async (context: HandlerContext) => {
+    seen.push(context);
+    return { isError: false, content: [{ type: 'text', text: 'recorded' }] };
+  },
+);
 
 const savedEnv = { ...process.env };
 let standIn: AdtStandIn;
@@ -114,7 +117,7 @@ it('the SSE launcher passes the shipped strategies to its session server', async
       },
       signal: controller.signal,
     });
-    expect(res.status).toBe(200);
+    assert.equal(res.status, 200);
     if (res.body === null) throw new Error('no stream');
     const next = eventReader(res.body);
     const endpoint = new URL(await next('endpoint'), baseUrl);
@@ -131,11 +134,11 @@ it('the SSE launcher passes the shipped strategies to its session server', async
         },
       }),
     });
-    expect(accepted.status).toBe(202);
+    assert.equal(accepted.status, 202);
     await next('message');
-    expect(seen).toHaveLength(1);
-    expect(seen[0]?.sapAnswerStrategy).toBe(skipSapAnswers);
-    expect(seen[0]?.lineMatchStrategy).toBe(substringLineMatch);
+    assert.equal(seen.length, 1);
+    assert.equal(seen[0]?.sapAnswerStrategy, skipSapAnswers);
+    assert.equal(seen[0]?.lineMatchStrategy, substringLineMatch);
   } finally {
     controller.abort();
     await server.stop();

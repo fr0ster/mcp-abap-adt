@@ -8,7 +8,25 @@
  * so the test asserts the composition, and asserts that a missing piece produces NO
  * url rather than a plausible one.
  */
-import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
+
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { mockModuleExports } from '../helpers/moduleMock';
+
+// The client and the language come from ADT's own `systeminformation`, so the
+// tool is tested against what that endpoint answers — including its refusals,
+// which must not fail a read that worked. adt-clients is replaced for this
+// file before the handler loads (node:test mock.module,
+// helpers/moduleMock.ts; its other exports stay the real ones). No case
+// queues a one-off answer, so resetting its calls and implementation before
+// each case is all a reset needs here.
+const systemInfo = mock.fn<(...args: any[]) => any>(
+  function getSystemInformation() {},
+);
+mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
+  getSystemInformation: systemInfo,
+});
+
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
@@ -17,21 +35,14 @@ import {
   NO_ORIGIN_NOTE,
   TOOL_DEFINITION,
 } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
+import * as clients from '../../lib/clients';
+import { assertMatchObject } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
-
-// The client and the language come from ADT's own `systeminformation`, so the
-// tool is tested against what that endpoint answers — including its refusals,
-// which must not fail a read that worked.
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  getSystemInformation: jest.fn(),
-}));
-const systemInfo = getSystemInformation as jest.Mock;
 
 const BINDING = `<?xml version="1.0" encoding="utf-8"?>
 <srvb:serviceBinding srvb:published="true" srvb:bindingCreated="true"
@@ -84,7 +95,9 @@ const clientFor = (parts: {
   });
 
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+// lib/clients' createAdtClient replaced on its own module (the handler reads
+// it at call time); the module's other names stay real.
+mock.method(clients, 'createAdtClient', () => fakeClient);
 
 const context = {
   connection: {
@@ -106,9 +119,11 @@ const payloadOf = async (args: Record<string, unknown>) => {
 
 describe('GetServiceBindingPreviewUrl', () => {
   beforeEach(() => {
-    systemInfo.mockReset();
+    systemInfo.mock.resetCalls();
     // adt-clients 37: a `404` is `ok` and `{ present: false }`.
-    systemInfo.mockResolvedValue(okResponse({ present: false }));
+    systemInfo.mock.mockImplementation(async () =>
+      okResponse({ present: false }),
+    );
   });
 
   it('composes the preview URL from the binding, the definition and the view', async () => {
@@ -123,26 +138,32 @@ describe('GetServiceBindingPreviewUrl', () => {
       client: '100',
     });
 
-    expect(payload.protocol).toBe('odatav2');
-    expect(payload.service).toBe('ZSB_STUDENT_V2');
-    expect(payload.service_definition).toBe('ZUI_STUDENT');
-    expect(payload.entity_sets).toEqual(['student_data', 'student_address']);
-    expect(payload.associations).toEqual(['to_ADDRESS']);
-    expect(payload.preview_descriptor).toBe(
+    assert.equal(payload.protocol, 'odatav2');
+    assert.equal(payload.service, 'ZSB_STUDENT_V2');
+    assert.equal(payload.service_definition, 'ZUI_STUDENT');
+    assert.deepStrictEqual(payload.entity_sets, [
+      'student_data',
+      'student_address',
+    ]);
+    assert.deepStrictEqual(payload.associations, ['to_ADDRESS']);
+    assert.equal(
+      payload.preview_descriptor,
       'ZSB_STUDENT_V2##student_data##to_ADDRESS##student_address##ZSB_STUDENT_V2_VAN##0001',
     );
     // The very URL Eclipse produced for this binding, host and client.
-    expect(payload.preview_url).toBe(
+    assert.equal(
+      payload.preview_url,
       'https://epbyminsd0654.epam.com:44300/sap/bc/adt/businessservices/odatav2/feap/' +
         'ngVsghiXYbhsjF77%C2%87%C2%88%C2%89xy%C2%82%C2%88sxu%C2%88u77%C2%88%C2%83sUXXfYgg77' +
         '%C2%87%C2%88%C2%89xy%C2%82%C2%88suxx%C2%86y%C2%87%C2%8777ngVsghiXYbhsjFsjUb77DDDE' +
         '/flp.html?sap-ui-xx-viewCache=false&sap-ui-language=EN&sap-client=100',
     );
-    expect(payload.service_url).toBe(
+    assert.equal(
+      payload.service_url,
       'https://epbyminsd0654.epam.com:44300/sap/opu/odata/sap/ZSB_STUDENT_V2/',
     );
-    expect(payload.metadata_url).toBe(`${payload.service_url}$metadata`);
-    expect(payload.missing).toBeUndefined();
+    assert.equal(payload.metadata_url, `${payload.service_url}$metadata`);
+    assert.equal(payload.missing, undefined);
   });
 
   it('still answers a URL when no association is found, because the segment is not read', async () => {
@@ -158,13 +179,16 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.missing).toBeUndefined();
-    expect(payload.associations).toEqual([]);
-    expect(payload.preview_descriptor).toBe(
+    assert.equal(payload.missing, undefined);
+    assert.deepStrictEqual(payload.associations, []);
+    assert.equal(
+      payload.preview_descriptor,
       'ZSB_STUDENT_V2##student_data####student_address##ZSB_STUDENT_V2_VAN##0001',
     );
-    expect(payload.preview_url).toContain('/businessservices/odatav2/feap/');
-    expect(payload.service_url).toContain('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
+    assert.ok(payload.preview_url.includes('/businessservices/odatav2/feap/'));
+    assert.ok(
+      payload.service_url.includes('/sap/opu/odata/sap/ZSB_STUDENT_V2/'),
+    );
   });
 
   it('answers no preview URL when the entity set cannot be found', async () => {
@@ -179,9 +203,11 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.preview_url).toBeUndefined();
-    expect(payload.missing).toEqual(['entity_set']);
-    expect(payload.service_url).toContain('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
+    assert.equal(payload.preview_url, undefined);
+    assert.deepStrictEqual(payload.missing, ['entity_set']);
+    assert.ok(
+      payload.service_url.includes('/sap/opu/odata/sap/ZSB_STUDENT_V2/'),
+    );
   });
 
   it('says when the binding is not published, because then nothing answers', async () => {
@@ -196,8 +222,8 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.published).toBe(false);
-    expect(payload.note).toMatch(/not published/);
+    assert.equal(payload.published, false);
+    assert.match(payload.note, /not published/);
   });
 
   it('takes the caller over the defaults', async () => {
@@ -215,12 +241,13 @@ describe('GetServiceBindingPreviewUrl', () => {
       language: 'DE',
     });
 
-    expect(payload.preview_descriptor).toBe(
+    assert.equal(
+      payload.preview_descriptor,
       'ZSB_STUDENT_V2##student_address##to_STUDENT##student_data##ZSB_STUDENT_V2_VAN##0001',
     );
-    expect(payload.preview_url).toContain('sap-ui-language=DE');
+    assert.ok(payload.preview_url.includes('sap-ui-language=DE'));
     // A named navigation means the view is not read at all.
-    expect(payload.associations).toEqual([]);
+    assert.deepStrictEqual(payload.associations, []);
   });
 
   it('builds the V4 root when the binding is V4', async () => {
@@ -232,27 +259,29 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.protocol).toBe('odatav4');
+    assert.equal(payload.protocol, 'odatav4');
     // Binding first, then the SERVICE — `ZSB_STUDENT_V2` in both positions here,
     // not the service definition `ZUI_STUDENT`. This fixture is the discriminating
     // case: the two names differ, and a URL Eclipse produced for a binding whose
     // names also differ carries the service. Where they coincide, as on a
     // SAP-delivered binding, the wrong reading answers 200 and hides itself.
-    expect(payload.service_url).toBe(
+    assert.equal(
+      payload.service_url,
       'https://epbyminsd0654.epam.com:44300/sap/opu/odata4/sap/zsb_student_v2' +
         '/srvd/sap/zsb_student_v2/0001/',
     );
     // V4 answers a preview too, from a different descriptor: the service's URL
     // path first, the binding last. Decoded from two URLs Eclipse produced; the
     // byte-exact fixtures live in feapDescriptor.test.ts.
-    expect(payload.preview_descriptor).toBe(
+    assert.equal(
+      payload.preview_descriptor,
       'https://epbyminsd0654.epam.com:44300/sap/opu/odata4/sap/zsb_student_v2/srvd/sap/zsb_student_v2/0001/'.replace(
         'https://epbyminsd0654.epam.com:44300',
         '',
       ) +
         '##student_data##to_ADDRESS##student_address##ZSB_STUDENT_V2##0001##ZSB_STUDENT_V2',
     );
-    expect(payload.preview_url).toContain('/businessservices/odatav4/feap/');
+    assert.ok(payload.preview_url.includes('/businessservices/odatav4/feap/'));
   });
 
   it('answers no preview for a Web API binding, because it has none', async () => {
@@ -267,16 +296,17 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.binding_category).toBe('web_api');
-    expect(payload.preview_url).toBeUndefined();
-    expect(payload.preview_descriptor).toBeUndefined();
-    expect(payload.missing).toBeUndefined();
-    expect(payload.note).toMatch(/Web API binding, which has no Fiori preview/);
+    assert.equal(payload.binding_category, 'web_api');
+    assert.equal(payload.preview_url, undefined);
+    assert.equal(payload.preview_descriptor, undefined);
+    assert.equal(payload.missing, undefined);
+    assert.match(payload.note, /Web API binding, which has no Fiori preview/);
     // What such a binding IS addressed by:
-    expect(payload.service_url).toBe(
+    assert.equal(
+      payload.service_url,
       'https://epbyminsd0654.epam.com:44300/sap/opu/odata/sap/ZSB_STUDENT_V2/',
     );
-    expect(payload.metadata_url).toBe(`${payload.service_url}$metadata`);
+    assert.equal(payload.metadata_url, `${payload.service_url}$metadata`);
   });
 
   it('reads the UI variant as the one a preview belongs to', async () => {
@@ -288,14 +318,14 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.binding_category).toBe('ui');
-    expect(payload.preview_url).toContain('/feap/');
+    assert.equal(payload.binding_category, 'ui');
+    assert.ok(payload.preview_url.includes('/feap/'));
   });
 
   it('takes the client and the language from the system when none were given', async () => {
     // What a caller cannot know and does not have to: the same record this
     // server already reads to resolve a request's system.
-    systemInfo.mockResolvedValue(
+    systemInfo.mock.mockImplementation(async () =>
       okResponse({ present: true, info: { client: '100', language: 'EN' } }),
     );
     fakeClient = clientFor({
@@ -306,14 +336,14 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.client).toBe('100');
-    expect(payload.language).toBe('EN');
-    expect(payload.preview_url).toContain('sap-client=100');
-    expect(payload.note).toBeUndefined();
+    assert.equal(payload.client, '100');
+    assert.equal(payload.language, 'EN');
+    assert.ok(payload.preview_url.includes('sap-client=100'));
+    assert.equal(payload.note, undefined);
   });
 
   it('leaves the parameter out when the caller passes an empty client', async () => {
-    systemInfo.mockResolvedValue(
+    systemInfo.mock.mockImplementation(async () =>
       okResponse({ present: true, info: { client: '100', language: 'EN' } }),
     );
     fakeClient = clientFor({
@@ -327,9 +357,9 @@ describe('GetServiceBindingPreviewUrl', () => {
       client: '',
     });
 
-    expect(payload.preview_url).not.toContain('sap-client');
+    assert.ok(!payload.preview_url.includes('sap-client'));
     // And an explicit empty string is not overridden by the system's answer.
-    expect(payload.client).toBe('');
+    assert.equal(payload.client, '');
   });
 
   it('does not ask the system when the caller gave both', async () => {
@@ -345,7 +375,7 @@ describe('GetServiceBindingPreviewUrl', () => {
       language: 'DE',
     });
 
-    expect(systemInfo).not.toHaveBeenCalled();
+    assert.equal(systemInfo.mock.callCount(), 0);
   });
 
   /** A failed lookup as adt-clients 37 answers it: `ok: false`, the response and the request. */
@@ -369,7 +399,9 @@ describe('GetServiceBindingPreviewUrl', () => {
     // Any status but a `404` is `ok: false` (adt-clients 37). It is not this
     // tool's failure: beside the URL, the lookup's failure is the error as
     // SAP answered it, with its step — not its message folded into a sentence.
-    systemInfo.mockResolvedValue(lookupFailed(403, 'Forbidden body'));
+    systemInfo.mock.mockImplementation(async () =>
+      lookupFailed(403, 'Forbidden body'),
+    );
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
@@ -378,10 +410,10 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.success).toBe(true);
-    expect(payload.preview_url).toContain('/feap/');
-    expect(payload.preview_url).not.toContain('sap-client');
-    expect(payload.system_information_failure).toEqual({
+    assert.equal(payload.success, true);
+    assert.ok(payload.preview_url.includes('/feap/'));
+    assert.ok(!payload.preview_url.includes('sap-client'));
+    assert.deepStrictEqual(payload.system_information_failure, {
       message: 'Request failed with status code 403',
       origin: 'connection',
       status: 403,
@@ -392,8 +424,8 @@ describe('GetServiceBindingPreviewUrl', () => {
       raw_body: 'Forbidden body',
       step: 'read system information',
     });
-    expect(payload.note).toContain('could not be read');
-    expect(payload.note).not.toContain('status code 403');
+    assert.ok(payload.note.includes('could not be read'));
+    assert.ok(!payload.note.includes('status code 403'));
   });
 
   it('a 404 is the endpoint absent: the URL without a client, and no failure beside it', async () => {
@@ -405,13 +437,13 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.success).toBe(true);
-    expect(payload.preview_url).not.toContain('sap-client');
-    expect(payload.system_information_failure).toBeUndefined();
+    assert.equal(payload.success, true);
+    assert.ok(!payload.preview_url.includes('sap-client'));
+    assert.equal(payload.system_information_failure, undefined);
   });
 
   it('a 405 is a failed lookup, reported beside the URL (only a 404 is absent)', async () => {
-    systemInfo.mockResolvedValue(lookupFailed(405, ''));
+    systemInfo.mock.mockImplementation(async () => lookupFailed(405, ''));
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
@@ -420,15 +452,15 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.success).toBe(true);
-    expect(payload.system_information_failure).toMatchObject({
+    assert.equal(payload.success, true);
+    assertMatchObject(payload.system_information_failure, {
       status: 405,
       step: 'read system information',
     });
   });
 
   it('a 401 answered as a failed lookup ends the call with it; the binding is not read', async () => {
-    systemInfo.mockResolvedValue(lookupFailed(401, ''));
+    systemInfo.mock.mockImplementation(async () => lookupFailed(401, ''));
     const reads: unknown[] = [];
     fakeClient = fakeClientOf({
       read: async (...args: unknown[]) => {
@@ -442,25 +474,25 @@ describe('GetServiceBindingPreviewUrl', () => {
       { service_binding_name: 'ZSB_STUDENT_V2' } as never,
     );
 
-    expect(answered.isError).toBe(true);
-    expect(JSON.parse(answered.content[0].text)).toMatchObject({
+    assert.equal(answered.isError, true);
+    assertMatchObject(JSON.parse(answered.content[0].text), {
       status: 401,
       step: 'read system information',
     });
-    expect(reads).toEqual([]);
+    assert.deepStrictEqual(reads, []);
   });
 
   it('a 401 thrown by the lookup ends the call with it; the binding is not read', async () => {
-    systemInfo.mockRejectedValue(
-      Object.assign(new Error('Request failed with status code 401'), {
+    systemInfo.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('Request failed with status code 401'), {
         response: {
           status: 401,
           statusText: 'Unauthorized',
           headers: {},
           data: '',
         },
-      }),
-    );
+      });
+    });
     const reads: unknown[] = [];
     fakeClient = fakeClientOf({
       read: async (...args: unknown[]) => {
@@ -474,12 +506,12 @@ describe('GetServiceBindingPreviewUrl', () => {
       { service_binding_name: 'ZSB_STUDENT_V2' } as never,
     );
 
-    expect(answered.isError).toBe(true);
-    expect(JSON.parse(answered.content[0].text)).toMatchObject({
+    assert.equal(answered.isError, true);
+    assertMatchObject(JSON.parse(answered.content[0].text), {
       status: 401,
       step: 'read system information',
     });
-    expect(reads).toEqual([]);
+    assert.deepStrictEqual(reads, []);
   });
 
   it('prefers the URL the system names over the one a rule composes', async () => {
@@ -508,7 +540,7 @@ describe('GetServiceBindingPreviewUrl', () => {
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
     // adt-clients' getServiceGroup, not a URL built here (#235).
-    expect(asked).toEqual([
+    assert.deepStrictEqual(asked, [
       [
         {
           objectname: 'ZSB_STUDENT_V2',
@@ -519,12 +551,13 @@ describe('GetServiceBindingPreviewUrl', () => {
         { analyse: analyseException },
       ],
     ]);
-    expect(payload.service_url_source).toBe('system');
-    expect(payload.service_url).toBe(
+    assert.equal(payload.service_url_source, 'system');
+    assert.equal(
+      payload.service_url,
       'https://epbyminsd0654.epam.com:44300/sap/opu/odata/sap/ELSEWHERE/',
     );
-    expect(payload.metadata_url).toBe(`${payload.service_url}$metadata`);
-    expect(payload.annotation_url).toBe('/sap/opu/odata/annotations/X/');
+    assert.equal(payload.metadata_url, `${payload.service_url}$metadata`);
+    assert.equal(payload.annotation_url, '/sap/opu/odata/annotations/X/');
   });
 
   describe('the service URL lookup: a credential failure ends the call as it came', () => {
@@ -558,8 +591,8 @@ describe('GetServiceBindingPreviewUrl', () => {
           request: sent,
         } as never),
       );
-      expect(answered.isError).toBe(true);
-      expect(JSON.parse(answered.content[0].text)).toMatchObject({
+      assert.equal(answered.isError, true);
+      assertMatchObject(JSON.parse(answered.content[0].text), {
         status: 401,
         step: 'read service URL',
         request: sent,
@@ -572,8 +605,9 @@ describe('GetServiceBindingPreviewUrl', () => {
           authError['credential-refused']({ credential: 'token' }),
         );
       });
-      expect(answered.isError).toBe(true);
-      expect(JSON.parse(answered.content[0].text).error).toBe(
+      assert.equal(answered.isError, true);
+      assert.equal(
+        JSON.parse(answered.content[0].text).error,
         'authentication_failed',
       );
     });
@@ -584,8 +618,9 @@ describe('GetServiceBindingPreviewUrl', () => {
           response: { status: 403, data: '' },
         } as never),
       );
-      expect(answered.isError).toBe(false);
-      expect(JSON.parse(answered.content[0].text).service_url_source).toBe(
+      assert.equal(answered.isError, false);
+      assert.equal(
+        JSON.parse(answered.content[0].text).service_url_source,
         'composed',
       );
     });
@@ -600,8 +635,10 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
-    expect(payload.service_url_source).toBe('composed');
-    expect(payload.service_url).toContain('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
+    assert.equal(payload.service_url_source, 'composed');
+    assert.ok(
+      payload.service_url.includes('/sap/opu/odata/sap/ZSB_STUDENT_V2/'),
+    );
   });
 
   describe('over RFC: the connection answers no URL', () => {
@@ -639,19 +676,21 @@ describe('GetServiceBindingPreviewUrl', () => {
         service_binding_name: 'ZSB_STUDENT_V2',
         client: '100',
       });
-      expect(payload.service_url).toBe('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
-      expect(payload.metadata_url).toBe(
+      assert.equal(payload.service_url, '/sap/opu/odata/sap/ZSB_STUDENT_V2/');
+      assert.equal(
+        payload.metadata_url,
         '/sap/opu/odata/sap/ZSB_STUDENT_V2/$metadata',
       );
-      expect(
+      assert.equal(
         payload.preview_url.startsWith(
           '/sap/bc/adt/businessservices/odatav2/feap/',
         ),
-      ).toBe(true);
-      expect(payload.preview_url).toContain('flp.html?');
-      expect(payload.preview_url).toContain('sap-client=100');
-      expect(payload.origin).toBe('unknown');
-      expect(payload.note).toContain(NO_ORIGIN_NOTE);
+        true,
+      );
+      assert.ok(payload.preview_url.includes('flp.html?'));
+      assert.ok(payload.preview_url.includes('sap-client=100'));
+      assert.equal(payload.origin, 'unknown');
+      assert.ok(payload.note.includes(NO_ORIGIN_NOTE));
     });
 
     it('reads the V4 service path from the path itself', async () => {
@@ -661,18 +700,21 @@ describe('GetServiceBindingPreviewUrl', () => {
         view: ROOT_VIEW,
       });
       const payload = await overRfc({ service_binding_name: 'ZSB_STUDENT_V2' });
-      expect(payload.service_url).toBe(
+      assert.equal(
+        payload.service_url,
         '/sap/opu/odata4/sap/zsb_student_v2/srvd/sap/zsb_student_v2/0001/',
       );
-      expect(payload.preview_descriptor).toBe(
+      assert.equal(
+        payload.preview_descriptor,
         '/sap/opu/odata4/sap/zsb_student_v2/srvd/sap/zsb_student_v2/0001/' +
           '##student_data##to_ADDRESS##student_address##ZSB_STUDENT_V2##0001##ZSB_STUDENT_V2',
       );
-      expect(
+      assert.equal(
         payload.preview_url.startsWith(
           '/sap/bc/adt/businessservices/odatav4/feap/',
         ),
-      ).toBe(true);
+        true,
+      );
     });
 
     it('keeps a service URL the system answered absolute', async () => {
@@ -685,10 +727,11 @@ describe('GetServiceBindingPreviewUrl', () => {
         ),
       });
       const payload = await overRfc({ service_binding_name: 'ZSB_STUDENT_V2' });
-      expect(payload.service_url).toBe(
+      assert.equal(
+        payload.service_url,
         'https://system.example.test/sap/opu/odata/sap/ELSEWHERE/',
       );
-      expect(payload.service_url_source).toBe('system');
+      assert.equal(payload.service_url_source, 'system');
     });
 
     it('answers a service URL the system answered as a path as that path', async () => {
@@ -699,7 +742,7 @@ describe('GetServiceBindingPreviewUrl', () => {
         serviceGroup: serviceGroupAnswering('/sap/opu/odata/sap/ELSEWHERE/'),
       });
       const payload = await overRfc({ service_binding_name: 'ZSB_STUDENT_V2' });
-      expect(payload.service_url).toBe('/sap/opu/odata/sap/ELSEWHERE/');
+      assert.equal(payload.service_url, '/sap/opu/odata/sap/ELSEWHERE/');
     });
 
     it('over HTTP the answer carries no origin field and no RFC note', async () => {
@@ -711,13 +754,15 @@ describe('GetServiceBindingPreviewUrl', () => {
       const payload = await payloadOf({
         service_binding_name: 'ZSB_STUDENT_V2',
       });
-      expect(payload.origin).toBeUndefined();
-      expect(payload.note ?? '').not.toContain(NO_ORIGIN_NOTE);
+      assert.equal(payload.origin, undefined);
+      assert.ok(!(payload.note ?? '').includes(NO_ORIGIN_NOTE));
     });
 
     it('the description says how the URLs are answered over RFC', () => {
-      expect(TOOL_DEFINITION.description).toContain(
-        'Over RFC, the URLs are answered as their paths and query',
+      assert.ok(
+        TOOL_DEFINITION.description.includes(
+          'Over RFC, the URLs are answered as their paths and query',
+        ),
       );
     });
   });

@@ -1,4 +1,8 @@
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
+import { assertMatchObject } from '../helpers/assertions';
 /**
  * The transport hint knows what the call sent even when the failed request's
  * URL does not show it (fr0ster/mcp-abap-adt#314).
@@ -123,12 +127,12 @@ async function call(args: Record<string, unknown>) {
 describe('through the server: the call’s own transport_request decides', () => {
   it('SAP names the request the call was given (not in the URL): the entry-held words, no transport_request', async () => {
     const payload = await call({ transport_request: 'SIDK900001' });
-    expect(payload.hint).toEqual({ text: TRANSPORT_ENTRY_HELD_WORDS });
+    assert.deepStrictEqual(payload.hint, { text: TRANSPORT_ENTRY_HELD_WORDS });
   });
 
   it('the call was given another request: the request SAP names, to pass', async () => {
     const payload = await call({ transport_request: 'SIDK900009' });
-    expect(payload.hint).toEqual({
+    assert.deepStrictEqual(payload.hint, {
       transport_request: 'SIDK900001',
       text: TRANSPORT_HINT_WORDS,
     });
@@ -136,7 +140,7 @@ describe('through the server: the call’s own transport_request decides', () =>
 
   it('the call was given none: the request SAP names, to pass', async () => {
     const payload = await call({});
-    expect(payload.hint).toEqual({
+    assert.deepStrictEqual(payload.hint, {
       transport_request: 'SIDK900001',
       text: TRANSPORT_HINT_WORDS,
     });
@@ -144,20 +148,46 @@ describe('through the server: the call’s own transport_request decides', () =>
 });
 
 describe('runWithCallTransport', () => {
-  it.each([
-    ['a request', { transport_request: 'SIDK900001' }, 'SIDK900001'],
-    ['an empty string', { transport_request: '' }, undefined],
-    ['blanks', { transport_request: '  ' }, undefined],
-    ['a number', { transport_request: 7 }, undefined],
-    ['no argument', {}, undefined],
-  ])('keeps %s as the call’s request: %p', (_label, args, expected) => {
-    expect(runWithCallTransport(args, () => callTransportRequest())).toBe(
-      expected,
-    );
-  });
+  // `%p` is pretty-format's rendering of the arguments, written out per row.
+  for (const [_label, args, shown, expected] of [
+    [
+      'a request',
+      { transport_request: 'SIDK900001' },
+      '{"transport_request": "SIDK900001"}',
+      'SIDK900001',
+    ],
+    [
+      'an empty string',
+      { transport_request: '' },
+      '{"transport_request": ""}',
+      undefined,
+    ],
+    [
+      'blanks',
+      { transport_request: '  ' },
+      '{"transport_request": "  "}',
+      undefined,
+    ],
+    [
+      'a number',
+      { transport_request: 7 },
+      '{"transport_request": 7}',
+      undefined,
+    ],
+    ['no argument', {}, '{}', undefined],
+  ] satisfies Array<
+    [string, Record<string, unknown>, string, string | undefined]
+  >) {
+    it(format('keeps %s as the call’s request: %s', _label, shown), () => {
+      assert.equal(
+        runWithCallTransport(args, () => callTransportRequest()),
+        expected,
+      );
+    });
+  }
 
   it('is nothing outside a call', () => {
-    expect(callTransportRequest()).toBeUndefined();
+    assert.equal(callTransportRequest(), undefined);
   });
 
   it('reaches the renderer of a handler run inside it', async () => {
@@ -165,7 +195,7 @@ describe('runWithCallTransport', () => {
       { transport_request: 'sidk900001' },
       handler,
     );
-    expect(JSON.parse(result.content[0].text).hint).toEqual({
+    assert.deepStrictEqual(JSON.parse(result.content[0].text).hint, {
       text: TRANSPORT_ENTRY_HELD_WORDS,
     });
   });
@@ -189,11 +219,11 @@ describe('the other ways a handler is invoked enter the same scope', () => {
       },
     } as unknown as McpServer);
     const sent = await callback?.({ transport_request: 'SIDK900001' });
-    expect(JSON.parse(sent.content[0].text).hint).toEqual({
+    assert.deepStrictEqual(JSON.parse(sent.content[0].text).hint, {
       text: TRANSPORT_ENTRY_HELD_WORDS,
     });
     const other = await callback?.({ transport_request: 'SIDK900009' });
-    expect(JSON.parse(other.content[0].text).hint).toMatchObject({
+    assertMatchObject(JSON.parse(other.content[0].text).hint, {
       transport_request: 'SIDK900001',
     });
   });
@@ -215,7 +245,7 @@ describe('the other ways a handler is invoked enter the same scope', () => {
     const result = toolAnswer(
       await exported?.call(noConnectionContext(), args),
     );
-    expect(JSON.parse(result.content[0]?.text ?? '{}').hint).toEqual({
+    assert.deepStrictEqual(JSON.parse(result.content[0]?.text ?? '{}').hint, {
       text: TRANSPORT_ENTRY_HELD_WORDS,
     });
   });

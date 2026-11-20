@@ -1,8 +1,14 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { handleCheckMetadataExtension as high } from '../../handlers/ddlx/high/handleCheckMetadataExtension';
 import { handleCheckMetadataExtension as low } from '../../handlers/ddlx/low/handleCheckMetadataExtension';
+import * as clients from '../../lib/clients';
 import { parseStructure } from '../../lib/strategies/reading';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+
+mock.method(clients, 'createAdtClient', () => fakeClient);
 
 /**
  * Which version a DDLX check asks for, and why the tool has to say.
@@ -22,7 +28,6 @@ const PROCESSED = corpusBody('check-ddlx-active-version--01-checkrun');
 const NOT_PROCESSED = corpusBody('check-ddlx-inactive-version--01-checkrun');
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 const context = { connection: {} as any, logger: undefined };
 const payload = (result: any) => JSON.parse(result.content[0].text);
@@ -46,10 +51,10 @@ describe('CheckMetadataExtensionLow names the version it checks', () => {
       name: 'zmcp_bld_ddlx_chk',
     });
 
-    expect(asked).toEqual(['active']);
-    expect(result.isError).toBe(false);
+    assert.deepStrictEqual(asked, ['active']);
+    assert.equal(result.isError, false);
     // The capture: an activated extension, asked for the version it has.
-    expect(payload(result)).toMatchObject({
+    assertMatchObject(payload(result), {
       ran: true,
       status_text: 'Object ZMCP_BLD_DDLX_CHK has been checked',
     });
@@ -64,13 +69,13 @@ describe('CheckMetadataExtensionLow names the version it checks', () => {
       version: 'inactive',
     });
 
-    expect(asked).toEqual(['inactive']);
+    assert.deepStrictEqual(asked, ['inactive']);
     // **Not a failure.** A `notProcessed` is a 200 with a report in it, and
     // `analyseException` refuses on an exception or a non-2xx and nothing
     // else. The caller is told the check did not run, and why — which is what
     // `terseCheck`'s `ran` is for.
-    expect(result.isError).toBe(false);
-    expect(payload(result)).toMatchObject({
+    assert.equal(result.isError, false);
+    assertMatchObject(payload(result), {
       ran: false,
       status_text:
         'Error while reading the object ZMCP_BLD_DDLX_CHK from the database',
@@ -82,7 +87,7 @@ describe('CheckMetadataExtensionLow names the version it checks', () => {
     fakeClient = clientAnswering(PROCESSED, asked);
     await low(context as any, { name: 'ZX', version: 'ACTIVE' as never });
     await low(context as any, { name: 'ZX', version: 'nonsense' as never });
-    expect(asked).toEqual(['active', 'active']);
+    assert.deepStrictEqual(asked, ['active', 'active']);
   });
 });
 
@@ -96,14 +101,14 @@ describe('CheckMetadataExtension forwards the version through the wrapper', () =
       version: 'inactive',
     });
 
-    expect(asked).toEqual(['inactive']);
-    expect(result.isError).toBe(false);
+    assert.deepStrictEqual(asked, ['inactive']);
+    assert.equal(result.isError, false);
   });
 
   it('defaults to active like the tier below it', async () => {
     const asked: string[] = [];
     fakeClient = clientAnswering(PROCESSED, asked);
     await high(context as any, { name: 'ZMCP_BLD_DDLX_CHK' });
-    expect(asked).toEqual(['active']);
+    assert.deepStrictEqual(asked, ['active']);
   });
 });

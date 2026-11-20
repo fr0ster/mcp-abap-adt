@@ -1,19 +1,21 @@
-// The node:test runner (D27): runs `node --test` over the compiled files of
-// the node:test list, on every platform the repository supports.
+// The test runner (D27): runs `node --test` over the compiled files of the
+// test selection, on every platform the repository supports.
 //
 //   node tools/run-tests.mjs --concurrency <N> [--root <dir>]... [--repo <dir>]
 //     [--env NAME=VALUE]... [--list] [node --test options]... [files]...
 //
-// - With no file, it runs the compiled file of every source on the list
-//   (`tools/node-test-files.json`), under `.test-build/tree/` (`npm run
-//   test:build` makes it). `--root <dir>` keeps the sources under that
-//   directory (repeatable; the sub-packages' `--roots` reach it through
-//   `tools/npm-test.mjs`). A selection with no file is refused: `node --test`
-//   given no file looks for files of its own, and a broken list would pass.
+// - With no file, it runs the compiled file, under `.test-build/tree/` (`npm
+//   run test:build` makes it), of every test the selection walks
+//   (`walkSources`, `tools/node-test-list.mjs`: each `….test.ts` under a
+//   `__tests__` directory of the test roots). `--root <dir>` keeps the
+//   sources under that directory (repeatable; each sub-package's `test`
+//   script passes its own `src`). A selection with no file is refused:
+//   `node --test` given no file looks for files of its own, and a broken
+//   walk would pass.
 // - A file named is run as named and must exist: a `….test.ts` source is run
 //   as its compiled file, which must exist too; a `….test.js` file as it is.
-//   With `--root`, a named file outside every root is not run (as Jest's
-//   `--roots` does), and a selection left empty is refused.
+//   With `--root`, a named file outside every root is not run, and a
+//   selection left empty is refused.
 // - `--concurrency <N>` is how many files run at once; without it, the
 //   variable `TEST_CONCURRENCY` gives it (the last `--concurrency` wins over
 //   the variable). With neither, the run is refused: there is no default — the
@@ -21,14 +23,20 @@
 //   given directly is refused for the same reason, and `--test-isolation`
 //   because every file runs in a process of its own, node:test's default,
 //   never overridden.
+// - An argument starting with `-` is an option, never a file, and so is the
+//   value after an option that takes one (`--test-name-pattern <x>`, …).
+//   Only node's `--test-*` options reach `node --test`; any other option, and
+//   any argument that is not a `….test.ts` / `….test.js` file (a directory
+//   above all, which node would expand itself, past the live check), is
+//   refused before anything runs: a directory is selected with `--root`.
 // - Options go to `node --test` before the files: after a file, `node --test`
 //   ignores them.
 // - `--env NAME=VALUE` sets a variable for the run; a shell prefix
 //   (`NAME=1 npm …`) does not work on Windows. No shell runs anything here.
 // - `--list` prints the source paths of the selection, one per line, and runs
 //   nothing (an empty selection prints nothing and is no error).
-// - `--repo <dir>` reads another repository's list and build (the runner's
-//   own tests use fixture repositories); the preload is always this
+// - `--repo <dir>` walks another repository's tests and reads its build (the
+//   runner's own tests use fixture repositories); the preload is always this
 //   repository's.
 //
 // - The live suites (`src/__tests__/integration/`, `src/__tests__/admin/`)
@@ -54,6 +62,9 @@
 //   it ends the process tree of every file still running. Either way the
 //   run fails, and under a live script the teardown still runs.
 //
+// Every file's process may mock a module (`--experimental-test-module-mocks`,
+// node:test's `mock.module`; `src/__tests__/helpers/moduleMock.ts`).
+//
 // Every file's process preloads the compiled resolve hook
 // (`src/__tests__/helpers/resolvePreload.ts`), which answers this
 // repository's package names with their compiled files, and the per-file
@@ -74,10 +85,11 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   buildDir,
   compiledFile,
+  LIVE_ROOTS,
   OWN_REPO,
-  readList,
   separateSources,
   sourceFile,
+  walkSources,
 } from './node-test-list.mjs';
 
 const CONCURRENCY_VARIABLE = 'TEST_CONCURRENCY';
@@ -94,6 +106,19 @@ const roots = [];
 let repo = OWN_REPO;
 let concurrency;
 let listOnly = false;
+
+/**
+ * The `node --test` options that take their value as the next argument: that
+ * argument is the option's value, never a file.
+ */
+const VALUE_OPTIONS = [
+  '--test-name-pattern',
+  '--test-skip-pattern',
+  '--test-reporter',
+  '--test-reporter-destination',
+  '--test-shard',
+  '--test-global-setup',
+];
 
 /** The value after option `args[i]`, or the run is refused. */
 function optionValue(args, i) {
@@ -127,10 +152,26 @@ for (let i = 0; i < args.length; i += 1) {
     );
   } else if (arg.startsWith('--test-isolation')) {
     fail(`${arg}: every file runs in a process of its own`);
-  } else if (arg.endsWith('.test.ts') || arg.endsWith('.test.js')) {
+  } else if (VALUE_OPTIONS.includes(arg)) {
+    // `--opt value`: both are node's, the value never a file.
+    options.push(arg, optionValue(args, i));
+    i += 1;
+  } else if (
+    !arg.startsWith('-') &&
+    (arg.endsWith('.test.ts') || arg.endsWith('.test.js'))
+  ) {
     named.push(arg);
-  } else {
+  } else if (arg.startsWith('--test-')) {
     options.push(arg);
+  } else {
+    // Only node's `--test-*` options reach `node --test`: a directory or any
+    // other argument forwarded there would be expanded by node, past the
+    // live check.
+    fail(
+      arg.startsWith('-')
+        ? `${arg}: not an option of the runner, and only --test-* options reach node --test`
+        : `${arg}: not a test file — name a ….test.ts or ….test.js file, or select a directory with --root <dir>`,
+    );
   }
 }
 
@@ -156,12 +197,9 @@ function inRoots(dirs, file) {
   return dirs.length === 0 || dirs.some((dir) => isUnder(dir, file));
 }
 
-/** The directories of the live suites, by their repository paths. */
-const LIVE_ROOTS = ['src/__tests__/integration/', 'src/__tests__/admin/'];
-
 /** Whether `source` (a repository source path) is a live suite's file. */
 function isLiveSource(source) {
-  return LIVE_ROOTS.some((root) => source.startsWith(root));
+  return LIVE_ROOTS.some((root) => source.startsWith(`${root}/`));
 }
 
 /** The compiled module `parts` of this repository's build, required. */
@@ -184,13 +222,13 @@ function liveScriptRunning() {
 }
 
 /**
- * The sources of the list under the roots asked for, or all of them but the
- * live suites' when no root is asked for.
+ * The walked sources under the roots asked for, or all of them but the live
+ * suites' when no root is asked for; never a run of its own's.
  */
 function selectedSources() {
   const dirs = rootDirs();
   const separate = separateSources(repo);
-  return readList(repo).filter(
+  return walkSources(repo).filter(
     (source) =>
       inRoots(dirs, sourceFile(repo, source)) &&
       (dirs.length > 0 || !isLiveSource(source)) &&
@@ -198,10 +236,7 @@ function selectedSources() {
   );
 }
 
-/**
- * The named files under the roots asked for: a named file outside every
- * root is not run, as Jest does with its `--roots`.
- */
+/** The named files under the roots asked for: one outside every root is not run. */
 function selectedNamed() {
   const dirs = rootDirs();
   return named.filter((arg) => inRoots(dirs, resolve(arg)));
@@ -211,11 +246,14 @@ function selectedNamed() {
 function namedFile(arg) {
   const file = resolve(arg);
   if (!existsSync(file)) fail(`${arg} does not exist`);
+  // A regular file only: node would expand a directory named ….test.ts
+  // itself, past the live check.
+  if (!statSync(file).isFile()) fail(`${arg} is not a file`);
   if (arg.endsWith('.test.js')) return file;
   if (!isUnder(repo, file)) fail(`${arg} is not a source of ${repo}`);
   const source = relative(repo, file).split(sep).join('/');
   const compiled = compiledFile(repo, source);
-  if (!existsSync(compiled)) {
+  if (!existsSync(compiled) || !statSync(compiled).isFile()) {
     fail(`${arg} has no compiled file — run the test build first`);
   }
   return compiled;
@@ -246,9 +284,17 @@ if (
   fail(`concurrency "${concurrency}" is not a positive integer`);
 }
 
-/** A repository source path of `file`, when it is one of `repo`'s. */
+/**
+ * A repository source path of `file`, when it is one of `repo`'s: a compiled
+ * file under the build (`.test-build/tree/…test.js`) is its source
+ * (`…test.ts`), so the live refusal reads a compiled live suite as one.
+ */
 function repoSource(file) {
   const absolute = resolve(file);
+  if (isUnder(buildDir(repo), absolute) && absolute.endsWith('.test.js')) {
+    const compiled = relative(buildDir(repo), absolute).split(sep).join('/');
+    return `${compiled.slice(0, -'.js'.length)}.ts`;
+  }
   return isUnder(repo, absolute)
     ? relative(repo, absolute).split(sep).join('/')
     : undefined;
@@ -268,8 +314,8 @@ if (named.length > 0) {
   if (sources.length === 0) {
     fail(
       roots.length === 0
-        ? 'the node:test list is empty: no test file to run'
-        : `no file of the node:test list under ${roots.join(', ')}: no test file to run`,
+        ? 'no test file found: no test file to run'
+        : `no test file under ${roots.join(', ')}: no test file to run`,
     );
   }
   if (!existsSync(buildDir(repo))) {
@@ -382,6 +428,9 @@ function runFile(file) {
     const child = spawn(
       process.execPath,
       [
+        // node:test's `mock.module` (helpers/moduleMock.ts): a file may
+        // replace a module whose exports map closes its internal files.
+        '--experimental-test-module-mocks',
         '--require',
         preload,
         '--require',

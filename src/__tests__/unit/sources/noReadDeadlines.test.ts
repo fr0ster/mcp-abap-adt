@@ -15,11 +15,14 @@
  * expression literals cannot hide or fake a call.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 const PACKAGES = [
   'src',
   'compact/src',
@@ -158,7 +161,7 @@ describe('no built-in deadline on the server reads', () => {
   const scans = files.map((file) => ({ file, ...scanFile(file) }));
 
   it('sees the sources, so the checks below are not vacuous', () => {
-    expect(files.length).toBeGreaterThan(300);
+    assert.ok(files.length > 300);
     const reads = scans.flatMap((s) =>
       s.calls.filter((c) => c.callee === 'makeAdtRequest'),
     );
@@ -167,7 +170,7 @@ describe('no built-in deadline on the server reads', () => {
     // through adt-clients since #235, GetInclude since 19.0.0. The floor keeps
     // the scan from passing on an empty set; when the last call goes, this
     // check goes with it.
-    expect(reads.length).toBeGreaterThanOrEqual(1);
+    assert.ok(reads.length >= 1);
   });
 
   it('every makeAdtRequest call passes no deadline (0)', () => {
@@ -177,7 +180,7 @@ describe('no built-in deadline on the server reads', () => {
         .filter((c) => c.args[3] !== '0')
         .map((c) => `${file}:${c.line} timeout=${c.args[3]}`),
     );
-    expect(offending).toEqual([]);
+    assert.deepStrictEqual(offending, []);
   });
 
   it('no package names a removed deadline helper or reads SAP_TIMEOUT_*', () => {
@@ -188,7 +191,7 @@ describe('no built-in deadline on the server reads', () => {
         )
         .map((n) => `${file}:${n.line} ${n.text}`),
     );
-    expect(offending).toEqual([]);
+    assert.deepStrictEqual(offending, []);
   });
 
   it('the reads race no timer and read no timeout argument', () => {
@@ -203,7 +206,7 @@ describe('no built-in deadline on the server reads', () => {
         ...(timeoutReads > 0 ? [`${file}: args.timeout`] : []),
       ];
     });
-    expect(offending).toEqual([]);
+    assert.deepStrictEqual(offending, []);
   });
 
   it('the scan sees what it checks, and nothing in comments or literals (load-bearing)', () => {
@@ -225,20 +228,30 @@ describe('no built-in deadline on the server reads', () => {
       ].join('\n'),
     );
     const named = (callee: string) => calls.filter((c) => c.callee === callee);
-    expect(named('makeAdtRequest').map((c) => c.args)).toEqual([
-      ['connection', '`/x/${f(a, b)}`', "'GET'", '15000', '{ Accept: "a,b" }'],
-    ]);
-    expect(named('getTimeout').map((c) => c.inside)).toEqual([
-      'makeAdtRequestWithTimeout',
-    ]);
-    expect(named('Promise.race')).toHaveLength(1);
-    expect(named('setTimeout')).toHaveLength(1);
-    expect(timeoutReads).toBe(2);
+    assert.deepStrictEqual(
+      named('makeAdtRequest').map((c) => c.args),
+      [
+        [
+          'connection',
+          '`/x/${f(a, b)}`',
+          "'GET'",
+          '15000',
+          '{ Accept: "a,b" }',
+        ],
+      ],
+    );
+    assert.deepStrictEqual(
+      named('getTimeout').map((c) => c.inside),
+      ['makeAdtRequestWithTimeout'],
+    );
+    assert.equal(named('Promise.race').length, 1);
+    assert.equal(named('setTimeout').length, 1);
+    assert.equal(timeoutReads, 2);
     const flagged = names
       .filter((n) => REMOVED.has(n.text) || n.text.startsWith(TIMEOUT_VARIABLE))
       .map((n) => n.text);
     // Comments name `makeAdtRequest(` only; the code names each once.
-    expect(flagged).toEqual([
+    assert.deepStrictEqual(flagged, [
       'makeAdtRequestWithTimeout',
       'getTimeout',
       'SAP_TIMEOUT_LONG',

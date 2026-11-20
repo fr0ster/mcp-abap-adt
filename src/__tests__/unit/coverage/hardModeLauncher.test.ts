@@ -5,16 +5,25 @@
  * `initialize` answer over stdio, the listening line over Streamable HTTP —
  * raced against its exit; stopping is `SIGTERM` and its exit event. A fake
  * is told to go on by a line on its stdin (`{"go":true}`), which every OS
- * carries — no POSIX-only signal. Jest's
- * fake timers count the timers left pending: a poll or a deadline of the
+ * carries — no POSIX-only signal. The fake
+ * timers count the timers left pending: a poll or a deadline of the
  * launcher's would leave one.
  */
 
+import assert from 'node:assert/strict';
 import { ChildProcess } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { PassThrough, Writable } from 'node:stream';
+import { after, afterEach, before, describe, it } from 'node:test';
+import { format } from 'node:util';
+import { assertRejects } from '../../helpers/assertions';
+import {
+  getTimerCount,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
 import {
   type Child,
   childOf,
@@ -24,12 +33,10 @@ import {
   stdioReady,
 } from '../../integration/helpers/testers/hardMode';
 
-jest.setTimeout(60_000);
-
 let dir: string;
 const children: Child[] = [];
 
-beforeAll(() => {
+before(() => {
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hard-mode-fakes-'));
   // Answers `initialize` once told to (a `go` line on stdin), after saying it
   // has read it.
@@ -97,11 +104,11 @@ process.exit(3);
 });
 
 afterEach(async () => {
-  jest.useRealTimers();
+  useRealTimers();
   for (const child of children.splice(0)) await child.stop();
 });
 
-afterAll(() => {
+after(() => {
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -135,9 +142,7 @@ const go = (child: Child): void => {
 const turn = (): Promise<void> => new Promise((r) => setImmediate(r));
 
 const fakeTimers = (): void => {
-  jest.useFakeTimers({
-    doNotFake: ['nextTick', 'setImmediate', 'queueMicrotask'],
-  });
+  useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
 };
 
 describe('stdio readiness', () => {
@@ -151,19 +156,20 @@ describe('stdio readiness', () => {
     });
     await said(child, 'read initialize');
     await turn();
-    expect(ready).toBe(false);
+    assert.equal(ready, false);
     // The initialize is out and unanswered: no timer is armed for it.
-    expect(jest.getTimerCount()).toBe(0);
+    assert.equal(getTimerCount(), 0);
     go(child);
     const session = await readiness;
-    expect(ready).toBe(true);
-    expect(jest.getTimerCount()).toBe(0);
+    assert.equal(ready, true);
+    assert.equal(getTimerCount(), 0);
     await session.close();
   });
 
   it('an exit before the initialize answer rejects at once', async () => {
     const child = start('stdio-exits.js');
-    await expect(stdioReady(child)).rejects.toThrow(
+    await assertRejects(
+      stdioReady(child),
       'the child exited (4) before it was stopped:\nno answer from this fake',
     );
   });
@@ -197,21 +203,24 @@ function endStandIn(
 }
 
 describe('stdio readiness, whatever the order of the child’s events', () => {
-  it.each<[string, ReadonlyArray<'exit' | 'close'>]>([
+  for (const [_name, order] of [
     ['exit, then close', ['exit', 'close']],
     ['close, then exit', ['close', 'exit']],
-  ])('%s: the exit status', async (_name, order) => {
-    const process = standIn(new PassThrough());
-    const child = childOf(process);
-    const readiness = stdioReady(child);
-    const rejected = expect(readiness).rejects.toThrow(
-      'the child exited (4) before it was stopped:\nno answer',
-    );
-    process.stderr?.emit('data', 'no answer\n');
-    await turn();
-    endStandIn(process, 4, order);
-    await rejected;
-  });
+  ] satisfies ReadonlyArray<[string, ReadonlyArray<'exit' | 'close'>]>) {
+    it(format('%s: the exit status', _name), async () => {
+      const process = standIn(new PassThrough());
+      const child = childOf(process);
+      const readiness = stdioReady(child);
+      const rejected = assertRejects(
+        readiness,
+        'the child exited (4) before it was stopped:\nno answer',
+      );
+      process.stderr?.emit('data', 'no answer\n');
+      await turn();
+      endStandIn(process, 4, order);
+      await rejected;
+    });
+  }
 
   it('a child that refuses the write: the exit status, none of the system’s words', async () => {
     const process = standIn(
@@ -229,14 +238,16 @@ describe('stdio readiness, whatever the order of the child’s events', () => {
     await turn();
     await turn();
     // The write failed, and the child has not closed yet: still waiting.
-    expect(settled).toBeUndefined();
+    assert.equal(settled, undefined);
     process.stderr?.emit('data', 'went away\n');
     endStandIn(process, 5, ['exit', 'close']);
     await readiness;
-    expect(String(settled)).toContain(
-      'the child exited (5) before it was stopped:\nwent away',
+    assert.ok(
+      String(settled).includes(
+        'the child exited (5) before it was stopped:\nwent away',
+      ),
     );
-    expect(String(settled)).not.toContain('EPIPE');
+    assert.ok(!String(settled).includes('EPIPE'));
   });
 });
 
@@ -250,16 +261,17 @@ describe('HTTP readiness', () => {
     });
     await said(child, 'starting');
     await turn();
-    expect(ready).toBeUndefined();
+    assert.equal(ready, undefined);
     go(child);
     await readiness;
-    expect(ready).toBe('127.0.0.1:4711');
-    expect(jest.getTimerCount()).toBe(0);
+    assert.equal(ready, '127.0.0.1:4711');
+    assert.equal(getTimerCount(), 0);
   });
 
   it('an exit before the listening line rejects at once', async () => {
     const child = start('http-exits.js');
-    await expect(httpReady(child)).rejects.toThrow(
+    await assertRejects(
+      httpReady(child),
       'the child exited (3) before it was stopped:\ncould not listen',
     );
   });
@@ -271,7 +283,7 @@ describe('stop', () => {
     await said(child, 'starting');
     fakeTimers();
     await child.stop();
-    expect(child.process.exitCode ?? child.process.signalCode).not.toBeNull();
-    expect(jest.getTimerCount()).toBe(0);
+    assert.notEqual(child.process.exitCode ?? child.process.signalCode, null);
+    assert.equal(getTimerCount(), 0);
   });
 });

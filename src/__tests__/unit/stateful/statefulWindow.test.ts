@@ -15,6 +15,9 @@
  *   lock's context, the `UNLOCK` reaches it; the instance's logoff ends it.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
+import { format } from 'node:util';
 import {
   carriesContext,
   isActivation,
@@ -26,8 +29,6 @@ import {
   statefulStand,
   toolRequests,
 } from './harness';
-
-jest.setTimeout(30_000);
 
 async function until(done: () => boolean, limitMs = 10_000): Promise<void> {
   const end = Date.now() + limitMs;
@@ -68,20 +69,20 @@ it('a full-binary update: LOCK and UNLOCK stateful, the write and the rest state
   const lock = sent.filter(isLock);
   const unlock = sent.filter(isUnlock);
   const write = sent.filter((r) => r.method === 'PUT');
-  expect(lock).toHaveLength(1);
-  expect(unlock).toHaveLength(1);
-  expect(write).toHaveLength(1);
-  expect(lock.every(isStateful)).toBe(true);
-  expect(unlock.every(isStateful)).toBe(true);
+  assert.equal(lock.length, 1);
+  assert.equal(unlock.length, 1);
+  assert.equal(write.length, 1);
+  assert.equal(lock.every(isStateful), true);
+  assert.equal(unlock.every(isStateful), true);
   // The UNLOCK reaches the context the LOCK opened; the write runs outside it.
-  expect(unlock.every(carriesContext)).toBe(true);
-  expect(write.some(isStateful)).toBe(false);
-  expect(write.some(carriesContext)).toBe(false);
+  assert.equal(unlock.every(carriesContext), true);
+  assert.equal(write.some(isStateful), false);
+  assert.equal(write.some(carriesContext), false);
   // Every other request of the tool: stateless.
   const others = sent.filter((r) => !isLock(r) && !isUnlock(r));
-  expect(shown(others.filter(isStateful))).toEqual([]);
+  assert.deepStrictEqual(shown(others.filter(isStateful)), []);
   // One ABAP session: the LOCK's.
-  expect(new Set(sent.map((r) => r.session)).size).toBe(1);
+  assert.equal(new Set(sent.map((r) => r.session)).size, 1);
 });
 
 it('an activation: sent as adt-clients sends it, stateless, with no window of the server', async () => {
@@ -89,22 +90,24 @@ it('an activation: sent as adt-clients sends it, stateless, with no window of th
     await s.during(() => s.call('ActivateClass', { class_name: NAME })),
   );
   const activation = sent.filter(isActivation);
-  expect(activation).toHaveLength(1);
-  expect(shown(sent.filter(isStateful))).toEqual([]);
-  expect(sent.some(carriesContext)).toBe(false);
+  assert.equal(activation.length, 1);
+  assert.deepStrictEqual(shown(sent.filter(isStateful)), []);
+  assert.equal(sent.some(carriesContext), false);
 });
 
-it.each([
+for (const [_label, tool, args] of [
   ['a read (GetClass)', 'GetClass', { class_name: NAME }],
   ['a search', 'SearchObject', { object_name: 'ZCL*' }],
   ['a run', 'RuntimeRunClass', { class_name: NAME }],
   ['a where-used', 'GetWhereUsed', { object_name: NAME, object_type: 'class' }],
-])('%s: every request stateless', async (_label, tool, args) => {
-  const sent = toolRequests(await s.during(() => s.call(tool, args)));
-  expect(sent.length).toBeGreaterThan(0);
-  expect(shown(sent.filter(isStateful))).toEqual([]);
-  expect(sent.some(carriesContext)).toBe(false);
-});
+] satisfies [string, string, Record<string, string>][]) {
+  it(format('%s: every request stateless', _label), async () => {
+    const sent = toolRequests(await s.during(() => s.call(tool, args)));
+    assert.ok(sent.length > 0);
+    assert.deepStrictEqual(shown(sent.filter(isStateful)), []);
+    assert.equal(sent.some(carriesContext), false);
+  });
+}
 
 it("compact's HandlerLock leaves the window open until HandlerUnlock: the calls between are stateless", async () => {
   const locked = toolRequests(
@@ -112,8 +115,8 @@ it("compact's HandlerLock leaves the window open until HandlerUnlock: the calls 
       s.call('HandlerLock', { object_type: 'CLASS', object_name: NAME }),
     ),
   );
-  expect(locked.filter(isLock)).toHaveLength(1);
-  expect(locked.filter(isLock).every(isStateful)).toBe(true);
+  assert.equal(locked.filter(isLock).length, 1);
+  assert.equal(locked.filter(isLock).every(isStateful), true);
   const lockSession = locked.filter(isLock)[0]?.session;
 
   const between = toolRequests(
@@ -122,8 +125,8 @@ it("compact's HandlerLock leaves the window open until HandlerUnlock: the calls 
       await s.call('SearchObject', { object_name: 'ZCL*' });
     }),
   );
-  expect(shown(between.filter(isStateful))).toEqual([]);
-  expect(between.some(carriesContext)).toBe(false);
+  assert.deepStrictEqual(shown(between.filter(isStateful)), []);
+  assert.equal(between.some(carriesContext), false);
 
   const unlocked = toolRequests(
     await s.during(() =>
@@ -135,11 +138,11 @@ it("compact's HandlerLock leaves the window open until HandlerUnlock: the calls 
     ),
   );
   const unlock = unlocked.filter(isUnlock);
-  expect(unlock).toHaveLength(1);
-  expect(unlock.every(isStateful)).toBe(true);
+  assert.equal(unlock.length, 1);
+  assert.equal(unlock.every(isStateful), true);
   // The UNLOCK reaches the context the LOCK opened, in the LOCK's session.
-  expect(unlock.every(carriesContext)).toBe(true);
-  expect(unlock[0]?.session).toBe(lockSession);
+  assert.equal(unlock.every(carriesContext), true);
+  assert.equal(unlock[0]?.session, lockSession);
 });
 
 it("compact's HandlerLock without HandlerUnlock: the instance's logoff ends the window", async () => {
@@ -149,10 +152,10 @@ it("compact's HandlerLock without HandlerUnlock: the instance's logoff ends the 
     ),
   );
   const lockSession = locked.filter(isLock)[0]?.session;
-  expect(lockSession).toBeDefined();
-  expect(s.standIn.loggedOff()).not.toContain(lockSession);
+  assert.notEqual(lockSession, undefined);
+  assert.ok(!s.standIn.loggedOff().includes(lockSession));
   // `disconnect()` resolves once the logoff is written: wait for its arrival.
   await s.logoff();
   await until(() => s.standIn.loggedOff().includes(lockSession as string));
-  expect(s.standIn.loggedOff()).toEqual([lockSession]);
+  assert.deepStrictEqual(s.standIn.loggedOff(), [lockSession]);
 });

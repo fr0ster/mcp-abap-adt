@@ -5,23 +5,48 @@
  * connection points at, resolved inside the library, per request, keyed by the
  * connection so nothing leaks between users.
  */
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  AdtClientOnPrem: jest.fn(),
-  AdtClientCloud: jest.fn(),
-  AdtClientLegacy: jest.fn(),
-}));
-jest.mock('../../../src/lib/systemInformation', () => ({
-  ...jest.requireActual('../../../src/lib/systemInformation'),
-  readSystemInformation: jest.fn(),
-}));
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
+import type { AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
+import { mockModuleExports } from '../../../src/__tests__/helpers/moduleMock';
 
-import { AdtClientCloud, AdtClientOnPrem } from '@mcp-abap-adt/adt-clients';
+type Options = ConstructorParameters<typeof AdtClientOnPrem>[2];
+
+/** The options of every client built, of either variant, in the order built. */
+const clientsBuilt: Options[] = [];
+
+// adt-clients replaced for this file before any module under test loads:
+// src/lib/clients binds the variants when it loads (`class … extends
+// AdtClientOnPrem`; node:test mock.module, helpers/moduleMock.ts; its other
+// exports stay the real ones). Each variant records its options in one list
+// across both, in the order the variants were constructed.
+mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
+  AdtClientOnPrem: mock.fn(function AdtClientOnPrem(
+    _connection: unknown,
+    _logger: unknown,
+    options: Options,
+  ) {
+    clientsBuilt.push(options);
+  }),
+  AdtClientCloud: mock.fn(function AdtClientCloud(
+    _connection: unknown,
+    _logger: unknown,
+    options: Options,
+  ) {
+    clientsBuilt.push(options);
+  }),
+});
+
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import * as z from 'zod';
+import {
+  assertMatchObject,
+  rejectionOf,
+} from '../../../src/__tests__/helpers/assertions';
 import { setSystemContext } from '../../../src/__tests__/helpers/processSystemContext';
 import type { HandlerContext } from '../../../src/handlers/interfaces';
 import { longToolInTheCall } from '../../../src/lib/backgroundRuns/tools';
@@ -43,7 +68,7 @@ import {
   getStatedSystemContext,
   resetSystemContextCache,
 } from '../../../src/lib/systemContext';
-import { readSystemInformation } from '../../../src/lib/systemInformation';
+import * as systemInformation from '../../../src/lib/systemInformation';
 import type { ToolResultLike } from '../../../src/lib/toolResult';
 
 import {
@@ -54,7 +79,23 @@ import {
   withRules,
 } from './helpers/withRules';
 
-const lookup = readSystemInformation as jest.Mock;
+/**
+ * readSystemInformation replaced on the module that defines it (its callers
+ * read it at call time), a fresh mock before each case and restored after
+ * it (nothing left over from an earlier case), answering
+ * a cloud system's user unless a case says otherwise.
+ */
+function stubLookup() {
+  return mock.method(
+    systemInformation,
+    'readSystemInformation',
+    async (): Promise<{ user: string | undefined; systemId: string }> => ({
+      user: 'CB_USER',
+      systemId: 'CLD',
+    }),
+  );
+}
+let lookup: ReturnType<typeof stubLookup>;
 
 const credential: IAuthProvider = {
   kind: 'test',
@@ -116,23 +157,9 @@ function foreignConn(url: string): IAbapConnection {
   return { getBaseUrl: async () => url } as unknown as IAbapConnection;
 }
 
-type Options = ConstructorParameters<typeof AdtClientOnPrem>[2];
-
 /** The options of the last client built, of either variant. */
 function lastOptions(): Options {
-  const built = [
-    ...jest
-      .mocked(AdtClientOnPrem)
-      .mock.invocationCallOrder.map((order, i) => ({
-        order,
-        options: jest.mocked(AdtClientOnPrem).mock.calls[i]?.[2],
-      })),
-    ...jest.mocked(AdtClientCloud).mock.invocationCallOrder.map((order, i) => ({
-      order,
-      options: jest.mocked(AdtClientCloud).mock.calls[i]?.[2],
-    })),
-  ].sort((a, b) => a.order - b.order);
-  return built.at(-1)?.options;
+  return clientsBuilt.at(-1);
 }
 
 function seen() {
@@ -154,13 +181,11 @@ beforeEach(() => {
   delete process.env.SAP_SYSTEM_TYPE;
   resetSystemContextCache();
   setSystemContext({});
-  jest.mocked(AdtClientOnPrem).mockClear();
-  jest.mocked(AdtClientCloud).mockClear();
-  lookup.mockReset();
-  lookup.mockResolvedValue({
-    user: 'CB_USER',
-    systemId: 'CLD',
-  });
+  clientsBuilt.length = 0;
+  lookup = stubLookup();
+});
+afterEach(() => {
+  lookup.mock.restore();
 });
 
 const status = (code: number) =>
@@ -168,163 +193,229 @@ const status = (code: number) =>
 
 describe('defaultSystemContextResolver: only what the system said, on every kind', () => {
   it('maps a cloud system to responsible and master system', async () => {
-    await expect(defaultSystemContextResolver(cloudConn())).resolves.toEqual({
+    assert.deepStrictEqual(await defaultSystemContextResolver(cloudConn()), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
   });
 
   it('asks an on-premise system too, and maps its answer', async () => {
-    await expect(defaultSystemContextResolver(onPremConn())).resolves.toEqual({
+    assert.deepStrictEqual(await defaultSystemContextResolver(onPremConn()), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
-    expect(lookup).toHaveBeenCalledTimes(1);
+    assert.equal(lookup.mock.callCount(), 1);
   });
 
-  it.each([
+  for (const [_kind, conn] of [
     ['cloud', cloudConn],
     ['on-premise', onPremConn],
-  ])('%s, an answer without a user: null', async (_kind, conn) => {
-    lookup.mockResolvedValue({ user: undefined, systemId: 'SID' });
-    await expect(defaultSystemContextResolver(conn())).resolves.toBe(null);
-  });
+  ] satisfies [string, () => IAbapConnection][]) {
+    it(format('%s, an answer without a user: null', _kind), async () => {
+      lookup.mock.mockImplementation(async () => ({
+        user: undefined,
+        systemId: 'SID',
+      }));
+      assert.equal(await defaultSystemContextResolver(conn()), null);
+    });
+  }
 
-  it.each([
+  for (const [_kind, conn, code] of [
     ['cloud', cloudConn, 404],
     ['cloud', cloudConn, 500],
     ['on-premise', onPremConn, 404],
     ['on-premise', onPremConn, 500],
-  ] as const)(
-    '%s, a failed request (%i): thrown as it came — the kind is not its to read',
-    async (_kind, conn, code) => {
-      const failed = status(code);
-      lookup.mockRejectedValue(failed);
-      await expect(defaultSystemContextResolver(conn())).rejects.toBe(failed);
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        '%s, a failed request (%i): thrown as it came — the kind is not its to read',
+        _kind,
+        conn,
+      ),
+      async () => {
+        const failed = status(code);
+        lookup.mock.mockImplementation(async () => {
+          throw failed;
+        });
+        assert.equal(
+          await rejectionOf(defaultSystemContextResolver(conn())),
+          failed,
+        );
+      },
+    );
+  }
 });
 
 describe('the recipe around the resolver, by the kind', () => {
   it('the kind recorded at build wins over a later SAP_SYSTEM_TYPE', async () => {
     const connection = onPremUserConn();
     process.env.SAP_SYSTEM_TYPE = 'cloud';
-    lookup.mockRejectedValue(status(404));
-    await expect(
-      withResolvedSystemContext(connection, () => 'ran'),
-    ).resolves.toBe('ran');
+    lookup.mock.mockImplementation(async () => {
+      throw status(404);
+    });
+    assert.equal(
+      await withResolvedSystemContext(connection, () => 'ran'),
+      'ran',
+    );
   });
 
   it('a connection the factory did not build, no kind stated anywhere: its 404 is system_type_required', async () => {
-    lookup.mockRejectedValue(status(404));
-    await expect(
-      withResolvedSystemContext(
-        foreignConn('https://system.example.invalid'),
-        () => 'ran',
+    lookup.mock.mockImplementation(async () => {
+      throw status(404);
+    });
+    assertMatchObject(
+      await rejectionOf(
+        withResolvedSystemContext(
+          foreignConn('https://system.example.invalid'),
+          () => 'ran',
+        ),
       ),
-    ).rejects.toMatchObject({ serverRefusal: 'system_type_required' });
+      { serverRefusal: 'system_type_required' },
+    );
   });
 
-  it.each([
+  for (const [url] of [
     ['https://system.abap.example.hana.ondemand.com'],
     ['https://system.example.invalid'],
-  ])(
-    'a connection the factory did not build: its 404 read by the stated kind alone, never the URL (%s)',
-    async (url) => {
-      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-      lookup.mockRejectedValue(status(404));
-      await expect(
-        runWithRequestContext({ login: 'BOB' }, () =>
-          withResolvedSystemContext(
-            foreignConn(url),
-            () => 'ran',
-            undefined,
-            'onprem',
+  ]) {
+    it(
+      format(
+        'a connection the factory did not build: its 404 read by the stated kind alone, never the URL (%s)',
+        url,
+      ),
+      async (t) => {
+        const warn = t.mock.method(logger, 'warn', () => {});
+        lookup.mock.mockImplementation(async () => {
+          throw status(404);
+        });
+        assert.equal(
+          await runWithRequestContext({ login: 'BOB' }, () =>
+            withResolvedSystemContext(
+              foreignConn(url),
+              () => 'ran',
+              undefined,
+              'onprem',
+            ),
           ),
-        ),
-      ).resolves.toBe('ran');
-      await expect(
-        runWithRequestContext({ login: 'BOB' }, () =>
-          withResolvedSystemContext(
-            foreignConn(url),
-            () => 'ran',
-            undefined,
-            'cloud',
+          'ran',
+        );
+        assertMatchObject(
+          await rejectionOf(
+            runWithRequestContext({ login: 'BOB' }, () =>
+              withResolvedSystemContext(
+                foreignConn(url),
+                () => 'ran',
+                undefined,
+                'cloud',
+              ),
+            ),
           ),
-        ),
-      ).rejects.toMatchObject({
-        serverRefusal: 'cloud_without_systeminformation',
-      });
-      warn.mockRestore();
-    },
-  );
+          {
+            serverRefusal: 'cloud_without_systeminformation',
+          },
+        );
+        warn.mock.restore();
+      },
+    );
+  }
 
-  it.each([
+  for (const [_kind, conn] of [
     ['cloud', cloudConn],
     ['on-premise', onPremUserConn],
-  ])(
-    '%s, a 401 on the lookup: the credential failure as it came — no fallback, never another error',
-    async (_kind, conn) => {
-      const refused = status(401);
-      lookup.mockRejectedValue(refused);
-      const fn = jest.fn();
-      await expect(
-        runWithRequestContext({ login: 'BOB' }, () =>
-          withResolvedSystemContext(conn(), fn),
-        ),
-      ).rejects.toBe(refused);
-      expect(fn).not.toHaveBeenCalled();
-    },
-  );
+  ] satisfies [string, () => IAbapConnection][]) {
+    it(
+      format(
+        '%s, a 401 on the lookup: the credential failure as it came — no fallback, never another error',
+        _kind,
+      ),
+      async () => {
+        const refused = status(401);
+        lookup.mock.mockImplementation(async () => {
+          throw refused;
+        });
+        const fn = mock.fn();
+        assert.equal(
+          await rejectionOf(
+            runWithRequestContext({ login: 'BOB' }, () =>
+              withResolvedSystemContext(conn(), fn),
+            ),
+          ),
+          refused,
+        );
+        assert.equal(fn.mock.callCount(), 0);
+      },
+    );
+  }
 
   it('on-premise, a 404: asked once per connection — later calls send no systeminformation', async () => {
-    lookup.mockRejectedValue(status(404));
+    lookup.mock.mockImplementation(async () => {
+      throw status(404);
+    });
     const connection = onPremUserConn();
     for (let i = 0; i < 3; i += 1) {
-      await expect(
-        withResolvedSystemContext(connection, () => 'ran'),
-      ).resolves.toBe('ran');
+      assert.equal(
+        await withResolvedSystemContext(connection, () => 'ran'),
+        'ran',
+      );
     }
-    expect(lookup).toHaveBeenCalledTimes(1);
+    assert.equal(lookup.mock.callCount(), 1);
   });
 
-  it('on-premise, a 404 with no user stated: system_user_unknown each call, nothing kept — asked again until the parameters are made', async () => {
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-    lookup.mockRejectedValue(status(404));
+  it('on-premise, a 404 with no user stated: system_user_unknown each call, nothing kept — asked again until the parameters are made', async (t) => {
+    const warn = t.mock.method(logger, 'warn', () => {});
+    lookup.mock.mockImplementation(async () => {
+      throw status(404);
+    });
     const connection = onPremConn();
     for (let i = 0; i < 2; i += 1) {
-      await expect(
-        withResolvedSystemContext(connection, () => 'ran'),
-      ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
+      assertMatchObject(
+        await rejectionOf(withResolvedSystemContext(connection, () => 'ran')),
+        { serverRefusal: 'system_user_unknown' },
+      );
     }
-    await expect(
-      runWithRequestContext({ login: 'BOB' }, () =>
+    assert.equal(
+      await runWithRequestContext({ login: 'BOB' }, () =>
         withResolvedSystemContext(connection, () => 'ran'),
       ),
-    ).resolves.toBe('ran');
+      'ran',
+    );
     // Made then, and kept: no further lookup.
-    await expect(
-      withResolvedSystemContext(connection, () => 'ran'),
-    ).resolves.toBe('ran');
-    expect(lookup).toHaveBeenCalledTimes(3);
-    warn.mockRestore();
+    assert.equal(
+      await withResolvedSystemContext(connection, () => 'ran'),
+      'ran',
+    );
+    assert.equal(lookup.mock.callCount(), 3);
+    warn.mock.restore();
   });
 
-  it.each([['cloud', cloudConn, 'cloud_without_systeminformation']] as const)(
-    '%s, a 404 is not kept: the next call asks again (%s)',
-    async (_kind, conn, code) => {
-      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-      lookup.mockRejectedValue(status(404));
-      const connection = conn();
-      for (let i = 0; i < 2; i += 1) {
-        await expect(
-          withResolvedSystemContext(connection, () => 'ran'),
-        ).rejects.toMatchObject({ serverRefusal: code });
-      }
-      expect(lookup).toHaveBeenCalledTimes(2);
-      warn.mockRestore();
-    },
-  );
+  for (const [_kind, conn, code] of [
+    ['cloud', cloudConn, 'cloud_without_systeminformation'],
+  ] as const) {
+    it(
+      format(
+        '%s, a 404 is not kept: the next call asks again (%s)',
+        _kind,
+        conn,
+      ),
+      async (t) => {
+        const warn = t.mock.method(logger, 'warn', () => {});
+        lookup.mock.mockImplementation(async () => {
+          throw status(404);
+        });
+        const connection = conn();
+        for (let i = 0; i < 2; i += 1) {
+          assertMatchObject(
+            await rejectionOf(
+              withResolvedSystemContext(connection, () => 'ran'),
+            ),
+            { serverRefusal: code },
+          );
+        }
+        assert.equal(lookup.mock.callCount(), 2);
+        warn.mock.restore();
+      },
+    );
+  }
 
   describe('a custom resolver answering nothing', () => {
     const nothing: Array<[string, () => SystemContextResolver]> = [
@@ -337,49 +428,69 @@ describe('the recipe around the resolver, by the kind', () => {
       ],
     ];
 
-    it.each(nothing)(
-      'on ABAP Cloud (%s): the cloud error, the stated user not used',
-      async (_what, make) => {
-        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-        const fn = jest.fn();
-        await expect(
-          runWithRequestContext({ login: 'BOB' }, () =>
-            withResolvedSystemContext(cloudConn(), fn, make()),
-          ),
-        ).rejects.toMatchObject({ serverRefusal: 'system_lookup_failed' });
-        expect(fn).not.toHaveBeenCalled();
-        warn.mockRestore();
-      },
-    );
+    for (const [_what, make] of nothing) {
+      it(
+        format(
+          'on ABAP Cloud (%s): the cloud error, the stated user not used',
+          _what,
+        ),
+        async (t) => {
+          const warn = t.mock.method(logger, 'warn', () => {});
+          const fn = mock.fn();
+          assertMatchObject(
+            await rejectionOf(
+              runWithRequestContext({ login: 'BOB' }, () =>
+                withResolvedSystemContext(cloudConn(), fn, make()),
+              ),
+            ),
+            { serverRefusal: 'system_lookup_failed' },
+          );
+          assert.equal(fn.mock.callCount(), 0);
+          warn.mock.restore();
+        },
+      );
+    }
 
-    it.each(nothing)(
-      'on-premise (%s): the headers / parameters — the stated values, else system_user_unknown',
-      async (_what, make) => {
-        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-        await expect(
-          runWithRequestContext(
-            { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
-            () => withResolvedSystemContext(onPremConn(), seen, make()),
-          ),
-        ).resolves.toMatchObject({ responsible: 'ALICE', masterSystem: 'SID' });
-        await expect(
-          withResolvedSystemContext(onPremConn(), seen, make()),
-        ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
-        warn.mockRestore();
-      },
-    );
+    for (const [_what, make] of nothing) {
+      it(
+        format(
+          'on-premise (%s): the headers / parameters — the stated values, else system_user_unknown',
+          _what,
+        ),
+        async (t) => {
+          const warn = t.mock.method(logger, 'warn', () => {});
+          assertMatchObject(
+            await runWithRequestContext(
+              { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+              () => withResolvedSystemContext(onPremConn(), seen, make()),
+            ),
+            { responsible: 'ALICE', masterSystem: 'SID' },
+          );
+          assertMatchObject(
+            await rejectionOf(
+              withResolvedSystemContext(onPremConn(), seen, make()),
+            ),
+            { serverRefusal: 'system_user_unknown' },
+          );
+          warn.mock.restore();
+        },
+      );
+    }
 
-    it('a custom resolver throwing a 404: the cloud error for a missing endpoint on ABAP Cloud', async () => {
-      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+    it('a custom resolver throwing a 404: the cloud error for a missing endpoint on ABAP Cloud', async (t) => {
+      const warn = t.mock.method(logger, 'warn', () => {});
       const resolver: SystemContextResolver = async () => {
         throw status(404);
       };
-      await expect(
-        withResolvedSystemContext(cloudConn(), () => 'ran', resolver),
-      ).rejects.toMatchObject({
-        serverRefusal: 'cloud_without_systeminformation',
-      });
-      warn.mockRestore();
+      assertMatchObject(
+        await rejectionOf(
+          withResolvedSystemContext(cloudConn(), () => 'ran', resolver),
+        ),
+        {
+          serverRefusal: 'cloud_without_systeminformation',
+        },
+      );
+      warn.mock.restore();
     });
   });
 });
@@ -391,38 +502,43 @@ describe('memoisation per connection', () => {
       withResolvedSystemContext(conn, seen),
       withResolvedSystemContext(conn, seen),
     ]);
-    expect(lookup).toHaveBeenCalledTimes(1);
+    assert.equal(lookup.mock.callCount(), 1);
   });
 
   it('two different connections make two lookups', async () => {
     await withResolvedSystemContext(cloudConn(), seen);
     await withResolvedSystemContext(cloudConn(), seen);
-    expect(lookup).toHaveBeenCalledTimes(2);
+    assert.equal(lookup.mock.callCount(), 2);
   });
 
-  it('a rejected lookup is not cached', async () => {
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+  it('a rejected lookup is not cached', async (t) => {
+    const warn = t.mock.method(logger, 'warn', () => {});
     const conn = cloudConn();
-    lookup.mockRejectedValueOnce(new Error('ICM down'));
-    await expect(withResolvedSystemContext(conn, seen)).rejects.toMatchObject({
-      serverRefusal: 'system_lookup_failed',
+    lookup.mock.mockImplementationOnce(async () => {
+      throw new Error('ICM down');
     });
+    assertMatchObject(
+      await rejectionOf(withResolvedSystemContext(conn, seen)),
+      {
+        serverRefusal: 'system_lookup_failed',
+      },
+    );
     const second = await withResolvedSystemContext(conn, seen);
-    expect(lookup).toHaveBeenCalledTimes(2);
-    expect(second).toMatchObject({ responsible: 'CB_USER' });
-    warn.mockRestore();
+    assert.equal(lookup.mock.callCount(), 2);
+    assertMatchObject(second, { responsible: 'CB_USER' });
+    warn.mock.restore();
   });
 
   it('an injected resolver is not served from the default cache', async () => {
     const conn = cloudConn();
     await withResolvedSystemContext(conn, seen);
-    const injected: SystemContextResolver = jest.fn(async () => ({
+    const injected = mock.fn<SystemContextResolver>(async () => ({
       responsible: 'INJ',
       masterSystem: 'INJ_SYS',
     }));
     const result = await withResolvedSystemContext(conn, seen, injected);
-    expect(injected).toHaveBeenCalledTimes(1);
-    expect(result).toMatchObject({
+    assert.equal(injected.mock.callCount(), 1);
+    assertMatchObject(result, {
       responsible: 'INJ',
       masterSystem: 'INJ_SYS',
     });
@@ -430,32 +546,36 @@ describe('memoisation per connection', () => {
 });
 
 describe('withResolvedSystemContext', () => {
-  it.each([
+  for (const [_kind, conn] of [
     ['cloud', cloudConn],
     ['on-premise', onPremConn],
-  ])(
-    '%s: the system answer wins over a scope carrying both',
-    async (_kind, conn) => {
-      const connection = conn();
-      await runWithRequestContext(
-        { responsible: 'ALICE', masterSystem: 'SID' },
-        () =>
-          withResolvedSystemContext(connection, () => {
-            createAdtClient(connection);
-          }),
-      );
-      expect(lookup).toHaveBeenCalledTimes(1);
-      expect(lastOptions()).toMatchObject({
-        responsible: 'CB_USER',
-        masterSystem: 'CLD',
-      });
-    },
-  );
+  ] satisfies [string, () => IAbapConnection][]) {
+    it(
+      format('%s: the system answer wins over a scope carrying both', _kind),
+      async () => {
+        const connection = conn();
+        await runWithRequestContext(
+          { responsible: 'ALICE', masterSystem: 'SID' },
+          () =>
+            withResolvedSystemContext(connection, () => {
+              createAdtClient(connection);
+            }),
+        );
+        assert.equal(lookup.mock.callCount(), 1);
+        assertMatchObject(lastOptions(), {
+          responsible: 'CB_USER',
+          masterSystem: 'CLD',
+        });
+      },
+    );
+  }
 
   it('on-premise without the function (404): the scope as stated, the system not in it', async () => {
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+    });
     const conn = onPremUserConn();
     await runWithRequestContext(
       { responsible: 'ALICE', masterSystem: 'SID' },
@@ -464,228 +584,302 @@ describe('withResolvedSystemContext', () => {
           createAdtClient(conn);
         }),
     );
-    expect(lastOptions()).toMatchObject({
+    assertMatchObject(lastOptions(), {
       responsible: 'ALICE',
       masterSystem: 'SID',
     });
   });
 
-  it('on-premise without the function (404), no user stated: system_user_unknown, fn never runs; nothing is kept, so the next call asks again', async () => {
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
+  it('on-premise without the function (404), no user stated: system_user_unknown, fn never runs; nothing is kept, so the next call asks again', async (t) => {
+    const warn = t.mock.method(logger, 'warn', () => {});
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+    });
     const conn = onPremConn();
-    const fn = jest.fn();
+    const fn = mock.fn();
     for (let i = 0; i < 2; i += 1) {
-      await expect(
-        runWithRequestContext({ masterSystem: 'SID' }, () =>
-          withResolvedSystemContext(conn, fn),
+      assertMatchObject(
+        await rejectionOf(
+          runWithRequestContext({ masterSystem: 'SID' }, () =>
+            withResolvedSystemContext(conn, fn),
+          ),
         ),
-      ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
+        { serverRefusal: 'system_user_unknown' },
+      );
     }
-    expect(fn).not.toHaveBeenCalled();
-    expect(lookup).toHaveBeenCalledTimes(2);
-    warn.mockRestore();
+    assert.equal(fn.mock.callCount(), 0);
+    assert.equal(lookup.mock.callCount(), 2);
+    warn.mock.restore();
   });
 
-  it.each<[string, { responsible?: string; login?: string }]>([
+  for (const [_case, scope] of [
     ['(a) responsible only', { responsible: 'ALICE' }],
     ['(b) login only', { login: 'BOB' }],
     ['(c) both', { responsible: 'ALICE', login: 'BOB' }],
-  ])(
-    'on-premise without the function (404), %s: fn runs, taking the responsible if stated, else the login',
-    async (_case, scope) => {
-      lookup.mockRejectedValue(
-        Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-      );
-      const seen: Array<string | undefined> = [];
-      await expect(
-        runWithRequestContext(scope, () =>
-          withResolvedSystemContext(onPremConn(), () => {
-            seen.push(getStatedSystemContext().responsible);
-            return 'ran';
-          }),
-        ),
-      ).resolves.toBe('ran');
-      expect(seen).toEqual([scope.responsible ?? scope.login]);
-    },
-  );
-
-  it('on-premise without the function (404), neither a responsible nor a login: system_user_unknown', async () => {
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
-    const fn = jest.fn();
-    await expect(
-      runWithRequestContext({ masterSystem: 'SID' }, () =>
-        withResolvedSystemContext(onPremConn(), fn),
+  ] satisfies ReadonlyArray<
+    [string, { responsible?: string; login?: string }]
+  >) {
+    it(
+      format(
+        'on-premise without the function (404), %s: fn runs, taking the responsible if stated, else the login',
+        _case,
       ),
-    ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
-    expect(fn).not.toHaveBeenCalled();
-    warn.mockRestore();
-  });
+      async () => {
+        lookup.mock.mockImplementation(async () => {
+          throw Object.assign(new Error('placeholder'), {
+            response: { status: 404 },
+          });
+        });
+        const seen: Array<string | undefined> = [];
+        assert.equal(
+          await runWithRequestContext(scope, () =>
+            withResolvedSystemContext(onPremConn(), () => {
+              seen.push(getStatedSystemContext().responsible);
+              return 'ran';
+            }),
+          ),
+          'ran',
+        );
+        assert.deepStrictEqual(seen, [scope.responsible ?? scope.login]);
+      },
+    );
+  }
 
-  it.each([
-    ['blank', '   '],
-    ['empty', ''],
-  ])(
-    'on-premise without the function (404), a %s login: system_user_unknown',
-    async (_case, login) => {
-      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-      lookup.mockRejectedValue(
-        Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-      );
-      const fn = jest.fn();
-      await expect(
-        runWithRequestContext({ login }, () =>
+  it('on-premise without the function (404), neither a responsible nor a login: system_user_unknown', async (t) => {
+    const warn = t.mock.method(logger, 'warn', () => {});
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+    });
+    const fn = mock.fn();
+    assertMatchObject(
+      await rejectionOf(
+        runWithRequestContext({ masterSystem: 'SID' }, () =>
           withResolvedSystemContext(onPremConn(), fn),
         ),
-      ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
-      expect(fn).not.toHaveBeenCalled();
-      warn.mockRestore();
-    },
-  );
-
-  it("on-premise without the function (404), the request's login states the user: fn runs", async () => {
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
-    const fn = jest.fn(async () => 'ran');
-    await expect(
-      runWithRequestContext({ login: 'HEADER_USER' }, () =>
-        withResolvedSystemContext(onPremConn(), fn),
       ),
-    ).resolves.toBe('ran');
-    expect(fn).toHaveBeenCalledTimes(1);
+      { serverRefusal: 'system_user_unknown' },
+    );
+    assert.equal(fn.mock.callCount(), 0);
+    warn.mock.restore();
   });
 
-  it.each([
+  for (const [_case, login] of [
+    ['blank', '   '],
+    ['empty', ''],
+  ]) {
+    it(
+      format(
+        'on-premise without the function (404), a %s login: system_user_unknown',
+        _case,
+      ),
+      async (t) => {
+        const warn = t.mock.method(logger, 'warn', () => {});
+        lookup.mock.mockImplementation(async () => {
+          throw Object.assign(new Error('placeholder'), {
+            response: { status: 404 },
+          });
+        });
+        const fn = mock.fn();
+        assertMatchObject(
+          await rejectionOf(
+            runWithRequestContext({ login }, () =>
+              withResolvedSystemContext(onPremConn(), fn),
+            ),
+          ),
+          { serverRefusal: 'system_user_unknown' },
+        );
+        assert.equal(fn.mock.callCount(), 0);
+        warn.mock.restore();
+      },
+    );
+  }
+
+  it("on-premise without the function (404), the request's login states the user: fn runs", async () => {
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+    });
+    const fn = mock.fn(async () => 'ran');
+    assert.equal(
+      await runWithRequestContext({ login: 'HEADER_USER' }, () =>
+        withResolvedSystemContext(onPremConn(), fn),
+      ),
+      'ran',
+    );
+    assert.equal(fn.mock.callCount(), 1);
+  });
+
+  for (const [_kind, conn, status, code] of [
     ['cloud', cloudConn, 404, 'cloud_without_systeminformation'],
     ['cloud', cloudConn, 500, 'system_lookup_failed'],
-  ] as const)(
-    '%s, a lookup answered %d: the call fails as %s, fn never runs, and the next call asks again',
-    async (_kind, conn, status, code) => {
-      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-      lookup.mockRejectedValue(
-        Object.assign(new Error('placeholder'), { response: { status } }),
-      );
-      const connection = conn();
-      const fn = jest.fn(seen);
-      for (let i = 0; i < 2; i++) {
-        await expect(
-          runWithRequestContext(
-            { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
-            () => withResolvedSystemContext(connection, fn),
-          ),
-        ).rejects.toMatchObject({ serverRefusal: code });
-      }
-      expect(fn).not.toHaveBeenCalled();
-      expect(lookup).toHaveBeenCalledTimes(2);
-      warn.mockRestore();
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        '%s, a lookup answered %d: the call fails as %s, fn never runs, and the next call asks again',
+        _kind,
+        conn,
+        status,
+      ),
+      async (t) => {
+        const warn = t.mock.method(logger, 'warn', () => {});
+        lookup.mock.mockImplementation(async () => {
+          throw Object.assign(new Error('placeholder'), {
+            response: { status },
+          });
+        });
+        const connection = conn();
+        const fn = mock.fn(seen);
+        for (let i = 0; i < 2; i++) {
+          assertMatchObject(
+            await rejectionOf(
+              runWithRequestContext(
+                { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+                () => withResolvedSystemContext(connection, fn),
+              ),
+            ),
+            { serverRefusal: code },
+          );
+        }
+        assert.equal(fn.mock.callCount(), 0);
+        assert.equal(lookup.mock.callCount(), 2);
+        warn.mock.restore();
+      },
+    );
+  }
 
-  it('cloud, a 2xx that names no user: the call fails as system_lookup_failed, fn never runs, and the next call asks again', async () => {
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-    lookup.mockResolvedValue({ user: undefined, systemId: 'CLD' });
+  it('cloud, a 2xx that names no user: the call fails as system_lookup_failed, fn never runs, and the next call asks again', async (t) => {
+    const warn = t.mock.method(logger, 'warn', () => {});
+    lookup.mock.mockImplementation(async () => ({
+      user: undefined,
+      systemId: 'CLD',
+    }));
     const connection = cloudConn();
-    const fn = jest.fn(seen);
+    const fn = mock.fn(seen);
     for (let i = 0; i < 2; i++) {
-      await expect(
-        runWithRequestContext({ login: 'BOB' }, () =>
-          withResolvedSystemContext(connection, fn),
+      assertMatchObject(
+        await rejectionOf(
+          runWithRequestContext({ login: 'BOB' }, () =>
+            withResolvedSystemContext(connection, fn),
+          ),
         ),
-      ).rejects.toMatchObject({ serverRefusal: 'system_lookup_failed' });
+        { serverRefusal: 'system_lookup_failed' },
+      );
     }
-    expect(fn).not.toHaveBeenCalled();
-    expect(lookup).toHaveBeenCalledTimes(2);
-    lookup.mockResolvedValue({ user: 'CB_USER', systemId: 'CLD' });
-    await expect(
-      withResolvedSystemContext(connection, fn),
-    ).resolves.toMatchObject({ responsible: 'CB_USER' });
-    warn.mockRestore();
+    assert.equal(fn.mock.callCount(), 0);
+    assert.equal(lookup.mock.callCount(), 2);
+    lookup.mock.mockImplementation(async () => ({
+      user: 'CB_USER',
+      systemId: 'CLD',
+    }));
+    assertMatchObject(await withResolvedSystemContext(connection, fn), {
+      responsible: 'CB_USER',
+    });
+    warn.mock.restore();
   });
 
   const onPremNoInformation = [
     [
       'no systeminformation (404)',
       () =>
-        lookup.mockRejectedValue(
-          Object.assign(new Error('placeholder'), {
+        lookup.mock.mockImplementation(async () => {
+          throw Object.assign(new Error('placeholder'), {
             response: { status: 404 },
-          }),
-        ),
+          });
+        }),
       1,
     ],
     [
       'an answer without a user',
-      () => lookup.mockResolvedValue({ user: undefined, systemId: 'OPS' }),
+      () =>
+        lookup.mock.mockImplementation(async () => ({
+          user: undefined,
+          systemId: 'OPS',
+        })),
       1,
     ],
     [
       'an error (500)',
       () =>
-        lookup.mockRejectedValue(
-          Object.assign(new Error('placeholder'), {
+        lookup.mock.mockImplementation(async () => {
+          throw Object.assign(new Error('placeholder'), {
             response: { status: 500 },
-          }),
-        ),
+          });
+        }),
       1,
     ],
   ] as const;
 
-  it.each(onPremNoInformation)(
-    'on-premise, %s: the stated values are taken, fn runs; the parameters made are kept, asked once',
-    async (_case, answer, lookups) => {
-      answer();
-      const connection = onPremConn();
-      for (let i = 0; i < 2; i++) {
-        await expect(
-          runWithRequestContext(
-            { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
-            () => withResolvedSystemContext(connection, seen),
+  for (const [_case, answer, lookups] of onPremNoInformation) {
+    it(
+      format(
+        'on-premise, %s: the stated values are taken, fn runs; the parameters made are kept, asked once',
+        _case,
+      ),
+      async () => {
+        answer();
+        const connection = onPremConn();
+        for (let i = 0; i < 2; i++) {
+          assertMatchObject(
+            await runWithRequestContext(
+              { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+              () => withResolvedSystemContext(connection, seen),
+            ),
+            { responsible: 'ALICE', masterSystem: 'SID' },
+          );
+        }
+        assert.equal(lookup.mock.callCount(), lookups);
+      },
+    );
+  }
+
+  for (const [_case, answer] of onPremNoInformation) {
+    it(
+      format(
+        'on-premise, %s, no user stated: system_user_unknown, fn never runs',
+        _case,
+      ),
+      async (t) => {
+        const warn = t.mock.method(logger, 'warn', () => {});
+        answer();
+        const fn = mock.fn(seen);
+        assertMatchObject(
+          await rejectionOf(
+            runWithRequestContext({ masterSystem: 'SID' }, () =>
+              withResolvedSystemContext(onPremConn(), fn),
+            ),
           ),
-        ).resolves.toMatchObject({ responsible: 'ALICE', masterSystem: 'SID' });
-      }
-      expect(lookup).toHaveBeenCalledTimes(lookups);
-    },
-  );
+          { serverRefusal: 'system_user_unknown' },
+        );
+        assert.equal(fn.mock.callCount(), 0);
+        warn.mock.restore();
+      },
+    );
+  }
 
-  it.each(onPremNoInformation)(
-    'on-premise, %s, no user stated: system_user_unknown, fn never runs',
-    async (_case, answer) => {
-      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-      answer();
-      const fn = jest.fn(seen);
-      await expect(
-        runWithRequestContext({ masterSystem: 'SID' }, () =>
-          withResolvedSystemContext(onPremConn(), fn),
-        ),
-      ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
-      expect(fn).not.toHaveBeenCalled();
-      warn.mockRestore();
-    },
-  );
-
-  it('an injected resolver answering without a user: no information — the stated values with a stated user, else system_user_unknown', async () => {
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-    const injected: SystemContextResolver = jest.fn(async () => ({
+  it('an injected resolver answering without a user: no information — the stated values with a stated user, else system_user_unknown', async (t) => {
+    const warn = t.mock.method(logger, 'warn', () => {});
+    const injected: SystemContextResolver = mock.fn(async () => ({
       masterSystem: 'INJ_SYS',
     }));
-    await expect(
-      runWithRequestContext(
+    assertMatchObject(
+      await runWithRequestContext(
         { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
         () => withResolvedSystemContext(onPremConn(), seen, injected),
       ),
-    ).resolves.toMatchObject({ responsible: 'ALICE', masterSystem: 'SID' });
-    const fn = jest.fn(seen);
-    await expect(
-      withResolvedSystemContext(onPremConn(), fn, injected),
-    ).rejects.toMatchObject({ serverRefusal: 'system_user_unknown' });
-    expect(fn).not.toHaveBeenCalled();
-    warn.mockRestore();
+      { responsible: 'ALICE', masterSystem: 'SID' },
+    );
+    const fn = mock.fn(seen);
+    assertMatchObject(
+      await rejectionOf(withResolvedSystemContext(onPremConn(), fn, injected)),
+      { serverRefusal: 'system_user_unknown' },
+    );
+    assert.equal(fn.mock.callCount(), 0);
+    warn.mock.restore();
   });
 
   it('on-premise, the information present: it wins over the stated values', async () => {
@@ -693,7 +887,7 @@ describe('withResolvedSystemContext', () => {
       { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
       () => withResolvedSystemContext(onPremUserConn(), seen),
     );
-    expect(result).toMatchObject({
+    assertMatchObject(result, {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
@@ -706,9 +900,31 @@ describe('withResolvedSystemContext', () => {
         createAdtClient(conn);
       }),
     );
-    expect(lastOptions()).toMatchObject({
+    assertMatchObject(lastOptions(), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
+    });
+  });
+
+  it('lastOptions reads the last client built: two clients, two systems', async () => {
+    // Added in the node:test move: no other case builds two clients after
+    // its reset, so the order lastOptions relies on was unexercised.
+    const first = cloudConn();
+    await withResolvedSystemContext(first, () => {
+      createAdtClient(first);
+    });
+    lookup.mock.mockImplementation(async () => ({
+      user: 'SECOND_USER',
+      systemId: 'SND',
+    }));
+    const second = cloudConn();
+    await withResolvedSystemContext(second, () => {
+      createAdtClient(second);
+    });
+    assert.equal(clientsBuilt.length, 2);
+    assertMatchObject(lastOptions(), {
+      responsible: 'SECOND_USER',
+      masterSystem: 'SND',
     });
   });
 
@@ -722,7 +938,7 @@ describe('withResolvedSystemContext', () => {
         createAdtClient(conn);
       }),
     );
-    expect(lastOptions()).toMatchObject({
+    assertMatchObject(lastOptions(), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
@@ -737,8 +953,8 @@ describe('withResolvedSystemContext', () => {
           createAdtClient(conn);
         }),
     );
-    expect(lookup).toHaveBeenCalledTimes(1);
-    expect(lastOptions()).toMatchObject({
+    assert.equal(lookup.mock.callCount(), 1);
+    assertMatchObject(lastOptions(), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
@@ -748,16 +964,18 @@ describe('withResolvedSystemContext', () => {
     // Key presence still decides against the process cache: what stops one
     // user's process-wide value reaching another user's scope.
     setSystemContext({ responsible: 'PROC_USER', masterSystem: 'PROC_SYS' });
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+    });
     const result = await runWithRequestContext(
       { responsible: undefined, masterSystem: undefined },
       () => withResolvedSystemContext(onPremUserConn(), seen),
     );
     // The connection's login (the rules' second step), never PROC_USER.
-    expect(result.responsible).toBe('STATED');
-    expect(result.masterSystem).toBeUndefined();
+    assert.equal(result.responsible, 'STATED');
+    assert.equal(result.masterSystem, undefined);
   });
 
   it('with no scope and an empty process context, fills and keeps the process language', async () => {
@@ -766,7 +984,7 @@ describe('withResolvedSystemContext', () => {
     await withResolvedSystemContext(conn, () => {
       createAdtClient(conn);
     });
-    expect(lastOptions()).toEqual({
+    assert.deepStrictEqual(lastOptions(), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
       masterLanguage: 'EN',
@@ -777,7 +995,7 @@ describe('withResolvedSystemContext', () => {
     const result = await runWithRequestContext({ masterLanguage: 'DE' }, () =>
       withResolvedSystemContext(cloudConn(), seen),
     );
-    expect(result).toEqual({
+    assert.deepStrictEqual(result, {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
       masterLanguage: 'DE',
@@ -786,24 +1004,26 @@ describe('withResolvedSystemContext', () => {
 
   it('a null resolver makes no lookup', async () => {
     const result = await withResolvedSystemContext(cloudConn(), seen, null);
-    expect(lookup).not.toHaveBeenCalled();
-    expect(result.responsible).toBeUndefined();
+    assert.equal(lookup.mock.callCount(), 0);
+    assert.equal(result.responsible, undefined);
   });
 
-  it('a throwing lookup logs a warning in fixed words, and fn does not run', async () => {
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-    lookup.mockRejectedValue(new Error('ICM down'));
-    const fn = jest.fn(seen);
+  it('a throwing lookup logs a warning in fixed words, and fn does not run', async (t) => {
+    const warn = t.mock.method(logger, 'warn', () => {});
+    lookup.mock.mockImplementation(async () => {
+      throw new Error('ICM down');
+    });
+    const fn = mock.fn(seen);
     const refused = await withResolvedSystemContext(cloudConn(), fn).catch(
       (error: unknown) => error,
     );
-    expect(refused).toMatchObject({ serverRefusal: 'system_lookup_failed' });
-    expect(String((refused as Error).message)).not.toContain('ICM down');
-    expect(fn).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledTimes(1);
+    assertMatchObject(refused, { serverRefusal: 'system_lookup_failed' });
+    assert.ok(!String((refused as Error).message).includes('ICM down'));
+    assert.equal(fn.mock.callCount(), 0);
+    assert.equal(warn.mock.callCount(), 1);
     // Fixed words: a lookup's message may quote what the system answered.
-    expect(String(warn.mock.calls[0][0])).not.toContain('ICM down');
-    warn.mockRestore();
+    assert.ok(!String(warn.mock.calls[0]?.arguments[0]).includes('ICM down'));
+    warn.mock.restore();
   });
 });
 
@@ -865,7 +1085,8 @@ describe('HandlerExporter.getHandlerEntries', () => {
       exporter as unknown as { handlerGroups: IHandlerGroup[] }
     ).handlerGroups.flatMap((g) => g.getHandlers());
     const wrapped = exporter.getHandlerEntries();
-    expect(wrapped.map((e) => e.toolDefinition)).toEqual(
+    assert.deepStrictEqual(
+      wrapped.map((e) => e.toolDefinition),
       raw.map((e) =>
         isLongTool(e.toolDefinition.name)
           ? longToolInTheCall(e.toolDefinition)
@@ -877,9 +1098,10 @@ describe('HandlerExporter.getHandlerEntries', () => {
   it('a handler runs with values filled from its connection', async () => {
     const exporter = exporterWith([fakeGroup(null)]);
     const entry = exporter.getHandlerEntries()[0];
-    await expect(
-      entry.call({ connection: cloudConn() }, {}),
-    ).resolves.toMatchObject({ responsible: 'CB_USER', masterSystem: 'CLD' });
+    assertMatchObject(await entry.call({ connection: cloudConn() }, {}), {
+      responsible: 'CB_USER',
+      masterSystem: 'CLD',
+    });
   });
 
   it("a handler reading its context's connection gets the call's", async () => {
@@ -887,127 +1109,153 @@ describe('HandlerExporter.getHandlerEntries', () => {
     const entry = exporterWith([group]).getHandlerEntries()[1];
     const conn = cloudConn();
     const result = await entry.call({ connection: conn }, {});
-    expect(result).toMatchObject({
+    assertMatchObject(result, {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
       connection: conn,
     });
   });
 
-  describe.each([
+  for (const [_name, index] of [
     ['WithContext', 0],
     ['Closure', 1],
-  ])('the %s handler', (_name, index) => {
-    /** Calls the entry on `connection` as an embedder does, recording whether it ran. */
-    function callOn(connection: IAbapConnection) {
-      const group = fakeGroup(connection);
-      const ran = jest.fn();
-      const original = group.getHandlers;
-      group.getHandlers = () =>
-        original().map(
-          (e): HandlerEntry => ({
-            ...e,
-            call: async (c, a) => {
-              ran();
-              return e.call(c, a);
-            },
-          }),
-        );
-      const entry = exporterWith([group]).getHandlerEntries()[index];
-      const call = () => entry.call({ connection }, {});
-      return { call, ran };
-    }
+  ] satisfies [string, number][]) {
+    describe(format('the %s handler', _name), () => {
+      /** Calls the entry on `connection` as an embedder does, recording whether it ran. */
+      function callOn(connection: IAbapConnection) {
+        const group = fakeGroup(connection);
+        const ran = mock.fn();
+        const original = group.getHandlers;
+        group.getHandlers = () =>
+          original().map(
+            (e): HandlerEntry => ({
+              ...e,
+              call: async (c, a) => {
+                ran();
+                return e.call(c, a);
+              },
+            }),
+          );
+        const entry = exporterWith([group]).getHandlerEntries()[index];
+        const call = () => entry.call({ connection }, {});
+        return { call, ran };
+      }
 
-    it.each([
-      [
-        'a cloud 2xx that names no user',
-        cloudConn,
-        () => lookup.mockResolvedValue({ user: '', systemId: 'CLD' }),
-        'system_lookup_failed',
-      ],
-      [
-        'a cloud 500',
-        cloudConn,
-        () =>
-          lookup.mockRejectedValue(
-            Object.assign(new Error('placeholder'), {
-              response: { status: 500 },
+      for (const [_case, conn, answer, code] of [
+        [
+          'a cloud 2xx that names no user',
+          cloudConn,
+          () =>
+            lookup.mock.mockImplementation(async () => ({
+              user: '',
+              systemId: 'CLD',
+            })),
+          'system_lookup_failed',
+        ],
+        [
+          'a cloud 500',
+          cloudConn,
+          () =>
+            lookup.mock.mockImplementation(async () => {
+              throw Object.assign(new Error('placeholder'), {
+                response: { status: 500 },
+              });
             }),
-          ),
-        'system_lookup_failed',
-      ],
-      [
-        'an on-premise 500 with no user stated',
-        onPremConn,
-        () =>
-          lookup.mockRejectedValue(
-            Object.assign(new Error('placeholder'), {
-              response: { status: 500 },
+          'system_lookup_failed',
+        ],
+        [
+          'an on-premise 500 with no user stated',
+          onPremConn,
+          () =>
+            lookup.mock.mockImplementation(async () => {
+              throw Object.assign(new Error('placeholder'), {
+                response: { status: 500 },
+              });
             }),
-          ),
-        'system_user_unknown',
-      ],
-      [
-        'an on-premise 2xx without a user, no user stated',
-        onPremConn,
-        () => lookup.mockResolvedValue({ user: '', systemId: 'OPS' }),
-        'system_user_unknown',
-      ],
-      [
-        'an on-premise 404 with no user stated',
-        onPremConn,
-        () =>
-          lookup.mockRejectedValue(
-            Object.assign(new Error('placeholder'), {
-              response: { status: 404 },
+          'system_user_unknown',
+        ],
+        [
+          'an on-premise 2xx without a user, no user stated',
+          onPremConn,
+          () =>
+            lookup.mock.mockImplementation(async () => ({
+              user: '',
+              systemId: 'OPS',
+            })),
+          'system_user_unknown',
+        ],
+        [
+          'an on-premise 404 with no user stated',
+          onPremConn,
+          () =>
+            lookup.mock.mockImplementation(async () => {
+              throw Object.assign(new Error('placeholder'), {
+                response: { status: 404 },
+              });
             }),
-          ),
-        'system_user_unknown',
-      ],
-      [
-        'a cloud 404',
-        cloudConn,
-        () =>
-          lookup.mockRejectedValue(
-            Object.assign(new Error('placeholder'), {
-              response: { status: 404 },
+          'system_user_unknown',
+        ],
+        [
+          'a cloud 404',
+          cloudConn,
+          () =>
+            lookup.mock.mockImplementation(async () => {
+              throw Object.assign(new Error('placeholder'), {
+                response: { status: 404 },
+              });
             }),
+          'cloud_without_systeminformation',
+        ],
+      ] satisfies [string, () => IAbapConnection, () => void, string][]) {
+        it(
+          format(
+            '%s: the call fails with the server refusal, no handler runs; nothing is kept, the next call asks again',
+            _case,
           ),
-        'cloud_without_systeminformation',
-      ],
-    ])(
-      '%s: the call fails with the server refusal, no handler runs; nothing is kept, the next call asks again',
-      async (_case, conn, answer, code) => {
-        const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-        answer();
-        const { call, ran } = callOn(conn());
-        await expect(call()).rejects.toMatchObject({ serverRefusal: code });
-        await expect(call()).rejects.toMatchObject({ serverRefusal: code });
-        expect(ran).not.toHaveBeenCalled();
-        expect(lookup).toHaveBeenCalledTimes(2);
-        warn.mockRestore();
-      },
-    );
+          async (t) => {
+            const warn = t.mock.method(logger, 'warn', () => {});
+            answer();
+            const { call, ran } = callOn(conn());
+            assertMatchObject(await rejectionOf(call()), {
+              serverRefusal: code,
+            });
+            assertMatchObject(await rejectionOf(call()), {
+              serverRefusal: code,
+            });
+            assert.equal(ran.mock.callCount(), 0);
+            assert.equal(lookup.mock.callCount(), 2);
+            warn.mock.restore();
+          },
+        );
+      }
 
-    it.each([404, 500])(
-      'an on-premise %i: the handler runs with the configured settings',
-      async (status) => {
-        lookup.mockRejectedValue(
-          Object.assign(new Error('placeholder'), { response: { status } }),
+      for (const status of [404, 500]) {
+        it(
+          format(
+            'an on-premise %i: the handler runs with the configured settings',
+            status,
+          ),
+          async () => {
+            lookup.mock.mockImplementation(async () => {
+              throw Object.assign(new Error('placeholder'), {
+                response: { status },
+              });
+            });
+            const { call, ran } = callOn(onPremUserConn());
+            const result = await runWithRequestContext(
+              { responsible: 'ALICE', masterSystem: 'SID' },
+              call,
+            );
+            assert.equal(ran.mock.callCount(), 1);
+            assertMatchObject(result, {
+              responsible: 'ALICE',
+              masterSystem: 'SID',
+            });
+          },
         );
-        const { call, ran } = callOn(onPremUserConn());
-        const result = await runWithRequestContext(
-          { responsible: 'ALICE', masterSystem: 'SID' },
-          call,
-        );
-        expect(ran).toHaveBeenCalledTimes(1);
-        expect(result).toMatchObject({
-          responsible: 'ALICE',
-          masterSystem: 'SID',
-        });
-      },
-    );
-  });
+      }
+    });
+  }
 
   it('systemContextResolver: null disables resolution', async () => {
     const exporter = exporterWith([fakeGroup(null)], {
@@ -1016,8 +1264,8 @@ describe('HandlerExporter.getHandlerEntries', () => {
     const result = await exporter
       .getHandlerEntries()[0]
       .call({ connection: cloudConn() }, {});
-    expect(lookup).not.toHaveBeenCalled();
-    expect(result).toMatchObject({ responsible: undefined });
+    assert.equal(lookup.mock.callCount(), 0);
+    assertMatchObject(result, { responsible: undefined });
   });
 });
 
@@ -1048,7 +1296,7 @@ describe('BaseHandlerGroup.registerToolOnServer', () => {
     } as unknown as McpServer;
     group.registerHandlers(server);
     await callback?.({});
-    expect(group.observed).toMatchObject({
+    assertMatchObject(group.observed, {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
@@ -1095,41 +1343,48 @@ describe('BaseMcpServer.registerHandlers', () => {
       handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
       systemType: 'cloud',
     });
-    expect(textOf(await callTool(server, 'WithContext'))).toMatchObject({
+    assertMatchObject(textOf(await callTool(server, 'WithContext')), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
-    expect(textOf(await callTool(server, 'Closure'))).toMatchObject({
+    assertMatchObject(textOf(await callTool(server, 'Closure')), {
       responsible: 'CB_USER',
       masterSystem: 'CLD',
     });
-    expect(lookup).toHaveBeenCalledTimes(1);
+    assert.equal(lookup.mock.callCount(), 1);
   });
 
-  it.each([
+  for (const [systemType, expected] of [
     ['cloud', { responsible: 'CB_USER', masterSystem: 'CLD' }],
     ['onprem', { responsible: 'CB_USER', masterSystem: 'CLD' }],
-  ] as const)(
-    "an injected connection, the server's systemType %s: the system's answer",
-    async (systemType, expected) => {
-      const server = new EmbeddableMcpServer({
-        connection: foreignConn(
-          'https://system.abap.example.hana.ondemand.com',
-        ) as never,
-        handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+  ] as const) {
+    it(
+      format(
+        "an injected connection, the server's systemType %s: the system's answer",
         systemType,
-      });
-      const result = textOf(await callTool(server, 'WithContext'));
-      expect(lookup).toHaveBeenCalledTimes(1);
-      expect(result).toMatchObject(expected);
-    },
-  );
-
-  it("an injected connection answered 404: the server's systemType states the kind, SAP_SYSTEM_TYPE unset", async () => {
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
+      ),
+      async () => {
+        const server = new EmbeddableMcpServer({
+          connection: foreignConn(
+            'https://system.abap.example.hana.ondemand.com',
+          ) as never,
+          handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+          systemType,
+        });
+        const result = textOf(await callTool(server, 'WithContext'));
+        assert.equal(lookup.mock.callCount(), 1);
+        assertMatchObject(result, expected);
+      },
     );
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
+  }
+
+  it("an injected connection answered 404: the server's systemType states the kind, SAP_SYSTEM_TYPE unset", async (t) => {
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+    });
+    const warn = t.mock.method(logger, 'warn', () => {});
     const onprem = new EmbeddableMcpServer({
       connection: foreignConn(
         'https://system.abap.example.hana.ondemand.com',
@@ -1138,8 +1393,8 @@ describe('BaseMcpServer.registerHandlers', () => {
       systemType: 'onprem',
     });
     const answered = textOf(await callTool(onprem, 'WithContext'));
-    expect(answered.responsible).toBeUndefined();
-    expect(answered.masterSystem).toBeUndefined();
+    assert.equal(answered.responsible, undefined);
+    assert.equal(answered.masterSystem, undefined);
     const cloud = new EmbeddableMcpServer({
       connection: foreignConn(
         'https://system.abap.example.hana.ondemand.com',
@@ -1151,9 +1406,9 @@ describe('BaseMcpServer.registerHandlers', () => {
       isError?: boolean;
       content: { text: string }[];
     };
-    expect(refused.isError).toBe(true);
-    expect(refused.content[0].text).toContain('systeminformation');
-    warn.mockRestore();
+    assert.equal(refused.isError, true);
+    assert.ok(refused.content[0].text.includes('systeminformation'));
+    warn.mock.restore();
   });
 
   it("two servers stating systemType 'cloud' over one connection make one lookup", async () => {
@@ -1167,12 +1422,12 @@ describe('BaseMcpServer.registerHandlers', () => {
         handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
         systemType: 'cloud',
       });
-      expect(textOf(await callTool(server, 'WithContext'))).toMatchObject({
+      assertMatchObject(textOf(await callTool(server, 'WithContext')), {
         responsible: 'CB_USER',
         masterSystem: 'CLD',
       });
     }
-    expect(lookup).toHaveBeenCalledTimes(1);
+    assert.equal(lookup.mock.callCount(), 1);
   });
 
   it("a factory-built connection of another kind than the server's: system_type_conflict, nothing looked up, the tool not run", async () => {
@@ -1187,16 +1442,18 @@ describe('BaseMcpServer.registerHandlers', () => {
       isError?: boolean;
       content: Array<{ text: string }>;
     };
-    expect(result.isError).toBe(true);
-    expect(result.content[0]?.text).toContain('system_type_conflict');
-    expect(lookup).not.toHaveBeenCalled();
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0]?.text.includes('system_type_conflict'));
+    assert.equal(lookup.mock.callCount(), 0);
   });
 
-  it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run; nothing is kept, the next call asks again', async () => {
-    const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-    lookup.mockRejectedValue(
-      Object.assign(new Error('placeholder'), { response: { status: 404 } }),
-    );
+  it('an injected on-premise connection, a 404, no user stated: system_user_unknown, the tool does not run; nothing is kept, the next call asks again', async (t) => {
+    const warn = t.mock.method(logger, 'warn', () => {});
+    lookup.mock.mockImplementation(async () => {
+      throw Object.assign(new Error('placeholder'), {
+        response: { status: 404 },
+      });
+    });
     const group = new ReportingGroup({ connection: {} as never });
     const server = new EmbeddableMcpServer({
       connection: onPremConn() as never,
@@ -1208,15 +1465,15 @@ describe('BaseMcpServer.registerHandlers', () => {
         isError?: boolean;
         content: Array<{ text: string }>;
       };
-      expect(result.isError).toBe(true);
-      expect(result.content[0]?.text).toContain('system_user_unknown');
+      assert.equal(result.isError, true);
+      assert.ok(result.content[0]?.text.includes('system_user_unknown'));
     }
-    expect(group.observed).toBeUndefined();
-    expect(lookup).toHaveBeenCalledTimes(2);
-    warn.mockRestore();
+    assert.equal(group.observed, undefined);
+    assert.equal(lookup.mock.callCount(), 2);
+    warn.mock.restore();
   });
 
-  it.each([
+  for (const [_what, resolver] of [
     ['null', async () => null],
     [
       'a throw',
@@ -1224,43 +1481,48 @@ describe('BaseMcpServer.registerHandlers', () => {
         throw new Error('custom lookup failed');
       },
     ],
-  ] as Array<[string, SystemContextResolver]>)(
-    "a custom resolver answering nothing (%s): on ABAP Cloud the cloud error, on-premise the stated values — the server's recipe, by the kind",
-    async (_what, resolver) => {
-      const warn = jest.spyOn(logger, 'warn').mockImplementation(() => {});
-      const cloudGroup = new ReportingGroup({ connection: {} as never });
-      const cloud = new EmbeddableMcpServer({
-        connection: cloudConn() as never,
-        handlersRegistry: new CompositeHandlersRegistry([cloudGroup]),
-        systemType: 'cloud',
-        systemContextResolver: resolver,
-      });
-      const refused = (await runWithRequestContext(
-        { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
-        () => callTool(cloud, 'Report'),
-      )) as { isError?: boolean; content: Array<{ text: string }> };
-      expect(refused.isError).toBe(true);
-      expect(refused.content[0]?.text).toContain('system_lookup_failed');
-      expect(cloudGroup.observed).toBeUndefined();
+  ] as Array<[string, SystemContextResolver]>) {
+    it(
+      format(
+        "a custom resolver answering nothing (%s): on ABAP Cloud the cloud error, on-premise the stated values — the server's recipe, by the kind",
+        _what,
+      ),
+      async (t) => {
+        const warn = t.mock.method(logger, 'warn', () => {});
+        const cloudGroup = new ReportingGroup({ connection: {} as never });
+        const cloud = new EmbeddableMcpServer({
+          connection: cloudConn() as never,
+          handlersRegistry: new CompositeHandlersRegistry([cloudGroup]),
+          systemType: 'cloud',
+          systemContextResolver: resolver,
+        });
+        const refused = (await runWithRequestContext(
+          { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+          () => callTool(cloud, 'Report'),
+        )) as { isError?: boolean; content: Array<{ text: string }> };
+        assert.equal(refused.isError, true);
+        assert.ok(refused.content[0]?.text.includes('system_lookup_failed'));
+        assert.equal(cloudGroup.observed, undefined);
 
-      const onPremGroup = new ReportingGroup({ connection: {} as never });
-      const onPrem = new EmbeddableMcpServer({
-        connection: onPremConn() as never,
-        handlersRegistry: new CompositeHandlersRegistry([onPremGroup]),
-        systemType: 'onprem',
-        systemContextResolver: resolver,
-      });
-      await runWithRequestContext(
-        { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
-        () => callTool(onPrem, 'Report'),
-      );
-      expect(onPremGroup.observed).toMatchObject({
-        responsible: 'ALICE',
-        masterSystem: 'SID',
-      });
-      warn.mockRestore();
-    },
-  );
+        const onPremGroup = new ReportingGroup({ connection: {} as never });
+        const onPrem = new EmbeddableMcpServer({
+          connection: onPremConn() as never,
+          handlersRegistry: new CompositeHandlersRegistry([onPremGroup]),
+          systemType: 'onprem',
+          systemContextResolver: resolver,
+        });
+        await runWithRequestContext(
+          { responsible: 'ALICE', masterSystem: 'SID', login: 'BOB' },
+          () => callTool(onPrem, 'Report'),
+        );
+        assertMatchObject(onPremGroup.observed, {
+          responsible: 'ALICE',
+          masterSystem: 'SID',
+        });
+        warn.mock.restore();
+      },
+    );
+  }
 
   it('systemContextResolver: null disables resolution', async () => {
     const server = new EmbeddableMcpServer({
@@ -1270,7 +1532,7 @@ describe('BaseMcpServer.registerHandlers', () => {
       systemContextResolver: null,
     });
     const result = textOf(await callTool(server, 'WithContext'));
-    expect(lookup).not.toHaveBeenCalled();
-    expect(result.responsible).toBeUndefined();
+    assert.equal(lookup.mock.callCount(), 0);
+    assert.equal(result.responsible, undefined);
   });
 });

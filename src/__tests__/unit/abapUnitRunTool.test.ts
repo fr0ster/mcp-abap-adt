@@ -9,6 +9,9 @@
  * started it.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { ABAP_UNIT_RUN_TYPES } from '@mcp-abap-adt/interfaces-adt';
 import {
   handleRunAbapUnit,
@@ -16,6 +19,7 @@ import {
 } from '../../handlers/unit_test/high/handleRunAbapUnit';
 import { defineTool } from '../../lib/handlers/interfaces';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertRejects } from '../helpers/assertions';
 import { jsonAt, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
@@ -59,50 +63,60 @@ describe('RunAbapUnit: a run by target, on the wire', () => {
       target: { kind: 'object', name: 'zcl_x', type: 'CLAS/OC' },
     });
 
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map(line)).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(connection.requests.map(line), [
       'POST /sap/bc/adt/abapunit/runs',
       `GET /sap/bc/adt/abapunit/runs/${RUN}`,
       `GET /sap/bc/adt/abapunit/results/${RUN}`,
     ]);
     const sent = body(connection.requests[0]);
-    expect(sent).toContain('<osl:objectSet xsi:type="osl:flatObjectSet">');
-    expect(sent).toContain('<osl:object name="ZCL_X" type="CLAS/OC"/>');
-    expect(sent).toContain(
-      '<aunit:scope ownTests="true" foreignTests="false" addForeignTestsAsPreview="true"/>',
+    assert.ok(sent.includes('<osl:objectSet xsi:type="osl:flatObjectSet">'));
+    assert.ok(sent.includes('<osl:object name="ZCL_X" type="CLAS/OC"/>'));
+    assert.ok(
+      sent.includes(
+        '<aunit:scope ownTests="true" foreignTests="false" addForeignTestsAsPreview="true"/>',
+      ),
     );
     const answer = JSON.parse(textOf(result));
-    expect(answer.finished).toBe(true);
-    expect(answer.run_id).toBe(RUN);
-    expect(JSON.stringify(answer.run_result)).toContain('TEST_METHOD');
+    assert.equal(answer.finished, true);
+    assert.equal(answer.run_id, RUN);
+    assert.ok(JSON.stringify(answer.run_result).includes('TEST_METHOD'));
   });
 
-  it.each([
+  for (const [include, attribute] of [
     [true, 'true'],
     [false, 'false'],
-  ])(
-    'a package target with include_subpackages %s goes as an osl:packageSet',
-    async (include, attribute) => {
-      const { connection, result } = await run({
-        target: {
-          kind: 'package',
-          name: '$zpkg',
-          include_subpackages: include,
-        },
-      });
+  ] satisfies Array<[boolean, string]>) {
+    it(
+      format(
+        'a package target with include_subpackages %s goes as an osl:packageSet',
+        include,
+      ),
+      async () => {
+        const { connection, result } = await run({
+          target: {
+            kind: 'package',
+            name: '$zpkg',
+            include_subpackages: include,
+          },
+        });
 
-      expect(result.isError).toBe(false);
-      expect(connection.requests.map(line)[0]).toBe(
-        'POST /sap/bc/adt/abapunit/runs',
-      );
-      const sent = body(connection.requests[0]);
-      expect(sent).toContain('<osl:objectSet xsi:type="osl:packageSet">');
-      expect(sent).toContain(
-        `<osl:package name="$ZPKG" includeSubpackages="${attribute}"/>`,
-      );
-      expect(sent).not.toContain('osl:object ');
-    },
-  );
+        assert.equal(result.isError, false);
+        assert.equal(
+          connection.requests.map(line)[0],
+          'POST /sap/bc/adt/abapunit/runs',
+        );
+        const sent = body(connection.requests[0]);
+        assert.ok(sent.includes('<osl:objectSet xsi:type="osl:packageSet">'));
+        assert.ok(
+          sent.includes(
+            `<osl:package name="$ZPKG" includeSubpackages="${attribute}"/>`,
+          ),
+        );
+        assert.ok(!sent.includes('osl:object '));
+      },
+    );
+  }
 
   it("a CDS view's assigned tests run as DDLS/DF with foreignTests, the scope, risk levels and durations as given", async () => {
     const { connection, result } = await run({
@@ -116,23 +130,29 @@ describe('RunAbapUnit: a run by target, on the wire', () => {
       duration: { short: true, medium: false, long: false },
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const sent = body(connection.requests[0]);
-    expect(sent).toContain('<osl:object name="ZI_VIEW" type="DDLS/DF"/>');
-    expect(sent).toContain(
-      '<aunit:scope ownTests="false" foreignTests="true" addForeignTestsAsPreview="false"/>',
+    assert.ok(sent.includes('<osl:object name="ZI_VIEW" type="DDLS/DF"/>'));
+    assert.ok(
+      sent.includes(
+        '<aunit:scope ownTests="false" foreignTests="true" addForeignTestsAsPreview="false"/>',
+      ),
     );
-    expect(sent).toContain(
-      '<aunit:riskLevel harmless="true" dangerous="false" critical="false"/>',
+    assert.ok(
+      sent.includes(
+        '<aunit:riskLevel harmless="true" dangerous="false" critical="false"/>',
+      ),
     );
-    expect(sent).toContain(
-      '<aunit:duration short="true" medium="false" long="false"/>',
+    assert.ok(
+      sent.includes(
+        '<aunit:duration short="true" medium="false" long="false"/>',
+      ),
     );
   });
 });
 
 describe('RunAbapUnit: refused before anything is sent', () => {
-  it.each([
+  for (const [_case, target, words] of [
     [
       'an object without its type',
       { kind: 'object', name: 'ZCL_X' },
@@ -163,23 +183,25 @@ describe('RunAbapUnit: refused before anything is sent', () => {
       },
       'target.include_subpackages is read for kind package only',
     ],
-  ] as const)('%s', async (_case, target, words) => {
-    const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+  ] as const) {
+    it(format('%s', _case), async () => {
+      const connection = recordingConnection([STARTED, FINISHED, RESULT]);
 
-    const result = await handleRunAbapUnit({ connection }, { target });
+      const result = await handleRunAbapUnit({ connection }, { target });
 
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain(words);
-    expect(textOf(result)).toContain('nothing was sent');
-    expect(connection.requests).toEqual([]);
-  });
+      assert.equal(result.isError, true);
+      assert.ok(textOf(result).includes(words));
+      assert.ok(textOf(result).includes('nothing was sent'));
+      assert.deepStrictEqual(connection.requests, []);
+    });
+  }
 
   /**
    * The model's call names its target through the tool's schema: a value
    * the schema does not take is refused there, naming the argument, before
    * the handler runs, and nothing is sent.
    */
-  it.each([
+  for (const [_case, given, path] of [
     [
       'a type outside the run registry',
       { target: { kind: 'object', name: 'ZCL_X', type: 'DEVC' } },
@@ -216,30 +238,35 @@ describe('RunAbapUnit: refused before anything is sent', () => {
       },
       'duration',
     ],
-  ])('%s: refused at the schema, nothing sent', async (_case, given, path) => {
-    const connection = recordingConnection([STARTED, FINISHED, RESULT]);
-    const refused = expect(
-      defineTool(TOOL_DEFINITION, handleRunAbapUnit).call(
-        { connection },
-        given,
-      ),
-    ).rejects.toThrow(`at ${path}`);
-    await refused;
-    expect(connection.requests).toEqual([]);
-  });
+  ] satisfies Array<[string, Record<string, unknown>, string]>) {
+    it(format('%s: refused at the schema, nothing sent', _case), async () => {
+      const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+      const refused = assertRejects(
+        defineTool(TOOL_DEFINITION, handleRunAbapUnit).call(
+          { connection },
+          given,
+        ),
+        `at ${path}`,
+      );
+      await refused;
+      assert.deepStrictEqual(connection.requests, []);
+    });
+  }
 });
 
 describe('RunAbapUnit: the schema', () => {
   it("target.type's enum is the keys of ABAP_UNIT_RUN_TYPES, in their order", () => {
-    expect(
+    assert.deepStrictEqual(
       jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'target', 'type').enum,
-    ).toEqual(Object.keys(ABAP_UNIT_RUN_TYPES));
+      Object.keys(ABAP_UNIT_RUN_TYPES),
+    );
   });
 
   it("target.kind's enum is the run target's kinds", () => {
-    expect(
+    assert.deepStrictEqual(
       jsonAt(listedJson(TOOL_DEFINITION.inputSchema), 'target', 'kind').enum,
-    ).toEqual(['object', 'package']);
+      ['object', 'package'],
+    );
   });
 });
 
@@ -272,10 +299,10 @@ describe('RunAbapUnit: where it is served', () => {
         }
       }
     }
-    expect(placement).toEqual(expected);
+    assert.deepStrictEqual(placement, expected);
   });
 
   it('carries no [read-only] marker', () => {
-    expect(TOOL_DEFINITION.description.startsWith('[read-only]')).toBe(false);
+    assert.equal(TOOL_DEFINITION.description.startsWith('[read-only]'), false);
   });
 });

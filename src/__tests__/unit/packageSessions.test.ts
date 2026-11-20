@@ -3,39 +3,18 @@
  * instance buffer — on premise, 2026-09-26/27). A create over RFC and every lock
  * chain, on either transport, run in sessions of their own.
  */
-const opened: Array<{
-  connect: jest.Mock;
-  disconnect: jest.Mock;
-  getConfig: () => { connectionType: string };
-  credential: unknown;
-  settings: unknown;
-}> = [];
-let useRealFactory = false;
-jest.mock('../../lib/connectionFactory', () => {
-  const actual = jest.requireActual('../../lib/connectionFactory');
-  return {
-    ...actual,
-    createAbapConnection: (settings: unknown, credential: unknown) => {
-      if (useRealFactory) {
-        return (actual.createAbapConnection as (...a: unknown[]) => unknown)(
-          settings,
-          credential,
-        );
-      }
-      const fresh = {
-        connect: jest.fn(async () => {}),
-        disconnect: jest.fn(async () => {}),
-        getConfig: () => ({ connectionType: 'rfc' }),
-        credential,
-        settings,
-      };
-      opened.push(fresh);
-      return fresh;
-    },
-  };
-});
-
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
+import * as connectionFactory from '../../lib/connectionFactory';
 import {
   connectionForPackageLock,
   connectionHoldingPackageLock,
@@ -44,6 +23,47 @@ import {
   registerFreshConnectionFactory,
   releasePackageLockSession,
 } from '../../lib/packageSessions';
+import {
+  assertMatchObject,
+  assertRejects,
+  rejectionOf,
+} from '../helpers/assertions';
+
+const opened: Array<{
+  connect: Mock<() => Promise<void>>;
+  disconnect: Mock<() => Promise<void>>;
+  getConfig: () => { connectionType: string };
+  credential: unknown;
+  settings: unknown;
+}> = [];
+let useRealFactory = false;
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time); the names not replaced stay real.
+// The real exports, read before any is replaced.
+const actual = { ...connectionFactory };
+
+mock.method(
+  connectionFactory,
+  'createAbapConnection',
+  (settings: unknown, credential: unknown) => {
+    if (useRealFactory) {
+      return (actual.createAbapConnection as (...a: unknown[]) => unknown)(
+        settings,
+        credential,
+      );
+    }
+    const fresh = {
+      connect: mock.fn(async () => {}),
+      disconnect: mock.fn(async () => {}),
+      getConfig: () => ({ connectionType: 'rfc' }),
+      credential,
+      settings,
+    };
+    opened.push(fresh);
+    return fresh;
+  },
+);
 
 /** A connection whose host hands fresh ones over through a factory. */
 const handedOver: typeof opened = [];
@@ -51,8 +71,8 @@ const connectionOf = (connectionType: string) => {
   const connection = { getConfig: () => ({ connectionType }) } as any;
   registerFreshConnectionFactory(connection, async () => {
     const fresh = {
-      connect: jest.fn(async () => {}),
-      disconnect: jest.fn(async () => {}),
+      connect: mock.fn(async () => {}),
+      disconnect: mock.fn(async () => {}),
       getConfig: () => ({ connectionType }),
       credential: undefined,
       settings: undefined,
@@ -77,8 +97,8 @@ describe('package sessions', () => {
       'x',
       async (c) => c,
     );
-    expect(used).toBe(caller);
-    expect(handedOver).toHaveLength(0);
+    assert.equal(used, caller);
+    assert.equal(handedOver.length, 0);
   });
 
   it('runs a create in a session of its own over RFC, and closes it', async () => {
@@ -89,33 +109,37 @@ describe('package sessions', () => {
       'x',
       async (c) => c,
     );
-    expect(handedOver).toHaveLength(1);
-    expect(used).toBe(handedOver[0]);
-    expect(handedOver[0].connect).toHaveBeenCalled();
-    expect(handedOver[0].disconnect).toHaveBeenCalled();
+    assert.equal(handedOver.length, 1);
+    assert.equal(used, handedOver[0]);
+    assert.ok(handedOver[0].connect.mock.callCount() > 0);
+    assert.ok(handedOver[0].disconnect.mock.callCount() > 0);
   });
 
   it('closes its own session over RFC when the work throws', async () => {
-    await expect(
+    await assertRejects(
       inOwnSessionOverRfc(connectionOf('rfc'), undefined, 'x', async () => {
         throw new Error('boom');
       }),
-    ).rejects.toThrow('boom');
-    expect(handedOver[0].disconnect).toHaveBeenCalled();
+      'boom',
+    );
+    assert.ok(handedOver[0].disconnect.mock.callCount() > 0);
   });
 
   it('keeps an RFC lock session under its handle until the unlock', async () => {
     const caller = connectionOf('rfc');
     const lockOn = await connectionForPackageLock(caller, undefined);
-    expect(lockOn.connection).toBe(handedOver[0]);
+    assert.equal(lockOn.connection, handedOver[0]);
     lockOn.keep('HANDLE1');
 
-    expect(connectionHoldingPackageLock(caller, 'HANDLE1')).toBe(handedOver[0]);
-    expect(handedOver[0].disconnect).not.toHaveBeenCalled();
+    assert.equal(
+      connectionHoldingPackageLock(caller, 'HANDLE1'),
+      handedOver[0],
+    );
+    assert.equal(handedOver[0].disconnect.mock.callCount(), 0);
 
     await releasePackageLockSession('HANDLE1', undefined);
-    expect(handedOver[0].disconnect).toHaveBeenCalled();
-    expect(connectionHoldingPackageLock(caller, 'HANDLE1')).toBe(caller);
+    assert.ok(handedOver[0].disconnect.mock.callCount() > 0);
+    assert.equal(connectionHoldingPackageLock(caller, 'HANDLE1'), caller);
   });
 
   it('closes an RFC lock session that took no lock', async () => {
@@ -124,7 +148,7 @@ describe('package sessions', () => {
       undefined,
     );
     await lockOn.drop();
-    expect(handedOver[0].disconnect).toHaveBeenCalled();
+    assert.ok(handedOver[0].disconnect.mock.callCount() > 0);
   });
 
   it('locks on the caller connection over HTTP', async () => {
@@ -132,10 +156,10 @@ describe('package sessions', () => {
     // PUT on the same connection runs outside it (on two on-premise releases, 2026-09-27).
     const caller = connectionOf('http');
     const lockOn = await connectionForPackageLock(caller, undefined);
-    expect(lockOn.connection).toBe(caller);
+    assert.equal(lockOn.connection, caller);
     lockOn.keep('HANDLE2');
-    expect(connectionHoldingPackageLock(caller, 'HANDLE2')).toBe(caller);
-    expect(handedOver).toHaveLength(0);
+    assert.equal(connectionHoldingPackageLock(caller, 'HANDLE2'), caller);
+    assert.equal(handedOver.length, 0);
   });
 });
 
@@ -149,10 +173,8 @@ describe('openFreshConnection', () => {
     delete process.env.SAP_SYSTEM_TYPE;
   });
 
-  it('opens a sibling holding the same credential object and the same settings', async () => {
-    const { createAbapConnection } = jest.requireActual(
-      '../../lib/connectionFactory',
-    ) as typeof import('../../lib/connectionFactory');
+  it('opens a sibling holding the same credential object and the same settings', async (t) => {
+    const { createAbapConnection } = actual;
     const credential = new BasicAuthProvider('user', 'secret');
     const settings = {
       url: 'https://sap.example.invalid',
@@ -162,23 +184,23 @@ describe('openFreshConnection', () => {
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     useRealFactory = true;
     const original = createAbapConnection(settings, credential) as any;
-    const connect = jest
-      .spyOn(Object.getPrototypeOf(Object.getPrototypeOf(original)), 'connect')
-      .mockResolvedValue(undefined);
+    const connect = t.mock.method(
+      Object.getPrototypeOf(Object.getPrototypeOf(original)),
+      'connect',
+      async () => undefined,
+    );
 
     const fresh = (await openFreshConnection(original, undefined)) as any;
 
-    expect(fresh).not.toBe(original);
-    expect(fresh.credential).toBe(credential);
-    expect(fresh.getConfig()).toEqual(settings);
-    expect(connect).toHaveBeenCalled();
-    connect.mockRestore();
+    assert.notEqual(fresh, original);
+    assert.equal(fresh.credential, credential);
+    assert.deepStrictEqual(fresh.getConfig(), settings);
+    assert.ok(connect.mock.callCount() > 0);
+    connect.mock.restore();
   });
 
-  it('closes a sibling whose connect fails, and answers the failure', async () => {
-    const { createAbapConnection } = jest.requireActual(
-      '../../lib/connectionFactory',
-    ) as typeof import('../../lib/connectionFactory');
+  it('closes a sibling whose connect fails, and answers the failure', async (t) => {
+    const { createAbapConnection } = actual;
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     useRealFactory = true;
     const original = createAbapConnection(
@@ -198,27 +220,27 @@ describe('openFreshConnection', () => {
       return proto;
     };
     const refusal = new Error('the logon failed');
-    const connect = jest
-      .spyOn(ownerOf('connect'), 'connect')
-      .mockRejectedValue(refusal);
+    const connect = t.mock.method(ownerOf('connect'), 'connect', async () => {
+      throw refusal;
+    });
     const closed: unknown[] = [];
-    const disconnect = jest
-      .spyOn(ownerOf('disconnect'), 'disconnect')
-      .mockImplementation(async function (this: unknown) {
+    const disconnect = t.mock.method(
+      ownerOf('disconnect'),
+      'disconnect',
+      async function (this: unknown) {
         closed.push(this);
-      });
+      },
+    );
 
     try {
-      const failed = expect(
-        openFreshConnection(original, undefined),
-      ).rejects.toBe(refusal);
-      await failed;
-      expect(connect).toHaveBeenCalledTimes(1);
-      expect(closed).toHaveLength(1);
-      expect(closed[0]).not.toBe(original);
+      const failed = rejectionOf(openFreshConnection(original, undefined));
+      assert.equal(await failed, refusal);
+      assert.equal(connect.mock.callCount(), 1);
+      assert.equal(closed.length, 1);
+      assert.notEqual(closed[0], original);
     } finally {
-      connect.mockRestore();
-      disconnect.mockRestore();
+      connect.mock.restore();
+      disconnect.mock.restore();
     }
   });
 
@@ -233,46 +255,44 @@ describe('openFreshConnection', () => {
     };
     const foreign = { getConfig: () => config, config } as any;
 
-    const refused = expect(
-      openFreshConnection(foreign, undefined),
-    ).rejects.toMatchObject({
+    const refused = rejectionOf(openFreshConnection(foreign, undefined));
+    assertMatchObject(await refused, {
       serverRefusal: 'fresh_connection_unavailable',
     });
-    await refused;
 
-    expect(opened).toHaveLength(0);
+    assert.equal(opened.length, 0);
   });
 
   it('takes a host’s connection from its factory, connects it, and builds nothing', async () => {
     opened.length = 0;
     const foreign = { getConfig: () => ({ connectionType: 'rfc' }) } as any;
     const handed = {
-      connect: jest.fn(async () => {}),
-      disconnect: jest.fn(async () => {}),
+      connect: mock.fn(async () => {}),
+      disconnect: mock.fn(async () => {}),
     };
-    const factory = jest.fn(async () => handed as any);
+    const factory = mock.fn(async () => handed as any);
     registerFreshConnectionFactory(foreign, factory);
 
     const fresh = await openFreshConnection(foreign, undefined);
 
-    expect(fresh).toBe(handed);
-    expect(handed.connect).toHaveBeenCalledTimes(1);
-    expect(factory).toHaveBeenCalledWith();
-    expect(opened).toHaveLength(0);
+    assert.equal(fresh, handed);
+    assert.equal(handed.connect.mock.callCount(), 1);
+    assert.ok(
+      factory.mock.calls.some((c) => isDeepStrictEqual(c.arguments, [])),
+    );
+    assert.equal(opened.length, 0);
   });
 
   it('forgets a host’s factory when the connection is registered again without one', async () => {
     const foreign = {} as any;
-    const factory = jest.fn(async () => ({}) as any);
+    const factory = mock.fn(async () => ({}) as any);
     registerFreshConnectionFactory(foreign, factory);
     registerFreshConnectionFactory(foreign, undefined);
 
-    const refused = expect(
-      openFreshConnection(foreign, undefined),
-    ).rejects.toMatchObject({
+    const refused = rejectionOf(openFreshConnection(foreign, undefined));
+    assertMatchObject(await refused, {
       serverRefusal: 'fresh_connection_unavailable',
     });
-    await refused;
-    expect(factory).not.toHaveBeenCalled();
+    assert.equal(factory.mock.callCount(), 0);
   });
 });

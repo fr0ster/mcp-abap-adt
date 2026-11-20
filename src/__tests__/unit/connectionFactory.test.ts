@@ -4,6 +4,9 @@
  * holds is the object it was given — never one built from the settings.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   AdtCloudConnector,
@@ -22,6 +25,7 @@ import {
   createAbapConnection,
   resolveSystemKind,
 } from '../../lib/connectionFactory';
+import { assertThrows } from '../helpers/assertions';
 
 const settings = (
   extra: Partial<Pick<SapHttpConfig, 'authType'>> = {},
@@ -44,17 +48,17 @@ describe('createAbapConnection', () => {
   it('builds the cloud connector on the cloud transport, holding the given credential', () => {
     process.env.SAP_SYSTEM_TYPE = 'cloud';
     const connection = createAbapConnection(settings(), credential) as any;
-    expect(connection).toBeInstanceOf(AdtCloudConnector);
-    expect(connection.transport).toBeInstanceOf(CloudHttpTransport);
-    expect(connection.credential).toBe(credential);
+    assert.ok(connection instanceof AdtCloudConnector);
+    assert.ok(connection.transport instanceof CloudHttpTransport);
+    assert.equal(connection.credential, credential);
   });
 
   it('builds the on-premise connector on the HTTP transport, holding the given credential', () => {
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     const connection = createAbapConnection(settings(), credential) as any;
-    expect(connection).toBeInstanceOf(AdtOnPremConnector);
-    expect(connection.transport).toBeInstanceOf(OnPremHttpTransport);
-    expect(connection.credential).toBe(credential);
+    assert.ok(connection instanceof AdtOnPremConnector);
+    assert.ok(connection.transport instanceof OnPremHttpTransport);
+    assert.equal(connection.credential, credential);
   });
 
   it('builds the on-premise connector on the RFC transport when the connection type is rfc', () => {
@@ -70,9 +74,9 @@ describe('createAbapConnection', () => {
       },
       credential,
     ) as any;
-    expect(connection).toBeInstanceOf(AdtOnPremConnector);
-    expect(connection.transport).toBeInstanceOf(RfcTransport);
-    expect(connection.credential).toBe(credential);
+    assert.ok(connection instanceof AdtOnPremConnector);
+    assert.ok(connection.transport instanceof RfcTransport);
+    assert.equal(connection.credential, credential);
   });
 
   it('holds the given credential whatever authType says', () => {
@@ -81,7 +85,7 @@ describe('createAbapConnection', () => {
       settings({ authType: 'jwt' }),
       credential,
     ) as any;
-    expect(connection.credential).toBe(credential);
+    assert.equal(connection.credential, credential);
     const cloud = (() => {
       process.env.SAP_SYSTEM_TYPE = 'cloud';
       return createAbapConnection(
@@ -89,55 +93,61 @@ describe('createAbapConnection', () => {
         credential,
       ) as any;
     })();
-    expect(cloud.credential).toBe(credential);
+    assert.equal(cloud.credential, credential);
   });
 });
 
 describe('resolveSystemKind', () => {
   it('lets SAP_SYSTEM_TYPE win over the auth type', () => {
-    expect(
+    assert.equal(
       resolveSystemKind(settings({ authType: 'jwt' }), {
         SAP_SYSTEM_TYPE: 'onprem',
       }),
-    ).toBe('onprem');
-    expect(
+      'onprem',
+    );
+    assert.equal(
       resolveSystemKind(settings({ authType: 'jwt' }), {
         SAP_SYSTEM_TYPE: 'legacy',
       }),
-    ).toBe('onprem');
-    expect(
+      'onprem',
+    );
+    assert.equal(
       resolveSystemKind(settings({ authType: 'basic' }), {
         SAP_SYSTEM_TYPE: 'cloud',
       }),
-    ).toBe('cloud');
+      'cloud',
+    );
   });
 
-  it.each([
+  for (const [_what, authType, declared] of [
     ['nothing declared, a jwt', 'jwt', undefined],
     ['nothing declared, basic', 'basic', undefined],
     ['a blank value', 'jwt', '  '],
     ['a value of no kind', 'basic', 'abap-cloud'],
-  ] as const)(
-    'is required, never guessed: %s is system_type_required',
-    (_what, authType, declared) => {
-      const thrown = (() => {
-        try {
-          resolveSystemKind(
-            settings({ authType }),
-            declared === undefined ? {} : { SAP_SYSTEM_TYPE: declared },
-          );
-        } catch (error) {
-          return error;
-        }
-        return undefined;
-      })();
-      expect(thrown).toBeInstanceOf(ServerRefusal);
-      expect((thrown as ServerRefusal).serverRefusal).toBe(
-        'system_type_required',
-      );
-      expect((thrown as Error).message).toBe(SYSTEM_TYPE_REQUIRED_WORDS);
-    },
-  );
+  ] as const) {
+    it(
+      format('is required, never guessed: %s is system_type_required', _what),
+      () => {
+        const thrown = (() => {
+          try {
+            resolveSystemKind(
+              settings({ authType }),
+              declared === undefined ? {} : { SAP_SYSTEM_TYPE: declared },
+            );
+          } catch (error) {
+            return error;
+          }
+          return undefined;
+        })();
+        assert.ok(thrown instanceof ServerRefusal);
+        assert.equal(
+          (thrown as ServerRefusal).serverRefusal,
+          'system_type_required',
+        );
+        assert.equal((thrown as Error).message, SYSTEM_TYPE_REQUIRED_WORDS);
+      },
+    );
+  }
 });
 
 describe('createAbapConnection without a stated kind', () => {
@@ -147,16 +157,23 @@ describe('createAbapConnection without a stated kind', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
-  it.each(['jwt', 'basic'] as const)(
-    'a %s destination is refused system_type_required, before any connector is built',
-    (authType) => {
-      delete process.env.SAP_SYSTEM_TYPE;
-      expect(() =>
-        createAbapConnection(
-          settings({ authType }),
-          new BasicAuthProvider('user', 'secret') as IAuthProvider,
-        ),
-      ).toThrow(SYSTEM_TYPE_REQUIRED_WORDS);
-    },
-  );
+  for (const authType of ['jwt', 'basic'] as const) {
+    it(
+      format(
+        'a %s destination is refused system_type_required, before any connector is built',
+        authType,
+      ),
+      () => {
+        delete process.env.SAP_SYSTEM_TYPE;
+        assertThrows(
+          () =>
+            createAbapConnection(
+              settings({ authType }),
+              new BasicAuthProvider('user', 'secret') as IAuthProvider,
+            ),
+          SYSTEM_TYPE_REQUIRED_WORDS,
+        );
+      },
+    );
+  }
 });

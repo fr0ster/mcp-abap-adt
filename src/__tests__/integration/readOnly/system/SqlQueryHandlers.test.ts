@@ -8,7 +8,7 @@
  *   DEBUG_ADT_LIBS=true        - Library logs
  *   DEBUG_CONNECTORS=true      - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/readOnly/system/SqlQuery
+ * Run: npm run test:integration -- src/__tests__/integration/readOnly/system/SqlQueryHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

@@ -12,6 +12,8 @@
  *   today's program reads and checks, and nothing more.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { listedTool, statedEnvironment } from '../../../lib/listedTool';
 import { resetSystemContextCache } from '../../../lib/systemContext';
@@ -216,13 +218,16 @@ describe('an on-premise system with a JWT credential', () => {
   it('onprem stated: the program tools are listed', async () => {
     const listed = listedNames('onprem');
     for (const tool of ['CreateProgram', 'UpdateProgram', 'ActivateProgram']) {
-      expect({ tool, listed: listed.has(tool) }).toEqual({
-        tool,
-        listed: true,
-      });
+      assert.deepStrictEqual(
+        { tool, listed: listed.has(tool) },
+        {
+          tool,
+          listed: true,
+        },
+      );
     }
     for (const tool of ['HandlerCreate', 'HandlerUpdate', 'HandlerActivate']) {
-      expect(objectTypes(tool, 'onprem')).toContain('PROGRAM');
+      assert.ok(objectTypes(tool, 'onprem').includes('PROGRAM'));
     }
   });
 });
@@ -243,10 +248,13 @@ describe('a cloud system with a basic credential', () => {
       'RuntimeRunProgram',
       'GetMainPrograms',
     ]) {
-      expect({ tool, listed: listed.has(tool) }).toEqual({
-        tool,
-        listed: false,
-      });
+      assert.deepStrictEqual(
+        { tool, listed: listed.has(tool) },
+        {
+          tool,
+          listed: false,
+        },
+      );
     }
     for (const tool of [
       'GetProgram',
@@ -256,10 +264,13 @@ describe('a cloud system with a basic credential', () => {
       'CheckProgram',
       'RunProgramUnitTest',
     ]) {
-      expect({ tool, listed: listed.has(tool) }).toEqual({
-        tool,
-        listed: true,
-      });
+      assert.deepStrictEqual(
+        { tool, listed: listed.has(tool) },
+        {
+          tool,
+          listed: true,
+        },
+      );
     }
     for (const tool of [
       'HandlerCreate',
@@ -270,20 +281,26 @@ describe('a cloud system with a basic credential', () => {
       'HandlerValidate',
       'HandlerDelete',
     ]) {
-      expect({
-        tool,
-        program: objectTypes(tool, 'cloud').includes('PROGRAM'),
-      }).toEqual({ tool, program: false });
+      assert.deepStrictEqual(
+        {
+          tool,
+          program: objectTypes(tool, 'cloud').includes('PROGRAM'),
+        },
+        { tool, program: false },
+      );
     }
     for (const tool of [
       'HandlerGet',
       'HandlerCheckRun',
       'HandlerDeletionCheck',
     ]) {
-      expect({
-        tool,
-        program: objectTypes(tool, 'cloud').includes('PROGRAM'),
-      }).toEqual({ tool, program: true });
+      assert.deepStrictEqual(
+        {
+          tool,
+          program: objectTypes(tool, 'cloud').includes('PROGRAM'),
+        },
+        { tool, program: true },
+      );
     }
   });
 
@@ -305,10 +322,12 @@ describe('a cloud system with a basic credential', () => {
       expected: 'none',
       ran: (answer) => {
         const text = answer.content[0]?.text ?? '';
-        expect(text).toContain(
-          'Input validation error: Invalid arguments for tool HandlerCreate: ',
+        assert.ok(
+          text.includes(
+            'Input validation error: Invalid arguments for tool HandlerCreate: ',
+          ),
         );
-        expect(text).toContain('at object_type');
+        assert.ok(text.includes('at object_type'));
       },
     });
   });

@@ -8,6 +8,9 @@
  * On the batch stand-in (`helpers/searchSourceStand.ts`): real handler, real
  * clients, real `AdtBatchConnection`; only the connection is a fake.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { READS_PER_ENVELOPE } from '../../../lib/search-source/orchestrator';
 import {
   type Fake,
@@ -132,47 +135,48 @@ const answeredNames = (result: unknown) => [
 
 describe('SearchSource: source reads in envelopes of at most 300', () => {
   it('the envelope bound is 300', () => {
-    expect(READS_PER_ENVELOPE).toBe(300);
+    assert.equal(READS_PER_ENVELOPE, 300);
   });
 
   it('650 one-read targets go as 300 + 300 + 50 reads, in target order', async () => {
     const fake = on(programs(650));
     const result = await search(fake, ['ZBIG']);
     // The walk: the root node, then its type node.
-    expect(fake.envelopes.slice(0, 2).map(partKeys)).toEqual([
+    assert.deepStrictEqual(fake.envelopes.slice(0, 2).map(partKeys), [
       [nodeKey('ZBIG')],
       [nodeKey('ZBIG', '20')],
     ]);
-    expect(sourceSizes(fake, 2)).toEqual([300, 300, 50]);
-    expect(
+    assert.deepStrictEqual(sourceSizes(fake, 2), [300, 300, 50]);
+    assert.deepStrictEqual(
       fake.envelopes
         .slice(2)
         .flatMap(partKeys)
         .map((k) => k.slice('PROGRAM '.length)),
-    ).toEqual(Array.from({ length: 650 }, (_, i) => `ZP${pad(i)}`));
+      Array.from({ length: 650 }, (_, i) => `ZP${pad(i)}`),
+    );
     const p = payloadOf(result);
-    expect(p.results).toHaveLength(650);
-    expect(p.scanned.objects).toBe(650);
-    expect(p.truncated).toEqual({ by_object_cap: false });
+    assert.equal(p.results.length, 650);
+    assert.equal(p.scanned.objects, 650);
+    assert.deepStrictEqual(p.truncated, { by_object_cap: false });
   });
 
   it("a function group's second round of 400 reads goes as 300 + 100; nothing dropped", async () => {
     const fake = on(bigGroup());
     const result = await search(fake, ['ZFGP'], { max_hits_per_object: 1000 });
-    expect(sourceSizes(fake, 2)).toEqual([1, 300, 100]);
-    expect(partKeys(fake.envelopes[2])).toEqual(['STRUCTURE ZFG_BIG']);
-    expect(new Set(fake.envelopes.slice(3).flatMap(partKeys)).size).toBe(400);
-    expect(payloadOf(result).results).toHaveLength(400);
+    assert.deepStrictEqual(sourceSizes(fake, 2), [1, 300, 100]);
+    assert.deepStrictEqual(partKeys(fake.envelopes[2]), ['STRUCTURE ZFG_BIG']);
+    assert.equal(new Set(fake.envelopes.slice(3).flatMap(partKeys)).size, 400);
+    assert.equal(payloadOf(result).results.length, 400);
   });
 
   it('the hits over envelopes are the hits of the same targets read one by one', async () => {
     const batched = await search(on(programs(650)), ['ZBIG']);
     const sequential = await search(on(programs(650)), ['ZBIG'], {}, true);
-    expect(textOf(batched)).toBe(textOf(sequential));
+    assert.equal(textOf(batched), textOf(sequential));
     const all = { max_hits_per_object: 1000 };
     const group = await search(on(bigGroup()), ['ZFGP'], all);
     const groupSequential = await search(on(bigGroup()), ['ZFGP'], all, true);
-    expect(payloadOf(group).results).toHaveLength(400);
-    expect(textOf(group)).toBe(textOf(groupSequential));
+    assert.equal(payloadOf(group).results.length, 400);
+    assert.equal(textOf(group), textOf(groupSequential));
   });
 });

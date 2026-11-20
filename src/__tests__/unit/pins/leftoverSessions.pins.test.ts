@@ -15,6 +15,8 @@
  * that variant.
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe } from 'node:test';
 import type { McpResult } from '../../helpers/pinCases';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 
@@ -30,7 +32,7 @@ function sessionsOf(answer: McpResult): unknown[] {
 
 /** A list answered the one session left behind. */
 function expectOneLeft(answer: McpResult): void {
-  expect(sessionsOf(answer)).toHaveLength(1);
+  assert.equal(sessionsOf(answer).length, 1);
 }
 
 /**
@@ -39,11 +41,11 @@ function expectOneLeft(answer: McpResult): void {
  */
 function statedAs(variant: 'onprem' | 'cloud'): void {
   let previous: string | undefined;
-  beforeAll(() => {
+  before(() => {
     previous = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = variant;
   });
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
   });

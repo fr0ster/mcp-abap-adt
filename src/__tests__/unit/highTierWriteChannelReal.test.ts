@@ -36,6 +36,8 @@
  * task's own writes.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleCreateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
@@ -416,15 +418,18 @@ const cases: ChannelCase[] = [
     run: (marker, connection) =>
       handleCreateTransport(ctx(connection) as any, { description: marker }),
     extraChecks: (_marker, requests) => {
-      expect(requests.map((r) => `${r.method} ${r.url.split('?')[0]}`)).toEqual(
+      assert.deepStrictEqual(
+        requests.map((r) => `${r.method} ${r.url.split('?')[0]}`),
         [
           'POST /sap/bc/adt/cts/transportrequests',
           'GET /sap/bc/adt/cts/transportrequests/SIDK900123',
           'PUT /sap/bc/adt/cts/transportrequests/TRLK900439',
         ],
       );
-      expect(String(requests[2]?.data ?? '')).toContain(
-        'tm:useraction="changetasktype"',
+      assert.ok(
+        String(requests[2]?.data ?? '').includes(
+          'tm:useraction="changetasktype"',
+        ),
       );
     },
   },
@@ -487,12 +492,13 @@ const cases: ChannelCase[] = [
       const bindingRequests = requests.filter((r) =>
         r.url.toLowerCase().includes('/sap/bc/adt/businessservices/bindings'),
       );
-      expect(
+      assert.equal(
         bindingRequests.some(
           (r) =>
             (r.params as { corrNr?: string } | undefined)?.corrNr === marker,
         ),
-      ).toBe(true);
+        true,
+      );
     },
   },
   {
@@ -538,9 +544,8 @@ describe('every write in task 20 and task 23 lands where its shipped member send
   });
   afterEach(() => resetSystemContextCache());
 
-  it.each(cases)(
-    '$name reaches $urlContains and carries the marker',
-    async (c) => {
+  for (const c of cases) {
+    it(`${c.name} reaches ${c.urlContains} and carries the marker`, async () => {
       // Bounded well under the 60-character SAP ADT description limit
       // (`limitDescription`, confirmed in `core/class/create.js` and its
       // structure/table siblings) — a truncated marker would silently pass by
@@ -554,18 +559,22 @@ describe('every write in task 20 and task 23 lands where its shipped member send
 
       const result: any = await c.run(marker, conn);
 
-      expect(result?.isError).toBe(false);
+      assert.equal(result?.isError, false);
 
       const hit = landedIn(conn.requests, marker);
-      expect(hit.length).toBeGreaterThan(0);
-      expect(hit.some((r) => r.method === c.method)).toBe(true);
-      expect(
+      assert.ok(hit.length > 0);
+      assert.equal(
+        hit.some((r) => r.method === c.method),
+        true,
+      );
+      assert.equal(
         hit.some((r) =>
           r.url.toLowerCase().includes(c.urlContains.toLowerCase()),
         ),
-      ).toBe(true);
+        true,
+      );
 
       c.extraChecks?.(marker, conn.requests);
-    },
-  );
+    });
+  }
 });

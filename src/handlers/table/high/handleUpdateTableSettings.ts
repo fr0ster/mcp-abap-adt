@@ -61,7 +61,7 @@ import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { byVariant } from '../../../lib/variantDefinition';
 
 const DESCRIPTION =
-  'Writes technical settings of the existing database table named by table_name: each setting given replaces the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.';
+  'Writes technical settings of the existing database table named by table_name: each setting given is written over the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.';
 
 /** The settings an update may name, on every system kind. */
 const SETTINGS_SHAPE = {
@@ -122,7 +122,7 @@ const AMDP_FLAG = z
   .boolean()
   .optional()
   .describe(
-    'true allows AMDP writes to the table; activation then needs buffering N, logging off and no replacement object.',
+    'true allows AMDP writes to the table; activation then needs buffering N, logging off and the table free of a replacement object.',
   );
 
 /** The fields every variant's schema ends with. */

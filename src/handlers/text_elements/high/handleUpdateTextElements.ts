@@ -72,7 +72,7 @@ import {
 } from '../textElementsShared';
 
 const DESCRIPTION =
-  "Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given replaces that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers whether SAP saved each part and, when activated, whether SAP activated them, with its messages.";
+  "Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers whether SAP saved each part and, when activated, whether SAP activated them, with its messages.";
 
 const SYMBOLS = z
   .array(

@@ -62,7 +62,21 @@ export const TOOL_DEFINITION = {
 
 type ReadTransportObjectsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-/** One entry, as this tool answers it. */
+/**
+ * One entry of the terse answer: `pgmid` `R3TR` where SAP gave none, and
+ * `position` `null` where SAP gave none.
+ */
+export interface ReadTransportEntry {
+  pgmid: string;
+  type: string;
+  name: string;
+  position: string | null;
+  task?: string;
+  description?: string;
+  lock_status?: string;
+}
+
+/** One entry, as this tool reads it. */
 interface Entry {
   name: string;
   type: string;
@@ -156,18 +170,20 @@ export async function handleReadTransportObjects(
       success: true,
       transport_number: args.transport_number,
       count: entries.length,
-      objects: entries.map((entry) => ({
-        pgmid: entry.pgmid ?? 'R3TR',
-        type: entry.type,
-        name: entry.name,
-        // Optional, and said so: an entry the server described without one
-        // cannot be removed, and inventing an empty string would produce a
-        // call that answers 200 and removes nothing.
-        position: entry.position ?? null,
-        ...(entry.task ? { task: entry.task } : {}),
-        ...(entry.description ? { description: entry.description } : {}),
-        ...(entry.lockStatus ? { lock_status: entry.lockStatus } : {}),
-      })),
+      objects: entries.map(
+        (entry): ReadTransportEntry => ({
+          pgmid: entry.pgmid ?? 'R3TR',
+          type: entry.type,
+          name: entry.name,
+          // Optional, and said so: an entry the server described without one
+          // cannot be removed, and inventing an empty string would produce a
+          // call that answers 200 and removes nothing.
+          position: entry.position ?? null,
+          ...(entry.task ? { task: entry.task } : {}),
+          ...(entry.description ? { description: entry.description } : {}),
+          ...(entry.lockStatus ? { lock_status: entry.lockStatus } : {}),
+        }),
+      ),
     };
   };
 

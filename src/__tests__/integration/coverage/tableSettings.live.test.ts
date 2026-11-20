@@ -151,7 +151,7 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
       object_name: TABLE,
       lock_handle: handle,
     });
-    lockReleased(String(handle));
+    if (unlocked.isError !== true) lockReleased(String(handle));
     succeeded('HandlerUpdate TABLE_SETTINGS', written);
     succeeded('HandlerUnlock TABLE_SETTINGS', unlocked);
     succeeded(

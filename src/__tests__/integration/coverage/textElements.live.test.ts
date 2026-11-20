@@ -367,7 +367,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       object_name: N.program,
       lock_handle: handle,
     });
-    lockReleased(String(handle));
+    if (unlocked.isError !== true) lockReleased(String(handle));
     succeeded('HandlerUpdate PROGRAM_TEXT_ELEMENTS', written);
     succeeded('HandlerUnlock PROGRAM_TEXT_ELEMENTS', unlocked);
     succeeded(
@@ -420,7 +420,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       object_name: N.group,
       lock_handle: handle,
     });
-    lockReleased(String(handle));
+    if (unlocked.isError !== true) lockReleased(String(handle));
     succeeded('HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS', written);
     succeeded('HandlerUnlock FUNCTION_GROUP_TEXT_ELEMENTS', unlocked);
     succeeded(
@@ -473,7 +473,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       object_name: N.class,
       lock_handle: handle,
     });
-    lockReleased(String(handle));
+    if (unlocked.isError !== true) lockReleased(String(handle));
     succeeded('HandlerUpdate CLASS_TEXT_ELEMENTS', written);
     succeeded('HandlerUnlock CLASS_TEXT_ELEMENTS', unlocked);
     succeeded(

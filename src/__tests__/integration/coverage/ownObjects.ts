@@ -13,6 +13,7 @@ import {
   resolvePackageName,
   resolveTransportRequest,
 } from '../helpers/configHelpers';
+import { HeldLiveLocks, type HeldLock } from '../helpers/heldLiveLocks';
 import { type LiveAnswer, livePrepare } from '../helpers/live';
 import { CREATION_PACKAGES } from '../helpers/packageGuard';
 
@@ -69,32 +70,27 @@ export function payloadOf(answer: LiveAnswer): unknown {
   return JSON.parse(answer.text);
 }
 
-/** A compact lock a case holds: released by its unlock, or by the suite's end. */
-interface HeldLock {
-  readonly object_type: string;
-  readonly object_name: string;
-  readonly lock_handle: string;
-}
+/** The compact locks the suites' cases hold until SAP answers their unlock. */
+const heldLocks = new HeldLiveLocks();
 
-const held: HeldLock[] = [];
-
-/** Records a lock handle the case now holds, until its unlock is sent. */
+/** Records a lock handle the case now holds. */
 export function holdLock(lock: HeldLock): void {
-  held.push(lock);
+  heldLocks.hold(lock);
 }
 
-/** The case sent the unlock of `handle`: the suite's end sends none. */
+/** SAP answered the case's unlock of `handle` with a success. */
 export function lockReleased(handle: string): void {
-  const at = held.findIndex((lock) => lock.lock_handle === handle);
-  if (at >= 0) held.splice(at, 1);
+  heldLocks.released(handle);
 }
 
 /**
- * The unlock of every lock a case still holds — one whose write threw before
- * its own unlock was sent — sent at the suite's end.
+ * The unlock of every lock a case still holds, each attempted whatever the
+ * others answered; a lock SAP still holds is named in the suite's output,
+ * and the suite goes on to its deletions.
  */
 export async function releaseHeldLocks(): Promise<void> {
-  for (const lock of held.splice(0)) {
-    await livePrepare('HandlerUnlock', { ...lock });
-  }
+  await heldLocks.releaseAll(
+    (lock) => livePrepare('HandlerUnlock', { ...lock }),
+    (line) => console.log(`[held locks] ${line}`),
+  );
 }

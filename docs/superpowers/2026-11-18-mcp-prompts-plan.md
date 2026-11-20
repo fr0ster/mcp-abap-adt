@@ -13,7 +13,8 @@ source from the `listedTool` results it already computes and registers the promp
 
 **Tech Stack:** TypeScript, zod 4.6.7, `@modelcontextprotocol/sdk` 1.32.1
 (`registerPrompt`, `completable`, `McpError`). Tests run on node:test with
-node:assert/strict (`tools/node-test-files.json`, `tools/run-tests.mjs`).
+node:assert/strict (`tools/run-tests.mjs`; the selection is a walk, `tools/node-test-list.mjs`,
+held to git by `src/__tests__/unit/runner/selection.test.ts`).
 
 **Spec:** `docs/superpowers/2026-11-18-mcp-prompts-spec.md`. Its §0 decisions bind this
 plan.
@@ -28,9 +29,10 @@ plan.
 - A value is typed by its contract (`ToolDefinition`, `VariantToolDefinition`,
   `z.input<…>`). It is never held as `unknown` and narrowed by hand.
 - Prompt, argument and tool descriptions are functional only, with no negations.
-- New test files use node:test and node:assert/strict, and each is added to
-  `tools/node-test-files.json` in sorted position. An existing Jest file that must change is
-  changed in place.
+- Every test file is node:test with node:assert/strict. A new one is a `….test.ts` under a
+  `__tests__` directory of the root `src` or of a package's `src`: the runner's walk
+  selects it, and there is no list to register it in. After creating one, check that
+  `npm test -- --list` prints its path.
 - Use npm scripts only. No npx, npm exec, `node_modules/.bin`, `node -e`, ts-node or a
   `timeout` wrapper.
 - Run one file with `npm test -- <path>`. Run the whole unit run only through the CI gate
@@ -94,6 +96,32 @@ decide it.
   exports, so nothing there changes. The new subpath goes into the root `package.json`
   `exports` and `tsconfig.paths.json`.
 
+## Open for the owner: the types 24.1.0 added (measured 2026-11-20)
+
+24.1.0 added four compact types and four full-set tools after the spec's measurements
+(spec §1.4 and §6 were counted on `8a9ed531`). **Measured** from today's
+`tests/fixtures/tools/listed-schemas.json` (compact stdio binary):
+
+- `HandlerGet` gains `TABLE_SETTINGS`, `PROGRAM_TEXT_ELEMENTS`,
+  `FUNCTION_GROUP_TEXT_ELEMENTS`, `CLASS_TEXT_ELEMENTS` (29 members on both kinds);
+  `HandlerUpdate` gains all four on onprem (28) and three on cloud, no program text
+  elements (25); `HandlerLock` the same four / three; `HandlerActivate` the three text
+  elements types on both kinds (21 / 19); `HandlerCreate`, `HandlerDelete` and
+  `HandlerCheckRun` are unchanged.
+- The full set serves them only through `GetTableSettings`, `UpdateTableSettings`,
+  `GetTextElements`, `UpdateTextElements` (one tool for three object kinds) and
+  `ActivateObjects` with `PROG/PX` / `CLAS/OCX`: no `<Operation><Type>` tool, so no full row
+  of spec §3.3's shape `{ tool, name }` can express them.
+- `GetWhereUsed` and `HandlerSystem` `where_used` take `PROG/PX` with a required
+  `container`; spec §2.4's `WHERE_USED_AS` holds 17 types without it.
+
+Spec §2.2 reads the compact vocabulary off each compact tool's members, which would take the
+four types into compact `get`, `update` and `activate` and change §6's counts; its premise
+("compact already names every type the six operations share") and owner decision 5 (types
+only one family has stay out) no longer agree for them. The spec does not decide it, so no
+task does: Tasks 3.1, 3.2, 3.4 and 5 start only after the owner's answer, and spec §6's
+served counts, which their assertions read, are re-counted on today's fixture under it.
+
 ## Review Focus
 
 These five inputs or failure modes are the most likely to bite, and no other test covers
@@ -129,20 +157,20 @@ them. The task that owns each one adds its test.
 ## Task 0: the CI gate copy (no commit)
 
 - [ ] Copy
-  `/tmp/claude-1000/-home-okyslytsia-prj-mcp-abap-adt-auth-providers/45cadf6b-c51e-4279-b008-585c7d322d82/scratchpad/ci.sh`
+  `/tmp/claude-1000/-home-okyslytsia-prj-mcp-abap-adt-auth-providers/45cadf6b-c51e-4279-b008-585c7d322d82/scratchpad/ci-node-test-rest.sh`
   to `ci-mcp-prompts.sh` in the same scratchpad directory, with three changes:
   - `cd /home/okyslytsia/prj/mcp-abap-adt/.worktrees/mcp-prompts`;
-  - the aside file is `$S/test-config.yaml.mcp-prompts.aside`, in both the `mv` and the
+  - the aside file is `$S/test-config.yaml.aside-mcp-prompts`, in both the `mv` and the
     `trap`;
-  - the step log is `$S/step-mcp-prompts.log`.
+  - the step log is `$S/step-mcp-prompts.log`, in both places it is named.
   Every step stays as it is.
-- [ ] Run it once on `48081ff1`.
-  **Expected:** each step except the audit is green; the only `FAILED:` line is
-  `npm audit --audit-level=moderate` (GHSA-fc5q-39xc-vjpf, picomatch, dev-only); the run
-  ends `DONE fail=1`.
+- [ ] Run it detached (`~/.claude/scripts/start-detached <log> bash ci-mcp-prompts.sh`) and
+  wait on its PID (`~/.claude/scripts/wait-pid`).
+  **Expected:** every step is green; the run ends `DONE fail=0`.
 
-**The gate:** before every commit below, run `ci-mcp-prompts.sh`. Commit only when its one
-`FAILED:` line is the audit.
+**The gate:** before every commit below, run `ci-mcp-prompts.sh`. Commit only when it ends
+`DONE fail=0`. The pre-commit hook (`biome check --staged`, then the build) runs on every
+commit; it is never skipped.
 
 ---
 
@@ -181,9 +209,11 @@ them. The task that owns each one adds its test.
 ### 1.2 Search texts follow the actions left
 
 **Files:** `tools/tool-search.json` (the `HandlerSystem` entry),
-`src/lib/toolSearch/index.ts`, `src/__tests__/unit/toolSearch/semanticItems.test.ts`
-(new, node:test), `src/__tests__/unit/access/withoutDenied.test.ts`,
-`src/__tests__/unit/toolSet/listedSchemas.test.ts` (Jest, changed in place).
+`src/lib/toolSearch/searchEntry.ts` (an entry's parser `entryOf` and renderer `rendered`,
+moved out of `index.ts` with no behaviour change in commit `4bd17f00b`),
+`src/__tests__/unit/toolSearch/semanticItems.test.ts` (new),
+`src/__tests__/unit/access/withoutDenied.test.ts`,
+`src/__tests__/unit/toolSet/listedSchemas.test.ts`.
 
 **Interfaces.** The table's format gains two optional fields. Every existing entry
 renders as before.
@@ -238,7 +268,7 @@ renders as before.
 
   With every action offered, this renders today's sentence byte for byte, serial comma
   included. The shared ATC phrase leaves once all three ATC actions are denied (spec §6a).
-- [ ] Implement `members` and `serial` in `src/lib/toolSearch/index.ts`. Both are parsed
+- [ ] Implement `members` and `serial` in `src/lib/toolSearch/searchEntry.ts`. Both are parsed
   once from the JSON, and the rendering stays plain string code.
 - [ ] Verify with `npm test -- src/__tests__/unit/access/withoutDenied.test.ts
   src/__tests__/unit/toolSearch/semanticItems.test.ts
@@ -257,8 +287,7 @@ renders as before.
 
 **Files:** `src/lib/compact/sourceless.ts` (new), `src/lib/compact/index.ts`,
 `compact-readonly-entries/src/handlers/compactPartRoutes.ts`,
-`compact-readonly-entries/src/__tests__/sourcelessParts.test.ts` (new, node:test),
-`tools/node-test-files.json`.
+`compact-readonly-entries/src/__tests__/sourcelessParts.test.ts` (new).
 
 **Interfaces.** Produces
 `export const SOURCELESS: ReadonlySet<CompactObjectType>` (`PACKAGE`, `DOMAIN`,
@@ -325,8 +354,7 @@ accessors. Every `compact…Description` uses them.
 - `src/__tests__/helpers/promptSources.ts`.
 
 **Files (changed):** root `package.json` (`exports["./prompts"]` →
-`dist/lib/prompts/index.*`), `tsconfig.paths.json` (`@mcp-abap-adt/lib/prompts`),
-`tools/node-test-files.json`.
+`dist/lib/prompts/index.*`), `tsconfig.paths.json` (`@mcp-abap-adt/lib/prompts`).
 
 **Interfaces.** Produces:
 - `PromptName = 'create' | 'get' | 'update' | 'delete' | 'activate' | 'check' | 'unit_test' | 'where_used' | 'transport'`;
@@ -708,7 +736,7 @@ target.
 - `src/__tests__/unit/prompts/promptRows.test.ts` (new): test 5;
 - `src/__tests__/unit/toolSet/fixtureBytes.test.ts`, where `listed-prompts.json` joins the
   byte check;
-- `src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts` (Jest, changed in place):
+- `src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts` (changed):
   test 7;
 - `tests/fixtures/tools/listed-prompts.json` and `tests/fixtures/tools/prompt-texts.json`,
   both new and written by their writers.
@@ -751,8 +779,7 @@ target.
 
 ## Task 5: every generated call parses against its tool's listed schema (test 14)
 
-**Files:** `src/__tests__/unit/prompts/promptCallsParse.test.ts` (new),
-`tools/node-test-files.json`.
+**Files:** `src/__tests__/unit/prompts/promptCallsParse.test.ts` (new).
 
 **Interfaces.** Consumes the `promptSource` and `listedPrompts` of a `BaseMcpServer`
 test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
@@ -854,7 +881,7 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
 - [ ] Extend `generate-tools-docs.js`, then run `npm run docs:tools`.
 - [ ] Write the hand-written sections in functional words only.
 - [ ] Verify with `npm test -- src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts`,
-  then run the gate. **Expected:** green except the audit.
+  then run the gate. **Expected:** `DONE fail=0`.
 - [ ] Commit `docs(prompts): the prompt page, the registration paths and the deny list`.
 
 **`CLAUDE.md` is the controller's.** The implementer does not edit it. The lines to propose
@@ -892,7 +919,7 @@ sibling ranges, `package-lock.json`, and every other place the previous minor bu
 - [ ] Bump every version and every sibling range to `<V>` in the places listed above.
   Regenerate the lockfile with `npm install --package-lock-only --ignore-scripts`. Check
   `package-lock.json` for `"link": true`: only the workspace siblings may carry it.
-- [ ] Verify with the gate. **Expected:** green except the audit; `npm run test:install`
+- [ ] Verify with the gate. **Expected:** `DONE fail=0`; `npm run test:install`
   passes.
 - [ ] Commit `release: <V> — MCP prompts`.
 

@@ -7,6 +7,34 @@ import * as z from 'zod';
 import { requiredText } from '../../lib/handlers/argumentRules';
 
 /** The settings an update may name, on every system kind. */
+/**
+ * The one buffering constraint of both boundaries (UpdateTableSettings and
+ * compact HandlerUpdate): `area_key_fields` goes beside type `G` or with no
+ * type given (the library's `ITableBufferingChange`; SAP reads the count
+ * only for a generic area, Code: `move_adt_to_ddv`, `schfeldanz` only `IF
+ * … pufferung = 'G'`).
+ */
+function bufferingRule(
+  buffering: {
+    type?: string | undefined;
+    area_key_fields?: number | undefined;
+  },
+  ctx: z.RefinementCtx,
+): void {
+  if (
+    buffering.area_key_fields !== undefined &&
+    buffering.type !== undefined &&
+    buffering.type !== 'G'
+  ) {
+    ctx.addIssue({
+      code: 'custom',
+      message:
+        'buffering.area_key_fields goes with buffering type G, or with no type given',
+      path: ['area_key_fields'],
+    });
+  }
+}
+
 export const SETTINGS_SHAPE = {
   table_name: requiredText('table_name is required').describe(
     'Table name. The table must already exist.',
@@ -43,6 +71,7 @@ export const SETTINGS_SHAPE = {
           'Number of key fields of a generic area; goes with type G, given here or stored.',
         ),
     })
+    .superRefine(bufferingRule)
     .optional()
     .describe('Buffering; each field given replaces the stored one.'),
   storage_type: z.string().optional().describe('Storage type.'),

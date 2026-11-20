@@ -265,6 +265,26 @@ describe("HandlerUpdate: the sub-resources under the caller's lock", () => {
     assert.ok(lines(requests)[1]?.includes(`lockHandle=${HANDLE}`));
   });
 
+  it('refuses area_key_fields beside a buffering type other than G, with nothing sent', async () => {
+    const { connection, requests } = system('onprem');
+    const args = {
+      object_type: 'TABLE_SETTINGS',
+      table_name: 'ZMCP_TS',
+      buffering: { type: 'P', area_key_fields: 2 },
+      lock_handle: HANDLE,
+    } as const;
+    assert.equal(HandlerUpdate.inputSchema.safeParse(args).success, false);
+    // The route parses with the same schema: refused as an input error.
+    await assert.rejects(
+      handleHandlerUpdate(
+        { connection, logger: undefined, heldLocks: holding(HANDLE) },
+        args,
+      ),
+      /area_key_fields goes with buffering type G/,
+    );
+    assert.deepEqual(requests, []);
+  });
+
   it('writes the text elements parts given, each one PUT under the handle, nothing else', async () => {
     const { connection, requests } = system('cloud');
     const result = await handleHandlerUpdate(

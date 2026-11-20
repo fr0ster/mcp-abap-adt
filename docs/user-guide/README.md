@@ -193,6 +193,19 @@ message about no object (`Activation was cancelled.`) carries its type and text.
 activation run (more than one object, or a type activated as a group) names the run's object it
 is about as `objectName` and `uri`, and its source as `source_uri` beside `position`.
 
+### Text elements
+
+A write of text elements (`UpdateTextElements` with `activate: false`) lands inactive beside its
+object, and an activation naming the object alone activates nothing: its answer lists the text
+elements in `still_inactive` (measured on premise). Name both: `PROG/PX` is a program's text
+elements, or with `parentName` a function group's; `CLAS/OCX` is a class's. Compact
+`HandlerActivate` names them `PROGRAM_TEXT_ELEMENTS`, `FUNCTION_GROUP_TEXT_ELEMENTS` and
+`CLASS_TEXT_ELEMENTS`; in compact the sequence is `HandlerLock`, `HandlerUpdate` (under the
+handle), `HandlerUnlock`, `HandlerActivate`, the same for `TABLE_SETTINGS` with the table
+activated as `TABLE`. `UpdateTextElements` with `activate: true` names both itself. Where-used of
+text elements is `GetWhereUsed` with `object_type: PROG/PX` and `container` (`program` or
+`function_group`).
+
 ## Package Tree Output
 
 `GetPackageTree` returns a package root with nested subpackages and a flat list of

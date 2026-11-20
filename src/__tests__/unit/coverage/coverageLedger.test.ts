@@ -139,8 +139,9 @@ describe('the coverage ledger guard', () => {
     // 24.0.0: GetObjectDraft, one more; BatchBegin, BatchEnd and
     // BatchAnswers left the full sets, three fewer; DebugBatchAnswers, one
     // more; compact HandlerSearch and HandlerWhereUsed left for
-    // HandlerSystem (D25), one fewer.
-    assert.equal(new Set(served.map((tool) => tool.name)).size, 311);
+    // HandlerSystem (D25), one fewer. A table's technical settings and the
+    // text elements: their reads and writes, four more.
+    assert.equal(new Set(served.map((tool) => tool.name)).size, 315);
     assertEquals(of(findings, 'served-mismatch'), []);
   });
 
@@ -197,6 +198,12 @@ describe('the coverage ledger guard', () => {
     // Adding one is a deliberate change: it is a key served on a system
     // where no live case runs, for the reason stated.
     assertEquals(reasonRows(readJson(LEDGER)), [
+      {
+        key: 'HandlerActivate#PROGRAM_TEXT_ELEMENTS',
+        kind: 'cloud',
+        reason:
+          "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is left inactive to activate",
+      },
       {
         key: 'HandlerTransportMoveObjects',
         kind: 'cloud',

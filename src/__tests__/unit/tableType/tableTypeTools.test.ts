@@ -831,17 +831,17 @@ describe('the definition SAP stored, read at a stated version', () => {
       undefined,
       undefined,
       { data: STORED_HASHED },
-      REFUSED,
     ]);
+    // SAP's refusal rejects, as the shipped connection rejects a non-2xx answer.
     const result = await handleCreateTableType(
-      { connection, logger: undefined },
+      { connection: throwingAt(connection, CHECK_URL), logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', access_type: 'hashed' },
     );
     assert.equal(result.isError, true);
     assert.equal(connection.requests.length, 8);
     assertMatchObject(answerOf(result), {
-      message: 'refused',
       status: 403,
+      raw_body: REFUSED.data,
       step: 'check',
       stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
@@ -903,19 +903,22 @@ describe('the definition SAP stored, read at a stated version', () => {
   });
 
   it('a write refused before the wait answers no stored definition', async () => {
-    const connection = sessionRecording([
-      undefined,
-      { data: STRING_TABLE },
-      REFUSED,
-    ]);
+    const connection = sessionRecording([undefined, { data: STRING_TABLE }]);
+    // SAP's refusal rejects, as the shipped connection rejects a non-2xx answer.
     const result = await handleUpdateTableType(
-      { connection, logger: undefined },
+      {
+        connection: throwingAt(
+          connection,
+          `${TTYP}/ztt_x?lockHandle=${HANDLE}`,
+        ),
+        logger: undefined,
+      },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },
     );
     assert.equal(result.isError, true);
     assert.equal(connection.requests.length, 4);
     const answered = answerOf(result);
-    assert.equal(answered.message, 'refused');
+    assertMatchObject(answered, { status: 403, raw_body: REFUSED.data });
     assertNoProperty(answered, 'stored_definition');
     assertNoProperty(answered, 'stored_definition_not_read');
     assertNoProperty(answered, 'stored_version');

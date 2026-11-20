@@ -251,6 +251,36 @@ const PUBLICATIONS: Array<[string, Record<string, unknown>]> = [
 
 const TYPES = [...DOCUMENTS, ...SOURCES, ...PUBLICATIONS];
 
+/**
+ * The sub-resources: one operation under the caller's lock each — the
+ * settings' patch (its read and its PUT), the text elements' one PUT per
+ * part given — and no lock, unlock or activation of their own.
+ */
+const SUB_RESOURCES: Array<[string, Record<string, unknown>]> = [
+  ['TABLE_SETTINGS', { table_name: 'ZTAB_A', data_class: 'APPL1' }],
+  [
+    'PROGRAM_TEXT_ELEMENTS',
+    {
+      program_name: 'ZPROG_A',
+      symbols: [{ key: '001', text: 'Text', max_length: 10 }],
+    },
+  ],
+  [
+    'FUNCTION_GROUP_TEXT_ELEMENTS',
+    {
+      function_group_name: 'ZFG_A',
+      symbols: [{ key: '001', text: 'Text', max_length: 10 }],
+    },
+  ],
+  [
+    'CLASS_TEXT_ELEMENTS',
+    {
+      class_name: 'ZCL_A',
+      symbols: [{ key: '001', text: 'Text', max_length: 10 }],
+    },
+  ],
+];
+
 const update =
   (object_type: string, fields: Record<string, unknown>) =>
   (context: HandlerContext) =>
@@ -282,9 +312,32 @@ describe('HandlerUpdate is one write under lock_handle', () => {
       .sort();
     assert.deepStrictEqual(
       withUpdate,
-      [...new Set(TYPES.map(([t]) => t))].sort(),
+      [...new Set([...TYPES, ...SUB_RESOURCES].map(([t]) => t))].sort(),
     );
   });
+
+  for (const [objectType, fields] of SUB_RESOURCES) {
+    it(
+      format(
+        '%s: its write alone, under the given lock_handle: no lock, unlock or activation',
+        objectType,
+      ),
+      async () => {
+        const answered = await run(
+          'answered',
+          update(objectType, underLock(fields)),
+        );
+        assert.ok(answered.sent.length > 0);
+        for (const request of answered.sent) {
+          assert.ok(!request.url.includes('_action='), request.url);
+          assert.ok(!request.url.includes('/activation'), request.url);
+          if (request.method === 'PUT') {
+            assert.ok(request.url.includes(`lockHandle=${LOCK}`));
+          }
+        }
+      },
+    );
+  }
 
   for (const [objectType, fields] of TYPES.filter(notModule)) {
     it(
@@ -682,7 +735,7 @@ describe('the HandlerUpdate schema and description', () => {
     ) as Array<[string, string[]]>;
     assert.deepStrictEqual(
       advertised.map(([type]) => type).sort(),
-      [...new Set(TYPES.map(([t]) => t))].sort(),
+      [...new Set([...TYPES, ...SUB_RESOURCES].map(([t]) => t))].sort(),
     );
     for (const [type, args] of advertised) {
       assert.deepStrictEqual(

@@ -389,6 +389,11 @@ const WALKS: Readonly<Record<string, Walk>> = {
     send: (context, value, variant) =>
       handleHandlerUpdate(context, {
         ...compactArguments(stated(HandlerUpdate, variant), value),
+        // A sub-resource writes what is named: a setting, or a part.
+        ...(value === 'TABLE_SETTINGS' ? { data_class: 'APPL1' } : {}),
+        ...(value.endsWith('_TEXT_ELEMENTS')
+          ? { symbols: [{ key: '001', text: 'Text', max_length: 10 }] }
+          : {}),
         lock_handle: 'LOCKHANDLE',
         object_type: value,
       }),
@@ -413,7 +418,16 @@ const WALKS: Readonly<Record<string, Walk>> = {
       }),
     routes: new Map(
       Object.entries(COMPACT_ACTIVATE_ROUTES).map(
-        ([name, code]): [string, Route] => [name, codeRoute(code)],
+        ([name, code]): [string, Route] => [
+          name,
+          // A function group's text elements are PROG/PX under the group.
+          name === 'FUNCTION_GROUP_TEXT_ELEMENTS'
+            ? {
+                collection: () => '/sap/bc/adt/textelements/functiongroups',
+                addressed: true,
+              }
+            : codeRoute(code),
+        ],
       ),
     ),
   }),
@@ -483,6 +497,8 @@ const WALKS: Readonly<Record<string, Walk>> = {
     send: (context, value) =>
       handleGetWhereUsed(context, {
         object_type: value,
+        // PROG/PX names its container: a program's, at its code's collection.
+        ...(value === 'PROG/PX' ? { container: 'program' as const } : {}),
         object_name:
           value === 'FUGR/FF' ||
           value === 'functionmodule' ||
@@ -506,8 +522,13 @@ const WALKS: Readonly<Record<string, Walk>> = {
     send: (context, value) =>
       handleActivateObjects(context, {
         objects: [
-          { name: 'ZOBJ_A', type: value, parentName: 'ZFG_A' },
-          { name: 'ZOBJ_B', type: value, parentName: 'ZFG_A' },
+          // A PROG/PX with a parent is a function group's text elements:
+          // the walk names the program's, at its code's collection.
+          ...['ZOBJ_A', 'ZOBJ_B'].map((name) => ({
+            name,
+            type: value,
+            ...(value === 'PROG/PX' ? {} : { parentName: 'ZFG_A' }),
+          })),
         ],
       }),
     routes: new Map([

@@ -4,6 +4,7 @@ import {
   COMPACT_UPDATE,
   compactUpdateDescription,
   compactUpdateSchemaFor,
+  subResourceRefusal,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
@@ -46,5 +47,7 @@ export async function handleHandlerUpdate(
       ),
     );
   }
+  const legacy = subResourceRefusal(context, member);
+  if (legacy !== undefined) return return_error(new Error(legacy));
   return routeCompactWrite(context, 'update', { ...args, object_type: member });
 }

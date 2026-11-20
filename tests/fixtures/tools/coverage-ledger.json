@@ -624,6 +624,13 @@
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
     }
   },
+  "GetTableSettings": {
+    "unit": "src/__tests__/unit/pins/tableSettingsTextElements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
+    }
+  },
   "GetTableTypeVersions": {
     "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
     "live": {
@@ -652,6 +659,13 @@
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
     }
   },
+  "GetTextElements": {
+    "unit": "src/__tests__/unit/pins/tableSettingsTextElements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
   "GetTransaction": {
     "unit": "src/__tests__/unit/pins/reads.pins.test.ts",
     "live": {
@@ -664,6 +678,29 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerActivate#CLASS_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/textElementsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerActivate#FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/textElementsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerActivate#PROGRAM_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/textElementsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": {
+        "reason": "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is left inactive to activate"
+      }
     }
   },
   "HandlerBackgroundRunDiscard": {
@@ -764,6 +801,13 @@
       "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
     }
   },
+  "HandlerGet#CLASS_TEXT_ELEMENTS#source": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
   "HandlerGet#DATA_ELEMENT#draft": {
     "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
     "live": {
@@ -790,6 +834,13 @@
     "live": {
       "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
       "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#FUNCTION_GROUP_TEXT_ELEMENTS#source": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
     }
   },
   "HandlerGet#FUNCTION_MODULE#draft": {
@@ -825,6 +876,13 @@
       "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
     }
   },
+  "HandlerGet#PROGRAM_TEXT_ELEMENTS#source": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
   "HandlerGet#SERVICE_DEFINITION#draft": {
     "unit": "src/__tests__/unit/pins/draft.pins.test.ts",
     "live": {
@@ -844,6 +902,13 @@
     "live": {
       "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
       "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#TABLE_SETTINGS#source": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
     }
   },
   "HandlerGet#TABLE_TYPE#draft": {
@@ -872,6 +937,33 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/leftoverSessions.live.test.ts"
+    }
+  },
+  "HandlerLock#CLASS_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerLock#FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerLock#PROGRAM_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerLock#TABLE_SETTINGS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
     }
   },
   "HandlerProfileList": {
@@ -1016,6 +1108,60 @@
       "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
     }
   },
+  "HandlerUnlock#CLASS_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerUnlock#FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerUnlock#PROGRAM_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerUnlock#TABLE_SETTINGS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
+    }
+  },
+  "HandlerUpdate#CLASS_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerUpdate#FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerUpdate#PROGRAM_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerUpdate#TABLE_SETTINGS": {
+    "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
+    }
+  },
   "ListBackgroundRuns": {
     "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
     "live": {
@@ -1105,6 +1251,20 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "UpdateTableSettings": {
+    "unit": "src/__tests__/unit/pins/tableSettingsTextElements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
+    }
+  },
+  "UpdateTextElements": {
+    "unit": "src/__tests__/unit/pins/tableSettingsTextElements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
     }
   },
   "ValidateServiceBinding": {

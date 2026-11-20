@@ -72,6 +72,8 @@ const FULL: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
   [
     [
       'UpdateTableType',
+      'UpdateTableSettings',
+      'UpdateTextElements',
       'DeleteDomain',
       'DeleteTableType',
       'UpdateMessageClass',

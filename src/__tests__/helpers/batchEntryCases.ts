@@ -259,6 +259,7 @@ const SOURCE_READS: Array<[string, Record<string, unknown>]> = [
   ['BEHAVIOR_DEFINITION', { behavior_definition_name: 'BDEF_A' }],
   ['BEHAVIOR_IMPLEMENTATION', { behavior_implementation_name: 'BIMP_A' }],
   ['METADATA_EXTENSION', { metadata_extension_name: 'DDLX_A' }],
+  ['CLASS_TEXT_ELEMENTS', { class_name: 'CLAS_A' }],
 ];
 
 /** `HandlerGet` with part `metadata`: the one metadata GET. */
@@ -307,6 +308,10 @@ const LOCKED_TYPES: Array<[string, string]> = [
   ['BEHAVIOR_DEFINITION', 'BDEF_A'],
   ['BEHAVIOR_IMPLEMENTATION', 'BIMP_A'],
   ['METADATA_EXTENSION', 'DDLX_A'],
+  ['TABLE_SETTINGS', 'TAB_A'],
+  ['PROGRAM_TEXT_ELEMENTS', 'PROG_A'],
+  ['FUNCTION_GROUP_TEXT_ELEMENTS', 'FUGR_A'],
+  ['CLASS_TEXT_ELEMENTS', 'CLAS_A'],
 ];
 
 /** A metadata document as `HandlerGet` part `metadata` answers it. */
@@ -314,6 +319,13 @@ const DOCUMENT = '<?xml version="1.0" encoding="utf-8"?><document/>';
 
 /** `HandlerUpdate` under `lock_handle`: every type but PACKAGE, one write each. */
 const SOURCE_WRITES: Array<[string, Record<string, unknown>]> = [
+  [
+    'CLASS_TEXT_ELEMENTS',
+    {
+      class_name: 'CLAS_A',
+      symbols: [{ key: '001', text: 'Text', max_length: 10 }],
+    },
+  ],
   ['DOMAIN', { domain_name: 'DOM_A', source_code: DOCUMENT }],
   ['DATA_ELEMENT', { data_element_name: 'DTEL_A', source_code: DOCUMENT }],
   ['FUNCTION_GROUP', { function_group_name: 'FUGR_A', source_code: DOCUMENT }],
@@ -763,6 +775,9 @@ const WRITES: BatchEntryCase[] = [
     'SERVICE_BINDING',
     'INCLUDE',
     'TABLE_TYPE',
+    'PROGRAM_TEXT_ELEMENTS',
+    'FUNCTION_GROUP_TEXT_ELEMENTS',
+    'CLASS_TEXT_ELEMENTS',
   ].map((object_type) => ({
     tool: 'HandlerActivate',
     args: { object_type, object_name: 'OBJ_A' },

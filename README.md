@@ -281,6 +281,8 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgram` - Create, retrieve, and update ABAP programs
 - **🔧 Behavior Definition (BDEF) Management**: `GetBehaviorDefinition`, `CreateBehaviorDefinition`, `UpdateBehaviorDefinition` - Create and manage ABAP Behavior Definitions with support for Managed, Unmanaged, Abstract, and Projection types
 - **📋 Metadata Extension (DDLX) Management**: `CreateMetadataExtension`, `UpdateMetadataExtension` - Create and manage ABAP Metadata Extensions
+- **⚙️ Table Technical Settings**: `GetTableSettings`, `UpdateTableSettings` - Read a table's technical settings and write the settings given, the rest kept as stored; the update activates the table when asked (on premise and cloud)
+- **🔤 Text Elements**: `GetTextElements`, `UpdateTextElements` - Read and write the text symbols, selection texts and headings of a program, a function group or a class; each part given is written as its whole list, and the update activates the object together with its text elements when asked (on premise and cloud; on the cloud a function group's and a class's)
 - **⚡ Activation**: `ActivateObject` - Universal activation for any ABAP object
 - **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create and retrieve transport requests
 - **🔍 Enhancement Analysis**: `GetEnhancements`, `GetEnhancementImpl`, `GetEnhancementSpot` - Enhancement discovery and analysis

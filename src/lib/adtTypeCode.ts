@@ -17,6 +17,7 @@ import {
   ACTIVATION_NAMES,
   codesWithNames,
   type ProjectionVariant,
+  SUB_RESOURCE_CODES,
   TABLE_CODES,
   TYPE_NAME_VALUES,
   TYPE_NAMES,
@@ -100,6 +101,9 @@ export function parentedCodesOf<C extends AdtUtilityCode>(
   return codes.filter((code) => PARENTED_CODES.has(code));
 }
 
+/** The code a function group's text elements are activated as, with its group. */
+const FUNCTION_GROUP_TEXTS = 'PROG/PX' satisfies AdtTypeCode;
+
 /**
  * What a `parentName` argument beside an activation's object type says on
  * `variant`: the codes of a group activation that need it
@@ -118,7 +122,11 @@ export function activationParentDescription(
       : parentedCodesOf(ACTIVATION_CODES[variant]).filter((code) =>
           codes.includes(code),
         );
-  return `The function group the object belongs to; its address is built from it. Required for ${codesWithNames(parented, codes === undefined ? ACTIVATION_NAMES[variant] : [])}.`;
+  const texts =
+    codes === undefined || codes.includes(FUNCTION_GROUP_TEXTS)
+      ? ' With PROG/PX, the function group whose text elements are activated.'
+      : '';
+  return `The function group the object belongs to; its address is built from it. Required for ${codesWithNames(parented, codes === undefined ? ACTIVATION_NAMES[variant] : [])}.${texts}`;
 }
 
 /** One object of a group request, as a tool's argument names it. */
@@ -144,16 +152,23 @@ export function namesItsParent<C extends AdtUtilityCode>(
 /**
  * The codes of `codes` whose main type `upper` (already upper-cased) names:
  * those whose entry states it as `main` ({@link MAIN_OF_CODE}). A code
- * whose main type is itself (`AUTH`) is named as a code.
+ * whose main type is itself (`AUTH`) is named as a code, and a sub-resource
+ * code ({@link SUB_RESOURCE_CODES}) is never a main type's.
  */
 function codesOfMain<C extends AdtUtilityCode>(
   upper: string,
   codes: readonly C[],
 ): C[] {
   return codes.filter(
-    (code) => code !== upper && MAIN_OF_CODE.get(code) === upper,
+    (code) =>
+      code !== upper &&
+      !SUB_RESOURCES.has(code) &&
+      MAIN_OF_CODE.get(code) === upper,
   );
 }
+
+/** The sub-resource codes, which no main type stands for. */
+const SUB_RESOURCES: ReadonlySet<string> = new Set(SUB_RESOURCE_CODES);
 
 /** The one code of `codes` whose main type `upper` names, else `undefined`. */
 function oneCodeOfMain<C extends AdtUtilityCode>(

@@ -3,10 +3,13 @@ import {
   AdtClientOnPrem,
   AdtExecutor,
 } from '@mcp-abap-adt/adt-clients';
-import type { IAdtClientOptions } from '@mcp-abap-adt/interfaces-adt';
+import type {
+  IAdtClientOptions,
+  ITextElementsResults,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import type { IServerAdtClient } from './adtClientContract';
+import type { IServerAdtClient, TextElementsApi } from './adtClientContract';
 import { ServerRefusal } from './auth/serverRefusal';
 import { registerConnectionResetHook } from './connectionEvents';
 import { systemKindOf } from './connectionFactory';
@@ -90,6 +93,20 @@ export function adtClientOf(
   connection: IAbapConnection,
   logger?: ILogger,
 ): ServerAdtClient {
+  const options = createOptions();
+  return variantOf(connection) === 'onprem'
+    ? {
+        variant: 'onprem',
+        client: new GuardedAdtClientOnPrem(connection, logger, options),
+      }
+    : {
+        variant: 'cloud',
+        client: new GuardedAdtClientCloud(connection, logger, options),
+      };
+}
+
+/** The system context a client is built with. */
+function createOptions(): IAdtClientOptions | undefined {
   // Inside a request scope (HTTP/SSE, or an embedding host's own), the scope
   // decides masterLanguage, and responsible/masterSystem when it carries them —
   // never a value a previous request left in the process cache. stdio has no
@@ -103,15 +120,29 @@ export function adtClientOf(
           masterLanguage: ctx.masterLanguage,
         }
       : undefined;
+  return options;
+}
+
+/** What the server calls to reach a program's, class's or function group's text elements. */
+export interface TextElementsClient {
+  getTextElements<R extends ITextElementsResults>(
+    results: R,
+  ): TextElementsApi<R>;
+}
+
+/**
+ * The declared variant's client, read as the text elements' getter alone
+ * (`TextElementsApi`): kept off `IServerAdtClient`, where one more member
+ * makes some callers' inferred types too complex (TS2590).
+ */
+export function textElementsClientOf(
+  connection: IAbapConnection,
+  logger?: ILogger,
+): TextElementsClient {
+  const options = createOptions();
   return variantOf(connection) === 'onprem'
-    ? {
-        variant: 'onprem',
-        client: new GuardedAdtClientOnPrem(connection, logger, options),
-      }
-    : {
-        variant: 'cloud',
-        client: new GuardedAdtClientCloud(connection, logger, options),
-      };
+    ? new GuardedAdtClientOnPrem(connection, logger, options)
+    : new GuardedAdtClientCloud(connection, logger, options);
 }
 
 /**

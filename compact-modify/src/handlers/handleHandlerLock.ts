@@ -8,6 +8,7 @@ import {
   compactLockSchemaFor,
   isJsonObject,
   jsonOf,
+  subResourceRefusal,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
@@ -44,6 +45,9 @@ export async function handleHandlerLock(
       `Lock is not supported for object_type: ${args.object_type}. ${supported(COMPACT_LOCK[variant])}`,
     );
   }
+
+  const legacy = subResourceRefusal(context, member);
+  if (legacy !== undefined) return return_error(new Error(legacy));
 
   // A lock this instance cannot keep could not be written or released
   // under its handle here (`lockHeldHere`): none is taken.

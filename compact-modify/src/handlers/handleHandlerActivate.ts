@@ -6,6 +6,7 @@ import {
   type CompactObjectType,
   compactActivateDescription,
   compactActivateSchemaWithNamesFor,
+  subResourceRefusal,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -111,10 +112,18 @@ export async function handleHandlerActivate(
       `HandlerActivate cannot turn object_type "${args.object_type}" into an ADT type code — pass object_adt_type instead (e.g. "CLAS/OC"). Known without it: ${compactActivatableTypes(context.connection).join(', ')}.`,
     );
   }
+  const legacy = subResourceRefusal(context, member);
+  if (legacy !== undefined) return return_error(legacy);
   const reference =
     member === 'FUNCTION_MODULE'
       ? functionModuleReference(args.object_name, args.function_group_name)
-      : { name: args.object_name.toUpperCase() };
+      : member === 'FUNCTION_GROUP_TEXT_ELEMENTS'
+        ? // A function group's text elements are addressed under the group.
+          {
+            name: args.object_name.toUpperCase(),
+            parentName: args.object_name.toUpperCase(),
+          }
+        : { name: args.object_name.toUpperCase() };
   if (typeof reference === 'string') return return_error(reference);
   const plan = activationPlan(
     [{ ...reference, type: COMPACT_ACTIVATE_ROUTES[member] }],

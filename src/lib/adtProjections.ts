@@ -182,6 +182,21 @@ export const NAME_CASE_SENTENCE =
 // Main types: the TADIR type a code belongs to (spec 2.4)
 // ---------------------------------------------------------------------------
 
+/**
+ * The codes of an object's sub-resources: a program's or a function group's
+ * text elements (`PROG/PX`), a class's (`CLAS/OCX`) and a table's technical
+ * settings (`TABL/DTT`). Each is named as its code; its main type stands for
+ * the object itself, so a main type never resolves to one of these.
+ */
+export const SUB_RESOURCE_CODES = [
+  'PROG/PX',
+  'CLAS/OCX',
+  'TABL/DTT',
+] as const satisfies readonly AdtTypeCode[];
+
+/** A code of {@link SUB_RESOURCE_CODES}. */
+export type SubResourceCode = (typeof SUB_RESOURCE_CODES)[number];
+
 /** The `codes` objects of table `T`, one per API that lists codes. */
 type CodesIn<T> = {
   [A in keyof T]: T[A] extends { readonly codes: infer C } ? C : never;
@@ -211,15 +226,16 @@ export type TableMainOf<C extends AdtUtilityCode> = MainStated<
 /**
  * The codes of projection `P` that carry a main type of their own: those
  * whose entry states a main type other than the code itself (a code without
- * a slash, `AUTH`, is its own main type and is just a code).
+ * a slash, `AUTH`, is its own main type and is just a code), sub-resources
+ * ({@link SUB_RESOURCE_CODES}) left out.
  */
 type CodeWithMainType<P extends AdtUtilityCode> = {
-  [C in P]: [TableMainOf<C>] extends [never]
+  [C in Exclude<P, SubResourceCode>]: [TableMainOf<C>] extends [never]
     ? never
     : TableMainOf<C> extends C
       ? never
       : C;
-}[P];
+}[Exclude<P, SubResourceCode>];
 
 /** The codes of projection `P` whose main type (`main`) is `M`. */
 export type CodesOfMainType<P extends AdtUtilityCode, M extends string> = {
@@ -309,8 +325,21 @@ export type TypeNameFor<P> = ServedCodeName<typeof TYPE_NAMES, P>;
 // Where-used (GetWhereUsed, HandlerSystem's where_used)
 // ---------------------------------------------------------------------------
 
-/** The codes where-used is asked of on `V` (adt-clients' `getWhereUsed`). */
-export type WhereUsedCode<V extends ProjectionVariant> = AdtWhereUsedCode<V>;
+/**
+ * The codes GetWhereUsed asks where-used of on `V`: adt-clients'
+ * `getWhereUsed` codes but `TABL/DTT` — SAP serves no where-used for a
+ * table's technical settings: `usageReferences?uri=/sap/bc/adt/ddic/db/settings/{t}`
+ * answered 200 "Where-Used List is not supported for Technical Table
+ * Settings.", 0 results, on premise and on the cloud (measured 2026-11-19).
+ * `PROG/PX` names its container (`GetWhereUsed`'s `container`).
+ */
+export type WhereUsedCode<V extends ProjectionVariant> = Exclude<
+  AdtWhereUsedCode<V>,
+  (typeof NOT_WHERE_USED)[number]
+>;
+
+/** The where-used codes GetWhereUsed leaves out ({@link WhereUsedCode}). */
+const NOT_WHERE_USED = ['TABL/DTT'] as const satisfies readonly AdtTypeCode[];
 
 /** GetWhereUsed's `object_type` codes. */
 export const WHERE_USED_CODES = projected<
@@ -346,6 +375,7 @@ export const WHERE_USED_CODES = projected<
     'ENHO/XHH',
     'ENHO/XHB',
     'ENHS/XSB',
+    'PROG/PX',
   ],
   cloud: [
     'CLAS/OC',
@@ -376,6 +406,7 @@ export const WHERE_USED_CODES = projected<
     'ENHO/XHH',
     'ENHO/XHB',
     'ENHS/XSB',
+    'PROG/PX',
   ],
 });
 
@@ -447,14 +478,18 @@ export function codesWithNames(
  * (`WHERE_USED_CODES`) or a name standing for one (`WHERE_USED_NAMES`).
  */
 export function whereUsedTypeDescription(variant: ProjectionVariant): string {
-  return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
+  return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. PROG/PX is a program's or a function group's text elements; container says which. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
 }
 
 // ---------------------------------------------------------------------------
 // Activation (ActivateObjects, HandlerActivate)
 // ---------------------------------------------------------------------------
 
-/** The codes a group activation activates on `V` (`activateObjectsGroup`). */
+/**
+ * The codes ActivateObjects activates on `V` (`activateObjectsGroup`), the
+ * text elements (`PROG/PX`, `CLAS/OCX`) among them: each an ordinary
+ * reference at its own address (`handleActivateObject`).
+ */
 export type ActivationCode<V extends ProjectionVariant> = AdtActivationCode<V>;
 
 /** ActivateObjects' `objects[].type` codes: what a group activation takes. */
@@ -491,6 +526,8 @@ export const ACTIVATION_CODES = projected<
     'ENHO/XHH',
     'ENHO/XHB',
     'ENHS/XSB',
+    'PROG/PX',
+    'CLAS/OCX',
   ],
   cloud: [
     'CLAS/OC',
@@ -518,6 +555,8 @@ export const ACTIVATION_CODES = projected<
     'ENHO/XHH',
     'ENHO/XHB',
     'ENHS/XSB',
+    'PROG/PX',
+    'CLAS/OCX',
   ],
 });
 
@@ -656,7 +695,9 @@ export const SINGLE_ACTIVATION_NAMES = projected<
  * activated as — through its family when {@link SINGLE_ACTIVATION} names it,
  * else in a group activation. A function module is activated in a group
  * activation under its function group, which the call names; a behaviour
- * implementation is a class.
+ * implementation is a class. The text elements are activated alone, as
+ * their codes (`PROG/PX` a program's or, with its group, a function
+ * group's; `CLAS/OCX` a class's).
  */
 export const COMPACT_ACTIVATE_ROUTES = {
   CLASS: 'CLAS/OC',
@@ -677,6 +718,9 @@ export const COMPACT_ACTIVATE_ROUTES = {
   SERVICE_BINDING: 'SRVB/SVB',
   FUNCTION_MODULE: 'FUGR/FF',
   BEHAVIOR_IMPLEMENTATION: 'CLAS/OC',
+  PROGRAM_TEXT_ELEMENTS: 'PROG/PX',
+  FUNCTION_GROUP_TEXT_ELEMENTS: 'PROG/PX',
+  CLASS_TEXT_ELEMENTS: 'CLAS/OCX',
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtTypeCode>>>;
 
 /** HandlerActivate's `object_type`. */
@@ -703,6 +747,9 @@ export const COMPACT_ACTIVATE = projected<
     'SERVICE_BINDING',
     'FUNCTION_MODULE',
     'BEHAVIOR_IMPLEMENTATION',
+    'PROGRAM_TEXT_ELEMENTS',
+    'FUNCTION_GROUP_TEXT_ELEMENTS',
+    'CLASS_TEXT_ELEMENTS',
   ],
   cloud: [
     'CLASS',
@@ -721,6 +768,9 @@ export const COMPACT_ACTIVATE = projected<
     'SERVICE_BINDING',
     'FUNCTION_MODULE',
     'BEHAVIOR_IMPLEMENTATION',
+    'PROGRAM_TEXT_ELEMENTS',
+    'FUNCTION_GROUP_TEXT_ELEMENTS',
+    'CLASS_TEXT_ELEMENTS',
   ],
 });
 
@@ -1068,6 +1118,10 @@ export const COMPACT_READ_ROUTES = {
   UNIT_TEST: { api: 'class', operation: 'unitTestResult' },
   CDS_UNIT_TEST: { api: 'class', operation: 'unitTestResult' },
   TRANSPORT: { api: 'request', operation: 'readObjects' },
+  TABLE_SETTINGS: { api: 'tableSettings', operation: 'readMetadata' },
+  PROGRAM_TEXT_ELEMENTS: { api: 'textElements', operation: 'read' },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { api: 'textElements', operation: 'read' },
+  CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'read' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
 const READ_ONPREM = [
@@ -1096,6 +1150,10 @@ const READ_ONPREM = [
   'UNIT_TEST',
   'CDS_UNIT_TEST',
   'TRANSPORT',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
 
 /** HandlerGet's `object_type`: a program and an include are read on both variants. */
@@ -1133,6 +1191,10 @@ export const COMPACT_UPDATE_ROUTES = {
   },
   METADATA_EXTENSION: { api: 'metadataExtension', operation: 'update' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'update' },
+  TABLE_SETTINGS: { api: 'tableSettings', operation: 'updateMetadata' },
+  PROGRAM_TEXT_ELEMENTS: { api: 'textElements', operation: 'update' },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { api: 'textElements', operation: 'update' },
+  CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'update' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
 const UPDATE_ONPREM = [
@@ -1160,16 +1222,29 @@ const UPDATE_ONPREM = [
   'BEHAVIOR_IMPLEMENTATION',
   'METADATA_EXTENSION',
   'SERVICE_BINDING',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
 
 /** HandlerUpdate's `object_type`. */
 export const COMPACT_UPDATE = projected<
   ServedName<'onprem', typeof COMPACT_UPDATE_ROUTES>,
-  ServedName<'cloud', typeof COMPACT_UPDATE_ROUTES>
+  Exclude<
+    ServedName<'cloud', typeof COMPACT_UPDATE_ROUTES>,
+    'PROGRAM_TEXT_ELEMENTS'
+  >
 >()({
   onprem: UPDATE_ONPREM,
+  // ABAP Cloud holds no program of the customer's: neither it nor its text
+  // elements are written there (the text elements' lock refuses a delivered
+  // program, Code on the cloud: `RS_ACCESS_PERMISSION`, `RS_EXTEND_CHECK`).
   cloud: UPDATE_ONPREM.filter(
-    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+    (member) =>
+      member !== 'PROGRAM' &&
+      member !== 'INCLUDE' &&
+      member !== 'PROGRAM_TEXT_ELEMENTS',
   ),
 });
 
@@ -1266,6 +1341,10 @@ export const COMPACT_LOCK_ROUTES = {
   METADATA_EXTENSION: { api: 'metadataExtension', operation: 'lock' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'lock' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'lock' },
+  TABLE_SETTINGS: { api: 'tableSettings', operation: 'lock' },
+  PROGRAM_TEXT_ELEMENTS: { api: 'textElements', operation: 'lock' },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { api: 'textElements', operation: 'lock' },
+  CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'lock' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
 /** What `HandlerUnlock` unlocks, each with its API. */
@@ -1291,6 +1370,10 @@ export const COMPACT_UNLOCK_ROUTES = {
   METADATA_EXTENSION: { api: 'metadataExtension', operation: 'unlock' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'unlock' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'unlock' },
+  TABLE_SETTINGS: { api: 'tableSettings', operation: 'unlock' },
+  PROGRAM_TEXT_ELEMENTS: { api: 'textElements', operation: 'unlock' },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { api: 'textElements', operation: 'unlock' },
+  CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'unlock' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
 const LOCK_ONPREM = [
@@ -1312,27 +1395,51 @@ const LOCK_ONPREM = [
   'METADATA_EXTENSION',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
 
 /** HandlerLock's `object_type`. */
 export const COMPACT_LOCK = projected<
   ServedName<'onprem', typeof COMPACT_LOCK_ROUTES>,
-  ServedName<'cloud', typeof COMPACT_LOCK_ROUTES>
+  Exclude<
+    ServedName<'cloud', typeof COMPACT_LOCK_ROUTES>,
+    'PROGRAM_TEXT_ELEMENTS'
+  >
 >()({
   onprem: LOCK_ONPREM,
+  // ABAP Cloud holds no program of the customer's: its text elements are
+  // locked for no write (HandlerUpdate leaves them out there; the lock of a
+  // delivered program is refused, Code on the cloud: `RS_ACCESS_PERMISSION`,
+  // `RS_EXTEND_CHECK`, design fact T11).
   cloud: LOCK_ONPREM.filter(
-    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+    (member) =>
+      member !== 'PROGRAM' &&
+      member !== 'INCLUDE' &&
+      member !== 'PROGRAM_TEXT_ELEMENTS',
   ),
 });
 
 /** HandlerUnlock's `object_type`. */
 export const COMPACT_UNLOCK = projected<
   ServedName<'onprem', typeof COMPACT_UNLOCK_ROUTES>,
-  ServedName<'cloud', typeof COMPACT_UNLOCK_ROUTES>
+  Exclude<
+    ServedName<'cloud', typeof COMPACT_UNLOCK_ROUTES>,
+    'PROGRAM_TEXT_ELEMENTS'
+  >
 >()({
   onprem: LOCK_ONPREM,
+  // ABAP Cloud holds no program of the customer's: its text elements are
+  // locked for no write (HandlerUpdate leaves them out there; the lock of a
+  // delivered program is refused, Code on the cloud: `RS_ACCESS_PERMISSION`,
+  // `RS_EXTEND_CHECK`, design fact T11).
   cloud: LOCK_ONPREM.filter(
-    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+    (member) =>
+      member !== 'PROGRAM' &&
+      member !== 'INCLUDE' &&
+      member !== 'PROGRAM_TEXT_ELEMENTS',
   ),
 });
 
@@ -1542,6 +1649,9 @@ const TABLE_CODE_LIST = [
   'ENHO/XHH',
   'ENHO/XHB',
   'ENHS/XSB',
+  'TABL/DTT',
+  'PROG/PX',
+  'CLAS/OCX',
 ] as const satisfies readonly AdtTypeCode[];
 
 /** Every code of each variant's table. */
@@ -1656,6 +1766,10 @@ export const LOCK_KIND_ROUTES = {
   metadata_extension: { api: 'metadataExtension', operation: 'lock' },
   service_definition: { api: 'serviceDefinition', operation: 'lock' },
   service_binding: { api: 'serviceBinding', operation: 'lock' },
+  table_settings: { api: 'tableSettings', operation: 'lock' },
+  program_text_elements: { api: 'textElements', operation: 'lock' },
+  function_group_text_elements: { api: 'textElements', operation: 'lock' },
+  class_text_elements: { api: 'textElements', operation: 'lock' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;
 
 /** What `UnlockObjectLow` unlocks, by kind. */
@@ -1681,6 +1795,10 @@ export const UNLOCK_KIND_ROUTES = {
   metadata_extension: { api: 'metadataExtension', operation: 'unlock' },
   service_definition: { api: 'serviceDefinition', operation: 'unlock' },
   service_binding: { api: 'serviceBinding', operation: 'unlock' },
+  table_settings: { api: 'tableSettings', operation: 'unlock' },
+  program_text_elements: { api: 'textElements', operation: 'unlock' },
+  function_group_text_elements: { api: 'textElements', operation: 'unlock' },
+  class_text_elements: { api: 'textElements', operation: 'unlock' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;
 
 /** A kind `LockObjectLow` locks. */
@@ -1708,6 +1826,10 @@ const LOCK_KIND_LIST = [
   'metadata_extension',
   'service_definition',
   'service_binding',
+  'table_settings',
+  'program_text_elements',
+  'function_group_text_elements',
+  'class_text_elements',
 ] as const;
 
 /** `LockObjectLow`'s `object_type`. */
@@ -1752,6 +1874,10 @@ export const COMPACT_LOCK_KINDS = {
   METADATA_EXTENSION: 'metadata_extension',
   SERVICE_DEFINITION: 'service_definition',
   SERVICE_BINDING: 'service_binding',
+  TABLE_SETTINGS: 'table_settings',
+  PROGRAM_TEXT_ELEMENTS: 'program_text_elements',
+  FUNCTION_GROUP_TEXT_ELEMENTS: 'function_group_text_elements',
+  CLASS_TEXT_ELEMENTS: 'class_text_elements',
 } as const satisfies KindsOf<
   typeof COMPACT_LOCK_ROUTES,
   typeof LOCK_KIND_ROUTES

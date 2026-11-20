@@ -51,7 +51,11 @@ import {
 } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
-import { createAdtClient, createOnPremAdtClient } from '../../../lib/clients';
+import {
+  createAdtClient,
+  createOnPremAdtClient,
+  variantOf,
+} from '../../../lib/clients';
 import type { compactUpdateSchema } from '../../../lib/compact/compactSchemas';
 import {
   defineTool,
@@ -97,10 +101,12 @@ import {
   handleUpdateStructure,
   TOOL_DEFINITION as UpdateStructure_Tool,
 } from '../../structure/low/handleUpdateStructure';
+import { patchTableSettingsUnderLock } from '../../table/high/handleUpdateTableSettings';
 import {
   handleUpdateTable,
   TOOL_DEFINITION as UpdateTable_Tool,
 } from '../../table/low/handleUpdateTable';
+import { writeTextElementsUnderLock } from '../../text_elements/high/handleUpdateTextElements';
 
 /** The object types the compact update writes, each one request under `lock_handle`. */
 export const UNDER_LOCK_TYPES = [
@@ -128,7 +134,25 @@ export const UNDER_LOCK_TYPES = [
   'BEHAVIOR_DEFINITION',
   'BEHAVIOR_IMPLEMENTATION',
   'METADATA_EXTENSION',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
+
+/** The text elements' types, each with the kind UpdateTextElements names. */
+const TEXT_KINDS = {
+  PROGRAM_TEXT_ELEMENTS: 'program',
+  FUNCTION_GROUP_TEXT_ELEMENTS: 'function_group',
+  CLASS_TEXT_ELEMENTS: 'class',
+} as const;
+
+/** The argument that names the object of each text elements kind. */
+const NAME_FIELDS = {
+  program: 'program_name',
+  function_group: 'function_group_name',
+  class: 'class_name',
+} as const;
 
 /** The types `part` is taken by: the include, its source or its metadata. */
 export const PART_TYPES = ['INCLUDE'] as const;
@@ -635,6 +659,87 @@ export async function handleUpdateUnderLock(
         name: args.name,
         source_code: args.source_code,
       });
+    case 'TABLE_SETTINGS': {
+      // The settings' one operation under the settings' lock: the library's
+      // read and guarded PUT (`patchMetadata`), nothing else.
+      const name = text(args.table_name);
+      if (name === undefined) {
+        return return_error(new Error('table_name is required'));
+      }
+      if (
+        args.is_writable_by_amdp !== undefined &&
+        variantOf(connection) !== 'cloud'
+      ) {
+        return return_error(
+          new Error(
+            'is_writable_by_amdp is a cloud setting; leave it out on this system',
+          ),
+        );
+      }
+      return answer(
+        ANSWER,
+        () =>
+          patchTableSettingsUnderLock(
+            context,
+            {
+              table_name: name,
+              transport_request: args.transport_request,
+              data_class: args.data_class,
+              size_category: args.size_category,
+              buffering: args.buffering,
+              storage_type: args.storage_type,
+              sharing_type: args.sharing_type,
+              load_unit: args.load_unit,
+              translation: args.translation,
+              logging_enabled: args.logging_enabled,
+              is_writable_by_amdp: args.is_writable_by_amdp,
+              activate: false,
+            },
+            lockHandle,
+          ),
+        project('terse', terseWrite),
+      );
+    }
+    case 'PROGRAM_TEXT_ELEMENTS':
+    case 'FUNCTION_GROUP_TEXT_ELEMENTS':
+    case 'CLASS_TEXT_ELEMENTS': {
+      // The text elements' one operation under their lock: one PUT per part
+      // given, each its whole list.
+      const kind = TEXT_KINDS[args.object_type];
+      const name = text(
+        kind === 'program'
+          ? args.program_name
+          : kind === 'function_group'
+            ? args.function_group_name
+            : args.class_name,
+      );
+      if (name === undefined) {
+        return return_error(new Error(`${NAME_FIELDS[kind]} is required`));
+      }
+      if (
+        kind === 'class' &&
+        (args.selections !== undefined || args.headings !== undefined)
+      ) {
+        return return_error(new Error('A class has text symbols only'));
+      }
+      return answer(
+        ANSWER,
+        () =>
+          writeTextElementsUnderLock(
+            context,
+            {
+              object_kind: kind,
+              object_name: name,
+              symbols: args.symbols,
+              selections: args.selections,
+              headings: args.headings,
+              transport_request: args.transport_request,
+            },
+            lockHandle,
+          ),
+        project('terse', terseWrite),
+      );
+    }
     default:
       return return_error(
         new Error(

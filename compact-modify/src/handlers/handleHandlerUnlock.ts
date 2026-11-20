@@ -10,6 +10,7 @@ import {
   lockHeldHere,
   lockNotHeldWords,
   spentBy,
+  subResourceRefusal,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
@@ -67,6 +68,8 @@ export async function handleHandlerUnlock(
       ],
     };
   }
+  const legacy = subResourceRefusal(context, member);
+  if (legacy !== undefined) return return_error(new Error(legacy));
   if (!lockHeldHere(context.heldLocks, args.lock_handle)) {
     return return_error(new Error(lockNotHeldWords(context.heldLocks)));
   }

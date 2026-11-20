@@ -967,7 +967,8 @@ for (const transportName of [
         // 24.0.0: GetObjectDraft, one more; batch mode is the compact sets'
         // (BatchBegin, BatchEnd, BatchAnswers left), three fewer; the debugger
         // batch reads its answers with DebugBatchAnswers, one more.
-        assert.equal(full.tools.length, onStdio ? 267 : onHttp ? 267 : 265);
+        // A table's technical settings and the text elements: four more.
+        assert.equal(full.tools.length, onStdio ? 271 : onHttp ? 271 : 269);
         {
           const actual = full.tools;
           for (const expected of [
@@ -986,7 +987,8 @@ for (const transportName of [
         // background-run tools of the long reads (and, on stdio, the
         // leftover-session list; on http SessionOpen and SessionClose); no
         // write, run, debugger, logoff, resume or batch mode.
-        assert.equal(fullRo.tools.length, onStdio ? 71 : onHttp ? 72 : 70);
+        // A table's technical settings and the text elements: two more.
+        assert.equal(fullRo.tools.length, onStdio ? 73 : onHttp ? 74 : 72);
         for (const name of [
           'GetBackgroundRun',
           'ListBackgroundRuns',

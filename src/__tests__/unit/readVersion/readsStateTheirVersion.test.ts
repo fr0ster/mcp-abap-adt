@@ -76,6 +76,7 @@ const OBJECT_ROOTS = [
   '/sap/bc/adt/packages/',
   '/sap/bc/adt/enhancements/',
   '/sap/bc/adt/acm/dcl/sources/',
+  '/sap/bc/adt/textelements/',
 ];
 
 /**
@@ -338,6 +339,7 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   UpdateServiceBinding: 'publishes or unpublishes the binding',
   UpdateStructure: 'writes the source it is given under a lock',
   UpdateTable: 'writes the source it is given under a lock',
+  UpdateTextElements: 'writes each part given whole, reading none',
   UpdateUnitTest: 'writes the source it is given under a lock',
   ValidateServiceBinding: 'validates a binding name',
 };
@@ -355,6 +357,10 @@ interface Sample {
 
 /** Sample calls for tools whose required arguments alone end before a read. */
 const SAMPLES: Readonly<Record<string, Sample>> = {
+  // A setting to write: the patch reads the working area first.
+  UpdateTableSettings: {
+    args: { table_name: 'TABL_A', data_class: 'APPL0', activate: false },
+  },
   CreateDomain: { args: { domain_name: 'DOM_A', package_name: 'PKG_A' } },
   DescribeByList: { args: { objects: [{ name: 'CLAS_A', type: 'CLAS/OC' }] } },
   GetIncludesList: { args: { object_name: 'PROG_A', object_type: 'PROG/P' } },

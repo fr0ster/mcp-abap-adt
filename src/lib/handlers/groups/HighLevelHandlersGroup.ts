@@ -487,6 +487,10 @@ import {
   TOOL_DEFINITION as UpdateTableHigh_Tool,
 } from '../../../handlers/table/high/handleUpdateTable';
 import {
+  handleUpdateTableSettings,
+  TOOL_DEFINITION as UpdateTableSettings_Tool,
+} from '../../../handlers/table/high/handleUpdateTableSettings';
+import {
   TOOL_DEFINITION as ActivateTable_Tool,
   handleActivateTable,
 } from '../../../handlers/table/low/handleActivateTable';
@@ -514,6 +518,10 @@ import {
   TOOL_DEFINITION as ActivateTableType_Tool,
   handleActivateTableType,
 } from '../../../handlers/table_type/low/handleActivateTableType';
+import {
+  handleUpdateTextElements,
+  TOOL_DEFINITION as UpdateTextElements_Tool,
+} from '../../../handlers/text_elements/high/handleUpdateTextElements';
 import {
   TOOL_DEFINITION as AddTransportObject_Tool,
   handleAddTransportObject,
@@ -818,6 +826,8 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       defineTool(CreateTable_Tool, handleCreateTable),
       defineTool(GetTable_Tool, handleGetTable),
       defineTool(UpdateTableHigh_Tool, handleUpdateTableHigh),
+      defineTool(UpdateTableSettings_Tool, handleUpdateTableSettings),
+      defineTool(UpdateTextElements_Tool, handleUpdateTextElements),
       defineTool(DeleteTable_Tool, handleDeleteTable),
       defineTool(CreateStructure_Tool, handleCreateStructure),
       defineTool(GetStructure_Tool, handleGetStructure),

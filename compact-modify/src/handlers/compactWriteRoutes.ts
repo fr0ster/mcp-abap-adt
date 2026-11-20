@@ -197,6 +197,11 @@ export const compactWriteRouterMap: CompactRouterMap = {
   // No CRUD: a profiler run and a dump are read through their own tools.
   RUNTIME_PROFILE: {},
   RUNTIME_DUMP: {},
+  // Written under the caller's lock; no create or delete of their own.
+  PROGRAM_TEXT_ELEMENTS: { update },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { update },
+  CLASS_TEXT_ELEMENTS: { update },
+  TABLE_SETTINGS: { update },
 };
 
 /** Route a compact write: `create`, `update` or `delete`. */

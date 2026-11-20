@@ -617,6 +617,12 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
     'application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.blues.v2+xml',
     'application/vnd.sap.adt.blues.v2+xml; charset=utf-8',
   ),
+  // A text elements part's own media type; any other Accept answers HTML
+  // (measured on premise and on the cloud, 2026-11-19).
+  'selectionTexts.update': pair(
+    'application/vnd.sap.adt.textelements.selections.v1',
+    'application/vnd.sap.adt.textelements.selections.v1; charset=utf-8',
+  ),
   'serviceBinding.activate': pair('application/xml', 'application/xml'),
   'serviceBinding.check': pair(
     'application/vnd.sap.adt.checkmessages+xml',
@@ -724,6 +730,18 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
   'tableType.updateMetadata': pair(
     'application/vnd.sap.adt.tabletype.v1+xml',
     'application/vnd.sap.adt.tabletype.v1+xml',
+  ),
+  // A text elements part's own media type; any other Accept answers HTML
+  // (measured on premise and on the cloud, 2026-11-19).
+  'textHeadings.update': pair(
+    'application/vnd.sap.adt.textelements.headings.v1',
+    'application/vnd.sap.adt.textelements.headings.v1; charset=utf-8',
+  ),
+  // A text elements part's own media type; any other Accept answers HTML
+  // (measured on premise and on the cloud, 2026-11-19).
+  'textSymbols.update': pair(
+    'application/vnd.sap.adt.textelements.symbols.v1',
+    'application/vnd.sap.adt.textelements.symbols.v1; charset=utf-8',
   ),
   'transformation.activate': pair('application/xml', 'application/xml'),
   'transformation.check': pair(

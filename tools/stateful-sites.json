@@ -810,6 +810,24 @@
     "whose": "adt-clients"
   },
   {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/tableSettings/AdtTableSettings.js",
+    "function": "lock",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the LOCK alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the LOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/tableSettings/AdtTableSettings.js",
+    "function": "unlock",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the UNLOCK alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the UNLOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
     "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/tabletype/AdtDdicTableType.js",
     "function": "lock",
     "site": "inStatefulSession",
@@ -834,6 +852,24 @@
     "count": 1,
     "window": "the UNLOCK alone (one request)",
     "stateless": "in the same call: a finally sets it stateless, also when the UNLOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/textElements/AdtTextElements.js",
+    "function": "lock",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the LOCK alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the LOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/textElements/AdtTextElements.js",
+    "function": "unlock",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the UNLOCK alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the UNLOCK is refused or throws",
     "whose": "adt-clients"
   },
   {

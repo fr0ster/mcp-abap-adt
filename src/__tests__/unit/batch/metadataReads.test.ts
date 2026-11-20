@@ -202,6 +202,8 @@ const EXCLUDED: Record<string, string> = {
     "a class's metadata, read to find its includes",
   'system/readonly/handleGetTypeInfo.ts':
     'a type name read as a data element, a domain, a structure and a table type; the table type read is the shared one of GetTableType, which the batch does not use',
+  'table/readonly/handleGetTableSettings.ts':
+    "a table's technical settings, read typed by the declared system kind (the cloud's reading needs the AMDP flag); the package walk does not read settings, so the batch has no read of the type",
   'table_type/high/handleGetTableType.ts':
     "a table type's metadata; the package walk does not read table types, so the batch has no read of the type",
 };

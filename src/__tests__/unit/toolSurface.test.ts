@@ -211,9 +211,11 @@ describe('the MCP tool surface', () => {
           relaxed: ['object_name', 'object_type'],
           added: ['objects'],
         },
+        // `container` names whose text elements PROG/PX is (optional: required
+        // with PROG/PX alone, the code it arrived with).
         'system/GetWhereUsed': {
           relaxed: ['object_name', 'object_type'],
-          added: ['objects'],
+          added: ['container', 'objects'],
         },
       };
       const listed = LIST_ARGUMENTS[tool];
@@ -572,6 +574,12 @@ describe('the MCP tool surface', () => {
    * **23.1.0: `ListATCResults` and `GetATCResult` arrived** (on premise and
    * cloud): the stored ATC results, `GET …/atc/results` and one by its
    * Display ID. Every other row was checked unchanged.
+   *
+   * **A table's technical settings and the text elements arrived**
+   * (`GetTableSettings`, `UpdateTableSettings`, `GetTextElements`,
+   * `UpdateTextElements`, on premise and cloud): adt-clients 46.1.0's
+   * `getTableSettings()` and `getTextElements()`. Every other row was checked
+   * unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

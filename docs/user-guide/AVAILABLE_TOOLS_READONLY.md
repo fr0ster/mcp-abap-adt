@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. Batch mode is the compact binaries' (`HandlerBatch`, [BATCH_MODE.md](BATCH_MODE.md)): none is served here. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 73
+- Total tools: 75
 
 ## Navigation
 
@@ -101,10 +101,13 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetSqlQuery](#getsqlquery-read-only-system)
     - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
+    - [GetTableSettings](#gettablesettings-read-only-table)
     - [GetTable](#gettable-read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
   - [Table Type](#read-only-table-type)
     - [GetTableType](#gettabletype-read-only-table-type)
+  - [Text Elements](#read-only-text-elements)
+    - [GetTextElements](#gettextelements-read-only-text-elements)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
@@ -946,11 +949,12 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
+- `container` (string, optional, one of: `program`, `function_group`) - With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.
 - `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
 - `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
 - `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
 - `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects). For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
-- `object_type` (string, optional) - Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): CLAS/OC (class), INTF/OI (interface), PROG/P (program), PROG/I (include), FUGR/F (functiongroup), FUGR/FF (function, functionmodule, function_module, func), DEVC/K (package), DDLS/DF (view), VIEW/DV (dbview), TABL/DT (table), TABL/DS (structure, stru), TTYP/DA, DOMA/DD (domain), DTEL/DE (dataelement), DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, MSAG/N, FTG2/FT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB. A function module is named as object_name says. A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class). A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
+- `object_type` (string, optional) - Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): CLAS/OC (class), INTF/OI (interface), PROG/P (program), PROG/I (include), FUGR/F (functiongroup), FUGR/FF (function, functionmodule, function_module, func), DEVC/K (package), DDLS/DF (view), VIEW/DV (dbview), TABL/DT (table), TABL/DS (structure, stru), TTYP/DA, DOMA/DD (domain), DTEL/DE (dataelement), DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, MSAG/N, FTG2/FT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB, PROG/PX. A function module is named as object_name says. PROG/PX is a program's or a function group's text elements; container says which. A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class). A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
 - `objects` (array, optional) - Several objects, read together (give this or object_name and object_type). The type filters apply to every object.
 
 ---
@@ -1106,6 +1110,18 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 <a id="read-only-table"></a>
 ### Read-Only / Table
 
+<a id="gettablesettings-read-only-table"></a>
+#### GetTableSettings (Read-Only / Table)
+**Description:** [read-only] Reads the technical settings of the database table named by table_name, at the version asked: data class, size category, buffering (allowed, type, number of key fields), storage type, sharing type, load unit, translation, logging, and the table's description; on ABAP Cloud also whether AMDP may write to the table.
+
+**Source:** `src/handlers/table/readonly/handleGetTableSettings.ts`
+
+**Parameters:**
+- `table_name` (string, required) - Table name.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
 <a id="gettable-read-only-table"></a>
 #### GetTable (Read-Only / Table)
 **Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
@@ -1148,6 +1164,23 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="read-only-text-elements"></a>
+### Read-Only / Text Elements
+
+<a id="gettextelements-read-only-text-elements"></a>
+#### GetTextElements (Read-Only / Text Elements)
+**Description:** [read-only] Reads the text elements of the program, function group or class named by object_kind and object_name, in the object's original language, at the version asked: text symbols (key, text, maximum length), selection texts (name, text, and whether the text is the dictionary's label) and the list and column headings. A class has text symbols only. Reads the parts named by parts, every part of the object by default.
+
+**Source:** `src/handlers/text_elements/readonly/handleGetTextElements.ts`
+
+**Parameters:**
+- `object_kind` (string, required, one of: `program`, `function_group`, `class`) - Kind of object: program, function_group or class.
+- `object_name` (string, required) - Name of the program, function group or class.
+- `parts` (array, optional) - Parts to read: symbols, selections, headings. Default: every part of the object; a class has symbols only.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---

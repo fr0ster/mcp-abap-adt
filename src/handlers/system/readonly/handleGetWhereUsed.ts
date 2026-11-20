@@ -20,16 +20,13 @@ import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type {
-  AdtWhereUsedCode,
-  IAdtError,
-  IAdtResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   type ProjectionVariant,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
+  type WhereUsedCode,
   whereUsedTypeDescription,
 } from '../../../lib/adtProjections';
 import { acceptedCodeOf, notAccepted } from '../../../lib/adtTypeCode';
@@ -507,7 +504,10 @@ async function whereUsedInEnvelopes(
       : undefined;
     return !name || code === undefined ? [] : [{ target, i, code, name }];
   });
-  const params = (entry: { name: string; code: AdtWhereUsedCode }) => ({
+  const params = (entry: {
+    name: string;
+    code: WhereUsedCode<ProjectionVariant>;
+  }) => ({
     object_name: entry.name,
     object_type: entry.code,
   });

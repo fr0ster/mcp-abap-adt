@@ -309,8 +309,18 @@ export type TypeNameFor<P> = ServedCodeName<typeof TYPE_NAMES, P>;
 // Where-used (GetWhereUsed, HandlerSystem's where_used)
 // ---------------------------------------------------------------------------
 
-/** The codes where-used is asked of on `V` (adt-clients' `getWhereUsed`). */
-export type WhereUsedCode<V extends ProjectionVariant> = AdtWhereUsedCode<V>;
+/**
+ * The codes GetWhereUsed asks where-used of on `V`: adt-clients'
+ * `getWhereUsed` codes but `TABL/DTT` — SAP serves no where-used for a
+ * table's technical settings: `usageReferences?uri=/sap/bc/adt/ddic/db/settings/{t}`
+ * answered 200 "Where-Used List is not supported for Technical Table
+ * Settings.", 0 results, on premise and on the cloud (measured 2026-11-19) —
+ * and `PROG/PX`, which needs its container.
+ */
+export type WhereUsedCode<V extends ProjectionVariant> = Exclude<
+  AdtWhereUsedCode<V>,
+  'TABL/DTT' | 'PROG/PX'
+>;
 
 /** GetWhereUsed's `object_type` codes. */
 export const WHERE_USED_CODES = projected<
@@ -454,8 +464,14 @@ export function whereUsedTypeDescription(variant: ProjectionVariant): string {
 // Activation (ActivateObjects, HandlerActivate)
 // ---------------------------------------------------------------------------
 
-/** The codes a group activation activates on `V` (`activateObjectsGroup`). */
-export type ActivationCode<V extends ProjectionVariant> = AdtActivationCode<V>;
+/**
+ * The codes ActivateObjects activates on `V` (`activateObjectsGroup`): the
+ * text elements (`PROG/PX`, `CLAS/OCX`) wait for their address rule.
+ */
+export type ActivationCode<V extends ProjectionVariant> = Exclude<
+  AdtActivationCode<V>,
+  'PROG/PX' | 'CLAS/OCX'
+>;
 
 /** ActivateObjects' `objects[].type` codes: what a group activation takes. */
 export const ACTIVATION_CODES = projected<
@@ -1542,6 +1558,9 @@ const TABLE_CODE_LIST = [
   'ENHO/XHH',
   'ENHO/XHB',
   'ENHS/XSB',
+  'TABL/DTT',
+  'PROG/PX',
+  'CLAS/OCX',
 ] as const satisfies readonly AdtTypeCode[];
 
 /** Every code of each variant's table. */

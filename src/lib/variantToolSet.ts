@@ -157,6 +157,7 @@ const TOOL_NEEDS_BY_NAME = {
   AddTransportObject: { api: 'request', operation: 'addObject' },
   CreateTable: { api: 'table', operation: 'create' },
   UpdateTable: { api: 'table', operation: 'update' },
+  UpdateTableSettings: { api: 'tableSettings', operation: 'updateMetadata' },
   DeleteTable: { api: 'table', operation: 'delete' },
   CreateStructure: { api: 'structure', operation: 'create' },
   UpdateStructure: { api: 'structure', operation: 'update' },

@@ -487,6 +487,10 @@ import {
   TOOL_DEFINITION as UpdateTableHigh_Tool,
 } from '../../../handlers/table/high/handleUpdateTable';
 import {
+  handleUpdateTableSettings,
+  TOOL_DEFINITION as UpdateTableSettings_Tool,
+} from '../../../handlers/table/high/handleUpdateTableSettings';
+import {
   TOOL_DEFINITION as ActivateTable_Tool,
   handleActivateTable,
 } from '../../../handlers/table/low/handleActivateTable';
@@ -818,6 +822,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       defineTool(CreateTable_Tool, handleCreateTable),
       defineTool(GetTable_Tool, handleGetTable),
       defineTool(UpdateTableHigh_Tool, handleUpdateTableHigh),
+      defineTool(UpdateTableSettings_Tool, handleUpdateTableSettings),
       defineTool(DeleteTable_Tool, handleDeleteTable),
       defineTool(CreateStructure_Tool, handleCreateStructure),
       defineTool(GetStructure_Tool, handleGetStructure),

@@ -64,7 +64,7 @@ const DESCRIPTION =
   'Writes technical settings of the existing database table named by table_name: each setting given is written over the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.';
 
 /** The settings an update may name, on every system kind. */
-const SETTINGS_SHAPE = {
+export const SETTINGS_SHAPE = {
   table_name: requiredText('table_name is required').describe(
     'Table name. The table must already exist.',
   ),
@@ -124,7 +124,7 @@ const SETTINGS_SHAPE = {
  * `chk_writable_amdp_usage`; measured on the cloud, an `E` message and the
  * table left inactive). The owner's wording.
  */
-const AMDP_FLAG = z
+export const AMDP_FLAG = z
   .boolean()
   .optional()
   .describe(
@@ -189,7 +189,9 @@ export const TOOL_DEFINITION = {
 } as const;
 
 /** The arguments as the cloud schema reads them; on premise without the flag. */
-type UpdateTableSettingsArgs = z.output<ReturnType<typeof settingsSchema>> & {
+export type UpdateTableSettingsArgs = z.output<
+  ReturnType<typeof settingsSchema>
+> & {
   is_writable_by_amdp?: boolean | undefined;
 };
 
@@ -305,6 +307,57 @@ type Written = IAdtResponse<
   IAdtError
 >;
 
+/** Patch `changes` under `lockHandle`: the library's read and guarded PUT. */
+function patchSettings<V extends AdtModernVariant>(
+  settings: SettingsHandler<V>,
+  config: { tableName: string; transportRequest?: string | undefined },
+  changes: ITableSettingsChangesOf<Extract<V, AdtModernVariant>>,
+  lockHandle: string,
+): Promise<Written> {
+  return settings.patchMetadata(
+    { ...config, changes },
+    {
+      headers: { accept: TABLE_SETTINGS_MEDIA_TYPE },
+      lockHandle,
+      analyse: analyseException,
+    },
+  );
+}
+
+/**
+ * The settings' write under a lock the caller holds (compact HandlerUpdate):
+ * `patchMetadata` alone, no lock, unlock or activation of its own; the
+ * change set typed by the variant the client was built for.
+ */
+export function patchTableSettingsUnderLock(
+  context: Pick<HandlerContext, 'connection' | 'logger'>,
+  args: UpdateTableSettingsArgs,
+  lockHandle: string,
+) {
+  const target = adtClientOf(context.connection, context.logger);
+  const config = {
+    tableName: args.table_name.toUpperCase(),
+    transportRequest: args.transport_request,
+  };
+  return target.variant === 'cloud'
+    ? writeOrRefuse(cloudChangesOf(args), (changes) =>
+        patchSettings(
+          target.client.getTableSettings(settingsResults()),
+          config,
+          changes,
+          lockHandle,
+        ),
+      )
+    : writeOrRefuse(changesOf(args), (changes) =>
+        patchSettings(
+          target.client.getTableSettings(settingsResults()),
+          config,
+          changes,
+          lockHandle,
+        ),
+      );
+}
+
 /**
  * LOCK the settings, patch `changes` under the handle, UNLOCK: one atomic
  * call, the release reported when it is refused (`withLock`).
@@ -320,14 +373,7 @@ function writeSettings<V extends AdtModernVariant>(
     atStep(
       'update',
       (lockHandle: string): Promise<Written> =>
-        settings.patchMetadata(
-          { ...config, changes },
-          {
-            headers: { accept: TABLE_SETTINGS_MEDIA_TYPE },
-            lockHandle,
-            analyse: analyseException,
-          },
-        ),
+        patchSettings(settings, config, changes, lockHandle),
     ),
     (lockHandle) =>
       settings.unlock({ tableName: config.tableName }, lockHandle, {

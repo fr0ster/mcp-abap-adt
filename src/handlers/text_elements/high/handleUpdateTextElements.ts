@@ -74,7 +74,7 @@ import {
 const DESCRIPTION =
   "Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers whether SAP saved each part and, when activated, whether SAP activated them, with its messages.";
 
-const SYMBOLS = z
+export const SYMBOLS = z
   .array(
     z.object({
       key: z.string().describe('Symbol key, up to 3 characters.'),
@@ -89,7 +89,7 @@ const SYMBOLS = z
   .optional()
   .describe('The text symbols: the whole list; symbols left out are deleted.');
 
-const SELECTIONS = z
+export const SELECTIONS = z
   .array(
     z.object({
       name: z
@@ -111,7 +111,7 @@ const SELECTIONS = z
     'The selection texts (programs and function groups): the whole list; texts left out are deleted.',
   );
 
-const HEADINGS = z
+export const HEADINGS = z
   .object({
     list_header: z.string().optional(),
     column_header_1: z.string().optional(),
@@ -196,7 +196,7 @@ export const TOOL_DEFINITION = {
 type UpdateTextElementsArgs = z.output<ReturnType<typeof updateSchema>>;
 
 /** The parts the arguments give, in a fixed order: symbols, selections, headings. */
-function documentsOf(args: UpdateTextElementsArgs): TextElementsDocument[] {
+function documentsOf(args: PartsArgs): TextElementsDocument[] {
   const symbols: TextElementsDocument[] =
     args.symbols === undefined
       ? []
@@ -248,7 +248,7 @@ function documentsOf(args: UpdateTextElementsArgs): TextElementsDocument[] {
 function partWrites(
   kind: ObjectKind,
   objectName: string,
-  args: UpdateTextElementsArgs,
+  args: PartsArgs,
 ): ITextElementsUpdateConfig[] {
   const transport =
     args.transport_request === undefined
@@ -293,6 +293,79 @@ const PART_OPERATION = {
   headings: 'textHeadings.update',
 } as const;
 
+/** The text elements handler of `connection`, with this tool's result set. */
+function textsOf(context: Pick<HandlerContext, 'connection' | 'logger'>) {
+  return textElementsClientOf(
+    context.connection,
+    context.logger,
+  ).getTextElements(resultsFor(textElementsDocuments));
+}
+
+/** The text elements handler UpdateTextElements writes through. */
+type TextsHandler = ReturnType<typeof textsOf>;
+
+/** What a write of parts reads of its arguments. */
+type PartsArgs = Pick<
+  UpdateTextElementsArgs,
+  | 'object_kind'
+  | 'object_name'
+  | 'symbols'
+  | 'selections'
+  | 'headings'
+  | 'transport_request'
+>;
+
+/**
+ * One PUT per part given, in order, under `lockHandle`; the first refused
+ * ends the writes, its step naming the part (the parts before it are
+ * saved). A call giving no part is refused, nothing sent.
+ */
+async function writeParts(
+  context: HandlerContext,
+  texts: TextsHandler,
+  args: PartsArgs,
+  lockHandle: string,
+): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> {
+  let last: IAdtResponse<AdtReading<unknown>, IAdtError> = failed(
+    {
+      message: 'Give at least one of symbols, selections, headings',
+      origin: 'refusal',
+      step: 'update',
+    },
+    'UpdateTextElements',
+  );
+  for (const config of partWrites(
+    args.object_kind,
+    args.object_name.toUpperCase(),
+    args,
+  )) {
+    last = await atStep(`update ${config.part}`, () =>
+      withAdtHeaders(context, PART_OPERATION[config.part], (headers) =>
+        texts.update(config, {
+          headers,
+          lockHandle,
+          analyse: analyseException,
+        }),
+      ),
+    )();
+    if (!last.ok) return last;
+  }
+  return last;
+}
+
+/**
+ * The text elements' write under a lock the caller holds (compact
+ * HandlerUpdate): one PUT per part given, no lock, unlock or activation of
+ * its own.
+ */
+export function writeTextElementsUnderLock(
+  context: HandlerContext,
+  args: PartsArgs,
+  lockHandle: string,
+) {
+  return writeParts(context, textsOf(context), args, lockHandle);
+}
+
 export async function handleUpdateTextElements(
   context: HandlerContext,
   args: UpdateTextElementsArgs,
@@ -312,32 +385,7 @@ export async function handleUpdateTextElements(
 
       const written = await withLock(
         () => texts.lock(object, { analyse: analyseLock }),
-        async (lockHandle) => {
-          // One PUT per part, in order; the first refused ends the writes,
-          // its step naming the part (the parts before it are saved). The
-          // schema refuses a call giving no part.
-          let last: IAdtResponse<AdtReading<unknown>, IAdtError> = failed(
-            {
-              message: 'Give at least one of symbols, selections, headings',
-              origin: 'refusal',
-              step: 'update',
-            },
-            'UpdateTextElements',
-          );
-          for (const config of partWrites(kind, objectName, args)) {
-            last = await atStep(`update ${config.part}`, () =>
-              withAdtHeaders(context, PART_OPERATION[config.part], (headers) =>
-                texts.update(config, {
-                  headers,
-                  lockHandle,
-                  analyse: analyseException,
-                }),
-              ),
-            )();
-            if (!last.ok) return last;
-          }
-          return last;
-        },
+        (lockHandle) => writeParts(context, texts, args, lockHandle),
         (lockHandle) =>
           texts.unlock(object, lockHandle, { analyse: analyseException }),
         { type: 'TEXT', name: objectName },

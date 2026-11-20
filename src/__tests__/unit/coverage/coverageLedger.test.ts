@@ -168,8 +168,9 @@ describe('the coverage ledger guard', () => {
     // 24.0.0: GetObjectDraft, one more; BatchBegin, BatchEnd and
     // BatchAnswers left the full sets, three fewer; DebugBatchAnswers, one
     // more; compact HandlerSearch and HandlerWhereUsed left for
-    // HandlerSystem (D25), one fewer.
-    assert.equal(new Set(served.map((tool) => tool.name)).size, 311);
+    // HandlerSystem (D25), one fewer. A table's technical settings and the
+    // text elements: their reads and writes, four more.
+    assert.equal(new Set(served.map((tool) => tool.name)).size, 315);
     assertEquals(of(findings, 'served-mismatch'), []);
   });
 

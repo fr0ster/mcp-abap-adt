@@ -4919,7 +4919,6 @@
       "edit",
       "write",
       "save",
-      "add",
       "delete",
       "text elements",
       "text symbols",
@@ -4932,6 +4931,6 @@
       "function group",
       "class"
     ],
-    "semantic": "Change the text elements of an ABAP program, function group or class: add, edit or delete its text symbols, selection texts and headings."
+    "semantic": "Change the text elements of an ABAP program, function group or class: write, edit or delete its text symbols, selection texts and headings."
   }
 }

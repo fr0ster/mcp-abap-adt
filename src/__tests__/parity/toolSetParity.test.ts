@@ -939,7 +939,8 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // background-run tools of the long reads (and, on stdio, the
       // leftover-session list; on http SessionOpen and SessionClose); no
       // write, run, debugger, logoff, resume or batch mode.
-      expect(fullRo.tools).toHaveLength(onStdio ? 71 : onHttp ? 72 : 70);
+      // A table's technical settings and the text elements: their reads, two more.
+      expect(fullRo.tools).toHaveLength(onStdio ? 73 : onHttp ? 74 : 72);
       for (const name of [
         'GetBackgroundRun',
         'ListBackgroundRuns',

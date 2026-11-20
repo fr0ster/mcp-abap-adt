@@ -259,7 +259,7 @@ operation, with no prefix (owner decision 5). The six object prompts are below; 
 | `activate` | `object_type` required, completed · `name` required | Activates an ABAP object of `object_type` named `name`: asks the model to call `<tools>`. |
 | `check` | `object_type` required, completed · `name` required | Runs a syntax check of an ABAP object of `object_type` named `name`: asks the model to call `<tools>`. |
 | `unit_test` | `object_type` required, completed · `name` required · `include_subpackages` optional, completed | Runs the ABAP Unit tests of the object of `object_type` named `name`, or of a package: asks the model to call `<tools>` and read the result. |
-| `where_used` | `object_type` required, completed · `name` required | Lists the objects that use the object of `object_type` named `name`: asks the model to call `<tools>`. |
+| `where_used` | `object_type` required, completed · `name` required · `container` optional, completed, required with `text_elements` | Lists the objects that use the object of `object_type` named `name`: asks the model to call `<tools>`. |
 | `transport` | `action` required, completed · `number` · `description` · `user` · `object_type` (completed) · `name` · `target_number` — each optional, required per action (§2.5) | Works with transport requests by `action`: asks the model to call `<tools>`. |
 
 Argument descriptions (static, functional, naming nothing concrete — the repository's
@@ -269,6 +269,8 @@ description rule, `CLAUDE.md` "What we write names nothing concrete"):
   operation."
 - `name` — "The object's name (for a function module, as the type's arguments state)."
 - `include_subpackages` — "For a package: `true` runs the tests of its subpackages too."
+- `container` — "For `text_elements`: whose text elements they are, `program` or
+  `function_group`."
 - `action`, `number`, `user`, `target_number` — §2.5.
 - `package_name` — "The package the object is created in."
 - `description` — "The object's short description."
@@ -291,7 +293,19 @@ already names every type the six operations share. Per operation:
 - `RUNTIME_PROFILE` and `RUNTIME_DUMP` are in no operation (their CRUD matrix row is empty,
   `COMPACT_CRUD_MATRIX`).
 
-The full-set-only types (message class, function include, …) stay out (owner decision 5).
+**Types only one family has stay out (owner decision 5), and this wins over reading a
+tool's members.** The vocabulary holds a type only when both families serve it, each in
+at least one operation of §1.4 (the full set by a per-type tool); a type one family alone
+serves is in no operation, whatever a tool's members say. A type in the vocabulary is still
+served per operation by the rows (compact alone activates `PACKAGE`). The
+full-set-only types (message class, function include, …) stay out. The current compact-only
+instance (owner, 2026-11-20): `TABLE_SETTINGS`, `PROGRAM_TEXT_ELEMENTS`,
+`FUNCTION_GROUP_TEXT_ELEMENTS` and `CLASS_TEXT_ELEMENTS`, members of `HandlerGet`,
+`HandlerUpdate`, `HandlerLock` and (the three text elements types) `HandlerActivate` since
+24.1.0, which the full set serves only through `GetTableSettings`, `UpdateTableSettings`,
+`GetTextElements`, `UpdateTextElements` and `ActivateObjects`. They are in no prompt's
+vocabulary: each row table types its keys over `CompactObjectType` without them (one
+exported union, `ONE_FAMILY_TYPES`, excluded), so a row for one does not compile.
 
 ### 2.3 `unit_test`
 
@@ -357,7 +371,10 @@ values typed as the codes both kinds' `WHERE_USED_CODES` hold (Code: the two lis
 `function_group` `FUGR/F`, `function_module` `FUGR/FF`, `package` `DEVC/K`, `ddl` `DDLS/DF`,
 `table` `TABL/DT`, `structure` `TABL/DS`, `table_type` `TTYP/DA`, `domain` `DOMA/DD`,
 `data_element` `DTEL/DE`, `behavior_definition` `BDEF/BDO`, `metadata_extension` `DDLX/EX`,
-`service_definition` `SRVD/SRV`, `service_binding` `SRVB/SVB` — 17 types.
+`service_definition` `SRVD/SRV`, `service_binding` `SRVB/SVB`, `text_elements` `PROG/PX` —
+18 types. `text_elements` (owner, 2026-11-20) is a program's or a function group's text
+elements, a where-used type both families serve; it is a where-used type only, in no other
+operation and not an `OBJECT_DIRECTORY_TYPE` key (§2.5).
 
 | Binary | Tool and arguments |
 |---|---|
@@ -365,8 +382,16 @@ values typed as the codes both kinds' `WHERE_USED_CODES` hold (Code: the two lis
 | compact, compact-ro | `HandlerSystem` with `action: where_used`, `object_name`, `object_type`: the code |
 | legacy | — |
 
-- **Per binary** (**Measured**, §1.7): every non-legacy binary serves all 17 types on onprem
-  and cloud (a type is served when its code is in the kind's `WHERE_USED_CODES`).
+- **Per binary** (**Measured**, §1.7; `PROG/PX` measured 2026-11-20 on the listed-schemas
+  fixture): every non-legacy binary serves all 18 types on onprem and cloud (a type is served
+  when its code is in the kind's `WHERE_USED_CODES`).
+- **`container`** (**Measured**: `GetWhereUsed` and `HandlerSystem` list `container`, enum
+  `program` | `function_group`, required with `PROG/PX` and taken by it alone, on every
+  non-legacy binary and kind). The prompt's `container` is required with `text_elements` and
+  passed through as the call's `container`: `where_used: container is required.` when it is
+  absent or blank, `where_used: container is read with object_type text_elements only.` when
+  it is given with another type, and a value outside the listed enum is refused with the
+  enum's values. It is completed from the listed `container` enum.
 - **A function module's name** is `GROUP|MODULE` for both tools (Measured: their
   `object_name` description); for `function_module` the instruction quotes the listed
   `object_name` description of the tool, so the form comes from the definition.
@@ -389,6 +414,12 @@ values typed as the codes both kinds' `WHERE_USED_CODES` hold (Code: the two lis
   List where the CLASS "<name>" is used.
   1. Call HandlerSystem with action: "where_used", object_name: "<name>",
      object_type: "CLAS/OC", background: false.
+  ```
+  core — `/where_used text_elements <name> program`:
+  ```
+  List where the TEXT_ELEMENTS "<name>" is used.
+  1. Call GetWhereUsed with object_name: "<name>", object_type: "PROG/PX",
+     container: "program", background: false.
   ```
 
 ### 2.5 `transport`
@@ -776,19 +807,22 @@ an omitted `background` reads as `true` (`readLongBackground`) and the call answ
   types per operation, under the SDK's cut of 100.
 - Other closed sets: `transport` `action` (the served actions, §2.5) and its `object_type`
   (the 16 types of `OBJECT_DIRECTORY_TYPE`); `unit_test` `include_subpackages` (`true`,
-  `false`). `name`, `number`, `user`, `description`, `change` are not completed (names from
+  `false`); `where_used` `container` (the listed enum: `program`, `function_group`). `name`, `number`, `user`, `description`, `change` are not completed (names from
   the SAP system are out of scope, goal).
-- Per binary and kind (**Measured**: the listed-schemas fixture counted under §2.2), served
-  types per operation:
+- Per binary and kind (**Measured**: the listed-schemas fixture counted under §2.2;
+  re-measured 2026-11-20 on the fixture after 24.1.0 — the four one-family types out, `get`
+  29 `HandlerGet` members less `UNIT_TEST`, `CDS_UNIT_TEST`, `TRANSPORT` and the four; the
+  full set's per-type tools unchanged; `where_used` gains `text_elements`), served types per
+  operation:
 
   | Binary family, kind | create | get | update | delete | activate | check | unit_test | where_used | transport actions |
   |---|---|---|---|---|---|---|---|---|---|
-  | core, onprem | 20 | 22 | 24 | 24 | 16 | 14 | 6 | 17 | 10 |
-  | core, cloud | 18 | 22 | 22 | 22 | 14 | 14 | 6 | 17 | 10 |
-  | core-ro, onprem / cloud | — | 18 | — | — | — | — | — | 17 | 4 |
-  | compact, onprem | 18 | 22 | 24 | 24 | 18 | 14 | 6 ² | 17 | 5 |
-  | compact, cloud | 16 | 22 | 22 | 22 | 16 | 14 | 6 ² | 17 | 5 |
-  | compact-ro, onprem / cloud | — | 22 | — | — | — | 14 | — | 17 | 2 |
+  | core, onprem | 20 | 22 | 24 | 24 | 16 | 14 | 6 | 18 | 10 |
+  | core, cloud | 18 | 22 | 22 | 22 | 14 | 14 | 6 | 18 | 10 |
+  | core-ro, onprem / cloud | — | 18 | — | — | — | — | — | 18 | 4 |
+  | compact, onprem | 18 | 22 | 24 | 24 | 18 | 14 | 6 ² | 18 | 5 |
+  | compact, cloud | 16 | 22 | 22 | 22 | 16 | 14 | 6 ² | 18 | 5 |
+  | compact-ro, onprem / cloud | — | 22 | — | — | — | 14 | — | 18 | 2 |
   | any, legacy | — | — | — | — | — | — | — | — | — |
 
   `get` leaves out `TRANSPORT` (§2.2); ² five if `function_module` leaves the compact

@@ -96,31 +96,26 @@ decide it.
   exports, so nothing there changes. The new subpath goes into the root `package.json`
   `exports` and `tsconfig.paths.json`.
 
-## Open for the owner: the types 24.1.0 added (measured 2026-11-20)
+## The types 24.1.0 added (owner decision, 2026-11-20)
 
-24.1.0 added four compact types and four full-set tools after the spec's measurements
-(spec §1.4 and §6 were counted on `8a9ed531`). **Measured** from today's
-`tests/fixtures/tools/listed-schemas.json` (compact stdio binary):
+24.1.0 added four compact types and four full-set tools after the spec's first
+measurements. **Measured** on today's `tests/fixtures/tools/listed-schemas.json`:
+`HandlerGet` offers `TABLE_SETTINGS`, `PROGRAM_TEXT_ELEMENTS`,
+`FUNCTION_GROUP_TEXT_ELEMENTS`, `CLASS_TEXT_ELEMENTS` (29 members on both kinds),
+`HandlerUpdate` all four on onprem and three on cloud, `HandlerActivate` the three text
+elements types; the full set serves them only through `GetTableSettings`,
+`UpdateTableSettings`, `GetTextElements`, `UpdateTextElements` and `ActivateObjects`, and
+lists no other new tool. `GetWhereUsed` and `HandlerSystem` `where_used` take `PROG/PX`
+with `container` (`program` | `function_group`) on every non-legacy binary and kind.
 
-- `HandlerGet` gains `TABLE_SETTINGS`, `PROGRAM_TEXT_ELEMENTS`,
-  `FUNCTION_GROUP_TEXT_ELEMENTS`, `CLASS_TEXT_ELEMENTS` (29 members on both kinds);
-  `HandlerUpdate` gains all four on onprem (28) and three on cloud, no program text
-  elements (25); `HandlerLock` the same four / three; `HandlerActivate` the three text
-  elements types on both kinds (21 / 19); `HandlerCreate`, `HandlerDelete` and
-  `HandlerCheckRun` are unchanged.
-- The full set serves them only through `GetTableSettings`, `UpdateTableSettings`,
-  `GetTextElements`, `UpdateTextElements` (one tool for three object kinds) and
-  `ActivateObjects` with `PROG/PX` / `CLAS/OCX`: no `<Operation><Type>` tool, so no full row
-  of spec §3.3's shape `{ tool, name }` can express them.
-- `GetWhereUsed` and `HandlerSystem` `where_used` take `PROG/PX` with a required
-  `container`; spec §2.4's `WHERE_USED_AS` holds 17 types without it.
-
-Spec §2.2 reads the compact vocabulary off each compact tool's members, which would take the
-four types into compact `get`, `update` and `activate` and change §6's counts; its premise
-("compact already names every type the six operations share") and owner decision 5 (types
-only one family has stay out) no longer agree for them. The spec does not decide it, so no
-task does: Tasks 3.1, 3.2, 3.4 and 5 start only after the owner's answer, and spec §6's
-served counts, which their assertions read, are re-counted on today's fixture under it.
+**Owner decision** (spec §2.2, §2.4, §6 amended):
+- The four types stay out of every prompt: types only one family has stay out (decision 5),
+  over reading a tool's members. `ONE_FAMILY_TYPES` (Task 3.1) names them, and every row
+  table is keyed by `Exclude<CompactObjectType, ONE_FAMILY_TYPES>`.
+- `where_used` serves `text_elements` (`PROG/PX`) with a `container` argument, required with
+  it and passed through (Task 3.4).
+- Spec §6, re-measured: every count is as before but `where_used`, 17 → 18 on every
+  non-legacy row.
 
 ## Review Focus
 
@@ -454,12 +449,16 @@ values.
   here uses it, and so does the compact `update` of Task 3.2;
 - `READ_AS: Partial<Record<UpdateType, ReadType>>`, with `UNIT_TEST` and `CDS_UNIT_TEST`
   mapped to `LOCAL_TEST_CLASS`. It is defined here beside the other tables, and only
-  Task 3.2 reads it.
+  Task 3.2 reads it;
+- `ONE_FAMILY_TYPES = 'TABLE_SETTINGS' | 'PROGRAM_TEXT_ELEMENTS' |
+  'FUNCTION_GROUP_TEXT_ELEMENTS' | 'CLASS_TEXT_ELEMENTS'` (spec §2.2), exported; the row
+  tables are keyed by `Exclude<CompactObjectType, ONE_FAMILY_TYPES>`.
 
 **Rules (spec):**
 - **Vocabulary (§2.2):** `create` leaves out `TRANSPORT`, and keeps the full set's
   `UNIT_TEST` and `CDS_UNIT_TEST`. `get` leaves out `UNIT_TEST`, `CDS_UNIT_TEST` and
-  `TRANSPORT`.
+  `TRANSPORT`. Every operation leaves out `ONE_FAMILY_TYPES`, even where a compact tool
+  offers them (`get`, `activate`).
 - **Full or compact (§3.1):** a binary uses the full row when its tools are listed, else
   the compact row.
 - **Optional arguments (§5.3):** `package_name`, `description` and `transport_request` are
@@ -484,6 +483,9 @@ values.
     compact-ro `/check class`;
   - compact `/get package` passes `part: "metadata"` and `background: false`;
   - compact `/get class` passes no `part`;
+  - `/get table_settings`, `/get class_text_elements` and `/activate program_text_elements`
+    are refused with the not-served words on compact onprem, and the completion of `get`
+    and `activate` names none of the four;
   - the served counts of spec §6 for these five operations, per family and kind, the
     `get` count without `TRANSPORT`;
   - test 3, refusals:
@@ -528,6 +530,8 @@ values.
   - compact `/update local_types` locks `CLASS` by `object_name: <name>`;
   - compact `/update package` reads with `part: "metadata"`;
   - full `/update unit_test` reads with `GetLocalTestClass`;
+  - compact `/update table_settings` and `/update function_group_text_elements` are refused
+    with the not-served words, and the `update` completion names none of the four;
   - the §6 `update` counts;
   - test 4's case: with `HandlerLock.CLASS` denied, compact `update` serves no class
     include, no `CLASS` and no `UNIT_TEST`, and a compact `delete` of `local_types` is
@@ -573,17 +577,26 @@ target.
 **Files:** `src/lib/prompts/whereUsedPrompt.ts`, `src/__tests__/unit/prompts/whereUsedPrompt.test.ts`.
 
 **Interfaces.** Produces `WHERE_USED_AS`, with values typed as members of both kinds'
-`WHERE_USED_CODES`. Its 17 entries are those of spec §2.4.
+`WHERE_USED_CODES`. Its 18 entries are those of spec §2.4, `text_elements` → `PROG/PX`
+included. The prompt gains the `container` argument (spec §2.1, §2.4), completed from the
+listed `container` enum of the row's tool.
 
 **Rules:**
 - **Core:** `GetWhereUsed`. **Compact:** `HandlerSystem` `action: "where_used"`, visible
   when `where_used` is in `membersOn(HandlerSystem)`.
 - **`background: false`** is passed exactly where the listed schema has `background`.
 - **`function_module`** quotes the tool's listed `object_name` description.
+- **`container`** (spec §2.4): with `text_elements` it is required and passed as the call's
+  `container`; absent or blank, `where_used: container is required.`; given with any other
+  type, `where_used: container is read with object_type text_elements only.`; a value
+  outside the listed enum is refused with the enum's values.
 
 - [ ] Tests first (test 11):
-  - the two §2.4 texts;
-  - every type's code;
+  - the three §2.4 texts, `text_elements` with `container: "program"` among them;
+  - every type's code, 18 types on every non-legacy binary and kind;
+  - `container`: `function_group` passed through; missing and blank refused; given with
+    `class` refused; `screen` refused naming `program`, `function_group`; its completion is
+    the listed enum;
   - a server with no background-run strategy (`promptSourceFor(…, { backgroundRuns: false })`)
     passes no `background`, and no step reads a `run_handle`;
   - denying `HandlerSystem.where_used` removes the prompt from compact, and denying
@@ -821,6 +834,8 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
     A property the helper cannot fill is a test failure naming the tool and the property.
     It is never skipped. For example, core `get function_module` fills
     `function_group_name: "X1"`;
+  - give `where_used` `text_elements` its `container` as the first value of the listed
+    `container` enum (`program`), the one prompt argument the generator cannot fill;
   - assert that, after the fill, every name in the listed schema's `required` is present.
     This shows the step data and the listed schema agree on what is required;
   - parse with `promptSource.tools.get(step.tool).inputSchema` (the variant's, rules
@@ -832,8 +847,9 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
     `000001`, `pgmid` `LIMU`. These are the top-level arguments of core `remove_object`,
     and `objects[0]` of `move_objects` (core and compact). On the unmutated code this
     holds, and the baseline passes.
-  - with no kind, each binary's served counts per prompt equal its `onprem` counts (spec
-    §6). This turns the members-unread mutation red, where an empty served set would
+  - each binary's served counts per prompt and kind equal spec §6's table as re-measured
+    on 2026-11-20 (`where_used` 18), and with no kind they equal its `onprem` counts (spec
+    §6, ruling C10). This turns the members-unread mutation red, where an empty served set would
     otherwise pass the test vacuously.
 - [ ] Verify with `npm test -- src/__tests__/unit/prompts/promptCallsParse.test.ts`.
   **Expected:** pass.

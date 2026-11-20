@@ -13,7 +13,7 @@ import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 /** `./src/index.ts` → `<buildDir>/src/index.js`. */
-function compiledFile(buildDir: string, target: string): string {
+export function compiledFile(buildDir: string, target: string): string {
   if (!target.startsWith('./') || !target.endsWith('.ts')) {
     throw new Error(`not a ./….ts source entry: ${target}`);
   }

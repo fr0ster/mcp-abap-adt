@@ -10,27 +10,28 @@
  * SAP-free via a mocked AdtClient.
  */
 
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
+import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
+import * as clients from '../../lib/clients';
 import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
 
-const mockCreate = jest.fn();
-const mockLock = jest.fn();
-const mockUpdate = jest.fn();
-const mockUnlock = jest.fn();
-const mockActivate = jest.fn();
+const mockCreate = mock.fn<(...args: any[]) => any>();
+const mockLock = mock.fn<(...args: any[]) => any>();
+const mockUpdate = mock.fn<(...args: any[]) => any>();
+const mockUnlock = mock.fn<(...args: any[]) => any>();
+const mockActivate = mock.fn<(...args: any[]) => any>();
 
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => ({
-    getServiceDefinition: () => ({
-      create: mockCreate,
-      lock: mockLock,
-      update: mockUpdate,
-      unlock: mockUnlock,
-      activate: mockActivate,
-    }),
+mock.method(clients, 'createAdtClient', () => ({
+  getServiceDefinition: () => ({
+    create: mockCreate,
+    lock: mockLock,
+    update: mockUpdate,
+    unlock: mockUnlock,
+    activate: mockActivate,
   }),
 }));
-
-import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -43,35 +44,40 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
       mockUnlock,
       mockActivate,
     ]) {
-      m.mockReset();
+      m.mock.resetCalls();
+      m.mock.mockImplementation(() => undefined);
     }
-    mockCreate.mockResolvedValue(okResponse(reading(undefined, '', 201)));
-    mockLock.mockResolvedValue(okResponse('LOCK1'));
-    mockUpdate.mockResolvedValue(okResponse(reading(undefined, '', 200)));
-    mockUnlock.mockResolvedValue(okResponse(undefined));
-    mockActivate.mockResolvedValue(okResponse(reading({})));
+    mockCreate.mock.mockImplementation(async () =>
+      okResponse(reading(undefined, '', 201)),
+    );
+    mockLock.mock.mockImplementation(async () => okResponse('LOCK1'));
+    mockUpdate.mock.mockImplementation(async () =>
+      okResponse(reading(undefined, '', 200)),
+    );
+    mockUnlock.mock.mockImplementation(async () => okResponse(undefined));
+    mockActivate.mock.mockImplementation(async () => okResponse(reading({})));
   });
 
   it('locks, calls update() with the source_code in options, and unlocks, before create() before activation', async () => {
     const src = 'define service ZSD provider contracts { expose zi_x; }';
     const order: string[] = [];
-    mockCreate.mockImplementation(async () => {
+    mockCreate.mock.mockImplementation(async () => {
       order.push('create');
       return okResponse(reading(undefined, '', 201));
     });
-    mockLock.mockImplementation(async () => {
+    mockLock.mock.mockImplementation(async () => {
       order.push('lock');
       return okResponse('LOCK1');
     });
-    mockUpdate.mockImplementation(async () => {
+    mockUpdate.mock.mockImplementation(async () => {
       order.push('update');
       return okResponse(reading(undefined, '', 200));
     });
-    mockUnlock.mockImplementation(async () => {
+    mockUnlock.mock.mockImplementation(async () => {
       order.push('unlock');
       return okResponse(undefined);
     });
-    mockActivate.mockImplementation(async () => {
+    mockActivate.mock.mockImplementation(async () => {
       order.push('activate');
       return okResponse(reading({}));
     });
@@ -82,26 +88,45 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
       source_code: src,
     } as any);
 
-    expect((result as any).isError).toBe(false);
-    expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(mockLock).toHaveBeenCalledWith(
-      { serviceDefinitionName: 'ZSD' },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal((result as any).isError, false);
+    assert.equal(mockCreate.mock.callCount(), 1);
+    assert.ok(
+      mockLock.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], { serviceDefinitionName: 'ZSD' }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
-    expect(mockUpdate).toHaveBeenCalledWith(
-      { serviceDefinitionName: 'ZSD', transportRequest: undefined },
-      expect.objectContaining({
-        source: src,
-        lockHandle: 'LOCK1',
-        analyse: expect.any(Function),
-      }),
+    assert.ok(
+      mockUpdate.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            serviceDefinitionName: 'ZSD',
+            transportRequest: undefined,
+          }) &&
+          isDeepStrictEqual(a[1]?.source, src) &&
+          isDeepStrictEqual(a[1]?.lockHandle, 'LOCK1') &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
-    expect(mockUnlock).toHaveBeenCalledWith(
-      { serviceDefinitionName: 'ZSD' },
-      'LOCK1',
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.ok(
+      mockUnlock.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 3 &&
+          isDeepStrictEqual(a[0], { serviceDefinitionName: 'ZSD' }) &&
+          isDeepStrictEqual(a[1], 'LOCK1') &&
+          typeof a[2]?.analyse === 'function',
+      ),
     );
-    expect(order).toEqual(['create', 'lock', 'update', 'unlock', 'activate']);
+    assert.deepStrictEqual(order, [
+      'create',
+      'lock',
+      'update',
+      'unlock',
+      'activate',
+    ]);
   });
 
   it('does not lock or call update() when no source_code is given', async () => {
@@ -111,14 +136,14 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
       activate: false,
     } as any);
 
-    expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(mockLock).not.toHaveBeenCalled();
-    expect(mockUpdate).not.toHaveBeenCalled();
-    expect(mockUnlock).not.toHaveBeenCalled();
+    assert.equal(mockCreate.mock.callCount(), 1);
+    assert.equal(mockLock.mock.callCount(), 0);
+    assert.equal(mockUpdate.mock.callCount(), 0);
+    assert.equal(mockUnlock.mock.callCount(), 0);
   });
 
   it('releases the lock and reports the failure when the body write is refused', async () => {
-    mockUpdate.mockResolvedValue(
+    mockUpdate.mock.mockImplementation(async () =>
       refusedResponse('Object is locked by another user'),
     );
 
@@ -128,11 +153,12 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
       source_code: 'define service ZSD { expose zi_x; }',
     } as any);
 
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
+    assert.equal(result.isError, true);
+    assert.equal(
+      JSON.parse(result.content[0].text).message,
       'Object is locked by another user',
     );
-    expect(mockUnlock).toHaveBeenCalledTimes(1);
-    expect(mockActivate).not.toHaveBeenCalled();
+    assert.equal(mockUnlock.mock.callCount(), 1);
+    assert.equal(mockActivate.mock.callCount(), 0);
   });
 });

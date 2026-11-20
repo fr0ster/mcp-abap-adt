@@ -4,6 +4,9 @@
  * sending anything.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { readTableType } from '../../../../compact-readonly-entries/src/handlers/compactReadRoutes';
 import { buildObjectVersionTools } from '../../../handlers/common/high/objectVersionTools';
 import { TOOL_DEFINITION as GET_OBJECT_VERSION_DIFF } from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
@@ -52,6 +55,11 @@ import {
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { corpusBody } from '../../helpers/adtCorpus';
+import {
+  assertMatchObject,
+  assertNoProperty,
+  assertRejects,
+} from '../../helpers/assertions';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
 import { setSystemContext } from '../../helpers/processSystemContext';
 import {
@@ -86,14 +94,14 @@ describe('GetTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ztt_x' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(1);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 1);
     const [sent] = connection.requests;
-    expect(sent?.method).toBe('GET');
-    expect(sent?.url).toBe('/sap/bc/adt/ddic/tabletypes/ztt_x?version=active');
+    assert.equal(sent?.method, 'GET');
+    assert.equal(sent?.url, '/sap/bc/adt/ddic/tabletypes/ztt_x?version=active');
     const first = result.content[0];
     const answered = JSON.parse(first && 'text' in first ? first.text : '{}');
-    expect(answered).toEqual({
+    assert.deepStrictEqual(answered, {
       success: true,
       table_type_name: 'ZTT_X',
       version: 'active',
@@ -103,66 +111,79 @@ describe('GetTableType', () => {
   });
 
   it('declares the shared read version, active by default', () => {
-    expect(GET_TABLE_TYPE.inputSchema.shape.version).toBe(READ_VERSION_FIELD);
+    assert.equal(GET_TABLE_TYPE.inputSchema.shape.version, READ_VERSION_FIELD);
   });
 
-  it.each(READ_VERSIONS)(
-    'reads the version given (%s), and answers it',
-    async (version) => {
-      const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
-      const result = await handleGetTableType(
-        { connection, logger: undefined },
-        { table_type_name: 'ztt_x', version },
-      );
-      expect(connection.requests.map((r) => r.url)).toEqual([
-        `/sap/bc/adt/ddic/tabletypes/ztt_x?version=${version}`,
-      ]);
-      const first = result.content[0];
-      const answered = JSON.parse(first && 'text' in first ? first.text : '{}');
-      expect(answered.version).toBe(version);
-    },
-  );
+  for (const version of READ_VERSIONS) {
+    it(
+      format('reads the version given (%s), and answers it', version),
+      async () => {
+        const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
+        const result = await handleGetTableType(
+          { connection, logger: undefined },
+          { table_type_name: 'ztt_x', version },
+        );
+        assert.deepStrictEqual(
+          connection.requests.map((r) => r.url),
+          [`/sap/bc/adt/ddic/tabletypes/ztt_x?version=${version}`],
+        );
+        const first = result.content[0];
+        const answered = JSON.parse(
+          first && 'text' in first ? first.text : '{}',
+        );
+        assert.equal(answered.version, version);
+      },
+    );
+  }
 
-  it.each(READ_VERSIONS)(
-    'compact HandlerGet TABLE_TYPE passes its version (%s) to the read',
-    async (version) => {
-      const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
-      await readTableType(
-        { connection, logger: undefined },
-        { table_type_name: 'ztt_x', version },
-      );
-      expect(connection.requests.map((r) => r.url)).toEqual([
-        `/sap/bc/adt/ddic/tabletypes/ztt_x?version=${version}`,
-      ]);
-    },
-  );
+  for (const version of READ_VERSIONS) {
+    it(
+      format(
+        'compact HandlerGet TABLE_TYPE passes its version (%s) to the read',
+        version,
+      ),
+      async () => {
+        const connection = recordingConnection([{ data: TABLE_TYPE_XML }]);
+        await readTableType(
+          { connection, logger: undefined },
+          { table_type_name: 'ztt_x', version },
+        );
+        assert.deepStrictEqual(
+          connection.requests.map((r) => r.url),
+          [`/sap/bc/adt/ddic/tabletypes/ztt_x?version=${version}`],
+        );
+      },
+    );
+  }
 
   it('compact HandlerGet TABLE_TYPE takes version', () => {
-    expect(COMPACT_READ_TAKES.members.TABLE_TYPE).toContain('version');
+    assert.ok(COMPACT_READ_TAKES.members.TABLE_TYPE.includes('version'));
   });
 
   it('refuses an empty table_type_name at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(GET_TABLE_TYPE, handleGetTableType).call(
         { connection, logger: undefined },
         { table_type_name: '' },
       ),
-    ).rejects.toThrow('table_type_name is required at table_type_name');
+      'table_type_name is required at table_type_name',
+    );
     await refused;
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(connection.requests.length, 0);
   });
 
   it('refuses an absent table_type_name at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(GET_TABLE_TYPE, handleGetTableType).call(
         { connection, logger: undefined },
         {},
       ),
-    ).rejects.toThrow('at table_type_name');
+      'at table_type_name',
+    );
     await refused;
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(connection.requests.length, 0);
   });
 
   it('is served on a connection declared cloud', async () => {
@@ -172,8 +193,8 @@ describe('GetTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(1);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 1);
   });
 });
 
@@ -259,8 +280,8 @@ describe('CreateTableType', () => {
         row_type_name: 'MARA',
       },
     );
-    expect(result.isError).toBe(false);
-    expect(wire(connection)).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(wire(connection), [
       `POST ${TTYP}/validation?objtype=ttypda&objname=ZTT_X&description=A+table+type`,
       `POST ${TTYP}?corrNr=K1`,
       `POST ${LOCK_URL}`,
@@ -272,7 +293,7 @@ describe('CreateTableType', () => {
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
       `GET ${TTYP}/ztt_x?version=active`,
     ]);
-    expect(connection.sessions).toEqual([
+    assert.deepStrictEqual(connection.sessions, [
       'stateless',
       'stateless',
       'stateful',
@@ -285,16 +306,17 @@ describe('CreateTableType', () => {
       'stateless',
     ]);
     const create = connection.requests[1];
-    expect(String(create?.data)).toContain(
-      'adtcore:description="A table type"',
+    assert.ok(
+      String(create?.data).includes('adtcore:description="A table type"'),
     );
-    expect(String(create?.data)).toContain(
-      '<adtcore:packageRef adtcore:name="ZP"/>',
+    assert.ok(
+      String(create?.data).includes('<adtcore:packageRef adtcore:name="ZP"/>'),
     );
-    expect(create?.headers?.['Content-Type']).toBe(PAIR);
+    assert.equal(create?.headers?.['Content-Type'], PAIR);
     const put = connection.requests[4];
-    expect(put?.headers?.['Content-Type']).toBe(PAIR);
-    expect(put?.data).toBe(
+    assert.equal(put?.headers?.['Content-Type'], PAIR);
+    assert.equal(
+      put?.data,
       STRING_TABLE.replace(
         '<ttyp:typeKind>predefinedAbapType</ttyp:typeKind>',
         '<ttyp:typeKind>dictionaryType</ttyp:typeKind>',
@@ -323,12 +345,12 @@ describe('CreateTableType', () => {
       },
     );
     const body = String(connection.requests[4]?.data);
-    expect(body).toContain('<ttyp:dataType>CHAR</ttyp:dataType>');
-    expect(body).toContain('<ttyp:length>000010</ttyp:length>');
-    expect(body).toContain('<ttyp:decimals>000002</ttyp:decimals>');
-    expect(body).toContain('<ttyp:accessType>sorted</ttyp:accessType>');
-    expect(body).toContain('<ttyp:definition>rowType</ttyp:definition>');
-    expect(body).toContain('<ttyp:kind>unique</ttyp:kind>');
+    assert.ok(body.includes('<ttyp:dataType>CHAR</ttyp:dataType>'));
+    assert.ok(body.includes('<ttyp:length>000010</ttyp:length>'));
+    assert.ok(body.includes('<ttyp:decimals>000002</ttyp:decimals>'));
+    assert.ok(body.includes('<ttyp:accessType>sorted</ttyp:accessType>'));
+    assert.ok(body.includes('<ttyp:definition>rowType</ttyp:definition>'));
+    assert.ok(body.includes('<ttyp:kind>unique</ttyp:kind>'));
   });
 
   it("leaves SAP's value for every definition property not given; the description is the name, as the create sent it", async () => {
@@ -337,8 +359,9 @@ describe('CreateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP' },
     );
-    expect(connection.requests[4]?.method).toBe('PUT');
-    expect(connection.requests[4]?.data).toBe(
+    assert.equal(connection.requests[4]?.method, 'PUT');
+    assert.equal(
+      connection.requests[4]?.data,
       STRING_TABLE.replace(
         'adtcore:description="Tabelle von Strings"',
         'adtcore:description="ZTT_X"',
@@ -352,12 +375,14 @@ describe('CreateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', description: '' },
     );
-    expect(String(connection.requests[1]?.data)).toContain(
-      'adtcore:description="ZTT_X"',
+    assert.ok(
+      String(connection.requests[1]?.data).includes(
+        'adtcore:description="ZTT_X"',
+      ),
     );
     const put = String(connection.requests[4]?.data);
-    expect(put).toContain('adtcore:description="ZTT_X"');
-    expect(put.includes('adtcore:description=""')).toBe(false);
+    assert.ok(put.includes('adtcore:description="ZTT_X"'));
+    assert.equal(put.includes('adtcore:description=""'), false);
   });
 
   it('declares a schema default on activate and the shared detail alone', () => {
@@ -366,7 +391,7 @@ describe('CreateTableType', () => {
     const defaulted = Object.entries(properties)
       .filter(([, schema]) => typeof schema === 'object' && 'default' in schema)
       .map(([name]) => name);
-    expect(defaulted).toEqual(['activate', 'detail']);
+    assert.deepStrictEqual(defaulted, ['activate', 'detail']);
   });
 
   it('sends no activation with activate false', async () => {
@@ -375,9 +400,9 @@ describe('CreateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', activate: false },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(8);
-    expect(connection.requests[7]?.url).toBe(CHECK_URL);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 8);
+    assert.equal(connection.requests[7]?.url, CHECK_URL);
   });
 
   it('still unlocks when the write is refused, and answers the refusal', async () => {
@@ -386,45 +411,50 @@ describe('CreateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP' },
     );
-    expect(result.isError).toBe(true);
-    expect(wire(connection).slice(4)).toEqual([
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(wire(connection).slice(4), [
       `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}`,
       `POST ${UNLOCK_URL}`,
     ]);
-    expect(connection.sessions[5]).toBe('stateful');
+    assert.equal(connection.sessions[5], 'stateful');
   });
 
-  it.each([
+  for (const [name, args] of [
     ['table_type_name', { table_type_name: '', package_name: 'ZP' }],
     ['package_name', { table_type_name: 'ZTT_X', package_name: '' }],
-  ] as const)('refuses an empty %s, sending nothing', async (name, args) => {
-    const connection = recordingConnection();
-    const result = await handleCreateTableType(
-      { connection, logger: undefined },
-      args,
-    );
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toBe(`${name} is required`);
-    expect(connection.requests).toHaveLength(0);
-  });
+  ] as const) {
+    it(format('refuses an empty %s, sending nothing', name), async () => {
+      const connection = recordingConnection();
+      const result = await handleCreateTableType(
+        { connection, logger: undefined },
+        args,
+      );
+      assert.equal(result.isError, true);
+      assert.equal(textOf(result), `${name} is required`);
+      assert.equal(connection.requests.length, 0);
+    });
+  }
 
-  it.each([
+  for (const [name, args] of [
     ['table_type_name', { package_name: 'ZP' }],
     ['package_name', { table_type_name: 'ZTT_X' }],
-  ])(
-    'refuses an absent %s at the schema, sending nothing',
-    async (name, args) => {
-      const connection = recordingConnection();
-      const refused = expect(
-        defineTool(CreateTableType_Tool, handleCreateTableType).call(
-          { connection, logger: undefined },
-          args,
-        ),
-      ).rejects.toThrow(`at ${name}`);
-      await refused;
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+  ] satisfies [string, Record<string, unknown>][]) {
+    it(
+      format('refuses an absent %s at the schema, sending nothing', name),
+      async () => {
+        const connection = recordingConnection();
+        const refused = assertRejects(
+          defineTool(CreateTableType_Tool, handleCreateTableType).call(
+            { connection, logger: undefined },
+            args,
+          ),
+          `at ${name}`,
+        );
+        await refused;
+        assert.equal(connection.requests.length, 0);
+      },
+    );
+  }
 
   it('is served on a connection declared cloud', async () => {
     const connection = created();
@@ -433,8 +463,8 @@ describe('CreateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(10);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 10);
   });
 });
 
@@ -453,8 +483,8 @@ describe('UpdateTableType', () => {
         transport_request: 'K1',
       },
     );
-    expect(result.isError).toBe(false);
-    expect(wire(connection)).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(wire(connection), [
       `POST ${LOCK_URL}`,
       `GET ${TTYP}/ztt_x?version=workingArea`,
       `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}&corrNr=K1`,
@@ -464,7 +494,7 @@ describe('UpdateTableType', () => {
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
       `GET ${TTYP}/ztt_x?version=active`,
     ]);
-    expect(connection.sessions).toEqual([
+    assert.deepStrictEqual(connection.sessions, [
       'stateful',
       'stateless',
       'stateless',
@@ -475,8 +505,9 @@ describe('UpdateTableType', () => {
       'stateless',
     ]);
     const put = connection.requests[2];
-    expect(put?.headers?.['Content-Type']).toBe(PAIR);
-    expect(put?.data).toBe(
+    assert.equal(put?.headers?.['Content-Type'], PAIR);
+    assert.equal(
+      put?.data,
       STRING_TABLE.replace(
         '<ttyp:accessType>standard</ttyp:accessType>',
         '<ttyp:accessType>hashed</ttyp:accessType>',
@@ -490,8 +521,8 @@ describe('UpdateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(connection.requests[2]?.method).toBe('PUT');
-    expect(connection.requests[2]?.data).toBe(STRING_TABLE);
+    assert.equal(connection.requests[2]?.method, 'PUT');
+    assert.equal(connection.requests[2]?.data, STRING_TABLE);
   });
 
   it('declares a schema default on activate and the shared detail alone, and takes no package', () => {
@@ -500,8 +531,8 @@ describe('UpdateTableType', () => {
     const defaulted = Object.entries(properties)
       .filter(([, schema]) => typeof schema === 'object' && 'default' in schema)
       .map(([name]) => name);
-    expect(defaulted).toEqual(['activate', 'detail']);
-    expect(Object.keys(properties)).not.toContain('package_name');
+    assert.deepStrictEqual(defaulted, ['activate', 'detail']);
+    assert.ok(!Object.keys(properties).includes('package_name'));
   });
 
   it('sends no activation with activate false', async () => {
@@ -510,9 +541,10 @@ describe('UpdateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', activate: false },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(6);
-    expect(connection.requests[5]?.url).toBe(
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 6);
+    assert.equal(
+      connection.requests[5]?.url,
       `${TTYP}/ztt_x?version=inactive&withLongPolling=true`,
     );
   });
@@ -523,14 +555,14 @@ describe('UpdateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(true);
-    expect(wire(connection)).toEqual([
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(wire(connection), [
       `POST ${LOCK_URL}`,
       `GET ${TTYP}/ztt_x?version=workingArea`,
       `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}`,
       `POST ${UNLOCK_URL}`,
     ]);
-    expect(connection.sessions[3]).toBe('stateful');
+    assert.equal(connection.sessions[3], 'stateful');
   });
 
   it('still unlocks when the check is refused, and sends nothing after the unlock', async () => {
@@ -539,15 +571,15 @@ describe('UpdateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(true);
-    expect(wire(connection)).toEqual([
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(wire(connection), [
       `POST ${LOCK_URL}`,
       `GET ${TTYP}/ztt_x?version=workingArea`,
       `PUT ${TTYP}/ztt_x?lockHandle=${HANDLE}`,
       `POST ${CHECK_URL}`,
       `POST ${UNLOCK_URL}`,
     ]);
-    expect(connection.sessions[4]).toBe('stateful');
+    assert.equal(connection.sessions[4], 'stateful');
   });
 
   it('refuses an empty table_type_name, sending nothing', async () => {
@@ -556,21 +588,22 @@ describe('UpdateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: '' },
     );
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toBe('table_type_name is required');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.equal(textOf(result), 'table_type_name is required');
+    assert.equal(connection.requests.length, 0);
   });
 
   it('refuses an absent table_type_name at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(UpdateTableType_Tool, handleUpdateTableType).call(
         { connection, logger: undefined },
         {},
       ),
-    ).rejects.toThrow('at table_type_name');
+      'at table_type_name',
+    );
     await refused;
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(connection.requests.length, 0);
   });
 
   it('is served on a connection declared cloud', async () => {
@@ -580,8 +613,8 @@ describe('UpdateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(8);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 8);
   });
 });
 
@@ -678,33 +711,38 @@ describe('the definition SAP stored, read at a stated version', () => {
       afterActivation,
     ]);
 
-  it.each(DETAILS)(
-    'CreateTableType, activated: reads the active version after the activation and answers it (detail %s)',
-    async (detail) => {
-      const connection = created(undefined, { data: STORED_HASHED });
-      const result = await handleCreateTableType(
-        { connection, logger: undefined },
-        {
-          table_type_name: 'ZTT_X',
-          package_name: 'ZP',
-          access_type: 'hashed',
-          key_kind: 'nonUnique',
-          detail,
-        },
-      );
-      expect(result.isError).toBe(false);
-      expect(wire(connection).slice(6)).toEqual([
-        `GET ${WAIT_URL}`,
-        `POST ${CHECK_URL}`,
-        `POST ${ACTIVATE_URL}`,
-        `GET ${ACTIVE_URL}`,
-      ]);
-      expect(answerOf(result)).toMatchObject({
-        stored_definition: STORED_HASHED_DEFINITION,
-        stored_version: 'active',
-      });
-    },
-  );
+  for (const detail of DETAILS) {
+    it(
+      format(
+        'CreateTableType, activated: reads the active version after the activation and answers it (detail %s)',
+        detail,
+      ),
+      async () => {
+        const connection = created(undefined, { data: STORED_HASHED });
+        const result = await handleCreateTableType(
+          { connection, logger: undefined },
+          {
+            table_type_name: 'ZTT_X',
+            package_name: 'ZP',
+            access_type: 'hashed',
+            key_kind: 'nonUnique',
+            detail,
+          },
+        );
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(wire(connection).slice(6), [
+          `GET ${WAIT_URL}`,
+          `POST ${CHECK_URL}`,
+          `POST ${ACTIVATE_URL}`,
+          `GET ${ACTIVE_URL}`,
+        ]);
+        assertMatchObject(answerOf(result), {
+          stored_definition: STORED_HASHED_DEFINITION,
+          stored_version: 'active',
+        });
+      },
+    );
+  }
 
   it('CreateTableType, activate false: the wait reads the inactive version, and the answer names it', async () => {
     const connection = created({ data: STORED_HASHED });
@@ -712,40 +750,45 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', activate: false },
     );
-    expect(connection.requests).toHaveLength(8);
-    expect(connection.requests[6]?.url).toBe(WAIT_URL);
-    expect(answerOf(result)).toEqual({
+    assert.equal(connection.requests.length, 8);
+    assert.equal(connection.requests[6]?.url, WAIT_URL);
+    assert.deepStrictEqual(answerOf(result), {
       result: 'SUCCESS',
       stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
 
-  it.each(DETAILS)(
-    'UpdateTableType, activated: reads the active version after the activation and answers it (detail %s)',
-    async (detail) => {
-      const connection = existing(undefined, { data: STORED_HASHED });
-      const result = await handleUpdateTableType(
-        { connection, logger: undefined },
-        {
-          table_type_name: 'ZTT_X',
-          access_type: 'hashed',
-          key_kind: 'nonUnique',
-          detail,
-        },
-      );
-      expect(result.isError).toBe(false);
-      expect(wire(connection).slice(5)).toEqual([
-        `GET ${WAIT_URL}`,
-        `POST ${ACTIVATE_URL}`,
-        `GET ${ACTIVE_URL}`,
-      ]);
-      expect(answerOf(result)).toMatchObject({
-        stored_definition: STORED_HASHED_DEFINITION,
-        stored_version: 'active',
-      });
-    },
-  );
+  for (const detail of DETAILS) {
+    it(
+      format(
+        'UpdateTableType, activated: reads the active version after the activation and answers it (detail %s)',
+        detail,
+      ),
+      async () => {
+        const connection = existing(undefined, { data: STORED_HASHED });
+        const result = await handleUpdateTableType(
+          { connection, logger: undefined },
+          {
+            table_type_name: 'ZTT_X',
+            access_type: 'hashed',
+            key_kind: 'nonUnique',
+            detail,
+          },
+        );
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(wire(connection).slice(5), [
+          `GET ${WAIT_URL}`,
+          `POST ${ACTIVATE_URL}`,
+          `GET ${ACTIVE_URL}`,
+        ]);
+        assertMatchObject(answerOf(result), {
+          stored_definition: STORED_HASHED_DEFINITION,
+          stored_version: 'active',
+        });
+      },
+    );
+  }
 
   it('UpdateTableType, activate false: the wait reads the inactive version, and the answer names it', async () => {
     const connection = existing({ data: STORED_HASHED });
@@ -753,9 +796,9 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', activate: false },
     );
-    expect(connection.requests).toHaveLength(6);
-    expect(connection.requests[5]?.url).toBe(WAIT_URL);
-    expect(answerOf(result)).toEqual({
+    assert.equal(connection.requests.length, 6);
+    assert.equal(connection.requests[5]?.url, WAIT_URL);
+    assert.deepStrictEqual(answerOf(result), {
       result: 'SUCCESS',
       stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
@@ -768,9 +811,9 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection: throwingAt(connection, ACTIVATE_URL), logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', access_type: 'hashed' },
     );
-    expect(result.isError).toBe(true);
-    expect(connection.requests).toHaveLength(9);
-    expect(answerOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assert.equal(connection.requests.length, 9);
+    assertMatchObject(answerOf(result), {
       status: 403,
       raw_body: REFUSED.data,
       step: 'activate',
@@ -794,9 +837,9 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection: throwingAt(connection, CHECK_URL), logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', access_type: 'hashed' },
     );
-    expect(result.isError).toBe(true);
-    expect(connection.requests).toHaveLength(8);
-    expect(answerOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assert.equal(connection.requests.length, 8);
+    assertMatchObject(answerOf(result), {
       status: 403,
       raw_body: REFUSED.data,
       step: 'check',
@@ -811,9 +854,9 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection: throwingAt(connection, ACTIVATE_URL), logger: undefined },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },
     );
-    expect(result.isError).toBe(true);
-    expect(connection.requests).toHaveLength(7);
-    expect(answerOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assert.equal(connection.requests.length, 7);
+    assertMatchObject(answerOf(result), {
       status: 403,
       raw_body: REFUSED.data,
       step: 'activate',
@@ -833,14 +876,14 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },
     );
-    expect(result.isError).toBe(true);
-    expect(wire(connection).slice(3)).toEqual([
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(wire(connection).slice(3), [
       `POST ${CHECK_URL}`,
       `POST ${UNLOCK_URL}`,
     ]);
     const answered = answerOf(result);
-    expect(answered).not.toHaveProperty('stored_definition');
-    expect(answered).not.toHaveProperty('stored_version');
+    assertNoProperty(answered, 'stored_definition');
+    assertNoProperty(answered, 'stored_version');
   });
 
   it('the descriptions say which version each answers, per tool', () => {
@@ -848,13 +891,15 @@ describe('the definition SAP stored, read at a stated version', () => {
     const update = UpdateTableType_Tool.description;
     // Create checks after the wait: a refused check carries the inactive
     // definition. Update checks under the lock, before the read.
-    expect(create.includes('a refused check or a refused activation')).toBe(
+    assert.equal(
+      create.includes('a refused check or a refused activation'),
       true,
     );
-    expect(update.includes('activate false or a refused activation')).toBe(
+    assert.equal(
+      update.includes('activate false or a refused activation'),
       true,
     );
-    expect(update.includes('a refused check is answered alone')).toBe(true);
+    assert.equal(update.includes('a refused check is answered alone'), true);
   });
 
   it('a write refused before the wait answers no stored definition', async () => {
@@ -870,13 +915,13 @@ describe('the definition SAP stored, read at a stated version', () => {
       },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },
     );
-    expect(result.isError).toBe(true);
-    expect(connection.requests).toHaveLength(4);
+    assert.equal(result.isError, true);
+    assert.equal(connection.requests.length, 4);
     const answered = answerOf(result);
-    expect(answered).toMatchObject({ status: 403, raw_body: REFUSED.data });
-    expect(answered).not.toHaveProperty('stored_definition');
-    expect(answered).not.toHaveProperty('stored_definition_not_read');
-    expect(answered).not.toHaveProperty('stored_version');
+    assertMatchObject(answered, { status: 403, raw_body: REFUSED.data });
+    assertNoProperty(answered, 'stored_definition');
+    assertNoProperty(answered, 'stored_definition_not_read');
+    assertNoProperty(answered, 'stored_version');
   });
 
   it("says the stored definition was not read when the read after the activation is refused, with SAP's answer", async () => {
@@ -885,12 +930,12 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(8);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 8);
     const answered = answerOf(result);
-    expect(answered.stored_definition).toBeUndefined();
-    expect(answered.stored_version).toBe('active');
-    expect(answered.stored_definition_not_read).toMatchObject({
+    assert.equal(answered.stored_definition, undefined);
+    assert.equal(answered.stored_version, 'active');
+    assertMatchObject(answered.stored_definition_not_read, {
       status: 403,
       raw_body: REFUSED.data,
     });
@@ -902,12 +947,12 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', activate: false },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(6);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 6);
     const answered = answerOf(result);
-    expect(answered.stored_definition).toBeUndefined();
-    expect(answered.stored_version).toBe('inactive');
-    expect(answered.stored_definition_not_read).toMatchObject({
+    assert.equal(answered.stored_definition, undefined);
+    assert.equal(answered.stored_version, 'inactive');
+    assertMatchObject(answered.stored_definition_not_read, {
       status: 403,
       raw_body: REFUSED.data,
     });
@@ -932,10 +977,10 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP' },
     );
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const answered = answerOf(result);
-    expect(answered.stored_definition).toBeUndefined();
-    expect(answered.stored_definition_not_read).toMatchObject({
+    assert.equal(answered.stored_definition, undefined);
+    assertMatchObject(answered.stored_definition_not_read, {
       step: 'read stored definition',
       status: 403,
       raw_body: REFUSED.data,
@@ -948,10 +993,10 @@ describe('the definition SAP stored, read at a stated version', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP' },
     );
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const answered = answerOf(result);
-    expect(answered.stored_definition).toBeUndefined();
-    expect(answered.stored_definition_not_read).toMatchObject({
+    assert.equal(answered.stored_definition, undefined);
+    assertMatchObject(answered.stored_definition_not_read, {
       status: 200,
       raw_body: '',
     });
@@ -987,29 +1032,33 @@ describe('DeleteTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ztt_x', transport_request: 'K1' },
     );
-    expect(result.isError).toBe(false);
-    expect(wire(connection)).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(wire(connection), [
       `POST ${DELETION_CHECK_URL}`,
       `POST ${DELETION_URL}`,
     ]);
-    expect(connection.sessions).toEqual(['stateless', 'stateless']);
+    assert.deepStrictEqual(connection.sessions, ['stateless', 'stateless']);
     const [check, del] = connection.requests;
-    expect(check?.headers?.Accept).toBe(
+    assert.equal(
+      check?.headers?.Accept,
       'application/vnd.sap.adt.deletion.check.response.v1+xml',
     );
-    expect(check?.headers?.['Content-Type']).toBe(
+    assert.equal(
+      check?.headers?.['Content-Type'],
       'application/vnd.sap.adt.deletion.check.request.v1+xml',
     );
-    expect(del?.headers?.Accept).toBe(
+    assert.equal(
+      del?.headers?.Accept,
       'application/vnd.sap.adt.deletion.response.v1+xml',
     );
-    expect(del?.headers?.['Content-Type']).toBe(
+    assert.equal(
+      del?.headers?.['Content-Type'],
       'application/vnd.sap.adt.deletion.request.v1+xml',
     );
-    expect(String(check?.data)).toContain(`adtcore:uri="${TTYP}/ztt_x"`);
-    expect(String(del?.data)).toContain(`adtcore:uri="${TTYP}/ztt_x"`);
-    expect(String(del?.data)).toContain('K1');
-    expect(JSON.parse(textOf(result))).toMatchObject({
+    assert.ok(String(check?.data).includes(`adtcore:uri="${TTYP}/ztt_x"`));
+    assert.ok(String(del?.data).includes(`adtcore:uri="${TTYP}/ztt_x"`));
+    assert.ok(String(del?.data).includes('K1'));
+    assertMatchObject(JSON.parse(textOf(result)), {
       deleted: true,
       object: 'ZTT_X',
     });
@@ -1023,9 +1072,9 @@ describe('DeleteTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('Table type is still used');
-    expect(wire(connection)).toEqual([`POST ${DELETION_CHECK_URL}`]);
+    assert.equal(result.isError, true);
+    assert.ok(textOf(result).includes('Table type is still used'));
+    assert.deepStrictEqual(wire(connection), [`POST ${DELETION_CHECK_URL}`]);
   });
 
   it('refuses an empty table_type_name, sending nothing', async () => {
@@ -1034,21 +1083,22 @@ describe('DeleteTableType', () => {
       { connection, logger: undefined },
       { table_type_name: '' },
     );
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toBe('table_type_name is required');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.equal(textOf(result), 'table_type_name is required');
+    assert.equal(connection.requests.length, 0);
   });
 
   it('refuses an absent table_type_name at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(DeleteTableType_Tool, handleDeleteTableType).call(
         { connection, logger: undefined },
         {},
       ),
-    ).rejects.toThrow('at table_type_name');
+      'at table_type_name',
+    );
     await refused;
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(connection.requests.length, 0);
   });
 
   it('is served on a connection declared cloud', async () => {
@@ -1061,8 +1111,8 @@ describe('DeleteTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(2);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 2);
   });
 });
 
@@ -1075,19 +1125,20 @@ describe('ActivateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ztt_x' },
     );
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(textOf(result))).toMatchObject({ activated: true });
-    expect(wire(connection)).toEqual([
+    assert.equal(result.isError, false);
+    assertMatchObject(JSON.parse(textOf(result)), { activated: true });
+    assert.deepStrictEqual(wire(connection), [
       'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
     ]);
     const [sent] = connection.requests;
-    expect(String(sent?.data)).toContain(`${TTYP}/ztt_x`);
-    expect(String(sent?.data)).toContain('adtcore:name="ZTT_X"');
-    expect(sent?.headers?.Accept).toBe('application/xml');
-    expect(sent?.headers?.['Content-Type']).toBe(
+    assert.ok(String(sent?.data).includes(`${TTYP}/ztt_x`));
+    assert.ok(String(sent?.data).includes('adtcore:name="ZTT_X"'));
+    assert.equal(sent?.headers?.Accept, 'application/xml');
+    assert.equal(
+      sent?.headers?.['Content-Type'],
       'application/vnd.sap.adt.activation+xml',
     );
-    expect(connection.sessions).toEqual(['stateless']);
+    assert.deepStrictEqual(connection.sessions, ['stateless']);
   });
 
   it('refuses an empty table_type_name, sending nothing', async () => {
@@ -1096,21 +1147,22 @@ describe('ActivateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: '' },
     );
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toBe('table_type_name is required');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.equal(textOf(result), 'table_type_name is required');
+    assert.equal(connection.requests.length, 0);
   });
 
   it('refuses an absent table_type_name at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(ActivateTableType_Tool, handleActivateTableType).call(
         { connection, logger: undefined },
         {},
       ),
-    ).rejects.toThrow('at table_type_name');
+      'at table_type_name',
+    );
     await refused;
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(connection.requests.length, 0);
   });
 
   it('is served on a connection declared cloud', async () => {
@@ -1122,8 +1174,8 @@ describe('ActivateTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(1);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 1);
   });
 });
 
@@ -1137,13 +1189,13 @@ describe('CheckTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ztt_x' },
     );
-    expect(result.isError).toBe(false);
-    expect(wire(connection)).toEqual([`POST ${CHECK_URL}`]);
-    expect(connection.sessions).toEqual(['stateless']);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(wire(connection), [`POST ${CHECK_URL}`]);
+    assert.deepStrictEqual(connection.sessions, ['stateless']);
     const [sent] = connection.requests;
-    expect(String(sent?.data)).toContain(`${TTYP}/ztt_x`);
-    expect(String(sent?.data)).toContain('chkrun:version="active"');
-    expect(JSON.parse(textOf(result)).object_name).toBe('ZTT_X');
+    assert.ok(String(sent?.data).includes(`${TTYP}/ztt_x`));
+    assert.ok(String(sent?.data).includes('chkrun:version="active"'));
+    assert.equal(JSON.parse(textOf(result)).object_name, 'ZTT_X');
   });
 
   it('checks the inactive version when asked', async () => {
@@ -1152,8 +1204,10 @@ describe('CheckTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X', version: 'inactive' },
     );
-    expect(String(connection.requests[0]?.data)).toContain(
-      'chkrun:version="inactive"',
+    assert.ok(
+      String(connection.requests[0]?.data).includes(
+        'chkrun:version="inactive"',
+      ),
     );
   });
 
@@ -1168,8 +1222,8 @@ describe('CheckTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('no authority for CHECKTT');
+    assert.equal(result.isError, true);
+    assert.ok(textOf(result).includes('no authority for CHECKTT'));
   });
 
   it('refuses an empty table_type_name, sending nothing', async () => {
@@ -1178,21 +1232,22 @@ describe('CheckTableType', () => {
       { connection, logger: undefined },
       { table_type_name: '' },
     );
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('table_type_name is required');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.ok(textOf(result).includes('table_type_name is required'));
+    assert.equal(connection.requests.length, 0);
   });
 
   it('refuses an absent table_type_name at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(CheckTableType_Tool, handleCheckTableType).call(
         { connection, logger: undefined },
         {},
       ),
-    ).rejects.toThrow('at table_type_name');
+      'at table_type_name',
+    );
     await refused;
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(connection.requests.length, 0);
   });
 
   it('is served on a connection declared cloud', async () => {
@@ -1202,8 +1257,8 @@ describe('CheckTableType', () => {
       { connection, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(1);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 1);
   });
 });
 
@@ -1225,45 +1280,53 @@ describe('the table-type version tools', () => {
 
   it('is the version list alone, [read-only], on both variants', () => {
     const { toolDefinition } = versionTool('GetTableTypeVersions');
-    expect(toolDefinition.description.startsWith('[read-only]')).toBe(true);
-    expect(toolDefinition.available_in).toEqual(['onprem', 'cloud']);
+    assert.equal(toolDefinition.description.startsWith('[read-only]'), true);
+    assert.deepStrictEqual(toolDefinition.available_in, ['onprem', 'cloud']);
     // SAP refuses a table type's version source: 403 "Request version for
     // TTYP is not supported" (measured on premise 2026-11-01, on ABAP cloud
     // 2026-11-02), so no source or diff tool is offered for it.
     const names = buildObjectVersionTools().map((e) => e.toolDefinition.name);
-    expect(names).not.toContain('GetTableTypeVersionSource');
-    expect(names).not.toContain('GetTableTypeVersionDiff');
+    assert.ok(!names.includes('GetTableTypeVersionSource'));
+    assert.ok(!names.includes('GetTableTypeVersionDiff'));
   });
 
-  it.each(['onprem', 'cloud'] as const)(
-    'GetObjectVersions takes table_type on %s; GetObjectVersionSource and GetObjectVersionDiff do not',
-    (variant) => {
-      expect(VERSIONED_KINDS[variant]).toContain('table_type');
-      expect(VERSION_SOURCE_KINDS[variant]).not.toContain('table_type');
-      expect(
-        jsonAt(
+  for (const variant of ['onprem', 'cloud'] as const) {
+    it(
+      format(
+        'GetObjectVersions takes table_type on %s; GetObjectVersionSource and GetObjectVersionDiff do not',
+        variant,
+      ),
+      () => {
+        // Widened to strings, so includes() takes any value.
+        const versioned: readonly string[] = VERSIONED_KINDS[variant];
+        const sourced: readonly string[] = VERSION_SOURCE_KINDS[variant];
+        assert.ok(versioned.includes('table_type'));
+        assert.ok(!sourced.includes('table_type'));
+        const sourceTypes = jsonAt(
           listedJson(GET_OBJECT_VERSION_SOURCE.variants[variant].inputSchema),
           'object_type',
-        ).enum,
-      ).not.toContain('table_type');
-      expect(
-        jsonAt(
+        ).enum;
+        assert.ok(Array.isArray(sourceTypes));
+        assert.ok(!sourceTypes.includes('table_type'));
+        const diffTypes = jsonAt(
           listedJson(GET_OBJECT_VERSION_DIFF.variants[variant].inputSchema),
           'object_type',
-        ).enum,
-      ).not.toContain('table_type');
-      expect(
-        jsonAt(
+        ).enum;
+        assert.ok(Array.isArray(diffTypes));
+        assert.ok(!diffTypes.includes('table_type'));
+        const versionsTypes = jsonAt(
           listedJson(GET_OBJECT_VERSIONS.variants[variant].inputSchema),
           'object_type',
-        ).enum,
-      ).toContain('table_type');
-    },
-  );
+        ).enum;
+        assert.ok(Array.isArray(versionsTypes));
+        assert.ok(versionsTypes.includes('table_type'));
+      },
+    );
+  }
 
   it('GetObjectVersionSource refuses table_type at the schema, sending nothing', async () => {
     const connection = recordingConnection();
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(GET_OBJECT_VERSION_SOURCE, handleGetObjectVersionSource).call(
         { connection, logger: undefined },
         {
@@ -1271,9 +1334,10 @@ describe('the table-type version tools', () => {
           content_uri: `${TTYP}/ztt_x/versions/0001`,
         },
       ),
-    ).rejects.toThrow('Invalid arguments for tool GetObjectVersionSource: ');
+      'Invalid arguments for tool GetObjectVersionSource: ',
+    );
     await refused;
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(connection.requests.length, 0);
   });
 
   it('GetTableTypeVersions sends one GET to the versions feed of the table type', async () => {
@@ -1282,12 +1346,12 @@ describe('the table-type version tools', () => {
       { connection, logger: undefined },
       { table_type_name: 'ztt_x' },
     );
-    expect(result.isError).toBe(false);
-    expect(wire(connection)).toEqual([`GET ${TTYP}/ztt_x/versions`]);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(wire(connection), [`GET ${TTYP}/ztt_x/versions`]);
     const answered = JSON.parse(textOf(result));
-    expect(answered.object_type).toBe('table_type');
-    expect(answered.object_name).toBe('ZTT_X');
-    expect(connection.sessions).toEqual(['stateless']);
+    assert.equal(answered.object_type, 'table_type');
+    assert.equal(answered.object_name, 'ZTT_X');
+    assert.deepStrictEqual(connection.sessions, ['stateless']);
   });
 
   it('GetObjectVersions takes the kind table_type, on a connection declared cloud too', async () => {
@@ -1297,23 +1361,27 @@ describe('the table-type version tools', () => {
       { connection, logger: undefined },
       { object_type: 'table_type', object_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(false);
-    expect(wire(connection)).toEqual([`GET ${TTYP}/ztt_x/versions`]);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(wire(connection), [`GET ${TTYP}/ztt_x/versions`]);
   });
 
-  it.each([['GetTableTypeVersions', {}, 'table_type_name is required']])(
-    '%s refuses missing arguments, sending nothing',
-    async (name, args, text) => {
-      const connection = recordingConnection();
-      const result = await versionTool(name).handler(
-        { connection, logger: undefined },
-        args,
-      );
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toBe(text);
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+  for (const [name, args, text] of [
+    ['GetTableTypeVersions', {}, 'table_type_name is required'],
+  ] satisfies [string, Record<string, unknown>, string][]) {
+    it(
+      format('%s refuses missing arguments, sending nothing', name),
+      async () => {
+        const connection = recordingConnection();
+        const result = await versionTool(name).handler(
+          { connection, logger: undefined },
+          args,
+        );
+        assert.equal(result.isError, true);
+        assert.equal(textOf(result), text);
+        assert.equal(connection.requests.length, 0);
+      },
+    );
+  }
 
   it("answers SAP's body when the connection throws on a 403, as the real transports do", async () => {
     const connection = recordingConnection();
@@ -1334,7 +1402,7 @@ describe('the table-type version tools', () => {
       { connection: refusing, logger: undefined },
       { table_type_name: 'ZTT_X' },
     );
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain('no authority for VERSIONTT');
+    assert.equal(result.isError, true);
+    assert.ok(textOf(result).includes('no authority for VERSIONTT'));
   });
 });

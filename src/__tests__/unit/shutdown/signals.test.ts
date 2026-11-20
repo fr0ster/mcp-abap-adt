@@ -6,7 +6,11 @@
  * input, exit 0), a crash outside a tool (one line, exit 1), an emptied event
  * loop (`beforeExit`). A second signal forces, as before.
  */
+
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { own } from '../../../lib/ownedConnections';
 import {
@@ -45,7 +49,7 @@ function setup() {
   const answered = new Promise<void>((r) => {
     answer = r;
   });
-  const disconnect = jest.fn(async () => undefined);
+  const disconnect = mock.fn(async () => undefined);
   own(
     { disconnect, flushGoodbye: () => answered },
     { owner: {}, role: 'built' },
@@ -104,25 +108,27 @@ const triggers: Array<
 ];
 
 describe('every catchable end runs the orderly shutdown once', () => {
-  it.each(triggers)(
-    '%s: one run, the logoff answered before the exit',
-    async (_name, trigger, code) => {
-      const s = setup();
-      trigger(s.processLike);
-      await turns();
-      expect(s.runs()).toBe(1);
-      expect(s.disconnect).toHaveBeenCalledTimes(1);
-      expect(s.exits).toEqual([]); // the logoff not yet answered
-      s.answer();
-      await turns();
-      expect(s.exits).toEqual([code]);
-      // A later trigger of any kind starts no second run.
-      s.processLike.emit('beforeExit', 0);
-      s.processLike.stdin.emit('end');
-      await turns();
-      expect(s.runs()).toBe(1);
-    },
-  );
+  for (const [_name, trigger, code] of triggers) {
+    it(
+      format('%s: one run, the logoff answered before the exit', _name),
+      async () => {
+        const s = setup();
+        trigger(s.processLike);
+        await turns();
+        assert.equal(s.runs(), 1);
+        assert.equal(s.disconnect.mock.callCount(), 1);
+        assert.deepStrictEqual(s.exits, []); // the logoff not yet answered
+        s.answer();
+        await turns();
+        assert.deepStrictEqual(s.exits, [code]);
+        // A later trigger of any kind starts no second run.
+        s.processLike.emit('beforeExit', 0);
+        s.processLike.stdin.emit('end');
+        await turns();
+        assert.equal(s.runs(), 1);
+      },
+    );
+  }
 
   it('a crash names its class on stderr, once', async () => {
     const s = setup();
@@ -130,23 +136,28 @@ describe('every catchable end runs the orderly shutdown once', () => {
     s.processLike.emit('uncaughtException', new TypeError('again'));
     s.answer();
     await turns();
-    expect(s.stderr.filter((l) => l.includes('(TypeError)'))).toHaveLength(1);
-    expect(s.stderr.join('\n')).not.toContain('secret detail');
-    expect(s.exits).toEqual([1]);
+    assert.equal(s.stderr.filter((l) => l.includes('(TypeError)')).length, 1);
+    assert.ok(!s.stderr.join('\n').includes('secret detail'));
+    assert.deepStrictEqual(s.exits, [1]);
   });
 
-  it.each(['SIGTERM', 'SIGHUP', 'SIGBREAK'])(
-    'a second signal (%s) forces the end while a logoff is still unanswered: exit 1',
-    async (name) => {
-      const s = setup();
-      s.processLike.emit('SIGINT');
-      await turns();
-      expect(s.exits).toEqual([]);
-      s.processLike.emit(name);
-      await turns();
-      expect(s.exits).toEqual([1]);
-      expect(s.runs()).toBe(1);
-      s.answer();
-    },
-  );
+  for (const name of ['SIGTERM', 'SIGHUP', 'SIGBREAK']) {
+    it(
+      format(
+        'a second signal (%s) forces the end while a logoff is still unanswered: exit 1',
+        name,
+      ),
+      async () => {
+        const s = setup();
+        s.processLike.emit('SIGINT');
+        await turns();
+        assert.deepStrictEqual(s.exits, []);
+        s.processLike.emit(name);
+        await turns();
+        assert.deepStrictEqual(s.exits, [1]);
+        assert.equal(s.runs(), 1);
+        s.answer();
+      },
+    );
+  }
 });

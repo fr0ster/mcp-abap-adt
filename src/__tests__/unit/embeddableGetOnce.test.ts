@@ -7,6 +7,9 @@
  * connection object is enough to inspect the registered tool set.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { NoDedupStrategy } from '../../lib/handlers/groups/strategies/index';
 
@@ -20,7 +23,7 @@ function registeredToolNames(server: EmbeddableMcpServer): string[] {
 const READS = ['GetProgram', 'GetClass', 'GetTable', 'GetFunctionModule'];
 
 describe('EmbeddableMcpServer serves Get<Type> once, and no Read<Type>', () => {
-  it.each([
+  for (const [_name, exposition, strategy] of [
     ['readonly+high, default strategy', ['readonly', 'high'], undefined],
     [
       'readonly+high, NoDedupStrategy',
@@ -28,17 +31,22 @@ describe('EmbeddableMcpServer serves Get<Type> once, and no Read<Type>', () => {
       new NoDedupStrategy(),
     ],
     ['readonly alone', ['readonly'], undefined],
-  ] as const)('%s', (_name, exposition, strategy) => {
-    const server = new EmbeddableMcpServer({
-      connection: {} as never,
-      exposition: [...exposition],
-      systemType: 'onprem',
-      ...(strategy !== undefined && { readOnlyDedupStrategy: strategy }),
+  ] as const) {
+    it(format('%s', _name), () => {
+      const server = new EmbeddableMcpServer({
+        connection: {} as never,
+        exposition: [...exposition],
+        systemType: 'onprem',
+        ...(strategy !== undefined && { readOnlyDedupStrategy: strategy }),
+      });
+      const names = registeredToolNames(server);
+      for (const tool of READS) {
+        assert.equal(names.filter((n) => n === tool).length, 1);
+      }
+      assert.deepStrictEqual(
+        names.filter((n) => /^Read(?!Transport)/.test(n)),
+        [],
+      );
     });
-    const names = registeredToolNames(server);
-    for (const tool of READS) {
-      expect(names.filter((n) => n === tool)).toHaveLength(1);
-    }
-    expect(names.filter((n) => /^Read(?!Transport)/.test(n))).toEqual([]);
-  });
+  }
 });

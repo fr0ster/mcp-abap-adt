@@ -7,8 +7,17 @@
  * stand-in, which records the `Authorization` each call put on the wire.
  */
 
+import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -22,6 +31,7 @@ import {
   basicOf,
   probeGroup,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 import { SYSTEM_TYPE_REQUIRED_WORDS } from '../../../../src/lib/auth/serverRefusal';
 import { SseServer } from '../SseServer.js';
 
@@ -32,11 +42,11 @@ let server: Server;
 let sse: SseServer;
 let baseUrl: string;
 let previousType: string | undefined;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 const open: AbortController[] = [];
 
 beforeEach(async () => {
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
   previousType = process.env.SAP_SYSTEM_TYPE;
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   standIn = await adtStandIn();
@@ -67,7 +77,7 @@ afterEach(async () => {
   await standIn.close();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
 const basic = (user: string, password: string) => ({
@@ -116,7 +126,7 @@ async function connect(headers: Record<string, string>) {
     headers,
     signal: controller.signal,
   });
-  expect(res.status).toBe(200);
+  assert.equal(res.status, 200);
   const next = eventReader(res.body as ReadableStream<Uint8Array>);
   const endpoint = new URL(await next('endpoint'), baseUrl);
   const post = (body: object, postHeaders: Record<string, string> = {}) =>
@@ -137,7 +147,7 @@ async function connect(headers: Record<string, string>) {
       },
       postHeaders,
     );
-    expect(accepted.status).toBe(202);
+    assert.equal(accepted.status, 202);
     const message = JSON.parse(await next('message')) as {
       result: { content: { text: string }[]; isError?: boolean };
     };
@@ -152,27 +162,37 @@ async function connect(headers: Record<string, string>) {
 describe("a connection's credential is its opening GET's", () => {
   it('opened with x-sap-* basic: its POSTs reach the stand-in as that user', async () => {
     const session = await connect(basic('USER_A', 'pass-a'));
-    expect(await session.probe('b1')).toEqual({ text: 'b1', isError: false });
-    expect(await session.probe('b2')).toEqual({ text: 'b2', isError: false });
-    expect(standIn.authorizationOf('b1')).toBe(basicOf('USER_A', 'pass-a'));
-    expect(standIn.authorizationOf('b2')).toBe(basicOf('USER_A', 'pass-a'));
+    assert.deepStrictEqual(await session.probe('b1'), {
+      text: 'b1',
+      isError: false,
+    });
+    assert.deepStrictEqual(await session.probe('b2'), {
+      text: 'b2',
+      isError: false,
+    });
+    assert.equal(standIn.authorizationOf('b1'), basicOf('USER_A', 'pass-a'));
+    assert.equal(standIn.authorizationOf('b2'), basicOf('USER_A', 'pass-a'));
   });
 
   it('opened with a token: its POSTs reach the stand-in with that Bearer token', async () => {
     const session = await connect(token('token-a.payload.sig'));
-    expect(await session.probe('t1')).toEqual({ text: 't1', isError: false });
-    expect(standIn.authorizationOf('t1')).toBe('Bearer token-a.payload.sig');
+    assert.deepStrictEqual(await session.probe('t1'), {
+      text: 't1',
+      isError: false,
+    });
+    assert.equal(standIn.authorizationOf('t1'), 'Bearer token-a.payload.sig');
   });
 
   it("a POST's own x-sap-* headers change nothing", async () => {
     const session = await connect(basic('USER_A', 'pass-a'));
-    expect(
+    assert.deepStrictEqual(
       await session.probe('p1', 0, {
         ...basic('USER_B', 'pass-b'),
         ...token('token-b.payload.sig'),
       }),
-    ).toEqual({ text: 'p1', isError: false });
-    expect(standIn.authorizationOf('p1')).toBe(basicOf('USER_A', 'pass-a'));
+      { text: 'p1', isError: false },
+    );
+    assert.equal(standIn.authorizationOf('p1'), basicOf('USER_A', 'pass-a'));
   });
 });
 
@@ -189,27 +209,27 @@ describe('a request the server does not serve', () => {
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     const session = await connect(basic('USER_A', 'pass-a'));
     const answer = await session.probe('k1');
-    expect(answer.isError).toBe(true);
-    expect(JSON.parse(answer.text)).toMatchObject({
+    assert.equal(answer.isError, true);
+    assertMatchObject(JSON.parse(answer.text), {
       error: 'system_type_required',
       message: SYSTEM_TYPE_REQUIRED_WORDS,
     });
-    expect(standIn.requests).toEqual([]);
+    assert.deepStrictEqual(standIn.requests, []);
   });
 
   it('a GET without credentials: 400 with its sentence', async () => {
     const res = await fetch(`${baseUrl}/sse`);
-    expect(res.status).toBe(400);
-    expect(await res.text()).toBe(CREDENTIALS_REQUIRED_WORDS);
-    expect(standIn.requests).toEqual([]);
+    assert.equal(res.status, 400);
+    assert.equal(await res.text(), CREDENTIALS_REQUIRED_WORDS);
+    assert.deepStrictEqual(standIn.requests, []);
   });
 
   it('a GET with x-mcp-destination: 400 with its sentence', async () => {
     const res = await fetch(`${baseUrl}/sse`, {
       headers: { ...basic('USER_A', 'pass-a'), 'x-mcp-destination': 'TRIAL' },
     });
-    expect(res.status).toBe(400);
-    expect(await res.text()).toBe(DESTINATIONS_ONLY_STDIO_WORDS);
+    assert.equal(res.status, 400);
+    assert.equal(await res.text(), DESTINATIONS_ONLY_STDIO_WORDS);
   });
 
   it('a POST with x-mcp-destination: 400 with its sentence, the tool not reached', async () => {
@@ -221,9 +241,9 @@ describe('a request the server does not serve', () => {
       },
       { 'x-mcp-destination': 'TRIAL' },
     );
-    expect(res.status).toBe(400);
-    expect(await res.text()).toBe(DESTINATIONS_ONLY_STDIO_WORDS);
-    expect(standIn.authorizationOf('d1')).toBeUndefined();
+    assert.equal(res.status, 400);
+    assert.equal(await res.text(), DESTINATIONS_ONLY_STDIO_WORDS);
+    assert.equal(standIn.authorizationOf('d1'), undefined);
   });
 });
 
@@ -234,8 +254,8 @@ describe('nothing is shared across connections', () => {
       connect(basic('USER_B', 'pass-b')),
     ]);
     const [ra, rb] = await Promise.all([a.probe('ca', 80), b.probe('cb', 0)]);
-    expect(ra.isError || rb.isError).toBe(false);
-    expect(standIn.authorizationOf('ca')).toBe(basicOf('USER_A', 'pass-a'));
-    expect(standIn.authorizationOf('cb')).toBe(basicOf('USER_B', 'pass-b'));
+    assert.equal(ra.isError || rb.isError, false);
+    assert.equal(standIn.authorizationOf('ca'), basicOf('USER_A', 'pass-a'));
+    assert.equal(standIn.authorizationOf('cb'), basicOf('USER_B', 'pass-b'));
   });
 });

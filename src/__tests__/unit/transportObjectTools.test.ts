@@ -1,15 +1,21 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { handleAddTransportObject } from '../../handlers/transport/high/handleAddTransportObject';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateTransportTask } from '../../handlers/transport/high/handleCreateTransportTask';
 import { handleRemoveTransportObject } from '../../handlers/transport/high/handleRemoveTransportObject';
 import { handleReadTransportActionLog } from '../../handlers/transport/readonly/handleReadTransportActionLog';
 import { handleReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects';
+import * as clients from '../../lib/clients';
+import { assertMatchObject } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+
+mock.method(clients, 'createAdtClient', () => fakeClient);
 
 /**
  * The five tools that answer fr0ster/mcp-abap-adt#221.
@@ -28,7 +34,6 @@ import {
  */
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 const context = { connection: {} as any, logger: undefined };
 const body = (result: any) => JSON.parse(result.content[0].text);
@@ -83,10 +88,10 @@ describe('ReadTransportObjects', () => {
       transport_number: 'SIDK905943',
     });
 
-    expect(asked).toBe('SIDK905943');
+    assert.equal(asked, 'SIDK905943');
     const answered = body(result);
-    expect(answered.count).toBe(2);
-    expect(answered.objects[0]).toMatchObject({
+    assert.equal(answered.count, 2);
+    assertMatchObject(answered.objects[0], {
       pgmid: 'R3TR',
       type: 'FUGR',
       name: 'ZMCP_BLD_FGR_H1',
@@ -149,14 +154,15 @@ describe('ReadTransportObjects', () => {
       }),
     );
 
-    expect(answered.count).toBe(3);
-    expect(
+    assert.equal(answered.count, 3);
+    assert.deepStrictEqual(
       answered.objects.map((o: any) => [o.task, o.type, o.name, o.position]),
-    ).toEqual([
-      ['SIDK900101', 'PROG', 'ZP_ONE', '000001'],
-      ['SIDK900101', 'CLAS', 'ZCL_TWO', '000002'],
-      ['SIDK900102', 'PROG', 'ZP_THREE', '000001'],
-    ]);
+      [
+        ['SIDK900101', 'PROG', 'ZP_ONE', '000001'],
+        ['SIDK900101', 'CLAS', 'ZCL_TWO', '000002'],
+        ['SIDK900102', 'PROG', 'ZP_THREE', '000001'],
+      ],
+    );
   });
 
   /** A task document as measured: its entries under `tm:root/tm:task`. */
@@ -185,8 +191,8 @@ describe('ReadTransportObjects', () => {
       }),
     );
 
-    expect(answered.count).toBe(2);
-    expect(answered.objects).toEqual([
+    assert.equal(answered.count, 2);
+    assert.deepStrictEqual(answered.objects, [
       { pgmid: 'R3TR', type: 'PROG', name: 'ZP_ONE', position: '000001' },
       { pgmid: 'R3TR', type: 'CLAS', name: 'ZCL_TWO', position: '000002' },
     ]);
@@ -220,7 +226,7 @@ describe('ReadTransportObjects', () => {
       transport_number: 'SIDK905943',
     });
 
-    expect(body(result).objects[0].position).toBeNull();
+    assert.equal(body(result).objects[0].position, null);
   });
 });
 
@@ -241,8 +247,8 @@ describe('RemoveTransportObject', () => {
       position: '000026',
     });
 
-    expect(sent.number).toBe('SIDK905943');
-    expect(sent.object).toMatchObject({
+    assert.equal(sent.number, 'SIDK905943');
+    assertMatchObject(sent.object, {
       name: 'ZCL_X',
       type: 'CLAS',
       position: '000026',
@@ -269,14 +275,14 @@ describe('RemoveTransportObject', () => {
       }),
     );
 
-    expect(answered.accepted).toBe(true);
-    expect(answered.removed).toBe('unknown');
-    expect(answered.confirm_with).toMatch(/ReadTransportActionLog/);
+    assert.equal(answered.accepted, true);
+    assert.equal(answered.removed, 'unknown');
+    assert.match(answered.confirm_with, /ReadTransportActionLog/);
     // **And no `success`.** Every other write here says `success: true`
     // because its answer means the write happened; this one's does not, and
     // a reader who stopped at that field would skip the re-read that is the
     // only thing establishing the outcome.
-    expect('success' in answered).toBe(false);
+    assert.equal('success' in answered, false);
   });
 
   it('refuses to call the server without a position', async () => {
@@ -293,7 +299,7 @@ describe('RemoveTransportObject', () => {
       } as never,
     );
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
   });
 });
 
@@ -313,8 +319,8 @@ describe('AddTransportObject', () => {
       object_type: 'CLAS',
     });
 
-    expect(sent).toEqual({ name: 'ZCL_X', type: 'CLAS' });
-    expect('position' in sent).toBe(false);
+    assert.deepStrictEqual(sent, { name: 'ZCL_X', type: 'CLAS' });
+    assert.equal('position' in sent, false);
   });
 
   it('claims acceptance, not attachment, and says what would settle it', async () => {
@@ -330,10 +336,10 @@ describe('AddTransportObject', () => {
       }),
     );
 
-    expect(answered.accepted).toBe(true);
-    expect(answered.added).toBe('unknown');
-    expect('success' in answered).toBe(false);
-    expect(answered.confirm_with).toMatch(/ReadTransportObjects/);
+    assert.equal(answered.accepted, true);
+    assert.equal(answered.added, 'unknown');
+    assert.equal('success' in answered, false);
+    assert.match(answered.confirm_with, /ReadTransportObjects/);
   });
 });
 
@@ -360,9 +366,9 @@ describe('CreateTransportTask', () => {
       }),
     );
 
-    expect(options.targetUser).toBe('DEVELOPER');
-    expect(answered.task_number).toBe('SIDK907073');
-    expect(answered.owner).toBe('DEVELOPER');
+    assert.equal(options.targetUser, 'DEVELOPER');
+    assert.equal(answered.task_number, 'SIDK907073');
+    assert.equal(answered.owner, 'DEVELOPER');
   });
 
   /**
@@ -388,8 +394,8 @@ describe('CreateTransportTask', () => {
       }),
     );
 
-    expect(options.targetUser).toBe('DEVELOPER');
-    expect(answered.owner).toBe('DEVELOPER');
+    assert.equal(options.targetUser, 'DEVELOPER');
+    assert.equal(answered.owner, 'DEVELOPER');
   });
 
   /**
@@ -409,8 +415,8 @@ describe('CreateTransportTask', () => {
       }),
     );
 
-    expect(answered.task_number).toBeNull();
-    expect(answered.note).toMatch(/no task number/);
+    assert.equal(answered.task_number, null);
+    assert.match(answered.note, /no task number/);
   });
 
   /**
@@ -438,9 +444,9 @@ describe('CreateTransportTask', () => {
       }),
     );
 
-    expect(typed).toHaveLength(1);
-    expect(typed[0].slice(0, 2)).toEqual(['SIDK907073', 'S']);
-    expect(answered.task_type).toBe('S');
+    assert.equal(typed.length, 1);
+    assert.deepStrictEqual(typed[0].slice(0, 2), ['SIDK907073', 'S']);
+    assert.equal(answered.task_type, 'S');
   });
 
   /**
@@ -468,14 +474,14 @@ describe('CreateTransportTask', () => {
         target_user: 'DEVELOPER',
       }),
     );
-    expect(terse.task_type).toBe('X');
-    expect(terse.task_type_error).toEqual({
+    assert.equal(terse.task_type, 'X');
+    assert.deepStrictEqual(terse.task_type_error, {
       message: 'You can only change the type of tasks in workbench requests',
       origin: 'refusal',
       step: 'change task type',
     });
-    expect(terse.cleanup.message).toContain('TK127');
-    expect(terse.cleanup.failures).toEqual([terse.task_type_error]);
+    assert.ok(terse.cleanup.message.includes('TK127'));
+    assert.deepStrictEqual(terse.cleanup.failures, [terse.task_type_error]);
 
     fakeClient = refused();
     const full = body(
@@ -485,11 +491,11 @@ describe('CreateTransportTask', () => {
         detail: 'full',
       }),
     );
-    expect(full.cleanup.message).toContain('still Unclassified');
+    assert.ok(full.cleanup.message.includes('still Unclassified'));
     // SAP's refusal rides as the method's error, with its step — not folded
     // into the note's words.
-    expect(full.cleanup.message).not.toContain('workbench requests');
-    expect(full.cleanup.failures).toEqual([
+    assert.ok(!full.cleanup.message.includes('workbench requests'));
+    assert.deepStrictEqual(full.cleanup.failures, [
       {
         message: 'You can only change the type of tasks in workbench requests',
         origin: 'refusal',
@@ -507,8 +513,8 @@ describe('CreateTransportTask', () => {
     );
     // A raw answer is a string, so `answer()` gives it somewhere to put the
     // note: `{ result, cleanup }`.
-    expect(raw.cleanup.message).toContain('still Unclassified');
-    expect(raw.result).toBeDefined();
+    assert.ok(raw.cleanup.message.includes('still Unclassified'));
+    assert.notEqual(raw.result, undefined);
   });
 
   it('types the task as asked, and leaves it alone when asked for X', async () => {
@@ -537,9 +543,12 @@ describe('CreateTransportTask', () => {
       }),
     );
 
-    expect(typed.map((call) => call[1])).toEqual(['R']);
-    expect(repair.task_type).toBe('R');
-    expect(unclassified.task_type).toBe('X');
+    assert.deepStrictEqual(
+      typed.map((call) => call[1]),
+      ['R'],
+    );
+    assert.equal(repair.task_type, 'R');
+    assert.equal(unclassified.task_type, 'X');
   });
 
   /**
@@ -560,12 +569,12 @@ describe('CreateTransportTask', () => {
     });
     const answered = body(result);
 
-    expect(result.isError).toBe(false);
-    expect(answered.task_number).toBe('SIDK907073');
-    expect(answered.task_type).toBe('X');
-    expect(answered.task_type_error.message).toMatch(/unknown/);
-    expect(answered.task_type_error.step).toBe('change task type');
-    expect(answered.note).toMatch(/AddTransportObject/);
+    assert.equal(result.isError, false);
+    assert.equal(answered.task_number, 'SIDK907073');
+    assert.equal(answered.task_type, 'X');
+    assert.match(answered.task_type_error.message, /unknown/);
+    assert.equal(answered.task_type_error.step, 'change task type');
+    assert.match(answered.note, /AddTransportObject/);
   });
 
   it('refuses a task type that is not S, R or X before calling the server', async () => {
@@ -588,8 +597,8 @@ describe('CreateTransportTask', () => {
       } as never,
     );
 
-    expect(result.isError).toBe(true);
-    expect(created).toBe(false);
+    assert.equal(result.isError, true);
+    assert.equal(created, false);
   });
 
   it('refuses to call the server without a target user', async () => {
@@ -604,7 +613,7 @@ describe('CreateTransportTask', () => {
       } as never,
     );
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
   });
 });
 
@@ -634,8 +643,8 @@ describe('ReadTransportActionLog', () => {
       }),
     );
 
-    expect(answered.count).toBe(1);
-    expect(answered.entries[0]).toMatch(/deleted following object/);
+    assert.equal(answered.count, 1);
+    assert.match(answered.entries[0], /deleted following object/);
   });
 
   /**
@@ -685,11 +694,12 @@ describe('ReadTransportActionLog', () => {
       }),
     );
 
-    expect(answered.count).toBe(3);
-    expect(answered.entries[1]).toBe(
+    assert.equal(answered.count, 3);
+    assert.equal(
+      answered.entries[1],
       '25.09.2026 10:52:18 task type changed to S',
     );
-    expect(answered.entries[2]).toMatch(/deleted following object R3TR PROG/);
+    assert.match(answered.entries[2], /deleted following object R3TR PROG/);
   });
 });
 
@@ -713,7 +723,7 @@ describe('CreateTransport', () => {
       owner: ' developer ',
     });
 
-    expect(given.owner).toBe('DEVELOPER');
+    assert.equal(given.owner, 'DEVELOPER');
   });
 
   it('sends no owner when none is given', async () => {
@@ -727,6 +737,6 @@ describe('CreateTransport', () => {
 
     await handleCreateTransport(context as any, { description: 'x' });
 
-    expect(given.owner).toBeUndefined();
+    assert.equal(given.owner, undefined);
   });
 });

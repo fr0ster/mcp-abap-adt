@@ -14,23 +14,21 @@
  * writes the fixture first (refused under CI).
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { after, before, describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import type { ToolSetKind } from '../../../lib/toolSet';
 import {
   type VariantSurface,
   variantSurface,
 } from '../../helpers/fixtureRenderings';
-
-jest.setTimeout(120_000);
+import { repositoryRoot } from '../../helpers/repoRoot';
 
 const FIXTURE = path.join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  '..',
+  repositoryRoot(__dirname),
   'tests',
   'fixtures',
   'tools',
@@ -50,7 +48,7 @@ describe('the tool set of each declared variant (WRITE_VARIANT_SURFACE=1 rewrite
   const previous = process.env.SAP_SYSTEM_TYPE;
   let current: Surface;
 
-  beforeAll(async () => {
+  before(async () => {
     current = await variantSurface();
     if (process.env.WRITE_VARIANT_SURFACE === '1') {
       if (process.env.CI) {
@@ -60,7 +58,7 @@ describe('the tool set of each declared variant (WRITE_VARIANT_SURFACE=1 rewrite
     }
   });
 
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
     resetProcessLatchForTests();
@@ -69,15 +67,15 @@ describe('the tool set of each declared variant (WRITE_VARIANT_SURFACE=1 rewrite
   const frozen = (): Surface => JSON.parse(fs.readFileSync(FIXTURE, 'utf8'));
 
   it('onprem (ADT_TYPES_ONPREM) registers the fixture’s tools and members', () => {
-    expect(current.onprem).toEqual(frozen().onprem);
+    assert.deepStrictEqual(current.onprem, frozen().onprem);
   });
 
   it('cloud (ADT_TYPES_CLOUD) registers the fixture’s tools and members', () => {
-    expect(current.cloud).toEqual(frozen().cloud);
+    assert.deepStrictEqual(current.cloud, frozen().cloud);
   });
 
   it('legacy (an on-premise system: ADT_TYPES_ONPREM, available_in legacy) registers the fixture’s tools and members', () => {
-    expect(current.legacy).toEqual(frozen().legacy);
+    assert.deepStrictEqual(current.legacy, frozen().legacy);
   });
 
   it('cloud serves a program’s read, check, versions and unit run (ADT_TYPES_CLOUD), and none of its writes', () => {
@@ -95,25 +93,32 @@ describe('the tool set of each declared variant (WRITE_VARIANT_SURFACE=1 rewrite
       'DeleteProgram',
       'UpdateProgram',
     ];
-    expect(current.cloud.core.tools).toEqual(
-      expect.arrayContaining(programReads),
-    );
-    expect(current.cloud['core-ro'].tools).toContain('GetProgram');
-    for (const write of programWrites) {
-      expect(current.cloud.core.tools).not.toContain(write);
+    {
+      const actual = current.cloud.core.tools;
+      for (const expected of programReads) {
+        assert.ok(actual.some((e) => isDeepStrictEqual(e, expected)));
+      }
     }
-    expect(current.cloud.compact.members['HandlerGet.object_type']).toContain(
-      'PROGRAM',
+    assert.ok(current.cloud['core-ro'].tools.includes('GetProgram'));
+    for (const write of programWrites) {
+      assert.ok(!current.cloud.core.tools.includes(write));
+    }
+    assert.ok(
+      current.cloud.compact.members['HandlerGet.object_type'].includes(
+        'PROGRAM',
+      ),
     );
-    expect(
-      current.cloud.compact.members['HandlerCreate.object_type'],
-    ).not.toContain('PROGRAM');
+    assert.ok(
+      !current.cloud.compact.members['HandlerCreate.object_type'].includes(
+        'PROGRAM',
+      ),
+    );
   });
 
   it('the surface is not vacuous: every kind lists tools on onprem and cloud', () => {
     for (const environment of ['onprem', 'cloud'] as const) {
       for (const kind of KINDS) {
-        expect(current[environment][kind].tools.length).toBeGreaterThan(10);
+        assert.ok(current[environment][kind].tools.length > 10);
       }
     }
   });

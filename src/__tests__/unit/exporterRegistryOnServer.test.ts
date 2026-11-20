@@ -5,6 +5,8 @@
  * applies to its own paths (`getHandlerEntries()`, `registerOnServer`).
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
@@ -33,8 +35,8 @@ async function listed(
 
 it("the server's systemType decides the listing, not the exporter's", async () => {
   const onpremServer = await listed('onprem', 'cloud');
-  expect(onpremServer).toEqual(await listed('onprem', 'onprem'));
+  assert.deepStrictEqual(onpremServer, await listed('onprem', 'onprem'));
   const cloudServer = await listed('cloud', 'onprem');
-  expect(cloudServer).toEqual(await listed('cloud', 'cloud'));
-  expect(onpremServer).not.toEqual(cloudServer);
+  assert.deepStrictEqual(cloudServer, await listed('cloud', 'cloud'));
+  assert.notDeepStrictEqual(onpremServer, cloudServer);
 });

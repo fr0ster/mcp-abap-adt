@@ -23,7 +23,7 @@
  * The other branch — the one this system does not answer — is shown by the
  * unit tests (`src/__tests__/unit/batch/availability.test.ts`).
  *
- * Run: npm test -- --testPathPatterns='noCommunicationBatch' --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
+ * Run: npm run test:integration -- src/__tests__/integration/batch/noCommunicationBatch.test.ts
  */
 
 import assert from 'node:assert/strict';

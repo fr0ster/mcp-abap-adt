@@ -5,10 +5,10 @@
  * writes (`console.error`, the server's logger) is scanned for the marker.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { basicHeaders, sseStand, until } from '../shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const MARKER = 'secret-marker-7f3a91c4';
 
@@ -21,13 +21,13 @@ const written = (args: unknown[]) =>
 beforeEach(() => {
   lines = [];
   logged = [];
-  jest.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+  mock.method(console, 'error', (...args: unknown[]) => {
     lines.push(written(args));
   });
 });
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const logger = () => ({
@@ -37,39 +37,45 @@ const logger = () => ({
   error: (...a: unknown[]) => void logged.push(written(a)),
 });
 
-it('a failed POST: fixed words and the reader, no message of the error', async () => {
+it('a failed POST: fixed words and the reader, no message of the error', async (t) => {
   const s = await sseStand({ server: { logger: logger() as never } });
   try {
     const connection = await s.open();
-    jest
-      .spyOn(SSEServerTransport.prototype, 'handlePostMessage')
-      .mockRejectedValue(new Error(`token endpoint said ${MARKER}`));
+    const said = new Error(`token endpoint said ${MARKER}`);
+    t.mock.method(
+      SSEServerTransport.prototype,
+      'handlePostMessage',
+      async () => {
+        throw said;
+      },
+    );
     await connection.call('LockedUpdate', { id: 'X' }, 1);
     await until(() => lines.some((l) => l.includes('[SSE POST] FAILED')));
     const failed = lines.find((l) => l.includes('[SSE POST] FAILED')) ?? '';
-    expect(failed).toContain(`for session ${connection.sessionId}: `);
-    expect(failed).toContain('Error');
-    expect([...lines, ...logged].join('\n')).not.toContain(MARKER);
+    assert.ok(failed.includes(`for session ${connection.sessionId}: `));
+    assert.ok(failed.includes('Error'));
+    assert.ok(![...lines, ...logged].join('\n').includes(MARKER));
   } finally {
     await s.close();
   }
 });
 
-it('a failed connect: fixed words and the reader, no message of the error', async () => {
+it('a failed connect: fixed words and the reader, no message of the error', async (t) => {
   const s = await sseStand({ server: { logger: logger() as never } });
   try {
-    jest
-      .spyOn(SSEServerTransport.prototype, 'start')
-      .mockRejectedValue(new Error(`token endpoint said ${MARKER}`));
+    const said = new Error(`token endpoint said ${MARKER}`);
+    t.mock.method(SSEServerTransport.prototype, 'start', async () => {
+      throw said;
+    });
     const response = await fetch(`http://127.0.0.1:${s.port}/sse`, {
       headers: basicHeaders(s.standIn.url),
     });
     await response.text();
-    expect(response.status).toBe(500);
+    assert.equal(response.status, 500);
     await until(() => logged.some((l) => l.includes('failed to connect')));
     const failed = logged.find((l) => l.includes('failed to connect')) ?? '';
-    expect(failed).toContain('Error');
-    expect([...lines, ...logged].join('\n')).not.toContain(MARKER);
+    assert.ok(failed.includes('Error'));
+    assert.ok(![...lines, ...logged].join('\n').includes(MARKER));
   } finally {
     await s.close();
   }

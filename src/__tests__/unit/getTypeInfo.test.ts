@@ -9,9 +9,13 @@
  * the fields read and without their author attributes, except the table
  * type's: SAP's whole answer, from the corpus.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -99,7 +103,7 @@ type Sent = { url: string; headers?: Record<string, string> };
 function systemWith(documents: Record<string, string | number>) {
   const sent: Sent[] = [];
   const connection = {
-    makeAdtRequest: jest.fn(async (request: Sent) => {
+    makeAdtRequest: mock.fn(async (request: Sent) => {
       sent.push(request);
       const answer = documents[request.url];
       if (answer === undefined) throw failedWith(404);
@@ -135,20 +139,23 @@ describe('GetTypeInfo', () => {
 
     const result = await run(connection, { type_name: 'MANDT' });
 
-    expect(sent.map((r) => r.url)).toEqual([
-      url.dataElement('mandt'),
-      url.domain('mandt'),
-      url.structure('mandt'),
-      url.tableType('mandt'),
-    ]);
-    expect(result.isError).toBe(false);
+    assert.deepStrictEqual(
+      sent.map((r) => r.url),
+      [
+        url.dataElement('mandt'),
+        url.domain('mandt'),
+        url.structure('mandt'),
+        url.tableType('mandt'),
+      ],
+    );
+    assert.equal(result.isError, false);
     const answer = result.content[0].json;
-    expect(answer.name).toBe('MANDT');
-    expect(answer.types.map((t: any) => t.objectType)).toEqual([
-      'data_element',
-      'domain',
-    ]);
-    expect(answer.types[0]).toEqual({
+    assert.equal(answer.name, 'MANDT');
+    assert.deepStrictEqual(
+      answer.types.map((t: any) => t.objectType),
+      ['data_element', 'domain'],
+    );
+    assert.deepStrictEqual(answer.types[0], {
       objectType: 'data_element',
       name: 'MANDT',
       description: 'Mandant',
@@ -165,7 +172,7 @@ describe('GetTypeInfo', () => {
         heading: 'Mdt',
       },
     });
-    expect(answer.types[1]).toEqual({
+    assert.deepStrictEqual(answer.types[1], {
       objectType: 'domain',
       name: 'MANDT',
       description: 'Mandant (Schluesselfeld in mandantenabh. Tabellen)',
@@ -175,7 +182,7 @@ describe('GetTypeInfo', () => {
       decimals: 0,
       output: {
         length: 3,
-        conversionExit: undefined,
+        // No conversion exit: the answer carries no such key.
         lowercase: false,
         signExists: false,
       },
@@ -188,18 +195,21 @@ describe('GetTypeInfo', () => {
     const { connection } = systemWith({ [url.domain('xfeld')]: XFELD_DOMAIN });
     const answer = (await run(connection, { type_name: 'XFELD' })).content[0]
       .json;
-    expect(answer.types).toHaveLength(1);
-    expect(answer.types[0].fixedValues).toEqual([
+    assert.equal(answer.types.length, 1);
+    assert.deepStrictEqual(answer.types[0].fixedValues, [
       { low: 'X', high: '', text: 'Ja' },
       { low: '', high: '', text: 'Nein' },
     ]);
     // What the client receives: the blank value is there, not dropped.
-    expect(JSON.parse(JSON.stringify(answer)).types[0].fixedValues[1]).toEqual({
-      low: '',
-      high: '',
-      text: 'Nein',
-    });
-    expect(answer.types[0].valueTable).toBeUndefined();
+    assert.deepStrictEqual(
+      JSON.parse(JSON.stringify(answer)).types[0].fixedValues[1],
+      {
+        low: '',
+        high: '',
+        text: 'Nein',
+      },
+    );
+    assert.equal(answer.types[0].valueTable, undefined);
   });
 
   it("keeps the spaces of a fixed value's bounds, which are the value", async () => {
@@ -210,7 +220,7 @@ describe('GetTypeInfo', () => {
     const { connection } = systemWith({ [url.domain('xfeld')]: SPACED });
     const answer = (await run(connection, { type_name: 'XFELD' })).content[0]
       .json;
-    expect(answer.types[0].fixedValues[0]).toEqual({
+    assert.deepStrictEqual(answer.types[0].fixedValues[0], {
       low: ' ',
       high: '  B ',
       text: 'Ja',
@@ -224,13 +234,13 @@ describe('GetTypeInfo', () => {
         '<?xml version="1.0"?><other:thing xmlns:other="urn:x"/>',
     });
     const result = await run(connection, { type_name: 'MANDT' });
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(JSON.parse(result.content[0].text), {
       error: 'client_threw',
       message:
         'read domain: the system answered a document that is not a doma:domain document',
     });
-    expect(sent).toHaveLength(2);
+    assert.equal(sent.length, 2);
   });
 
   it('answers a structure from its blue:blueSource document', async () => {
@@ -239,7 +249,7 @@ describe('GetTypeInfo', () => {
     });
     const answer = (await run(connection, { type_name: 'SYST' })).content[0]
       .json;
-    expect(answer.types).toEqual([
+    assert.deepStrictEqual(answer.types, [
       {
         objectType: 'structure',
         name: 'SYST',
@@ -255,7 +265,7 @@ describe('GetTypeInfo', () => {
     });
     const answer = (await run(connection, { type_name: 'STRING_TABLE' }))
       .content[0].json;
-    expect(answer.types).toEqual([
+    assert.deepStrictEqual(answer.types, [
       {
         objectType: 'table_type',
         name: 'STRING_TABLE',
@@ -263,7 +273,7 @@ describe('GetTypeInfo', () => {
         package: 'SOOL',
         rowType: {
           typeKind: 'predefinedAbapType',
-          typeName: undefined,
+          // A predefined type has no type name: the answer carries no such key.
           dataType: 'STRING',
           length: 0,
           decimals: 0,
@@ -277,11 +287,12 @@ describe('GetTypeInfo', () => {
   it("a name no read finds is the call's error, after every read", async () => {
     const { connection, sent } = systemWith({});
     const result = await run(connection, { type_name: 'ZZ_NOPE' });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe(
+    assert.equal(result.isError, true);
+    assert.equal(
+      result.content[0].text,
       'Type ZZ_NOPE was not found as data element, domain, structure or table type.',
     );
-    expect(sent).toHaveLength(4);
+    assert.equal(sent.length, 4);
   });
 
   it('include_structure_fallback false leaves the structure read out', async () => {
@@ -290,12 +301,12 @@ describe('GetTypeInfo', () => {
       type_name: 'ZT',
       include_structure_fallback: false,
     });
-    expect(sent.map((r) => r.url)).toEqual([
-      url.dataElement('zt'),
-      url.domain('zt'),
-      url.tableType('zt'),
-    ]);
-    expect(result.content[0].text).toBe(
+    assert.deepStrictEqual(
+      sent.map((r) => r.url),
+      [url.dataElement('zt'), url.domain('zt'), url.tableType('zt')],
+    );
+    assert.equal(
+      result.content[0].text,
       'Type ZT was not found as data element, domain or table type.',
     );
   });
@@ -307,7 +318,10 @@ describe('GetTypeInfo', () => {
     });
     const answer = (await run(connection, { type_name: 'MANDT' })).content[0]
       .json;
-    expect(answer.types.map((t: any) => t.objectType)).toEqual(['domain']);
+    assert.deepStrictEqual(
+      answer.types.map((t: any) => t.objectType),
+      ['domain'],
+    );
   });
 
   it("a refusal that is not 404 is the call's answer, with the read as its step; nothing after it is read", async () => {
@@ -316,11 +330,11 @@ describe('GetTypeInfo', () => {
       [url.domain('mandt')]: 403,
     });
     const result = await run(connection, { type_name: 'MANDT' });
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(JSON.parse(result.content[0].text), {
       status: 403,
       step: 'read domain',
     });
-    expect(sent).toHaveLength(2);
+    assert.equal(sent.length, 2);
   });
 });

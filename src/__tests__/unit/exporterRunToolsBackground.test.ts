@@ -10,6 +10,8 @@
  * registration and `getHandlerEntries()` keep no runs: without it.
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -24,7 +26,7 @@ async function runClassBackground(server: EmbeddableMcpServer) {
   try {
     const { tools } = await client.listTools();
     const run = tools.find((tool) => tool.name === 'RuntimeRunClass');
-    expect(run).toBeDefined();
+    assert.notEqual(run, undefined);
     return Object.keys(run?.inputSchema.properties ?? {}).includes(
       'background',
     );
@@ -42,7 +44,7 @@ it('createRegistry() on a server with backgroundRuns lists RuntimeRunClass with 
     handlersRegistry: exporter().createRegistry(),
     backgroundRuns: new InMemoryBackgroundRuns(),
   });
-  expect(await runClassBackground(server)).toBe(true);
+  assert.equal(await runClassBackground(server), true);
 });
 
 it('without backgroundRuns: as the server lists its own run tools (background: true is refused in words there)', async () => {
@@ -56,7 +58,8 @@ it('without backgroundRuns: as the server lists its own run tools (background: t
     systemType: 'onprem',
     handlersRegistry: exporter().createRegistry(),
   });
-  expect(await runClassBackground(exported)).toBe(
+  assert.equal(
+    await runClassBackground(exported),
     await runClassBackground(own),
   );
 });
@@ -65,7 +68,9 @@ it('getHandlerEntries() hands RuntimeRunClass out without background', () => {
   const entry = exporter()
     .getHandlerEntries()
     .find((e) => e.toolDefinition.name === 'RuntimeRunClass');
-  expect(
-    Object.keys(entry?.toolDefinition.inputSchema.shape ?? {}),
-  ).not.toContain('background');
+  assert.ok(
+    !Object.keys(entry?.toolDefinition.inputSchema.shape ?? {}).includes(
+      'background',
+    ),
+  );
 });

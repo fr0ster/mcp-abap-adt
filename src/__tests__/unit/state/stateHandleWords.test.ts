@@ -4,6 +4,10 @@
  * headers (#308, spec §1): the held-lock refusal and the descriptions of the
  * tools that answer or need a handle.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import {
   compactDataEntries,
@@ -51,25 +55,30 @@ const descriptions = new Map(
 
 describe('the texts that ask for a state_handle name the argument', () => {
   it('the held-lock refusal', () => {
-    expect(LOCK_NOT_HELD_WORDS).toBe(NOT_HELD_WORDS);
+    assert.equal(LOCK_NOT_HELD_WORDS, NOT_HELD_WORDS);
   });
 
-  it.each(TOOLS)(
-    '%s names the argument, the header as the alternative',
-    (tool) => {
-      const description = descriptions.get(tool);
-      expect(description).toContain(ARGUMENT);
-      expect(description).toContain(HEADER);
-      // Never the header alone, as before.
-      expect(description).not.toContain(
-        'send in the x-mcp-state-handle header',
-      );
-      expect(description).not.toContain(
-        "carries the lock's state_handle in the x-mcp-state-handle header",
-      );
-      expect(description).not.toContain(
-        'send it in the x-mcp-state-handle header',
-      );
-    },
-  );
+  for (const tool of TOOLS) {
+    it(
+      format('%s names the argument, the header as the alternative', tool),
+      () => {
+        const description = descriptions.get(tool);
+        assert.ok(description !== undefined);
+        assert.ok(description.includes(ARGUMENT));
+        assert.ok(description.includes(HEADER));
+        // Never the header alone, as before.
+        assert.ok(
+          !description.includes('send in the x-mcp-state-handle header'),
+        );
+        assert.ok(
+          !description.includes(
+            "carries the lock's state_handle in the x-mcp-state-handle header",
+          ),
+        );
+        assert.ok(
+          !description.includes('send it in the x-mcp-state-handle header'),
+        );
+      },
+    );
+  }
 });

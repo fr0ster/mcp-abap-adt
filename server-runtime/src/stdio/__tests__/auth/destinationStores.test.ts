@@ -1,6 +1,14 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
+import {
+  assertMatchObject,
+  assertThrows,
+  rejectionOf,
+} from '../../../../../src/__tests__/helpers/assertions';
 import { keyShapeOf, storesFor } from '../../auth/destinationStores';
 
 const URL_ = 'https://system.example.test';
@@ -48,17 +56,17 @@ describe('destination stores', () => {
   describe('keyShapeOf', () => {
     it('root url, clientid, clientsecret is xsuaa', () => {
       writeKey('x', xsuaaKey);
-      expect(keyShapeOf(keysDir, 'x')).toBe('xsuaa');
+      assert.equal(keyShapeOf(keysDir, 'x'), 'xsuaa');
     });
     it('a nested uaa is abap', () => {
       writeKey('x', abapKey());
-      expect(keyShapeOf(keysDir, 'x')).toBe('abap');
+      assert.equal(keyShapeOf(keysDir, 'x'), 'abap');
     });
     it('no key is abap', () => {
-      expect(keyShapeOf(keysDir, 'x')).toBe('abap');
+      assert.equal(keyShapeOf(keysDir, 'x'), 'abap');
     });
     it('refuses a name that is a path', () => {
-      expect(() => keyShapeOf(keysDir, '../x')).toThrow();
+      assertThrows(() => keyShapeOf(keysDir, '../x'));
     });
   });
 
@@ -68,7 +76,8 @@ describe('destination stores', () => {
 
     it('a missing file is refused naming the source and the path', () => {
       const missing = path.join(root, 'nope.env');
-      expect(() => storesFor(mode(missing))).toThrow(
+      assertThrows(
+        () => storesFor(mode(missing)),
         new RegExp(
           `^--env: .*${missing.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`,
         ),
@@ -88,9 +97,9 @@ describe('destination stores', () => {
         ].join('\n'),
       );
       const s = storesFor(mode(file));
-      expect(s.urlKey).toBe('SAP_URL');
+      assert.equal(s.urlKey, 'SAP_URL');
       const cfg = await s.serviceKeyStore.getConnectionConfig('default');
-      expect(cfg).toMatchObject({
+      assertMatchObject(cfg, {
         serviceUrl: URL_,
         authType: 'basic',
         username: 'user-a',
@@ -106,7 +115,7 @@ describe('destination stores', () => {
       );
       const s = storesFor(mode(file));
       const session = await s.sessionStore.loadSession('default');
-      expect(session?.authorizationToken).toBe('tok-1');
+      assert.equal(session?.authorizationToken, 'tok-1');
     });
 
     it('a token without its binding keys is not of the store format: refused, record-format (auth-stores 5)', async () => {
@@ -116,7 +125,8 @@ describe('destination stores', () => {
         `SAP_URL=${URL_}\nSAP_AUTH_TYPE=jwt\nSAP_JWT_TOKEN=tok-1\n`,
       );
       const s = storesFor(mode(file));
-      await expect(s.sessionStore.loadSession('default')).rejects.toMatchObject(
+      assertMatchObject(
+        await rejectionOf(s.sessionStore.loadSession('default')),
         { code: 'STORAGE_ERROR', reason: 'record-format' },
       );
     });
@@ -144,9 +154,9 @@ describe('destination stores', () => {
         refreshToken: 'new-refresh',
       });
       const after = fs.readFileSync(file, 'utf8');
-      expect(after).toContain('SAP_JWT_TOKEN=new-token');
-      expect(after).toContain('SAP_REFRESH_TOKEN=new-refresh');
-      expect(after).toMatch(/SAP_EXPIRES_AT=(?!1$)\S+/m);
+      assert.ok(after.includes('SAP_JWT_TOKEN=new-token'));
+      assert.ok(after.includes('SAP_REFRESH_TOKEN=new-refresh'));
+      assert.match(after, /SAP_EXPIRES_AT=(?!1$)\S+/m);
       const rest = (t: string) =>
         t
           .split('\n')
@@ -157,7 +167,7 @@ describe('destination stores', () => {
               ),
           )
           .join('\n');
-      expect(rest(after)).toBe(rest(before));
+      assert.equal(rest(after), rest(before));
     });
   });
 
@@ -165,8 +175,8 @@ describe('destination stores', () => {
     it('an ABAP key alone answers its url, client and the authorization_code grant', async () => {
       writeKey('x', abapKey());
       const s = storesFor(named('x'));
-      expect(s.urlKey).toBe('SAP_URL');
-      expect(await s.serviceKeyStore.getConnectionConfig('x')).toMatchObject({
+      assert.equal(s.urlKey, 'SAP_URL');
+      assertMatchObject(await s.serviceKeyStore.getConnectionConfig('x'), {
         serviceUrl: URL_,
         sapClient: '100',
         authType: 'jwt',
@@ -180,8 +190,8 @@ describe('destination stores', () => {
       const cfg = await storesFor(
         named('x'),
       ).serviceKeyStore.getConnectionConfig('x');
-      expect(cfg?.sapClient).toBe('200');
-      expect(cfg?.serviceUrl).toBe(URL_);
+      assert.equal(cfg?.sapClient, '200');
+      assert.equal(cfg?.serviceUrl, URL_);
     });
 
     it('no key, a file stating snc, is answered as snc', async () => {
@@ -193,7 +203,7 @@ describe('destination stores', () => {
       const cfg = await storesFor(
         named('x'),
       ).serviceKeyStore.getConnectionConfig('x');
-      expect(cfg).toMatchObject({
+      assertMatchObject(cfg, {
         authType: 'snc',
         sncPartnerName: 'p:placeholder',
       });
@@ -203,13 +213,15 @@ describe('destination stores', () => {
       writeKey('x', xsuaaKey);
       writeSession('x', [`XSUAA_MCP_URL=${XSUAA_URL}`]);
       const s = storesFor(named('x'));
-      expect(s.urlKey).toBe('XSUAA_MCP_URL');
-      expect(
+      assert.equal(s.urlKey, 'XSUAA_MCP_URL');
+      assert.equal(
         (await s.serviceKeyStore.getConnectionConfig('x'))?.serviceUrl,
-      ).toBe(XSUAA_URL);
-      expect(
+        XSUAA_URL,
+      );
+      assert.equal(
         (await s.serviceKeyStore.getAuthorizationConfig('x'))?.uaaClientId,
-      ).toBe('xs-client-id');
+        'xs-client-id',
+      );
     });
 
     it('with SAP_URL instead, an XSUAA destination answers no url', async () => {
@@ -218,7 +230,7 @@ describe('destination stores', () => {
       const cfg = await storesFor(
         named('x'),
       ).serviceKeyStore.getConnectionConfig('x');
-      expect(cfg?.serviceUrl).toBeFalsy();
+      assert.ok(!cfg?.serviceUrl);
     });
 
     describe('urlStore: where the connector URL is read', () => {
@@ -229,61 +241,77 @@ describe('destination stores', () => {
         ['a url without "authentication"', 'https://tenant.example.test'],
       ] as const;
 
-      it.each(keyUrls)(
-        'XSUAA key with %s: answers XSUAA_MCP_URL',
-        async (_label, keyUrl) => {
-          writeKey('x', { ...xsuaaKey, url: keyUrl });
-          writeSession('x', [`XSUAA_MCP_URL=${XSUAA_URL}`]);
-          const s = storesFor(named('x'));
-          expect((await s.urlStore.getConnectionConfig('x'))?.serviceUrl).toBe(
-            XSUAA_URL,
-          );
-        },
-      );
+      for (const [_label, keyUrl] of keyUrls) {
+        it(
+          format('XSUAA key with %s: answers XSUAA_MCP_URL', _label),
+          async () => {
+            writeKey('x', { ...xsuaaKey, url: keyUrl });
+            writeSession('x', [`XSUAA_MCP_URL=${XSUAA_URL}`]);
+            const s = storesFor(named('x'));
+            assert.equal(
+              (await s.urlStore.getConnectionConfig('x'))?.serviceUrl,
+              XSUAA_URL,
+            );
+          },
+        );
+      }
 
-      it.each(keyUrls)(
-        'XSUAA key with %s and SAP_URL instead: answers no url, never the key url',
-        async (_label, keyUrl) => {
-          writeKey('x', { ...xsuaaKey, url: keyUrl });
-          writeSession('x', [`SAP_URL=${URL_}`]);
-          const cfg = await storesFor(named('x')).urlStore.getConnectionConfig(
-            'x',
-          );
-          expect(cfg?.serviceUrl).toBeUndefined();
-        },
-      );
+      for (const [_label, keyUrl] of keyUrls) {
+        it(
+          format(
+            'XSUAA key with %s and SAP_URL instead: answers no url, never the key url',
+            _label,
+          ),
+          async () => {
+            writeKey('x', { ...xsuaaKey, url: keyUrl });
+            writeSession('x', [`SAP_URL=${URL_}`]);
+            const cfg = await storesFor(
+              named('x'),
+            ).urlStore.getConnectionConfig('x');
+            assert.equal(cfg?.serviceUrl, undefined);
+          },
+        );
+      }
 
-      it.each(keyUrls)(
-        'XSUAA key with %s and no session file: answers no url',
-        async (_label, keyUrl) => {
-          writeKey('x', { ...xsuaaKey, url: keyUrl });
-          const cfg = await storesFor(named('x')).urlStore.getConnectionConfig(
-            'x',
-          );
-          expect(cfg?.serviceUrl).toBeUndefined();
-        },
-      );
+      for (const [_label, keyUrl] of keyUrls) {
+        it(
+          format(
+            'XSUAA key with %s and no session file: answers no url',
+            _label,
+          ),
+          async () => {
+            writeKey('x', { ...xsuaaKey, url: keyUrl });
+            const cfg = await storesFor(
+              named('x'),
+            ).urlStore.getConnectionConfig('x');
+            assert.equal(cfg?.serviceUrl, undefined);
+          },
+        );
+      }
 
       it('ABAP key: the url the key store answers (key, or SAP_URL over it)', async () => {
         writeKey('x', abapKey());
-        expect(
+        assert.equal(
           (await storesFor(named('x')).urlStore.getConnectionConfig('x'))
             ?.serviceUrl,
-        ).toBe(URL_);
+          URL_,
+        );
         writeSession('x', ['SAP_URL=https://other.example.test']);
-        expect(
+        assert.equal(
           (await storesFor(named('x')).urlStore.getConnectionConfig('x'))
             ?.serviceUrl,
-        ).toBe('https://other.example.test');
+          'https://other.example.test',
+        );
       });
 
       it('an --env file: its SAP_URL', async () => {
         const file = path.join(root, 'conn.env');
         fs.writeFileSync(file, `SAP_URL=${URL_}\nSAP_AUTH_TYPE=basic\n`);
         const s = storesFor({ kind: 'envFile', path: file, source: '--env' });
-        expect(
+        assert.equal(
           (await s.urlStore.getConnectionConfig('default'))?.serviceUrl,
-        ).toBe(URL_);
+          URL_,
+        );
       });
     });
 
@@ -295,8 +323,8 @@ describe('destination stores', () => {
         refreshToken: 'ref-2',
       });
       const file = path.join(sessionsDir, 'x.env');
-      expect(fs.existsSync(file)).toBe(true);
-      expect(fs.readFileSync(file, 'utf8')).toContain('tok-2');
+      assert.equal(fs.existsSync(file), true);
+      assert.ok(fs.readFileSync(file, 'utf8').includes('tok-2'));
     });
 
     it('not unsafe: no file is written, the secret is kept in memory', async () => {
@@ -306,14 +334,15 @@ describe('destination stores', () => {
         authorizationToken: 'tok-3',
         refreshToken: 'ref-3',
       });
-      expect(fs.readdirSync(sessionsDir)).toEqual([]);
-      expect((await s.sessionStore.loadSession('x'))?.authorizationToken).toBe(
+      assert.deepStrictEqual(fs.readdirSync(sessionsDir), []);
+      assert.equal(
+        (await s.sessionStore.loadSession('x'))?.authorizationToken,
         'tok-3',
       );
     });
 
     it('refuses a name that is a path before reading anything', () => {
-      expect(() => storesFor(named('../x'))).toThrow();
+      assertThrows(() => storesFor(named('../x')));
     });
   });
 });

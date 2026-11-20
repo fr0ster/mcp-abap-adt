@@ -10,6 +10,8 @@
  * embedder.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type {
   IAbapConnection,
@@ -139,7 +141,7 @@ describe('a batch view keeps the connection’s system kind', () => {
     const results = await runPhase(context, ['one'], async (_item, view) =>
       systemKindOf(view),
     );
-    expect(results).toEqual([{ ok: true, value: 'onprem' }]);
+    assert.deepStrictEqual(results, [{ ok: true, value: 'onprem' }]);
   });
 
   it('ListTransports answers on a connection whose kind is only declared', async () => {
@@ -153,14 +155,15 @@ describe('a batch view keeps the connection’s system kind', () => {
     const from = stand.requests.length;
     const answer = await handleListTransports(context, { user: 'owner_a' });
     const text = answer.content.map((part) => part.text).join('\n');
-    expect({ isError: answer.isError, text }).toEqual({
-      isError: false,
-      text: expect.stringContaining('K900001'),
-    });
-    expect(envelopes).toBe(0);
-    expect(directs(from).map((request) => request.url)).toEqual([
-      '/sap/bc/adt/cts/transportrequests?user=OWNER_A&requestStatus=D&requestType=KWT',
-    ]);
+    assert.equal(answer.isError, false);
+    assert.ok(text.includes('K900001'));
+    assert.equal(envelopes, 0);
+    assert.deepStrictEqual(
+      directs(from).map((request) => request.url),
+      [
+        '/sap/bc/adt/cts/transportrequests?user=OWNER_A&requestStatus=D&requestType=KWT',
+      ],
+    );
   });
 
   it('a feed’s round connection has the kind of the connection it is over', () => {
@@ -169,7 +172,7 @@ describe('a batch view keeps the connection’s system kind', () => {
     const view = roundConnection(connection, (request) =>
       inner.makeAdtRequest(request),
     );
-    expect(systemKindOf(view)).toBe('onprem');
+    assert.equal(systemKindOf(view), 'onprem');
   });
 
   it('a connection stated with no kind gives its views none: SAP_SYSTEM_TYPE is not read for them', async () => {
@@ -182,13 +185,13 @@ describe('a batch view keeps the connection’s system kind', () => {
     const results = await runPhase(context, ['one'], async (_item, view) =>
       systemKindOf(view),
     );
-    expect(results).toEqual([{ ok: true, value: undefined }]);
+    assert.deepStrictEqual(results, [{ ok: true, value: undefined }]);
     const from = stand.requests.length;
     const answer = await handleListTransports(context, { user: 'owner_a' });
     const text = answer.content.map((part) => part.text).join('\n');
-    expect(answer.isError).toBe(true);
-    expect(text).toContain('system_type_required');
-    expect(stand.requests.slice(from)).toEqual([]);
+    assert.equal(answer.isError, true);
+    assert.ok(text.includes('system_type_required'));
+    assert.deepStrictEqual(stand.requests.slice(from), []);
   });
 
   it('a connection with no kind is still refused system_type_required, nothing sent', async () => {
@@ -197,8 +200,8 @@ describe('a batch view keeps the connection’s system kind', () => {
     const from = stand.requests.length;
     const answer = await handleListTransports(context, { user: 'owner_a' });
     const text = answer.content.map((part) => part.text).join('\n');
-    expect(answer.isError).toBe(true);
-    expect(text).toContain('system_type_required');
-    expect(stand.requests.slice(from)).toEqual([]);
+    assert.equal(answer.isError, true);
+    assert.ok(text.includes('system_type_required'));
+    assert.deepStrictEqual(stand.requests.slice(from), []);
   });
 });

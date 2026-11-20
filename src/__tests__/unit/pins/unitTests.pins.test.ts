@@ -3,9 +3,10 @@
  * request list as a literal, on `recordingConnection` with real adt-clients
  * code.
  *
- * A run's status is read first without long polling, and only a run SAP
- * answers `RUNNING` is long-polled (`?withLongPolling=true`), read again
- * after each answer. Measured on both systems (2026-11-05): an unknown run
+ * A run's status is read first without long polling, and a run SAP answers
+ * `RUNNING` is long-polled (`?withLongPolling=true`), read again after each
+ * answer; after the tool's own start, a first `NOT_STARTED` is long-polled
+ * once too. Measured on both systems (2026-11-05): an unknown run
  * id reads `NOT_STARTED` at once without long polling and only after about
  * 300 s with it; a run in progress reads `RUNNING` from right after its
  * start; a finished one `FINISHED`.
@@ -16,6 +17,9 @@
  * - `HandlerUnitTestResult`: the compact result tool, which reads only the
  *   result.
  */
+
+import assert from 'node:assert/strict';
+import { describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { type McpResult, pinCases } from '../../helpers/pinCases';
 
@@ -71,18 +75,18 @@ function member(value: unknown, key: string): unknown {
 /** The answer of a run SAP answered finished: its id and a result. */
 function expectFinished(runId: string) {
   return (answer: McpResult) => {
-    expect(answer.isError).toBe(false);
+    assert.equal(answer.isError, false);
     const value = answered(answer);
-    expect(member(value, 'run_id')).toBe(runId);
-    expect(member(value, 'finished')).toBe(true);
-    expect(member(value, 'run_result')).toBeDefined();
+    assert.equal(member(value, 'run_id'), runId);
+    assert.equal(member(value, 'finished'), true);
+    assert.notEqual(member(value, 'run_result'), undefined);
   };
 }
 
 /** The answer of a run SAP answered `NOT_STARTED`: its id and that status. */
 function expectNotStarted(answer: McpResult) {
-  expect(answer.isError).toBe(false);
-  expect(answered(answer)).toEqual({
+  assert.equal(answer.isError, false);
+  assert.deepStrictEqual(answered(answer), {
     success: true,
     run_id: RUN,
     status: 'NOT_STARTED',
@@ -275,13 +279,13 @@ describe('unit test run pins', () => {
       ],
       ran: expectFinished(ODD_RUN),
     },
-    // a run SAP answers NOT_STARTED: answered at once
+    // a run SAP answers NOT_STARTED: read again by long polling; NOT_STARTED there is answered
     {
       tool: 'RunUnitTest',
       variant: 'onprem',
       stand: 'recording',
       args: { class_name: 'ZCL_X' },
-      answers: [STARTED, NOT_STARTED, FINISHED, RESULT],
+      answers: [STARTED, NOT_STARTED, NOT_STARTED, FINISHED, RESULT],
       expected: [
         {
           method: 'POST',
@@ -295,16 +299,22 @@ describe('unit test run pins', () => {
           headers: STATUS_ACCEPT,
           body: undefined,
         },
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB8599833A05D44?withLongPolling=true',
+          headers: STATUS_ACCEPT,
+          body: undefined,
+        },
       ],
       ran: expectNotStarted,
     },
-    // a run SAP answers NOT_STARTED: answered at once
+    // a run SAP answers NOT_STARTED: read again by long polling; NOT_STARTED there is answered
     {
       tool: 'RunUnitTest',
       variant: 'cloud',
       stand: 'recording',
       args: { class_name: 'ZCL_X' },
-      answers: [STARTED, NOT_STARTED, FINISHED, RESULT],
+      answers: [STARTED, NOT_STARTED, NOT_STARTED, FINISHED, RESULT],
       expected: [
         {
           method: 'POST',
@@ -315,6 +325,12 @@ describe('unit test run pins', () => {
         {
           method: 'GET',
           url: '/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB8599833A05D44',
+          headers: STATUS_ACCEPT,
+          body: undefined,
+        },
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB8599833A05D44?withLongPolling=true',
           headers: STATUS_ACCEPT,
           body: undefined,
         },
@@ -449,13 +465,13 @@ describe('unit test run pins', () => {
       ],
       ran: expectFinished(RUN),
     },
-    // a run SAP answers NOT_STARTED: answered at once
+    // a run SAP answers NOT_STARTED: read again by long polling; NOT_STARTED there is answered
     {
       tool: 'RunAbapUnit',
       variant: 'onprem',
       stand: 'recording',
       args: { target: { kind: 'object', name: 'ZCL_X', type: 'CLAS/OC' } },
-      answers: [STARTED, NOT_STARTED, FINISHED, RESULT],
+      answers: [STARTED, NOT_STARTED, NOT_STARTED, FINISHED, RESULT],
       expected: [
         {
           method: 'POST',
@@ -469,16 +485,22 @@ describe('unit test run pins', () => {
           headers: STATUS_ACCEPT,
           body: undefined,
         },
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB8599833A05D44?withLongPolling=true',
+          headers: STATUS_ACCEPT,
+          body: undefined,
+        },
       ],
       ran: expectNotStarted,
     },
-    // a run SAP answers NOT_STARTED: answered at once
+    // a run SAP answers NOT_STARTED: read again by long polling; NOT_STARTED there is answered
     {
       tool: 'RunAbapUnit',
       variant: 'cloud',
       stand: 'recording',
       args: { target: { kind: 'object', name: 'ZCL_X', type: 'CLAS/OC' } },
-      answers: [STARTED, NOT_STARTED, FINISHED, RESULT],
+      answers: [STARTED, NOT_STARTED, NOT_STARTED, FINISHED, RESULT],
       expected: [
         {
           method: 'POST',
@@ -489,6 +511,12 @@ describe('unit test run pins', () => {
         {
           method: 'GET',
           url: '/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB8599833A05D44',
+          headers: STATUS_ACCEPT,
+          body: undefined,
+        },
+        {
+          method: 'GET',
+          url: '/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB8599833A05D44?withLongPolling=true',
           headers: STATUS_ACCEPT,
           body: undefined,
         },

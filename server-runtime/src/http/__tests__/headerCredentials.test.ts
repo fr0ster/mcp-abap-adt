@@ -1,3 +1,13 @@
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
 /**
  * Streamable HTTP takes credentials only from each request's `x-sap-*`
@@ -92,10 +102,10 @@ let server: Server;
 let mcp: StreamableHttpServer;
 let baseUrl: string;
 let previousType: string | undefined;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 beforeEach(async () => {
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
   previousType = process.env.SAP_SYSTEM_TYPE;
   process.env.SAP_SYSTEM_TYPE = 'onprem'; // no system lookup
   standIn = await adtStandIn();
@@ -118,7 +128,7 @@ afterEach(async () => {
   await standIn.close();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
 const basic = (user: string, password: string) => ({
@@ -154,7 +164,7 @@ async function call(
     method: 'tools/call',
     params: { name, arguments: args },
   });
-  expect(res.status).toBe(200);
+  assert.equal(res.status, 200);
   const body = (await res.json()) as {
     result: { content: { text: string }[]; isError?: boolean };
   };
@@ -167,21 +177,21 @@ async function call(
 describe('the credential comes from the request headers', () => {
   it('x-sap-* basic reaches the stand-in as that user', async () => {
     const r = await call(basic('USER_A', 'pass-a'), 'ProbeAdt', { id: 'b1' });
-    expect(r).toEqual({ text: 'b1', isError: false });
-    expect(standIn.authorizationOf('b1')).toBe(basicOf('USER_A', 'pass-a'));
+    assert.deepStrictEqual(r, { text: 'b1', isError: false });
+    assert.equal(standIn.authorizationOf('b1'), basicOf('USER_A', 'pass-a'));
   });
 
   it('x-sap-jwt-token reaches the stand-in as that Bearer token', async () => {
     const r = await call(token('token-a.payload.sig'), 'ProbeAdt', {
       id: 't1',
     });
-    expect(r).toEqual({ text: 't1', isError: false });
-    expect(standIn.authorizationOf('t1')).toBe('Bearer token-a.payload.sig');
+    assert.deepStrictEqual(r, { text: 't1', isError: false });
+    assert.equal(standIn.authorizationOf('t1'), 'Bearer token-a.payload.sig');
   });
 });
 
 describe('a request the server does not serve', () => {
-  it.each([
+  for (const [_name, body] of [
     ['initialize', { method: 'initialize', params: {} }],
     [
       'tools/call',
@@ -190,36 +200,49 @@ describe('a request the server does not serve', () => {
         params: { name: 'ProbeAdt', arguments: { id: 'x' } },
       },
     ],
-  ])('%s without credentials: 400 with its sentence', async (_name, body) => {
-    const res = await post({}, body);
-    expect(res.status).toBe(400);
-    expect(await res.text()).toBe(CREDENTIALS_REQUIRED_WORDS);
-    expect(standIn.requests).toEqual([]);
-  });
+  ] satisfies [string, object][]) {
+    it(
+      format('%s without credentials: 400 with its sentence', _name),
+      async () => {
+        const res = await post({}, body);
+        assert.equal(res.status, 400);
+        assert.equal(await res.text(), CREDENTIALS_REQUIRED_WORDS);
+        assert.deepStrictEqual(standIn.requests, []);
+      },
+    );
+  }
 
-  it.each([
+  for (const [_label, headers] of [
     ['with credentials', () => basic('USER_A', 'pass-a')],
     ['without credentials', () => ({})],
-  ])(
-    'x-mcp-destination %s: 400 with its sentence, nothing sent',
-    async (_label, headers) => {
-      const res = await post(
-        { ...headers(), 'x-mcp-destination': 'TRIAL' },
-        {
-          method: 'tools/call',
-          params: { name: 'ProbeAdt', arguments: { id: 'd1' } },
-        },
-      );
-      expect(res.status).toBe(400);
-      expect(await res.text()).toBe(DESTINATIONS_ONLY_STDIO_WORDS);
-      expect(standIn.requests).toEqual([]);
-    },
-  );
+  ] satisfies [string, () => Record<string, string>][]) {
+    it(
+      format(
+        'x-mcp-destination %s: 400 with its sentence, nothing sent',
+        _label,
+      ),
+      async () => {
+        const res = await post(
+          { ...headers(), 'x-mcp-destination': 'TRIAL' },
+          {
+            method: 'tools/call',
+            params: { name: 'ProbeAdt', arguments: { id: 'd1' } },
+          },
+        );
+        assert.equal(res.status, 400);
+        assert.equal(await res.text(), DESTINATIONS_ONLY_STDIO_WORDS);
+        assert.deepStrictEqual(standIn.requests, []);
+      },
+    );
+  }
 
   it('ping without credentials answers', async () => {
     const res = await post({}, { method: 'ping' });
-    expect(res.status).toBe(200);
-    expect(((await res.json()) as { result: unknown }).result).toEqual({});
+    assert.equal(res.status, 200);
+    assert.deepStrictEqual(
+      ((await res.json()) as { result: unknown }).result,
+      {},
+    );
   });
 });
 
@@ -229,31 +252,31 @@ describe('nothing is shared across requests', () => {
       call(basic('USER_A', 'pass-a'), 'ProbeAdt', { id: 'ca', delayMs: 80 }),
       call(basic('USER_B', 'pass-b'), 'ProbeAdt', { id: 'cb', delayMs: 0 }),
     ]);
-    expect(a.isError || b.isError).toBe(false);
-    expect(standIn.authorizationOf('ca')).toBe(basicOf('USER_A', 'pass-a'));
-    expect(standIn.authorizationOf('cb')).toBe(basicOf('USER_B', 'pass-b'));
+    assert.equal(a.isError || b.isError, false);
+    assert.equal(standIn.authorizationOf('ca'), basicOf('USER_A', 'pass-a'));
+    assert.equal(standIn.authorizationOf('cb'), basicOf('USER_B', 'pass-b'));
   });
 
   it("a call routed by state_handle to a kept instance builds its connection from its own headers, not the instance's first request", async () => {
     const held = await call(basic('USER_A', 'pass-a'), 'HoldAndProbe', {
       id: 'h1',
     });
-    expect(held.isError).toBe(false);
+    assert.equal(held.isError, false);
     const handle = held.text;
-    expect(standIn.authorizationOf('h1')).toBe(basicOf('USER_A', 'pass-a'));
+    assert.equal(standIn.authorizationOf('h1'), basicOf('USER_A', 'pass-a'));
 
     const routed = await call(basic('USER_B', 'pass-b'), 'HeldProbe', {
       id: 'h2',
       state_handle: handle,
     });
-    expect(routed).toEqual({ text: 'h2', isError: false });
-    expect(standIn.authorizationOf('h2')).toBe(basicOf('USER_B', 'pass-b'));
+    assert.deepStrictEqual(routed, { text: 'h2', isError: false });
+    assert.equal(standIn.authorizationOf('h2'), basicOf('USER_B', 'pass-b'));
 
     const asToken = await call(token('token-c.payload.sig'), 'HeldProbe', {
       id: 'h3',
       state_handle: handle,
     });
-    expect(asToken).toEqual({ text: 'h3', isError: false });
-    expect(standIn.authorizationOf('h3')).toBe('Bearer token-c.payload.sig');
+    assert.deepStrictEqual(asToken, { text: 'h3', isError: false });
+    assert.equal(standIn.authorizationOf('h3'), 'Bearer token-c.payload.sig');
   });
 });

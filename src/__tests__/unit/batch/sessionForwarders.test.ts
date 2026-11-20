@@ -5,6 +5,10 @@
  * (or no connection) answers nothing — as the batch connection reads them,
  * `getSessionType?.() ?? getSessionMode?.() ?? 'stateless'`.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { EnvelopeWatch } from '../../../lib/batch/envelopeWatch';
 import { LateBoundConnection } from '../../../lib/batch/lateBound';
@@ -60,33 +64,35 @@ const forwarders: [string, (under?: IAbapConnection) => IAbapConnection][] = [
   ],
 ];
 
-describe.each(forwarders)('%s forwards the session members', (_, over) => {
-  it('answers nothing for a member the connection lacks, and calls no other', () => {
-    const calls: string[] = [];
-    const typeOnly = over(connectionWith({ type: 'stateful' }, calls));
-    expect(typeOnly.getSessionType?.()).toBe('stateful');
-    expect(typeOnly.getSessionMode?.()).toBeUndefined();
-    const modeOnly = over(connectionWith({ mode: 'stateful' }, calls));
-    expect(modeOnly.getSessionType?.()).toBeUndefined();
-    expect(modeOnly.getSessionMode?.()).toBe('stateful');
-    expect(calls).toEqual(['getSessionType', 'getSessionMode']);
-  });
+for (const [_, over] of forwarders) {
+  describe(format('%s forwards the session members', _), () => {
+    it('answers nothing for a member the connection lacks, and calls no other', () => {
+      const calls: string[] = [];
+      const typeOnly = over(connectionWith({ type: 'stateful' }, calls));
+      assert.equal(typeOnly.getSessionType?.(), 'stateful');
+      assert.equal(typeOnly.getSessionMode?.(), undefined);
+      const modeOnly = over(connectionWith({ mode: 'stateful' }, calls));
+      assert.equal(modeOnly.getSessionType?.(), undefined);
+      assert.equal(modeOnly.getSessionMode?.(), 'stateful');
+      assert.deepStrictEqual(calls, ['getSessionType', 'getSessionMode']);
+    });
 
-  it('answers each member from the same-named one', () => {
-    const calls: string[] = [];
-    const both = over(
-      connectionWith({ type: 'stateful', mode: 'stateless' }, calls),
-    );
-    expect(both.getSessionType?.()).toBe('stateful');
-    expect(both.getSessionMode?.()).toBe('stateless');
-    expect(calls).toEqual(['getSessionType', 'getSessionMode']);
+    it('answers each member from the same-named one', () => {
+      const calls: string[] = [];
+      const both = over(
+        connectionWith({ type: 'stateful', mode: 'stateless' }, calls),
+      );
+      assert.equal(both.getSessionType?.(), 'stateful');
+      assert.equal(both.getSessionMode?.(), 'stateless');
+      assert.deepStrictEqual(calls, ['getSessionType', 'getSessionMode']);
+    });
   });
-});
+}
 
 describe('LateBoundConnection pointed at no connection', () => {
   it('answers no session', () => {
     const late = new LateBoundConnection();
-    expect(late.getSessionType?.()).toBeUndefined();
-    expect(late.getSessionMode?.()).toBeUndefined();
+    assert.equal(late.getSessionType?.(), undefined);
+    assert.equal(late.getSessionMode?.(), undefined);
   });
 });

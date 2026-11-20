@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
 /**
  * core's failure reader: a `DestinationConfigError` is read
@@ -12,6 +15,7 @@ import { answerFailure } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { assertNoProperty } from '../../../../../src/__tests__/helpers/assertions';
 import { stateSystemKind } from '../../../../../src/__tests__/helpers/systemKind';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import {
@@ -53,32 +57,33 @@ function payload(thrown: unknown): Record<string, unknown> {
 
 describe('a DestinationConfigError', () => {
   // `browser` has a headline of its own (below).
-  it.each(
-    (Object.keys(KNOWN) as Array<keyof typeof KNOWN>).filter(
-      (field) => field !== 'browser',
-    ),
-  )('names %s with its own hint and no other', (field) => {
-    const answer = payload(
-      new DestinationConfigError('dest', [field], 'fixed reason'),
-    );
-    expect(answer).toEqual({
-      error: 'destination_refused',
-      message: `Destination "dest" cannot be used: ${field}`,
-      hint: KNOWN[field],
+  for (const field of (Object.keys(KNOWN) as Array<keyof typeof KNOWN>).filter(
+    (field) => field !== 'browser',
+  )) {
+    it(format('names %s with its own hint and no other', field), () => {
+      const answer = payload(
+        new DestinationConfigError('dest', [field], 'fixed reason'),
+      );
+      assert.deepStrictEqual(answer, {
+        error: 'destination_refused',
+        message: `Destination "dest" cannot be used: ${field}`,
+        hint: KNOWN[field],
+      });
     });
-  });
+  }
 
   it('the hints are the ones the server holds, and no other', () => {
-    expect(HINTS).toEqual(KNOWN);
+    assert.deepStrictEqual(HINTS, KNOWN);
   });
 
   it('a field without a known remedy: the headline alone', () => {
-    expect(
+    assert.deepStrictEqual(
       payload(new DestinationConfigError('dest', ['uaaClientId'], 'r')),
-    ).toEqual({
-      error: 'destination_refused',
-      message: 'Destination "dest" cannot be used: uaaClientId',
-    });
+      {
+        error: 'destination_refused',
+        message: 'Destination "dest" cannot be used: uaaClientId',
+      },
+    );
   });
 
   it('several fields: one headline naming them, one hint per known field, each once', () => {
@@ -89,10 +94,11 @@ describe('a DestinationConfigError', () => {
         'r',
       ),
     );
-    expect(answer.message).toBe(
+    assert.equal(
+      answer.message,
       'Destination "dest" cannot be used: uaaUrl, SAP_URL, grantType, SAP_URL',
     );
-    expect(answer.hint).toBe(`${KNOWN.SAP_URL}\n${KNOWN.grantType}`);
+    assert.equal(answer.hint, `${KNOWN.SAP_URL}\n${KNOWN.grantType}`);
   });
 
   it('a carried error: its hint first, then the fields’ hints; cause_kind its kind', () => {
@@ -104,11 +110,12 @@ describe('a DestinationConfigError', () => {
       carried,
     );
     const answer = payload(error);
-    expect(answer.cause_kind).toBe('credential-refused');
-    expect(answer.hint).toBe(
+    assert.equal(answer.cause_kind, 'credential-refused');
+    assert.equal(
+      answer.hint,
       [carried.hint, KNOWN.grantType].filter(Boolean).join('\n'),
     );
-    expect(answer).not.toHaveProperty('kind');
+    assertNoProperty(answer, 'kind');
   });
 
   it('carries no value read from a store', () => {
@@ -122,8 +129,10 @@ describe('a DestinationConfigError', () => {
       err = e;
     }
     const text = JSON.stringify(payload(err));
-    expect(text).toContain('Destination \\"dest\\" cannot be used: grantType');
-    expect(text).not.toContain('made-up-grant-z9');
+    assert.ok(
+      text.includes('Destination \\"dest\\" cannot be used: grantType'),
+    );
+    assert.ok(!text.includes('made-up-grant-z9'));
   });
 
   it('browser alone: the browser headline naming the platform, and its hint', () => {
@@ -131,7 +140,7 @@ describe('a DestinationConfigError', () => {
       new DestinationConfigError('default', ['browser'], 'r'),
       { platform: 'freebsd' },
     );
-    expect(read).toEqual({
+    assert.deepStrictEqual(read, {
       error: 'destination_refused',
       message:
         'Destination "default" logs in through a browser, and none is known on this platform (freebsd)',
@@ -142,24 +151,26 @@ describe('a DestinationConfigError', () => {
 
 describe('core’s own refusals and the rest', () => {
   it('an unsupported authentication: destination_refused in its words', () => {
-    expect(
+    assert.deepStrictEqual(
       payload(
         new UnsupportedAuthenticationError('dest', 'jwt', 'client_credentials'),
       ),
-    ).toEqual({
-      error: 'destination_refused',
-      message:
-        'Destination "dest" uses jwt / client_credentials, which this server does not support',
-    });
+      {
+        error: 'destination_refused',
+        message:
+          'Destination "dest" uses jwt / client_credentials, which this server does not support',
+      },
+    );
   });
 
   it('a DestinationRefusal: destination_refused in its vetted words', () => {
-    expect(
+    assert.deepStrictEqual(
       payload(new DestinationRefusal('--env-path: no such file.')),
-    ).toEqual({
-      error: 'destination_refused',
-      message: '--env-path: no such file.',
-    });
+      {
+        error: 'destination_refused',
+        message: '--env-path: no such file.',
+      },
+    );
   });
 
   it("a chain failure: lib's reading, with the server's sentence when it has one", () => {
@@ -167,14 +178,15 @@ describe('core’s own refusals and the rest', () => {
     const read = destinationFailureOf(new AuthProviderFailure(error), {
       sentenceFor: (e) => (e.kind === 'renewal-declined' ? 'S.' : undefined),
     });
-    expect(read?.error).toBe('authentication_failed');
-    expect(read?.server).toBe('S.');
+    assert.equal(read?.error, 'authentication_failed');
+    assert.equal(read?.server, 'S.');
   });
 
   it('anything else: undefined; its words are the class only', () => {
     const thrown = new SyntaxError('Unexpected token in "PLACEHOLDERSECRET"');
-    expect(destinationFailureOf(thrown)).toBeUndefined();
-    expect(destinationFailureWords(thrown, 'dest')).toBe(
+    assert.equal(destinationFailureOf(thrown), undefined);
+    assert.equal(
+      destinationFailureWords(thrown, 'dest'),
       'Destination "dest" cannot be read: SyntaxError',
     );
   });
@@ -205,14 +217,14 @@ describe('through a real --env file (broker 5.0.1)', () => {
     } catch (e) {
       thrown = e;
     }
-    expect(payload(thrown)).toEqual({
+    assert.deepStrictEqual(payload(thrown), {
       error: 'destination_refused',
       message:
         'Destination "default" uses jwt / none, which this server does not support',
       hint: JWT_NONE_HINT,
     });
-    expect(JSON.stringify(payload(thrown))).not.toContain(
-      'placeholder-token-value',
+    assert.ok(
+      !JSON.stringify(payload(thrown)).includes('placeholder-token-value'),
     );
   });
 
@@ -240,8 +252,8 @@ describe('through a real --env file (broker 5.0.1)', () => {
         },
       }),
     );
-    await expect(factory.getProvider('default')).resolves.toBeDefined();
-    expect(warnings).toEqual([
+    assert.notEqual(await factory.getProvider('default'), undefined);
+    assert.deepStrictEqual(warnings, [
       "[AuthBroker] default: the stored session secret is not recorded as issued under the destination's current means; not used, the provider obtains a new one",
     ]);
   });
@@ -256,7 +268,7 @@ describe('a tool call on core (StdioServer): the server sentence beside the chai
   });
   afterEach(() => base.remove());
 
-  it('--renewal=refresh-only with no session: authentication_failed, renewal-declined, server: the refresh-only sentence', async () => {
+  it('--renewal=refresh-only with no session: authentication_failed, renewal-declined, server: the refresh-only sentence', async (t) => {
     const file = base.writeFile('conn.env', authorizationCodeLines());
     const factory = new AuthBrokerFactory(
       factoryConfig(base, recordingLogins(), {
@@ -264,7 +276,7 @@ describe('a tool call on core (StdioServer): the server sentence beside the chai
         renewal: 'refresh-only',
       }),
     );
-    const reached = jest.fn();
+    const reached = mock.fn();
     const group = {
       getName: () => 'stub',
       getHandlers: () => [
@@ -287,9 +299,7 @@ describe('a tool call on core (StdioServer): the server sentence beside the chai
       factory,
       { sentenceFor: (error) => factory.sentenceFor(error) },
     );
-    const stderr = jest
-      .spyOn(process.stderr, 'write')
-      .mockImplementation(() => true);
+    const stderr = t.mock.method(process.stderr, 'write', () => true);
     const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 'test', version: '1.0.0' });
     try {
@@ -301,15 +311,15 @@ describe('a tool call on core (StdioServer): the server sentence beside the chai
         name: 'StubTool',
         arguments: {},
       })) as { isError?: boolean; content: Array<{ text: string }> };
-      expect(result.isError).toBe(true);
+      assert.equal(result.isError, true);
       const answer = JSON.parse(result.content[0].text);
-      expect(answer.error).toBe('authentication_failed');
-      expect(answer.kind).toBe('renewal-declined');
-      expect(answer.server).toBe(REFRESH_ONLY_SENTENCE);
-      expect(reached).not.toHaveBeenCalled();
+      assert.equal(answer.error, 'authentication_failed');
+      assert.equal(answer.kind, 'renewal-declined');
+      assert.equal(answer.server, REFRESH_ONLY_SENTENCE);
+      assert.equal(reached.mock.callCount(), 0);
     } finally {
       await client.close();
-      stderr.mockRestore();
+      stderr.mock.restore();
     }
   });
 });

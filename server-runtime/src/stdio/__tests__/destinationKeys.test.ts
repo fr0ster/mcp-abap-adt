@@ -11,6 +11,9 @@
  * destination's `.env` reaches `process.env`.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { DestinationKey, YamlConfig } from '@mcp-abap-adt/lib/config';
 import { withDestinationSystemContext } from '../../../../src/lib/requestSystemResolution';
 import { getStatedSystemContext } from '../../../../src/lib/systemContext';
@@ -107,64 +110,79 @@ async function inEffect(
   return (await factory.destinationKeysFor('d'))[key];
 }
 
-describe.each(FORMS)('%s: one precedence for every source', (key) => {
-  it('the CLI beats the environment, the file and YAML', async () => {
-    expect(
-      await inEffect(key, {
-        cli: 'from-cli',
-        env: 'from-env',
-        file: 'from-file',
-        yaml: 'from-yaml',
-      }),
-    ).toBe('from-cli');
-  });
+for (const [key] of FORMS) {
+  describe(format('%s: one precedence for every source', key), () => {
+    it('the CLI beats the environment, the file and YAML', async () => {
+      assert.equal(
+        await inEffect(key, {
+          cli: 'from-cli',
+          env: 'from-env',
+          file: 'from-file',
+          yaml: 'from-yaml',
+        }),
+        'from-cli',
+      );
+    });
 
-  it("the process's environment beats the destination's .env and YAML", async () => {
-    expect(
-      await inEffect(key, {
-        env: 'from-env',
-        file: 'from-file',
-        yaml: 'from-yaml',
-      }),
-    ).toBe('from-env');
-  });
+    it("the process's environment beats the destination's .env and YAML", async () => {
+      assert.equal(
+        await inEffect(key, {
+          env: 'from-env',
+          file: 'from-file',
+          yaml: 'from-yaml',
+        }),
+        'from-env',
+      );
+    });
 
-  it("the destination's .env beats YAML", async () => {
-    expect(await inEffect(key, { file: 'from-file', yaml: 'from-yaml' })).toBe(
-      'from-file',
-    );
-  });
+    it("the destination's .env beats YAML", async () => {
+      assert.equal(
+        await inEffect(key, { file: 'from-file', yaml: 'from-yaml' }),
+        'from-file',
+      );
+    });
 
-  it('YAML alone is read', async () => {
-    expect(await inEffect(key, { yaml: 'from-yaml' })).toBe('from-yaml');
-  });
+    it('YAML alone is read', async () => {
+      assert.equal(await inEffect(key, { yaml: 'from-yaml' }), 'from-yaml');
+    });
 
-  it('each source is trimmed', async () => {
-    expect(await inEffect(key, { cli: '  from-cli  ' })).toBe('from-cli');
-    expect(await inEffect(key, { env: '  from-env  ' })).toBe('from-env');
-    expect(await inEffect(key, { file: '  from-file  ' })).toBe('from-file');
-    // A quoted value keeps its spaces in the file: the factory trims it.
-    expect(await inEffect(key, { file: '"  from-file  "' })).toBe('from-file');
-    expect(await inEffect(key, { yaml: '  from-yaml  ' })).toBe('from-yaml');
-  });
+    it('each source is trimmed', async () => {
+      assert.equal(await inEffect(key, { cli: '  from-cli  ' }), 'from-cli');
+      assert.equal(await inEffect(key, { env: '  from-env  ' }), 'from-env');
+      assert.equal(await inEffect(key, { file: '  from-file  ' }), 'from-file');
+      // A quoted value keeps its spaces in the file: the factory trims it.
+      assert.equal(
+        await inEffect(key, { file: '"  from-file  "' }),
+        'from-file',
+      );
+      assert.equal(await inEffect(key, { yaml: '  from-yaml  ' }), 'from-yaml');
+    });
 
-  it('a blank value is unset: the next source answers', async () => {
-    expect(
-      await inEffect(key, { env: '   ', file: 'from-file', yaml: 'from-yaml' }),
-    ).toBe('from-file');
-    expect(await inEffect(key, { file: '   ', yaml: 'from-yaml' })).toBe(
-      'from-yaml',
-    );
-    expect(await inEffect(key, { file: '   ' })).toBeUndefined();
-    expect(await inEffect(key, { file: '"   "', yaml: 'from-yaml' })).toBe(
-      'from-yaml',
-    );
-  });
+    it('a blank value is unset: the next source answers', async () => {
+      assert.equal(
+        await inEffect(key, {
+          env: '   ',
+          file: 'from-file',
+          yaml: 'from-yaml',
+        }),
+        'from-file',
+      );
+      assert.equal(
+        await inEffect(key, { file: '   ', yaml: 'from-yaml' }),
+        'from-yaml',
+      );
+      assert.equal(await inEffect(key, { file: '   ' }), undefined);
+      assert.equal(
+        await inEffect(key, { file: '"   "', yaml: 'from-yaml' }),
+        'from-yaml',
+      );
+    });
 
-  it('stated nowhere: no value, no default', async () => {
-    expect(await inEffect(key, {})).toBeUndefined();
+    it('stated nowhere: no value, no default', async () => {
+      assert.equal(await inEffect(key, {}), undefined);
+    });
   });
-});
+}
 
 describe('two destinations in one process', () => {
   const A = [
@@ -194,20 +212,20 @@ describe('two destinations in one process', () => {
 
   it('each keeps its own client, language and address; the environment gets none of them', async () => {
     const factory = factoryOf(['--connection-type=rfc'], {});
-    expect(await factory.destinationKeysFor('a')).toEqual({
+    assert.deepStrictEqual(await factory.destinationKeysFor('a'), {
       ashost: 'host-a.example.test',
       sysnr: '00',
       client: '100',
       language: 'DE',
     });
-    expect(await factory.destinationKeysFor('b')).toEqual({
+    assert.deepStrictEqual(await factory.destinationKeysFor('b'), {
       mshost: 'ms-b.example.test',
       sysid: 'SYB',
       group: 'GROUP_B',
       client: '200',
       language: 'FR',
     });
-    expect(await factory.settingsFor('a')).toEqual({
+    assert.deepStrictEqual(await factory.settingsFor('a'), {
       authType: 'basic',
       connectionType: 'rfc',
       client: '100',
@@ -215,7 +233,7 @@ describe('two destinations in one process', () => {
       ashost: 'host-a.example.test',
       sysnr: '00',
     });
-    expect(await factory.settingsFor('b')).toEqual({
+    assert.deepStrictEqual(await factory.settingsFor('b'), {
       authType: 'basic',
       connectionType: 'rfc',
       client: '200',
@@ -224,26 +242,28 @@ describe('two destinations in one process', () => {
       group: 'GROUP_B',
       sysid: 'SYB',
     });
-    for (const [, , env] of FORMS) expect(process.env[env]).toBeUndefined();
+    for (const [, , env] of FORMS) assert.equal(process.env[env], undefined);
   });
 
   it("each one's master language of created objects is its own", async () => {
     const factory = factoryOf([], {});
     const a = await factory.systemContextFor('a');
     const b = await factory.systemContextFor('b');
-    expect(a.masterLanguage).toBe('DE');
-    expect(b.masterLanguage).toBe('FR');
-    expect(
+    assert.equal(a.masterLanguage, 'DE');
+    assert.equal(b.masterLanguage, 'FR');
+    assert.equal(
       withDestinationSystemContext(
         a,
         () => getStatedSystemContext().masterLanguage,
       ),
-    ).toBe('DE');
-    expect(
+      'DE',
+    );
+    assert.equal(
       withDestinationSystemContext(
         b,
         () => getStatedSystemContext().masterLanguage,
       ),
-    ).toBe('FR');
+      'FR',
+    );
   });
 });

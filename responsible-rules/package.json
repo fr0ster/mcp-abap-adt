@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/responsible-rules",
-  "version": "24.0.1",
+  "version": "24.0.2",
   "description": "The rules of the MCP ABAP ADT servers that name a call's responsible, user and system: a SystemContextRules of @mcp-abap-adt/lib making each connection's parameters from its systeminformation by the system kind, and the system type the transports require.",
   "license": "Apache-2.0",
   "publishConfig": {
@@ -41,17 +41,16 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json",
-    "test": "npm --prefix .. test -- --roots responsible-rules/src",
+    "test": "npm --prefix .. test -- --root responsible-rules/src",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
     "lint:check": "biome check src",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
-    "@mcp-abap-adt/lib": "^24.0.1"
+    "@mcp-abap-adt/lib": "^24.0.2"
   },
   "devDependencies": {
-    "@mcp-abap-adt/lib": "^24.0.1",
-    "@types/jest": "*",
+    "@mcp-abap-adt/lib": "^24.0.2",
     "@types/node": "*",
     "typescript": "*"
   }

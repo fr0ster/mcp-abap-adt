@@ -11,6 +11,9 @@
  * id in `Location`), the run's status reads, its results.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -20,6 +23,11 @@ import { handleActivateObject } from '../../handlers/common/low/handleActivateOb
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import {
+  getTimerCount,
+  useFakeTimers,
+  useRealTimers,
+} from '../helpers/fakeTime';
 import { setSystemContext } from '../helpers/processSystemContext';
 import {
   RUNS_DISCOVERY,
@@ -89,7 +97,7 @@ describe('a group activation waits for its run on long polling alone', () => {
   });
 
   afterEach(() => {
-    jest.useRealTimers();
+    useRealTimers();
     resetSystemContextCache();
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
@@ -101,12 +109,12 @@ describe('a group activation waits for its run on long polling alone', () => {
       { connection },
       { objects: OBJECTS },
     );
-    expect(answered.isError).toBe(false);
+    assert.equal(answered.isError, false);
     // The discovery read and the run's start come first.
     const reads = connection.requests
       .slice(2)
       .map((request) => `${request.method} ${request.url}`);
-    expect(reads).toEqual([
+    assert.deepStrictEqual(reads, [
       `GET ${STATUS_URL}`,
       `GET ${STATUS_URL}`,
       `GET ${STATUS_URL}`,
@@ -116,12 +124,14 @@ describe('a group activation waits for its run on long polling alone', () => {
   });
 
   it('no timer runs between reads', async () => {
-    jest.useFakeTimers();
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    });
     const connection = runAnswering(3);
     const pendingAtReads: number[] = [];
     const answer = connection.makeAdtRequest.bind(connection);
     connection.makeAdtRequest = (options) => {
-      pendingAtReads.push(jest.getTimerCount());
+      pendingAtReads.push(getTimerCount());
       return answer(options);
     };
     // The wait completes without the fake clock being advanced.
@@ -129,12 +139,12 @@ describe('a group activation waits for its run on long polling alone', () => {
       { connection },
       { objects: OBJECTS },
     );
-    expect(answered.isError).toBe(false);
+    assert.equal(answered.isError, false);
     // Seven requests: the discovery read first (fr0ster/mcp-abap-adt#351),
     // then the six the run takes.
-    expect(connection.requests).toHaveLength(7);
-    expect(pendingAtReads).toEqual([0, 0, 0, 0, 0, 0, 0]);
-    expect(jest.getTimerCount()).toBe(0);
+    assert.equal(connection.requests.length, 7);
+    assert.deepStrictEqual(pendingAtReads, [0, 0, 0, 0, 0, 0, 0]);
+    assert.equal(getTimerCount(), 0);
   });
 
   it('a run past six reads is still waited for', async () => {
@@ -142,17 +152,17 @@ describe('a group activation waits for its run on long polling alone', () => {
     const payload = payloadOf(
       await handleActivateObject({ connection }, { objects: OBJECTS }),
     );
-    expect(payload.run_status).toBe('finished');
-    expect(payload.activated).toBe(true);
+    assert.equal(payload.run_status, 'finished');
+    assert.equal(payload.activated, true);
     const urls = connection.requests.map((request) => request.url);
-    expect(urls.filter((url) => url === STATUS_URL)).toHaveLength(8);
-    expect(urls.at(-1)).toBe(RESULTS_URL);
+    assert.equal(urls.filter((url) => url === STATUS_URL).length, 8);
+    assert.equal(urls.at(-1), RESULTS_URL);
   });
 
   /**
    * A run answering `status` on every read, its reads counted: past
    * `READ_BOUND` the double refuses and records it, so a wait that does not
-   * end fails the case instead of running Jest out of memory. The bound is
+   * end fails the case instead of running the test out of memory. The bound is
    * this test's alone.
    */
   function answeringAlways(statusAttribute: string) {
@@ -178,50 +188,56 @@ describe('a group activation waits for its run on long polling alone', () => {
     return { connection, reads };
   }
 
-  it.each([
+  for (const [_case, statusAttribute, named] of [
     ['an empty status', ' runs:status=""', 'no status'],
     ['a missing status', '', 'no status'],
     ['an unknown status', ' runs:status="paused"', '"paused"'],
-  ])(
-    '%s ends the wait as a failure naming what SAP sent',
-    async (_case, statusAttribute, named) => {
-      const { connection, reads } = answeringAlways(statusAttribute);
-      const answered = await handleActivateObject(
-        { connection },
-        { objects: OBJECTS },
-      );
-      expect(reads.overRead).toBe(false);
-      expect(reads.count).toBe(1);
-      expect(answered.isError).toBe(true);
-      // A failure on our side, never dressed as SAP's answer.
-      const payload = payloadOf(answered);
-      expect(payload.error).toBe('client_threw');
-      expect(payload.origin).toBeUndefined();
-      expect(payload.status).toBeUndefined();
-      const message = String(payload.message);
-      expect(message).toContain(`activation run ${RUN_ID}`);
-      expect(message).toContain(named);
-      // Nothing more is sent: no results read after a status nobody knows.
-      expect(
-        connection.requests.some((request) => request.url === RESULTS_URL),
-      ).toBe(false);
-    },
-  );
+  ]) {
+    it(
+      format('%s ends the wait as a failure naming what SAP sent', _case),
+      async () => {
+        const { connection, reads } = answeringAlways(statusAttribute);
+        const answered = await handleActivateObject(
+          { connection },
+          { objects: OBJECTS },
+        );
+        assert.equal(reads.overRead, false);
+        assert.equal(reads.count, 1);
+        assert.equal(answered.isError, true);
+        // A failure on our side, never dressed as SAP's answer.
+        const payload = payloadOf(answered);
+        assert.equal(payload.error, 'client_threw');
+        assert.equal(payload.origin, undefined);
+        assert.equal(payload.status, undefined);
+        const message = String(payload.message);
+        assert.ok(message.includes(`activation run ${RUN_ID}`));
+        assert.ok(message.includes(named));
+        // Nothing more is sent: no results read after a status nobody knows.
+        assert.equal(
+          connection.requests.some((request) => request.url === RESULTS_URL),
+          false,
+        );
+      },
+    );
+  }
 
   it('running, then finished, is still waited for and read', async () => {
     const connection = runAnswering(2);
     const payload = payloadOf(
       await handleActivateObject({ connection }, { objects: OBJECTS }),
     );
-    expect(payload.run_status).toBe('finished');
-    expect(connection.requests.map((request) => request.url)).toEqual([
-      '/sap/bc/adt/discovery',
-      '/sap/bc/adt/activation/runs?method=activate&preauditRequested=true',
-      STATUS_URL,
-      STATUS_URL,
-      STATUS_URL,
-      RESULTS_URL,
-    ]);
+    assert.equal(payload.run_status, 'finished');
+    assert.deepStrictEqual(
+      connection.requests.map((request) => request.url),
+      [
+        '/sap/bc/adt/discovery',
+        '/sap/bc/adt/activation/runs?method=activate&preauditRequested=true',
+        STATUS_URL,
+        STATUS_URL,
+        STATUS_URL,
+        RESULTS_URL,
+      ],
+    );
   });
 });
 
@@ -335,9 +351,9 @@ describe('the read after a run whose results are silent', () => {
       { connection },
       { objects: GROUP_AND_PROGRAM },
     );
-    expect(answered.isError).toBe(true);
+    assert.equal(answered.isError, true);
     const payload = payloadOf(answered);
-    expect(payload.still_inactive).toEqual([
+    assert.deepStrictEqual(payload.still_inactive, [
       {
         name: 'ZACT751P9325',
         type: 'FUGR/F',
@@ -350,7 +366,7 @@ describe('the read after a run whose results are silent', () => {
         parent_uri: '/sap/bc/adt/functions/groups/zact751p9325',
       },
     ]);
-    expect(requests.filter((r) => r === READ)).toHaveLength(1);
+    assert.equal(requests.filter((r) => r === READ).length, 1);
   });
 
   it('an empty list: nothing to activate, no error', async () => {
@@ -359,8 +375,8 @@ describe('the read after a run whose results are silent', () => {
       { connection },
       { objects: GROUP_AND_PROGRAM },
     );
-    expect(answered.isError).toBe(false);
-    expect(payloadOf(answered).nothing_to_activate).toBe(true);
+    assert.equal(answered.isError, false);
+    assert.equal(payloadOf(answered).nothing_to_activate, true);
   });
 
   it('a listed object that is no run reference is not counted', async () => {
@@ -369,8 +385,8 @@ describe('the read after a run whose results are silent', () => {
       { connection },
       { objects: OBJECTS },
     );
-    expect(answered.isError).toBe(false);
-    expect(payloadOf(answered).nothing_to_activate).toBe(true);
+    assert.equal(answered.isError, false);
+    assert.equal(payloadOf(answered).nothing_to_activate, true);
   });
 
   it('a read that fails: an error at step inactiveObjects, the outcome not decided', async () => {
@@ -379,11 +395,12 @@ describe('the read after a run whose results are silent', () => {
       { connection },
       { objects: GROUP_AND_PROGRAM },
     );
-    expect(answered.isError).toBe(true);
+    assert.equal(answered.isError, true);
     const payload = payloadOf(answered);
-    expect(payload.step).toBe('inactiveObjects');
-    expect(payload.message).toContain(
-      "activation's outcome could not be decided",
+    assert.equal(payload.step, 'inactiveObjects');
+    assert.ok(
+      typeof payload.message === 'string' &&
+        payload.message.includes("activation's outcome could not be decided"),
     );
   });
 
@@ -396,18 +413,26 @@ describe('the read after a run whose results are silent', () => {
       { connection },
       { objects: GROUP_AND_PROGRAM },
     );
-    expect(answered.isError).toBe(true);
+    assert.equal(answered.isError, true);
     const payload = payloadOf(answered);
-    expect(payload.step).toBe('inactiveObjects');
-    expect(payload.message).toContain('is no list of inactive objects');
+    assert.equal(payload.step, 'inactiveObjects');
+    assert.ok(
+      typeof payload.message === 'string' &&
+        payload.message.includes('is no list of inactive objects'),
+    );
   });
 
-  it.each([
+  for (const [_what, results] of [
     ['activationExecuted="true"', RESULTS.data],
     ['an E', REFUSED_RESULTS],
-  ])('results with %s: no read', async (_what, results) => {
-    const { connection, requests } = run(results, LISTED);
-    await handleActivateObject({ connection }, { objects: GROUP_AND_PROGRAM });
-    expect(requests).not.toContain(READ);
-  });
+  ]) {
+    it(format('results with %s: no read', _what), async () => {
+      const { connection, requests } = run(results, LISTED);
+      await handleActivateObject(
+        { connection },
+        { objects: GROUP_AND_PROGRAM },
+      );
+      assert.ok(!requests.includes(READ));
+    });
+  }
 });

@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { handleCheckBehaviorDefinition as bdefHigh } from '../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleCheckBehaviorDefinition as bdefLow } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
 import { handleCheckClass as clasHigh } from '../../handlers/class/high/handleCheckClass';
@@ -25,10 +28,16 @@ import { handleCheckStructure as strucHigh } from '../../handlers/structure/high
 import { handleCheckStructure as strucLow } from '../../handlers/structure/low/handleCheckStructure';
 import { handleCheckTable as tablHigh } from '../../handlers/table/high/handleCheckTable';
 import { handleCheckTable as tablLow } from '../../handlers/table/low/handleCheckTable';
+import * as clients from '../../lib/clients';
 import { parseStructure } from '../../lib/strategies/reading';
 import { corpusBody } from '../helpers/adtCorpus';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The declared variant the boundary checks a type argument against.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => fakeClient);
 
 /**
  * #181: a check names the version it runs on, and without `version` that is
@@ -40,11 +49,6 @@ import { readsModuleIn } from '../helpers/functionModuleMetadata';
 const DOCUMENT = corpusBody('check-ddlx-active-version--01-checkrun');
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => fakeClient,
-}));
 
 const context = { connection: {} as any, logger: undefined };
 
@@ -94,33 +98,34 @@ const cases: Array<[string, Handler, Record<string, unknown>]> = [
   ['CheckObjectLow', objectLow, { object_name: 'ZCL', object_type: 'class' }],
 ];
 
-describe.each(cases)('%s', (_name, handler, base) => {
-  it('checks the active version when no version is given', async () => {
-    const asked: unknown[] = [];
-    fakeClient = asking(asked);
-    await handler(context, base);
-    expect(asked).toEqual(['active']);
-  });
+for (const [_name, handler, base] of cases) {
+  describe(format('%s', _name), () => {
+    it('checks the active version when no version is given', async () => {
+      const asked: unknown[] = [];
+      fakeClient = asking(asked);
+      await handler(context, base);
+      assert.deepStrictEqual(asked, ['active']);
+    });
 
-  it('checks the inactive version when version is inactive', async () => {
-    const asked: unknown[] = [];
-    fakeClient = asking(asked);
-    await handler(context, { ...base, version: 'inactive' });
-    expect(asked).toEqual(['inactive']);
+    it('checks the inactive version when version is inactive', async () => {
+      const asked: unknown[] = [];
+      fakeClient = asking(asked);
+      await handler(context, { ...base, version: 'inactive' });
+      assert.deepStrictEqual(asked, ['inactive']);
+    });
   });
-});
+}
 
 describe('CheckPackage', () => {
-  it.each([
+  for (const [_n, handler] of [
     ['CheckPackageLow', devcLow],
     ['CheckPackage', devcHigh],
-  ] as Array<[string, Handler]>)(
-    '%s checks the active version',
-    async (_n, handler) => {
+  ] as Array<[string, Handler]>) {
+    it(format('%s checks the active version', _n), async () => {
       const asked: unknown[] = [];
       fakeClient = asking(asked);
       await handler(context, { package_name: 'ZPKG' });
-      expect(asked).toEqual(['active']);
-    },
-  );
+      assert.deepStrictEqual(asked, ['active']);
+    });
+  }
 });

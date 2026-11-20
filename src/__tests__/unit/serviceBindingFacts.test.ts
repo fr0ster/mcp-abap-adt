@@ -7,6 +7,9 @@
  * service is not the definition, the version in the URL is the CONTENT's version,
  * and the protocol lives on a different element again.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   associationsOf,
   categoryServiceUrlsOf,
@@ -48,7 +51,7 @@ define service ZUI_Travel {
 
 describe('what a service binding document says', () => {
   it('reads the service, the definition, the version and the protocol', () => {
-    expect(serviceBindingFactsOf(V4_BINDING)).toEqual({
+    assert.deepStrictEqual(serviceBindingFactsOf(V4_BINDING), {
       service: 'ZUI_TRAVEL',
       serviceDefinition: 'ZUI_TRAVEL',
       version: '0001',
@@ -61,17 +64,18 @@ describe('what a service binding document says', () => {
 
   it('does not mistake the definition for the service', () => {
     const facts = serviceBindingFactsOf(V2_BINDING);
-    expect(facts.protocol).toBe('odatav2');
-    expect(facts.serviceDefinition).toBe('ZTRAVEL_SD');
-    expect(facts.service).toBe('ZUI_TRAVEL');
+    assert.equal(facts.protocol, 'odatav2');
+    assert.equal(facts.serviceDefinition, 'ZTRAVEL_SD');
+    assert.equal(facts.service, 'ZUI_TRAVEL');
   });
 
   it('calls an unpublished binding unpublished', () => {
-    expect(
+    assert.equal(
       serviceBindingFactsOf(
         V4_BINDING.replace('srvb:published="true"', 'srvb:published="false"'),
       ).published,
-    ).toBe(false);
+      false,
+    );
   });
 });
 
@@ -83,13 +87,14 @@ describe('the binding document read through the XML parser', () => {
         "<srvb:services srvb:name='ZUI_TRAVEL'>",
       )
       .replace('srvb:published="true"', "srvb:published='true'");
-    expect(serviceBindingFactsOf(quoted)).toEqual(
+    assert.deepStrictEqual(
+      serviceBindingFactsOf(quoted),
       serviceBindingFactsOf(V4_BINDING),
     );
   });
 
   it('reads nothing of a document that is not XML', () => {
-    expect(serviceBindingFactsOf('')).toEqual({
+    assert.deepStrictEqual(serviceBindingFactsOf(''), {
       service: undefined,
       serviceDefinition: undefined,
       version: undefined,
@@ -111,7 +116,7 @@ const V2_SERVICE_LIST = `<?xml version="1.0" encoding="utf-8"?>
 
 describe('what the protocol-category resource says', () => {
   it('reads the service URL, the annotation URL and the published flag', () => {
-    expect(categoryServiceUrlsOf(V2_SERVICE_LIST)).toEqual({
+    assert.deepStrictEqual(categoryServiceUrlsOf(V2_SERVICE_LIST), {
       serviceUrl: '/sap/opu/odata/sap/ELSEWHERE/',
       annotationUrl: '/sap/opu/odata/annotations/X/',
       serviceUrlPrefix: undefined,
@@ -125,7 +130,7 @@ describe('what the protocol-category resource says', () => {
       "odatav4:serviceUrlPrefix='/sap/opu/odata4/sap/zgroup/srvd/sap/' odatav4:published='false'>" +
       '<odatav4:services odatav4:serviceUrl="/x?a=1&amp;b=2" odatav4:annotationUrl=""/>' +
       '</odatav4:serviceGroup>';
-    expect(categoryServiceUrlsOf(group)).toEqual({
+    assert.deepStrictEqual(categoryServiceUrlsOf(group), {
       serviceUrl: '/x?a=1&b=2',
       annotationUrl: undefined,
       serviceUrlPrefix: '/sap/opu/odata4/sap/zgroup/srvd/sap/',
@@ -136,7 +141,7 @@ describe('what the protocol-category resource says', () => {
 
 describe('what a service definition exposes', () => {
   it('takes the alias as the entity set, not the entity', () => {
-    expect(exposedEntitiesOf(SERVICE_DEFINITION)).toEqual([
+    assert.deepStrictEqual(exposedEntitiesOf(SERVICE_DEFINITION), [
       { entity: 'ZC_Travel_LJ', entitySet: 'Travel' },
       { entity: 'ZI_Booking_LJ', entitySet: 'Booking' },
       { entity: '/DMO/I_Customer', entitySet: 'Customer' },
@@ -144,9 +149,10 @@ describe('what a service definition exposes', () => {
   });
 
   it('falls back to the entity name when there is no alias', () => {
-    expect(
+    assert.deepStrictEqual(
       exposedEntitiesOf('define service X { expose ZI_Student; }'),
-    ).toEqual([{ entity: 'ZI_Student', entitySet: 'ZI_Student' }]);
+      [{ entity: 'ZI_Student', entitySet: 'ZI_Student' }],
+    );
   });
 });
 
@@ -156,7 +162,7 @@ describe('associations of an exposed view', () => {
   composition [0..*] of ZI_StudentAddress as _Address
   association [0..1] to ZI_Class as to_CLASS
   { key id; _Address; to_CLASS; }`;
-    expect(associationsOf(view)).toEqual(['_Address', 'to_CLASS']);
+    assert.deepStrictEqual(associationsOf(view), ['_Address', 'to_CLASS']);
   });
 });
 
@@ -182,20 +188,21 @@ define root view entity ZMCP_PRV_C_ROOT
 }`;
 
   it('reads a redirected composition', () => {
-    expect(associationsOf(PROJECTION)).toEqual(['_children']);
+    assert.deepStrictEqual(associationsOf(PROJECTION), ['_children']);
   });
 
   it('reads a redirected parent', () => {
-    expect(associationsOf(CHILD_PROJECTION)).toEqual(['_parent']);
+    assert.deepStrictEqual(associationsOf(CHILD_PROJECTION), ['_parent']);
   });
 
   it('still reads the defining forms', () => {
-    expect(
+    assert.deepStrictEqual(
       associationsOf(`define root view entity X
   as select from t
   composition [0..*] of Y as _kids
   association [0..1] to Z as to_thing
 { key a }`),
-    ).toEqual(['_kids', 'to_thing']);
+      ['_kids', 'to_thing'],
+    );
   });
 });

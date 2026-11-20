@@ -6,15 +6,26 @@
  * Every public entry (each path of the root `exports` map) loads the
  * registering module for its side effect.
  */
+
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+
+import sea = require('node:sea');
+
+import { afterEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { secondCopyLine } from '../../../server-runtime/src/secondCopy';
 import type { LibInstance } from '../../lib/instance';
 import { packageManifestOf } from '../../lib/packageManifest';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 const REGISTRY = Symbol.for('@mcp-abap-adt/lib/instances');
-const ROOT = path.resolve(__dirname, '..', '..', '..');
-const INSTANCE_SOURCE = path.join(ROOT, 'src', 'lib', 'instance.ts');
+const ROOT = repositoryRoot(__dirname);
+/** The test build's compiled src/ (this file runs from its __tests__/unit). */
+const BUILT_SRC = path.join(__dirname, '..', '..');
+/** The compiled module the test build made of src/lib/instance.ts. */
+const INSTANCE_SOURCE = path.join(BUILT_SRC, 'lib', 'instance.js');
 const VERSION = packageManifestOf(
   JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')),
 ).version;
@@ -31,11 +42,16 @@ function resetRegistry(): void {
 
 /** `modulePath` loaded afresh, as another copy of lib would be. */
 function loadIsolated(modulePath: string): unknown {
-  let loaded: unknown;
-  jest.isolateModules(() => {
-    loaded = require(modulePath);
-  });
-  return loaded;
+  // Every compiled src module but the tests' out of the module cache first,
+  // so this load runs the module and everything of lib it loads again — the
+  // fresh module graph.
+  const tests = `${path.sep}__tests__${path.sep}`;
+  for (const cached of Object.keys(require.cache)) {
+    if (cached.startsWith(BUILT_SRC + path.sep) && !cached.includes(tests)) {
+      delete require.cache[cached];
+    }
+  }
+  return require(modulePath);
 }
 
 /** The `libInstances` a loaded module exports; a module without one fails. */
@@ -58,46 +74,46 @@ describe('lib instance registry', () => {
   it('registers one frozen entry per load: the version and the label, no path', () => {
     resetRegistry();
     const list = libInstancesOf(loadIsolated(INSTANCE_SOURCE))();
-    expect(list).toEqual([THIS_COPY]);
-    expect(Object.isFrozen(list)).toBe(true);
-    expect(Array.isArray(list) && Object.isFrozen(list[0])).toBe(true);
-    expect(JSON.stringify(registry())).not.toContain(ROOT);
+    assert.deepStrictEqual(list, [THIS_COPY]);
+    assert.equal(Object.isFrozen(list), true);
+    assert.equal(Array.isArray(list) && Object.isFrozen(list[0]), true);
+    assert.ok(!JSON.stringify(registry()).includes(ROOT));
   });
 
   it('a second load registers a second entry', () => {
     resetRegistry();
     loadIsolated(INSTANCE_SOURCE);
     const list = libInstancesOf(loadIsolated(INSTANCE_SOURCE))();
-    expect(list).toEqual([THIS_COPY, THIS_COPY]);
+    assert.deepStrictEqual(list, [THIS_COPY, THIS_COPY]);
   });
 
   it('libInstances returns a copy, not the registry', () => {
     resetRegistry();
     const list = libInstancesOf(loadIsolated(INSTANCE_SOURCE))();
-    expect(list).not.toBe(registry());
+    assert.notEqual(list, registry());
   });
 
   it('exports no mutator', () => {
     resetRegistry();
     const loaded = loadIsolated(INSTANCE_SOURCE);
-    expect(
+    assert.deepStrictEqual(
       typeof loaded === 'object' && loaded !== null ? Object.keys(loaded) : [],
-    ).toEqual(['libInstances']);
+      ['libInstances'],
+    );
   });
 
   it('the label is "bundled" inside a Node SEA executable', () => {
     resetRegistry();
     let loaded: unknown;
+    // node:sea's own object (the module reads isSea from it when it loads);
+    // lifted after the load.
+    const insideSea = mock.method(sea, 'isSea', () => true);
     try {
-      jest.isolateModules(() => {
-        jest.doMock('node:sea', () => ({ isSea: () => true }));
-        loaded = require(INSTANCE_SOURCE);
-      });
+      loaded = loadIsolated(INSTANCE_SOURCE);
     } finally {
-      // The mock is the registry's, not the isolated block's: lift it.
-      jest.dontMock('node:sea');
+      insideSea.mock.restore();
     }
-    expect(libInstancesOf(loaded)()).toEqual([
+    assert.deepStrictEqual(libInstancesOf(loaded)(), [
       { version: VERSION, label: 'bundled' },
     ]);
   });
@@ -107,28 +123,34 @@ describe('lib instance registry', () => {
       '/global/a/node_modules/@mcp-abap-adt/lib/dist/lib/instance.js';
     Reflect.set(globalThis, REGISTRY, [Object.freeze({ file: earlierFile })]);
     const list = libInstancesOf(loadIsolated(INSTANCE_SOURCE))();
-    expect(list).toEqual([{ file: earlierFile }, THIS_COPY]);
+    assert.deepStrictEqual(list, [{ file: earlierFile }, THIS_COPY]);
     const seen: LibInstance[] = [{ file: earlierFile }, THIS_COPY];
     const line = secondCopyLine(seen, '@mcp-abap-adt/core');
-    expect(line).toBe(
+    assert.equal(
+      line,
       `Two copies of @mcp-abap-adt/lib are loaded in this process (a copy before 24.0.0, ${VERSION} dist): reinstall @mcp-abap-adt/core (npm install -g @mcp-abap-adt/core).`,
     );
-    expect(line).not.toContain(earlierFile);
+    assert.ok(!line.includes(earlierFile));
   });
 
-  it.each([
+  for (const [_name, entry] of [
     ['a file that is no string', { file: 42 }],
     ['a version without a label', { version: '24.0.0' }],
     ['an unknown label', { version: '24.0.0', label: 'elsewhere' }],
     ['no entry at all', 'not an entry'],
-  ])('an array with a malformed entry (%s) is replaced', (_name, entry) => {
-    const malformed = [entry];
-    Reflect.set(globalThis, REGISTRY, malformed);
-    const list = libInstancesOf(loadIsolated(INSTANCE_SOURCE))();
-    expect(list).toEqual([THIS_COPY]);
-    expect(registry()).not.toBe(malformed);
-    expect(malformed).toEqual([entry]);
-  });
+  ]) {
+    it(
+      format('an array with a malformed entry (%s) is replaced', _name),
+      () => {
+        const malformed = [entry];
+        Reflect.set(globalThis, REGISTRY, malformed);
+        const list = libInstancesOf(loadIsolated(INSTANCE_SOURCE))();
+        assert.deepStrictEqual(list, [THIS_COPY]);
+        assert.notEqual(registry(), malformed);
+        assert.deepStrictEqual(malformed, [entry]);
+      },
+    );
+  }
 
   describe('every public entry registers exactly once', () => {
     const manifest: unknown = JSON.parse(
@@ -148,33 +170,34 @@ describe('lib instance registry', () => {
         typeof target.require === 'string'
           ? target.require
           : '';
-      expect(dist.startsWith('./dist/')).toBe(true);
-      expect(dist.endsWith('.js')).toBe(true);
+      assert.equal(dist.startsWith('./dist/'), true);
+      assert.equal(dist.endsWith('.js'), true);
       const src = path.join(
-        ROOT,
-        'src',
-        `${dist.slice('./dist/'.length, -'.js'.length)}.ts`,
+        BUILT_SRC,
+        `${dist.slice('./dist/'.length, -'.js'.length)}.js`,
       );
       return [key, src] as const;
     });
 
     it('reads the whole exports map', () => {
-      expect(entries.length).toBe(17);
+      assert.equal(entries.length, 17);
     });
 
-    it.each(entries)('%s', (_key, src) => {
-      resetRegistry();
-      loadIsolated(src);
-      expect(registry()).toEqual([THIS_COPY]);
-    });
+    for (const [_key, src] of entries) {
+      it(format('%s', _key), () => {
+        resetRegistry();
+        loadIsolated(src);
+        assert.deepStrictEqual(registry(), [THIS_COPY]);
+      });
+    }
 
     it('the root and config export libInstances', () => {
       for (const src of [
-        path.join(ROOT, 'src', 'index.ts'),
-        path.join(ROOT, 'src', 'lib', 'config', 'index.ts'),
+        path.join(BUILT_SRC, 'index.js'),
+        path.join(BUILT_SRC, 'lib', 'config', 'index.js'),
       ]) {
         resetRegistry();
-        expect(typeof libInstancesOf(loadIsolated(src))).toBe('function');
+        assert.equal(typeof libInstancesOf(loadIsolated(src)), 'function');
       }
     });
   });

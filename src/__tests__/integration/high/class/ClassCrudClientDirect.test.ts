@@ -13,7 +13,7 @@ import { classDocuments } from '@mcp-abap-adt/adt-clients';
  *   DEBUG_ADT_LIBS=true        - Library logs
  *   DEBUG_CONNECTORS=true      - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/class/ClassAdtClientDirect
+ * Run: npm run test:integration -- src/__tests__/integration/high/class/ClassCrudClientDirect.test.ts
  */
 
 import {

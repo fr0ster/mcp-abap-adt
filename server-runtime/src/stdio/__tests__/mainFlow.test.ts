@@ -6,18 +6,18 @@
  * exits `0` without waiting for either.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import {
   isLockOf,
   isUnlockOf,
 } from '../../../../src/__tests__/helpers/shutdownTools';
 import { stand, until } from './helpers/loginStand';
 
-jest.setTimeout(30_000);
-
 beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 it('SIGTERM with a call in the flow and one queued: the logoff at once, the queued call never sends, exit 0', async () => {
   const s = await stand({ kind: 'onprem', shutdown: {} });
@@ -28,16 +28,25 @@ it('SIGTERM with a call in the flow and one queued: the logoff at once, the queu
     void s.callTool('LockedUpdate', { id: 'B' });
     await new Promise((resolve) => setTimeout(resolve, 100));
     // B waits behind A: nothing of it has reached SAP.
-    expect(s.adt.requests.some((r) => isLockOf('B')(r.url))).toBe(false);
+    assert.equal(
+      s.adt.requests.some((r) => isLockOf('B')(r.url)),
+      false,
+    );
 
     s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
+    assert.equal(await s.exited, 0);
     await until(() => s.adt.logoffs() === 1);
     held.release();
     await until(() => s.active() === 0);
     await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(s.adt.requests.some((r) => isLockOf('B')(r.url))).toBe(false);
-    expect(s.adt.requests.some((r) => isUnlockOf('A')(r.url))).toBe(false);
+    assert.equal(
+      s.adt.requests.some((r) => isLockOf('B')(r.url)),
+      false,
+    );
+    assert.equal(
+      s.adt.requests.some((r) => isUnlockOf('A')(r.url)),
+      false,
+    );
   } finally {
     await s.close();
   }

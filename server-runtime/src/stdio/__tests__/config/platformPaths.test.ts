@@ -8,6 +8,9 @@
  * otherwise pass or fail depending on where CI happens to run.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { getPlatformPaths } from '../../config/platformPaths';
 
 describe('getPlatformPaths with AUTH_BROKER_PATH', () => {
@@ -36,21 +39,21 @@ describe('getPlatformPaths with AUTH_BROKER_PATH', () => {
 
     // One path from the variable. Splitting on ':' as well would yield "D" and "\Users\dev\mcp-abap-adt" — two entries, the
     // second resolving against whatever drive the process happens to be on.
-    expect(getPlatformPaths(undefined, 'sessions')).toHaveLength(1);
+    assert.equal(getPlatformPaths(undefined, 'sessions').length, 1);
   });
 
   it('still separates several Windows paths on the semicolon', () => {
     pretendPlatform('win32');
     process.env.AUTH_BROKER_PATH = 'D:\\one;E:\\two';
 
-    expect(getPlatformPaths(undefined, 'sessions')).toHaveLength(2);
+    assert.equal(getPlatformPaths(undefined, 'sessions').length, 2);
   });
 
   it('separates Unix paths on the colon', () => {
     pretendPlatform('linux');
     process.env.AUTH_BROKER_PATH = '/opt/one:/opt/two';
 
-    expect(getPlatformPaths(undefined, 'sessions')).toHaveLength(2);
+    assert.equal(getPlatformPaths(undefined, 'sessions').length, 2);
   });
 
   it('still accepts a semicolon on Unix', () => {
@@ -58,14 +61,14 @@ describe('getPlatformPaths with AUTH_BROKER_PATH', () => {
     pretendPlatform('linux');
     process.env.AUTH_BROKER_PATH = '/opt/one;/opt/two';
 
-    expect(getPlatformPaths(undefined, 'sessions')).toHaveLength(2);
+    assert.equal(getPlatformPaths(undefined, 'sessions').length, 2);
   });
 
   it('ignores empty entries left by a trailing separator', () => {
     pretendPlatform('win32');
     process.env.AUTH_BROKER_PATH = 'D:\\one;;';
 
-    expect(getPlatformPaths(undefined, 'sessions')).toHaveLength(1);
+    assert.equal(getPlatformPaths(undefined, 'sessions').length, 1);
   });
 });
 
@@ -80,15 +83,17 @@ describe('getPlatformPaths never returns the working directory', () => {
     else process.env.AUTH_BROKER_PATH = realEnv;
   });
 
-  it.each([
+  for (const [_label, custom, env] of [
     ['the platform default', undefined, undefined],
     ['a custom path', '/opt/stores', undefined],
     ['AUTH_BROKER_PATH', undefined, '/opt/stores'],
-  ])('%s', (_label, custom, env) => {
-    if (env === undefined) delete process.env.AUTH_BROKER_PATH;
-    else process.env.AUTH_BROKER_PATH = env;
-    for (const sub of [undefined, 'sessions', 'service-keys'] as const) {
-      expect(getPlatformPaths(custom, sub)).not.toContain(process.cwd());
-    }
-  });
+  ]) {
+    it(format('%s', _label), () => {
+      if (env === undefined) delete process.env.AUTH_BROKER_PATH;
+      else process.env.AUTH_BROKER_PATH = env;
+      for (const sub of [undefined, 'sessions', 'service-keys'] as const) {
+        assert.ok(!getPlatformPaths(custom, sub).includes(process.cwd()));
+      }
+    });
+  }
 });

@@ -6,7 +6,10 @@
  * free the moment a login ends.
  */
 
+import assert from 'node:assert/strict';
 import * as net from 'node:net';
+import { describe, it, mock } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { readFailure } from '@mcp-abap-adt/auth-errors';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import type {
@@ -15,6 +18,10 @@ import type {
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import {
+  assertMatchObject,
+  rejectionOf,
+} from '../../../../../src/__tests__/helpers/assertions';
 import { promptLogger, serverLogin } from '../../auth/serverLogin';
 
 const silent: ILogger = {
@@ -26,7 +33,7 @@ const silent: ILogger = {
 
 function recordingInner() {
   const requests: AuthorizationRequest[] = [];
-  const dispose = jest.fn(async () => {});
+  const dispose = mock.fn(async () => {});
   const inner: IAuthorizationStrategy<string> = {
     authorize: async (request) => {
       requests.push(request);
@@ -53,49 +60,63 @@ describe('serverLogin', () => {
       signal: controller.signal,
       logger: silent,
     });
-    expect(outcome).toEqual({
+    assert.deepStrictEqual(outcome, {
       payload: 'code-1',
       redirectUri: 'http://localhost:1/callback',
     });
-    expect(requests).toHaveLength(1);
-    expect(requests[0].signal).toBe(controller.signal);
-    expect(requests[0].logger).toBe(prompts);
-    expect(built).toEqual(['http://localhost:1/callback']);
+    assert.equal(requests.length, 1);
+    assert.equal(requests[0].signal, controller.signal);
+    assert.equal(requests[0].logger, prompts);
+    assert.deepStrictEqual(built, ['http://localhost:1/callback']);
   });
 
   it('forwards dispose()', async () => {
     const { inner, dispose } = recordingInner();
     const login = serverLogin(inner, { logger: silent, record: () => {} });
     await login.dispose?.();
-    expect(dispose).toHaveBeenCalledTimes(1);
+    assert.equal(dispose.mock.callCount(), 1);
   });
 
   it('is recorded for disposal, once, as the wrapper', () => {
     const { inner } = recordingInner();
-    const record = jest.fn();
+    const record = mock.fn();
     const login = serverLogin(inner, { logger: silent, record });
-    expect(record).toHaveBeenCalledTimes(1);
-    expect(record).toHaveBeenCalledWith(login);
+    assert.equal(record.mock.callCount(), 1);
+    assert.ok(
+      record.mock.calls.some((c) => isDeepStrictEqual(c.arguments, [login])),
+    );
   });
 
   it('the prompt logger writes info to stderr and leaves the rest to the diagnostics', () => {
     const lines: string[] = [];
     const diagnostics = {
-      info: jest.fn(),
-      warn: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
+      info: mock.fn(),
+      warn: mock.fn(),
+      error: mock.fn(),
+      debug: mock.fn(),
     };
     const logger = promptLogger((line) => lines.push(line), diagnostics);
     logger.info('open the URL');
     logger.warn('w');
     logger.error('e');
     logger.debug('d');
-    expect(lines).toEqual(['open the URL']);
-    expect(diagnostics.info).not.toHaveBeenCalled();
-    expect(diagnostics.warn).toHaveBeenCalledWith('w', undefined);
-    expect(diagnostics.error).toHaveBeenCalledWith('e', undefined);
-    expect(diagnostics.debug).toHaveBeenCalledWith('d', undefined);
+    assert.deepStrictEqual(lines, ['open the URL']);
+    assert.equal(diagnostics.info.mock.callCount(), 0);
+    assert.ok(
+      diagnostics.warn.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['w', undefined]),
+      ),
+    );
+    assert.ok(
+      diagnostics.error.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['e', undefined]),
+      ),
+    );
+    assert.ok(
+      diagnostics.debug.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['d', undefined]),
+      ),
+    );
   });
 });
 
@@ -158,9 +179,9 @@ describe('serverLogin over a real loopback strategy on port 0', () => {
     const { req, seen } = request(new AbortController().signal);
     const outcome = await login.authorize(req);
     order.push('login settled');
-    expect(outcome.payload).toBe('the-code');
-    expect(order).toEqual(['listener closed', 'login settled']);
-    expect(seen.port).toBeGreaterThan(0);
+    assert.equal(outcome.payload, 'the-code');
+    assert.deepStrictEqual(order, ['listener closed', 'login settled']);
+    assert.ok(seen.port !== undefined && seen.port > 0);
     await bindsFree(seen.port as number);
   });
 
@@ -182,9 +203,9 @@ describe('serverLogin over a real loopback strategy on port 0', () => {
     );
     const { req, seen } = request(controller.signal);
     const ended = login.authorize(req);
-    const rejected = expect(
+    const rejected = rejectionOf(
       ended.finally(() => order.push('login settled')),
-    ).rejects.toBeDefined();
+    ).then((reason) => assert.notEqual(reason, undefined));
     // How it ended, read as auth-errors reads a thrown value: the composed
     // strategy's own abort — the signal reached it through the wrapper.
     const failure = ended.then(
@@ -194,10 +215,10 @@ describe('serverLogin over a real loopback strategy on port 0', () => {
     await open;
     controller.abort();
     await rejected;
-    expect(order).toEqual(['listener closed', 'login settled']);
+    assert.deepStrictEqual(order, ['listener closed', 'login settled']);
     const read = await failure;
-    expect(read?.kind).toBe('interactive-login');
-    expect(read?.facts).toMatchObject({ outcome: 'aborted' });
+    assert.equal(read?.kind, 'interactive-login');
+    assertMatchObject(read?.facts, { outcome: 'aborted' });
     await bindsFree(seen.port as number);
   });
 });

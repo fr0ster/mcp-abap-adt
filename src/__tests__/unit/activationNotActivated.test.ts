@@ -19,6 +19,9 @@
  * `still_inactive`, field by field.
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -31,6 +34,7 @@ import type { HandlerContext } from '../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertNoProperty } from '../helpers/assertions';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { LOCK_SUCCESS_XML } from '../helpers/recordingConnection';
 
@@ -113,10 +117,10 @@ function payloadOf(result: object): Record<string, unknown> {
   return JSON.parse(text);
 }
 
-beforeAll(() => {
+before(() => {
   setSystemContext({ masterSystem: 'SID', responsible: 'SAPUSER01' });
 });
-afterAll(() => resetSystemContextCache());
+after(() => resetSystemContextCache());
 
 describe('ActivateClassLow', () => {
   it('an ioc:inactiveObjects answer (751) is an error, its objects in still_inactive', async () => {
@@ -124,19 +128,26 @@ describe('ActivateClassLow', () => {
     const result = await handleActivateClass(contextOver(connection), {
       class_name: 'ZCL_AI_ACT_PROBE',
     });
-    expect(isError(result)).toBe(true);
+    assert.equal(isError(result), true);
     const payload = payloadOf(result);
-    expect(payload.message).toContain(
-      'SAP answered the objects still inactive',
+    assert.ok(
+      typeof payload.message === 'string' &&
+        payload.message.includes('SAP answered the objects still inactive'),
     );
-    expect(payload.still_inactive).toHaveLength(8);
-    expect(payload.still_inactive).toContainEqual({
-      name: 'ZCL_AI_ACT_PROBE',
-      type: 'CLAS/OCN/definitions',
-      uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/definitions',
-      parent_uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe',
-    });
-    expect(payload).not.toHaveProperty('activation_not_stated');
+    assert.ok(Array.isArray(payload.still_inactive));
+    assert.equal(payload.still_inactive.length, 8);
+    assert.ok(Array.isArray(payload.still_inactive));
+    assert.ok(
+      payload.still_inactive.some((e) =>
+        isDeepStrictEqual(e, {
+          name: 'ZCL_AI_ACT_PROBE',
+          type: 'CLAS/OCN/definitions',
+          uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe/includes/definitions',
+          parent_uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe',
+        }),
+      ),
+    );
+    assertNoProperty(payload, 'activation_not_stated');
   });
 });
 
@@ -146,13 +157,18 @@ describe('ActivateObjects, one object', () => {
     const result = await handleActivateObjects(contextOver(connection), {
       objects: [{ name: 'ZCL_AI_ACT_PROBE', type: 'CLAS/OC' }],
     });
-    expect(isError(result)).toBe(true);
+    assert.equal(isError(result), true);
     const payload = payloadOf(result);
-    expect(payload.still_inactive).toContainEqual({
-      name: 'ZCL_AI_ACT_PROBE',
-      type: 'CLAS/OC',
-      uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe',
-    });
+    assert.ok(Array.isArray(payload.still_inactive));
+    assert.ok(
+      payload.still_inactive.some((e) =>
+        isDeepStrictEqual(e, {
+          name: 'ZCL_AI_ACT_PROBE',
+          type: 'CLAS/OC',
+          uri: '/sap/bc/adt/oo/classes/zcl_ai_act_probe',
+        }),
+      ),
+    );
   });
 
   it('a silent checklist with the group still listed (S/4HANA 2025) is an error, the group in still_inactive', async () => {
@@ -162,10 +178,13 @@ describe('ActivateObjects, one object', () => {
     const result = await handleActivateObjects(contextOver(connection), {
       objects: [{ name: 'ZACT751P9325', type: 'FUGR/F' }],
     });
-    expect(isError(result)).toBe(true);
+    assert.equal(isError(result), true);
     const payload = payloadOf(result);
-    expect(payload.message).toContain('the inactive list still names');
-    expect(payload.still_inactive).toEqual([
+    assert.ok(
+      typeof payload.message === 'string' &&
+        payload.message.includes('the inactive list still names'),
+    );
+    assert.deepStrictEqual(payload.still_inactive, [
       {
         name: 'ZACT751P9325',
         type: 'FUGR/F',
@@ -178,7 +197,7 @@ describe('ActivateObjects, one object', () => {
         parent_uri: '/sap/bc/adt/functions/groups/zact751p9325',
       },
     ]);
-    expect(requests).toContain('GET /sap/bc/adt/activation/inactiveobjects');
+    assert.ok(requests.includes('GET /sap/bc/adt/activation/inactiveobjects'));
   });
 });
 
@@ -190,9 +209,9 @@ describe('ActivateObjects, a warned checklist (#360)', () => {
     const result = await handleActivateObjects(contextOver(connection), {
       objects: [{ name: 'ZCL_AI_ACT_PROBE', type: 'CLAS/OC' }],
     });
-    expect(isError(result)).toBe(false);
-    expect(payloadOf(result)).not.toHaveProperty('still_inactive');
-    expect(requests).toContain('GET /sap/bc/adt/activation/inactiveobjects');
+    assert.equal(isError(result), false);
+    assertNoProperty(payloadOf(result), 'still_inactive');
+    assert.ok(requests.includes('GET /sap/bc/adt/activation/inactiveobjects'));
   });
 });
 
@@ -204,9 +223,10 @@ describe('UpdateClass with activate: true', () => {
       source_code: 'CLASS zcl_ai_act_probe DEFINITION. ENDCLASS.',
       activate: true,
     });
-    expect(isError(result)).toBe(true);
+    assert.equal(isError(result), true);
     const payload = payloadOf(result);
-    expect(payload.step).toBe('activate');
-    expect(payload.still_inactive).toHaveLength(8);
+    assert.equal(payload.step, 'activate');
+    assert.ok(Array.isArray(payload.still_inactive));
+    assert.equal(payload.still_inactive.length, 8);
   });
 });

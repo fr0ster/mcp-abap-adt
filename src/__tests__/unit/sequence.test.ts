@@ -1,7 +1,10 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../lib/answer';
 import { writeProjection } from '../../lib/strategies/promised';
 import { pair, sequence } from '../../lib/strategies/sequence';
+import { assertMatchObject, rejectionOf } from '../helpers/assertions';
 
 /**
  * `writeProjection` is `Terse<unknown>` — `(value, status)`, same as
@@ -49,8 +52,8 @@ describe('a sequence keeps the strategies in charge', () => {
         return ok('written');
       },
     );
-    expect(seen).toEqual(['read', 'write:<doma:domain/>']);
-    expect(result.ok).toBe(true);
+    assert.deepStrictEqual(seen, ['read', 'write:<doma:domain/>']);
+    assert.equal(result.ok, true);
   });
 
   it('stops at the first failure and does not run what follows', async () => {
@@ -62,8 +65,8 @@ describe('a sequence keeps the strategies in charge', () => {
         return ok('written');
       },
     );
-    expect(wrote).toBe(false);
-    expect(result.ok).toBe(false);
+    assert.equal(wrote, false);
+    assert.equal(result.ok, false);
   });
 
   it("hands back the failing step's own answer, untouched", async () => {
@@ -84,8 +87,11 @@ describe('a sequence keeps the strategies in charge', () => {
       async () => ok('<doma:domain/>'),
       async () => refused(built.message, built),
     );
-    expect(result.ok).toBe(false);
-    expect((result as { getError: () => unknown }).getError()).toEqual(built);
+    assert.equal(result.ok, false);
+    assert.deepStrictEqual(
+      (result as { getError: () => unknown }).getError(),
+      built,
+    );
   });
 
   it('carries that failure through the adapter with everything on it', async () => {
@@ -113,9 +119,9 @@ describe('a sequence keeps the strategies in charge', () => {
         )
       ).content[0].text,
     );
-    expect(payload.origin).toBe('refusal');
-    expect(payload.adt_type).toBe('ExceptionResourceInvalidLockHandle');
-    expect(payload.messages[0].t100).toEqual({
+    assert.equal(payload.origin, 'refusal');
+    assert.equal(payload.adt_type, 'ExceptionResourceInvalidLockHandle');
+    assert.deepStrictEqual(payload.messages[0].t100, {
       id: 'SADT_RESOURCE',
       no: '026',
     });
@@ -131,8 +137,8 @@ describe('a sequence keeps the strategies in charge', () => {
         ),
       projectWrite,
     );
-    expect(result.isError).toBe(false);
-    expect(result.content[0].text).toBe('SUCCESS');
+    assert.equal(result.isError, false);
+    assert.equal(result.content[0].text, 'SUCCESS');
   });
 
   it('runs three steps as readily as two', async () => {
@@ -141,9 +147,10 @@ describe('a sequence keeps the strategies in charge', () => {
       async (n) => ok(n + 1),
       async (n) => ok(n + 1),
     );
-    expect(
+    assert.equal(
       (result as { getResult: () => { value: number } }).getResult().value,
-    ).toBe(3);
+      3,
+    );
   });
 });
 
@@ -154,18 +161,18 @@ describe('pair', () => {
       async () => ok('meta') as never,
     );
     if (!result.ok) throw new Error('expected both values');
-    expect(result.getResult().value).toEqual(['source', 'meta']);
+    assert.deepStrictEqual(result.getResult().value, ['source', 'meta']);
   });
 
   it('hands back the first failure untouched, and never calls the second step', async () => {
-    const second = jest.fn();
+    const second = mock.fn();
     const result = await pair(
       async () => refused('read refused') as never,
       second as never,
     );
     if (result.ok) throw new Error('expected the read refusal');
-    expect(result.getError().message).toBe('read refused');
-    expect(second).not.toHaveBeenCalled();
+    assert.equal(result.getError().message, 'read refused');
+    assert.equal(second.mock.callCount(), 0);
   });
 
   it('hands back the second failure untouched', async () => {
@@ -174,7 +181,7 @@ describe('pair', () => {
       async () => refused('meta refused') as never,
     );
     if (result.ok) throw new Error('expected the metadata refusal');
-    expect(result.getError().message).toBe('meta refused');
+    assert.equal(result.getError().message, 'meta refused');
   });
 });
 
@@ -192,13 +199,19 @@ describe('sequence, at four and five steps', () => {
       step('check'),
       step('activate'),
     );
-    expect(order).toEqual(['validate', 'create', 'write', 'check', 'activate']);
+    assert.deepStrictEqual(order, [
+      'validate',
+      'create',
+      'write',
+      'check',
+      'activate',
+    ]);
     if (!result.ok) throw new Error('expected all five to run');
-    expect(result.getResult().value).toBe('activate');
+    assert.equal(result.getResult().value, 'activate');
   });
 
   it('stops at the fourth and never reaches the fifth', async () => {
-    const fifth = jest.fn();
+    const fifth = mock.fn();
     const step = (name: string) => async () => ok(name) as never;
     const result = await sequence(
       step('validate'),
@@ -208,8 +221,8 @@ describe('sequence, at four and five steps', () => {
       fifth as never,
     );
     if (result.ok) throw new Error('expected the check refusal');
-    expect(result.getError().message).toBe('Check refused');
-    expect(fifth).not.toHaveBeenCalled();
+    assert.equal(result.getError().message, 'Check refused');
+    assert.equal(fifth.mock.callCount(), 0);
   });
 });
 
@@ -235,8 +248,8 @@ describe('a sequence carries a held lock past the step that answers next', () =>
       async () => ok('checked'),
     );
     if (!result.ok) throw new Error('expected the check to stand');
-    expect(result.getResult().value).toBe('checked');
-    expect((result as { cleanup?: unknown }).cleanup).toEqual(held);
+    assert.equal(result.getResult().value, 'checked');
+    assert.deepStrictEqual((result as { cleanup?: unknown }).cleanup, held);
   });
 
   it('carries it onto a later step that refused, error untouched', async () => {
@@ -246,8 +259,8 @@ describe('a sequence carries a held lock past the step that answers next', () =>
     );
     if (result.ok) throw new Error('expected the check refusal');
     const error = result.getError() as IAdtError & { cleanup?: unknown };
-    expect(error.message).toBe('Check refused');
-    expect(error.cleanup).toEqual(held);
+    assert.equal(error.message, 'Check refused');
+    assert.deepStrictEqual(error.cleanup, held);
   });
 
   it('carries it across every step that follows, not just the next one', async () => {
@@ -257,8 +270,8 @@ describe('a sequence carries a held lock past the step that answers next', () =>
       async () => ok('read back'),
     );
     if (!result.ok) throw new Error('expected the last step to stand');
-    expect(result.getResult().value).toBe('read back');
-    expect((result as { cleanup?: unknown }).cleanup).toEqual(held);
+    assert.equal(result.getResult().value, 'read back');
+    assert.deepStrictEqual((result as { cleanup?: unknown }).cleanup, held);
   });
 
   /**
@@ -270,31 +283,37 @@ describe('a sequence carries a held lock past the step that answers next', () =>
    */
   it('carries it out on a step that threw', async () => {
     const boom = new Error('socket hang up');
-    await expect(
-      sequence(
-        async () => holding('written'),
-        async () => {
-          throw boom;
-        },
+    assertMatchObject(
+      await rejectionOf(
+        sequence(
+          async () => holding('written'),
+          async () => {
+            throw boom;
+          },
+        ),
       ),
-    ).rejects.toMatchObject({
-      name: 'LockNotReleased',
-      message: 'socket hang up',
-      cleanup: held,
-      cause: boom,
-    });
+      {
+        name: 'LockNotReleased',
+        message: 'socket hang up',
+        cleanup: held,
+        cause: boom,
+      },
+    );
   });
 
   it('lets a step’s throw past untouched when no lock is held', async () => {
     const boom = new Error('socket hang up');
-    await expect(
-      sequence(
-        async () => ok('written'),
-        async () => {
-          throw boom;
-        },
+    assert.equal(
+      await rejectionOf(
+        sequence(
+          async () => ok('written'),
+          async () => {
+            throw boom;
+          },
+        ),
       ),
-    ).rejects.toBe(boom);
+      boom,
+    );
   });
 
   it('leaves an answer alone when no step held anything', async () => {
@@ -302,7 +321,7 @@ describe('a sequence carries a held lock past the step that answers next', () =>
       async () => ok('written'),
       async () => ok('checked'),
     );
-    expect((result as { cleanup?: unknown }).cleanup).toBeUndefined();
+    assert.equal((result as { cleanup?: unknown }).cleanup, undefined);
   });
 
   it('keeps it through a pair, which builds its answer from scratch', async () => {
@@ -311,7 +330,7 @@ describe('a sequence carries a held lock past the step that answers next', () =>
       async () => ok('metadata'),
     );
     if (!result.ok) throw new Error('expected both answers');
-    expect(result.getResult().value).toEqual(['document', 'metadata']);
-    expect((result as { cleanup?: unknown }).cleanup).toEqual(held);
+    assert.deepStrictEqual(result.getResult().value, ['document', 'metadata']);
+    assert.deepStrictEqual((result as { cleanup?: unknown }).cleanup, held);
   });
 });

@@ -1,7 +1,11 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { handleMemorySnapshotDelta } from '../../../handlers/debugger/debug/handleMemorySnapshotDelta';
 import { handleMemorySnapshotGet } from '../../../handlers/debugger/debug/handleMemorySnapshotGet';
 import { handleMemorySnapshotList } from '../../../handlers/debugger/debug/handleMemorySnapshotList';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 const ctx = (conn: any) => ({ connection: conn, logger: undefined }) as any;
@@ -19,15 +23,15 @@ describe('MemorySnapshotList', () => {
     ]);
     const r: any = await handleMemorySnapshotList(ctx(conn), {});
     const list = JSON.parse(r.content[0].text);
-    expect(list[0]).toMatchObject({
+    assertMatchObject(list[0], {
       id: '0CC47A1E68C11FE1B1827ADCF9D455CB',
       user: 'SAPUSER01',
-      programName: expect.any(String),
     });
-    expect(list[0].fileName).toBeUndefined();
-    expect(conn.requests[0].method).toBe('GET');
-    expect(conn.requests[0].url).toContain('/runtime/memory/snapshots');
-    expect(sent(conn)).not.toContain('user=');
+    assert.equal(typeof list[0].programName, 'string');
+    assert.equal(list[0].fileName, undefined);
+    assert.equal(conn.requests[0].method, 'GET');
+    assert.ok(conn.requests[0].url.includes('/runtime/memory/snapshots'));
+    assert.ok(!sent(conn).includes('user='));
   });
   it('full keeps the file name', async () => {
     const r: any = await handleMemorySnapshotList(
@@ -41,12 +45,12 @@ describe('MemorySnapshotList', () => {
       ),
       { detail: 'full' },
     );
-    expect(JSON.parse(r.content[0].text)[0].fileName).toBeTruthy();
+    assert.ok(JSON.parse(r.content[0].text)[0].fileName);
   });
   it('sends the user upper-cased', async () => {
     const conn = ok();
     await handleMemorySnapshotList(ctx(conn), { user: 'sapuser01' });
-    expect(sent(conn)).toContain('user=SAPUSER01');
+    assert.ok(sent(conn).includes('user=SAPUSER01'));
   });
   it('an empty list says the authorization may be missing', async () => {
     const r: any = await handleMemorySnapshotList(
@@ -62,30 +66,32 @@ describe('MemorySnapshotList', () => {
       ),
       {},
     );
-    expect(JSON.parse(r.content[0].text)).toMatchObject({ snapshots: [] });
-    expect(r.content[0].text).toMatch(/authorization/);
+    assertMatchObject(JSON.parse(r.content[0].text), { snapshots: [] });
+    assert.match(r.content[0].text, /authorization/);
   });
 });
 
 describe('MemorySnapshotGet', () => {
-  it.each([
+  for (const [view, url] of [
     ['header', 'snapshots/S1'],
     ['overview', 'snapshots/S1/overview'],
-  ] as const)('%s is one GET of the snapshot', async (view, url) => {
-    const conn = ok();
-    const r: any = await handleMemorySnapshotGet(ctx(conn), {
-      snapshot_id: 'S1',
-      view,
+  ] as const) {
+    it(format('%s is one GET of the snapshot', view), async () => {
+      const conn = ok();
+      const r: any = await handleMemorySnapshotGet(ctx(conn), {
+        snapshot_id: 'S1',
+        view,
+      });
+      assert.equal(r.isError, false);
+      assert.equal(conn.requests.length, 1);
+      assert.equal(conn.requests[0].method, 'GET');
+      assert.ok(conn.requests[0].url.includes(url));
     });
-    expect(r.isError).toBe(false);
-    expect(conn.requests).toHaveLength(1);
-    expect(conn.requests[0].method).toBe('GET');
-    expect(conn.requests[0].url).toContain(url);
-  });
+  }
   it('defaults to the overview', async () => {
     const conn = ok();
     await handleMemorySnapshotGet(ctx(conn), { snapshot_id: 'S1' });
-    expect(conn.requests[0].url).toContain('S1/overview');
+    assert.ok(conn.requests[0].url.includes('S1/overview'));
   });
   it('ranking sends the required limit, 50 by default and as given', async () => {
     const a = ok();
@@ -93,14 +99,14 @@ describe('MemorySnapshotGet', () => {
       snapshot_id: 'S1',
       view: 'ranking',
     });
-    expect(sent(a)).toContain('maxNumberOfObjects=50');
+    assert.ok(sent(a).includes('maxNumberOfObjects=50'));
     const b = ok();
     await handleMemorySnapshotGet(ctx(b), {
       snapshot_id: 'S1',
       view: 'ranking',
       max_objects: 7,
     });
-    expect(sent(b)).toContain('maxNumberOfObjects=7');
+    assert.ok(sent(b).includes('maxNumberOfObjects=7'));
   });
   it('children and references send the key and the limit', async () => {
     const c = ok();
@@ -110,8 +116,8 @@ describe('MemorySnapshotGet', () => {
       key: 'K1',
       max_objects: 5,
     });
-    expect(sent(c)).toContain('K1');
-    expect(sent(c)).toContain('maxNumberOfObjects=5');
+    assert.ok(sent(c).includes('K1'));
+    assert.ok(sent(c).includes('maxNumberOfObjects=5'));
     const r = ok();
     await handleMemorySnapshotGet(ctx(r), {
       snapshot_id: 'S1',
@@ -119,27 +125,29 @@ describe('MemorySnapshotGet', () => {
       key: 'K2',
       max_objects: 6,
     });
-    expect(sent(r)).toContain('K2');
-    expect(sent(r)).toContain('maxNumberOfReferences=6');
+    assert.ok(sent(r).includes('K2'));
+    assert.ok(sent(r).includes('maxNumberOfReferences=6'));
   });
-  it.each(['children', 'references'] as const)(
-    '%s without a key is an error that sends nothing',
-    async (view) => {
-      const conn = recordingConnection([]);
-      const r: any = await handleMemorySnapshotGet(ctx(conn), {
-        snapshot_id: 'S1',
-        view,
-      });
-      expect(r.isError).toBe(true);
-      expect(conn.requests).toHaveLength(0);
-    },
-  );
+  for (const view of ['children', 'references'] as const) {
+    it(
+      format('%s without a key is an error that sends nothing', view),
+      async () => {
+        const conn = recordingConnection([]);
+        const r: any = await handleMemorySnapshotGet(ctx(conn), {
+          snapshot_id: 'S1',
+          view,
+        });
+        assert.equal(r.isError, true);
+        assert.equal(conn.requests.length, 0);
+      },
+    );
+  }
   it('raw is the document as sent', async () => {
     const r: any = await handleMemorySnapshotGet(ctx(ok()), {
       snapshot_id: 'S1',
       detail: 'raw',
     });
-    expect(r.content[0].text).toBe(DOC);
+    assert.equal(r.content[0].text, DOC);
   });
 });
 
@@ -150,10 +158,10 @@ describe('MemorySnapshotDelta', () => {
       from_id: 'A1',
       to_id: 'B2',
     });
-    expect(r.isError).toBe(false);
-    expect(conn.requests[0].method).toBe('GET');
-    expect(sent(conn)).toContain('A1');
-    expect(sent(conn)).toContain('B2');
+    assert.equal(r.isError, false);
+    assert.equal(conn.requests[0].method, 'GET');
+    assert.ok(sent(conn).includes('A1'));
+    assert.ok(sent(conn).includes('B2'));
   });
   it('ranking, children and references send their limits and keys', async () => {
     const a = ok();
@@ -163,7 +171,7 @@ describe('MemorySnapshotDelta', () => {
       view: 'ranking',
       max_objects: 9,
     });
-    expect(sent(a)).toContain('maxNumberOfObjects=9');
+    assert.ok(sent(a).includes('maxNumberOfObjects=9'));
     const b = ok();
     await handleMemorySnapshotDelta(ctx(b), {
       from_id: 'A1',
@@ -171,8 +179,8 @@ describe('MemorySnapshotDelta', () => {
       view: 'children',
       key: 'K1',
     });
-    expect(sent(b)).toContain('K1');
-    expect(sent(b)).toContain('maxNumberOfObjects=50');
+    assert.ok(sent(b).includes('K1'));
+    assert.ok(sent(b).includes('maxNumberOfObjects=50'));
     const c = ok();
     await handleMemorySnapshotDelta(ctx(c), {
       from_id: 'A1',
@@ -180,7 +188,7 @@ describe('MemorySnapshotDelta', () => {
       view: 'references',
       key: 'K2',
     });
-    expect(sent(c)).toContain('maxNumberOfReferences=50');
+    assert.ok(sent(c).includes('maxNumberOfReferences=50'));
   });
   it('a missing key sends nothing', async () => {
     const conn = recordingConnection([]);
@@ -189,7 +197,7 @@ describe('MemorySnapshotDelta', () => {
       to_id: 'B2',
       view: 'children',
     });
-    expect(r.isError).toBe(true);
-    expect(conn.requests).toHaveLength(0);
+    assert.equal(r.isError, true);
+    assert.equal(conn.requests.length, 0);
   });
 });

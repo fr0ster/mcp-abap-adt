@@ -16,8 +16,11 @@
  * once per connection.
  */
 
+import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
@@ -72,15 +75,15 @@ beforeEach(async () => {
   process.env.SAP_SYSTEM_TYPE = 'cloud';
   standIn = await adtStandIn();
   stderr = [];
-  jest.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+  mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
     stderr.push(String(chunk));
     return true;
   });
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
 });
 
 afterEach(async () => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   await standIn.close();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
@@ -231,51 +234,54 @@ const SERVERS: Record<string, () => Promise<Served>> = {
   },
 };
 
-describe.each(Object.keys(SERVERS))('%s', (name) => {
-  jest.setTimeout(30_000);
-
-  /** A call whose system lookup is held, then released; cancelled or not. */
-  async function heldCall(served: Served, id: string, cancel: boolean) {
-    const hold = standIn.hold(isLookup);
-    const call = served.call(id);
-    await hold.arrived;
-    if (cancel) {
-      call.cancel();
-      // An MCP cancel, or a dropped http request, aborts nothing: the call
-      // is live, its signal not aborted.
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      expect(activeTools()).toHaveLength(1);
-      expect(activeTools()[0]?.signal.aborted).toBe(false);
+for (const name of Object.keys(SERVERS)) {
+  describe(format('%s', name), () => {
+    /** A call whose system lookup is held, then released; cancelled or not. */
+    async function heldCall(served: Served, id: string, cancel: boolean) {
+      const hold = standIn.hold(isLookup);
+      const call = served.call(id);
+      await hold.arrived;
+      if (cancel) {
+        call.cancel();
+        // An MCP cancel, or a dropped http request, aborts nothing: the call
+        // is live, its signal not aborted.
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        assert.equal(activeTools().length, 1);
+        assert.equal(activeTools()[0]?.signal.aborted, false);
+      }
+      hold.release();
+      // The call has settled on the server.
+      await until(() => activeTools().length === 0);
+      await call.done;
     }
-    hold.release();
-    // The call has settled on the server.
-    await until(() => activeTools().length === 0);
-    await call.done;
-  }
 
-  // Each case on a server of its own: the lookup is made once per connection.
-  it('(control) a call held at the lookup and released reaches its tool', async () => {
-    const served = await SERVERS[name]();
-    try {
-      await heldCall(served, 'reached-control', false);
-      expect(standIn.requests.map((r) => r.url)).toContain(
-        `${PROBE_PATH}reached-control`,
-      );
-    } finally {
-      await served.close();
-    }
+    // Each case on a server of its own: the lookup is made once per connection.
+    it('(control) a call held at the lookup and released reaches its tool', async () => {
+      const served = await SERVERS[name]();
+      try {
+        await heldCall(served, 'reached-control', false);
+        assert.ok(
+          standIn.requests
+            .map((r) => r.url)
+            .includes(`${PROBE_PATH}reached-control`),
+        );
+      } finally {
+        await served.close();
+      }
+    });
+
+    it('a call cancelled after its connection is ready: an MCP cancel, or a dropped http request, aborts nothing and the tool runs once', async () => {
+      const served = await SERVERS[name]();
+      try {
+        await heldCall(served, 'cancelled', true);
+        const urls = standIn.requests.map((r) => r.url);
+        assert.equal(
+          urls.filter((url) => url === `${PROBE_PATH}cancelled`).length,
+          1,
+        );
+      } finally {
+        await served.close();
+      }
+    });
   });
-
-  it('a call cancelled after its connection is ready: an MCP cancel, or a dropped http request, aborts nothing and the tool runs once', async () => {
-    const served = await SERVERS[name]();
-    try {
-      await heldCall(served, 'cancelled', true);
-      const urls = standIn.requests.map((r) => r.url);
-      expect(
-        urls.filter((url) => url === `${PROBE_PATH}cancelled`),
-      ).toHaveLength(1);
-    } finally {
-      await served.close();
-    }
-  });
-});
+}

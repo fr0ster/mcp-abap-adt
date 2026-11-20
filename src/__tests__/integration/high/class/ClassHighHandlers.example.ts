@@ -10,6 +10,7 @@
  * - Tester to provide all common infrastructure (connection, session, logger, params, etc.)
  */
 
+import { afterEach, before, describe, it } from 'node:test';
 import * as z from 'zod';
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
 import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
@@ -38,7 +39,7 @@ describe('Class High-Level Handlers Integration (Example with Workflow Functions
   // Logger is created in test scope and captured by closure in lambdas
   const logger = createTestLogger('class-high');
 
-  beforeAll(async () => {
+  before(async () => {
     tester = new LambdaTester(
       'create_class',
       'builder_class',

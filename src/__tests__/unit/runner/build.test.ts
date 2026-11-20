@@ -1,6 +1,7 @@
 /**
- * The node:test build, `tools/build-node-tests.mjs` (`npm run test:build`;
- * D27, plan step 4): it refuses a Jest global, starts clean, emits nothing
+ * The test build, `tools/build-node-tests.mjs` (`npm run test:build`;
+ * D27, plan step 4): it compiles with node's types alone (an `expect` global
+ * fails it), starts clean, emits nothing
  * when a compile fails, and takes its `paths` from the package-name table, as
  * every test configuration does. The build runs in a child process over
  * fixture repositories whose `tsconfig.node-test.json` extends the
@@ -70,24 +71,24 @@ describe('the node:test build', () => {
     );
   });
 
-  it('the node:test build refuses a Jest global', () => {
-    const jestGlobal = fixtureRepo(path.join(scratch.dir, 'jest'), [LISTED], {
+  it("the test build refuses a global outside node's types", () => {
+    const undeclared = fixtureRepo(path.join(scratch.dir, 'undeclared'), {
       [LISTED]: [
         "import { test } from 'node:test';",
-        "test('uses Jest', () => { expect(1).toBe(1); });",
+        "test('uses expect', () => { expect(1).toBe(1); });",
         '',
       ].join('\n'),
     });
-    const refused = build(jestGlobal);
+    const refused = build(undeclared);
     assert.equal(refused.status, 1);
     assert.ok(
       refused.stderr.includes("Cannot find name 'expect'"),
       refused.stderr,
     );
-    assert.deepEqual(filesUnder(path.join(jestGlobal, '.test-build')), []);
+    assert.deepEqual(filesUnder(path.join(undeclared, '.test-build')), []);
 
-    // The same file without the Jest global builds.
-    const plain = fixtureRepo(path.join(scratch.dir, 'plain'), [LISTED], {
+    // The same file without the undeclared global builds.
+    const plain = fixtureRepo(path.join(scratch.dir, 'plain'), {
       [LISTED]: [
         "import assert from 'node:assert/strict';",
         "import { test } from 'node:test';",
@@ -101,7 +102,7 @@ describe('the node:test build', () => {
   });
 
   it('the build starts clean', () => {
-    const repo = fixtureRepo(path.join(scratch.dir, 'clean'), [LISTED], {
+    const repo = fixtureRepo(path.join(scratch.dir, 'clean'), {
       [LISTED]: nodeTestSource('listed', 'FAIL_LISTED'),
     });
     // A compiled test whose source no longer exists, and a file beside the
@@ -121,7 +122,8 @@ describe('the node:test build', () => {
       'tree/stub.js.map',
     ]);
 
-    // Even with a stale file left, the runner runs the listed sources only.
+    // Even with a stale file left, the runner runs the walked sources only:
+    // the walk never enters `.test-build`.
     writeAt(
       repo,
       '.test-build/tree/src/__tests__/stale.test.js',
@@ -138,7 +140,7 @@ describe('the node:test build', () => {
   });
 
   it('the build places the listed files beside the compiled code', () => {
-    const repo = fixtureRepo(path.join(scratch.dir, 'placed'), [LISTED], {
+    const repo = fixtureRepo(path.join(scratch.dir, 'placed'), {
       [LISTED]: nodeTestSource('listed', 'FAIL_LISTED'),
       'pkg/package.json': '{"version":"1.2.3"}\n',
       'fixtures/dir/a.json': '"a"\n',
@@ -188,7 +190,7 @@ describe('the node:test build', () => {
     // A package-shaped directory is one with a package.json and a src: the
     // compiled tree has both once the root manifest is placed, so it sits
     // one level inside `.test-build/`, which holds neither.
-    const repo = fixtureRepo(path.join(scratch.dir, 'rootManifest'), [LISTED], {
+    const repo = fixtureRepo(path.join(scratch.dir, 'rootManifest'), {
       [LISTED]: nodeTestSource('listed', 'FAIL_LISTED'),
       'package.json': '{"name":"fixture","version":"1.0.0"}\n',
     });
@@ -215,20 +217,16 @@ describe('the node:test build', () => {
 
   it('a failed compile runs nothing', () => {
     const other = 'src/__tests__/other.test.ts';
-    const repo = fixtureRepo(
-      path.join(scratch.dir, 'failed'),
-      [LISTED, other],
-      {
-        [LISTED]: [
-          "import { test } from 'node:test';",
-          "const wrong: number = 'not a number';",
-          "test('typed wrong', () => { void wrong; });",
-          '',
-        ].join('\n'),
-        [other]: nodeTestSource('other', 'FAIL_OTHER'),
-        'pkg/package.json': '{}\n',
-      },
-    );
+    const repo = fixtureRepo(path.join(scratch.dir, 'failed'), {
+      [LISTED]: [
+        "import { test } from 'node:test';",
+        "const wrong: number = 'not a number';",
+        "test('typed wrong', () => { void wrong; });",
+        '',
+      ].join('\n'),
+      [other]: nodeTestSource('other', 'FAIL_OTHER'),
+      'pkg/package.json': '{}\n',
+    });
     writeAt(
       repo,
       'tools/node-test-placed.json',

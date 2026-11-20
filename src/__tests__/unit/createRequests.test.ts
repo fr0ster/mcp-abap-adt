@@ -19,6 +19,9 @@
  * request is the POST whose body writes `adtcore:description`.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { XMLParser, XMLValidator } from 'fast-xml-parser';
 import { listedTool, statedEnvironment } from '../../lib/listedTool';
 import { resetSystemContextCache } from '../../lib/systemContext';
@@ -276,58 +279,59 @@ afterEach(() => {
 
 describe('a create states its language once (#348)', () => {
   it('runs every create that takes master_language on a variant', () => {
-    expect(FULL.map((each) => each.c.tool)).toEqual(
-      expect.arrayContaining(FULL_CREATES.map((c) => c.tool)),
-    );
-    expect(
+    {
+      const actual = FULL.map((each) => each.c.tool);
+      for (const expected of FULL_CREATES.map((c) => c.tool)) {
+        assert.ok(actual.some((e) => isDeepStrictEqual(e, expected)));
+      }
+    }
+    assert.deepStrictEqual(
       COMPACT_CREATES.filter((c) => !COMPACT.some((each) => each.c === c)).map(
         (c) => c.args.object_type,
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
-  it.each(ALL)(
-    '$name: master_language given — body and header carry it',
-    async ({ c, variant }) => {
+  for (const { name, c, variant } of ALL) {
+    it(`${name}: master_language given — body and header carry it`, async () => {
       const create = createOf(
         await sent(c, variant, {
           description: 'Pin language',
           master_language: 'DE',
         }),
       );
-      expect(create.body).toContain('adtcore:language="DE"');
-      expect(create.body).toContain('adtcore:masterLanguage="DE"');
-      expect(headerOf(create, 'sap-language')).toBe('DE');
-    },
-  );
+      assert.ok(create.body?.includes('adtcore:language="DE"'));
+      assert.ok(create.body?.includes('adtcore:masterLanguage="DE"'));
+      assert.equal(headerOf(create, 'sap-language'), 'DE');
+    });
+  }
 
-  it.each(ALL)(
-    '$name: the session language — body and header carry it',
-    async ({ c, variant }) => {
+  for (const { name, c, variant } of ALL) {
+    it(`${name}: the session language — body and header carry it`, async () => {
       setSystemContext({ masterLanguage: 'FR' });
       const create = createOf(
         await sent(c, variant, { description: 'Pin language' }),
       );
-      expect(create.body).toContain('adtcore:language="FR"');
-      expect(create.body).toContain('adtcore:masterLanguage="FR"');
-      expect(headerOf(create, 'sap-language')).toBe('FR');
-    },
-  );
+      assert.ok(create.body?.includes('adtcore:language="FR"'));
+      assert.ok(create.body?.includes('adtcore:masterLanguage="FR"'));
+      assert.equal(headerOf(create, 'sap-language'), 'FR');
+    });
+  }
 
-  it.each(ALL)(
-    '$name: no language anywhere — neither attribute nor header',
-    async ({ c, variant }) => {
+  for (const { name, c, variant } of ALL) {
+    it(`${name}: no language anywhere — neither attribute nor header`, async () => {
       const requests = await sent(c, variant, { description: 'Pin language' });
       createOf(requests);
       for (const request of requests) {
-        expect(languageOf(request)).toEqual({
+        assert.deepStrictEqual(languageOf(request), {
           language: false,
           masterLanguage: false,
           header: undefined,
         });
       }
-    },
-  );
+    });
+  }
 });
 
 /** A description holding every character an attribute value escapes. */
@@ -336,7 +340,7 @@ const ESCAPED_DESCRIPTION = `Pin & <esc> "q" 'a'`;
 /** The root element's `adtcore:description` of `body`, read by an XML parser. */
 function rootDescription(body: string | undefined): unknown {
   const text = body ?? '';
-  expect(XMLValidator.validate(text)).toBe(true);
+  assert.equal(XMLValidator.validate(text), true);
   const parsed: unknown = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '@',
@@ -358,18 +362,17 @@ const DESCRIBED = ALL.filter(
 );
 
 describe('a create escapes its description (#8)', () => {
-  it.each(DESCRIBED)(
-    '$name: the body is well-formed and the description whole',
-    async ({ c, variant }) => {
+  for (const { name, c, variant } of DESCRIBED) {
+    it(`${name}: the body is well-formed and the description whole`, async () => {
       const create = createOf(
         await sent(c, variant, {
           description: ESCAPED_DESCRIPTION,
           master_language: 'EN',
         }),
       );
-      expect(rootDescription(create.body)).toBe(ESCAPED_DESCRIPTION);
-    },
-  );
+      assert.equal(rootDescription(create.body), ESCAPED_DESCRIPTION);
+    });
+  }
 });
 
 /** What `master_language` does, as every create lists it. */
@@ -377,21 +380,29 @@ const MASTER_LANGUAGE_WORDS =
   "Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.";
 
 describe('master_language says what a create does with it', () => {
-  it.each(
-    [...FULL_CREATES.map((c) => c.tool), 'HandlerCreate'].flatMap((tool) =>
-      VARIANTS.filter((variant) => servedEntries(variant).has(tool)).map(
-        (variant) => ({ tool, variant }),
-      ),
+  for (const { tool, variant } of [
+    ...FULL_CREATES.map((c) => c.tool),
+    'HandlerCreate',
+  ].flatMap((tool) =>
+    VARIANTS.filter((variant) => servedEntries(variant).has(tool)).map(
+      (variant) => ({ tool, variant }),
     ),
-  )('$tool ($variant)', ({ tool, variant }) => {
-    const entry = servedEntries(variant).get(tool);
-    if (entry === undefined) throw new Error(`${variant} lists no ${tool}`);
-    const listed = listedTool(entry.toolDefinition, statedEnvironment(variant));
-    if (!listed.listed) throw new Error(`${variant} lists no ${tool}`);
-    expect(
-      jsonFind(listedJson(listed.inputSchema), 'master_language')?.description,
-    ).toBe(MASTER_LANGUAGE_WORDS);
-  });
+  )) {
+    it(`${tool} (${variant})`, () => {
+      const entry = servedEntries(variant).get(tool);
+      if (entry === undefined) throw new Error(`${variant} lists no ${tool}`);
+      const listed = listedTool(
+        entry.toolDefinition,
+        statedEnvironment(variant),
+      );
+      if (!listed.listed) throw new Error(`${variant} lists no ${tool}`);
+      assert.equal(
+        jsonFind(listedJson(listed.inputSchema), 'master_language')
+          ?.description,
+        MASTER_LANGUAGE_WORDS,
+      );
+    });
+  }
 });
 
 /**
@@ -400,9 +411,10 @@ describe('master_language says what a create does with it', () => {
  * SAP's answers are real corpus documents where the chain reads one.
  */
 describe('CreateDataElement activates what it created', () => {
-  it.each(VARIANTS.filter((v) => servedEntries(v).has('CreateDataElement')))(
-    '%s',
-    async (variant) => {
+  for (const variant of VARIANTS.filter((v) =>
+    servedEntries(v).has('CreateDataElement'),
+  )) {
+    it(format('%s', variant), async () => {
       const recording = await recordCase({
         tool: 'CreateDataElement',
         variant,
@@ -417,9 +429,9 @@ describe('CreateDataElement activates what it created', () => {
       });
       const requests = recording.requests;
       const last = requests[requests.length - 1];
-      expect(last?.method).toBe('POST');
-      expect(last?.url.startsWith('/sap/bc/adt/activation?')).toBe(true);
-      expect(last?.body).toContain('adtcore:name="ZPIN_DTEL"');
-    },
-  );
+      assert.equal(last?.method, 'POST');
+      assert.equal(last?.url.startsWith('/sap/bc/adt/activation?'), true);
+      assert.ok(last?.body?.includes('adtcore:name="ZPIN_DTEL"'));
+    });
+  }
 });

@@ -12,6 +12,10 @@
  * variant — real adt-clients code, no SAP — and reads the `objectType` of
  * the one quickSearch on the wire.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { handleHandlerSystem } from '../../../compact-readonly-entries/src/handlers/handleHandlerSystem';
 import { handleSearchObject } from '../../handlers/search/readonly/handleSearchObject';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
@@ -34,7 +38,7 @@ function oneByOne() {
 
 /** The `objectType` of the one search on the wire; `null` for none. */
 function sentObjectType(requests: readonly RecordedRequest[]): string | null {
-  expect(requests).toHaveLength(1);
+  assert.equal(requests.length, 1);
   const [request] = requests;
   if (request === undefined) throw new Error('no request was sent');
   return new URL(request.url, 'https://system.invalid').searchParams.get(
@@ -79,132 +83,148 @@ const OWN_ONLY: { readonly [V in ProjectionVariant]: string } = {
   cloud: 'TXPA',
 };
 
-describe.each(VARIANTS)('SearchObject.object_type on %s', (variant) => {
-  it.each([
-    ['STRU', 'STRU'],
-    ['stru', 'STRU'],
-    ['TABL', 'TABL'],
-    ['DEVC', 'DEVC'],
-    ['FUNC', 'FUNC'],
-    ['abap_test_cockpit', 'ABAP_TEST_COCKPIT'],
-  ])('a search name, %s, is sent as %s', async (value, wire) => {
-    const { result, requests } = await search(variant, value);
-    expect(result.isError).toBe(false);
-    expect(sentObjectType(requests)).toBe(wire);
-  });
+for (const variant of VARIANTS) {
+  describe(format('SearchObject.object_type on %s', variant), () => {
+    for (const [value, wire] of [
+      ['STRU', 'STRU'],
+      ['stru', 'STRU'],
+      ['TABL', 'TABL'],
+      ['DEVC', 'DEVC'],
+      ['FUNC', 'FUNC'],
+      ['abap_test_cockpit', 'ABAP_TEST_COCKPIT'],
+    ]) {
+      it(format('a search name, %s, is sent as %s', value, wire), async () => {
+        const { result, requests } = await search(variant, value);
+        assert.equal(result.isError, false);
+        assert.equal(sentObjectType(requests), wire);
+      });
+    }
 
-  it("a name only this variant's list holds is sent", async () => {
-    const own = OWN_ONLY[variant];
-    const { requests } = await search(variant, own);
-    expect(sentObjectType(requests)).toBe(own);
-  });
+    it("a name only this variant's list holds is sent", async () => {
+      const own = OWN_ONLY[variant];
+      const { requests } = await search(variant, own);
+      assert.equal(sentObjectType(requests), own);
+    });
 
-  it.each([
-    // The item whose `type` the code is.
-    ['CLAS/OC', 'CLAS'],
-    ['DEVC/K', 'DEVC'],
-    ['TABL/DS', 'STRU'],
-    ['tabl/dt', 'DTAB'],
-    ['FUGR/FF', 'FUNC'],
-    ['PROG/I', 'INCL'],
-    // Two items list it (`PROG`, `REPO`): the one that is its main type.
-    ['PROG/P', 'PROG'],
-    // No item lists it: the main type its entry states.
-    ['ENHO/XHH', 'ENHO'],
-    ['ENHO/XHB', 'ENHO'],
-    ['ENHS/XSB', 'ENHS'],
-    ['MSAG/NN', 'MSAG'],
-  ])('a code, %s, stands for the name %s', async (value, wire) => {
-    const { requests } = await search(variant, value);
-    expect(sentObjectType(requests)).toBe(wire);
-  });
+    for (const [value, wire] of [
+      // The item whose `type` the code is.
+      ['CLAS/OC', 'CLAS'],
+      ['DEVC/K', 'DEVC'],
+      ['TABL/DS', 'STRU'],
+      ['tabl/dt', 'DTAB'],
+      ['FUGR/FF', 'FUNC'],
+      ['PROG/I', 'INCL'],
+      // Two items list it (`PROG`, `REPO`): the one that is its main type.
+      ['PROG/P', 'PROG'],
+      // No item lists it: the main type its entry states.
+      ['ENHO/XHH', 'ENHO'],
+      ['ENHO/XHB', 'ENHO'],
+      ['ENHS/XSB', 'ENHS'],
+      ['MSAG/NN', 'MSAG'],
+    ]) {
+      it(
+        format('a code, %s, stands for the name %s', value, wire),
+        async () => {
+          const { requests } = await search(variant, value);
+          assert.equal(sentObjectType(requests), wire);
+        },
+      );
+    }
 
-  it.each([
-    // The code of the name is the item's type.
-    ['class', 'CLAS'],
-    ['structure', 'STRU'],
-    ['table', 'DTAB'],
-    ['FUNCTION', 'FUNC'],
-    ['function_module', 'FUNC'],
-    ['functiongroup', 'FUGR'],
-    ['include', 'INCL'],
-    ['package', 'DEVC'],
-    // Two items list the code (`PROG`, `REPO`): the one that is its main type.
-    ['program', 'PROG'],
-    // A name is read as its code before the list: `view` is a CDS view
-    // (`DDLS/DF`), in lower or mixed case; in upper case `VIEW` is the
-    // search name of the dictionary views (`VIEW/DV`; caseRule.test.ts).
-    ['view', 'DDLS'],
-    ['View', 'DDLS'],
-    ['VIEW/DV', 'VIEW'],
-  ])('a friendly name, %s, reaches the wire as %s', async (value, wire) => {
-    const { requests } = await search(variant, value);
-    expect(sentObjectType(requests)).toBe(wire);
-  });
+    for (const [value, wire] of [
+      // The code of the name is the item's type.
+      ['class', 'CLAS'],
+      ['structure', 'STRU'],
+      ['table', 'DTAB'],
+      ['FUNCTION', 'FUNC'],
+      ['function_module', 'FUNC'],
+      ['functiongroup', 'FUGR'],
+      ['include', 'INCL'],
+      ['package', 'DEVC'],
+      // Two items list the code (`PROG`, `REPO`): the one that is its main type.
+      ['program', 'PROG'],
+      // A name is read as its code before the list: `view` is a CDS view
+      // (`DDLS/DF`), in lower or mixed case; in upper case `VIEW` is the
+      // search name of the dictionary views (`VIEW/DV`; caseRule.test.ts).
+      ['view', 'DDLS'],
+      ['View', 'DDLS'],
+      ['VIEW/DV', 'VIEW'],
+    ]) {
+      it(
+        format('a friendly name, %s, reaches the wire as %s', value, wire),
+        async () => {
+          const { requests } = await search(variant, value);
+          assert.equal(sentObjectType(requests), wire);
+        },
+      );
+    }
 
-  it.each(['NOPE', 'NOPE/XX', 'classes', OTHERS_ONLY[variant]])(
-    '%s names no search name: refused, nothing sent',
-    async (value) => {
-      const { result, requests } = await search(variant, value);
-      expect(requests).toEqual([]);
-      expect(result.isError).toBe(true);
-      expect(textOf(result)).toContain(refusal(value));
-    },
-  );
+    for (const value of ['NOPE', 'NOPE/XX', 'classes', OTHERS_ONLY[variant]]) {
+      it(
+        format('%s names no search name: refused, nothing sent', value),
+        async () => {
+          const { result, requests } = await search(variant, value);
+          assert.deepStrictEqual(requests, []);
+          assert.equal(result.isError, true);
+          assert.ok(textOf(result).includes(refusal(value)));
+        },
+      );
+    }
 
-  it('no filter sends none', async () => {
-    const { requests } = await search(variant, undefined);
-    expect(sentObjectType(requests)).toBeNull();
-  });
+    it('no filter sends none', async () => {
+      const { requests } = await search(variant, undefined);
+      assert.equal(sentObjectType(requests), null);
+    });
 
-  it('HandlerSystem search_object hands its object_type on to the same boundary', async () => {
-    const connection = recordingConnection();
-    declareSystemKind(connection, variant);
-    await handleHandlerSystem(
-      { connection },
-      {
-        action: 'search_object',
-        object_name: 'Z*',
-        object_type: 'TABL/DS',
-      },
-    );
-    expect(sentObjectType(connection.requests)).toBe('STRU');
-    const refusedConnection = recordingConnection();
-    declareSystemKind(refusedConnection, variant);
-    // The target's schema on this variant refuses it, before its handler.
-    const refused = await handleHandlerSystem(
-      { connection: refusedConnection },
-      { action: 'search_object', object_name: 'Z*', object_type: 'NOPE' },
-    ).then(
-      () => '',
-      (error: Error) => error.message,
-    );
-    expect(refusedConnection.requests).toEqual([]);
-    expect(refused).toContain(refusal('NOPE'));
-  });
+    it('HandlerSystem search_object hands its object_type on to the same boundary', async () => {
+      const connection = recordingConnection();
+      declareSystemKind(connection, variant);
+      await handleHandlerSystem(
+        { connection },
+        {
+          action: 'search_object',
+          object_name: 'Z*',
+          object_type: 'TABL/DS',
+        },
+      );
+      assert.equal(sentObjectType(connection.requests), 'STRU');
+      const refusedConnection = recordingConnection();
+      declareSystemKind(refusedConnection, variant);
+      // The target's schema on this variant refuses it, before its handler.
+      const refused = await handleHandlerSystem(
+        { connection: refusedConnection },
+        { action: 'search_object', object_name: 'Z*', object_type: 'NOPE' },
+      ).then(
+        () => '',
+        (error: Error) => error.message,
+      );
+      assert.deepStrictEqual(refusedConnection.requests, []);
+      assert.ok(refused.includes(refusal('NOPE')));
+    });
 
-  it('DescribeByList searches an object whose type is no search name without one', async () => {
-    const connection = recordingConnection();
-    declareSystemKind(connection, variant);
-    await handleDescribeByList(
-      { connection, batchAvailability: oneByOne() },
-      { objects: [{ name: 'ZT', type: 'NOPE' }] },
-    );
-    expect(sentObjectType(connection.requests)).toBeNull();
-  });
+    it('DescribeByList searches an object whose type is no search name without one', async () => {
+      const connection = recordingConnection();
+      declareSystemKind(connection, variant);
+      await handleDescribeByList(
+        { connection, batchAvailability: oneByOne() },
+        { objects: [{ name: 'ZT', type: 'NOPE' }] },
+      );
+      assert.equal(sentObjectType(connection.requests), null);
+    });
 
-  it('DescribeByList sends a code as the search name it stands for', async () => {
-    const connection = recordingConnection();
-    declareSystemKind(connection, variant);
-    await handleDescribeByList(
-      { connection, batchAvailability: oneByOne() },
-      { objects: [{ name: 'ZT', type: 'TABL/DT' }] },
-    );
-    const types = connection.requests.map((request) =>
-      new URL(request.url, 'https://system.invalid').searchParams.get(
-        'objectType',
-      ),
-    );
-    expect(types).toEqual(['DTAB']);
+    it('DescribeByList sends a code as the search name it stands for', async () => {
+      const connection = recordingConnection();
+      declareSystemKind(connection, variant);
+      await handleDescribeByList(
+        { connection, batchAvailability: oneByOne() },
+        { objects: [{ name: 'ZT', type: 'TABL/DT' }] },
+      );
+      const types = connection.requests.map((request) =>
+        new URL(request.url, 'https://system.invalid').searchParams.get(
+          'objectType',
+        ),
+      );
+      assert.deepStrictEqual(types, ['DTAB']);
+    });
   });
-});
+}

@@ -5,6 +5,10 @@
  * and an activation run's parts (`isLongRead`), so the sentence names every
  * other member.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { COMPACT_READ } from '../../lib/adtProjections';
 import { compactGetSchemaFor } from '../../lib/compact/compactSchemas';
 import { isLongRead } from '../../lib/longTools';
@@ -31,12 +35,14 @@ describe("HandlerGet's background names the reads that take it", () => {
     isLongRead('HandlerGet', { object_type: member }),
   );
 
-  it.each(reads)('names %s', (member) => {
-    expect(namedInList(words, member)).toBe(true);
-  });
+  for (const member of reads) {
+    it(format('names %s', member), () => {
+      assert.equal(namedInList(words, member), true);
+    });
+  }
 
   it('names no run mode', () => {
-    expect(namedInList(words, 'UNIT_TEST')).toBe(false);
-    expect(words.includes('CDS_UNIT_TEST')).toBe(false);
+    assert.equal(namedInList(words, 'UNIT_TEST'), false);
+    assert.equal(words.includes('CDS_UNIT_TEST'), false);
   });
 });

@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type {
   AuthorizationRequest,
@@ -5,6 +8,7 @@ import type {
   IBrowser,
 } from '@mcp-abap-adt/interfaces-auth';
 import { SettingsError } from '@mcp-abap-adt/lib/auth';
+import { assertThrows } from '../../../../../src/__tests__/helpers/assertions';
 import { UnsupportedAuthenticationError } from '../../auth/destinationFailure';
 import {
   type AuthHandlerContext,
@@ -49,75 +53,86 @@ const request = {
 } as AuthorizationRequest;
 
 describe('handlerFor', () => {
-  it.each([
+  for (const [vetted] of [
     [{ authType: 'basic' as const }],
     [{ authType: 'snc' as const }],
     [{ authType: 'jwt' as const, grantType: 'authorization_code' as const }],
-  ])('finds the handler for %j', (vetted) => {
-    const h = handlerFor('dest', vetted);
-    expect(h.authType).toBe(vetted.authType);
-    expect(h.grantType).toBe((vetted as { grantType?: string }).grantType);
-  });
+  ]) {
+    it(format('finds the handler for %j', vetted), () => {
+      const h = handlerFor('dest', vetted);
+      assert.equal(h.authType, vetted.authType);
+      assert.equal(h.grantType, (vetted as { grantType?: string }).grantType);
+    });
+  }
 
-  it.each([
+  for (const [vetted] of [
     [{ authType: 'saml' as const, grantType: 'saml2_bearer' as const }],
     [{ authType: 'jwt' as const, grantType: 'passcode' as const }],
     [{ authType: 'jwt' as const, grantType: 'client_credentials' as const }],
     [{ authType: 'jwt' as const, grantType: 'none' as const }],
-  ])('refuses %j, naming destination, type and grant', (vetted) => {
-    let err: unknown;
-    try {
-      handlerFor('dest', vetted);
-    } catch (e) {
-      err = e;
-    }
-    expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
-    const u = err as UnsupportedAuthenticationError;
-    expect(u.destination).toBe('dest');
-    expect(u.authType).toBe(vetted.authType);
-    expect(u.grantType).toBe(vetted.grantType);
-    expect(u.message).toContain('dest');
-    expect(u.message).toContain(vetted.grantType);
-  });
+  ]) {
+    it(format('refuses %j, naming destination, type and grant', vetted), () => {
+      let err: unknown;
+      try {
+        handlerFor('dest', vetted);
+      } catch (e) {
+        err = e;
+      }
+      assert.ok(err instanceof UnsupportedAuthenticationError);
+      const u = err as UnsupportedAuthenticationError;
+      assert.equal(u.destination, 'dest');
+      assert.equal(u.authType, vetted.authType);
+      assert.equal(u.grantType, vetted.grantType);
+      assert.ok(u.message.includes('dest'));
+      assert.ok(u.message.includes(vetted.grantType));
+    });
+  }
 });
 
 describe('jwt / none', () => {
   it('is refused like any authentication not in the table: three handlers', () => {
-    expect(HANDLERS.map((h) => `${h.authType}/${h.grantType ?? ''}`)).toEqual([
-      'basic/',
-      'snc/',
-      'jwt/authorization_code',
-    ]);
+    assert.deepStrictEqual(
+      HANDLERS.map((h) => `${h.authType}/${h.grantType ?? ''}`),
+      ['basic/', 'snc/', 'jwt/authorization_code'],
+    );
   });
 });
 
 describe('certificate and kerberos', () => {
-  it.each(['certificate', 'kerberos'] as const)(
-    '%s is refused as unsupported, named, without a grant',
-    (authType) => {
-      let err: unknown;
-      try {
-        handlerFor('dest', { authType });
-      } catch (e) {
-        err = e;
-      }
-      expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
-      const u = err as UnsupportedAuthenticationError;
-      expect(u.authType).toBe(authType);
-      expect(u.message).toBe(
-        `Destination "dest" uses ${authType}, which this server does not support`,
-      );
-    },
-  );
+  for (const authType of ['certificate', 'kerberos'] as const) {
+    it(
+      format('%s is refused as unsupported, named, without a grant', authType),
+      () => {
+        let err: unknown;
+        try {
+          handlerFor('dest', { authType });
+        } catch (e) {
+          err = e;
+        }
+        assert.ok(err instanceof UnsupportedAuthenticationError);
+        const u = err as UnsupportedAuthenticationError;
+        assert.equal(u.authType, authType);
+        assert.equal(
+          u.message,
+          `Destination "dest" uses ${authType}, which this server does not support`,
+        );
+      },
+    );
+  }
 });
 
 describe('brokerOptions', () => {
-  it.each([[{ authType: 'basic' as const }], [{ authType: 'snc' as const }]])(
-    '%j adds nothing',
-    (vetted) => {
-      expect(handlerFor('d', vetted).brokerOptions(context().ctx)).toEqual({});
-    },
-  );
+  for (const [vetted] of [
+    [{ authType: 'basic' as const }],
+    [{ authType: 'snc' as const }],
+  ]) {
+    it(format('%j adds nothing', vetted), () => {
+      assert.deepStrictEqual(
+        handlerFor('d', vetted).brokerOptions(context().ctx),
+        {},
+      );
+    });
+  }
 
   it('jwt / authorization_code returns exactly `authorization`: serverLogin over the context browser and port', async () => {
     const { ctx, calls, recorded, requests } = context({
@@ -127,13 +142,13 @@ describe('brokerOptions', () => {
       authType: 'jwt',
       grantType: 'authorization_code',
     }).brokerOptions(ctx);
-    expect(Object.keys(options)).toEqual(['authorization']);
+    assert.deepStrictEqual(Object.keys(options), ['authorization']);
     const strategy = options.authorization?.('d', 'authorization_code');
-    expect(calls).toEqual([{ browser: BROWSER, port: 4242 }]);
+    assert.deepStrictEqual(calls, [{ browser: BROWSER, port: 4242 }]);
     // The serverLogin wrapper: recorded for disposal, the prompt logger in.
-    expect(recorded).toEqual([strategy]);
+    assert.deepStrictEqual(recorded, [strategy]);
     await (strategy as IAuthorizationStrategy<string>).authorize(request);
-    expect(requests[0].logger).toBe(silent);
+    assert.equal(requests[0].logger, silent);
   });
 
   it('leaves the browser and the port out when the context has none', () => {
@@ -144,7 +159,7 @@ describe('brokerOptions', () => {
     })
       .brokerOptions(ctx)
       .authorization?.('d', 'authorization_code');
-    expect(calls).toEqual([{}]);
+    assert.deepStrictEqual(calls, [{}]);
   });
 });
 
@@ -163,16 +178,12 @@ describe('jwt / authorization_code checkSettings: the browser', () => {
     } catch (e) {
       err = e;
     }
-    expect(err).toBeInstanceOf(SettingsError);
-    expect((err as SettingsError).setting).toBe('browser');
+    assert.ok(err instanceof SettingsError);
+    assert.equal((err as SettingsError).setting, 'browser');
   });
   it('a browser, or none chosen, is accepted', () => {
-    expect(() =>
-      login.checkSettings?.({} as SapConfig, context().ctx),
-    ).not.toThrow();
-    expect(() =>
-      login.checkSettings?.({} as SapConfig, noBrowser().ctx),
-    ).not.toThrow();
+    login.checkSettings?.({} as SapConfig, context().ctx);
+    login.checkSettings?.({} as SapConfig, noBrowser().ctx);
   });
 });
 
@@ -188,23 +199,23 @@ describe('snc.checkSettings', () => {
     } catch (e) {
       err = e;
     }
-    expect(err).toBeInstanceOf(SettingsError);
-    expect((err as SettingsError).message).toContain('connection-type');
-    expect(() => snc.checkSettings?.({} as SapConfig, context().ctx)).toThrow(
+    assert.ok(err instanceof SettingsError);
+    assert.ok((err as SettingsError).message.includes('connection-type'));
+    assertThrows(
+      () => snc.checkSettings?.({} as SapConfig, context().ctx),
       SettingsError,
     );
   });
   it('accepts rfc', () => {
-    expect(() =>
-      snc.checkSettings?.(
-        { connectionType: 'rfc' } as unknown as SapConfig,
-        context().ctx,
-      ),
-    ).not.toThrow();
+    snc.checkSettings?.(
+      { connectionType: 'rfc' } as unknown as SapConfig,
+      context().ctx,
+    );
   });
   it('basic has no checkSettings', () => {
-    expect(
+    assert.equal(
       handlerFor('d', { authType: 'basic' }).checkSettings,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 });

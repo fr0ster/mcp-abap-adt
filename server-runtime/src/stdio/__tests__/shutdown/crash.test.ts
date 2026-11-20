@@ -12,6 +12,10 @@
  * as Node delivers them: a real throw here would end the test runner.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, it, mock } from 'node:test';
+import { format } from 'node:util';
+import { assertMatchObject } from '../../../../../src/__tests__/helpers/assertions';
 import { isUnlockOf } from '../../../../../src/__tests__/helpers/shutdownTools';
 import {
   deferred,
@@ -20,8 +24,6 @@ import {
   turns,
   until,
 } from '../helpers/loginStand';
-
-jest.setTimeout(30_000);
 
 let s: Stand;
 
@@ -32,7 +34,7 @@ afterEach(async () => {
 const failedLine = (lines: string[]) =>
   lines.filter((l) => l.startsWith('[MCP] The process failed (TypeError)'));
 
-it.each([
+for (const [_name, crash] of [
   [
     'a timer callback that throws',
     (st: Stand, error: Error) =>
@@ -47,51 +49,61 @@ it.each([
         0,
       ),
   ],
-])(
-  '%s: the orderly shutdown logs off the connection, one line, exit 1',
-  async (_name, crash) => {
-    s = await stand({ kind: 'onprem', shutdown: {} });
-    expect(await s.callTool('ProbeAdt', { id: 'p1' })).toMatchObject({
-      isError: false,
-    });
-    crash(s, new TypeError('a secret-looking detail'));
-    expect(await s.exited).toBe(1);
-    await until(() => s.adt.logoffs() === 1);
-    expect(failedLine(s.shutdownLines)).toHaveLength(1);
-    expect(s.shutdownLines.join('\n')).not.toContain('secret-looking');
-  },
-);
+] satisfies [string, (st: Stand, error: Error) => NodeJS.Timeout][]) {
+  it(
+    format(
+      '%s: the orderly shutdown logs off the connection, one line, exit 1',
+      _name,
+    ),
+    async () => {
+      s = await stand({ kind: 'onprem', shutdown: {} });
+      assertMatchObject(await s.callTool('ProbeAdt', { id: 'p1' }), {
+        isError: false,
+      });
+      crash(s, new TypeError('a secret-looking detail'));
+      assert.equal(await s.exited, 1);
+      await until(() => s.adt.logoffs() === 1);
+      assert.equal(failedLine(s.shutdownLines).length, 1);
+      assert.ok(!s.shutdownLines.join('\n').includes('secret-looking'));
+    },
+  );
+}
 
-it('a crash during a running shutdown lets it finish and exits 1; a second crash adds nothing', async () => {
+it('a crash during a running shutdown lets it finish and exits 1; a second crash adds nothing', async (t) => {
   s = await stand({ kind: 'onprem', shutdown: {} });
   // The session writes are held: the orderly shutdown is still running.
   const written = deferred<void>();
   const broker = await s.factory.getBroker('default');
-  const flush = jest
-    .spyOn(broker, 'flush')
-    .mockImplementation(() => written.promise);
+  const flush = t.mock.method(broker, 'flush', () => written.promise);
   const hold = s.adt.hold((r) => isUnlockOf('A')(r.url));
-  void s.callTool('LockedUpdate', { id: 'A' });
-  await hold.arrived;
-  s.processLike.emit('SIGTERM');
-  await until(() => s.adt.logoffs() === 1);
-  await turns(20);
-  expect(s.exits).toEqual([]);
-  s.processLike.emit('uncaughtException', new TypeError('first'));
-  s.processLike.emit('uncaughtException', new TypeError('second'));
-  await turns(20);
-  // Not forced: the sequence still waits for its session writes.
-  expect(s.exits).toEqual([]);
-  written.resolve();
-  expect(await s.exited).toBe(1);
-  await turns(20);
-  expect(s.exits).toEqual([1]);
-  // The logoff the shutdown wrote is joined, never sent again.
-  expect(s.adt.logoffs()).toBe(1);
-  expect(failedLine(s.shutdownLines)).toHaveLength(1);
-  expect(s.shutdownLines.some((l) => l.includes('at the forced close'))).toBe(
-    false,
-  );
-  hold.release();
-  flush.mockRestore();
+  // Released whatever a check says: held writes and a held request keep
+  // the stand's close, and with it the file's process, waiting.
+  try {
+    void s.callTool('LockedUpdate', { id: 'A' });
+    await hold.arrived;
+    s.processLike.emit('SIGTERM');
+    await until(() => s.adt.logoffs() === 1);
+    await turns(20);
+    assert.deepStrictEqual(s.exits, []);
+    s.processLike.emit('uncaughtException', new TypeError('first'));
+    s.processLike.emit('uncaughtException', new TypeError('second'));
+    await turns(20);
+    // Not forced: the sequence still waits for its session writes.
+    assert.deepStrictEqual(s.exits, []);
+    written.resolve();
+    assert.equal(await s.exited, 1);
+    await turns(20);
+    assert.deepStrictEqual(s.exits, [1]);
+    // The logoff the shutdown wrote is joined, never sent again.
+    assert.equal(s.adt.logoffs(), 1);
+    assert.equal(failedLine(s.shutdownLines).length, 1);
+    assert.equal(
+      s.shutdownLines.some((l) => l.includes('at the forced close')),
+      false,
+    );
+  } finally {
+    written.resolve();
+    hold.release();
+    flush.mock.restore();
+  }
 });

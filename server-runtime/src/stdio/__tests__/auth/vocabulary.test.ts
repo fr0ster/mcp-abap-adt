@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
 import { GRANTS, vetMeans } from '../../auth/vocabulary';
@@ -18,27 +21,29 @@ function expectNamed(
   field: string,
   secret?: string,
 ) {
-  expect(err).toBeInstanceOf(DestinationConfigError);
-  expect(err.missingFields).toEqual([field]);
+  assert.ok(err instanceof DestinationConfigError);
+  assert.deepStrictEqual(err.missingFields, [field]);
   if (secret) {
-    expect(err.message).not.toContain(secret);
+    assert.ok(!err.message.includes(secret));
     for (const value of Object.values(err)) {
-      expect(JSON.stringify(value)).not.toContain(secret);
+      assert.ok(!JSON.stringify(value).includes(secret));
     }
   }
 }
 
 describe('vetMeans', () => {
-  it.each([
+  for (const [_n, means] of [
     ['null means', null],
     ['absent', {}],
     ['empty', { authType: '' }],
-  ])('refuses an authType that is %s, naming authType', (_n, means) => {
-    expectNamed(
-      refusal(() => vetMeans('dest', means as never)),
-      'authType',
-    );
-  });
+  ]) {
+    it(format('refuses an authType that is %s, naming authType', _n), () => {
+      expectNamed(
+        refusal(() => vetMeans('dest', means as never)),
+        'authType',
+      );
+    });
+  }
 
   it('refuses a made-up authType without quoting it', () => {
     expectNamed(
@@ -48,19 +53,21 @@ describe('vetMeans', () => {
     );
   });
 
-  it.each([
+  for (const [_n, extra] of [
     ['absent', {}],
     ['empty', { grantType: '' }],
     ['made up', { grantType: MADE_UP }],
-  ])(
-    'refuses jwt with a grantType that is %s, naming grantType',
-    (_n, extra) => {
-      const err = refusal(() =>
-        vetMeans('dest', { authType: 'jwt', ...extra } as never),
-      );
-      expectNamed(err, 'grantType', MADE_UP);
-    },
-  );
+  ] satisfies [string, Record<string, string>][]) {
+    it(
+      format('refuses jwt with a grantType that is %s, naming grantType', _n),
+      () => {
+        const err = refusal(() =>
+          vetMeans('dest', { authType: 'jwt', ...extra } as never),
+        );
+        expectNamed(err, 'grantType', MADE_UP);
+      },
+    );
+  }
 
   it('refuses saml without a grantType', () => {
     expectNamed(
@@ -70,40 +77,50 @@ describe('vetMeans', () => {
   });
 
   it('accepts jwt and saml with a known grant', () => {
-    expect(
+    assert.deepStrictEqual(
       vetMeans('dest', { authType: 'jwt', grantType: 'authorization_code' }),
-    ).toEqual({ authType: 'jwt', grantType: 'authorization_code' });
-    expect(
+      { authType: 'jwt', grantType: 'authorization_code' },
+    );
+    assert.deepStrictEqual(
       vetMeans('dest', { authType: 'saml', grantType: 'saml2_pure' }),
-    ).toEqual({ authType: 'saml', grantType: 'saml2_pure' });
+      { authType: 'saml', grantType: 'saml2_pure' },
+    );
   });
 
-  it.each(['basic', 'snc'] as const)(
-    '%s is vetted without a stray grantType',
-    (authType) => {
-      expect(vetMeans('dest', { authType, grantType: 'passcode' })).toEqual({
-        authType,
-      });
-    },
-  );
+  for (const authType of ['basic', 'snc'] as const) {
+    it(format('%s is vetted without a stray grantType', authType), () => {
+      assert.deepStrictEqual(
+        vetMeans('dest', { authType, grantType: 'passcode' }),
+        {
+          authType,
+        },
+      );
+    });
+  }
 });
 
 describe('known but unsupported types', () => {
-  it.each(['certificate', 'kerberos'] as const)(
-    '%s is vetted (so the server can name it), without a grant',
-    (authType) => {
-      expect(
-        vetMeans('dest', { authType, grantType: 'passcode' } as never),
-      ).toEqual({ authType });
-    },
-  );
+  for (const authType of ['certificate', 'kerberos'] as const) {
+    it(
+      format(
+        '%s is vetted (so the server can name it), without a grant',
+        authType,
+      ),
+      () => {
+        assert.deepStrictEqual(
+          vetMeans('dest', { authType, grantType: 'passcode' } as never),
+          { authType },
+        );
+      },
+    );
+  }
 });
 
 describe('GRANTS', () => {
   it('lists every DestinationGrant (compile-time: test:check fails on a missing member)', () => {
     type Missing = Exclude<DestinationGrant, (typeof GRANTS)[number]>;
     const none: [Missing] extends [never] ? true : never = true;
-    expect(none).toBe(true);
-    expect(new Set(GRANTS).size).toBe(GRANTS.length);
+    assert.equal(none, true);
+    assert.equal(new Set(GRANTS).size, GRANTS.length);
   });
 });

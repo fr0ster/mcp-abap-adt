@@ -4,16 +4,20 @@
  * `exports` as a consumer's Node resolves it (after a build), exactly its
  * public names, and the texts it answers the ones `tools/list` carries.
  */
+
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import {
   TOOL_SEARCH_META_KEY,
   toolSearchText,
   toolSearchTexts,
 } from '@mcp-abap-adt/lib/tool-search';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const root = path.join(__dirname, '..', '..', '..', '..');
+const root = repositoryRoot(__dirname);
 const PUBLIC = ['TOOL_SEARCH_META_KEY', 'toolSearchText', 'toolSearchTexts'];
 
 describe('@mcp-abap-adt/lib/tool-search through the package exports', () => {
@@ -36,30 +40,32 @@ describe('@mcp-abap-adt/lib/tool-search through the package exports', () => {
         cwd: root,
         encoding: 'utf8',
       });
-      expect(run.status).toBe(0);
+      assert.equal(run.status, 0);
       const { resolved, names, size, ddl } = JSON.parse(run.stdout);
-      expect(resolved).toBe(
+      assert.equal(
+        resolved,
         path.join(root, 'dist', 'lib', 'toolSearch', 'index.js'),
       );
-      expect(
+      assert.equal(
         fs.existsSync(
           path.join(root, 'dist', 'lib', 'toolSearch', 'index.d.ts'),
         ),
-      ).toBe(true);
-      expect(names).toEqual(PUBLIC);
-      expect(size).toBe(toolSearchTexts().size);
-      expect(ddl).toEqual(toolSearchText('GetDdl'));
+        true,
+      );
+      assert.deepStrictEqual(names, PUBLIC);
+      assert.equal(size, toolSearchTexts().size);
+      assert.deepStrictEqual(ddl, toolSearchText('GetDdl'));
     },
   );
 });
 
 describe('the search texts', () => {
   it('answers a tool by name, and none for a name no tool has', () => {
-    expect(TOOL_SEARCH_META_KEY).toBe('mcp-abap-adt/search');
+    assert.equal(TOOL_SEARCH_META_KEY, 'mcp-abap-adt/search');
     const ddl = toolSearchText('GetDdl');
-    expect(ddl?.keywords).toContain('CDS view');
-    expect(ddl?.semantic).toContain('CDS view');
-    expect(toolSearchText('NoSuchTool')).toBeUndefined();
-    expect(toolSearchTexts().get('GetDdl')).toBe(ddl);
+    assert.ok(ddl?.keywords.includes('CDS view'));
+    assert.ok(ddl?.semantic.includes('CDS view'));
+    assert.equal(toolSearchText('NoSuchTool'), undefined);
+    assert.equal(toolSearchTexts().get('GetDdl'), ddl);
   });
 });

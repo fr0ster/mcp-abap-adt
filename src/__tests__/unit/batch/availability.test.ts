@@ -10,6 +10,9 @@
  *
  * Real `AdtBatchConnection` (adt-clients 34.x); only the connection is a fake.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -18,6 +21,7 @@ import type {
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { runPhase, withSequentialFallback } from '../../../lib/batch/phases';
+import { assertMatchObject, rejectionOf } from '../../helpers/assertions';
 import {
   type EnvelopeAnswer,
   envelopeConnection,
@@ -101,17 +105,17 @@ describe('batch availability', () => {
       throw statusError(404, 'Not Found');
     });
 
-    expect(await withinTurns(toolRead(s.context))).toEqual(SEQUENTIAL);
-    expect(s.fake.envelopes).toHaveLength(1);
-    expect(s.availability.available()).toBe(false);
+    assert.deepStrictEqual(await withinTurns(toolRead(s.context)), SEQUENTIAL);
+    assert.equal(s.fake.envelopes.length, 1);
+    assert.equal(s.availability.available(), false);
 
-    expect(await withinTurns(toolRead(s.context))).toEqual(SEQUENTIAL);
+    assert.deepStrictEqual(await withinTurns(toolRead(s.context)), SEQUENTIAL);
     // No envelope for the later call: only its direct reads.
-    expect(s.fake.envelopes).toHaveLength(1);
-    expect(s.fake.directs.map((r) => r.url)).toEqual([
-      ...ITEMS.map(urlOf),
-      ...ITEMS.map(urlOf),
-    ]);
+    assert.equal(s.fake.envelopes.length, 1);
+    assert.deepStrictEqual(
+      s.fake.directs.map((r) => r.url),
+      [...ITEMS.map(urlOf), ...ITEMS.map(urlOf)],
+    );
   });
 
   it('an outer 404 a connection resolves without a multipart body marks it (via the forwarding connection under the batch)', async () => {
@@ -125,12 +129,12 @@ describe('batch availability', () => {
         }) as IAdtWireResponse,
     );
 
-    expect(await withinTurns(toolRead(s.context))).toEqual(SEQUENTIAL);
-    expect(s.fake.envelopes).toHaveLength(1);
-    expect(s.availability.available()).toBe(false);
+    assert.deepStrictEqual(await withinTurns(toolRead(s.context)), SEQUENTIAL);
+    assert.equal(s.fake.envelopes.length, 1);
+    assert.equal(s.availability.available(), false);
 
-    expect(await withinTurns(toolRead(s.context))).toEqual(SEQUENTIAL);
-    expect(s.fake.envelopes).toHaveLength(1);
+    assert.deepStrictEqual(await withinTurns(toolRead(s.context)), SEQUENTIAL);
+    assert.equal(s.fake.envelopes.length, 1);
   });
 
   it("an inner part's 404 leaves batching on", async () => {
@@ -142,15 +146,15 @@ describe('batch availability', () => {
       ),
     );
 
-    expect(await withinTurns(toolRead(s.context))).toEqual({
+    assert.deepStrictEqual(await withinTurns(toolRead(s.context)), {
       ran: 'batched',
       values: ['failed', urlOf('ITEM_B')],
     });
-    expect(s.availability.available()).toBe(true);
+    assert.equal(s.availability.available(), true);
 
     await withinTurns(toolRead(s.context));
-    expect(s.fake.envelopes).toHaveLength(2);
-    expect(s.fake.directs).toHaveLength(0);
+    assert.equal(s.fake.envelopes.length, 2);
+    assert.equal(s.fake.directs.length, 0);
   });
 
   it('any other envelope failure is not a verdict', async () => {
@@ -172,14 +176,14 @@ describe('batch availability', () => {
     });
 
     for (let call = 1; call <= 3; call++) {
-      expect(await withinTurns(toolRead(s.context))).toEqual({
+      assert.deepStrictEqual(await withinTurns(toolRead(s.context)), {
         ran: 'batched',
         values: ['failed', 'failed'],
       });
-      expect(s.availability.available()).toBe(true);
-      expect(s.fake.envelopes).toHaveLength(call);
+      assert.equal(s.availability.available(), true);
+      assert.equal(s.fake.envelopes.length, call);
     }
-    expect(s.fake.directs).toHaveLength(0);
+    assert.equal(s.fake.directs.length, 0);
   });
 
   describe('the first outer status decides', () => {
@@ -197,19 +201,19 @@ describe('batch availability', () => {
         throw statusError(404, 'Not Found');
       });
 
-      expect((await withinTurns(toolRead(s.context))).ran).toBe('batched');
-      expect(s.availability.available()).toBe(true);
+      assert.equal((await withinTurns(toolRead(s.context))).ran, 'batched');
+      assert.equal(s.availability.available(), true);
 
-      expect(await withinTurns(toolRead(s.context))).toEqual({
+      assert.deepStrictEqual(await withinTurns(toolRead(s.context)), {
         ran: 'batched',
         values: ['failed', 'failed'],
       });
-      expect(s.availability.available()).toBe(true);
-      expect(s.fake.directs).toHaveLength(0);
+      assert.equal(s.availability.available(), true);
+      assert.equal(s.fake.directs.length, 0);
 
       // Still batching: the next call sends its envelope.
       await withinTurns(toolRead(s.context));
-      expect(s.fake.envelopes).toHaveLength(3);
+      assert.equal(s.fake.envelopes.length, 3);
     });
 
     it('404 first: a later 2xx envelope does not turn batching back on', async () => {
@@ -224,16 +228,23 @@ describe('batch availability', () => {
         }))(parts, undefined as never);
       });
 
-      await expect(
-        withinTurns(runPhase(s.context, ITEMS, get)),
-      ).rejects.toMatchObject({ response: { status: 404 } });
-      expect(s.availability.available()).toBe(false);
+      assertMatchObject(
+        await rejectionOf(withinTurns(runPhase(s.context, ITEMS, get))),
+        { response: { status: 404 } },
+      );
+      assert.equal(s.availability.available(), false);
 
       const later = await withinTurns(runPhase(s.context, ITEMS, get));
-      expect(later.every((r) => r.ok)).toBe(true);
-      expect(s.availability.available()).toBe(false);
-      expect(await withinTurns(toolRead(s.context))).toEqual(SEQUENTIAL);
-      expect(s.fake.envelopes).toHaveLength(2);
+      assert.equal(
+        later.every((r) => r.ok),
+        true,
+      );
+      assert.equal(s.availability.available(), false);
+      assert.deepStrictEqual(
+        await withinTurns(toolRead(s.context)),
+        SEQUENTIAL,
+      );
+      assert.equal(s.fake.envelopes.length, 2);
     });
 
     it('a status that is neither decides nothing; the first 2xx or 404 after it does', () => {
@@ -241,13 +252,13 @@ describe('batch availability', () => {
       served.noteOuterStatus(500);
       served.noteOuterStatus(200);
       served.noteOuterStatus(404);
-      expect(served.available()).toBe(true);
+      assert.equal(served.available(), true);
 
       const absent = createBatchAvailability();
       absent.noteOuterStatus(503);
       absent.noteOuterStatus(404);
       absent.noteOuterStatus(204);
-      expect(absent.available()).toBe(false);
+      assert.equal(absent.available(), false);
     });
   });
 });

@@ -1,5 +1,8 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { parseCheckRunResponse } from '../../lib/checkRunParser';
 import { normalizeCheckResponse } from '../../lib/normalizeCheckResponse';
+import { assertThrows } from '../helpers/assertions';
 
 describe('normalizeCheckResponse', () => {
   it('should add object_name and strip session fields from success response', () => {
@@ -30,13 +33,13 @@ describe('normalizeCheckResponse', () => {
 
     const result = normalizeCheckResponse(lowLevelResult, 'ZCL_TEST');
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const data = JSON.parse(result.content[0].text);
-    expect(data.object_name).toBe('ZCL_TEST');
-    expect(data.class_name).toBe('ZCL_TEST');
-    expect(data.success).toBe(true);
-    expect(data.check_result).toBeDefined();
-    expect(data.message).toBeDefined();
+    assert.equal(data.object_name, 'ZCL_TEST');
+    assert.equal(data.class_name, 'ZCL_TEST');
+    assert.equal(data.success, true);
+    assert.notEqual(data.check_result, undefined);
+    assert.notEqual(data.message, undefined);
   });
 
   it('should pass through error responses unchanged', () => {
@@ -47,7 +50,7 @@ describe('normalizeCheckResponse', () => {
 
     const result = normalizeCheckResponse(errorResult, 'ZCL_TEST');
 
-    expect(result).toBe(errorResult);
+    assert.equal(result, errorResult);
   });
 
   it('should pass through non-JSON responses unchanged', () => {
@@ -58,7 +61,7 @@ describe('normalizeCheckResponse', () => {
 
     const result = normalizeCheckResponse(nonJsonResult, 'ZCL_TEST');
 
-    expect(result).toBe(nonJsonResult);
+    assert.equal(result, nonJsonResult);
   });
 });
 
@@ -90,12 +93,12 @@ describe('parseCheckRunResponse', () => {
 
     const result = parseCheckRunResponse(axios(xml));
 
-    expect(result.success).toBe(true);
-    expect(result.status).toBe('processed');
-    expect(result.message).toBe('Object ZBP_MCP_SHR_I_ROOT has been checked');
-    expect(result.errors).toEqual([]);
-    expect(result.has_errors).toBe(false);
-    expect(result.total_messages).toBe(0);
+    assert.equal(result.success, true);
+    assert.equal(result.status, 'processed');
+    assert.equal(result.message, 'Object ZBP_MCP_SHR_I_ROOT has been checked');
+    assert.deepStrictEqual(result.errors, []);
+    assert.equal(result.has_errors, false);
+    assert.equal(result.total_messages, 0);
   });
 
   it('reads a syntax-error report as a failure with the error bucketed — tests/fixtures/adt/refusal-syntax-check--01-checkrun.body.xml', () => {
@@ -104,14 +107,15 @@ describe('parseCheckRunResponse', () => {
 
     const result = parseCheckRunResponse(axios(xml));
 
-    expect(result.success).toBe(false);
-    expect(result.has_errors).toBe(true);
-    expect(result.errors).toHaveLength(1);
-    expect(result.errors[0].type).toBe('E');
-    expect(result.errors[0].text).toBe(
+    assert.equal(result.success, false);
+    assert.equal(result.has_errors, true);
+    assert.equal(result.errors.length, 1);
+    assert.equal(result.errors[0].type, 'E');
+    assert.equal(
+      result.errors[0].text,
       'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
     );
-    expect(result.total_messages).toBe(1);
+    assert.equal(result.total_messages, 1);
   });
 });
 
@@ -123,23 +127,25 @@ describe('parseCheckRunResponse — a document that cannot be read', () => {
   });
 
   it('words the failure with what was thrown, written out', () => {
-    expect(parseCheckRunResponse(throwing(new Error('boom'))).message).toBe(
+    assert.equal(
+      parseCheckRunResponse(throwing(new Error('boom'))).message,
       'Failed to parse check run response: Error: boom',
     );
-    expect(parseCheckRunResponse(throwing('plain')).message).toBe(
+    assert.equal(
+      parseCheckRunResponse(throwing('plain')).message,
       'Failed to parse check run response: plain',
     );
-    expect(parseCheckRunResponse(throwing(42)).message).toBe(
+    assert.equal(
+      parseCheckRunResponse(throwing(42)).message,
       'Failed to parse check run response: 42',
     );
-    expect(parseCheckRunResponse(throwing(null)).message).toBe(
+    assert.equal(
+      parseCheckRunResponse(throwing(null)).message,
       'Failed to parse check run response: null',
     );
   });
 
   it('cannot word a thrown Symbol: the template throws TypeError', () => {
-    expect(() => parseCheckRunResponse(throwing(Symbol('s')))).toThrow(
-      TypeError,
-    );
+    assertThrows(() => parseCheckRunResponse(throwing(Symbol('s'))), TypeError);
   });
 });

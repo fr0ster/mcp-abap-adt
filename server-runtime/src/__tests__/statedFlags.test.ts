@@ -4,9 +4,12 @@
  * `--flag false` (two words) is refused suggesting `--flag=false`.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   type ParameterTable,
   readStartupConfig,
@@ -63,6 +66,19 @@ const LAUNCHERS: readonly Launcher[] = [
 ];
 
 /** The start's lines and exits, for `argv` and an optional config file. */
+/**
+ * The value at `keyPath` (dot-separated) under `value`, each step present —
+ * a walk of the path, one key at a time.
+ */
+function propertyAt(value: unknown, keyPath: string): unknown {
+  let node = value;
+  for (const step of keyPath.split('.')) {
+    assert.ok(step in Object(node), `${keyPath}: no ${step}`);
+    node = Reflect.get(Object(node), step);
+  }
+  return node;
+}
+
 function startWith(
   launcher: Launcher,
   argv: readonly string[],
@@ -92,43 +108,50 @@ function startWith(
   }
 }
 
-describe.each(LAUNCHERS)('$name: a flag and its value', (launcher) => {
-  it.each(launcher.flags)(
-    '%s false is refused, suggesting its = form',
-    (flag) => {
-      const { lines, exits, config } = startWith(launcher, [flag, 'false']);
-      expect(config).toBeUndefined();
-      expect(exits).toEqual([1]);
-      expect(lines).toEqual([
-        `[MCP] ${flag} false: a flag's value follows "=" — write ${flag}=false`,
-      ]);
-    },
-  );
+for (const launcher of LAUNCHERS) {
+  describe(`${launcher.name}: a flag and its value`, () => {
+    for (const flag of launcher.flags) {
+      it(format('%s false is refused, suggesting its = form', flag), () => {
+        const { lines, exits, config } = startWith(launcher, [flag, 'false']);
+        assert.equal(config, undefined);
+        assert.deepStrictEqual(exits, [1]);
+        assert.deepStrictEqual(lines, [
+          `[MCP] ${flag} false: a flag's value follows "=" — write ${flag}=false`,
+        ]);
+      });
+    }
 
-  it.each(launcher.flags)('%s true is refused the same way', (flag) => {
-    const { lines, exits } = startWith(launcher, [flag, 'TRUE']);
-    expect(exits).toEqual([1]);
-    expect(lines).toEqual([
-      `[MCP] ${flag} TRUE: a flag's value follows "=" — write ${flag}=true`,
-    ]);
+    for (const flag of launcher.flags) {
+      it(format('%s true is refused the same way', flag), () => {
+        const { lines, exits } = startWith(launcher, [flag, 'TRUE']);
+        assert.deepStrictEqual(exits, [1]);
+        assert.deepStrictEqual(lines, [
+          `[MCP] ${flag} TRUE: a flag's value follows "=" — write ${flag}=true`,
+        ]);
+      });
+    }
+
+    for (const flag of launcher.flags) {
+      it(
+        format('%s: =false is false; =true and a bare flag are true', flag),
+        () => {
+          const row = launcher.table.rows.find((each) => each.cli === flag);
+          const key = row?.key ?? '';
+          // The DNS-rebinding flag is read only beside a list (F1).
+          const besides = flag.endsWith('-enable-dns-protection')
+            ? [
+                `${flag.slice(0, -'enable-dns-protection'.length)}allowed-hosts=h:1`,
+              ]
+            : [];
+          const on = (args: readonly string[]) =>
+            startWith(launcher, [...args, ...besides]).config;
+          const off = startWith(launcher, [`${flag}=false`]).config;
+          assert.notEqual(off, undefined);
+          assert.equal(propertyAt(off, key), false);
+          assert.equal(propertyAt(on([`${flag}=true`]), key), true);
+          assert.equal(propertyAt(on([flag]), key), true);
+        },
+      );
+    }
   });
-
-  it.each(launcher.flags)(
-    '%s: =false is false; =true and a bare flag are true',
-    (flag) => {
-      const row = launcher.table.rows.find((each) => each.cli === flag);
-      const key = row?.key ?? '';
-      // The DNS-rebinding flag is read only beside a list (F1).
-      const besides = flag.endsWith('-enable-dns-protection')
-        ? [`${flag.slice(0, -'enable-dns-protection'.length)}allowed-hosts=h:1`]
-        : [];
-      const on = (args: readonly string[]) =>
-        startWith(launcher, [...args, ...besides]).config;
-      const off = startWith(launcher, [`${flag}=false`]).config;
-      expect(off).toBeDefined();
-      expect(off).toHaveProperty(key, false);
-      expect(on([`${flag}=true`])).toHaveProperty(key, true);
-      expect(on([flag])).toHaveProperty(key, true);
-    },
-  );
-});
+}

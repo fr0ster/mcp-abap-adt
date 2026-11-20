@@ -185,9 +185,9 @@ const laterPatch = (version: string): string => {
  * context, the runtimes loaded and the package (`name@version`) each
  * specifier resolved into.
  *
- * Everything is resolved in the child: inside Jest, `createRequire` answers
- * through the `moduleNameMapper`, which maps the release's names to this
- * checkout's sources. `MATRIX_RUNTIME` names the runtime's directory mark
+ * Everything is resolved in the child: inside a test file, `createRequire`
+ * answers through the resolve hook (`helpers/resolvePreload.ts`), which maps
+ * the release's names to this checkout's compiled sources. `MATRIX_RUNTIME` names the runtime's directory mark
  * (the 19.1.0 measurement used `/@mcp-abap-adt/core/`).
  */
 const CHECKER = `'use strict';

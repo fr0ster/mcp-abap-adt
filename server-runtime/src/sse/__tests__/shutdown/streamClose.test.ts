@@ -9,7 +9,10 @@
  * logon, nothing left owned.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import { isLogoff } from '../../../../../src/__tests__/helpers/adtStandIn';
+import { assertMatchObject } from '../../../../../src/__tests__/helpers/assertions';
 import {
   isLockOf,
   isUnlockOf,
@@ -22,42 +25,40 @@ import { activeTools } from '../../../../../src/lib/activeTools';
 import { ownedConnections } from '../../../../../src/lib/ownedConnections';
 import { type SseStand, sseStand, turns, until } from './harness';
 
-jest.setTimeout(30_000);
-
 let s: SseStand;
-let errorSpy: jest.SpyInstance;
-let stderrSpy: jest.SpyInstance | undefined;
+let errorSpy: Mock<typeof console.error>;
+let stderrSpy: Mock<typeof process.stderr.write> | undefined;
 
 beforeEach(async () => {
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
   s = await sseStand();
 });
 
 afterEach(async () => {
   await s.close();
-  errorSpy.mockRestore();
-  stderrSpy?.mockRestore();
+  errorSpy.mock.restore();
+  stderrSpy?.mock.restore();
   stderrSpy = undefined;
 });
 
-const loggedOff = () =>
+const loggedOff = (): (string | undefined)[] =>
   s.standIn.requests.filter((r) => isLogoff(r.url)).map((r) => r.session);
 const sessionOf = (match: (url: string) => boolean) =>
   s.standIn.requests.find((r) => match(r.url))?.session;
 
 it('the stream closes under a held update: connector and state logged off at once, the queued call never sends, no UNLOCK; another stream untouched', async () => {
   const other = await s.open();
-  expect(await other.call('ProbeAdt', { id: 'other' }, 1)).toBe(202);
+  assert.equal(await other.call('ProbeAdt', { id: 'other' }, 1), 202);
   await other.answer(1);
   const otherSession = sessionOf((url) => url.includes('/probe/other'));
 
   const connection = await s.open();
-  expect(await connection.call('HoldState', { id: 'S' }, 1)).toBe(202);
+  assert.equal(await connection.call('HoldState', { id: 'S' }, 1), 202);
   await connection.answer(1);
   const hold = s.standIn.hold((r) => isUpdateOf('A')(r.url));
-  expect(await connection.call('LockedUpdate', { id: 'A' }, 2)).toBe(202);
+  assert.equal(await connection.call('LockedUpdate', { id: 'A' }, 2), 202);
   await hold.arrived;
-  expect(await connection.call('LockedUpdate', { id: 'B' }, 3)).toBe(202);
+  assert.equal(await connection.call('LockedUpdate', { id: 'B' }, 3), 202);
   await turns(10);
   const toolSession = sessionOf(isUpdateOf('A'));
   const stateSession = sessionOf((url) => url.includes('/debugger/listen/S'));
@@ -69,66 +70,74 @@ it('the stream closes under a held update: connector and state logged off at onc
       loggedOff().includes(toolSession ?? '') &&
       loggedOff().includes(stateSession ?? ''),
   );
-  expect(activeTools().map((t) => t.name)).toContain('LockedUpdate');
+  assert.ok(
+    activeTools()
+      .map((t) => t.name)
+      .includes('LockedUpdate'),
+  );
 
   hold.release();
   await until(() => activeTools().length === 0);
   await turns(20);
-  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
-  expect(s.indexOf(isLockOf('B'))).toBe(-1);
+  assert.equal(s.indexOf(isUnlockOf('A')), -1);
+  assert.equal(s.indexOf(isLockOf('B')), -1);
   // The stream's close and its transport's close are one close: one logoff
   // per connection.
-  expect(loggedOff().filter((x) => x === toolSession)).toHaveLength(1);
-  expect(loggedOff().filter((x) => x === stateSession)).toHaveLength(1);
+  assert.equal(loggedOff().filter((x) => x === toolSession).length, 1);
+  assert.equal(loggedOff().filter((x) => x === stateSession).length, 1);
   // The other stream's instance keeps its session and still answers.
-  expect(loggedOff()).not.toContain(otherSession);
-  expect(await other.call('ProbeAdt', { id: 'other2' }, 2)).toBe(202);
-  expect(await other.answer(2)).toMatchObject({ isError: false });
+  assert.ok(!loggedOff().includes(otherSession));
+  assert.equal(await other.call('ProbeAdt', { id: 'other2' }, 2), 202);
+  assertMatchObject(await other.answer(2), { isError: false });
 });
 
 it("the stream closes under a held long read: the read's own connection is logged off at once", async () => {
   const connection = await s.open();
   const hold = s.standIn.hold((r) => r.url.startsWith(longReadUrl('L')));
-  expect(await connection.call('LongRead', { id: 'L' }, 1)).toBe(202);
+  assert.equal(await connection.call('LongRead', { id: 'L' }, 1), 202);
   await hold.arrived;
   const readSession = sessionOf((url) => url.startsWith(longReadUrl('L')));
 
   connection.close();
   await until(() => loggedOff().includes(readSession ?? ''));
-  expect(activeTools().map((t) => t.name)).toEqual(['LongRead']);
+  assert.deepStrictEqual(
+    activeTools().map((t) => t.name),
+    ['LongRead'],
+  );
   // Every connection of the instance: its connector too.
   await until(() => s.standIn.logoffs() === s.connects());
   hold.release();
   await until(() => activeTools().length === 0);
 });
 
-it("SAP answers the tool's main-connection request after the close: its next step opens no fresh connection — no second logon, nothing owned", async () => {
+it("SAP answers the tool's main-connection request after the close: its next step opens no fresh connection — no second logon, nothing owned", async (t) => {
   const connection = await s.open();
   const hold = s.standIn.hold((r) => r.url.startsWith(mainReadUrl('M')));
-  expect(await connection.call('MainThenFresh', { id: 'M' }, 1)).toBe(202);
+  assert.equal(await connection.call('MainThenFresh', { id: 'M' }, 1), 202);
   await hold.arrived;
-  expect(s.connects()).toBe(1);
+  assert.equal(s.connects(), 1);
 
   const written: string[] = [];
-  stderrSpy = jest
-    .spyOn(process.stderr, 'write')
-    .mockImplementation((chunk: unknown) => {
-      written.push(String(chunk));
-      return true;
-    });
+  stderrSpy = t.mock.method(process.stderr, 'write', (chunk: unknown) => {
+    written.push(String(chunk));
+    return true;
+  });
   connection.close();
   await until(() => s.standIn.logoffs() === 1);
   // SAP answers the held request: the tool goes on to its fresh connection.
   hold.release();
   await until(() => activeTools().length === 0);
   await turns(20);
-  expect(s.connects()).toBe(1);
-  expect(s.indexOf((url) => url.startsWith(listenUrl('M')))).toBe(-1);
-  expect(ownedConnections()).toEqual([]);
-  expect(s.standIn.logoffs()).toBe(s.connects());
+  assert.equal(s.connects(), 1);
+  assert.equal(
+    s.indexOf((url) => url.startsWith(listenUrl('M'))),
+    -1,
+  );
+  assert.deepStrictEqual(ownedConnections(), []);
+  assert.equal(s.standIn.logoffs(), s.connects());
   // The server keeps running: the refusal is the instance's own, neither an
   // authentication failure nor a shutdown.
   const lines = written.join('');
-  expect(lines).toContain('[MCP] instance_closed');
-  expect(lines).not.toContain('authentication_failed');
+  assert.ok(lines.includes('[MCP] instance_closed'));
+  assert.ok(!lines.includes('authentication_failed'));
 });

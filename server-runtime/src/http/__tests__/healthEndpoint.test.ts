@@ -1,5 +1,7 @@
+import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { after, before, describe, it } from 'node:test';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
@@ -26,7 +28,7 @@ describe('Health endpoint — StreamableHttpServer', () => {
   let httpServer: Server;
   let baseUrl: string;
 
-  beforeAll(async () => {
+  before(async () => {
     const mcpServer = new StreamableHttpServer(emptyRegistry, {
       version: '1.2.3',
     });
@@ -35,7 +37,7 @@ describe('Health endpoint — StreamableHttpServer', () => {
     baseUrl = result.baseUrl;
   });
 
-  afterAll(
+  after(
     () =>
       new Promise<void>((resolve) => {
         httpServer.close(() => resolve());
@@ -44,17 +46,17 @@ describe('Health endpoint — StreamableHttpServer', () => {
 
   it('returns 200 with status ok', async () => {
     const res = await fetch(`${baseUrl}/mcp/health`);
-    expect(res.status).toBe(200);
+    assert.equal(res.status, 200);
 
     const body = (await res.json()) as any;
-    expect(body.status).toBe('ok');
-    expect(body.transport).toBe('http');
-    expect(body.version).toBe('1.2.3');
-    expect(typeof body.uptime).toBe('number');
+    assert.equal(body.status, 'ok');
+    assert.equal(body.transport, 'http');
+    assert.equal(body.version, '1.2.3');
+    assert.equal(typeof body.uptime, 'number');
   });
 
   it('does not require special headers', async () => {
     const res = await fetch(`${baseUrl}/mcp/health`);
-    expect(res.status).toBe(200);
+    assert.equal(res.status, 200);
   });
 });

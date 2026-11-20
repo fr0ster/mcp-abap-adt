@@ -8,7 +8,7 @@
  * an example leaves to the embedder (its pool, its web framework, its user)
  * is declared here.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 import { AsyncLocalStorage } from 'node:async_hooks';

@@ -7,7 +7,11 @@
       "name": "MCP Server - SSE",
       "program": "${workspaceFolder}/sse/bin/mcp-abap-adt-sse.js",
       "args": [],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js", "${workspaceFolder}/sse/dist/**/*.js", "${workspaceFolder}/server-runtime/dist/**/*.js"],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js",
+        "${workspaceFolder}/sse/dist/**/*.js",
+        "${workspaceFolder}/server-runtime/dist/**/*.js"
+      ],
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "console": "internalConsole",
@@ -22,7 +26,11 @@
       "name": "MCP Server - StreamableHTTP",
       "program": "${workspaceFolder}/http/bin/mcp-abap-adt-http.js",
       "args": [],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js", "${workspaceFolder}/http/dist/**/*.js", "${workspaceFolder}/server-runtime/dist/**/*.js"],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js",
+        "${workspaceFolder}/http/dist/**/*.js",
+        "${workspaceFolder}/server-runtime/dist/**/*.js"
+      ],
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "console": "internalConsole",
@@ -37,7 +45,11 @@
       "name": "MCP Server - STDIO",
       "program": "${workspaceFolder}/server/bin/mcp-abap-adt.js",
       "args": ["--env-path", "${workspaceFolder}/.env"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js", "${workspaceFolder}/server/dist/**/*.js", "${workspaceFolder}/server-runtime/dist/**/*.js"],
+      "outFiles": [
+        "${workspaceFolder}/dist/**/*.js",
+        "${workspaceFolder}/server/dist/**/*.js",
+        "${workspaceFolder}/server-runtime/dist/**/*.js"
+      ],
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "console": "internalConsole",
@@ -49,9 +61,9 @@
       "type": "node",
       "request": "launch",
       "name": "Run Tests",
-      "program": "${workspaceFolder}/node_modules/.bin/jest",
-      "args": ["--runInBand"],
-      "outFiles": ["${workspaceFolder}/dist/**/*.js"],
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["test", "--", "--concurrency", "1", "${file}"],
+      "outFiles": ["${workspaceFolder}/.test-build/tree/**/*.js"],
       "sourceMaps": true,
       "skipFiles": ["<node_internals>/**"],
       "console": "internalConsole",

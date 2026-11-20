@@ -5,9 +5,9 @@
  * - `wait: false` sends the start alone and answers the run id;
  * - `wait: true`, and the default, read the status at once (no long
  *   polling), and long-poll (`?withLongPolling=true`) only while SAP answers
- *   `RUNNING`: `FINISHED` reads the result, `NOT_STARTED` is answered with
- *   the run id, and a status with no `aunit:progress` is a failure carrying
- *   SAP's document;
+ *   `RUNNING` or answers the first read `NOT_STARTED`: `FINISHED` reads the
+ *   result, a long-polled `NOT_STARTED` is answered with the run id, and a
+ *   status with no `aunit:progress` is a failure carrying SAP's document;
  * - `wait` with `runner: 'sync'` is refused with nothing sent, and a value
  *   that is not a boolean is refused with nothing sent;
  * - the readers (`GetUnitTestResult`, the library's `GetUnitTest`,
@@ -19,6 +19,9 @@
  * one under test, so a further status read would be answered and seen.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest';
 import { handleGetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult';
 import { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTest';
@@ -52,6 +55,7 @@ import {
 } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { defineTool } from '../../lib/handlers/interfaces';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertNoProperty, assertRejects } from '../helpers/assertions';
 import { declaredRequired, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
@@ -188,95 +192,103 @@ const resultReads = (requests: readonly RecordedRequest[]) =>
   requests.filter((r) => r.url.includes('/abapunit/results/'));
 const answerOf = (result: Answer) => JSON.parse(result.content[0]?.text ?? '');
 
-describe.each(RUN_TOOLS)('$name: wait', (tool) => {
-  it('wait false sends the start alone and answers the run id', async () => {
-    const connection = recordingConnection([STARTED, FINISHED, RESULT]);
-    const result = await tool.call(connection, { wait: false });
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(1);
-    expect(starts(connection.requests)).toHaveLength(1);
-    expect(answerOf(result)).toEqual({ success: true, run_id: RUN });
-  });
-
-  describe.each([
-    ['wait true', { wait: true }],
-    ['no wait (the default)', {}],
-  ])('%s', (_label, wait) => {
-    it('a FINISHED status: one status read, then the result', async () => {
+for (const tool of RUN_TOOLS) {
+  describe(`${tool.name}: wait`, () => {
+    it('wait false sends the start alone and answers the run id', async () => {
       const connection = recordingConnection([STARTED, FINISHED, RESULT]);
-      const result = await tool.call(connection, wait);
-      expect(result.isError).toBe(false);
-      expect(starts(connection.requests)).toHaveLength(1);
-      expect(statusReads(connection.requests).map((r) => r.url)).toEqual([
-        STATUS_URL,
-      ]);
-      expect(resultReads(connection.requests)).toHaveLength(1);
-      expect(connection.requests).toHaveLength(3);
-      const answer = answerOf(result);
-      expect(answer.success).toBe(true);
-      expect(answer.run_id).toBe(RUN);
-      expect(answer.finished).toBe(true);
-      expect(JSON.stringify(answer.run_result)).toContain('TEST_METHOD');
+      const result = await tool.call(connection, { wait: false });
+      assert.equal(result.isError, false);
+      assert.equal(connection.requests.length, 1);
+      assert.equal(starts(connection.requests).length, 1);
+      assert.deepStrictEqual(answerOf(result), { success: true, run_id: RUN });
     });
 
-    it('a NOT_STARTED status: the run id and the status, one status read, no result read', async () => {
-      const connection = recordingConnection([
-        STARTED,
-        NOT_STARTED,
-        FINISHED,
-        RESULT,
-      ]);
-      const result = await tool.call(connection, wait);
-      expect(result.isError).toBe(false);
-      expect(statusReads(connection.requests).map((r) => r.url)).toEqual([
-        STATUS_URL,
-      ]);
-      expect(resultReads(connection.requests)).toEqual([]);
-      expect(connection.requests).toHaveLength(2);
-      expect(answerOf(result)).toEqual({
-        success: true,
-        run_id: RUN,
-        status: 'NOT_STARTED',
+    for (const [_label, wait] of [
+      ['wait true', { wait: true }],
+      ['no wait (the default)', {}],
+    ] satisfies Array<[string, { wait?: boolean }]>) {
+      describe(format('%s', _label), () => {
+        it('a FINISHED status: one status read, then the result', async () => {
+          const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+          const result = await tool.call(connection, wait);
+          assert.equal(result.isError, false);
+          assert.equal(starts(connection.requests).length, 1);
+          assert.deepStrictEqual(
+            statusReads(connection.requests).map((r) => r.url),
+            [STATUS_URL],
+          );
+          assert.equal(resultReads(connection.requests).length, 1);
+          assert.equal(connection.requests.length, 3);
+          const answer = answerOf(result);
+          assert.equal(answer.success, true);
+          assert.equal(answer.run_id, RUN);
+          assert.equal(answer.finished, true);
+          assert.ok(JSON.stringify(answer.run_result).includes('TEST_METHOD'));
+        });
+
+        it('a NOT_STARTED status, long-polled NOT_STARTED again: the run id and the status, no result read', async () => {
+          const connection = recordingConnection([
+            STARTED,
+            NOT_STARTED,
+            NOT_STARTED,
+            FINISHED,
+            RESULT,
+          ]);
+          const result = await tool.call(connection, wait);
+          assert.equal(result.isError, false);
+          assert.deepStrictEqual(
+            statusReads(connection.requests).map((r) => r.url),
+            [STATUS_URL, LONG_POLL_URL],
+          );
+          assert.deepStrictEqual(resultReads(connection.requests), []);
+          assert.equal(connection.requests.length, 3);
+          assert.deepStrictEqual(answerOf(result), {
+            success: true,
+            run_id: RUN,
+            status: 'NOT_STARTED',
+          });
+        });
+
+        it('a RUNNING status: long-polled until FINISHED, then the result', async () => {
+          const connection = recordingConnection([
+            STARTED,
+            RUNNING,
+            FINISHED,
+            RESULT,
+          ]);
+          const result = await tool.call(connection, wait);
+          assert.equal(result.isError, false);
+          assert.deepStrictEqual(
+            statusReads(connection.requests).map((r) => r.url),
+            [STATUS_URL, LONG_POLL_URL],
+          );
+          assert.equal(resultReads(connection.requests).length, 1);
+          assert.equal(answerOf(result).finished, true);
+        });
+
+        it('a status with no progress: a failure carrying the document, one status read', async () => {
+          const connection = recordingConnection([
+            STARTED,
+            NO_PROGRESS,
+            FINISHED,
+            RESULT,
+          ]);
+          const result = await tool.call(connection, wait);
+          assert.equal(result.isError, true);
+          assert.deepStrictEqual(
+            statusReads(connection.requests).map((r) => r.url),
+            [STATUS_URL],
+          );
+          assert.deepStrictEqual(resultReads(connection.requests), []);
+          assert.equal(connection.requests.length, 2);
+          const failure = answerOf(result);
+          assert.equal(failure.step, 'read status');
+          assert.ok(failure.message.includes(NO_PROGRESS_DOCUMENT));
+        });
       });
-    });
-
-    it('a RUNNING status: long-polled until FINISHED, then the result', async () => {
-      const connection = recordingConnection([
-        STARTED,
-        RUNNING,
-        FINISHED,
-        RESULT,
-      ]);
-      const result = await tool.call(connection, wait);
-      expect(result.isError).toBe(false);
-      expect(statusReads(connection.requests).map((r) => r.url)).toEqual([
-        STATUS_URL,
-        LONG_POLL_URL,
-      ]);
-      expect(resultReads(connection.requests)).toHaveLength(1);
-      expect(answerOf(result).finished).toBe(true);
-    });
-
-    it('a status with no progress: a failure carrying the document, one status read', async () => {
-      const connection = recordingConnection([
-        STARTED,
-        NO_PROGRESS,
-        FINISHED,
-        RESULT,
-      ]);
-      const result = await tool.call(connection, wait);
-      expect(result.isError).toBe(true);
-      expect(statusReads(connection.requests).map((r) => r.url)).toEqual([
-        STATUS_URL,
-      ]);
-      expect(resultReads(connection.requests)).toEqual([]);
-      expect(connection.requests).toHaveLength(2);
-      const failure = answerOf(result);
-      expect(failure.step).toBe('read status');
-      expect(failure.message).toContain(NO_PROGRESS_DOCUMENT);
-    });
+    }
   });
-});
+}
 
 describe('wait with runner sync', () => {
   const SYNC_TOOLS: ReadonlyArray<
@@ -324,21 +336,25 @@ describe('wait with runner sync', () => {
     ],
   ];
 
-  describe.each(SYNC_TOOLS)('%s', (_name, call) => {
-    it.each([true, false])(
-      'refuses wait %s before anything is sent',
-      async (wait) => {
-        const connection = recordingConnection([RESULT]);
-        const result = await call(connection, wait);
-        expect(result.isError).toBe(true);
-        expect(result.content[0]?.text).toContain(
-          'wait goes with runner async',
+  for (const [_name, call] of SYNC_TOOLS) {
+    describe(format('%s', _name), () => {
+      for (const wait of [true, false]) {
+        it(
+          format('refuses wait %s before anything is sent', wait),
+          async () => {
+            const connection = recordingConnection([RESULT]);
+            const result = await call(connection, wait);
+            assert.equal(result.isError, true);
+            assert.ok(
+              result.content[0]?.text.includes('wait goes with runner async'),
+            );
+            assert.ok(result.content[0]?.text.includes('nothing was sent'));
+            assert.deepStrictEqual(connection.requests, []);
+          },
         );
-        expect(result.content[0]?.text).toContain('nothing was sent');
-        expect(connection.requests).toEqual([]);
-      },
-    );
-  });
+      }
+    });
+  }
 });
 
 /**
@@ -420,115 +436,139 @@ describe('a wait that is not a boolean, on each run tool', () => {
         ),
     ],
   ];
-  describe.each(calls)('%s', (_name, call) => {
-    it.each(NOT_BOOLEAN)(
-      "the tool's schema refuses %s before anything is sent",
-      async (wait) => {
-        const connection = recordingConnection([STARTED, FINISHED, RESULT]);
-        const refused = expect(call(connection, wait)).rejects.toThrow('wait');
-        await refused;
-        expect(connection.requests).toEqual([]);
-      },
-    );
-  });
+  for (const [_name, call] of calls) {
+    describe(format('%s', _name), () => {
+      for (const wait of NOT_BOOLEAN) {
+        it(
+          format("the tool's schema refuses %s before anything is sent", wait),
+          async () => {
+            const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+            const refused = assertRejects(call(connection, wait), 'wait');
+            await refused;
+            assert.deepStrictEqual(connection.requests, []);
+          },
+        );
+      }
+    });
+  }
 });
 
-describe.each(READERS)('$name reads the status first', (reader) => {
-  it('a FINISHED status: one status read, then the result', async () => {
-    const connection = recordingConnection([FINISHED, RESULT]);
-    const result = await reader.call(connection);
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map((r) => r.url)).toEqual([
-      STATUS_URL,
-      expect.stringContaining('/abapunit/results/'),
-    ]);
-    const answer = answerOf(result);
-    expect(answer.finished).toBe(true);
-    expect(answer.run_id).toBe(RUN);
-    expect(answer).toHaveProperty('run_result');
-  });
+for (const reader of READERS) {
+  describe(`${reader.name} reads the status first`, () => {
+    it('a FINISHED status: one status read, then the result', async () => {
+      const connection = recordingConnection([FINISHED, RESULT]);
+      const result = await reader.call(connection);
+      assert.equal(result.isError, false);
+      const urls = connection.requests.map((r) => r.url);
+      assert.equal(urls.length, 2);
+      assert.equal(urls[0], STATUS_URL);
+      assert.ok(urls[1]?.includes('/abapunit/results/'));
+      const answer = answerOf(result);
+      assert.equal(answer.finished, true);
+      assert.equal(answer.run_id, RUN);
+      assert.ok('run_result' in Object(answer));
+    });
 
-  it('a NOT_STARTED status: the run id and the status, one status read, no result read', async () => {
-    const connection = recordingConnection([NOT_STARTED, FINISHED, RESULT]);
-    const result = await reader.call(connection);
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map((r) => r.url)).toEqual([STATUS_URL]);
-    expect(answerOf(result)).toEqual({
-      success: true,
-      run_id: RUN,
-      status: 'NOT_STARTED',
+    it('a NOT_STARTED status: the run id and the status, one status read, no result read', async () => {
+      const connection = recordingConnection([NOT_STARTED, FINISHED, RESULT]);
+      const result = await reader.call(connection);
+      assert.equal(result.isError, false);
+      assert.deepStrictEqual(
+        connection.requests.map((r) => r.url),
+        [STATUS_URL],
+      );
+      assert.deepStrictEqual(answerOf(result), {
+        success: true,
+        run_id: RUN,
+        status: 'NOT_STARTED',
+      });
+    });
+
+    it('a RUNNING status: long-polled until FINISHED, then the result', async () => {
+      const connection = recordingConnection([RUNNING, FINISHED, RESULT]);
+      const result = await reader.call(connection);
+      assert.equal(result.isError, false);
+      const urls = connection.requests.map((r) => r.url);
+      assert.equal(urls.length, 3);
+      assert.deepStrictEqual(urls.slice(0, 2), [STATUS_URL, LONG_POLL_URL]);
+      assert.ok(urls[2]?.includes('/abapunit/results/'));
+      assert.equal(answerOf(result).finished, true);
+    });
+
+    it('a status with no progress: a failure carrying the document, one status read', async () => {
+      const connection = recordingConnection([NO_PROGRESS, FINISHED, RESULT]);
+      const result = await reader.call(connection);
+      assert.equal(result.isError, true);
+      assert.deepStrictEqual(
+        connection.requests.map((r) => r.url),
+        [STATUS_URL],
+      );
+      const failure = answerOf(result);
+      assert.equal(failure.step, 'read status');
+      assert.ok(failure.message.includes(NO_PROGRESS_DOCUMENT));
     });
   });
-
-  it('a RUNNING status: long-polled until FINISHED, then the result', async () => {
-    const connection = recordingConnection([RUNNING, FINISHED, RESULT]);
-    const result = await reader.call(connection);
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map((r) => r.url)).toEqual([
-      STATUS_URL,
-      LONG_POLL_URL,
-      expect.stringContaining('/abapunit/results/'),
-    ]);
-    expect(answerOf(result).finished).toBe(true);
-  });
-
-  it('a status with no progress: a failure carrying the document, one status read', async () => {
-    const connection = recordingConnection([NO_PROGRESS, FINISHED, RESULT]);
-    const result = await reader.call(connection);
-    expect(result.isError).toBe(true);
-    expect(connection.requests.map((r) => r.url)).toEqual([STATUS_URL]);
-    const failure = answerOf(result);
-    expect(failure.step).toBe('read status');
-    expect(failure.message).toContain(NO_PROGRESS_DOCUMENT);
-  });
-});
+}
 
 describe('the schema', () => {
-  it.each([
+  for (const tool of [
     RunUnitTest_Tool,
     RunCdsUnitTest_Tool,
     RunProgramUnitTest_Tool,
     RunFunctionGroupUnitTest_Tool,
     RunFunctionModuleUnitTest_Tool,
     RunAbapUnit_Tool,
-  ])(
-    '$name declares wait: an optional boolean with no schema default (true when absent), and says what each value does',
-    (tool) => {
+  ]) {
+    it(`${tool.name} declares wait: an optional boolean with no schema default (true when absent), and says what each value does`, () => {
       const properties = listedJson(tool.inputSchema).properties ?? {};
-      expect(properties.wait).toEqual({
-        type: 'boolean',
-        description: expect.stringContaining(
-          'A long run under a client with a request time limit is started with false.',
+      const wait = properties.wait;
+      assert.ok(wait !== undefined && typeof wait === 'object');
+      const { description, ...rest } = wait;
+      assert.deepStrictEqual(rest, { type: 'boolean' });
+      assert.ok(
+        typeof description === 'string' &&
+          description.includes(
+            'A long run under a client with a request time limit is started with false.',
+          ),
+      );
+      assertNoProperty(properties, 'max_status_polls');
+      assert.ok(!declaredRequired(tool.inputSchema).includes('wait'));
+      assert.ok(tool.description.includes('with wait true (default)'));
+      assert.ok(
+        tool.description.includes(
+          'with wait false the call answers the run_id right after the start',
         ),
-      });
-      expect(properties).not.toHaveProperty('max_status_polls');
-      expect(declaredRequired(tool.inputSchema)).not.toContain('wait');
-      expect(tool.description).toContain('with wait true (default)');
-      expect(tool.description).toContain(
-        'with wait false the call answers the run_id right after the start',
       );
-      expect(tool.description).toContain(
-        'A long run under a client with a request time limit is started with wait false.',
+      assert.ok(
+        tool.description.includes(
+          'A long run under a client with a request time limit is started with wait false.',
+        ),
       );
-      expect(tool.description).toContain(
-        'a run SAP reports unstarted (its answer for an unknown run_id) returns the run_id and that status',
+      assert.ok(
+        tool.description.includes(
+          'a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status',
+        ),
       );
-    },
-  );
+    });
+  }
 
   it('GetUnitTestResult declares no wait and no max_status_polls', () => {
     const properties =
       listedJson(GetUnitTestResult_Tool.inputSchema).properties ?? {};
-    expect(properties).not.toHaveProperty('wait');
-    expect(properties).not.toHaveProperty('max_status_polls');
+    assertNoProperty(properties, 'wait');
+    assertNoProperty(properties, 'max_status_polls');
   });
 
   it('GetUnitTestResult says what it answers for a run SAP answers unfinished', () => {
-    expect(GetUnitTestResult_Tool.description).toContain(
-      'a run SAP answers running is read again by long polling',
+    assert.ok(
+      GetUnitTestResult_Tool.description.includes(
+        'a run SAP answers running is read again by long polling',
+      ),
     );
-    expect(GetUnitTestResult_Tool.description).toContain(
-      'a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once',
+    assert.ok(
+      GetUnitTestResult_Tool.description.includes(
+        'a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once',
+      ),
     );
   });
 });

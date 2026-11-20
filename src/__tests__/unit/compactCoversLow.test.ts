@@ -4,6 +4,9 @@
  * arguments honest, and the function-group read-back.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import type {
@@ -68,11 +71,13 @@ describe('compact covers what the low set did', () => {
       class_name: 'CLAS_A',
       source_code: 'source text',
     });
-    expect(answered.isError).toBe(true);
-    expect(answered.text).toContain(
-      'Invalid arguments for tool HandlerUpdate: Invalid input: expected string, received undefined at lock_handle',
+    assert.equal(answered.isError, true);
+    assert.ok(
+      answered.text.includes(
+        'Invalid arguments for tool HandlerUpdate: Invalid input: expected string, received undefined at lock_handle',
+      ),
     );
-    expect(answered.sent).toBe(0);
+    assert.equal(answered.sent, 0);
   });
 
   it('an update under lock_handle is the one write: no lock, no unlock', async () => {
@@ -87,7 +92,10 @@ describe('compact covers what the low set did', () => {
       },
       connection,
     );
-    expect(connection.requests.map((r) => r.method)).toEqual(['PUT']);
+    assert.deepStrictEqual(
+      connection.requests.map((r) => r.method),
+      ['PUT'],
+    );
   });
 
   it('source_code is checked only for CLASS, STRUCTURE and DDL', async () => {
@@ -96,36 +104,43 @@ describe('compact covers what the low set did', () => {
       object_name: 'PROG_A',
       source_code: 'source text',
     });
-    expect(answered.isError).toBe(true);
-    expect(answered.text).toContain('source_code is checked only for');
-    expect(answered.sent).toBe(0);
+    assert.equal(answered.isError, true);
+    assert.ok(answered.text.includes('source_code is checked only for'));
+    assert.equal(answered.sent, 0);
   });
 
-  it.each(['object_structure', 'node_structure'])(
-    'HandlerGet part=%s needs object_adt_type and object_name',
-    async (part) => {
-      const answered = await call('HandlerGet', {
-        part,
-        object_name: 'CLAS_A',
-      });
-      expect(answered.isError).toBe(true);
-      expect(answered.text).toContain(
-        'requires object_adt_type and object_name',
-      );
-      expect(answered.sent).toBe(0);
-    },
-  );
+  for (const part of ['object_structure', 'node_structure']) {
+    it(
+      format('HandlerGet part=%s needs object_adt_type and object_name', part),
+      async () => {
+        const answered = await call('HandlerGet', {
+          part,
+          object_name: 'CLAS_A',
+        });
+        assert.equal(answered.isError, true);
+        assert.ok(
+          answered.text.includes('requires object_adt_type and object_name'),
+        );
+        assert.equal(answered.sent, 0);
+      },
+    );
+  }
 
-  it.each(['source', 'metadata', 'urls', 'contents'])(
-    'HandlerGet part=%s without object_type is refused: object_type is required',
-    async (part) => {
-      const answered = await call('HandlerGet', { part });
-      expect(answered.isError).toBe(true);
-      expect(answered.text).toContain('object_type is required');
-      expect(answered.text).not.toContain('undefined');
-      expect(answered.sent).toBe(0);
-    },
-  );
+  for (const part of ['source', 'metadata', 'urls', 'contents']) {
+    it(
+      format(
+        'HandlerGet part=%s without object_type is refused: object_type is required',
+        part,
+      ),
+      async () => {
+        const answered = await call('HandlerGet', { part });
+        assert.equal(answered.isError, true);
+        assert.ok(answered.text.includes('object_type is required'));
+        assert.ok(!answered.text.includes('undefined'));
+        assert.equal(answered.sent, 0);
+      },
+    );
+  }
 
   it('a function module is named GROUP|MODULE for validate and check', async () => {
     for (const tool of ['HandlerValidate', 'HandlerCheckRun']) {
@@ -136,9 +151,9 @@ describe('compact covers what the low set did', () => {
         // given, so the name's form is what is refused.
         ...(tool === 'HandlerValidate' ? { description: 'Text' } : {}),
       });
-      expect(answered.isError).toBe(true);
-      expect(answered.text).toContain('GROUP|FM_NAME');
-      expect(answered.sent).toBe(0);
+      assert.equal(answered.isError, true);
+      assert.ok(answered.text.includes('GROUP|FM_NAME'));
+      assert.equal(answered.sent, 0);
     }
   });
 
@@ -163,9 +178,12 @@ describe('compact covers what the low set did', () => {
     );
     // One request per compact call: whether the group landed is the
     // caller's next call (HandlerGet part metadata), not a read of ours.
-    expect(connection.requests.map((r) => r.method)).toEqual(['POST']);
-    expect(answered.isError).toBe(true);
-    expect(answered.text).toContain('has not been created');
+    assert.deepStrictEqual(
+      connection.requests.map((r) => r.method),
+      ['POST'],
+    );
+    assert.equal(answered.isError, true);
+    assert.ok(answered.text.includes('has not been created'));
   });
 
   it('another refusal of a function group create is answered as it came, with no read', async () => {
@@ -183,8 +201,11 @@ describe('compact covers what the low set did', () => {
       },
       connection,
     );
-    expect(connection.requests.map((r) => r.method)).toEqual(['POST']);
-    expect(answered.isError).toBe(true);
+    assert.deepStrictEqual(
+      connection.requests.map((r) => r.method),
+      ['POST'],
+    );
+    assert.equal(answered.isError, true);
   });
 
   it('HandlerActivate no longer names a low tool', async () => {
@@ -192,7 +213,7 @@ describe('compact covers what the low set did', () => {
       object_type: 'FUNCTION_MODULE',
       object_name: 'FM_A',
     }).catch((error: Error) => ({ text: error.message }));
-    expect(answered.text).toContain('function_group_name');
-    expect(answered.text).not.toMatch(/\w+Low\b/);
+    assert.ok(answered.text.includes('function_group_name'));
+    assert.doesNotMatch(answered.text, /\w+Low\b/);
   });
 });

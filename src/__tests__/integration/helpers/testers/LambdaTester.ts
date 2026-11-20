@@ -530,7 +530,7 @@ export class LambdaTester {
    * Lifecycle: afterEach
    * Cleanup after each test
    * Automatically checks YAML parameters and executes cleanup if needed
-   * This method is guaranteed to run by Jest even if test fails
+   * This method is guaranteed to run by node:test even if the test fails
    * @param lambda - Optional lambda to execute before cleanup check
    */
   async afterEach(lambda?: TLambda): Promise<void> {
@@ -554,7 +554,7 @@ export class LambdaTester {
 
     // Always check YAML parameters and execute cleanup if needed
     // This ensures cleanup runs even if test failed
-    // Jest guarantees afterEach runs regardless of test outcome
+    // node:test runs afterEach regardless of the test's outcome
     try {
       await this.cleanupAfter();
     } catch (error) {
@@ -568,9 +568,9 @@ export class LambdaTester {
 
   /**
    * Main run method - executes test function (lambda) with context
-   * Ensures cleanup runs even if test fails (cleanup is called by afterEach, which Jest guarantees to run)
-   * Note: Jest's afterEach hook will run cleanup even if test fails, so we don't need try-finally here.
-   * The cleanup is handled by afterEach() which is called by Jest regardless of test outcome.
+   * Ensures cleanup runs even if test fails (cleanup is called by afterEach, which node:test always runs)
+   * Note: node:test's afterEach hook runs cleanup even if the test fails, so we don't need try-finally here.
+   * The cleanup is handled by afterEach() which node:test calls regardless of the test's outcome.
    */
   async run(testFunc: TLambda): Promise<void> {
     if (!this.context) {

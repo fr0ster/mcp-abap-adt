@@ -7,6 +7,8 @@
  * overwritten (one of another kind is refused, as before).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -64,7 +66,7 @@ it('an undeclared injected connection dispatches on the server’s kind, whateve
     handlersRegistry: kindReporter(connection),
   });
   process.env.SAP_SYSTEM_TYPE = 'cloud';
-  expect(await ownKindOn(server)).toBe('onprem');
+  assert.equal(await ownKindOn(server), 'onprem');
 });
 
 it('a declared kind is kept, not overwritten, when it is the server’s', async () => {
@@ -79,5 +81,5 @@ it('a declared kind is kept, not overwritten, when it is the server’s', async 
     handlersRegistry: kindReporter(connection),
   });
   process.env.SAP_SYSTEM_TYPE = 'onprem';
-  expect(await ownKindOn(server)).toBe('cloud');
+  assert.equal(await ownKindOn(server), 'cloud');
 });

@@ -12,7 +12,7 @@
  * What it asserts is what the system answered: at least one main program, each
  * with a name, a type and a uri, and the compact part answering the same list.
  *
- * Run: npm test -- --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit 'integration/readOnly/include/IncludeMainPrograms'
+ * Run: npm run test:integration -- src/__tests__/integration/readOnly/include/IncludeMainProgramsHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

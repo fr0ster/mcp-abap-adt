@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import * as z from 'zod';
 /**
  * The server's refusals are minted or its own. Behind the closed gate a
@@ -55,14 +57,14 @@ describe('the closed gate', () => {
       counted.rejected({} as never),
     ]);
     for (const answer of answers) {
-      expect(answer.ok).toBe(false);
+      assert.equal(answer.ok, false);
       if (answer.ok) continue;
-      expect(isMinted(answer.refusal)).toBe(true);
-      expect(answer.refusal.kind).toBe('interactive-login');
-      expect(answer.refusal.facts).toEqual({ outcome: 'aborted' });
-      expect(answer.refusal.reason).toBe(expected.reason);
+      assert.equal(isMinted(answer.refusal), true);
+      assert.equal(answer.refusal.kind, 'interactive-login');
+      assert.deepStrictEqual(answer.refusal.facts, { outcome: 'aborted' });
+      assert.equal(answer.refusal.reason, expected.reason);
     }
-    expect(provider.calls).toBe(0);
+    assert.equal(provider.calls, 0);
   });
 });
 
@@ -70,7 +72,7 @@ describe('inspection-only mode', () => {
   const TOOL = 'StubTool';
 
   class StubGroup {
-    readonly reached = jest.fn();
+    readonly reached = mock.fn();
     getName() {
       return 'stub';
     }
@@ -92,8 +94,8 @@ describe('inspection-only mode', () => {
     registerHandlers() {}
   }
 
-  it('a tool call answers the inspection_only refusal; no connection is built, no handler runs', async () => {
-    const build = jest.spyOn(connectionFactory, 'createAbapConnection');
+  it('a tool call answers the inspection_only refusal; no connection is built, no handler runs', async (t) => {
+    const build = t.mock.method(connectionFactory, 'createAbapConnection');
     const group = new StubGroup();
     const server = new StdioServer(
       new CompositeHandlersRegistry([group as never]),
@@ -110,19 +112,19 @@ describe('inspection-only mode', () => {
         isError?: boolean;
         content: Array<{ text: string }>;
       };
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(INSPECTION_ONLY_WORDS);
-      expect(group.reached).not.toHaveBeenCalled();
-      expect(build).not.toHaveBeenCalled();
+      assert.equal(result.isError, true);
+      assert.ok(result.content[0].text.includes(INSPECTION_ONLY_WORDS));
+      assert.equal(group.reached.mock.callCount(), 0);
+      assert.equal(build.mock.callCount(), 0);
     } finally {
       await client.close();
-      build.mockRestore();
+      build.mock.restore();
     }
   });
 
   it('the refusal is the server’s own, coded inspection_only', () => {
     const refusal = new ServerRefusal('inspection_only');
-    expect(refusal.serverRefusal).toBe('inspection_only');
-    expect(refusal.message).toBe(INSPECTION_ONLY_WORDS);
+    assert.equal(refusal.serverRefusal, 'inspection_only');
+    assert.equal(refusal.message, INSPECTION_ONLY_WORDS);
   });
 });

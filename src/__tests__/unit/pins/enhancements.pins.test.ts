@@ -6,6 +6,7 @@
  * spot or the plugin's source, each answered by what it is (`matched`).
  * SAP's answers are a minimal BAdI spot document and a minimal plugin source.
  */
+import { after, before, describe } from 'node:test';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 
 /** A BAdI enhancement spot, as SAP answers its read. */
@@ -65,11 +66,11 @@ const MATCHED = {
  */
 function statedAs(variant: 'onprem' | 'cloud'): void {
   let previous: string | undefined;
-  beforeAll(() => {
+  before(() => {
     previous = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = variant;
   });
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
   });

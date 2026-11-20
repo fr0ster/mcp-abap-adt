@@ -1,7 +1,10 @@
+import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
 import { tsxCommand } from '../helpers/platform';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 /**
  * **The long tools on the approved list** (`tools/long-handlers.json`,
@@ -13,7 +16,7 @@ const LONG_TOOLS = new Set(
   (
     JSON.parse(
       readFileSync(
-        join(__dirname, '../../../tools/long-handlers.json'),
+        join(repositoryRoot(__dirname), 'tools', 'long-handlers.json'),
         'utf8',
       ),
     ) as Array<{ tool: string }>
@@ -61,7 +64,13 @@ describe('the MCP tool surface', () => {
 
   const frozen: Row[] = JSON.parse(
     readFileSync(
-      join(__dirname, '../../../tests/fixtures/tools/surface.json'),
+      join(
+        repositoryRoot(__dirname),
+        'tests',
+        'fixtures',
+        'tools',
+        'surface.json',
+      ),
       'utf8',
     ),
   );
@@ -84,15 +93,16 @@ describe('the MCP tool surface', () => {
     // A run that listed nothing would satisfy every comparison that follows.
     // 19.0.0: the 112 low tools left the surface, and their rows the
     // fixture — 264 remain; 21.0.0 adds RunAbapUnit, 265.
-    expect(frozen.length).toBeGreaterThan(250);
-    expect(current.length).toBe(frozen.length);
+    assert.ok(frozen.length > 250);
+    assert.equal(current.length, frozen.length);
   });
 
   // 24.0.0: GetSqlQuery (from system) and GetTableContents (from readonly)
   // moved to the data group, DataHandlersGroup, which a set serves only with
   // --enable-data-tools. Their rows changed group, nothing else.
   it('has the same tools in the same groups', () => {
-    expect([...read(current).keys()].sort()).toEqual(
+    assert.deepStrictEqual(
+      [...read(current).keys()].sort(),
       [...read(frozen).keys()].sort(),
     );
   });
@@ -266,25 +276,28 @@ describe('the MCP tool surface', () => {
         'high/UpdateMetadataExtension': ['lock_handle'],
       };
       const removed = REMOVED[tool] ?? [];
-      expect({
-        tool,
-        lost: had.filter(
-          (p) =>
-            !has.includes(p) &&
-            !removed.includes(p) &&
-            p !== `${relaxed ?? '\u0000'}*` &&
-            p !== tightened &&
-            !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))) &&
-            // 24.0.0 (D24, the owner): no long tool takes `timeout`.
-            !(
-              LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1)) &&
-              p === 'timeout'
-            ),
-        ),
-      }).toEqual({
-        tool,
-        lost: [],
-      });
+      assert.deepStrictEqual(
+        {
+          tool,
+          lost: had.filter(
+            (p) =>
+              !has.includes(p) &&
+              !removed.includes(p) &&
+              p !== `${relaxed ?? '\u0000'}*` &&
+              p !== tightened &&
+              !(listRelaxed(p) && has.includes(p.replace(/\*$/, ''))) &&
+              // 24.0.0 (D24, the owner): no long tool takes `timeout`.
+              !(
+                LONG_TOOLS.has(tool.slice(tool.indexOf('/') + 1)) &&
+                p === 'timeout'
+              ),
+          ),
+        },
+        {
+          tool,
+          lost: [],
+        },
+      );
       const MAY_GAIN_VERSION = new Set([
         'high/CheckMetadataExtension',
         'low/CheckMetadataExtensionLow',
@@ -449,19 +462,22 @@ describe('the MCP tool surface', () => {
       // A long tool whose only change is its `timeout` (gained, or moved
       // first in the list) gained nothing else.
       if (isLong && added.length === 0) continue;
-      expect({ tool, added: [...added].sort() }).toEqual({
-        tool,
-        added: [
-          ...(listed !== undefined
-            ? [...listed.added, ...(EXTRA_ALLOWED_ADDITIONS[tool] ?? [])]
-            : MAY_GAIN_VERSION.has(tool)
-              ? ['version']
-              : relaxed !== undefined
-                ? []
-                : (EXTRA_ALLOWED_ADDITIONS[tool] ??
-                  (tightened !== undefined ? [] : ['detail']))),
-        ].sort(),
-      });
+      assert.deepStrictEqual(
+        { tool, added: [...added].sort() },
+        {
+          tool,
+          added: [
+            ...(listed !== undefined
+              ? [...listed.added, ...(EXTRA_ALLOWED_ADDITIONS[tool] ?? [])]
+              : MAY_GAIN_VERSION.has(tool)
+                ? ['version']
+                : relaxed !== undefined
+                  ? []
+                  : (EXTRA_ALLOWED_ADDITIONS[tool] ??
+                    (tightened !== undefined ? [] : ['detail']))),
+          ].sort(),
+        },
+      );
     }
   });
 
@@ -567,20 +583,26 @@ describe('the MCP tool surface', () => {
     const arrived = [...read(current).keys()].filter(
       (tool) => !read(frozen).has(tool),
     );
-    expect(arrived).toEqual([]);
+    assert.deepStrictEqual(arrived, []);
   });
 
   it('no tool declares legacy', () => {
-    expect(current.filter((r) => /legacy/.test(r.available_in))).toEqual([]);
+    assert.deepStrictEqual(
+      current.filter((r) => /legacy/.test(r.available_in)),
+      [],
+    );
   });
 
   it('changes no tool availability', () => {
     const now = availability(current);
     for (const [tool, before] of availability(frozen)) {
-      expect({ tool, available_in: now.get(tool) }).toEqual({
-        tool,
-        available_in: before,
-      });
+      assert.deepStrictEqual(
+        { tool, available_in: now.get(tool) },
+        {
+          tool,
+          available_in: before,
+        },
+      );
     }
   });
 });

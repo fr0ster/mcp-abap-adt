@@ -1,11 +1,10 @@
 /**
  * The unit run reaches no outside service (D27, step 15; spec §4): the
- * suites that do — `test:install` (packs and installs the release) — are a
- * run of their own, named in `tools/separate-runs.json`. Neither runner's
- * unit set holds one of their files: Jest's discovery (`--listTests`, a
- * child process) and the runner's default selection, both as
- * `tools/npm-test.mjs --list` reads them. Each run's npm script names
- * exactly its files.
+ * suites that do — `test:install` (packs and installs the release),
+ * `test:retrieval` (Ollama) — are runs of their own, named in
+ * `tools/separate-runs.json`. The runner's unit selection
+ * (`tools/run-tests.mjs --list`, a child process) holds none of their
+ * files. Each run's npm script names exactly its files.
  */
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -30,38 +29,23 @@ function separateRuns(): Map<string, string[]> {
   return runs;
 }
 
-/** The unit run's two sets, as repository paths: `npm test -- --list`. */
-function unitSets(): { jest: string[]; nodeTest: string[] } {
-  const run = runTool('npm-test.mjs', ['--list'], environment());
+/** The unit run's selection, as repository paths: `run-tests.mjs --list`. */
+function unitSelection(): string[] {
+  const run = runTool('run-tests.mjs', ['--list'], environment());
   assert.equal(run.status, 0, run.stderr);
-  const listed: unknown = JSON.parse(run.stdout);
-  assert.ok(typeof listed === 'object' && listed !== null);
-  const jest: unknown = Reflect.get(listed, 'jest');
-  const nodeTest: unknown = Reflect.get(listed, 'nodeTest');
-  assert.ok(Array.isArray(jest) && Array.isArray(nodeTest));
-  const relativeOf = (file: unknown) =>
-    path
-      .relative(REPO, path.resolve(REPO, String(file)))
-      .split(path.sep)
-      .join('/');
-  return { jest: jest.map(relativeOf), nodeTest: nodeTest.map(relativeOf) };
+  return run.stdout.split('\n').filter((line) => line !== '');
 }
 
 describe('the runs of their own', () => {
   it('the unit run reaches no outside service', () => {
-    const { jest, nodeTest } = unitSets();
-    // Both sets were read: an empty one would hold nothing by default.
-    assert.ok(jest.length > 0 && nodeTest.length > 0);
+    const selected = unitSelection();
+    // The selection was read: an empty one would hold nothing by default.
+    assert.ok(selected.length > 0);
     for (const [script, files] of separateRuns()) {
       assert.ok(files.length > 0, script);
       for (const file of files) {
         assert.equal(
-          jest.includes(file),
-          false,
-          `${script}: Jest runs ${file}`,
-        );
-        assert.equal(
-          nodeTest.includes(file),
+          selected.includes(file),
           false,
           `${script}: the runner's unit set holds ${file}`,
         );

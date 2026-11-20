@@ -1,4 +1,15 @@
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 /**
  * Who creates objects (responsible) and on which system (master system), per
  * request, over Streamable HTTP, where an on-premise system has no
@@ -17,17 +28,6 @@ import type { AddressInfo } from 'node:net';
 // The connector, without a wire: an on-premise system without
 // systeminformation (its lookup answers 404), so the configured order below
 // applies — where the system names its user, its answer wins over all of it.
-jest.mock('../../../../src/lib/connectionFactory', () => ({
-  ...jest.requireActual('../../../../src/lib/connectionFactory'),
-  createAbapConnection: () => ({
-    connect: async () => {},
-    makeAdtRequest: async () => {
-      throw Object.assign(new Error('Request failed with status code 404'), {
-        response: { status: 404 },
-      });
-    },
-  }),
-}));
 
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import {
@@ -36,11 +36,23 @@ import {
   type IHandlerGroup,
 } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
+import * as connectionFactory from '../../../../src/lib/connectionFactory';
 import {
   getStatedSystemContext,
   resetSystemContextCache,
 } from '../../../../src/lib/systemContext';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time); the names not replaced stay real.
+mock.method(connectionFactory, 'createAbapConnection', () => ({
+  connect: async () => {},
+  makeAdtRequest: async () => {
+    throw Object.assign(new Error('Request failed with status code 404'), {
+      response: { status: 404 },
+    });
+  },
+}));
 
 /** One tool: waits `delayMs`, then answers the context its call sees. */
 const whoAmI: IHandlerGroup = {
@@ -110,7 +122,7 @@ const PROCESS_KEYS = [
   'SAP_SYSTEM_TYPE',
 ] as const;
 const saved: Record<string, string | undefined> = {};
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 beforeEach(() => {
   for (const key of PROCESS_KEYS) {
@@ -120,11 +132,11 @@ beforeEach(() => {
   process.env.SAP_RESPONSIBLE = 'PROCESS_USER';
   process.env.SAP_MASTER_SYSTEM = 'PROCESS_SYS';
   resetSystemContextCache();
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
 });
 afterEach(async () => {
   await new Promise((resolve) => setTimeout(resolve, 20));
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
   for (const key of PROCESS_KEYS) {
     if (saved[key] === undefined) delete process.env[key];
     else process.env[key] = saved[key];
@@ -188,20 +200,22 @@ describe('StreamableHttpServer: responsible and master system per request', () =
   }
 
   it('the headers only: the process environment answers neither (D26 D2)', async () => {
-    await expect(
-      ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
-    ).resolves.toEqual({
-      responsible: 'HEADER_USER',
-      masterSystem: null,
-    });
-    await expect(
-      ask({ ...BASIC, 'x-sap-master-system': 'HEADER_SYS' }),
-    ).resolves.toEqual({
-      // No responsible header: the basic connection's login stands in.
-      responsible: 'HEADER_LOGIN',
-      masterSystem: 'HEADER_SYS',
-    });
-    await expect(ask(BASIC)).resolves.toEqual({
+    assert.deepStrictEqual(
+      await ask({ ...BASIC, 'x-sap-responsible': 'HEADER_USER' }),
+      {
+        responsible: 'HEADER_USER',
+        masterSystem: null,
+      },
+    );
+    assert.deepStrictEqual(
+      await ask({ ...BASIC, 'x-sap-master-system': 'HEADER_SYS' }),
+      {
+        // No responsible header: the basic connection's login stands in.
+        responsible: 'HEADER_LOGIN',
+        masterSystem: 'HEADER_SYS',
+      },
+    );
+    assert.deepStrictEqual(await ask(BASIC), {
       responsible: 'HEADER_LOGIN',
       masterSystem: null,
     });
@@ -224,8 +238,8 @@ describe('StreamableHttpServer: responsible and master system per request', () =
         0,
       ),
     ]);
-    expect(a).toEqual({ responsible: 'FIRST', masterSystem: 'S1' });
-    expect(b).toEqual({ responsible: 'SECOND', masterSystem: 'S2' });
+    assert.deepStrictEqual(a, { responsible: 'FIRST', masterSystem: 'S1' });
+    assert.deepStrictEqual(b, { responsible: 'SECOND', masterSystem: 'S2' });
   });
 
   describe('the login, when no SAP_RESPONSIBLE / x-sap-responsible is stated', () => {
@@ -237,14 +251,14 @@ describe('StreamableHttpServer: responsible and master system per request', () =
 
     it('x-sap-login beats the process SAP_USERNAME; the process SAP_RESPONSIBLE is not read (D26 D2)', async () => {
       process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-      await expect(ask(direct)).resolves.toEqual({
+      assert.deepStrictEqual(await ask(direct), {
         responsible: 'HEADER_LOGIN',
         masterSystem: null,
       });
       delete process.env.SAP_RESPONSIBLE;
       delete process.env.SAP_MASTER_SYSTEM;
       resetSystemContextCache();
-      await expect(ask(direct)).resolves.toEqual({
+      assert.deepStrictEqual(await ask(direct), {
         responsible: 'HEADER_LOGIN',
         masterSystem: null,
       });
@@ -255,50 +269,57 @@ describe('StreamableHttpServer: responsible and master system per request', () =
       delete process.env.SAP_MASTER_SYSTEM;
       resetSystemContextCache();
       // (a) responsible only: a token connection states no login.
-      await expect(
-        ask({
+      assert.deepStrictEqual(
+        await ask({
           ...TOKEN,
           'x-sap-responsible': 'HEADER_RESP',
           'x-sap-master-system': 'HEADER_SYS',
         }),
-      ).resolves.toEqual({
-        responsible: 'HEADER_RESP',
-        masterSystem: 'HEADER_SYS',
-      });
+        {
+          responsible: 'HEADER_RESP',
+          masterSystem: 'HEADER_SYS',
+        },
+      );
       // (b) login only.
-      await expect(ask(direct)).resolves.toEqual({
+      assert.deepStrictEqual(await ask(direct), {
         responsible: 'HEADER_LOGIN',
         masterSystem: null,
       });
       // (c) both: the responsible.
-      await expect(
-        ask({ ...direct, 'x-sap-responsible': 'HEADER_RESP' }),
-      ).resolves.toEqual({ responsible: 'HEADER_RESP', masterSystem: null });
+      assert.deepStrictEqual(
+        await ask({ ...direct, 'x-sap-responsible': 'HEADER_RESP' }),
+        { responsible: 'HEADER_RESP', masterSystem: null },
+      );
       // (d) neither.
       const refused = await answer(TOKEN);
-      expect(refused.isError).toBe(true);
-      expect(JSON.parse(refused.text)).toMatchObject({
+      assert.equal(refused.isError, true);
+      assertMatchObject(JSON.parse(refused.text), {
         error: 'system_user_unknown',
       });
     });
 
-    it.each([
+    for (const [_case, headers] of [
       ['a token connection', TOKEN],
       [
         'a token connection with x-sap-login (it logs nobody on)',
         { ...TOKEN, 'x-sap-login': 'HEADER_LOGIN' },
       ],
-    ])(
-      '%s states no user: system_user_unknown, the tool not run — the process SAP_USERNAME does not stand in',
-      async (_case, headers) => {
-        delete process.env.SAP_RESPONSIBLE;
-        process.env.SAP_USERNAME = 'PROCESS_LOGIN';
-        const refused = await answer(headers);
-        expect(refused.isError).toBe(true);
-        expect(JSON.parse(refused.text)).toMatchObject({
-          error: 'system_user_unknown',
-        });
-      },
-    );
+    ] satisfies [string, Record<string, string>][]) {
+      it(
+        format(
+          '%s states no user: system_user_unknown, the tool not run — the process SAP_USERNAME does not stand in',
+          _case,
+        ),
+        async () => {
+          delete process.env.SAP_RESPONSIBLE;
+          process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+          const refused = await answer(headers);
+          assert.equal(refused.isError, true);
+          assertMatchObject(JSON.parse(refused.text), {
+            error: 'system_user_unknown',
+          });
+        },
+      );
+    }
   });
 });

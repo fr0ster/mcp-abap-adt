@@ -16,10 +16,15 @@
  * doubled. Each case runs held open, answered and answered `404`: the same
  * one request in all three.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { compactDeleteSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
+import { assertMatchObject } from '../../../src/__tests__/helpers/assertions';
 import { moduleMetadataDocument } from '../../../src/__tests__/helpers/functionModuleMetadata';
 import { holdingLockOf } from '../../../src/__tests__/helpers/heldLocks';
 import { jsonAt, listedJson } from '../../../src/__tests__/helpers/listedJson';
@@ -214,146 +219,170 @@ describe('HandlerDelete is one request', () => {
       .filter(([, routes]) => routes.delete !== undefined)
       .map(([type]) => type)
       .sort();
-    expect(withDelete).toEqual([...ALL_TYPES].sort());
+    assert.deepStrictEqual(withDelete, [...ALL_TYPES].sort());
   });
 
   it('deletes by the deletion request exactly the types the deletion check asks about', () => {
-    expect(DELETIONS.map(([t]) => t).sort()).toEqual(
+    assert.deepStrictEqual(
+      DELETIONS.map(([t]) => t).sort(),
       [...DELETION_TYPES].sort(),
     );
   });
 
-  it.each(DELETIONS)(
-    '%s: exactly one request, the deletion — no lock, no check — the same held, answered or 404 (a function module: its metadata read first)',
-    async (objectType, fields, uri) => {
-      const args = {
-        object_type: objectType,
-        ...fields,
-        transport_request: TRANSPORT,
-      };
-      const held = await run('pending', args);
-      const answered = await run('answered', args);
-      const notFound = await run('not-found', args);
+  for (const [objectType, fields, uri] of DELETIONS) {
+    it(
+      format(
+        '%s: exactly one request, the deletion — no lock, no check — the same held, answered or 404 (a function module: its metadata read first)',
+        objectType,
+      ),
+      async () => {
+        const args = {
+          object_type: objectType,
+          ...fields,
+          transport_request: TRANSPORT,
+        };
+        const held = await run('pending', args);
+        const answered = await run('answered', args);
+        const notFound = await run('not-found', args);
 
-      // A function module's metadata is read at the group given, and the
-      // deletion sent only when that group holds it (#2).
-      const checked = objectType === 'FUNCTION_MODULE';
-      if (checked) {
-        expect(held.sent).toEqual([
-          { method: 'GET', url: MODULE_METADATA, data: undefined },
-        ]);
-        expect(answered.sent).toHaveLength(2);
-        expect(answered.sent[0]).toEqual(held.sent[0]);
-      } else {
-        expect(held.sent).toHaveLength(1);
-        expect(answered.sent).toEqual(held.sent);
-      }
-      const deletion = checked ? answered.sent[1] : held.sent[0];
-      if (deletion === undefined) throw new Error('no deletion was sent');
-      if (objectType === 'METADATA_EXTENSION') {
-        // Its deletion is a DELETE on its own URL.
-        expect(deletion.method).toBe('DELETE');
-        expect(deletion.url.toLowerCase()).toContain(uri);
-        expect(deletion.url).toContain(`corrNr=${TRANSPORT}`);
-      } else {
-        expect(deletion.method).toBe('POST');
-        expect(deletion.url).toBe('/sap/bc/adt/deletion/delete');
-        expect(String(deletion.data).toLowerCase()).toContain(uri);
-        expect(String(deletion.data)).toContain(TRANSPORT);
-      }
-      expect(deletion.url).not.toContain('_action=');
-      expect(deletion.url).not.toContain('/deletion/check');
+        // A function module's metadata is read at the group given, and the
+        // deletion sent only when that group holds it (#2).
+        const checked = objectType === 'FUNCTION_MODULE';
+        if (checked) {
+          assert.deepStrictEqual(held.sent, [
+            { method: 'GET', url: MODULE_METADATA, data: undefined },
+          ]);
+          assert.equal(answered.sent.length, 2);
+          assert.deepStrictEqual(answered.sent[0], held.sent[0]);
+        } else {
+          assert.equal(held.sent.length, 1);
+          assert.deepStrictEqual(answered.sent, held.sent);
+        }
+        const deletion = checked ? answered.sent[1] : held.sent[0];
+        if (deletion === undefined) throw new Error('no deletion was sent');
+        if (objectType === 'METADATA_EXTENSION') {
+          // Its deletion is a DELETE on its own URL.
+          assert.equal(deletion.method, 'DELETE');
+          assert.ok(deletion.url.toLowerCase().includes(uri));
+          assert.ok(deletion.url.includes(`corrNr=${TRANSPORT}`));
+        } else {
+          assert.equal(deletion.method, 'POST');
+          assert.equal(deletion.url, '/sap/bc/adt/deletion/delete');
+          assert.ok(String(deletion.data).toLowerCase().includes(uri));
+          assert.ok(String(deletion.data).includes(TRANSPORT));
+        }
+        assert.ok(!deletion.url.includes('_action='));
+        assert.ok(!deletion.url.includes('/deletion/check'));
 
-      expect(notFound.sent).toEqual(held.sent);
-      expect(answered.answer?.isError).not.toBe(true);
-      expect(notFound.answer?.isError).toBe(true);
-    },
-  );
+        assert.deepStrictEqual(notFound.sent, held.sent);
+        assert.notEqual(answered.answer?.isError, true);
+        assert.equal(notFound.answer?.isError, true);
+      },
+    );
+  }
 
   it('answers the deletion result as SAP gave it', async () => {
     const answered = await run('answered', {
       object_type: 'CLASS',
       class_name: 'ZCL_A',
     });
-    expect(JSON.parse(textOf(answered.answer))).toMatchObject({
+    assertMatchObject(JSON.parse(textOf(answered.answer)), {
       deleted: true,
     });
   });
 
-  it.each(INCLUDES)(
-    '%s: exactly one PUT, empty body, under the given lock_handle — no lock, unlock or activation — the same held, answered or 404',
-    async (objectType, include) => {
-      const args = {
-        object_type: objectType,
-        class_name: 'ZCL_A',
-        lock_handle: LOCK,
-        transport_request: TRANSPORT,
-      };
-      const held = await run('pending', args);
-      const answered = await run('answered', args);
-      const notFound = await run('not-found', args);
-
-      expect(held.sent).toHaveLength(1);
-      const [write] = held.sent;
-      expect(write.method).toBe('PUT');
-      expect(write.url).toContain(
-        `/sap/bc/adt/oo/classes/zcl_a/includes/${include}`,
-      );
-      expect(write.url).toContain(`lockHandle=${LOCK}`);
-      expect(write.url).toContain(`corrNr=${TRANSPORT}`);
-      expect(write.data).toBe('');
-
-      expect(answered.sent).toEqual(held.sent);
-      expect(notFound.sent).toEqual(held.sent);
-      expect(answered.answer?.isError).not.toBe(true);
-      expect(notFound.answer?.isError).toBe(true);
-    },
-  );
-
-  it.each(INCLUDES)(
-    '%s: without lock_handle refused before any request',
-    async (objectType) => {
-      for (const lock_handle of [undefined, '', '  ']) {
-        const answered = await run('answered', {
+  for (const [objectType, include] of INCLUDES) {
+    it(
+      format(
+        '%s: exactly one PUT, empty body, under the given lock_handle — no lock, unlock or activation — the same held, answered or 404',
+        objectType,
+      ),
+      async () => {
+        const args = {
           object_type: objectType,
           class_name: 'ZCL_A',
-          lock_handle,
-        });
-        expect(answered.sent).toEqual([]);
-        expect(answered.answer?.isError).toBe(true);
-        expect(textOf(answered.answer)).toContain('lock_handle is required');
-      }
-    },
-  );
-
-  it.each(INCLUDES)(
-    '%s: under a lock_handle the instance does not hold (Streamable HTTP), refused before any request',
-    async (objectType) => {
-      const answered = await run(
-        'answered',
-        { object_type: objectType, class_name: 'ZCL_A', lock_handle: LOCK },
-        new HeldLocks(),
-      );
-      expect(answered.sent).toEqual([]);
-      expect(textOf(answered.answer)).toContain('lock_handle is not held');
-    },
-  );
-
-  it.each(INCLUDES)(
-    '%s: without class_name refused before any request',
-    async (objectType) => {
-      for (const class_name of [undefined, '', '  ']) {
-        const answered = await run('answered', {
-          object_type: objectType,
-          class_name,
           lock_handle: LOCK,
-        });
-        expect(answered.sent).toEqual([]);
-        expect(answered.answer?.isError).toBe(true);
-        expect(textOf(answered.answer)).toContain('class_name is required');
-      }
-    },
-  );
+          transport_request: TRANSPORT,
+        };
+        const held = await run('pending', args);
+        const answered = await run('answered', args);
+        const notFound = await run('not-found', args);
+
+        assert.equal(held.sent.length, 1);
+        const [write] = held.sent;
+        assert.equal(write.method, 'PUT');
+        assert.ok(
+          write.url.includes(
+            `/sap/bc/adt/oo/classes/zcl_a/includes/${include}`,
+          ),
+        );
+        assert.ok(write.url.includes(`lockHandle=${LOCK}`));
+        assert.ok(write.url.includes(`corrNr=${TRANSPORT}`));
+        assert.equal(write.data, '');
+
+        assert.deepStrictEqual(answered.sent, held.sent);
+        assert.deepStrictEqual(notFound.sent, held.sent);
+        assert.notEqual(answered.answer?.isError, true);
+        assert.equal(notFound.answer?.isError, true);
+      },
+    );
+  }
+
+  for (const [objectType] of INCLUDES) {
+    it(
+      format('%s: without lock_handle refused before any request', objectType),
+      async () => {
+        for (const lock_handle of [undefined, '', '  ']) {
+          const answered = await run('answered', {
+            object_type: objectType,
+            class_name: 'ZCL_A',
+            lock_handle,
+          });
+          assert.deepStrictEqual(answered.sent, []);
+          assert.equal(answered.answer?.isError, true);
+          assert.ok(
+            textOf(answered.answer).includes('lock_handle is required'),
+          );
+        }
+      },
+    );
+  }
+
+  for (const [objectType] of INCLUDES) {
+    it(
+      format(
+        '%s: under a lock_handle the instance does not hold (Streamable HTTP), refused before any request',
+        objectType,
+      ),
+      async () => {
+        const answered = await run(
+          'answered',
+          { object_type: objectType, class_name: 'ZCL_A', lock_handle: LOCK },
+          new HeldLocks(),
+        );
+        assert.deepStrictEqual(answered.sent, []);
+        assert.ok(textOf(answered.answer).includes('lock_handle is not held'));
+      },
+    );
+  }
+
+  for (const [objectType] of INCLUDES) {
+    it(
+      format('%s: without class_name refused before any request', objectType),
+      async () => {
+        for (const class_name of [undefined, '', '  ']) {
+          const answered = await run('answered', {
+            object_type: objectType,
+            class_name,
+            lock_handle: LOCK,
+          });
+          assert.deepStrictEqual(answered.sent, []);
+          assert.equal(answered.answer?.isError, true);
+          assert.ok(textOf(answered.answer).includes('class_name is required'));
+        }
+      },
+    );
+  }
 
   it('FUNCTION_MODULE: without function_group_name refused before any request', async () => {
     for (const function_group_name of [undefined, '', '  ']) {
@@ -362,60 +391,73 @@ describe('HandlerDelete is one request', () => {
         function_module_name: 'Z_FM_A',
         function_group_name,
       });
-      expect(answered.sent).toEqual([]);
-      expect(answered.answer?.isError).toBe(true);
-      expect(textOf(answered.answer)).toContain(
-        'function_group_name is required',
+      assert.deepStrictEqual(answered.sent, []);
+      assert.equal(answered.answer?.isError, true);
+      assert.ok(
+        textOf(answered.answer).includes('function_group_name is required'),
       );
     }
   });
 
-  it.each(DELETIONS)(
-    '%s: without its name refused before any request',
-    async (objectType, fields) => {
-      const [field] = Object.keys(fields);
-      const answered = await run('answered', {
-        object_type: objectType,
-        ...fields,
-        [field]: undefined,
-      });
-      expect(answered.sent).toEqual([]);
-      expect(textOf(answered.answer)).toContain(`${field} is required`);
-    },
-  );
+  for (const [objectType, fields] of DELETIONS) {
+    it(
+      format('%s: without its name refused before any request', objectType),
+      async () => {
+        const [field] = Object.keys(fields);
+        const answered = await run('answered', {
+          object_type: objectType,
+          ...fields,
+          [field]: undefined,
+        });
+        assert.deepStrictEqual(answered.sent, []);
+        assert.ok(textOf(answered.answer).includes(`${field} is required`));
+      },
+    );
+  }
 
-  it.each(['TRANSPORT', 'RUNTIME_DUMP', 'NO_SUCH_TYPE'])(
-    '%s: a type with no delete answers in the delete route’s words',
-    async (objectType) => {
-      const answered = await run('answered', { object_type: objectType });
-      expect(answered.sent).toEqual([]);
-      expect(textOf(answered.answer)).toContain(
-        `Unsupported delete for object_type: ${objectType}`,
-      );
-    },
-  );
+  for (const objectType of ['TRANSPORT', 'RUNTIME_DUMP', 'NO_SUCH_TYPE']) {
+    it(
+      format(
+        '%s: a type with no delete answers in the delete route’s words',
+        objectType,
+      ),
+      async () => {
+        const answered = await run('answered', { object_type: objectType });
+        assert.deepStrictEqual(answered.sent, []);
+        assert.ok(
+          textOf(answered.answer).includes(
+            `Unsupported delete for object_type: ${objectType}`,
+          ),
+        );
+      },
+    );
+  }
 });
 
 const schemaProperties = listedJson(compactDeleteSchema).properties ?? {};
 
 describe('the HandlerDelete schema and description', () => {
-  it.each(['activate_on_delete', 'force_new_connection', 'activate'])(
-    '%s is not in the schema',
-    (name) => {
-      expect(Object.keys(schemaProperties)).not.toContain(name);
-    },
-  );
+  for (const name of [
+    'activate_on_delete',
+    'force_new_connection',
+    'activate',
+  ]) {
+    it(format('%s is not in the schema', name), () => {
+      assert.ok(!Object.keys(schemaProperties).includes(name));
+    });
+  }
 
   it('object_type names exactly the types with a delete route', () => {
     const withDelete = Object.entries(compactWriteRouterMap)
       .filter(([, routes]) => routes.delete !== undefined)
       .map(([type]) => type)
       .sort();
-    expect(
+    assert.deepStrictEqual(
       [
         ...(jsonAt(listedJson(compactDeleteSchema), 'object_type').enum ?? []),
       ].sort(),
-    ).toEqual(withDelete);
+      withDelete,
+    );
   });
 
   it('deletes a table type on ABAP cloud, and no include there', () => {
@@ -424,24 +466,25 @@ describe('the HandlerDelete schema and description', () => {
         listedJson(TOOL_DEFINITION.variants.cloud.inputSchema),
         'object_type',
       ).enum ?? [];
-    expect(members).toContain('TABLE_TYPE');
-    expect(members).not.toContain('INCLUDE');
+    assert.ok(members.includes('TABLE_TYPE'));
+    assert.ok(!members.includes('INCLUDE'));
   });
 
   it('lock_handle and transport_request are in the schema', () => {
-    expect(Object.keys(schemaProperties)).toEqual(
-      expect.arrayContaining(['lock_handle', 'transport_request']),
-    );
+    const keys = Object.keys(schemaProperties);
+    for (const key of ['lock_handle', 'transport_request']) {
+      assert.ok(keys.some((e) => isDeepStrictEqual(e, key)));
+    }
   });
 
   it('names no other tool', () => {
-    expect(TOOL_DEFINITION.description).not.toMatch(/Handler[A-Z]/);
+    assert.doesNotMatch(TOOL_DEFINITION.description, /Handler[A-Z]/);
   });
 
   it('advertises every type it deletes, with only schema arguments; lock_handle for the includes alone', () => {
     const description: string = TOOL_DEFINITION.description;
     const start = description.indexOf('object_type required:');
-    expect(start).toBeGreaterThanOrEqual(0);
+    assert.ok(start >= 0);
     const tail = description.slice(start);
     const segment = tail.slice(0, tail.indexOf('. '));
     const advertised = [...segment.matchAll(/([A-Z_]+)\(([^)]*)\)/g)].map(
@@ -453,16 +496,20 @@ describe('the HandlerDelete schema and description', () => {
           .filter((arg) => arg.length > 0),
       ],
     ) as Array<[string, string[]]>;
-    expect(advertised.map(([type]) => type).sort()).toEqual(
+    assert.deepStrictEqual(
+      advertised.map(([type]) => type).sort(),
       [...ALL_TYPES].sort(),
     );
     const includeTypes = INCLUDES.map(([t]) => t);
     for (const [type, args] of advertised) {
-      expect({
-        type,
-        foreign: args.filter((arg) => !(arg in schemaProperties)),
-        lock: args.includes('lock_handle'),
-      }).toEqual({ type, foreign: [], lock: includeTypes.includes(type) });
+      assert.deepStrictEqual(
+        {
+          type,
+          foreign: args.filter((arg) => !(arg in schemaProperties)),
+          lock: args.includes('lock_handle'),
+        },
+        { type, foreign: [], lock: includeTypes.includes(type) },
+      );
     }
   });
 });

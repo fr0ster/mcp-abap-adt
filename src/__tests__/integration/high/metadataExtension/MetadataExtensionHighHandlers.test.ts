@@ -11,7 +11,7 @@
  *   DEBUG_ADT_LIBS=true      - Library logs
  *   DEBUG_CONNECTORS=true    - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/metadataExtension
+ * Run: npm run test:integration -- src/__tests__/integration/high/metadataExtension/MetadataExtensionHighHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

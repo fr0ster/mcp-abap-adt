@@ -8,6 +8,9 @@
  * a system. The batch connection is adt-clients' own `AdtBatchConnection`
  * over the late-bound target; its `execute()` is never run here (Task 6).
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, describe, it, type Mock, mock } from 'node:test';
 import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import type { IAbapRequestOptions } from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -42,6 +45,12 @@ import { noConnectionContext } from '../../../lib/handlers/registry/expositionRe
 import * as longCall from '../../../lib/longCall';
 import * as packageSessions from '../../../lib/packageSessions';
 import { currentRequestSignal } from '../../../lib/requestSignal';
+import {
+  assertMatchObject,
+  assertRejects,
+  assertThrows,
+  rejectionOf,
+} from '../../helpers/assertions';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -53,12 +62,12 @@ const silent = { info() {}, debug() {}, warn() {}, error() {} };
 function fakeConnection() {
   const sent: IAbapRequestOptions[] = [];
   const connection = {
-    connect: jest.fn(async () => undefined),
-    getBaseUrl: jest.fn(async () => 'https://system.invalid'),
+    connect: mock.fn(async () => undefined),
+    getBaseUrl: mock.fn(async () => 'https://system.invalid'),
     getSessionId: () => null,
-    setSessionType: jest.fn(),
+    setSessionType: mock.fn(),
     getSessionType: () => 'stateless' as const,
-    makeAdtRequest: jest.fn(async (request: IAbapRequestOptions) => {
+    makeAdtRequest: mock.fn(async (request: IAbapRequestOptions) => {
       sent.push(request);
       return { status: 200, statusText: 'OK', headers: {}, data: '' };
     }),
@@ -129,7 +138,7 @@ interface Stand {
   target: LateBoundConnection;
   /** Every request recorded into the batch connection, in order. */
   recorded: string[];
-  execute: jest.SpyInstance;
+  execute: Mock<AdtBatchConnection['execute']>;
   instance: ReturnType<typeof fakeConnection>;
   server: EmbeddableMcpServer;
   call(name: string, args?: Record<string, unknown>): Promise<Answer>;
@@ -161,7 +170,7 @@ async function stand(
     recorded.push(request.url);
     return record(request);
   }) as typeof batch.makeAdtRequest;
-  const execute = jest.spyOn(batch, 'execute');
+  const execute = mock.method(batch, 'execute');
   if (options.open !== false) {
     owner.begin('communication', { connection: batch, target, recorded: [] });
   }
@@ -206,7 +215,7 @@ async function stand(
 
 /** The `{ error, message }` of a server refusal's answer. */
 function refusalOf(answer: Answer): { error?: string; message?: string } {
-  expect(answer.isError).toBe(true);
+  assert.equal(answer.isError, true);
   return JSON.parse(answer.content?.[0]?.text ?? '{}');
 }
 
@@ -214,7 +223,7 @@ const recordedCalls = (s: Stand) =>
   s.owner.opened()?.recorded.map((r) => r.number) ?? [];
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 describe('recording in batch mode', () => {
@@ -225,10 +234,10 @@ describe('recording in batch mode', () => {
     const answer = await s.call('HandlerServiceBindingListTypes', {
       name: 'Z',
     });
-    expect(answer).toEqual({ content: [] });
-    expect(s.execute).not.toHaveBeenCalled();
-    expect(s.recorded).toEqual(['/program']);
-    expect(recordedCalls(s)).toEqual([1]);
+    assert.deepStrictEqual(answer, { content: [] });
+    assert.equal(s.execute.mock.callCount(), 0);
+    assert.deepStrictEqual(s.recorded, ['/program']);
+    assert.deepStrictEqual(recordedCalls(s), [1]);
     await s.close();
   });
 
@@ -242,8 +251,8 @@ describe('recording in batch mode', () => {
       object_type: 'CLASS',
       class_name: 'ZCL_PLACEHOLDER',
     });
-    expect(s.instance.connection.makeAdtRequest).not.toHaveBeenCalled();
-    expect(s.recorded).toHaveLength(2);
+    assert.equal(s.instance.connection.makeAdtRequest.mock.callCount(), 0);
+    assert.equal(s.recorded.length, 2);
     await s.close();
   });
 
@@ -259,9 +268,9 @@ describe('recording in batch mode', () => {
       s.call('HandlerServiceBindingListTypes', { name: 'Z' }),
       s.call('HandlerProfileList', { name: 'Z' }),
     ]);
-    expect(answers).toEqual([{ content: [] }, { content: [] }]);
-    expect(s.recorded).toEqual(['/first', '/second']);
-    expect(recordedCalls(s)).toEqual([1, 2]);
+    assert.deepStrictEqual(answers, [{ content: [] }, { content: [] }]);
+    assert.deepStrictEqual(s.recorded, ['/first', '/second']);
+    assert.deepStrictEqual(recordedCalls(s), [1, 2]);
     await s.close();
   });
 
@@ -270,19 +279,23 @@ describe('recording in batch mode', () => {
       shipped('HandlerGet'),
       groupOf([tool('HandlerServiceBindingListTypes', oneGet('/program'))]),
     ]);
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerGet', {
         object_type: 'PROGRAM',
         program_name: 'PROG_A',
         part: 'draft',
       }),
-    ).toEqual({ content: [] });
+      { content: [] },
+    );
     // The three versions of the one part, sent together.
-    expect(s.recorded).toHaveLength(3);
-    expect(s.recorded.every((url) => url.includes('prog_a'))).toBe(true);
-    expect(recordedCalls(s)).toEqual([1]);
+    assert.equal(s.recorded.length, 3);
+    assert.equal(
+      s.recorded.every((url) => url.includes('prog_a')),
+      true,
+    );
+    assert.deepStrictEqual(recordedCalls(s), [1]);
     await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
-    expect(recordedCalls(s)).toEqual([1, 2]);
+    assert.deepStrictEqual(recordedCalls(s), [1, 2]);
     await s.close();
   });
 
@@ -314,13 +327,13 @@ describe('recording in batch mode', () => {
       s.call('HandlerServiceBindingListTypes', { name: 'Z' }),
       s.call('HandlerProfileList', { name: 'Z' }),
     ]);
-    expect(s.recorded).toEqual(['/a-1', '/a-2', '/b']);
-    expect(recordedCalls(s)).toEqual([1, 2]);
+    assert.deepStrictEqual(s.recorded, ['/a-1', '/a-2', '/b']);
+    assert.deepStrictEqual(recordedCalls(s), [1, 2]);
     await s.close();
   });
 
-  it('eligible() receives the SDK-parsed arguments (a schema default applied, an unknown key stripped)', async () => {
-    const asked = jest.spyOn(eligibility, 'eligible');
+  it('eligible() receives the SDK-parsed arguments (a schema default applied, an unknown key stripped)', async (t) => {
+    const asked = t.mock.method(eligibility, 'eligible');
     let received: unknown;
     const s = await stand([
       groupOf([
@@ -341,18 +354,21 @@ describe('recording in batch mode', () => {
       class_name: 'ZCL_PLACEHOLDER',
       unknown: 1,
     });
-    expect(asked).toHaveBeenCalledTimes(1);
-    const [name, args, kind] = asked.mock.calls[0] ?? [];
-    expect(name).toBe('HandlerProfileList');
-    expect(args).toEqual({ class_name: 'ZCL_PLACEHOLDER', version: 'active' });
-    expect(kind).toBe('http');
+    assert.equal(asked.mock.callCount(), 1);
+    const [name, args, kind] = asked.mock.calls[0]?.arguments ?? [];
+    assert.equal(name, 'HandlerProfileList');
+    assert.deepStrictEqual(args, {
+      class_name: 'ZCL_PLACEHOLDER',
+      version: 'active',
+    });
+    assert.equal(kind, 'http');
     // The same object the handler received.
-    expect(args).toBe(received);
+    assert.equal(args, received);
     await s.close();
   });
 
   it('an ineligible call is refused batch_not_recordable, its handler not called, no number taken', async () => {
-    const update = jest.fn(oneGet('/update'));
+    const update = mock.fn(oneGet('/update'));
     const s = await stand([
       groupOf([
         tool('UpdateDomain', update as Handler),
@@ -360,14 +376,14 @@ describe('recording in batch mode', () => {
       ]),
     ]);
     const refused = refusalOf(await s.call('UpdateDomain', { name: 'Z' }));
-    expect(refused).toEqual({
+    assert.deepStrictEqual(refused, {
       error: 'batch_not_recordable',
       message: batchNotRecordableWords('UpdateDomain'),
     });
-    expect(update).not.toHaveBeenCalled();
-    expect(s.recorded).toEqual([]);
+    assert.equal(update.mock.callCount(), 0);
+    assert.deepStrictEqual(s.recorded, []);
     await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
-    expect(recordedCalls(s)).toEqual([1]);
+    assert.deepStrictEqual(recordedCalls(s), [1]);
     await s.close();
   });
 
@@ -382,19 +398,19 @@ describe('recording in batch mode', () => {
       ]),
     ]);
     const answer = await s.call('HandlerProfileList', { name: '' });
-    expect(answer).toEqual({
+    assert.deepStrictEqual(answer, {
       isError: true,
       content: [{ type: 'text', text: 'class_name is required' }],
     });
-    expect(recordedCalls(s)).toEqual([]);
+    assert.deepStrictEqual(recordedCalls(s), []);
     await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
-    expect(recordedCalls(s)).toEqual([1]);
+    assert.deepStrictEqual(recordedCalls(s), [1]);
     await s.close();
   });
 
   it('while a batch is open a debugger tool, a leftover-session tool and a registry\'s own tool are refused "<tool> is not served while a batch is open"', async () => {
-    const debug = jest.fn(oneGet('/debug'));
-    const leftover = jest.fn(async () => ({ content: [] }));
+    const debug = mock.fn(oneGet('/debug'));
+    const leftover = mock.fn(async () => ({ content: [] }));
     const s = await stand([
       groupOf([
         tool('DebugStep', debug as Handler),
@@ -404,17 +420,17 @@ describe('recording in batch mode', () => {
       ]),
     ]);
     for (const name of ['DebugStep', 'ListLeftoverSessions']) {
-      expect(refusalOf(await s.call(name, {}))).toEqual({
+      assert.deepStrictEqual(refusalOf(await s.call(name, {})), {
         error: 'batch_not_recordable',
         message: batchNotServedWords(name),
       });
     }
-    expect(debug).not.toHaveBeenCalled();
-    expect(leftover).not.toHaveBeenCalled();
+    assert.equal(debug.mock.callCount(), 0);
+    assert.equal(leftover.mock.callCount(), 0);
     await s.close();
 
     // A registry that registers its own tools.
-    const own = jest.fn(async () => ({
+    const own = mock.fn(async () => ({
       content: [{ type: 'text', text: 'x' }],
     }));
     const registry = {
@@ -431,30 +447,30 @@ describe('recording in batch mode', () => {
       registerTool() {},
     } as unknown as IHandlersRegistry;
     const r = await stand([], { registry });
-    expect(refusalOf(await r.call('OwnTool', {}))).toEqual({
+    assert.deepStrictEqual(refusalOf(await r.call('OwnTool', {})), {
       error: 'batch_not_recordable',
       message: batchNotServedWords('OwnTool'),
     });
-    expect(own).not.toHaveBeenCalled();
-    expect(r.recorded).toEqual([]);
+    assert.equal(own.mock.callCount(), 0);
+    assert.deepStrictEqual(r.recorded, []);
     await r.close();
   });
 
-  it('a long read with independent requests is recorded: runLongCall and openFreshConnection not called', async () => {
-    const run = jest.spyOn(longCall, 'runLongCall');
-    const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
+  it('a long read with independent requests is recorded: runLongCall and openFreshConnection not called', async (t) => {
+    const run = t.mock.method(longCall, 'runLongCall');
+    const fresh = t.mock.method(packageSessions, 'openFreshConnection');
     const s = await stand([shipped('HandlerSystem')]);
     const answer = await s.call('HandlerSystem', {
       action: 'search_object',
       object_name: 'ZPLACEHOLDER*',
     });
-    expect(answer).toEqual({ content: [] });
-    expect(run).not.toHaveBeenCalled();
-    expect(fresh).not.toHaveBeenCalled();
-    expect(s.recorded).toHaveLength(1);
-    expect(s.recorded[0]).toContain('quickSearch');
-    expect(s.instance.connection.makeAdtRequest).not.toHaveBeenCalled();
-    expect(recordedCalls(s)).toEqual([1]);
+    assert.deepStrictEqual(answer, { content: [] });
+    assert.equal(run.mock.callCount(), 0);
+    assert.equal(fresh.mock.callCount(), 0);
+    assert.equal(s.recorded.length, 1);
+    assert.ok(s.recorded[0].includes('quickSearch'));
+    assert.equal(s.instance.connection.makeAdtRequest.mock.callCount(), 0);
+    assert.deepStrictEqual(recordedCalls(s), [1]);
     await s.close();
   });
 
@@ -474,12 +490,12 @@ describe('recording in batch mode', () => {
         background: true,
       }),
     );
-    expect(refused).toEqual({
+    assert.deepStrictEqual(refused, {
       error: 'batch_no_background',
       message: BATCH_NO_BACKGROUND_WORDS,
     });
-    expect(s.recorded).toEqual([]);
-    expect(recordedCalls(s)).toEqual([]);
+    assert.deepStrictEqual(s.recorded, []);
+    assert.deepStrictEqual(recordedCalls(s), []);
     await s.close();
   });
 
@@ -495,13 +511,13 @@ describe('recording in batch mode', () => {
     ]);
     await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
     await s.server.idle();
-    expect(seen).toBe(s.owner.signal());
-    expect(seen?.aborted).toBe(false);
+    assert.equal(seen, s.owner.signal());
+    assert.equal(seen?.aborted, false);
     await s.close();
   });
 
-  it("the recorded handler runs with the call's own transport_request (the failure renderer's transport hint)", async () => {
-    jest.spyOn(eligibility, 'eligible').mockReturnValue({ ok: true } as never);
+  it("the recorded handler runs with the call's own transport_request (the failure renderer's transport hint)", async (t) => {
+    t.mock.method(eligibility, 'eligible', () => ({ ok: true }) as never);
     let seen: string | undefined;
     const s = await stand([
       groupOf([
@@ -522,9 +538,9 @@ describe('recording in batch mode', () => {
       name: 'Z',
       transport_request: 'SIDK900001',
     });
-    expect(answered).toEqual({ content: [] });
+    assert.deepStrictEqual(answered, { content: [] });
     await s.server.idle();
-    expect(seen).toBe('SIDK900001');
+    assert.equal(seen, 'SIDK900001');
     await s.close();
   });
 
@@ -544,8 +560,8 @@ describe('recording in batch mode', () => {
       s.server.idle().then(() => 'idle'),
       new Promise((r) => setTimeout(() => r('held'), 1000)),
     ]);
-    expect(idle).toBe('idle');
-    expect(settled).toBe(false); // its part waits for HandlerBatch end
+    assert.equal(idle, 'idle');
+    assert.equal(settled, false); // its part waits for HandlerBatch end
     await s.close();
   });
 
@@ -559,15 +575,13 @@ describe('recording in batch mode', () => {
       ]),
     ]);
     await s.call('HandlerServiceBindingListTypes', { name: 'Z' });
-    expect(s.instance.connection.getBaseUrl).toHaveBeenCalledTimes(1);
-    await expect(s.target.getBaseUrl()).rejects.toThrow(
-      LATE_BOUND_UNPOINTED_WORDS,
-    );
+    assert.equal(s.instance.connection.getBaseUrl.mock.callCount(), 1);
+    await assertRejects(s.target.getBaseUrl(), LATE_BOUND_UNPOINTED_WORDS);
     await s.close();
   });
 
   it('a background run in batch mode is not served: its handler not called, no number', async () => {
-    const run = jest.fn(oneGet('/run'));
+    const run = mock.fn(oneGet('/run'));
     const s = await stand(
       [
         groupOf([
@@ -583,26 +597,27 @@ describe('recording in batch mode', () => {
       ],
       { backgroundRuns: true },
     );
-    expect(
+    assert.deepStrictEqual(
       refusalOf(
         await s.call('RuntimeRunClass', {
           class_name: 'ZCL_PLACEHOLDER',
           background: true,
         }),
       ),
-    ).toEqual({
-      error: 'batch_not_recordable',
-      message: batchNotServedWords('RuntimeRunClass'),
-    });
-    expect(run).not.toHaveBeenCalled();
-    expect(s.recorded).toEqual([]);
-    expect(recordedCalls(s)).toEqual([]);
+      {
+        error: 'batch_not_recordable',
+        message: batchNotServedWords('RuntimeRunClass'),
+      },
+    );
+    assert.equal(run.mock.callCount(), 0);
+    assert.deepStrictEqual(s.recorded, []);
+    assert.deepStrictEqual(recordedCalls(s), []);
     await s.close();
   });
 
-  it('a long read admitted on its own connection before the batch opened is not served once it opens: nothing recorded, no own connection', async () => {
-    const run = jest.spyOn(longCall, 'runLongCall');
-    const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
+  it('a long read admitted on its own connection before the batch opened is not served once it opens: nothing recorded, no own connection', async (t) => {
+    const run = t.mock.method(longCall, 'runLongCall');
+    const fresh = t.mock.method(packageSessions, 'openFreshConnection');
     // The batch opens while the call is past its entry: during its system
     // lookup, which it makes in a turn of its own (it holds none).
     const s = await stand([shipped('HandlerSystem')], {
@@ -617,22 +632,23 @@ describe('recording in batch mode', () => {
         }
       },
     });
-    expect(
+    assert.deepStrictEqual(
       refusalOf(
         await s.call('HandlerSystem', {
           action: 'search_object',
           object_name: 'ZPLACEHOLDER*',
         }),
       ),
-    ).toEqual({
-      error: 'batch_not_recordable',
-      message: batchNotServedWords('HandlerSystem'),
-    });
-    expect(s.owner.mode()).toBe('communication');
-    expect(run).not.toHaveBeenCalled();
-    expect(fresh).not.toHaveBeenCalled();
-    expect(s.recorded).toEqual([]);
-    expect(recordedCalls(s)).toEqual([]);
+      {
+        error: 'batch_not_recordable',
+        message: batchNotServedWords('HandlerSystem'),
+      },
+    );
+    assert.equal(s.owner.mode(), 'communication');
+    assert.equal(run.mock.callCount(), 0);
+    assert.equal(fresh.mock.callCount(), 0);
+    assert.deepStrictEqual(s.recorded, []);
+    assert.deepStrictEqual(recordedCalls(s), []);
     await s.close();
   });
 
@@ -646,9 +662,14 @@ describe('recording in batch mode', () => {
     const answer = await s.call('HandlerServiceBindingListTypes', {
       name: 'Z',
     });
-    expect(answer).toEqual({ content: [{ type: 'text', text: '/program' }] });
-    expect(s.instance.sent.map((r) => r.url)).toEqual(['/program']);
-    expect(s.recorded).toEqual([]);
+    assert.deepStrictEqual(answer, {
+      content: [{ type: 'text', text: '/program' }],
+    });
+    assert.deepStrictEqual(
+      s.instance.sent.map((r) => r.url),
+      ['/program'],
+    );
+    assert.deepStrictEqual(s.recorded, []);
     await s.close();
   });
 });
@@ -686,9 +707,9 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
       send('/1');
       return never;
     })();
-    expect(await untilSent(handler, recorder)).toBe('recorded');
-    expect(recorder.requests()).toBe(3);
-    expect(numbers).toEqual([1]);
+    assert.equal(await untilSent(handler, recorder), 'recorded');
+    assert.equal(recorder.requests(), 3);
+    assert.deepStrictEqual(numbers, [1]);
   });
 
   it('nothing recorded yet is no end: a handler recording after a delay is waited for', async () => {
@@ -698,8 +719,8 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
       send('/late');
       return never;
     })();
-    expect(await untilSent(handler, recorder)).toBe('recorded');
-    expect(recorder.requests()).toBe(1);
+    assert.equal(await untilSent(handler, recorder), 'recorded');
+    assert.equal(recorder.requests(), 1);
   });
 
   it('a part answered 406 through an AdtClient over the recorder is not corrected and sent again', async () => {
@@ -736,10 +757,10 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
     });
     // The handler meets its part when its number is read.
     recorder.release();
-    await expect(answered).rejects.toMatchObject({
+    assertMatchObject(await rejectionOf(answered), {
       response: { status: 406 },
     });
-    expect(sent).toHaveLength(1);
+    assert.equal(sent.length, 1);
   });
 
   it('a batch connection that throws while recording takes no number: the next recorded request takes 1', () => {
@@ -760,23 +781,25 @@ describe('the recorder, and untilSent: everything sent before an answer, by even
       (n) => numbers.push(n),
       'GetProgram',
     );
-    expect(() =>
-      recorder.makeAdtRequest({ url: '/refused', method: 'GET', timeout: 0 }),
-    ).toThrow('the batch connection refused the request');
-    expect(recorder.number()).toBeUndefined();
-    expect(recorder.requests()).toBe(0);
-    expect(numbers).toEqual([]);
+    assertThrows(
+      () =>
+        recorder.makeAdtRequest({ url: '/refused', method: 'GET', timeout: 0 }),
+      'the batch connection refused the request',
+    );
+    assert.equal(recorder.number(), undefined);
+    assert.equal(recorder.requests(), 0);
+    assert.deepStrictEqual(numbers, []);
     refuse = false;
     void recorder.makeAdtRequest({ url: '/kept', method: 'GET', timeout: 0 });
-    expect(recorder.number()).toBe(1);
-    expect(numbers).toEqual([1]);
+    assert.equal(recorder.number(), 1);
+    assert.deepStrictEqual(numbers, [1]);
   });
 
   it('a handler settling without a request is settled, with no number', async () => {
     const { recorder, numbers } = pendingRecorder();
     const handler = (async () => ({ content: [] }))();
-    expect(await untilSent(handler, recorder)).toBe('settled');
-    expect(recorder.number()).toBeUndefined();
-    expect(numbers).toEqual([]);
+    assert.equal(await untilSent(handler, recorder), 'settled');
+    assert.equal(recorder.number(), undefined);
+    assert.deepStrictEqual(numbers, []);
   });
 });

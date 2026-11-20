@@ -23,8 +23,10 @@
  * hold one).
  */
 
+import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import * as path from 'node:path';
+import { it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { McpResult } from '../../lib/answer';
@@ -45,6 +47,7 @@ import {
   type StandInRequest,
   type StandInResponse,
 } from './adtStandIn';
+import { useFakeTimers, useRealTimers } from './fakeTime';
 import { holdingLockOf } from './heldLocks';
 import type { PinnedRequest } from './pinnedRequest';
 import { type PinSetup, pinServer } from './pinServer';
@@ -321,41 +324,24 @@ export function seededCrypto(seed: string) {
   };
 }
 
-/** Every timer API but `Date`: left real, so timers, ticks and I/O run. */
-const REAL_TIMERS = [
-  'hrtime',
-  'nextTick',
-  'performance',
-  'queueMicrotask',
-  'requestAnimationFrame',
-  'cancelAnimationFrame',
-  'requestIdleCallback',
-  'cancelIdleCallback',
-  'setImmediate',
-  'clearImmediate',
-  'setInterval',
-  'clearInterval',
-  'setTimeout',
-  'clearTimeout',
-] as const;
-
 /**
- * Fixes the clock at `PIN_EPOCH` and every random source a case can reach
- * to `seed`'s sequences; the answer restores each.
+ * Fixes the clock at `PIN_EPOCH` — `Date` alone faked, so timers, ticks and
+ * I/O run — and every random source a case can reach to `seed`'s
+ * sequences; the answer restores each.
  */
 export function installPinFakes(seed: string): () => void {
-  jest.useFakeTimers({ now: PIN_EPOCH, doNotFake: [...REAL_TIMERS] });
+  useFakeTimers({ apis: ['Date'], now: PIN_EPOCH });
   const seeded = seededCrypto(seed);
   const spies = [
-    jest.spyOn(crypto, 'randomUUID').mockImplementation(seeded.randomUUID),
-    jest
-      .spyOn(crypto, 'randomBytes')
-      .mockImplementation((size: number) => seeded.randomBytes(size)),
-    jest.spyOn(Math, 'random').mockImplementation(seeded.random),
+    mock.method(crypto, 'randomUUID', seeded.randomUUID),
+    mock.method(crypto, 'randomBytes', (size: number) =>
+      seeded.randomBytes(size),
+    ),
+    mock.method(Math, 'random', seeded.random),
   ];
   return () => {
-    for (const spy of spies) spy.mockRestore();
-    jest.useRealTimers();
+    for (const spy of spies) spy.mock.restore();
+    useRealTimers();
   };
 }
 
@@ -837,23 +823,24 @@ export async function runPinCase(
   }
   if (c.refusal === 'thrown') {
     const message = first.thrown instanceof Error ? first.thrown.message : '';
-    expect(message.startsWith(invalidArgumentsStart(c.tool))).toBe(true);
-    expect(first.requests).toEqual([]);
+    assert.equal(message.startsWith(invalidArgumentsStart(c.tool)), true);
+    assert.deepStrictEqual(first.requests, []);
     return;
   }
   if (first.thrown !== undefined) throw first.thrown;
   const answer = first.answer;
   if (answer === undefined) throw new Error('the call answered nothing');
-  expect({ isError: answer.isError }).toEqual({
-    isError: c.refusal === 'answer',
-  });
+  assert.deepStrictEqual(
+    { isError: answer.isError },
+    { isError: c.refusal === 'answer' },
+  );
   if (c.expected === 'none') {
-    expect(first.requests).toEqual([]);
+    assert.deepStrictEqual(first.requests, []);
     c.ran?.(answer);
     return;
   }
   if (c.expected === 'nothing-sent') return;
-  expect(first.requests).toEqual(c.expected);
+  assert.deepStrictEqual(first.requests, c.expected);
 }
 
 /** The key a case stands for: `keyOf(tool, args)`. */
@@ -862,7 +849,7 @@ export const pinKey = (c: PinCase): CoverageKey => keyOf(c.tool, c.args);
 /**
  * One `it('<key> (<variant>) sends the pinned requests')` per case. Call it
  * at the top level or in a `describe` callback: the guard refuses a call
- * Jest never collects.
+ * the runner never collects.
  */
 export function pinCases(
   cases: readonly PinCase[],

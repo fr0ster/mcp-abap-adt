@@ -6,6 +6,9 @@
  * (`sourceUriOf`) with the version.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { ReadVersion } from '../../../lib/handlers/readVersion';
 import {
@@ -59,20 +62,26 @@ const everyReader = (version: ReadVersion): SourceRead[] => [
 ];
 
 describe('SearchSource: every source read states its version', () => {
-  it.each(VERSIONS)(
-    'every reader sends its source URI at the version given (%s)',
-    async (version) => {
-      const { deps, sent } = reader();
-      const reads = everyReader(version);
-      for (const read of reads) await deps.readSource(read);
-      expect(sent).toEqual(
-        reads.map((read) => `GET ${sourceUriOf(read)}?version=${version}`),
-      );
-    },
-  );
+  for (const version of VERSIONS) {
+    it(
+      format(
+        'every reader sends its source URI at the version given (%s)',
+        version,
+      ),
+      async () => {
+        const { deps, sent } = reader();
+        const reads = everyReader(version);
+        for (const read of reads) await deps.readSource(read);
+        assert.deepStrictEqual(
+          sent,
+          reads.map((read) => `GET ${sourceUriOf(read)}?version=${version}`),
+        );
+      },
+    );
+  }
 
   it('the source URIs, written out', () => {
-    expect(everyReader('inactive').map(sourceUriOf)).toEqual([
+    assert.deepStrictEqual(everyReader('inactive').map(sourceUriOf), [
       '/sap/bc/adt/programs/programs/zprog/source/main',
       '/sap/bc/adt/programs/includes/zincl/source/main',
       '/sap/bc/adt/oo/classes/zcl_x/source/main',

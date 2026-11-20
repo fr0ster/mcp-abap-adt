@@ -8,6 +8,9 @@
  * binary lists none (`toolSet.test.ts`).
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import {
   compactDataEntries,
@@ -38,20 +41,24 @@ const namesOf = (
 ) => groups.flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
 
 describe('the object-oriented handler sets an embedder combines', () => {
-  it.each<[HandlerSet[], string[]]>([
+  for (const [exposition, expected] of [
     [['readonly'], LIST],
     [['readonly', 'debug'], LIST],
     [['debug'], LIST],
     [['readonly', 'high'], FULL],
     [['high'], FULL],
-  ])('%j serves %j, no resume', (exposition, expected) => {
-    const tools = namesOf(registryForExposition(exposition).getHandlerGroups());
-    expect(leftoverOf(tools)).toEqual(expected);
-  });
+  ] satisfies ReadonlyArray<[HandlerSet[], string[]]>) {
+    it(format('%j serves %j, no resume', exposition, expected), () => {
+      const tools = namesOf(
+        registryForExposition(exposition).getHandlerGroups(),
+      );
+      assert.deepStrictEqual(leftoverOf(tools), expected);
+    });
+  }
 });
 
 describe('the stdio binaries', () => {
-  it.each<[string, ToolSet, string[]]>([
+  for (const [_kind, set, expected] of [
     ['core', fullToolSet, FULL],
     ['core-ro', fullReadOnlyToolSet, LIST],
     [
@@ -71,11 +78,16 @@ describe('the stdio binaries', () => {
       }),
       COMPACT,
     ],
-  ])('%s serves %j and no resume', (_kind, set, expected) => {
-    const tools = namesOf(
-      registryOf(set, 'stdio', { dataTools: false }).getHandlerGroups(),
-    );
-    expect(leftoverOf(tools)).toEqual(expected);
-    expect(tools.some((t) => t.includes('Resume'))).toBe(false);
-  });
+  ] satisfies ReadonlyArray<[string, ToolSet, string[]]>) {
+    it(format('%s serves %j and no resume', _kind, set), () => {
+      const tools = namesOf(
+        registryOf(set, 'stdio', { dataTools: false }).getHandlerGroups(),
+      );
+      assert.deepStrictEqual(leftoverOf(tools), expected);
+      assert.equal(
+        tools.some((t) => t.includes('Resume')),
+        false,
+      );
+    });
+  }
 });

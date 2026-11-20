@@ -1,10 +1,9 @@
 /**
  * `servedEntries` (`helpers/servedEntries.ts`): the entries a system kind
  * serves, by tool name, as the pin harness and the live files read them. The
- * module imports no test runner (D27, plan step 9), so a node:test file reaches
- * it: this file is on the node:test list, and the node:test build refuses it
- * when the module reaches the Jest pin harness (`helpers/pinCases.ts`) or any
- * other Jest API.
+ * module imports no test runner (D27, plan step 9): the test build, whose
+ * `types` is `node` alone, refuses this file when the module reaches a
+ * global node's types do not declare.
  */
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';

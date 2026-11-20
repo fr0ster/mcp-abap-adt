@@ -8,6 +8,9 @@
  * the variant — real adt-clients code, no SAP.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   TOOL_DEFINITION as HandlerLock,
   handleHandlerLock,
@@ -28,12 +31,11 @@ import type { ProjectionVariant } from '../../lib/adtProjections';
 import { defineTool, type HandlerContext } from '../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
+import { assertRejects } from '../helpers/assertions';
 import { holding } from '../helpers/heldLocks';
 import { listedJson } from '../helpers/listedJson';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
-
-jest.setTimeout(60_000);
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
@@ -188,25 +190,41 @@ describe('the arguments a compact tool needs for one object type', () => {
     ),
   );
 
-  it.each(cases)(
-    '%s %s on %s: the description names the arguments',
-    (_tool, _type, variant, need) => {
-      expect(
-        TOOLS[need.tool].definition.variants[variant].description,
-      ).toContain(need.token);
-    },
-  );
+  for (const [_tool, _type, variant, need] of cases) {
+    it(
+      format(
+        '%s %s on %s: the description names the arguments',
+        _tool,
+        _type,
+        variant,
+      ),
+      () => {
+        assert.ok(
+          TOOLS[need.tool].definition.variants[variant].description.includes(
+            need.token,
+          ),
+        );
+      },
+    );
+  }
 
-  it.each(cases)(
-    '%s %s on %s: with its arguments the call reaches the client',
-    async (_tool, _type, variant, need) => {
-      const { requests } = await call(need, variant, {
-        ...need.rest,
-        ...need.needed,
-      });
-      expect(requests).toBeGreaterThan(0);
-    },
-  );
+  for (const [_tool, _type, variant, need] of cases) {
+    it(
+      format(
+        '%s %s on %s: with its arguments the call reaches the client',
+        _tool,
+        _type,
+        variant,
+      ),
+      async () => {
+        const { requests } = await call(need, variant, {
+          ...need.rest,
+          ...need.needed,
+        });
+        assert.ok(requests > 0);
+      },
+    );
+  }
 
   const missing = VARIANTS.flatMap((variant) =>
     offeredOn(variant).flatMap((need) =>
@@ -217,23 +235,31 @@ describe('the arguments a compact tool needs for one object type', () => {
     ),
   );
 
-  it.each(missing)(
-    '%s %s without %s on %s: refused naming it, nothing sent',
-    async (_tool, _type, argument, variant, need) => {
-      const given = Object.fromEntries(
-        Object.entries(need.needed).filter(([name]) => name !== argument),
-      );
-      for (const absent of [given, { ...given, [argument]: '' }]) {
-        const { requests, answered } = await call(need, variant, {
-          ...need.rest,
-          ...absent,
-        });
-        expect(answered).toContain(need.refusal(argument));
-        expect(answered).toContain('"isError":true');
-        expect(requests).toBe(0);
-      }
-    },
-  );
+  for (const [_tool, _type, argument, variant, need] of missing) {
+    it(
+      format(
+        '%s %s without %s on %s: refused naming it, nothing sent',
+        _tool,
+        _type,
+        argument,
+        variant,
+      ),
+      async () => {
+        const given = Object.fromEntries(
+          Object.entries(need.needed).filter(([name]) => name !== argument),
+        );
+        for (const absent of [given, { ...given, [argument]: '' }]) {
+          const { requests, answered } = await call(need, variant, {
+            ...need.rest,
+            ...absent,
+          });
+          assert.ok(answered.includes(need.refusal(argument)));
+          assert.ok(answered.includes('"isError":true'));
+          assert.equal(requests, 0);
+        }
+      },
+    );
+  }
 });
 
 /**
@@ -248,39 +274,51 @@ describe('HandlerValidate and HandlerCheckRun take a table type', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
-  it.each(VARIANTS)('on %s: one validation request', async (variant) => {
-    process.env.SAP_SYSTEM_TYPE = variant;
-    const connection = recordingConnection();
-    declareSystemKind(connection, variant);
-    expect(HandlerValidate.variants[variant].description).toContain(
-      'TABLE_TYPE(object_name*, description)',
-    );
-    await handleHandlerValidate(
-      { connection },
-      { object_type: 'TABLE_TYPE', object_name: 'ZTTYP_A' },
-    );
-    expect(connection.requests).toHaveLength(1);
-    expect(JSON.stringify(connection.requests[0]).toLowerCase()).toContain(
-      'tabletype',
-    );
-  });
+  for (const variant of VARIANTS) {
+    it(format('on %s: one validation request', variant), async () => {
+      process.env.SAP_SYSTEM_TYPE = variant;
+      const connection = recordingConnection();
+      declareSystemKind(connection, variant);
+      assert.ok(
+        HandlerValidate.variants[variant].description.includes(
+          'TABLE_TYPE(object_name*, description)',
+        ),
+      );
+      await handleHandlerValidate(
+        { connection },
+        { object_type: 'TABLE_TYPE', object_name: 'ZTTYP_A' },
+      );
+      assert.equal(connection.requests.length, 1);
+      assert.ok(
+        JSON.stringify(connection.requests[0])
+          .toLowerCase()
+          .includes('tabletype'),
+      );
+    });
+  }
 
-  it.each(VARIANTS)('on %s: one check request', async (variant) => {
-    process.env.SAP_SYSTEM_TYPE = variant;
-    const connection = recordingConnection();
-    declareSystemKind(connection, variant);
-    expect(HandlerCheckRun.variants[variant].description).toContain(
-      'TABLE_TYPE(object_name*)',
-    );
-    await handleHandlerCheckRun(
-      { connection },
-      { object_type: 'TABLE_TYPE', object_name: 'ZTTYP_A' },
-    );
-    expect(connection.requests).toHaveLength(1);
-    expect(JSON.stringify(connection.requests[0]).toLowerCase()).toContain(
-      '/sap/bc/adt/ddic/tabletypes/zttyp_a',
-    );
-  });
+  for (const variant of VARIANTS) {
+    it(format('on %s: one check request', variant), async () => {
+      process.env.SAP_SYSTEM_TYPE = variant;
+      const connection = recordingConnection();
+      declareSystemKind(connection, variant);
+      assert.ok(
+        HandlerCheckRun.variants[variant].description.includes(
+          'TABLE_TYPE(object_name*)',
+        ),
+      );
+      await handleHandlerCheckRun(
+        { connection },
+        { object_type: 'TABLE_TYPE', object_name: 'ZTTYP_A' },
+      );
+      assert.equal(connection.requests.length, 1);
+      assert.ok(
+        JSON.stringify(connection.requests[0])
+          .toLowerCase()
+          .includes('/sap/bc/adt/ddic/tabletypes/zttyp_a'),
+      );
+    });
+  }
 });
 
 /**
@@ -290,15 +328,17 @@ describe('HandlerValidate and HandlerCheckRun take a table type', () => {
  */
 describe('ValidateServiceBinding requires package_name', () => {
   it('the schema requires it', () => {
-    expect(listedJson(ValidateServiceBinding.inputSchema).required).toContain(
-      'package_name',
+    assert.ok(
+      listedJson(ValidateServiceBinding.inputSchema).required?.includes(
+        'package_name',
+      ),
     );
   });
 
   it('a call without it is refused at the schema, naming it, nothing sent', async () => {
     const connection = recordingConnection();
     declareSystemKind(connection, 'onprem');
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(ValidateServiceBinding, handleValidateServiceBinding).call(
         { connection },
         {
@@ -306,31 +346,32 @@ describe('ValidateServiceBinding requires package_name', () => {
           service_definition_name: 'ZSRVD_A',
         },
       ),
-    ).rejects.toThrow(
       'Invalid arguments for tool ValidateServiceBinding: Invalid input: expected string, received undefined at package_name',
     );
     await refused;
-    expect(connection.requests).toEqual([]);
+    assert.deepStrictEqual(connection.requests, []);
   });
 
-  it.each([{ package_name: '' }, { package_name: '  ' }])(
-    'a call with %j is refused naming it, nothing sent',
-    async (absent) => {
-      const connection = recordingConnection();
-      declareSystemKind(connection, 'onprem');
-      const answered = await handleValidateServiceBinding(
-        { connection },
-        {
-          service_binding_name: 'ZSRVB_A',
-          service_definition_name: 'ZSRVD_A',
-          ...absent,
-        },
-      );
-      expect(textOf(answered)).toContain('package_name is required');
-      expect(answered.isError).toBe(true);
-      expect(connection.requests).toEqual([]);
-    },
-  );
+  for (const absent of [{ package_name: '' }, { package_name: '  ' }]) {
+    it(
+      format('a call with %j is refused naming it, nothing sent', absent),
+      async () => {
+        const connection = recordingConnection();
+        declareSystemKind(connection, 'onprem');
+        const answered = await handleValidateServiceBinding(
+          { connection },
+          {
+            service_binding_name: 'ZSRVB_A',
+            service_definition_name: 'ZSRVD_A',
+            ...absent,
+          },
+        );
+        assert.ok(textOf(answered).includes('package_name is required'));
+        assert.equal(answered.isError, true);
+        assert.deepStrictEqual(connection.requests, []);
+      },
+    );
+  }
 
   it('a call with it reaches the client', async () => {
     const connection = recordingConnection();
@@ -343,7 +384,7 @@ describe('ValidateServiceBinding requires package_name', () => {
         package_name: 'ZPKG_A',
       },
     );
-    expect(connection.requests.length).toBeGreaterThan(0);
+    assert.ok(connection.requests.length > 0);
   });
 });
 
@@ -412,16 +453,18 @@ describe('HandlerValidate SERVICE_BINDING: the callee’s refusals, in its order
     ],
   ];
 
-  it.each(cases)('%s: refused, nothing sent', async (_case, given, words) => {
-    process.env.SAP_SYSTEM_TYPE = 'onprem';
-    const connection = recordingConnection();
-    declareSystemKind(connection, 'onprem');
-    const answered = await defineTool(
-      HandlerValidate,
-      handleHandlerValidate,
-    ).call({ connection }, { object_type: 'SERVICE_BINDING', ...given });
-    expect(textOf(answered)).toContain(words);
-    expect(textOf(answered)).toContain('"isError":true');
-    expect(connection.requests).toEqual([]);
-  });
+  for (const [_case, given, words] of cases) {
+    it(format('%s: refused, nothing sent', _case), async () => {
+      process.env.SAP_SYSTEM_TYPE = 'onprem';
+      const connection = recordingConnection();
+      declareSystemKind(connection, 'onprem');
+      const answered = await defineTool(
+        HandlerValidate,
+        handleHandlerValidate,
+      ).call({ connection }, { object_type: 'SERVICE_BINDING', ...given });
+      assert.ok(textOf(answered).includes(words));
+      assert.ok(textOf(answered).includes('"isError":true'));
+      assert.deepStrictEqual(connection.requests, []);
+    });
+  }
 });

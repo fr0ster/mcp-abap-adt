@@ -4,6 +4,10 @@
  * `.` or `..` — a path step, not a run — is refused before anything is sent,
  * and the tool answers that refusal.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { type McpResult, recordCase } from '../helpers/pinCases';
 
 /** What `tool` sends and answers for `runId` on premise. */
@@ -22,25 +26,34 @@ const textOf = (answer: McpResult | undefined): string =>
   answer?.content.map((item) => item.text).join('\n') ?? '';
 
 describe('a unit-test run id is one path segment', () => {
-  it.each([
+  for (const [tool, path] of [
     ['HandlerUnitTestStatus', '/sap/bc/adt/abapunit/runs/a%2Fb%3Fc%23d%25'],
     ['HandlerUnitTestResult', '/sap/bc/adt/abapunit/results/a%2Fb%3Fc%23d%25'],
-  ])('%s encodes the run id', async (tool, path) => {
-    const recording = await ran(tool, 'a/b?c#d%');
-    expect(recording.requests).toHaveLength(1);
-    expect(recording.requests[0]?.url.startsWith(path)).toBe(true);
-  });
+  ]) {
+    it(format('%s encodes the run id', tool), async () => {
+      const recording = await ran(tool, 'a/b?c#d%');
+      assert.equal(recording.requests.length, 1);
+      assert.equal(recording.requests[0]?.url.startsWith(path), true);
+    });
+  }
 
-  it.each([
+  for (const [tool, runId] of [
     ['HandlerUnitTestStatus', '.'],
     ['HandlerUnitTestStatus', '..'],
     ['HandlerUnitTestResult', '.'],
     ['HandlerUnitTestResult', '..'],
-  ])('%s refuses the run id %s, sending nothing', async (tool, runId) => {
-    const recording = await ran(tool, runId);
-    expect(recording.thrown).toBeUndefined();
-    expect(recording.requests).toEqual([]);
-    expect(recording.answer?.isError).toBe(true);
-    expect(textOf(recording.answer)).toContain('is a path step, not a run');
-  });
+  ]) {
+    it(
+      format('%s refuses the run id %s, sending nothing', tool, runId),
+      async () => {
+        const recording = await ran(tool, runId);
+        assert.equal(recording.thrown, undefined);
+        assert.deepStrictEqual(recording.requests, []);
+        assert.equal(recording.answer?.isError, true);
+        assert.ok(
+          textOf(recording.answer).includes('is a path step, not a run'),
+        );
+      },
+    );
+  }
 });

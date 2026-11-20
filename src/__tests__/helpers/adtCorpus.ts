@@ -5,8 +5,8 @@ import { repositoryRoot } from './repoRoot';
 
 /**
  * Where the raw ADT corpus lives, resolved in one place: in the repository,
- * from its root (`repositoryRoot`), so a test reads it there whether it runs
- * from its source (Jest) or from the node:test build. Test support only: no
+ * from its root (`repositoryRoot`), so a test reads it there although it runs
+ * from the test build (`.test-build/tree/`). Test support only: no
  * production code reads the corpus.
  *
  * The readings left, into `@mcp-abap-adt/adt-strategies`, and the corpus went

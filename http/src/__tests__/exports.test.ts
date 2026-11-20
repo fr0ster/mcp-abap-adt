@@ -13,18 +13,25 @@
  * `StreamableHttpServer` answers http's version when it is constructed without
  * one, whatever version the runtime has.
  */
-jest.mock('../../../server-runtime/src/runtimeVersion', () => ({
-  RUNTIME_VERSION: '0.0.0-runtime',
-}));
-
+import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
+import * as runtimeVersion from '../../../server-runtime/src/runtimeVersion';
+
+// server-runtime's RUNTIME_VERSION replaced on its module before the servers
+// load (they read it when constructed): the entry's
+// own version must win over it.
+mock.property(runtimeVersion, 'RUNTIME_VERSION', '0.0.0-runtime');
+
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import * as runtime from '@mcp-abap-adt/server-runtime/http/server';
 import express from 'express';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../../../src/__tests__/helpers/repoRoot';
 import { HTTP_VERSION } from '../httpVersion';
 import * as http from '../index';
 import * as launcher from '../launcher';
@@ -47,7 +54,7 @@ const LAUNCHER_19_1_0 = {
   types: ['HttpLauncherDeps', 'HttpLauncherOptions'],
 };
 
-const SRC = path.resolve(__dirname, '..');
+const SRC = path.resolve(repositoryRoot(__dirname), 'http', 'src');
 const ENTRIES = [
   ['@mcp-abap-adt/http', 'index.ts', http, HTTP_19_1_0],
   ['@mcp-abap-adt/http/launcher', 'launcher.ts', launcher, LAUNCHER_19_1_0],
@@ -83,25 +90,32 @@ function checkedExports(): Map<string, string[]> {
 }
 
 describe('@mcp-abap-adt/http keeps every name 19.1.0 exported', () => {
-  describe.each(ENTRIES)('%s', (_name, _file, loaded, before) => {
-    it.each(before.values)('exports the value %s', (name) => {
-      expect(loaded).toHaveProperty(name);
-      expect((loaded as Record<string, unknown>)[name]).toBeDefined();
+  for (const [_name, _file, loaded, before] of ENTRIES) {
+    describe(format('%s', _name), () => {
+      for (const name of before.values) {
+        it(format('exports the value %s', name), () => {
+          assert.ok(
+            typeof loaded === 'object' && loaded !== null && name in loaded,
+          );
+          assert.notEqual((loaded as Record<string, unknown>)[name], undefined);
+        });
+      }
     });
-  });
+  }
 
   // One program for both entries: the checker follows each re-export into
   // server-runtime's sources through tsconfig.test.json's paths.
   const checked = checkedExports();
-  describe.each(ENTRIES)(
-    '%s, as the checker reads it',
-    (_name, file, _l, before) => {
+  for (const [_name, file, _l, before] of ENTRIES) {
+    describe(format('%s, as the checker reads it', _name), () => {
       const exported = checked.get(path.join(SRC, file)) ?? [];
-      it.each([...before.values, ...before.types])('exports %s', (name) => {
-        expect(exported).toContain(name);
-      });
-    },
-  );
+      for (const name of [...before.values, ...before.types]) {
+        it(format('exports %s', name), () => {
+          assert.ok(exported.includes(name));
+        });
+      }
+    });
+  }
 });
 
 /** The version the server's `/health` answers. */
@@ -128,15 +142,15 @@ describe("http's StreamableHttpServer answers http's version", () => {
     const server = new runtime.StreamableHttpServer(
       new CompositeHandlersRegistry([]),
     );
-    expect(await versionAnswered(server)).toBe('0.0.0-runtime');
-    expect(HTTP_VERSION).not.toBe('0.0.0-runtime');
+    assert.equal(await versionAnswered(server), '0.0.0-runtime');
+    assert.notEqual(HTTP_VERSION, '0.0.0-runtime');
   });
 
   it('without a version: HTTP_VERSION', async () => {
     const server = new http.StreamableHttpServer(
       new CompositeHandlersRegistry([]),
     );
-    expect(await versionAnswered(server)).toBe(HTTP_VERSION);
+    assert.equal(await versionAnswered(server), HTTP_VERSION);
   });
 
   it('with a version: that version', async () => {
@@ -144,13 +158,13 @@ describe("http's StreamableHttpServer answers http's version", () => {
       new CompositeHandlersRegistry([]),
       { version: '9.9.9-given' },
     );
-    expect(await versionAnswered(server)).toBe('9.9.9-given');
+    assert.equal(await versionAnswered(server), '9.9.9-given');
   });
 
   it('is the runtime StreamableHttpServer underneath', () => {
     const server = new http.StreamableHttpServer(
       new CompositeHandlersRegistry([]),
     );
-    expect(server).toBeInstanceOf(runtime.StreamableHttpServer);
+    assert.ok(server instanceof runtime.StreamableHttpServer);
   });
 });

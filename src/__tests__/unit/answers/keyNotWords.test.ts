@@ -11,6 +11,8 @@
  * (2026-10-01).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { handleCreateFunctionGroup } from '../../../handlers/function/high/handleCreateFunctionGroup';
@@ -23,6 +25,7 @@ import {
   return_error,
 } from '../../../lib/utils';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 import { setSystemContext } from '../../helpers/processSystemContext';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
@@ -73,20 +76,21 @@ const TAKEN_CLASS = corpusBody(
 
 describe('isAlreadyExistsError: a taken name, by its T100 key', () => {
   it('the keyed case is recognised (SWB_TOOL 016, OO 002)', () => {
-    expect(isAlreadyExistsError(carrying(TAKEN_TABLE))).toBe(true);
-    expect(isAlreadyExistsError(carrying(TAKEN_CLASS))).toBe(true);
+    assert.equal(isAlreadyExistsError(carrying(TAKEN_TABLE)), true);
+    assert.equal(isAlreadyExistsError(carrying(TAKEN_CLASS)), true);
   });
 
   it('the same words under another key are not', () => {
-    expect(
+    assert.equal(
       isAlreadyExistsError(
         carrying(exception('Database Table ZX already exists', 'SY', '530')),
       ),
-    ).toBe(false);
+      false,
+    );
   });
 
   it('the same key worded in another logon language is', () => {
-    expect(
+    assert.equal(
       isAlreadyExistsError(
         carrying(
           exception(
@@ -97,7 +101,8 @@ describe('isAlreadyExistsError: a taken name, by its T100 key', () => {
           ),
         ),
       ),
-    ).toBe(true);
+      true,
+    );
   });
 });
 
@@ -122,14 +127,15 @@ describe('the creates measured on premise (2026-11-05)', () => {
   );
 
   it('a class duplicate (SADT_RESOURCE 001) is a taken name', () => {
-    expect(isAlreadyExistsError(carrying(classTaken))).toBe(true);
-    expect(
+    assert.equal(isAlreadyExistsError(carrying(classTaken)), true);
+    assert.equal(
       parseValidationResponse({ status: 400, data: classTaken }).exists,
-    ).toBe(true);
+      true,
+    );
   });
 
   it('the same key in another logon language is too', () => {
-    expect(
+    assert.equal(
       isAlreadyExistsError(
         carrying(
           exception(
@@ -141,53 +147,59 @@ describe('the creates measured on premise (2026-11-05)', () => {
           ),
         ),
       ),
-    ).toBe(true);
+      true,
+    );
   });
 
   it("a program duplicate (XI 001) is a taken name, SAP's text relayed", () => {
-    expect(isAlreadyExistsError(carrying(programTaken))).toBe(true);
-    expect(
+    assert.equal(isAlreadyExistsError(carrying(programTaken)), true);
+    assert.deepStrictEqual(
       parseValidationResponse({ status: 500, data: programTaken }),
-    ).toEqual({
-      valid: false,
-      severity: 'ERROR',
-      message: 'A program or include already exists with the name ZPROG_X',
-      exists: true,
-    });
+      {
+        valid: false,
+        severity: 'ERROR',
+        message: 'A program or include already exists with the name ZPROG_X',
+        exists: true,
+      },
+    );
   });
 });
 
 describe('isAlreadyExistsError: with no key, the exception type decides', () => {
   it('a keyless ExceptionResourceAlreadyExists is recognised', () => {
-    expect(
+    assert.equal(
       isAlreadyExistsError(
         carrying(keyless('ZX', 'ExceptionResourceAlreadyExists')),
       ),
-    ).toBe(true);
-    expect(
+      true,
+    );
+    assert.equal(
       parseValidationResponse({
         status: 400,
         data: keyless('ZX', 'ExceptionResourceAlreadyExists'),
       }).exists,
-    ).toBe(true);
+      true,
+    );
   });
 
   it('the same words under another type are not', () => {
-    expect(
+    assert.equal(
       isAlreadyExistsError(
         carrying(keyless('Class ZX already exists', 'InvalidClifName')),
       ),
-    ).toBe(false);
-    expect(
+      false,
+    );
+    assert.equal(
       parseValidationResponse({
         status: 400,
         data: keyless('Class ZX already exists', 'InvalidClifName'),
       }).exists,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('with a key, the key decides: the type with another key is not (PAK 058, a held package)', () => {
-    expect(
+    assert.equal(
       isAlreadyExistsError(
         carrying(
           exception(
@@ -199,13 +211,15 @@ describe('isAlreadyExistsError: with no key, the exception type decides', () => 
           ),
         ),
       ),
-    ).toBe(false);
+      false,
+    );
   });
 });
 
 describe('parseValidationResponse: exists by key; a keyless refusal relayed', () => {
   it('the keyed case is recognised', () => {
-    expect(parseValidationResponse({ status: 400, data: TAKEN_TABLE })).toEqual(
+    assert.deepStrictEqual(
+      parseValidationResponse({ status: 400, data: TAKEN_TABLE }),
       {
         valid: false,
         severity: 'ERROR',
@@ -216,50 +230,54 @@ describe('parseValidationResponse: exists by key; a keyless refusal relayed', ()
   });
 
   it('the same words under another key are not', () => {
-    expect(
+    assert.equal(
       parseValidationResponse({
         status: 400,
         data: exception('Class ZX already exists', 'SY', '530'),
       }).exists,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('the same key worded in another logon language is', () => {
-    expect(
+    assert.equal(
       parseValidationResponse({
         status: 400,
         data: exception('Klasse ZX ist bereits vorhanden', 'OO', '002', 'DE'),
       }).exists,
-    ).toBe(true);
+      true,
+    );
   });
 
   it('a refusal with no key (DDL) is relayed, exists not stated', () => {
-    expect(
+    assert.deepStrictEqual(
       parseValidationResponse({
         status: 200,
         data: corpusBody(
           'refusal-validation-name-taken-ddl--01-ddl-validation',
         ),
       }),
-    ).toEqual({
-      valid: false,
-      severity: 'ERROR',
-      message: 'Data definition ZMCP_SHR_I_ROOT already exists',
-      longText: '',
-    });
+      {
+        valid: false,
+        severity: 'ERROR',
+        message: 'Data definition ZMCP_SHR_I_ROOT already exists',
+        longText: '',
+      },
+    );
   });
 
   it('a body that is no document is relayed as it came, never cut out of markup', () => {
-    expect(
+    assert.deepStrictEqual(
       parseValidationResponse({
         status: 500,
         data: '<message>a</message', // not XML
       }),
-    ).toEqual({
-      valid: false,
-      severity: 'ERROR',
-      message: '<message>a</message',
-    });
+      {
+        valid: false,
+        severity: 'ERROR',
+        message: '<message>a</message',
+      },
+    );
   });
 });
 
@@ -299,8 +317,8 @@ describe('CreateFunctionGroup: the interface 400 by its T100 key', () => {
           'ExceptionResourceCreationFailure',
         ),
       );
-      expect(methods).toEqual(['POST', 'GET']);
-      expect(result.isError).toBe(false);
+      assert.deepStrictEqual(methods, ['POST', 'GET']);
+      assert.equal(result.isError, false);
     }
   });
 
@@ -314,8 +332,8 @@ describe('CreateFunctionGroup: the interface 400 by its T100 key', () => {
         'ExceptionResourceCreationFailure',
       ),
     );
-    expect(methods).toEqual(['POST']);
-    expect(result.isError).toBe(true);
+    assert.deepStrictEqual(methods, ['POST']);
+    assert.equal(result.isError, true);
   });
 
   it('the same key worded in another logon language is', async () => {
@@ -328,8 +346,8 @@ describe('CreateFunctionGroup: the interface 400 by its T100 key', () => {
         'ExceptionResourceCreationFailure',
       ),
     );
-    expect(methods).toEqual(['POST', 'GET']);
-    expect(result.isError).toBe(false);
+    assert.deepStrictEqual(methods, ['POST', 'GET']);
+    assert.equal(result.isError, false);
   });
 });
 
@@ -341,24 +359,26 @@ describe('the dump reader: the termination link by its whole relation', () => {
     '</dump:links></dump:dump>';
 
   it('the exact relation is recognised', () => {
-    expect(
+    assertMatchObject(
       dumpSummaryOf(
         dump('http://www.sap.com/adt/relations/runtime/dump/termination'),
       ),
-    ).toMatchObject({
-      termination: {
-        uri: '/sap/bc/adt/oo/classes/zcl_x/source/main',
-        line: 42,
+      {
+        termination: {
+          uri: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+          line: 42,
+        },
       },
-    });
+    );
   });
 
   it('another relation that names a termination is not', () => {
-    expect(
+    assert.equal(
       dumpSummaryOf(
         dump('http://www.sap.com/adt/relations/runtime/dump/termination/raw'),
       )?.termination,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 });
 
@@ -373,8 +393,10 @@ describe('return_error: network failures by their code, not their words', () => 
       }),
     });
     const text = return_error(error).content[0]?.text ?? '';
-    expect(text).toContain(
-      'DNS resolution failed: Cannot resolve hostname "sap.example.com"',
+    assert.ok(
+      text.includes(
+        'DNS resolution failed: Cannot resolve hostname "sap.example.com"',
+      ),
     );
   });
 
@@ -382,18 +404,19 @@ describe('return_error: network failures by their code, not their words', () => 
     const text =
       return_error(new Error('getaddrinfo ENOTFOUND sap.example.com'))
         .content[0]?.text ?? '';
-    expect(text).toBe('getaddrinfo ENOTFOUND sap.example.com');
+    assert.equal(text, 'getaddrinfo ENOTFOUND sap.example.com');
   });
 
   it("an SDK McpError answers its own words, cut by its code's prefix", () => {
     const error = new McpError(ErrorCode.InvalidParams, 'bad input');
-    expect(return_error(error).content[0]?.text).toBe('bad input');
+    assert.equal(return_error(error).content[0]?.text, 'bad input');
   });
 
   it('another error worded like one is answered as it came', () => {
-    expect(
+    assert.equal(
       return_error(new Error('MCP error -32602: bad input')).content[0]?.text,
-    ).toBe('MCP error -32602: bad input');
+      'MCP error -32602: bad input',
+    );
   });
 });
 
@@ -406,17 +429,19 @@ describe('failureText: what the document adds, no text searched', () => {
       response: { data: conflict },
     });
     const line = told.slice('Request failed with status code 409: '.length);
-    expect(failureText({ message: line, response: { data: conflict } })).toBe(
+    assert.equal(
+      failureText({ message: line, response: { data: conflict } }),
       `${line}: ${line}`,
     );
   });
 
   it('a body that is no exception document adds nothing', () => {
-    expect(
+    assert.equal(
       failureText({
         message: 'socket hang up',
         response: { data: 'no exception here' },
       }),
-    ).toBe('socket hang up');
+      'socket hang up',
+    );
   });
 });

@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/http",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-http",
-  "version": "24.0.1",
+  "version": "24.0.2",
   "description": "The Streamable HTTP transport of the MCP ABAP ADT server: an Express app serving the ADT tools of @mcp-abap-adt/lib over MCP Streamable HTTP, with DNS rebinding protection and TLS.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -58,20 +58,19 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json",
-    "test": "npm --prefix .. test -- --roots http/src",
+    "test": "npm --prefix .. test -- --root http/src",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
     "lint:check": "biome check src",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@mcp-abap-adt/background-runs-memory": "^24.0.1",
-    "@mcp-abap-adt/lib": "^24.0.1",
-    "@mcp-abap-adt/responsible-rules": "^24.0.1",
-    "@mcp-abap-adt/server-runtime": "^24.0.1"
+    "@mcp-abap-adt/background-runs-memory": "^24.0.2",
+    "@mcp-abap-adt/lib": "^24.0.2",
+    "@mcp-abap-adt/responsible-rules": "^24.0.2",
+    "@mcp-abap-adt/server-runtime": "^24.0.2"
   },
   "devDependencies": {
     "@types/express": "*",
-    "@types/jest": "*",
     "@types/node": "*",
     "typescript": "*"
   }

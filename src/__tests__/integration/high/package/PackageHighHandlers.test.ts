@@ -11,7 +11,7 @@
  *   DEBUG_CONNECTORS=true         - Connection logs
  *   DEBUG_CONNECTION_MANAGER=true - Connection manager logs (getManagedConnection)
  *
- * Run: npm test -- --testPathPattern=integration/package
+ * Run: npm run test:integration -- src/__tests__/integration/high/package/PackageHighHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

@@ -2,6 +2,9 @@
  * Batch mode on HTTP: every pooled instance gets an owner of its own, with
  * the server's settings; without them, none.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
@@ -21,14 +24,14 @@ describe('the batch owner of the pool', () => {
     });
     const first = instanceOf(server).batch;
     const second = instanceOf(server).batch;
-    expect(first).toBeDefined();
-    expect(second).toBeDefined();
-    expect(first).not.toBe(second);
-    expect(first?.keepRawParts).toBe(true);
+    assert.notEqual(first, undefined);
+    assert.notEqual(second, undefined);
+    assert.notEqual(first, second);
+    assert.equal(first?.keepRawParts, true);
   });
 
   it('without batch settings no instance has one', () => {
     const server = new StreamableHttpServer(new CompositeHandlersRegistry([]));
-    expect(instanceOf(server).batch).toBeUndefined();
+    assert.equal(instanceOf(server).batch, undefined);
   });
 });

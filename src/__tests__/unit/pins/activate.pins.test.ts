@@ -7,6 +7,7 @@
  * plain read, answered at once; with it, the long poll
  * (`?withLongPolling=true`) SAP holds until the run ends.
  */
+import { describe } from 'node:test';
 import { pinCases } from '../../helpers/pinCases';
 
 /** A finished run's status document. */

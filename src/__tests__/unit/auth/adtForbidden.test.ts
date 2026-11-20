@@ -8,6 +8,8 @@
  * over one the consumer injected.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -20,8 +22,6 @@ import { adtStandIn } from '../../helpers/adtStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { StandServer, silent } from '../backgroundRuns/harness';
 import { oneToolGroup } from '../stateful/harness';
-
-jest.setTimeout(30_000);
 
 const SAP_TEXT = 'No authorization to display the object ZCL_FORBIDDEN';
 const EXCEPTION = `<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="ExceptionResourceNoAuthorization"/><message lang="EN">${SAP_TEXT}</message></exc:exception>`;
@@ -78,20 +78,20 @@ function expectSapsWords(
   payload: Record<string, unknown>,
   asked: number,
 ): void {
-  expect(result.isError).toBe(true);
+  assert.equal(result.isError, true);
   // SAP's answer, as it is.
-  expect(payload.status).toBe(403);
-  expect(payload.adt_type).toBe('ExceptionResourceNoAuthorization');
-  expect(payload.raw_body).toBe(EXCEPTION);
-  expect(JSON.stringify(payload.messages)).toContain(SAP_TEXT);
+  assert.equal(payload.status, 403);
+  assert.equal(payload.adt_type, 'ExceptionResourceNoAuthorization');
+  assert.equal(payload.raw_body, EXCEPTION);
+  assert.ok(JSON.stringify(payload.messages).includes(SAP_TEXT));
   // GetClass sends one request: the method's error as it is, no step.
-  expect(payload.step).toBeUndefined();
+  assert.equal(payload.step, undefined);
   // Not a credential refusal.
-  expect(payload.error).toBeUndefined();
-  expect(payload.kind).toBeUndefined();
-  expect(JSON.stringify(result)).not.toContain('authentication_failed');
+  assert.equal(payload.error, undefined);
+  assert.equal(payload.kind, undefined);
+  assert.ok(!JSON.stringify(result).includes('authentication_failed'));
   // The credential was not asked: no renewal.
-  expect(asked).toBe(0);
+  assert.equal(asked, 0);
 }
 
 describe('a 403 with an ADT exception body', () => {

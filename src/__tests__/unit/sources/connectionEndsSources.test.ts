@@ -14,11 +14,15 @@
  * skipped, a call is its name followed by `(`.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 const PACKAGES = [
   'src',
   'compact/src',
@@ -201,14 +205,14 @@ describe('every owned connection has a listed end', () => {
     const named = listed()
       .map((l) => `${l.file} ${l.site}`)
       .sort((a, b) => a.localeCompare(b));
-    expect(found).toEqual(named);
+    assert.deepStrictEqual(found, named);
   });
 
   it('every listed site names its end and why', () => {
     for (const entry of listed()) {
-      expect(entry.function.trim()).not.toBe('');
-      expect(entry.end.trim()).not.toBe('');
-      expect(entry.why.trim()).not.toBe('');
+      assert.notEqual(entry.function.trim(), '');
+      assert.notEqual(entry.end.trim(), '');
+      assert.notEqual(entry.why.trim(), '');
     }
   });
 
@@ -228,13 +232,13 @@ describe('every owned connection has a listed end', () => {
         ].join('\n'),
       );
       const found = scanSites(root);
-      expect(found).toHaveLength(2);
-      expect(found).toEqual(
-        expect.arrayContaining([
-          { file: 'src/lib/probe.ts', site: 'Map<string, IAbapConnection>' },
-          { file: 'src/lib/probe.ts', site: 'createAbapConnection' },
-        ]),
-      );
+      assert.equal(found.length, 2);
+      for (const expected of [
+        { file: 'src/lib/probe.ts', site: 'Map<string, IAbapConnection>' },
+        { file: 'src/lib/probe.ts', site: 'createAbapConnection' },
+      ]) {
+        assert.ok(found.some((e) => isDeepStrictEqual(e, expected)));
+      }
     } finally {
       fs.rmSync(root, { recursive: true, force: true });
     }

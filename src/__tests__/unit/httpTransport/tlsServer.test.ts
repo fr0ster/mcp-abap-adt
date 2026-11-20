@@ -1,25 +1,28 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as https from 'node:https';
 import type { AddressInfo } from 'node:net';
+import { after, before, describe, it } from 'node:test';
 import express from 'express';
 import {
   createServerListener,
   getProtocol,
 } from '../../../lib/httpTransport/tlsUtils';
+import { assertThrows } from '../../helpers/assertions';
 import { createSelfSignedCert } from './helpers/selfSignedCert';
 
 let certDir: string;
 let certPath: string;
 let keyPath: string;
 
-beforeAll(() => {
+before(() => {
   const { cert, key, dir } = createSelfSignedCert();
   certDir = dir;
   certPath = cert;
   keyPath = key;
 });
 
-afterAll(() => {
+after(() => {
   fs.rmSync(certDir, { recursive: true, force: true });
 });
 
@@ -37,26 +40,30 @@ describe('createServerListener', () => {
       server.listen(0, '127.0.0.1', () => resolve());
     });
 
-    const { port } = server.address() as AddressInfo;
+    // Closed in `finally`: a failing assertion must not leave the listener
+    // open, or the file never ends (node:test waits for it).
+    try {
+      const { port } = server.address() as AddressInfo;
 
-    // Use node:https to make request with rejectUnauthorized: false
-    const body = await new Promise<string>((resolve, reject) => {
-      https
-        .get(
-          `https://127.0.0.1:${port}/test`,
-          { rejectUnauthorized: false },
-          (res) => {
-            let data = '';
-            res.on('data', (chunk) => (data += chunk));
-            res.on('end', () => resolve(data));
-          },
-        )
-        .on('error', reject);
-    });
+      // Use node:https to make request with rejectUnauthorized: false
+      const body = await new Promise<string>((resolve, reject) => {
+        https
+          .get(
+            `https://127.0.0.1:${port}/test`,
+            { rejectUnauthorized: false },
+            (res) => {
+              let data = '';
+              res.on('data', (chunk) => (data += chunk));
+              res.on('end', () => resolve(data));
+            },
+          )
+          .on('error', reject);
+      });
 
-    expect(JSON.parse(body)).toEqual({ ok: true });
-
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+      assert.deepStrictEqual(JSON.parse(body), { ok: true });
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it('creates HTTP server when no tls config is provided', async () => {
@@ -69,44 +76,52 @@ describe('createServerListener', () => {
       server.listen(0, '127.0.0.1', () => resolve());
     });
 
-    const { port } = server.address() as AddressInfo;
-    const res = await fetch(`http://127.0.0.1:${port}/test`);
-    expect(res.status).toBe(200);
+    // Closed in `finally`: a failing assertion must not leave the listener
+    // open, or the file never ends (node:test waits for it).
+    try {
+      const { port } = server.address() as AddressInfo;
+      const res = await fetch(`http://127.0.0.1:${port}/test`);
+      assert.equal(res.status, 200);
 
-    const json = (await res.json()) as any;
-    expect(json.ok).toBe(true);
-
-    await new Promise<void>((resolve) => server.close(() => resolve()));
+      const json = (await res.json()) as any;
+      assert.equal(json.ok, true);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 
   it('throws when cert file does not exist', () => {
     const app = express();
-    expect(() =>
-      createServerListener(app, {
-        cert: '/nonexistent/cert.pem',
-        key: keyPath,
-      }),
-    ).toThrow(/cert/i);
+    assertThrows(
+      () =>
+        createServerListener(app, {
+          cert: '/nonexistent/cert.pem',
+          key: keyPath,
+        }),
+      /cert/i,
+    );
   });
 
   it('throws when key file does not exist', () => {
     const app = express();
-    expect(() =>
-      createServerListener(app, {
-        cert: certPath,
-        key: '/nonexistent/key.pem',
-      }),
-    ).toThrow(/key/i);
+    assertThrows(
+      () =>
+        createServerListener(app, {
+          cert: certPath,
+          key: '/nonexistent/key.pem',
+        }),
+      /key/i,
+    );
   });
 });
 
 describe('getProtocol', () => {
   it('returns https when tls config provided', () => {
-    expect(getProtocol({ cert: 'a', key: 'b' })).toBe('https');
+    assert.equal(getProtocol({ cert: 'a', key: 'b' }), 'https');
   });
 
   it('returns http when no tls config', () => {
-    expect(getProtocol()).toBe('http');
-    expect(getProtocol(undefined)).toBe('http');
+    assert.equal(getProtocol(), 'http');
+    assert.equal(getProtocol(undefined), 'http');
   });
 });

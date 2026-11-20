@@ -8,6 +8,9 @@
  * their CLI or YAML form stops the start like every other destination option.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   DESTINATION_OPTIONS_REMOVED,
@@ -16,6 +19,7 @@ import {
   readParameters,
   validateYamlConfig,
 } from '@mcp-abap-adt/lib/config';
+import { assertThrows } from '../../../../src/__tests__/helpers/assertions';
 import { CORE_PARAMETERS, readCoreConfig } from '../config/coreParameters';
 import { coreHelp } from '../launcher';
 
@@ -39,40 +43,48 @@ const read = (
 ) => readCoreConfig(argv, env, yaml) as unknown as Record<string, unknown>;
 
 describe('the CLI and YAML forms reach the same fields', () => {
-  it.each(FORMS)('%s: %s, %s and %s', (field, cli, env, yaml) => {
-    const value = '/H/value.example.test/S/3299';
-    expect(read([`${cli}=${value}`])[field]).toBe(value);
-    expect(read([cli, value])[field]).toBe(value);
-    expect(read([], { [env]: value })[field]).toBe(value);
-    expect(read([], {}, { [yaml]: value })[field]).toBe(value);
-  });
+  for (const [field, cli, env, yaml] of FORMS) {
+    it(format('%s: %s, %s and %s', field, cli, env, yaml), () => {
+      const value = '/H/value.example.test/S/3299';
+      assert.equal(read([`${cli}=${value}`])[field], value);
+      assert.equal(read([cli, value])[field], value);
+      assert.equal(read([], { [env]: value })[field], value);
+      assert.equal(read([], {}, { [yaml]: value })[field], value);
+    });
+  }
 
-  it.each(FORMS)(
-    '%s: the form it came from is kept',
-    (field, cli, env, yaml) => {
+  for (const [field, cli, env, yaml] of FORMS) {
+    it(format('%s: the form it came from is kept', field), () => {
       const sourceOf = (config: ReturnType<typeof readCoreConfig>) =>
         config.destinationKeySource?.[field];
-      expect(sourceOf(readCoreConfig([`${cli}=v`], {}))).toBe(cli);
-      expect(sourceOf(readCoreConfig([], { [env]: 'v' }))).toBe(env);
-      expect(sourceOf(readCoreConfig([], {}, { [yaml]: 'v' }))).toBe(
+      assert.equal(sourceOf(readCoreConfig([`${cli}=v`], {})), cli);
+      assert.equal(sourceOf(readCoreConfig([], { [env]: 'v' })), env);
+      assert.equal(
+        sourceOf(readCoreConfig([], {}, { [yaml]: 'v' })),
         `${yaml} (config file)`,
       );
-    },
-  );
+    });
+  }
 
-  it.each(FORMS)('%s: a blank value is unset', (field, cli, env, yaml) => {
-    expect(read([`${cli}=   `])[field]).toBeUndefined();
-    expect(read([], { [env]: '   ' })[field]).toBeUndefined();
-    expect(read([], {}, { [yaml]: '   ' })[field]).toBeUndefined();
-  });
+  for (const [field, cli, env, yaml] of FORMS) {
+    it(format('%s: a blank value is unset', field), () => {
+      assert.equal(read([`${cli}=   `])[field], undefined);
+      assert.equal(read([], { [env]: '   ' })[field], undefined);
+      assert.equal(read([], {}, { [yaml]: '   ' })[field], undefined);
+    });
+  }
 
-  it.each(FORMS)('%s: trimmed, as every string parameter is', (field, cli) => {
-    expect(read([`${cli}=  value-one  `])[field]).toBe('value-one');
-  });
+  for (const [field, cli] of FORMS) {
+    it(format('%s: trimmed, as every string parameter is', field), () => {
+      assert.equal(read([`${cli}=  value-one  `])[field], 'value-one');
+    });
+  }
 
-  it.each(FORMS)('%s: a YAML number is its text', (field, _cli, _env, yaml) => {
-    expect(read([], {}, { [yaml]: 3600 })[field]).toBe('3600');
-  });
+  for (const [field, _cli, _env, yaml] of FORMS) {
+    it(format('%s: a YAML number is its text', field), () => {
+      assert.equal(read([], {}, { [yaml]: 3600 })[field], '3600');
+    });
+  }
 
   it('CLI beats the environment, the environment beats YAML', () => {
     const config = read(
@@ -80,27 +92,27 @@ describe('the CLI and YAML forms reach the same fields', () => {
       { SAP_MSHOST: 'from-env', SAP_SYSID: 'ENV' },
       { mshost: 'from-yaml', sysid: 'YML', group: 'FROM_YAML' },
     );
-    expect(config.mshost).toBe('from-cli');
-    expect(config.sysid).toBe('ENV');
-    expect(config.group).toBe('FROM_YAML');
+    assert.equal(config.mshost, 'from-cli');
+    assert.equal(config.sysid, 'ENV');
+    assert.equal(config.group, 'FROM_YAML');
   });
 
   it('none given: none set, no default', () => {
     const config = read([]);
-    for (const [field] of FORMS) expect(config[field]).toBeUndefined();
+    for (const [field] of FORMS) assert.equal(config[field], undefined);
   });
 
   it('the help lists every form', () => {
     const help = coreHelp();
     for (const [, cli, env] of FORMS) {
-      expect(help).toContain(cli);
-      expect(help).toContain(env);
+      assert.ok(help.includes(cli));
+      assert.ok(help.includes(env));
     }
   });
 
   it('YAML validation accepts them', () => {
     const yaml = Object.fromEntries(FORMS.map(([, , , y]) => [y, 'v']));
-    expect(validateYamlConfig(CORE_PARAMETERS, yaml).valid).toBe(true);
+    assert.equal(validateYamlConfig(CORE_PARAMETERS, yaml).valid, true);
   });
 });
 
@@ -112,23 +124,35 @@ const FOREIGN: ParameterTable = {
 };
 
 describe("another binary's form of them stops the start as other foreign parameters do", () => {
-  it.each(FORMS)('%s: its CLI form', (_field, cli) => {
-    expect(() => readParameters(FOREIGN, [`${cli}=value-one`], {})).toThrow(
-      `${cli}: ${DESTINATIONS_ELSEWHERE}`,
-    );
-    // As --connection-type is.
-    expect(() =>
-      readParameters(FOREIGN, ['--connection-type=rfc'], {}),
-    ).toThrow(`--connection-type: ${DESTINATIONS_ELSEWHERE}`);
-  });
+  for (const [_field, cli] of FORMS) {
+    it(format('%s: its CLI form', _field), () => {
+      assertThrows(
+        () => readParameters(FOREIGN, [`${cli}=value-one`], {}),
+        `${cli}: ${DESTINATIONS_ELSEWHERE}`,
+      );
+      // As --connection-type is.
+      assertThrows(
+        () => readParameters(FOREIGN, ['--connection-type=rfc'], {}),
+        `--connection-type: ${DESTINATIONS_ELSEWHERE}`,
+      );
+    });
+  }
 
-  it.each(FORMS)('%s: its YAML form', (_field, _cli, _env, yaml) => {
-    expect(() =>
-      readParameters(FOREIGN, [], {}, { [yaml]: 'value-one' }),
-    ).toThrow(`${yaml} (config file): ${DESTINATIONS_ELSEWHERE}`);
-  });
+  for (const [_field, _cli, _env, yaml] of FORMS) {
+    it(format('%s: its YAML form', _field), () => {
+      assertThrows(
+        () => readParameters(FOREIGN, [], {}, { [yaml]: 'value-one' }),
+        `${yaml} (config file): ${DESTINATIONS_ELSEWHERE}`,
+      );
+    });
+  }
 
-  it.each(FORMS)('%s: its environment form is not read', (_f, _c, env) => {
-    expect(readParameters(FOREIGN, [], { [env]: 'value-one' })).toEqual({});
-  });
+  for (const [_f, _c, env] of FORMS) {
+    it(format('%s: its environment form is not read', _f), () => {
+      assert.deepStrictEqual(
+        readParameters(FOREIGN, [], { [env]: 'value-one' }),
+        {},
+      );
+    });
+  }
 });

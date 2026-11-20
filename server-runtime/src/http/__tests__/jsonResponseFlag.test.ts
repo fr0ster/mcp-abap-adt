@@ -5,15 +5,16 @@
  * to an `initialize` POST is `text/event-stream` or `application/json`.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { main } from '../launcher';
 import type { StreamableHttpServer } from '../StreamableHttpServer';
-
-jest.setTimeout(30_000);
 
 const savedEnv = process.env;
 let running: StreamableHttpServer | undefined;
@@ -68,7 +69,7 @@ async function answerType(
       }),
     },
   );
-  const errors = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const errors = mock.method(console, 'error', () => {});
   try {
     const port = running?.listeningPort();
     if (port === undefined) throw new Error(JSON.stringify(lines));
@@ -94,11 +95,11 @@ async function answerType(
     await answer.text();
     return answer.headers.get('content-type');
   } finally {
-    errors.mockRestore();
+    errors.mock.restore();
   }
 }
 
-it.each([
+for (const [_form, argv, env, yaml] of [
   ['--http-json-response=false', ['--http-json-response=false'], {}, undefined],
   [
     'MCP_HTTP_ENABLE_JSON_RESPONSE=false',
@@ -107,18 +108,22 @@ it.each([
     undefined,
   ],
   ['YAML http.json-response: false', [], {}, 'http:\n  json-response: false\n'],
-] as const)('%s gives SSE streams', async (_form, argv, env, yaml) => {
-  expect(await answerType([...argv], { ...env }, yaml)).toContain(
-    'text/event-stream',
-  );
-});
+] as const) {
+  it(format('%s gives SSE streams', _form), async () => {
+    assert.ok(
+      (await answerType([...argv], { ...env }, yaml))?.includes(
+        'text/event-stream',
+      ),
+    );
+  });
+}
 
 it('--http-json-response (true) gives JSON responses', async () => {
-  expect(await answerType(['--http-json-response'])).toContain(
-    'application/json',
+  assert.ok(
+    (await answerType(['--http-json-response']))?.includes('application/json'),
   );
 });
 
 it('absent, the server answers JSON, as before', async () => {
-  expect(await answerType([])).toContain('application/json');
+  assert.ok((await answerType([]))?.includes('application/json'));
 });

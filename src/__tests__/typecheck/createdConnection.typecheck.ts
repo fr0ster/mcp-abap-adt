@@ -5,7 +5,7 @@
  * each `@ts-expect-error` below fails the check the moment the line it marks
  * compiles.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 import type { CreatedConnection } from '@mcp-abap-adt/connection';

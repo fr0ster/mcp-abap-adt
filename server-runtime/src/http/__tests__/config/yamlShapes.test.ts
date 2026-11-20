@@ -7,6 +7,9 @@
  * given, as before.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   type ParameterTable,
   validateYamlConfig,
@@ -28,7 +31,7 @@ const errorsOf = (table: ParameterTable, text: string) =>
   validateYamlConfig(table, yaml(text)).errors;
 
 describe('a section of the wrong shape is refused, naming its key', () => {
-  it.each([
+  for (const [_case, table, text, key] of [
     [
       'http as a list (the finding)',
       HTTP_PARAMETERS,
@@ -60,16 +63,18 @@ describe('a section of the wrong shape is refused, naming its key', () => {
       'restrictions: all\n',
       'restrictions',
     ],
-  ])('%s', (_case, table, text, key) => {
-    const errors = errorsOf(table, text);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain(`"${key}"`);
-    expect(errors[0]).toContain('mapping');
-  });
+  ] satisfies [string, Parameters<typeof errorsOf>[0], string, string][]) {
+    it(format('%s', _case), () => {
+      const errors = errorsOf(table, text);
+      assert.equal(errors.length, 1);
+      assert.ok(errors[0].includes(`"${key}"`));
+      assert.ok(errors[0].includes('mapping'));
+    });
+  }
 });
 
 describe('a value of the wrong shape is refused, naming its key', () => {
-  it.each([
+  for (const [_case, table, text, key] of [
     [
       'a port as a mapping',
       HTTP_PARAMETERS,
@@ -112,31 +117,36 @@ describe('a value of the wrong shape is refused, naming its key', () => {
       'shutdown-timeout: [5]\n',
       'shutdown-timeout',
     ],
-  ])('%s', (_case, table, text, key) => {
-    const errors = errorsOf(table, text);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain(key);
-  });
+  ] satisfies [string, Parameters<typeof errorsOf>[0], string, string][]) {
+    it(format('%s', _case), () => {
+      const errors = errorsOf(table, text);
+      assert.equal(errors.length, 1);
+      assert.ok(errors[0].includes(key));
+    });
+  }
 });
 
 describe('an empty value and null are not given', () => {
-  it.each([
+  for (const [_case, table, text] of [
     ['http null', HTTP_PARAMETERS, 'http:\n'],
     ['http empty', HTTP_PARAMETERS, "http: ''\n"],
     ['http.tls null', HTTP_PARAMETERS, 'http:\n  tls:\n'],
     ['restrictions null', HTTP_PARAMETERS, 'restrictions:\n'],
     ['a port null', HTTP_PARAMETERS, 'http:\n  port:\n'],
     ['a host empty', HTTP_PARAMETERS, "http:\n  host: ''\n"],
-  ])('%s', (_case, table, text) => {
-    expect(errorsOf(table, text)).toEqual([]);
-  });
+  ] satisfies [string, Parameters<typeof errorsOf>[0], string][]) {
+    it(format('%s', _case), () => {
+      assert.deepStrictEqual(errorsOf(table, text), []);
+    });
+  }
 
   it('a well-shaped section is read', () => {
-    expect(
+    assert.deepStrictEqual(
       errorsOf(
         HTTP_PARAMETERS,
         'http:\n  enable-dns-protection: true\n  allowed-hosts: ["localhost:3000"]\n',
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 });

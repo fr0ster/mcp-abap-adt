@@ -1,5 +1,9 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 /**
  * `exports` and `typesVersions` must describe the same package.
@@ -22,7 +26,7 @@ import * as path from 'node:path';
  * imports by relative path. Hence this.
  */
 
-const root = path.join(__dirname, '..', '..', '..');
+const root = repositoryRoot(__dirname);
 
 interface Manifest {
   name: string;
@@ -45,30 +49,31 @@ const packages: Array<[label: string, dir: string]> = [
   ['@mcp-abap-adt/sse', path.join(root, 'sse')],
 ];
 
-describe.each(packages)('%s entry points', (_label, dir) => {
-  const pkg = manifest(dir);
-  const subpaths = Object.keys(pkg.exports ?? {}).filter((s) => s !== '.');
+for (const [_label, dir] of packages) {
+  describe(format('%s entry points', _label), () => {
+    const pkg = manifest(dir);
+    const subpaths = Object.keys(pkg.exports ?? {}).filter((s) => s !== '.');
 
-  it('declares exports at all', () => {
-    expect(
-      subpaths.length + Object.keys(pkg.exports ?? {}).length,
-    ).toBeGreaterThan(0);
-  });
+    it('declares exports at all', () => {
+      assert.ok(subpaths.length + Object.keys(pkg.exports ?? {}).length > 0);
+    });
 
-  it('names every exported subpath in typesVersions', () => {
-    const declared = Object.keys(pkg.typesVersions?.['*'] ?? {}).sort();
-    const expected = subpaths.map((s) => s.replace(/^\.\//, '')).sort();
-    expect(declared).toEqual(expected);
-  });
+    it('names every exported subpath in typesVersions', () => {
+      const declared = Object.keys(pkg.typesVersions?.['*'] ?? {}).sort();
+      const expected = subpaths.map((s) => s.replace(/^\.\//, '')).sort();
+      assert.deepStrictEqual(declared, expected);
+    });
 
-  it('points typesVersions at the same file exports does', () => {
-    for (const sub of subpaths) {
-      const viaExports = pkg.exports?.[sub]?.types.replace(/^\.\//, '');
-      const viaTypes = pkg.typesVersions?.['*'][sub.replace(/^\.\//, '')]?.[0];
-      expect(viaTypes).toBe(viaExports);
-    }
+    it('points typesVersions at the same file exports does', () => {
+      for (const sub of subpaths) {
+        const viaExports = pkg.exports?.[sub]?.types.replace(/^\.\//, '');
+        const viaTypes =
+          pkg.typesVersions?.['*'][sub.replace(/^\.\//, '')]?.[0];
+        assert.equal(viaTypes, viaExports);
+      }
+    });
   });
-});
+}
 
 /**
  * Separate from the map comparison above: a map may agree with itself and
@@ -79,23 +84,25 @@ describe('every declared entry point exists on disk after a build', () => {
   const built = fs.existsSync(path.join(root, 'dist', 'index.js'));
   const t = built ? it : it.skip;
 
-  t.each(packages)('%s', (_label, dir) => {
-    const pkg = manifest(dir);
-    const targets = [
-      ...Object.values(pkg.exports ?? {}).flatMap((m) => [
-        m.types,
-        m.import,
-        m.require,
-      ]),
-      ...Object.values(pkg.typesVersions?.['*'] ?? {}).flat(),
-      pkg.main,
-      pkg.types,
-      ...Object.values(pkg.bin ?? {}),
-    ].filter((p): p is string => typeof p === 'string');
+  for (const [_label, dir] of packages) {
+    t(format('%s', _label), () => {
+      const pkg = manifest(dir);
+      const targets = [
+        ...Object.values(pkg.exports ?? {}).flatMap((m) => [
+          m.types,
+          m.import,
+          m.require,
+        ]),
+        ...Object.values(pkg.typesVersions?.['*'] ?? {}).flat(),
+        pkg.main,
+        pkg.types,
+        ...Object.values(pkg.bin ?? {}),
+      ].filter((p): p is string => typeof p === 'string');
 
-    const missing = targets.filter(
-      (rel) => !fs.existsSync(path.join(dir, rel)),
-    );
-    expect(missing).toEqual([]);
-  });
+      const missing = targets.filter(
+        (rel) => !fs.existsSync(path.join(dir, rel)),
+      );
+      assert.deepStrictEqual(missing, []);
+    });
+  }
 });

@@ -5,6 +5,9 @@
  * or a classified failure, and no getter of the value is run.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { failureOf } from '../../../lib/auth/failures';
 
@@ -49,55 +52,54 @@ function revoked(): object {
 }
 
 describe('failureOf on hostile values', () => {
-  it.each(['refusal', 'error', 'code', 'name', 'message', 'kind'])(
-    'a throwing getter on %s: never run, never throws',
-    (key) => {
+  for (const key of ['refusal', 'error', 'code', 'name', 'message', 'kind']) {
+    it(format('a throwing getter on %s: never run, never throws', key), () => {
       const { value, ran } = throwingGetters(key);
-      expect(() => failureOf(value)).not.toThrow();
-      expect(failureOf(value)).toBeUndefined();
-      expect(ran).toEqual([]);
-    },
-  );
+      failureOf(value);
+      assert.equal(failureOf(value), undefined);
+      assert.deepStrictEqual(ran, []);
+    });
+  }
 
   it('throwing getters on refusal, error and code at once', () => {
     const { value, ran } = throwingGetters('refusal', 'error', 'code');
-    expect(failureOf(value)).toBeUndefined();
-    expect(ran).toEqual([]);
+    assert.equal(failureOf(value), undefined);
+    assert.deepStrictEqual(ran, []);
   });
 
   it('an own refusal whose kind is a throwing getter', () => {
     const { value: refusal, ran } = throwingGetters('kind', 'facts');
-    expect(failureOf({ refusal })).toBeUndefined();
-    expect(ran).toEqual([]);
+    assert.equal(failureOf({ refusal }), undefined);
+    assert.deepStrictEqual(ran, []);
   });
 
   it('a Proxy whose traps throw, as the value and as its refusal', () => {
-    expect(() => failureOf(trapsThatThrow())).not.toThrow();
-    expect(failureOf(trapsThatThrow())).toBeUndefined();
-    expect(failureOf({ refusal: trapsThatThrow() })).toBeUndefined();
+    failureOf(trapsThatThrow());
+    assert.equal(failureOf(trapsThatThrow()), undefined);
+    assert.equal(failureOf({ refusal: trapsThatThrow() }), undefined);
   });
 
   it('a revoked Proxy, as the value and as its refusal', () => {
-    expect(failureOf(revoked())).toBeUndefined();
-    expect(failureOf({ refusal: revoked() })).toBeUndefined();
-    expect(failureOf({ refusal: { refusal: revoked() } })).toBeUndefined();
+    assert.equal(failureOf(revoked()), undefined);
+    assert.equal(failureOf({ refusal: revoked() }), undefined);
+    assert.equal(failureOf({ refusal: { refusal: revoked() } }), undefined);
   });
 
   it('a refusal with a known kind but forged facts: a classified failure, not a throw', () => {
     const read = failureOf({
       refusal: { kind: 'credential-refused', facts: { credential: 42 } },
     });
-    expect(read?.error).toBe('authentication_failed');
-    expect(read?.kind).toBe('unknown');
+    assert.equal(read?.error, 'authentication_failed');
+    assert.equal(read?.kind, 'unknown');
   });
 
   it('a refusal held behind a getter on a value with a real one beside it: only own data is read', () => {
     const error = authError['credential-refused']({ credential: 'token' });
     const proto = { refusal: error };
-    expect(failureOf(Object.create(proto))).toBeUndefined();
+    assert.equal(failureOf(Object.create(proto)), undefined);
   });
 
-  it.each([
+  for (const [_label, value] of [
     ['null', null],
     ['undefined', undefined],
     ['a number', 42],
@@ -105,13 +107,15 @@ describe('failureOf on hostile values', () => {
     ['a boolean', true],
     ['a symbol', Symbol('x')],
     ['a bigint', BigInt(1)],
-  ])('%s: undefined', (_label, value) => {
-    expect(failureOf(value)).toBeUndefined();
-  });
+  ]) {
+    it(format('%s: undefined', _label), () => {
+      assert.equal(failureOf(value), undefined);
+    });
+  }
 
   it('a function with an own refusal is read like an object', () => {
     const error = authError['credential-refused']({ credential: 'token' });
     const fn = Object.assign(() => {}, { refusal: error });
-    expect(failureOf(fn)?.kind).toBe('credential-refused');
+    assert.equal(failureOf(fn)?.kind, 'credential-refused');
   });
 });

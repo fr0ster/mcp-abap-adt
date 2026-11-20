@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import {
   attachCleanup,
@@ -6,6 +9,11 @@ import {
   LockNotReleased,
   withLock,
 } from '../../lib/strategies/withLock';
+import {
+  assertMatchObject,
+  assertRejects,
+  rejectionOf,
+} from '../helpers/assertions';
 
 /** What every lock here is taken on. */
 const OBJECT = { type: 'CLASS', name: 'OBJ' };
@@ -43,8 +51,8 @@ function refused(
 
 describe('withLock', () => {
   it('runs neither body nor release when the lock is refused', async () => {
-    const body = jest.fn();
-    const release = jest.fn();
+    const body = mock.fn();
+    const release = mock.fn();
 
     const result = await withLock(
       async () => refused('Object is locked by another user'),
@@ -53,15 +61,15 @@ describe('withLock', () => {
       OBJECT,
     );
 
-    expect(result.ok).toBe(false);
+    assert.equal(result.ok, false);
     if (result.ok) throw new Error('expected the acquire refusal');
-    expect(result.getError().message).toBe('Object is locked by another user');
-    expect(body).not.toHaveBeenCalled();
-    expect(release).not.toHaveBeenCalled();
+    assert.equal(result.getError().message, 'Object is locked by another user');
+    assert.equal(body.mock.callCount(), 0);
+    assert.equal(release.mock.callCount(), 0);
   });
 
   it('answers the body value, releasing exactly once', async () => {
-    const release = jest.fn(async () => ok(undefined));
+    const release = mock.fn(async () => ok(undefined));
 
     const result = await withLock(
       async () => ok('handle-1'),
@@ -71,13 +79,17 @@ describe('withLock', () => {
     );
 
     if (!result.ok) throw new Error('expected the body value');
-    expect(result.getResult().value).toBe('written');
-    expect(release).toHaveBeenCalledTimes(1);
-    expect(release).toHaveBeenCalledWith('handle-1');
+    assert.equal(result.getResult().value, 'written');
+    assert.equal(release.mock.callCount(), 1);
+    assert.ok(
+      release.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['handle-1']),
+      ),
+    );
   });
 
   it('releases after a refused body and answers that failure untouched', async () => {
-    const release = jest.fn(async () => ok(undefined));
+    const release = mock.fn(async () => ok(undefined));
 
     const result = await withLock(
       async () => ok('handle-1'),
@@ -86,18 +98,19 @@ describe('withLock', () => {
       OBJECT,
     );
 
-    expect(release).toHaveBeenCalledTimes(1);
+    assert.equal(release.mock.callCount(), 1);
     if (result.ok) throw new Error('expected the body refusal');
-    expect(result.getError().message).toBe('Update refused');
-    expect(
+    assert.equal(result.getError().message, 'Update refused');
+    assert.equal(
       (result.getError() as { cleanup?: unknown }).cleanup,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('releases after a THROWN body and lets the throw out unchanged', async () => {
-    const release = jest.fn(async () => ok(undefined));
+    const release = mock.fn(async () => ok(undefined));
 
-    await expect(
+    await assertRejects(
       withLock(
         async () => ok('handle-1'),
         async () => {
@@ -106,11 +119,12 @@ describe('withLock', () => {
         release,
         OBJECT,
       ),
-    ).rejects.toThrow('parser blew up');
+      'parser blew up',
+    );
 
     // Exactly once, on the throw path as much as the others. This is the half
     // the code can promise; whether SAP then lets go is SAP's answer.
-    expect(release).toHaveBeenCalledTimes(1);
+    assert.equal(release.mock.callCount(), 1);
   });
 
   it('keeps the body failure and names the dangling lock when the release is REFUSED', async () => {
@@ -122,8 +136,8 @@ describe('withLock', () => {
     );
 
     if (result.ok) throw new Error('expected the body refusal');
-    expect(result.getError().message).toBe('Update refused');
-    expect((result.getError() as { cleanup?: unknown }).cleanup).toMatchObject({
+    assert.equal(result.getError().message, 'Update refused');
+    assertMatchObject((result.getError() as { cleanup?: unknown }).cleanup, {
       message: 'Unlock refused',
       origin: 'refusal',
     });
@@ -140,19 +154,22 @@ describe('withLock', () => {
     );
 
     if (result.ok) throw new Error('expected the body refusal');
-    expect(result.getError().message).toBe('Update refused');
-    expect((result.getError() as { cleanup?: unknown }).cleanup).toEqual({
-      error: 'client_threw',
-      message: 'unlock called with no handle',
-      failures: [
-        {
-          error: 'client_threw',
-          message: 'unlock called with no handle',
-          step: 'unlock',
-        },
-      ],
-      ...leftLockedBy('unlock called with no handle'),
-    });
+    assert.equal(result.getError().message, 'Update refused');
+    assert.deepStrictEqual(
+      (result.getError() as { cleanup?: unknown }).cleanup,
+      {
+        error: 'client_threw',
+        message: 'unlock called with no handle',
+        failures: [
+          {
+            error: 'client_threw',
+            message: 'unlock called with no handle',
+            step: 'unlock',
+          },
+        ],
+        ...leftLockedBy('unlock called with no handle'),
+      },
+    );
   });
 
   /**
@@ -177,12 +194,12 @@ describe('withLock', () => {
       OBJECT,
     );
 
-    expect(result.ok).toBe(true);
+    assert.equal(result.ok, true);
     if (!result.ok) throw new Error('expected the write to stand');
-    expect(result.getResult().value).toBe('written');
-    expect(
-      (result as { cleanup?: { message?: string } }).cleanup,
-    ).toMatchObject({ message: 'Unlock refused' });
+    assert.equal(result.getResult().value, 'written');
+    assertMatchObject((result as { cleanup?: { message?: string } }).cleanup, {
+      message: 'Unlock refused',
+    });
   });
 
   it('never puts a transport config in a succeeded write under a REFUSED unlock', async () => {
@@ -200,13 +217,13 @@ describe('withLock', () => {
       OBJECT,
     );
 
-    expect(result.ok).toBe(true);
+    assert.equal(result.ok, true);
     if (!result.ok) throw new Error('expected the write to stand');
     const cleanup = (result as { cleanup?: { request?: unknown } }).cleanup;
-    expect(cleanup?.request).toEqual({ method: 'POST', url: '/u' });
+    assert.deepStrictEqual(cleanup?.request, { method: 'POST', url: '/u' });
     // The rule the cleanup channel exists for: nothing reaches a caller except
     // by name, so the Authorization header cannot ride out on the lock note.
-    expect(JSON.stringify(result)).not.toContain(SECRET);
+    assert.ok(!JSON.stringify(result).includes(SECRET));
   });
 
   /**
@@ -224,10 +241,10 @@ describe('withLock', () => {
       OBJECT,
     );
 
-    expect(result.ok).toBe(true);
+    assert.equal(result.ok, true);
     if (!result.ok) throw new Error('expected the write to stand');
-    expect(result.getResult().value).toBe('written');
-    expect((result as { cleanup?: unknown }).cleanup).toEqual({
+    assert.equal(result.getResult().value, 'written');
+    assert.deepStrictEqual((result as { cleanup?: unknown }).cleanup, {
       error: 'client_threw',
       message: 'unlock called with no handle',
       failures: [
@@ -242,7 +259,8 @@ describe('withLock', () => {
   });
 
   it('carries the dangling lock out with a THROWN body when the release is refused', async () => {
-    expect.assertions(3);
+    // expect.assertions(3): the three checks of the catch, counted.
+    let checked = 0;
     try {
       await withLock(
         async () => ok('handle-1'),
@@ -254,13 +272,17 @@ describe('withLock', () => {
       );
     } catch (thrown) {
       const error = thrown as Error & { cause?: Error; cleanup?: unknown };
-      expect(error.message).toBe('parser blew up');
-      expect(error.cause?.message).toBe('parser blew up');
-      expect(error.cleanup).toMatchObject({
+      assert.equal(error.message, 'parser blew up');
+      checked += 1;
+      assert.equal(error.cause?.message, 'parser blew up');
+      checked += 1;
+      assertMatchObject(error.cleanup, {
         message: 'Unlock refused',
         origin: 'refusal',
       });
+      checked += 1;
     }
+    assert.equal(checked, 3);
   });
 
   it('never puts a transport config in the carrier, even before the boundary', async () => {
@@ -281,8 +303,8 @@ describe('withLock', () => {
     if (result.ok) throw new Error('expected the body refusal');
     const cleanup = (result.getError() as { cleanup?: { request?: unknown } })
       .cleanup;
-    expect(cleanup?.request).toEqual({ method: 'POST', url: '/u' });
-    expect(JSON.stringify(result.getError())).not.toContain(SECRET);
+    assert.deepStrictEqual(cleanup?.request, { method: 'POST', url: '/u' });
+    assert.ok(!JSON.stringify(result.getError()).includes(SECRET));
   });
 });
 
@@ -309,30 +331,37 @@ describe('withLock, a release on a spent connection', () => {
       }),
     }) as unknown as IAdtResponse<never, IAdtError>;
 
-  it.each([
+  for (const [_name, extra] of [
     ['sessionError ADT_NOT_CONNECTED', { sessionError: 'ADT_NOT_CONNECTED' }],
     [
       'sessionError ADT_SESSION_REPLACED',
       { sessionError: 'ADT_SESSION_REPLACED' },
     ],
     ['sessionLost', { sessionLost: 'ADT_SESSION_REPLACED' }],
-  ] as const)(
-    '%s: the lock went with the session — no left_locked, no handle',
-    async (_name, extra) => {
-      const result = await withLock(
-        async () => ok('handle-1'),
-        async () => ok('written'),
-        spentRelease(extra),
-        OBJECT,
-      );
-      expect(result.ok).toBe(true);
-      const cleanup = (result as { cleanup?: Record<string, unknown> }).cleanup;
-      expect(cleanup?.left_locked).toBeUndefined();
-      expect(cleanup?.lock_handle).toBeUndefined();
-      expect(cleanup?.object).toEqual({ type: 'CLASS', name: 'OBJ' });
-      expect(cleanup?.warning).toBe(LOCK_WENT_WITH_SESSION_WORDS);
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        '%s: the lock went with the session — no left_locked, no handle',
+        _name,
+      ),
+      async () => {
+        const result = await withLock(
+          async () => ok('handle-1'),
+          async () => ok('written'),
+          spentRelease(extra),
+          OBJECT,
+        );
+        // Read before the check below, which narrows `result` to a success.
+        const cleanup = (result as { cleanup?: Record<string, unknown> })
+          .cleanup;
+        assert.equal(result.ok, true);
+        assert.equal(cleanup?.left_locked, undefined);
+        assert.equal(cleanup?.lock_handle, undefined);
+        assert.deepStrictEqual(cleanup?.object, { type: 'CLASS', name: 'OBJ' });
+        assert.equal(cleanup?.warning, LOCK_WENT_WITH_SESSION_WORDS);
+      },
+    );
+  }
 
   it('ADT_RELEASE_PENDING is no spent connection: the lock may be left locked', async () => {
     const result = await withLock(
@@ -342,7 +371,7 @@ describe('withLock, a release on a spent connection', () => {
       OBJECT,
     );
     const cleanup = (result as { cleanup?: Record<string, unknown> }).cleanup;
-    expect(cleanup).toMatchObject(leftLockedBy('words that are never read'));
+    assertMatchObject(cleanup, leftLockedBy('words that are never read'));
   });
 });
 
@@ -359,8 +388,8 @@ describe('carryCleanup', () => {
       ok('activated'),
     );
     if (!carried.ok) throw new Error('expected the activation to stand');
-    expect(carried.getResult().value).toBe('activated');
-    expect((carried as { cleanup?: unknown }).cleanup).toEqual(held);
+    assert.equal(carried.getResult().value, 'activated');
+    assert.deepStrictEqual((carried as { cleanup?: unknown }).cleanup, held);
   });
 
   it('moves the note onto a failure without touching its error', async () => {
@@ -369,8 +398,8 @@ describe('carryCleanup', () => {
     );
     if (carried.ok) throw new Error('expected the activation refusal');
     const error = carried.getError() as IAdtError & { cleanup?: unknown };
-    expect(error.message).toBe('Object is locked');
-    expect(error.cleanup).toEqual(held);
+    assert.equal(error.message, 'Object is locked');
+    assert.deepStrictEqual(error.cleanup, held);
   });
 
   /**
@@ -381,30 +410,37 @@ describe('carryCleanup', () => {
    */
   it('carries the note out on a call that threw', async () => {
     const boom = new Error('socket hang up');
-    await expect(
-      carryCleanup(withCleanup(ok('written')), async () => {
-        throw boom;
-      }),
-    ).rejects.toMatchObject({
-      name: 'LockNotReleased',
-      message: 'socket hang up',
-      cleanup: held,
-      cause: boom,
-    });
+    assertMatchObject(
+      await rejectionOf(
+        carryCleanup(withCleanup(ok('written')), async () => {
+          throw boom;
+        }),
+      ),
+      {
+        name: 'LockNotReleased',
+        message: 'socket hang up',
+        cleanup: held,
+        cause: boom,
+      },
+    );
   });
 
   it('lets a throw past untouched when no lock is held', async () => {
     const boom = new Error('socket hang up');
-    await expect(
-      carryCleanup(ok('written'), async () => {
-        throw boom;
-      }),
-    ).rejects.toBe(boom);
+    assert.equal(
+      await rejectionOf(
+        carryCleanup(ok('written'), async () => {
+          throw boom;
+        }),
+      ),
+      boom,
+    );
   });
 
   it('hands back the call’s answer untouched when there is no note', async () => {
     const activated = ok('activated');
-    expect(await carryCleanup(ok('written'), async () => activated)).toBe(
+    assert.equal(
+      await carryCleanup(ok('written'), async () => activated),
       activated,
     );
   });
@@ -419,12 +455,12 @@ describe('carryCleanup', () => {
       withCleanup(ok('written')),
       async () => activated,
     );
-    expect((carried as { cleanup?: unknown }).cleanup).toEqual(own);
+    assert.deepStrictEqual((carried as { cleanup?: unknown }).cleanup, own);
   });
 
   it('carries between two answers already in hand, for pair', () => {
     const carried = attachCleanup(withCleanup(ok('document')), ok('metadata'));
-    expect((carried as { cleanup?: unknown }).cleanup).toEqual(held);
-    expect(LockNotReleased.name).toBe('LockNotReleased');
+    assert.deepStrictEqual((carried as { cleanup?: unknown }).cleanup, held);
+    assert.equal(LockNotReleased.name, 'LockNotReleased');
   });
 });

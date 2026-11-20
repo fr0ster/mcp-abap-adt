@@ -635,7 +635,7 @@ export function getManagedConnection(kind?: SapEnvironment): IAbapConnection {
     cachedKind = builtKind;
 
     // Don't call connect() here - it will be called lazily on first request
-    // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
+    // This prevents unnecessary connection attempts during module import (e.g., in tests)
     // The retry logic in makeAdtRequest will handle connection establishment automatically
   } else {
     connectionManagerLogger?.debug(

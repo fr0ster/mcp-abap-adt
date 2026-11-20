@@ -3,6 +3,16 @@
  * a failing observer) to the server's state logger — stderr when none is
  * given, never a silent transport logger.
  */
+
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
@@ -27,17 +37,15 @@ const provokeObserverFailure = (state: {
 
 describe('the state logger of the pool', () => {
   let written: string[];
-  let spy: jest.SpyInstance;
+  let spy: Mock<typeof process.stderr.write>;
   beforeEach(() => {
     written = [];
-    spy = jest
-      .spyOn(process.stderr, 'write')
-      .mockImplementation((chunk: unknown) => {
-        written.push(String(chunk));
-        return true;
-      });
+    spy = mock.method(process.stderr, 'write', (chunk: unknown) => {
+      written.push(String(chunk));
+      return true;
+    });
   });
-  afterEach(() => spy.mockRestore());
+  afterEach(() => spy.mock.restore());
 
   it("the HTTP pool's instances report to the server's state logger", () => {
     const lines: string[] = [];
@@ -50,7 +58,7 @@ describe('the state logger of the pool', () => {
       }
     ).createPerRequestServer();
     provokeObserverFailure(instance.state as never);
-    expect(lines.join('')).toContain('observer broke');
+    assert.ok(lines.join('').includes('observer broke'));
   });
 
   it('an HTTP server without any logger: its pool instances report on stderr', () => {
@@ -61,6 +69,6 @@ describe('the state logger of the pool', () => {
       }
     ).createPerRequestServer();
     provokeObserverFailure(instance.state as never);
-    expect(written.join('')).toContain('observer broke');
+    assert.ok(written.join('').includes('observer broke'));
   });
 });

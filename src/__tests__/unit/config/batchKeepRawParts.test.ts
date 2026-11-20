@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { HTTP_PARAMETERS } from '../../../../server-runtime/src/http/config/httpParameters';
 import { SSE_PARAMETERS } from '../../../../server-runtime/src/sse/config/sseParameters';
 import { CORE_PARAMETERS } from '../../../../server-runtime/src/stdio/config/coreParameters';
@@ -10,6 +13,7 @@ import {
   generateYamlConfigTemplate as templateOf,
   validateYamlConfig as validateTable,
 } from '../../../lib/config/yamlConfig';
+import { assertThrows } from '../../helpers/assertions';
 
 /** lib's shared row alone: every binary's table holds it. */
 const RAW: ParameterTable = {
@@ -22,75 +26,92 @@ const ENV = 'MCP_BATCH_KEEP_RAW_PARTS';
 
 describe('batch.keepRawParts — CLI, env, YAML', () => {
   it('absent → false', () => {
-    expect(readBatchKeepRawParts([], {}, null)).toBe(false);
-    expect(readBatchKeepRawParts([], {}, {})).toBe(false);
-    expect(readBatchKeepRawParts([], {}, { batch: {} })).toBe(false);
+    assert.equal(readBatchKeepRawParts([], {}, null), false);
+    assert.equal(readBatchKeepRawParts([], {}, {}), false);
+    assert.equal(readBatchKeepRawParts([], {}, { batch: {} }), false);
   });
 
   it('true from YAML batch.keepRawParts', () => {
-    expect(
+    assert.equal(
       readBatchKeepRawParts([], {}, { batch: { keepRawParts: true } }),
-    ).toBe(true);
-    expect(
+      true,
+    );
+    assert.equal(
       readBatchKeepRawParts([], {}, { batch: { keepRawParts: false } }),
-    ).toBe(false);
+      false,
+    );
   });
 
   it('the CLI beats the env, which beats the YAML', () => {
-    expect(readBatchKeepRawParts(['--batch-keep-raw-parts'], {}, null)).toBe(
+    assert.equal(
+      readBatchKeepRawParts(['--batch-keep-raw-parts'], {}, null),
       true,
     );
-    expect(readBatchKeepRawParts([], { [ENV]: 'true' }, null)).toBe(true);
-    expect(
+    assert.equal(readBatchKeepRawParts([], { [ENV]: 'true' }, null), true);
+    assert.equal(
       readBatchKeepRawParts(
         ['--batch-keep-raw-parts=false'],
         { [ENV]: 'true' },
         { batch: { keepRawParts: true } },
       ),
-    ).toBe(false);
-    expect(
+      false,
+    );
+    assert.equal(
       readBatchKeepRawParts(
         [],
         { [ENV]: 'false' },
         { batch: { keepRawParts: true } },
       ),
-    ).toBe(false);
+      false,
+    );
   });
 
-  it.each([5, 'yes', 'on', [true]])(
-    'a non-boolean is refused at start (%p)',
-    (value) => {
-      expect(() =>
-        readBatchKeepRawParts([], {}, { batch: { keepRawParts: value } }),
-      ).toThrow(/batch\.keepRawParts \(config file\).*Must be true or false/);
-      expect(
+  // The title shows each value as written: a string quoted.
+  for (const [value, shown] of [
+    [5, '5'],
+    ['yes', '"yes"'],
+    ['on', '"on"'],
+    [[true], '[true]'],
+  ] satisfies [unknown, string][]) {
+    it(`a non-boolean is refused at start (${shown})`, () => {
+      assertThrows(
+        () => readBatchKeepRawParts([], {}, { batch: { keepRawParts: value } }),
+        /batch\.keepRawParts \(config file\).*Must be true or false/,
+      );
+      assert.match(
         validateTable(RAW, { batch: { keepRawParts: value } }).errors.join(
           '\n',
         ),
-      ).toMatch(/batch\.keepRawParts \(config file\).*Must be true or false/);
-    },
-  );
+        /batch\.keepRawParts \(config file\).*Must be true or false/,
+      );
+    });
+  }
 
   it('a non-boolean CLI or env value is refused, named in its form', () => {
-    expect(() =>
-      readBatchKeepRawParts(['--batch-keep-raw-parts=maybe'], {}, null),
-    ).toThrow(/--batch-keep-raw-parts.*Must be true or false/);
-    expect(() => readBatchKeepRawParts([], { [ENV]: 'maybe' }, null)).toThrow(
+    assertThrows(
+      () => readBatchKeepRawParts(['--batch-keep-raw-parts=maybe'], {}, null),
+      /--batch-keep-raw-parts.*Must be true or false/,
+    );
+    assertThrows(
+      () => readBatchKeepRawParts([], { [ENV]: 'maybe' }, null),
       new RegExp(`${ENV}.*Must be true or false`),
     );
   });
 
   it('the template writes it under batch:, false', () => {
-    expect(templateOf(RAW)).toMatch(
+    assert.match(
+      templateOf(RAW),
       /batch:\n {2}# .*\n {2}# .*\n {2}keepRawParts: false/,
     );
   });
 
-  it.each([
+  for (const [_binary, table] of [
     ['mcp-abap-adt', CORE_PARAMETERS],
     ['mcp-abap-adt-http', HTTP_PARAMETERS],
     ['mcp-abap-adt-sse', SSE_PARAMETERS],
-  ])('%s reads it', (_binary, table) => {
-    expect(table.rows).toContain(BATCH_KEEP_RAW_PARTS_ROW);
-  });
+  ] satisfies [string, typeof CORE_PARAMETERS][]) {
+    it(format('%s reads it', _binary), () => {
+      assert.ok(table.rows.includes(BATCH_KEEP_RAW_PARTS_ROW));
+    });
+  }
 });

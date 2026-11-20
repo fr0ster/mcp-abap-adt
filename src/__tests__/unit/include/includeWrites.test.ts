@@ -4,6 +4,9 @@
  * sending anything.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   TOOL_DEFINITION as CREATE_INCLUDE,
   handleCreateInclude,
@@ -28,6 +31,7 @@ import { defineTool } from '../../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject, assertRejects } from '../../helpers/assertions';
 import { setSystemContext } from '../../helpers/processSystemContext';
 import {
   type RecordingConnection,
@@ -56,8 +60,8 @@ const PAIR = 'application/vnd.sap.adt.programs.includes.v2+xml';
 describe('CreateInclude', () => {
   it('says SAP writes its comment header into the new include (measured)', () => {
     const { description } = CREATE_INCLUDE;
-    expect(description.includes('comment header')).toBe(true);
-    expect(description.toLowerCase().includes('empty')).toBe(false);
+    assert.equal(description.includes('comment header'), true);
+    assert.equal(description.toLowerCase().includes('empty'), false);
   });
 
   it('sends one POST to the includes collection, stateless, with the include document', async () => {
@@ -70,24 +74,25 @@ describe('CreateInclude', () => {
         description: 'An include',
       },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(1);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 1);
     const [sent] = connection.requests;
-    expect(sent?.method).toBe('POST');
-    expect(sent?.url).toBe(INCLUDES);
+    assert.equal(sent?.method, 'POST');
+    assert.equal(sent?.url, INCLUDES);
     const body = String(sent?.data);
-    expect(body).toContain('<include:abapInclude');
-    expect(body).toContain('adtcore:name="ZI_X"');
-    expect(body).toContain('adtcore:description="An include"');
-    expect(body).toContain('<adtcore:packageRef adtcore:name="ZP"/>');
-    expect(sent?.headers?.Accept).toBe(PAIR);
-    expect(sent?.headers?.['Content-Type']).toBe(PAIR);
-    expect(
+    assert.ok(body.includes('<include:abapInclude'));
+    assert.ok(body.includes('adtcore:name="ZI_X"'));
+    assert.ok(body.includes('adtcore:description="An include"'));
+    assert.ok(body.includes('<adtcore:packageRef adtcore:name="ZP"/>'));
+    assert.equal(sent?.headers?.Accept, PAIR);
+    assert.equal(sent?.headers?.['Content-Type'], PAIR);
+    assert.equal(
       Object.keys(sent?.headers ?? {})
         .join(' ')
         .toLowerCase()
         .includes('sessiontype'),
-    ).toBe(false);
+      false,
+    );
   });
 
   it('puts the transport on corrNr, and only with one', async () => {
@@ -96,14 +101,14 @@ describe('CreateInclude', () => {
       { connection: withTransport, logger: undefined },
       { include_name: 'ZI_X', package_name: 'ZP', transport_request: 'K1' },
     );
-    expect(withTransport.requests[0]?.url).toBe(`${INCLUDES}?corrNr=K1`);
+    assert.equal(withTransport.requests[0]?.url, `${INCLUDES}?corrNr=K1`);
 
     const without = recordingConnection();
     await handleCreateInclude(
       { connection: without, logger: undefined },
       { include_name: 'ZI_X', package_name: 'ZP' },
     );
-    expect(without.requests[0]?.url).toBe(INCLUDES);
+    assert.equal(without.requests[0]?.url, INCLUDES);
   });
 
   it('uses the name as the description when none is given, and sends the master language', async () => {
@@ -113,41 +118,46 @@ describe('CreateInclude', () => {
       { include_name: 'zi_x', package_name: 'ZP', master_language: 'DE' },
     );
     const body = String(connection.requests[0]?.data);
-    expect(body).toContain('adtcore:description="ZI_X"');
-    expect(body).toContain('adtcore:masterLanguage="DE"');
+    assert.ok(body.includes('adtcore:description="ZI_X"'));
+    assert.ok(body.includes('adtcore:masterLanguage="DE"'));
   });
 
-  it.each([
+  for (const [name, args] of [
     ['include_name', { include_name: '', package_name: 'ZP' }],
     ['package_name', { include_name: 'ZI_X', package_name: '' }],
-  ] as const)('refuses an empty %s, sending nothing', async (name, args) => {
-    const connection = recordingConnection();
-    const result = await handleCreateInclude(
-      { connection, logger: undefined },
-      args,
-    );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe(`${name} is required`);
-    expect(connection.requests).toHaveLength(0);
-  });
+  ] as const) {
+    it(format('refuses an empty %s, sending nothing', name), async () => {
+      const connection = recordingConnection();
+      const result = await handleCreateInclude(
+        { connection, logger: undefined },
+        args,
+      );
+      assert.equal(result.isError, true);
+      assert.equal(result.content[0].text, `${name} is required`);
+      assert.equal(connection.requests.length, 0);
+    });
+  }
 
-  it.each([
+  for (const [name, args] of [
     ['include_name', { package_name: 'ZP' }],
     ['package_name', { include_name: 'ZI_X' }],
-  ])(
-    'refuses an absent %s at the schema, sending nothing',
-    async (name, args) => {
-      const connection = recordingConnection();
-      const refused = expect(
-        defineTool(CREATE_INCLUDE, handleCreateInclude).call(
-          { connection, logger: undefined },
-          args,
-        ),
-      ).rejects.toThrow(`at ${name}`);
-      await refused;
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+  ] satisfies [string, Record<string, unknown>][]) {
+    it(
+      format('refuses an absent %s at the schema, sending nothing', name),
+      async () => {
+        const connection = recordingConnection();
+        const refused = assertRejects(
+          defineTool(CREATE_INCLUDE, handleCreateInclude).call(
+            { connection, logger: undefined },
+            args,
+          ),
+          `at ${name}`,
+        );
+        await refused;
+        assert.equal(connection.requests.length, 0);
+      },
+    );
+  }
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -156,9 +166,9 @@ describe('CreateInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', package_name: 'ZP' },
     );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('variant_not_served');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('variant_not_served'));
+    assert.equal(connection.requests.length, 0);
   });
 });
 
@@ -206,17 +216,24 @@ describe('UpdateInclude', () => {
         transport_request: 'K1',
       },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `POST ${LOCK_URL}`,
-      `PUT ${INCLUDES}/zi_x/source/main?lockHandle=${HANDLE}&corrNr=K1`,
-      `POST ${UNLOCK_URL}`,
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(
+      connection.requests.map((r) => `${r.method} ${r.url}`),
+      [
+        `POST ${LOCK_URL}`,
+        `PUT ${INCLUDES}/zi_x/source/main?lockHandle=${HANDLE}&corrNr=K1`,
+        `POST ${UNLOCK_URL}`,
+      ],
+    );
+    assert.deepStrictEqual(connection.sessions, [
+      'stateful',
+      'stateless',
+      'stateful',
     ]);
-    expect(connection.sessions).toEqual(['stateful', 'stateless', 'stateful']);
     const put = connection.requests[1];
-    expect(put?.data).toBe('WRITE 1.');
-    expect(put?.headers?.Accept).toBe('text/plain');
-    expect(put?.headers?.['Content-Type']).toBe('text/plain; charset=utf-8');
+    assert.equal(put?.data, 'WRITE 1.');
+    assert.equal(put?.headers?.Accept, 'text/plain');
+    assert.equal(put?.headers?.['Content-Type'], 'text/plain; charset=utf-8');
   });
 
   it('sends no corrNr without a transport, and no activation without activate', async () => {
@@ -225,10 +242,11 @@ describe('UpdateInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', source_code: 'x', activate: false },
     );
-    expect(connection.requests[1]?.url).toBe(
+    assert.equal(
+      connection.requests[1]?.url,
       `${INCLUDES}/zi_x/source/main?lockHandle=${HANDLE}`,
     );
-    expect(connection.requests).toHaveLength(3);
+    assert.equal(connection.requests.length, 3);
   });
 
   it('adds one activation POST after the unlock when activate is true', async () => {
@@ -237,13 +255,13 @@ describe('UpdateInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', source_code: 'x', activate: true },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests).toHaveLength(4);
+    assert.equal(result.isError, false);
+    assert.equal(connection.requests.length, 4);
     const activation = connection.requests[3];
-    expect(activation?.method).toBe('POST');
-    expect(activation?.url).toContain('/sap/bc/adt/activation');
-    expect(String(activation?.data)).toContain('/programs/includes/zi_x');
-    expect(connection.sessions[3]).toBe('stateless');
+    assert.equal(activation?.method, 'POST');
+    assert.ok(activation?.url.includes('/sap/bc/adt/activation'));
+    assert.ok(String(activation?.data).includes('/programs/includes/zi_x'));
+    assert.equal(connection.sessions[3], 'stateless');
   });
 
   it("unlocks before the activation, and answers a refused activation as an error with SAP's text", async () => {
@@ -259,22 +277,25 @@ describe('UpdateInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', source_code: 'x', activate: true },
     );
-    expect(result.isError).toBe(true);
-    expect(connection.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `POST ${LOCK_URL}`,
-      `PUT ${INCLUDES}/zi_x/source/main?lockHandle=${HANDLE}`,
-      `POST ${UNLOCK_URL}`,
-      'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
-    ]);
-    expect(connection.sessions).toEqual([
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(
+      connection.requests.map((r) => `${r.method} ${r.url}`),
+      [
+        `POST ${LOCK_URL}`,
+        `PUT ${INCLUDES}/zi_x/source/main?lockHandle=${HANDLE}`,
+        `POST ${UNLOCK_URL}`,
+        'POST /sap/bc/adt/activation?method=activate&preauditRequested=true',
+      ],
+    );
+    assert.deepStrictEqual(connection.sessions, [
       'stateful',
       'stateless',
       'stateful',
       'stateless',
     ]);
     const text = result.content.map((item) => item.text ?? '').join('\n');
-    expect(text).toContain('STRONG_BUT_NOT_A_REAL_TYPE');
-    expect(text).toContain('is unknown.');
+    assert.ok(text.includes('STRONG_BUT_NOT_A_REAL_TYPE'));
+    assert.ok(text.includes('is unknown.'));
   });
 
   it('still unlocks when the write is refused, and answers the refusal', async () => {
@@ -283,47 +304,51 @@ describe('UpdateInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', source_code: 'x', activate: true },
     );
-    expect(result.isError).toBe(true);
-    expect(connection.requests.map((r) => r.method)).toEqual([
-      'POST',
-      'PUT',
-      'POST',
-    ]);
-    expect(connection.requests[2]?.url).toBe(UNLOCK_URL);
-    expect(connection.sessions[2]).toBe('stateful');
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(
+      connection.requests.map((r) => r.method),
+      ['POST', 'PUT', 'POST'],
+    );
+    assert.equal(connection.requests[2]?.url, UNLOCK_URL);
+    assert.equal(connection.sessions[2], 'stateful');
   });
 
-  it.each([
+  for (const [name, args] of [
     ['include_name', { include_name: '', source_code: 'x' }],
     ['source_code', { include_name: 'ZI_X', source_code: '' }],
-  ] as const)('refuses an empty %s, sending nothing', async (name, args) => {
-    const connection = recordingConnection();
-    const result = await handleUpdateInclude(
-      { connection, logger: undefined },
-      args,
-    );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe(`${name} is required`);
-    expect(connection.requests).toHaveLength(0);
-  });
+  ] as const) {
+    it(format('refuses an empty %s, sending nothing', name), async () => {
+      const connection = recordingConnection();
+      const result = await handleUpdateInclude(
+        { connection, logger: undefined },
+        args,
+      );
+      assert.equal(result.isError, true);
+      assert.equal(result.content[0].text, `${name} is required`);
+      assert.equal(connection.requests.length, 0);
+    });
+  }
 
-  it.each([
+  for (const [name, args] of [
     ['include_name', { source_code: 'x' }],
     ['source_code', { include_name: 'ZI_X' }],
-  ])(
-    'refuses an absent %s at the schema, sending nothing',
-    async (name, args) => {
-      const connection = recordingConnection();
-      const refused = expect(
-        defineTool(UPDATE_INCLUDE, handleUpdateInclude).call(
-          { connection, logger: undefined },
-          args,
-        ),
-      ).rejects.toThrow(`at ${name}`);
-      await refused;
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+  ] satisfies [string, Record<string, unknown>][]) {
+    it(
+      format('refuses an absent %s at the schema, sending nothing', name),
+      async () => {
+        const connection = recordingConnection();
+        const refused = assertRejects(
+          defineTool(UPDATE_INCLUDE, handleUpdateInclude).call(
+            { connection, logger: undefined },
+            args,
+          ),
+          `at ${name}`,
+        );
+        await refused;
+        assert.equal(connection.requests.length, 0);
+      },
+    );
+  }
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -332,9 +357,9 @@ describe('UpdateInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', source_code: 'x' },
     );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('variant_not_served');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('variant_not_served'));
+    assert.equal(connection.requests.length, 0);
   });
 });
 
@@ -348,17 +373,24 @@ describe('UpdateIncludeMetadata', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', metadata: DOCUMENT, transport_request: 'K1' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `POST ${LOCK_URL}`,
-      `PUT ${INCLUDES}/zi_x?lockHandle=${HANDLE}&corrNr=K1`,
-      `POST ${UNLOCK_URL}`,
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(
+      connection.requests.map((r) => `${r.method} ${r.url}`),
+      [
+        `POST ${LOCK_URL}`,
+        `PUT ${INCLUDES}/zi_x?lockHandle=${HANDLE}&corrNr=K1`,
+        `POST ${UNLOCK_URL}`,
+      ],
+    );
+    assert.deepStrictEqual(connection.sessions, [
+      'stateful',
+      'stateless',
+      'stateful',
     ]);
-    expect(connection.sessions).toEqual(['stateful', 'stateless', 'stateful']);
     const put = connection.requests[1];
-    expect(put?.data).toBe(DOCUMENT);
-    expect(put?.headers?.Accept).toBe(PAIR);
-    expect(put?.headers?.['Content-Type']).toBe(PAIR);
+    assert.equal(put?.data, DOCUMENT);
+    assert.equal(put?.headers?.Accept, PAIR);
+    assert.equal(put?.headers?.['Content-Type'], PAIR);
   });
 
   it('sends no corrNr without a transport and no activation', async () => {
@@ -367,10 +399,11 @@ describe('UpdateIncludeMetadata', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', metadata: DOCUMENT },
     );
-    expect(connection.requests[1]?.url).toBe(
+    assert.equal(
+      connection.requests[1]?.url,
       `${INCLUDES}/zi_x?lockHandle=${HANDLE}`,
     );
-    expect(connection.requests).toHaveLength(3);
+    assert.equal(connection.requests.length, 3);
   });
 
   it('still unlocks when the write is refused', async () => {
@@ -379,46 +412,50 @@ describe('UpdateIncludeMetadata', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', metadata: DOCUMENT },
     );
-    expect(result.isError).toBe(true);
-    expect(connection.requests.map((r) => r.method)).toEqual([
-      'POST',
-      'PUT',
-      'POST',
-    ]);
-    expect(connection.requests[2]?.url).toBe(UNLOCK_URL);
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(
+      connection.requests.map((r) => r.method),
+      ['POST', 'PUT', 'POST'],
+    );
+    assert.equal(connection.requests[2]?.url, UNLOCK_URL);
   });
 
-  it.each([
+  for (const [name, args] of [
     ['include_name', { include_name: '', metadata: DOCUMENT }],
     ['metadata', { include_name: 'ZI_X', metadata: '' }],
-  ] as const)('refuses an empty %s, sending nothing', async (name, args) => {
-    const connection = recordingConnection();
-    const result = await handleUpdateIncludeMetadata(
-      { connection, logger: undefined },
-      args,
-    );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe(`${name} is required`);
-    expect(connection.requests).toHaveLength(0);
-  });
+  ] as const) {
+    it(format('refuses an empty %s, sending nothing', name), async () => {
+      const connection = recordingConnection();
+      const result = await handleUpdateIncludeMetadata(
+        { connection, logger: undefined },
+        args,
+      );
+      assert.equal(result.isError, true);
+      assert.equal(result.content[0].text, `${name} is required`);
+      assert.equal(connection.requests.length, 0);
+    });
+  }
 
-  it.each([
+  for (const [name, args] of [
     ['include_name', { metadata: DOCUMENT }],
     ['metadata', { include_name: 'ZI_X' }],
-  ])(
-    'refuses an absent %s at the schema, sending nothing',
-    async (name, args) => {
-      const connection = recordingConnection();
-      const refused = expect(
-        defineTool(UPDATE_INCLUDE_METADATA, handleUpdateIncludeMetadata).call(
-          { connection, logger: undefined },
-          args,
-        ),
-      ).rejects.toThrow(`at ${name}`);
-      await refused;
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+  ] satisfies [string, Record<string, unknown>][]) {
+    it(
+      format('refuses an absent %s at the schema, sending nothing', name),
+      async () => {
+        const connection = recordingConnection();
+        const refused = assertRejects(
+          defineTool(UPDATE_INCLUDE_METADATA, handleUpdateIncludeMetadata).call(
+            { connection, logger: undefined },
+            args,
+          ),
+          `at ${name}`,
+        );
+        await refused;
+        assert.equal(connection.requests.length, 0);
+      },
+    );
+  }
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -427,9 +464,9 @@ describe('UpdateIncludeMetadata', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X', metadata: DOCUMENT },
     );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('variant_not_served');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('variant_not_served'));
+    assert.equal(connection.requests.length, 0);
   });
 });
 
@@ -472,29 +509,35 @@ describe('DeleteInclude', () => {
       { connection, logger: undefined },
       { include_name: 'zi_x', transport_request: 'K1' },
     );
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `POST ${CHECK_URL}`,
-      `POST ${DELETE_URL}`,
-    ]);
-    expect(connection.sessions).toEqual(['stateless', 'stateless']);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(
+      connection.requests.map((r) => `${r.method} ${r.url}`),
+      [`POST ${CHECK_URL}`, `POST ${DELETE_URL}`],
+    );
+    assert.deepStrictEqual(connection.sessions, ['stateless', 'stateless']);
     const [check, del] = connection.requests;
-    expect(check?.headers?.Accept).toBe(DELETION_PAIR.check.Accept);
-    expect(check?.headers?.['Content-Type']).toBe(
+    assert.equal(check?.headers?.Accept, DELETION_PAIR.check.Accept);
+    assert.equal(
+      check?.headers?.['Content-Type'],
       DELETION_PAIR.check['Content-Type'],
     );
-    expect(del?.headers?.Accept).toBe(DELETION_PAIR.delete.Accept);
-    expect(del?.headers?.['Content-Type']).toBe(
+    assert.equal(del?.headers?.Accept, DELETION_PAIR.delete.Accept);
+    assert.equal(
+      del?.headers?.['Content-Type'],
       DELETION_PAIR.delete['Content-Type'],
     );
-    expect(String(check?.data)).toContain(
-      'adtcore:uri="/sap/bc/adt/programs/includes/zi_x"',
+    assert.ok(
+      String(check?.data).includes(
+        'adtcore:uri="/sap/bc/adt/programs/includes/zi_x"',
+      ),
     );
-    expect(String(del?.data)).toContain(
-      'adtcore:uri="/sap/bc/adt/programs/includes/zi_x"',
+    assert.ok(
+      String(del?.data).includes(
+        'adtcore:uri="/sap/bc/adt/programs/includes/zi_x"',
+      ),
     );
-    expect(String(del?.data)).toContain('K1');
-    expect(JSON.parse(result.content[0].text)).toMatchObject({
+    assert.ok(String(del?.data).includes('K1'));
+    assertMatchObject(JSON.parse(result.content[0].text), {
       deleted: true,
       object: 'ZI_X',
     });
@@ -508,39 +551,46 @@ describe('DeleteInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X' },
     );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Include is still used');
-    expect(connection.requests.map((r) => r.url)).toEqual([CHECK_URL]);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('Include is still used'));
+    assert.deepStrictEqual(
+      connection.requests.map((r) => r.url),
+      [CHECK_URL],
+    );
   });
 
-  it.each([['include_name', { include_name: '' }]] as const)(
-    'refuses an empty %s, sending nothing',
-    async (name, args) => {
+  for (const [name, args] of [
+    ['include_name', { include_name: '' }],
+  ] as const) {
+    it(format('refuses an empty %s, sending nothing', name), async () => {
       const connection = recordingConnection();
       const result = await handleDeleteInclude(
         { connection, logger: undefined },
         args,
       );
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe(`${name} is required`);
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+      assert.equal(result.isError, true);
+      assert.equal(result.content[0].text, `${name} is required`);
+      assert.equal(connection.requests.length, 0);
+    });
+  }
 
-  it.each([['include_name', {}]])(
-    'refuses an absent %s at the schema, sending nothing',
-    async (name, args) => {
-      const connection = recordingConnection();
-      const refused = expect(
-        defineTool(DELETE_INCLUDE, handleDeleteInclude).call(
-          { connection, logger: undefined },
-          args,
-        ),
-      ).rejects.toThrow(`at ${name}`);
-      await refused;
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+  for (const [name, args] of [['include_name', {}]]) {
+    it(
+      format('refuses an absent %s at the schema, sending nothing', name),
+      async () => {
+        const connection = recordingConnection();
+        const refused = assertRejects(
+          defineTool(DELETE_INCLUDE, handleDeleteInclude).call(
+            { connection, logger: undefined },
+            args,
+          ),
+          `at ${name}`,
+        );
+        await refused;
+        assert.equal(connection.requests.length, 0);
+      },
+    );
+  }
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -549,9 +599,9 @@ describe('DeleteInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X' },
     );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('variant_not_served');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('variant_not_served'));
+    assert.equal(connection.requests.length, 0);
   });
 });
 
@@ -564,53 +614,60 @@ describe('ActivateInclude', () => {
       { connection, logger: undefined },
       { include_name: 'zi_x' },
     );
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toMatchObject({
+    assert.equal(result.isError, false);
+    assertMatchObject(JSON.parse(result.content[0].text), {
       activated: true,
     });
-    expect(connection.requests).toHaveLength(1);
+    assert.equal(connection.requests.length, 1);
     const [sent] = connection.requests;
-    expect(sent?.method).toBe('POST');
-    expect(sent?.url).toContain(
-      '/sap/bc/adt/activation?method=activate&preauditRequested=true',
+    assert.equal(sent?.method, 'POST');
+    assert.ok(
+      sent?.url.includes(
+        '/sap/bc/adt/activation?method=activate&preauditRequested=true',
+      ),
     );
-    expect(String(sent?.data)).toContain('/programs/includes/zi_x');
-    expect(String(sent?.data)).toContain('adtcore:name="ZI_X"');
-    expect(sent?.headers?.Accept).toBe('application/xml');
-    expect(sent?.headers?.['Content-Type']).toBe(
+    assert.ok(String(sent?.data).includes('/programs/includes/zi_x'));
+    assert.ok(String(sent?.data).includes('adtcore:name="ZI_X"'));
+    assert.equal(sent?.headers?.Accept, 'application/xml');
+    assert.equal(
+      sent?.headers?.['Content-Type'],
       'application/vnd.sap.adt.activation+xml',
     );
-    expect(connection.sessions).toEqual(['stateless']);
+    assert.deepStrictEqual(connection.sessions, ['stateless']);
   });
 
-  it.each([['include_name', { include_name: '' }]] as const)(
-    'refuses an empty %s, sending nothing',
-    async (name, args) => {
+  for (const [name, args] of [
+    ['include_name', { include_name: '' }],
+  ] as const) {
+    it(format('refuses an empty %s, sending nothing', name), async () => {
       const connection = recordingConnection();
       const result = await handleActivateInclude(
         { connection, logger: undefined },
         args,
       );
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toBe(`${name} is required`);
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+      assert.equal(result.isError, true);
+      assert.equal(result.content[0].text, `${name} is required`);
+      assert.equal(connection.requests.length, 0);
+    });
+  }
 
-  it.each([['include_name', {}]])(
-    'refuses an absent %s at the schema, sending nothing',
-    async (name, args) => {
-      const connection = recordingConnection();
-      const refused = expect(
-        defineTool(ACTIVATE_INCLUDE, handleActivateInclude).call(
-          { connection, logger: undefined },
-          args,
-        ),
-      ).rejects.toThrow(`at ${name}`);
-      await refused;
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+  for (const [name, args] of [['include_name', {}]]) {
+    it(
+      format('refuses an absent %s at the schema, sending nothing', name),
+      async () => {
+        const connection = recordingConnection();
+        const refused = assertRejects(
+          defineTool(ACTIVATE_INCLUDE, handleActivateInclude).call(
+            { connection, logger: undefined },
+            args,
+          ),
+          `at ${name}`,
+        );
+        await refused;
+        assert.equal(connection.requests.length, 0);
+      },
+    );
+  }
 
   it('is refused variant_not_served on a connection declared cloud, sending nothing', async () => {
     const connection = recordingConnection();
@@ -619,8 +676,8 @@ describe('ActivateInclude', () => {
       { connection, logger: undefined },
       { include_name: 'ZI_X' },
     );
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('variant_not_served');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('variant_not_served'));
+    assert.equal(connection.requests.length, 0);
   });
 });

@@ -7,6 +7,7 @@
  * function module's list reads the module first); the table type has its version list alone. SAP's answers are a version feed
  * of two entries and two sources.
  */
+import { describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { pinCases } from '../../helpers/pinCases';
 

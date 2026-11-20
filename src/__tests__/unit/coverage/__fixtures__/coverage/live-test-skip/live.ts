@@ -1,3 +1,4 @@
+import { it, test } from 'node:test';
 import {
   expectAbsent,
   expectCleared,

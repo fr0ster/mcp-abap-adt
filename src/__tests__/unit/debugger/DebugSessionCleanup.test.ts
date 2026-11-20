@@ -1,11 +1,21 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import {
   DebugCleanupError,
   DebugSession,
   DebugStateError,
 } from '../../../lib/debugger/DebugSession';
 import { return_error } from '../../../lib/utils';
+import { assertMatchObject, assertRejects } from '../../helpers/assertions';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
+  advanceTimersByTimeAsync,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
+import {
+  assertMessageHolding,
   CONFLICT,
   CONFLICT_409,
   deferred,
@@ -16,6 +26,7 @@ import {
   LISTEN_NOTHING,
   rowsXml,
   START,
+  stringOf,
   until,
 } from './fakes';
 
@@ -38,8 +49,13 @@ const NOT_COMPLETE =
   'the cleanup of this debug session is not complete: DebugStop it, then start again';
 
 describe('the cleanup', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   async function armed(
     world = fakeWorld(),
@@ -64,21 +80,23 @@ describe('the cleanup', () => {
     world.override.stopListener = async () => refusedResponse('listener busy');
     world.override.deleteBreakpoint = async () =>
       refusedResponse('Breakpoint is locked');
-    await expect(session.stop()).rejects.toThrow(
+    await assertRejects(
+      session.stop(),
       /stop listener: listener busy; delete breakpoint L10: Breakpoint is locked; delete breakpoint E1: Breakpoint is locked/,
     );
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
     world.calls.length = 0;
     await session.stop();
-    expect(world.calls).toContain('stopListener');
-    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
+    assert.ok(world.calls.includes('stopListener'));
+    assert.equal(
+      world.calls.some((c) => c.startsWith('deleteBreakpoint:')),
       false,
     );
-    expect(session.listBreakpoints()).toEqual([]);
-    expect(session.requestedBreakpoints()).toEqual([]);
-    expect(session.failures()).toEqual([]);
-    expect(session.holdsState()).toBe(false);
+    assert.deepStrictEqual(session.listBreakpoints(), []);
+    assert.deepStrictEqual(session.requestedBreakpoints(), []);
+    assert.deepStrictEqual(session.failures(), []);
+    assert.equal(session.holdsState(), false);
   });
 
   it('after a failed stopListener the per-id deletes run, and what fails stays for the next stop', async () => {
@@ -89,12 +107,15 @@ describe('the cleanup', () => {
       id === 'E1'
         ? refusedResponse('Breakpoint is locked')
         : okResponse(undefined);
-    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-    expect(session.listBreakpoints().map((r) => r.id)).toEqual(['E1']);
-    expect(session.requestedBreakpoints()).toEqual([EXC]);
+    await assertRejects(session.stop(), DebugCleanupError);
+    assert.deepStrictEqual(
+      session.listBreakpoints().map((r) => r.id),
+      ['E1'],
+    );
+    assert.deepStrictEqual(session.requestedBreakpoints(), [EXC]);
     // Each in the shape of every other failure: the method's error as it
     // is, with its step — not one text.
-    expect(session.failures()).toEqual([
+    assert.deepStrictEqual(session.failures(), [
       { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
       {
         message: 'Breakpoint is locked',
@@ -102,7 +123,7 @@ describe('the cleanup', () => {
         step: 'delete breakpoint E1',
       },
     ]);
-    expect(session.holdsState()).toBe(true);
+    assert.equal(session.holdsState(), true);
   });
 
   // A debuggee let go while a breakpoint may still be set can stop there
@@ -121,11 +142,15 @@ describe('the cleanup', () => {
         ? refusedResponse('Breakpoint is locked')
         : okResponse(undefined);
     world.calls.length = 0;
-    await expect(session.stop()).rejects.toThrow(
+    await assertRejects(
+      session.stop(),
       /release the debuggee: not sent: the listener's stop failed and a breakpoint may still be set/,
     );
-    expect(world.calls.filter((c) => c.startsWith('step:'))).toEqual([]);
-    expect(session.failures()).toEqual([
+    assert.deepStrictEqual(
+      world.calls.filter((c) => c.startsWith('step:')),
+      [],
+    );
+    assert.deepStrictEqual(session.failures(), [
       { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
       {
         message: 'Breakpoint is locked',
@@ -137,17 +162,17 @@ describe('the cleanup', () => {
         step: 'release the debuggee',
       },
     ]);
-    expect(session.holdsState()).toBe(true);
+    assert.equal(session.holdsState(), true);
     // The next stop: the listener's stop succeeds first, then the release.
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
     world.calls.length = 0;
-    await expect(session.stop()).resolves.toEqual([]);
+    assert.deepStrictEqual(await session.stop(), []);
     const release = world.calls.indexOf('step:stepContinue:analysed');
-    expect(release).toBeGreaterThan(world.calls.indexOf('stopListener'));
-    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.ok(release > world.calls.indexOf('stopListener'));
+    assert.ok(world.calls.indexOf('stopListener') >= 0);
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   // The run's request is the one held at the breakpoint: its connection's
@@ -161,7 +186,7 @@ describe('the cleanup', () => {
     });
     await until(() => world.runs.length === 1);
     const runConnection = world.opened[world.sessionKinds.indexOf('stateless')];
-    expect(runConnection).toBeDefined();
+    assert.notEqual(runConnection, undefined);
     world.polls[1].resolve(LISTEN_CATCH());
     await until(() => world.calls.includes('getStack'));
     world.override.stopListener = async () => refusedResponse('listener busy');
@@ -169,9 +194,9 @@ describe('the cleanup', () => {
       id === 'E1'
         ? refusedResponse('Breakpoint is locked')
         : okResponse(undefined);
-    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-    expect(world.closed).not.toContain(runConnection);
-    expect(session.holdsState()).toBe(true);
+    await assertRejects(session.stop(), DebugCleanupError);
+    assert.ok(!world.closed.includes(runConnection));
+    assert.equal(session.holdsState(), true);
     // The next stop releases the debuggee, then closes the run's connection.
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
@@ -181,17 +206,19 @@ describe('the cleanup', () => {
       return close(c);
     };
     world.calls.length = 0;
-    await expect(session.stop()).resolves.toEqual([]);
-    expect(world.calls.indexOf('close:run')).toBeGreaterThan(
-      world.calls.indexOf('step:stepContinue:analysed'),
+    assert.deepStrictEqual(await session.stop(), []);
+    assert.ok(
+      world.calls.indexOf('close:run') >
+        world.calls.indexOf('step:stepContinue:analysed'),
     );
-    expect(world.calls.indexOf('step:stepContinue:analysed')).toBeGreaterThan(
-      world.calls.indexOf('stopListener'),
+    assert.ok(
+      world.calls.indexOf('step:stepContinue:analysed') >
+        world.calls.indexOf('stopListener'),
     );
-    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
-    expect(world.closed).toContain(runConnection);
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.ok(world.calls.indexOf('stopListener') >= 0);
+    assert.ok(world.closed.includes(runConnection));
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a release an earlier stop owed is not sent either while a breakpoint may still be set', async () => {
@@ -204,8 +231,8 @@ describe('the cleanup', () => {
     (session as any).generation++; // the listener moved on while the attach ran
     world.override.step = async () => refusedResponse('work process busy');
     attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
-    await jest.advanceTimersByTimeAsync(0);
-    await jest.advanceTimersByTimeAsync(0);
+    await advanceTimersByTimeAsync(0);
+    await advanceTimersByTimeAsync(0);
     delete world.override.step;
     // Owed now; the stop that follows fails its listener stop and a delete.
     world.override.stopListener = async () => refusedResponse('listener busy');
@@ -214,21 +241,29 @@ describe('the cleanup', () => {
         ? refusedResponse('Breakpoint is locked')
         : okResponse(undefined);
     world.calls.length = 0;
-    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-    expect(world.calls.filter((c) => c.startsWith('step:'))).toEqual([]);
-    expect(session.failures()).toContainEqual({
-      message: DEBUGGEE_KEPT,
-      step: 'release the debuggee',
-    });
+    await assertRejects(session.stop(), DebugCleanupError);
+    assert.deepStrictEqual(
+      world.calls.filter((c) => c.startsWith('step:')),
+      [],
+    );
+    assert.ok(
+      session.failures().some((e) =>
+        isDeepStrictEqual(e, {
+          message: DEBUGGEE_KEPT,
+          step: 'release the debuggee',
+        }),
+      ),
+    );
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
     world.calls.length = 0;
-    await expect(session.stop()).resolves.toEqual([]);
-    expect(world.calls.indexOf('step:stepContinue:analysed')).toBeGreaterThan(
-      world.calls.indexOf('stopListener'),
+    assert.deepStrictEqual(await session.stop(), []);
+    assert.ok(
+      world.calls.indexOf('step:stepContinue:analysed') >
+        world.calls.indexOf('stopListener'),
     );
-    expect(world.calls.indexOf('stopListener')).toBeGreaterThanOrEqual(0);
-    expect(session.holdsState()).toBe(false);
+    assert.ok(world.calls.indexOf('stopListener') >= 0);
+    assert.equal(session.holdsState(), false);
   });
 
   it('a release an earlier stop owed whose connection is spent is dropped without a request, reported, and owed no more', async () => {
@@ -241,8 +276,8 @@ describe('the cleanup', () => {
     (session as any).generation++; // the listener moved on while the attach ran
     world.override.step = async () => refusedResponse('work process busy');
     attach.resolve(okResponse('<dbg:attach xmlns:dbg="x"/>'));
-    await jest.advanceTimersByTimeAsync(0);
-    await jest.advanceTimersByTimeAsync(0);
+    await advanceTimersByTimeAsync(0);
+    await advanceTimersByTimeAsync(0);
     // Owed now; its connection is spent by the time the stop releases it.
     world.override.step = async () =>
       refusedResponse('words that are never read', {
@@ -251,15 +286,12 @@ describe('the cleanup', () => {
       });
     const closedBefore = world.closed.length;
     const notes = await session.stop();
-    expect(world.dropped).toHaveLength(1);
-    expect(world.closed.slice(closedBefore)).not.toContain(world.dropped[0]);
-    expect(notes).toEqual([
-      expect.objectContaining({
-        cleanup: { message: expect.stringContaining('dropped') },
-      }),
-    ]);
-    expect(session.failures()).toEqual([]);
-    expect(session.holdsState()).toBe(false);
+    assert.equal(world.dropped.length, 1);
+    assert.ok(!world.closed.slice(closedBefore).includes(world.dropped[0]));
+    assert.equal(notes.length, 1);
+    assertMessageHolding(notes[0]?.cleanup, 'dropped');
+    assert.deepStrictEqual(session.failures(), []);
+    assert.equal(session.holdsState(), false);
   });
 
   it('a failed stopListener whose deletes by id all succeeded: the held debuggee is released, after the deletes', async () => {
@@ -269,15 +301,11 @@ describe('the cleanup', () => {
     await until(() => world.calls.includes('getStack'));
     world.override.stopListener = async () => refusedResponse('listener busy');
     world.calls.length = 0;
-    await expect(session.stop()).rejects.toThrow(
-      /stop listener: listener busy/,
-    );
+    await assertRejects(session.stop(), /stop listener: listener busy/);
     const release = world.calls.indexOf('step:stepContinue:analysed');
-    expect(release).toBeGreaterThan(
-      world.calls.lastIndexOf('deleteBreakpoint:E1'),
-    );
-    expect(session.listBreakpoints()).toEqual([]);
-    expect(session.failures()).toEqual([
+    assert.ok(release > world.calls.lastIndexOf('deleteBreakpoint:E1'));
+    assert.deepStrictEqual(session.listBreakpoints(), []);
+    assert.deepStrictEqual(session.failures(), [
       { message: 'listener busy', origin: 'refusal', step: 'stop listener' },
     ]);
   });
@@ -289,14 +317,15 @@ describe('the cleanup', () => {
     const s = session.start('refuse', { breakpoints: [A, EXC] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(CONFLICT());
-    await expect(s).rejects.toThrow(/SY 530/);
-    expect(world.calls).toContain('stopListener');
-    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(
+    await assertRejects(s, /SY 530/);
+    assert.ok(world.calls.includes('stopListener'));
+    assert.equal(
+      world.calls.some((c) => c.startsWith('deleteBreakpoint:')),
       false,
     );
-    expect(session.listBreakpoints()).toEqual([]);
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.deepStrictEqual(session.listBreakpoints(), []);
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a start refused by the preflight 409, or before the wire, sends no stopListener and no deletion', async () => {
@@ -307,18 +336,20 @@ describe('the cleanup', () => {
       { ...IDS, stated: true },
       { breakpointConflict: 'refuse-if-held' },
     ).bind('origin');
-    await expect(held.start('refuse', { breakpoints: [A] })).rejects.toThrow(
+    await assertRejects(
+      held.start('refuse', { breakpoints: [A] }),
       /global debugging scope/,
     );
     const terminal = new DebugSession(world.ports, IDS).bind('origin');
-    await expect(
+    await assertRejects(
       terminal.start('refuse', {
         ...START,
         debuggingMode: 'terminal',
         requestUser: 'SAPUSER02',
       }),
-    ).rejects.toThrow('request_user does not apply to terminal mode');
-    expect(world.calls).toEqual(['checkListener']);
+      'request_user does not apply to terminal mode',
+    );
+    assert.deepStrictEqual(world.calls, ['checkListener']);
   });
 
   it('a close that fails during a refusal before any change keeps the identity; a new start is refused; DebugStop completes the cleanup and a start is accepted', async () => {
@@ -338,35 +369,39 @@ describe('the cleanup', () => {
       { ...IDS, stated: true },
       { breakpointConflict: 'refuse-if-held' },
     ).bind('origin');
-    await expect(
+    await assertRejects(
       session.start('refuse', {
         ...START,
         requestUser: 'SAPUSER02',
         settings: { systemDebugging: true },
         breakpoints: [A],
       }),
-    ).rejects.toThrow(/global debugging scope.*not closed: .*close refused/);
-    expect(world.calls).not.toContain('stopListener');
-    expect(session.currentIdentity()).toMatchObject({
+      /global debugging scope.*not closed: .*close refused/,
+    );
+    assert.ok(!world.calls.includes('stopListener'));
+    assertMatchObject(session.currentIdentity(), {
       debuggingMode: 'user',
       requestUser: 'SAPUSER02',
     });
-    expect(session.preferredSettings()).toEqual({ systemDebugging: true });
-    expect(session.holdsState()).toBe(true);
-    await expect(session.start('refuse', { breakpoints: [A] })).rejects.toThrow(
+    assert.deepStrictEqual(session.preferredSettings(), {
+      systemDebugging: true,
+    });
+    assert.equal(session.holdsState(), true);
+    await assertRejects(
+      session.start('refuse', { breakpoints: [A] }),
       NOT_COMPLETE,
     );
     await session.stop();
-    expect(session.currentIdentity()).toBeUndefined();
-    expect(session.preferredSettings()).toEqual({});
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.equal(session.currentIdentity(), undefined);
+    assert.deepStrictEqual(session.preferredSettings(), {});
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
     world.breakpointAnswers.push(ROWS);
     const again = session.start('refuse', { breakpoints: [A, EXC] });
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
-    await expect(again).resolves.toBeDefined();
-    expect(session.currentIdentity()).toMatchObject({ debuggingMode: 'user' });
+    assert.notEqual(await again, undefined);
+    assertMatchObject(session.currentIdentity(), { debuggingMode: 'user' });
   });
 
   it('a failed stop keeps the identity and the settings; a new start is refused; the retry addresses the same key; a complete one clears them', async () => {
@@ -376,23 +411,27 @@ describe('the cleanup', () => {
       settings: { systemDebugging: true },
     });
     world.override.stopListener = async () => refusedResponse('listener busy');
-    await expect(session.stop()).rejects.toThrow(/listener busy/);
-    expect(session.currentIdentity()).toMatchObject({
+    await assertRejects(session.stop(), /listener busy/);
+    assertMatchObject(session.currentIdentity(), {
       debuggingMode: 'user',
       requestUser: 'SAPUSER02',
     });
-    expect(session.preferredSettings()).toEqual({ systemDebugging: true });
-    await expect(
+    assert.deepStrictEqual(session.preferredSettings(), {
+      systemDebugging: true,
+    });
+    await assertRejects(
       session.start('refuse', { ...START, requestUser: 'SAPUSER03' }),
-    ).rejects.toThrow(DebugStateError);
+      DebugStateError,
+    );
     delete world.override.stopListener;
     world.log.length = 0;
     await session.stop();
-    expect(
+    assertMatchObject(
       world.log.find((c) => c.call === 'stopListener')!.args[0],
-    ).toMatchObject({ requestUser: 'SAPUSER02' });
-    expect(session.currentIdentity()).toBeUndefined();
-    expect(session.preferredSettings()).toEqual({});
+      { requestUser: 'SAPUSER02' },
+    );
+    assert.equal(session.currentIdentity(), undefined);
+    assert.deepStrictEqual(session.preferredSettings(), {});
   });
 
   it('a stop that kept breakpoints refuses a start with another request user, and the identity stays', async () => {
@@ -403,28 +442,33 @@ describe('the cleanup', () => {
     world.override.stopListener = async () => refusedResponse('listener busy');
     world.override.deleteBreakpoint = async () =>
       refusedResponse('Breakpoint is locked');
-    await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+    await assertRejects(session.stop(), DebugCleanupError);
     world.calls.length = 0;
-    await expect(
+    await assertRejects(
       session.start('refuse', {
         ...START,
         requestUser: 'SAPUSER03',
         breakpoints: [A],
       }),
-    ).rejects.toThrow(NOT_COMPLETE);
-    expect(world.calls).toEqual([]);
-    expect(session.currentIdentity()).toMatchObject({
+      NOT_COMPLETE,
+    );
+    assert.deepStrictEqual(world.calls, []);
+    assertMatchObject(session.currentIdentity(), {
       requestUser: 'SAPUSER02',
     });
-    expect(session.listBreakpoints().map((r) => r.id)).toEqual(['L10', 'E1']);
+    assert.deepStrictEqual(
+      session.listBreakpoints().map((r) => r.id),
+      ['L10', 'E1'],
+    );
     delete world.override.stopListener;
     delete world.override.deleteBreakpoint;
     world.log.length = 0;
     await session.stop();
-    expect(
+    assertMatchObject(
       world.log.find((c) => c.call === 'stopListener')!.args[0],
-    ).toMatchObject({ requestUser: 'SAPUSER02' });
-    expect(session.holdsState()).toBe(false);
+      { requestUser: 'SAPUSER02' },
+    );
+    assert.equal(session.holdsState(), false);
   });
 
   it('a stop whose stopListener succeeded but kept a connection owes only the close: the retry sends no second stopListener', async () => {
@@ -439,17 +483,17 @@ describe('the cleanup', () => {
       }
       return realClose(c);
     };
-    await expect(session.stop()).rejects.toThrow(/close refused/);
-    expect(session.listBreakpoints()).toEqual([]);
-    expect(session.requestedBreakpoints()).toEqual([]);
-    expect(session.holdsState()).toBe(true);
-    await expect(session.start('refuse', START)).rejects.toThrow(NOT_COMPLETE);
+    await assertRejects(session.stop(), /close refused/);
+    assert.deepStrictEqual(session.listBreakpoints(), []);
+    assert.deepStrictEqual(session.requestedBreakpoints(), []);
+    assert.equal(session.holdsState(), true);
+    await assertRejects(session.start('refuse', START), NOT_COMPLETE);
     world.calls.length = 0;
     await session.stop();
-    expect(world.calls).not.toContain('stopListener');
-    expect(session.currentIdentity()).toBeUndefined();
-    expect(session.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.ok(!world.calls.includes('stopListener'));
+    assert.equal(session.currentIdentity(), undefined);
+    assert.equal(session.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 
   it('a stopListener refused for the user is final even when a close failed: the retry sends no second stopListener', async () => {
@@ -472,13 +516,13 @@ describe('the cleanup', () => {
     // Refused, the system's listener was not stopped: its open poll answers on its own.
     await until(() => world.calls.includes('stopListener'));
     world.polls[world.polls.length - 1].resolve(LISTEN_NOTHING());
-    await expect(first).rejects.toThrow(/close refused/);
-    expect(session.holdsState()).toBe(true);
+    await assertRejects(first, /close refused/);
+    assert.equal(session.holdsState(), true);
     delete world.override.stopListener;
     world.calls.length = 0;
     await session.stop();
-    expect(world.calls).not.toContain('stopListener');
-    expect(session.holdsState()).toBe(false);
+    assert.ok(!world.calls.includes('stopListener'));
+    assert.equal(session.holdsState(), false);
   });
 
   // Review Focus 3.
@@ -492,12 +536,12 @@ describe('the cleanup', () => {
     await until(() => world.polls.length === 2);
     world.polls[1].resolve(CONFLICT_409()); // taken over by another IDE
     await until(() => world.closed.length === 1);
-    await expect(session.wait(0)).rejects.toThrow(/global debugging scope/);
-    expect(session.holdsState()).toBe(true);
-    await expect(session.start('refuse', START)).rejects.toThrow(NOT_COMPLETE);
+    await assertRejects(session.wait(0), /global debugging scope/);
+    assert.equal(session.holdsState(), true);
+    await assertRejects(session.start('refuse', START), NOT_COMPLETE);
     await session.stop();
-    expect(world.calls).toContain('stopListener');
-    expect(session.holdsState()).toBe(false);
+    assert.ok(world.calls.includes('stopListener'));
+    assert.equal(session.holdsState(), false);
   });
 
   it('a start that failed with no SAP answer behind it answers its own words, with what it could not undo as entries', async () => {
@@ -517,7 +561,7 @@ describe('the cleanup', () => {
       (return_error(error) as { content: Array<{ text: string }> }).content[0]
         .text,
     );
-    expect(answered).toEqual({
+    assert.deepStrictEqual(answered, {
       message: 'socket hang up',
       cleanup: {
         message: 'not undone',
@@ -553,7 +597,8 @@ describe('the cleanup', () => {
     const error = await session
       .start('refuse', { ...START, requestUser: 'SAPUSER02', breakpoints: [A] })
       .catch((e: unknown) => e);
-    expect((error as Error).message).toBe(
+    assert.equal(
+      (error as Error).message,
       `${NO_AUTH}; not undone: stop listener: ${NO_AUTH}`,
     );
     // The consumer's answer: the arming's refusal as it is, with what could
@@ -562,15 +607,15 @@ describe('the cleanup', () => {
       (return_error(error) as { content: Array<{ text: string }> }).content[0]
         .text,
     );
-    expect(answered.message).toBe(NO_AUTH);
-    expect(answered.cleanup).toEqual({
+    assert.equal(answered.message, NO_AUTH);
+    assert.deepStrictEqual(answered.cleanup, {
       message: 'not undone',
       failures: [
         { message: NO_AUTH, origin: 'refusal', step: 'stop listener' },
       ],
     });
-    expect(session.holdsState()).toBe(true);
-    expect(session.currentIdentity()).toMatchObject({
+    assert.equal(session.holdsState(), true);
+    assertMatchObject(session.currentIdentity(), {
       requestUser: 'SAPUSER02',
     });
   });
@@ -597,8 +642,8 @@ describe('the cleanup', () => {
     await until(() => world.polls.length === 3);
     world.polls[2].resolve(LISTEN_NOTHING());
     await second;
-    expect(world.log.length).toBeGreaterThan(0);
-    for (const c of world.log) expect(served.has(c.connection)).toBe(false);
+    assert.ok(world.log.length > 0);
+    for (const c of world.log) assert.equal(served.has(c.connection), false);
   });
 
   // A stop whose connection is spent (the owner's decision): its SAP session
@@ -624,44 +669,46 @@ describe('the cleanup', () => {
       const again = session.start('refuse', { breakpoints: [A, EXC] });
       await until(() => world.polls.length === polls + 1);
       world.polls[polls].resolve(LISTEN_NOTHING());
-      await expect(again).resolves.toBeDefined();
+      assert.notEqual(await again, undefined);
     }
 
-    it.each([
+    for (const [_name, extra] of [
       ['sessionError ADT_NOT_CONNECTED', { sessionError: 'ADT_NOT_CONNECTED' }],
       [
         'sessionError ADT_SESSION_REPLACED',
         { sessionError: 'ADT_SESSION_REPLACED' },
       ],
       ['sessionLost on the refusal', { sessionLost: 'ADT_SESSION_REPLACED' }],
-    ] as const)(
-      '%s: the stop is dropped without a request, reported, and a start is accepted',
-      async (_name, extra) => {
-        const { world, session } = await heldStop();
-        world.override.step = async () =>
-          refusedResponse('words that are never read', {
-            origin: 'connection',
-            ...extra,
-          });
-        world.calls.length = 0;
-        const closedBefore = world.closed.length;
-        const notes = await session.stop();
-        // Dropped: no logoff on it, nothing sent after the release.
-        expect(world.dropped).toHaveLength(1);
-        expect(world.closed.slice(closedBefore)).not.toContain(
-          world.dropped[0],
-        );
-        expect(notes).toEqual([
-          expect.objectContaining({
-            step: 'release the debuggee',
-            cleanup: { message: expect.stringContaining('dropped') },
-          }),
-        ]);
-        expect(session.failures()).toEqual([]);
-        expect(session.holdsState()).toBe(false);
-        await startsAgain(world, session);
-      },
-    );
+    ] as const) {
+      it(
+        format(
+          '%s: the stop is dropped without a request, reported, and a start is accepted',
+          _name,
+        ),
+        async () => {
+          const { world, session } = await heldStop();
+          world.override.step = async () =>
+            refusedResponse('words that are never read', {
+              origin: 'connection',
+              ...extra,
+            });
+          world.calls.length = 0;
+          const closedBefore = world.closed.length;
+          const notes = await session.stop();
+          // Dropped: no logoff on it, nothing sent after the release.
+          assert.equal(world.dropped.length, 1);
+          assert.ok(
+            !world.closed.slice(closedBefore).includes(world.dropped[0]),
+          );
+          assert.equal(notes.length, 1);
+          assertMatchObject(notes[0], { step: 'release the debuggee' });
+          assertMessageHolding(notes[0]?.cleanup, 'dropped');
+          assert.deepStrictEqual(session.failures(), []);
+          assert.equal(session.holdsState(), false);
+          await startsAgain(world, session);
+        },
+      );
+    }
 
     it('a released stop whose answer carries sessionLost is dropped, not logged off', async () => {
       const { world, session } = await heldStop();
@@ -676,10 +723,10 @@ describe('the cleanup', () => {
         },
       });
       const closedBefore = world.closed.length;
-      await expect(session.stop()).resolves.toEqual([]);
-      expect(world.dropped).toHaveLength(1);
-      expect(world.closed.slice(closedBefore)).not.toContain(world.dropped[0]);
-      expect(session.holdsState()).toBe(false);
+      assert.deepStrictEqual(await session.stop(), []);
+      assert.equal(world.dropped.length, 1);
+      assert.ok(!world.closed.slice(closedBefore).includes(world.dropped[0]));
+      assert.equal(session.holdsState(), false);
     });
 
     it('a connection failure that names no session error stays a failure, kept for the next stop', async () => {
@@ -688,12 +735,13 @@ describe('the cleanup', () => {
         refusedResponse('ADT_NOT_CONNECTED in the words only', {
           origin: 'connection',
         });
-      await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-      expect(world.dropped).toEqual([]);
-      expect(session.failures()).toEqual([
-        expect.objectContaining({ step: 'release the debuggee' }),
-      ]);
-      expect(session.holdsState()).toBe(true);
+      await assertRejects(session.stop(), DebugCleanupError);
+      assert.deepStrictEqual(world.dropped, []);
+      assert.equal(session.failures().length, 1);
+      assertMatchObject(session.failures()[0], {
+        step: 'release the debuggee',
+      });
+      assert.equal(session.holdsState(), true);
     });
 
     it('ADT_RELEASE_PENDING is no spent connection: it stays a failure', async () => {
@@ -703,9 +751,9 @@ describe('the cleanup', () => {
           origin: 'connection',
           sessionError: 'ADT_RELEASE_PENDING',
         });
-      await expect(session.stop()).rejects.toThrow(DebugCleanupError);
-      expect(world.dropped).toEqual([]);
-      expect(session.holdsState()).toBe(true);
+      await assertRejects(session.stop(), DebugCleanupError);
+      assert.deepStrictEqual(world.dropped, []);
+      assert.equal(session.holdsState(), true);
     });
   });
 
@@ -718,15 +766,15 @@ describe('the cleanup', () => {
     world.polls[0].resolve(LISTEN_NOTHING());
     await first;
     await session.stop();
-    expect(session.requestedBreakpoints()).toEqual([]);
+    assert.deepStrictEqual(session.requestedBreakpoints(), []);
     const second = session.start('refuse', { breakpoints: [A] });
     await until(() => world.polls.length === 3);
     world.polls[2].resolve(LISTEN_NOTHING());
     await second;
-    expect(world.sent.map((l) => l.map((b: any) => b.clientId))).toEqual([
-      ['bp1'],
-      ['bp2'],
-    ]);
-    expect(session.requestedBreakpoints()).toEqual([A]);
+    assert.deepStrictEqual(
+      world.sent.map((l) => l.map((b: any) => b.clientId)),
+      [['bp1'], ['bp2']],
+    );
+    assert.deepStrictEqual(session.requestedBreakpoints(), [A]);
   });
 });

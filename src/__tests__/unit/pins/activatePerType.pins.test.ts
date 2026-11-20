@@ -4,6 +4,7 @@
  * activation of the object it names (a function module's after its read); SAP's answer is the activation the
  * corpus captured succeeding. The program is on premise only.
  */
+import { describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { pinCases } from '../../helpers/pinCases';
 

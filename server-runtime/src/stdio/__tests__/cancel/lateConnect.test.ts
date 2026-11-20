@@ -16,9 +16,9 @@
  * completes — `loginEndsWithRequest` covers that.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import { type Stand, stand, turns, until } from '../helpers/loginStand';
-
-jest.setTimeout(30_000);
 
 let s: Stand;
 
@@ -38,9 +38,9 @@ it('the sole caller is sent a cancel while connect() is held: it runs on the lat
   await hold.arrived;
 
   r1.cancel();
-  expect(await r1.done).toBe('cancelled');
+  assert.equal(await r1.done, 'cancelled');
   await turns(50);
-  expect(s.active()).toBe(1);
+  assert.equal(s.active(), 1);
 
   hold.release();
   // The connect completes and the call's tool runs on it; no logoff
@@ -48,22 +48,32 @@ it('the sole caller is sent a cancel while connect() is held: it runs on the lat
   await until(() => s.reached('r1'));
   await until(() => s.active() === 0);
   const connectRequests = s.adt.requests.length;
-  expect(s.adt.requests.some((r) => isLogoff(r.url))).toBe(false);
+  assert.equal(
+    s.adt.requests.some((r) => isLogoff(r.url)),
+    false,
+  );
 
   // Kept: the next request sends its probe alone, on the late connection —
   // no new connect before it.
-  expect(await s.call('r2').done).toEqual({ text: 'r2', isError: false });
-  expect(s.adt.requests.slice(connectRequests).map((r) => r.url)).toEqual([
-    '/sap/bc/adt/probe/r2',
-  ]);
-  expect(s.adt.requests.some((r) => isLogoff(r.url))).toBe(false);
+  assert.deepStrictEqual(await s.call('r2').done, {
+    text: 'r2',
+    isError: false,
+  });
+  assert.deepStrictEqual(
+    s.adt.requests.slice(connectRequests).map((r) => r.url),
+    ['/sap/bc/adt/probe/r2'],
+  );
+  assert.equal(
+    s.adt.requests.some((r) => isLogoff(r.url)),
+    false,
+  );
 
   // The terminal close at shutdown disconnects it, once.
   s.processLike.emit('SIGTERM');
-  expect(await s.exited).toBe(0);
+  assert.equal(await s.exited, 0);
   await until(() => s.adt.logoffs() === 1);
   await turns(20);
-  expect(s.adt.logoffs()).toBe(1);
+  assert.equal(s.adt.logoffs(), 1);
 });
 
 it('the session ends while connect() is held: no logoff before the connect’s request was answered', async () => {
@@ -73,19 +83,19 @@ it('the session ends while connect() is held: no logoff before the connect’s r
 
   // The session's end: the client's transport closes, then the shutdown.
   await s.client.close();
-  expect(await r1.done).toBe('cancelled');
+  assert.equal(await r1.done, 'cancelled');
   s.processLike.emit('SIGTERM');
   await turns(50);
-  expect(s.adt.logoffs()).toBe(0);
+  assert.equal(s.adt.logoffs(), 0);
   // The call is tracked until its connect settled: the shutdown waits for it.
-  expect(s.active()).toBe(1);
+  assert.equal(s.active(), 1);
 
   const held = s.adt.requests.length;
   hold.release();
-  expect(await s.exited).toBe(0);
+  assert.equal(await s.exited, 0);
   await until(() => s.adt.logoffs() === 1);
   // The logoff came after the held request; the tool never ran.
   const logoff = s.adt.requests.findIndex((r) => isLogoff(r.url));
-  expect(logoff).toBeGreaterThanOrEqual(held);
-  expect(s.reached('r1')).toBe(false);
+  assert.ok(logoff >= held);
+  assert.equal(s.reached('r1'), false);
 });

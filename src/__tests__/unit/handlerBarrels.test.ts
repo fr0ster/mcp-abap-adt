@@ -18,12 +18,16 @@
  * write handler. The membership was measured from the groups' import graphs — 35
  * read, 69 write, no overlap — so the assertions below are the measurement, kept.
  */
+
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
+import { describe, it } from 'node:test';
 import * as readBarrel from '../../lib/handlers/read';
 import * as writeBarrel from '../../lib/handlers/write';
+import { repositoryRoot } from '../helpers/repoRoot';
 
-const SRC = resolve(__dirname, '../..');
+const SRC = resolve(repositoryRoot(__dirname), 'src');
 
 function importsOf(file: string): string[] {
   const source = readFileSync(file, 'utf8');
@@ -90,7 +94,7 @@ describe("lib's read and write handler barrels", () => {
     // SearchSource, GetPackageTree, ListTransports and the three ATC reads
     // (68). A table's technical settings and the text elements: their reads
     // (70).
-    expect(read).toHaveLength(70);
+    assert.equal(read.length, 70);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
@@ -121,17 +125,20 @@ describe("lib's read and write handler barrels", () => {
     // `DeleteInclude` (97); and table types: `CreateTableType` (98),
     // `UpdateTableType` (99), `DeleteTableType` (100). A table's technical
     // settings and the text elements: their writes (102).
-    expect(write).toHaveLength(102);
+    assert.equal(write.length, 102);
   });
 
   it('share not one symbol', () => {
-    expect(read.filter((name) => write.includes(name))).toEqual([]);
+    assert.deepStrictEqual(
+      read.filter((name) => write.includes(name)),
+      [],
+    );
   });
 
   it('name what they are: the read half writes nothing', () => {
     // A create/update/delete/activate/lock export in the read barrel is the
     // mistake this file exists to catch, whatever the symbol is called.
-    expect(
+    assert.deepStrictEqual(
       read.filter((name) =>
         // `(?![a-z])` so `handleRuntimeListFeeds` is not read as a "Run": the
         // verb has to end where the rule says it does.
@@ -139,7 +146,8 @@ describe("lib's read and write handler barrels", () => {
           name,
         ),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('the read barrel links no write handler module', () => {
@@ -152,6 +160,6 @@ describe("lib's read and write handler barrels", () => {
       )
       .map((file) => file.slice(SRC.length + 1))
       .sort();
-    expect(offenders).toEqual([]);
+    assert.deepStrictEqual(offenders, []);
   });
 });

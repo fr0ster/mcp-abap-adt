@@ -1,5 +1,13 @@
+import assert from 'node:assert/strict';
 import * as net from 'node:net';
+import { describe, it } from 'node:test';
 import * as ts from 'typescript';
+import {
+  assertMatchObject,
+  assertRejects,
+  assertThrows,
+} from '../../helpers/assertions';
+import { repositoryRoot } from '../../helpers/repoRoot';
 /**
  * `pinCases`' own behaviour (plan C1 Step 3): what it refuses, what it
  * asserts, the deterministic inputs and the one adapter `toPinned`. Each
@@ -32,8 +40,6 @@ import {
 } from '../../helpers/pinCases';
 import { pinServer } from '../../helpers/pinServer';
 import { recordingConnection } from '../../helpers/recordingConnection';
-
-jest.setTimeout(120_000);
 
 const getProgram: PinCase = {
   tool: 'GetProgram',
@@ -68,36 +74,39 @@ const textAnswer = (text: string) => ({
 
 describe('pinCases', () => {
   it('refuses an empty expected', async () => {
-    await expect(runPinCase(getProgram)).rejects.toThrow(
+    await assertRejects(
+      runPinCase(getProgram),
       'an empty expected is refused; recorded:',
     );
-    await expect(runPinCase(getProgram)).rejects.toThrow('zpin_program');
+    await assertRejects(runPinCase(getProgram), 'zpin_program');
   });
 
   it('refuses a tool the variant does not serve', async () => {
-    await expect(
+    await assertRejects(
       runPinCase({ ...getProgram, tool: 'DeleteProgram', variant: 'cloud' }),
-    ).rejects.toThrow('the cloud variant serves no tool DeleteProgram');
+      'the cloud variant serves no tool DeleteProgram',
+    );
   });
 
   it('fails when one request more is recorded than expected', async () => {
     const recorded = await recordCase(getProgram);
-    expect(recorded.requests.length).toBeGreaterThan(0);
-    await expect(
+    assert.ok(recorded.requests.length > 0);
+    await assertRejects(
       runPinCase({ ...getProgram, expected: recorded.requests.slice(1) }),
-    ).rejects.toThrow();
-    await expect(
-      runPinCase({ ...getProgram, expected: recorded.requests }),
-    ).resolves.toBeUndefined();
+    );
+    assert.equal(
+      await runPinCase({ ...getProgram, expected: recorded.requests }),
+      undefined,
+    );
   });
 
   it('a none case fails when the tool never ran', async () => {
     const early = stub('StubBegin', async () => textAnswer('{}'));
     const ran = (answer: { content: Array<{ text: string }> }) => {
       const parsed: unknown = JSON.parse(answer.content[0]?.text ?? '');
-      expect(parsed).toHaveProperty('state_handle');
+      assert.ok('state_handle' in Object(parsed));
     };
-    await expect(
+    await assertRejects(
       runPinCase(
         {
           tool: 'StubBegin',
@@ -109,12 +118,13 @@ describe('pinCases', () => {
         },
         { entries: entries(early) },
       ),
-    ).rejects.toThrow('state_handle');
+      'state_handle',
+    );
     const begun = stub('StubBegin', async () =>
       textAnswer('{"state_handle":"H"}'),
     );
-    await expect(
-      runPinCase(
+    assert.equal(
+      await runPinCase(
         {
           tool: 'StubBegin',
           variant: 'onprem',
@@ -125,24 +135,26 @@ describe('pinCases', () => {
         },
         { entries: entries(begun) },
       ),
-    ).resolves.toBeUndefined();
+      undefined,
+    );
   });
 
   it('a none case fails when the tool sends a request', async () => {
-    await expect(
+    await assertRejects(
       runPinCase({ ...getProgram, expected: 'none', ran: () => {} }),
-    ).rejects.toThrow();
+    );
   });
 
   it('a thrown refusal is asserted as thrown, with zero requests', async () => {
-    await expect(
-      runPinCase({
+    assert.equal(
+      await runPinCase({
         ...getProgram,
         args: { program_name: 7 },
         refusal: 'thrown',
         expected: 'nothing-sent',
       }),
-    ).resolves.toBeUndefined();
+      undefined,
+    );
     const sendsThenThrows = stub('StubSends', async (context) => {
       await context.connection.makeAdtRequest({
         url: '/sap/bc/adt/stub',
@@ -153,7 +165,7 @@ describe('pinCases', () => {
         'Input validation error: Invalid arguments for tool StubSends: late',
       );
     });
-    await expect(
+    await assertRejects(
       runPinCase(
         {
           tool: 'StubSends',
@@ -165,14 +177,13 @@ describe('pinCases', () => {
         },
         { entries: entries(sendsThenThrows) },
       ),
-    ).rejects.toThrow();
-    await expect(
+    );
+    await assertRejects(
       runPinCase({
         ...getProgram,
         args: { program_name: 7 },
         expected: 'nothing-sent',
       }),
-    ).rejects.toThrow(
       "expected: 'nothing-sent' is legal only with refusal: 'thrown'",
     );
   });
@@ -188,8 +199,8 @@ describe('pinCases', () => {
     };
     const first = await recordCase(begin);
     const second = await recordCase(begin);
-    expect(first.answer?.content[0]?.text).toContain('state_handle');
-    expect(second.answer).toEqual(first.answer);
+    assert.ok(first.answer?.content[0]?.text.includes('state_handle'));
+    assert.deepStrictEqual(second.answer, first.answer);
 
     // Built before the fakes, a server keeps the real random source: the
     // same seed gives two different handles.
@@ -207,7 +218,7 @@ describe('pinCases', () => {
         await stand.close();
       }
     }
-    expect(handles[0]).not.toEqual(handles[1]);
+    assert.notDeepStrictEqual(handles[0], handles[1]);
   });
 
   it('a stand case runs while a port of the old fixed pin range is taken', async () => {
@@ -227,7 +238,7 @@ describe('pinCases', () => {
     try {
       const onStand: PinCase = { ...getProgram, stand: 'adtStandIn' };
       const recorded = await recordCase(onStand);
-      expect(recorded.requests.length).toBeGreaterThan(0);
+      assert.ok(recorded.requests.length > 0);
     } finally {
       if (held)
         await new Promise<void>((resolve) => holder.close(() => resolve()));
@@ -238,9 +249,9 @@ describe('pinCases', () => {
     const onStand: PinCase = { ...getProgram, stand: 'adtStandIn' };
     const first = await recordCase(onStand);
     const second = await recordCase(onStand);
-    expect(first.requests.length).toBeGreaterThan(0);
-    expect(first.requests[0]?.headers.host).toBe(PIN_STAND_HOST);
-    expect(second.requests).toEqual(first.requests);
+    assert.ok(first.requests.length > 0);
+    assert.equal(first.requests[0]?.headers.host, PIN_STAND_HOST);
+    assert.deepStrictEqual(second.requests, first.requests);
   });
 
   it('a pin whose two recordings differ fails, naming the first differing field', async () => {
@@ -255,7 +266,7 @@ describe('pinCases', () => {
       });
       return textAnswer('{}');
     });
-    await expect(
+    await assertRejects(
       runPinCase(
         {
           tool: 'StubDrifts',
@@ -273,7 +284,8 @@ describe('pinCases', () => {
         },
         { entries: entries(drifting) },
       ),
-    ).rejects.toThrow('two recordings of the case differ at request 0: url');
+      'two recordings of the case differ at request 0: url',
+    );
   });
 
   it("a thrown case's recording leaves out its before steps, on both stands", async () => {
@@ -303,15 +315,18 @@ describe('pinCases', () => {
         },
         { entries: entries(before, throws) },
       );
-      expect({
-        stand,
-        thrown: recorded.thrown instanceof Error,
-        requests: recorded.requests,
-      }).toEqual({
-        stand,
-        thrown: true,
-        requests: [],
-      });
+      assert.deepStrictEqual(
+        {
+          stand,
+          thrown: recorded.thrown instanceof Error,
+          requests: recorded.requests,
+        },
+        {
+          stand,
+          thrown: true,
+          requests: [],
+        },
+      );
     }
   });
 
@@ -348,13 +363,13 @@ describe('pinCases', () => {
       },
       { entries: entries(start, read) },
     );
-    expect(seen).toEqual([{ run_id: 'RUN_7' }, { run_id: 'RUN_7' }]);
+    assert.deepStrictEqual(seen, [{ run_id: 'RUN_7' }, { run_id: 'RUN_7' }]);
   });
 
   it('a binding of a key-bearing field is refused', async () => {
     const start = stub('StubStart', async () => textAnswer('{"type":"CLASS"}'));
     const read = stub('StubRead', async () => textAnswer('{}'));
-    await expect(
+    await assertRejects(
       runPinCase(
         {
           tool: 'StubRead',
@@ -368,7 +383,8 @@ describe('pinCases', () => {
         },
         { entries: entries(start, read) },
       ),
-    ).rejects.toThrow('a binding of object_type is refused');
+      'a binding of object_type is refused',
+    );
   });
 
   it('toPinned excludes session and nothing else', () => {
@@ -385,31 +401,35 @@ describe('pinCases', () => {
       headers: { accept: 'application/xml', authorization: 'Basic eA==' },
       query: 'a=1',
     };
-    expect(toPinned(record)).toEqual({
+    assert.deepStrictEqual(toPinned(record), {
       method: 'GET',
       url: '/sap/bc/adt/x?a=1',
       headers: { accept: 'application/xml', authorization: 'Basic eA==' },
       body: undefined,
     });
-    expect(() => toPinned(Object.assign({}, record, { extra: 'x' }))).toThrow(
+    assertThrows(
+      () => toPinned(Object.assign({}, record, { extra: 'x' })),
       'the stand-in record carries extra: the pinned shape has no place for it',
     );
-    expect(() =>
-      toPinned(Object.assign({ method: 'GET', url: '/x' }, { timeout: 5 })),
-    ).toThrow('the recorded request carries timeout');
+    assertThrows(
+      () =>
+        toPinned(Object.assign({ method: 'GET', url: '/x' }, { timeout: 5 })),
+      'the recorded request carries timeout',
+    );
   });
 
   // adt-clients hands a LOCK and an UNLOCK `data: null`; an HTTP client
   // sends no body for it, as for `undefined`.
   it('toPinned reads a null body as none', () => {
-    expect(
+    assert.deepStrictEqual(
       toPinned({ method: 'POST', url: '/sap/bc/adt/x', data: null }),
-    ).toEqual({
-      method: 'POST',
-      url: '/sap/bc/adt/x',
-      headers: {},
-      body: undefined,
-    });
+      {
+        method: 'POST',
+        url: '/sap/bc/adt/x',
+        headers: {},
+        body: undefined,
+      },
+    );
   });
 
   it('toPinned keeps the query, every header and the body', async () => {
@@ -425,7 +445,7 @@ describe('pinCases', () => {
     });
     const recorded = connection.requests[0];
     if (recorded === undefined) throw new Error('nothing was recorded');
-    expect(toPinned(recorded)).toEqual({
+    assert.deepStrictEqual(toPinned(recorded), {
       method: 'POST',
       url: '/sap/bc/adt/x?b=two+words&a=1',
       headers,
@@ -442,10 +462,10 @@ describe('pinCases', () => {
       const sent = stand.requests[0];
       if (sent === undefined) throw new Error('the stand-in got nothing');
       const pinned = toPinned(sent);
-      expect(pinned.url).toBe('/sap/bc/adt/x?b=two&a=1');
-      expect(pinned.body).toBe('<x/>');
-      expect(pinned.headers).toMatchObject(headers);
-      expect(pinned.headers.host).toBe(new URL(stand.url).host);
+      assert.equal(pinned.url, '/sap/bc/adt/x?b=two&a=1');
+      assert.equal(pinned.body, '<x/>');
+      assertMatchObject(pinned.headers, headers);
+      assert.equal(pinned.headers.host, new URL(stand.url).host);
     } finally {
       await stand.close();
     }
@@ -453,7 +473,7 @@ describe('pinCases', () => {
 });
 
 describe('no test server listens on a fixed port', () => {
-  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const repo = repositoryRoot(__dirname);
 
   /** Every test source under `dir`. */
   function sources(dir: string, out: string[] = []): string[] {
@@ -508,18 +528,27 @@ describe('no test server listens on a fixed port', () => {
         .map((entry) => path.join(repo, entry.name, 'src'))
         .filter((dir) => fs.existsSync(dir) && dir !== path.join(repo, 'src')),
     ];
-    const self = __filename;
+    // This file's source (it names fixed ports as the refused example), not
+    // the compiled file `__filename` names under the node:test build.
+    const self = path.join(
+      repo,
+      'src',
+      '__tests__',
+      'unit',
+      'coverage',
+      'pinCases.test.ts',
+    );
     const found = roots
       .flatMap((root) => sources(root))
       .filter((file) => file.includes(`${path.sep}__tests__${path.sep}`))
       .filter((file) => file !== self)
       .flatMap(fixedListens);
-    expect(found).toEqual([]);
+    assert.deepStrictEqual(found, []);
   });
 
   it('the ADT stand-in takes no port', () => {
     const arity: Parameters<typeof adtStandIn>['length'] = 0;
-    expect(adtStandIn.length).toBe(arity);
+    assert.equal(adtStandIn.length, arity);
   });
 });
 
@@ -566,18 +595,20 @@ describe('a matched case', () => {
       { method: 'GET', path: '/sap/bc/adt/b' },
     ]);
     const recorded = await recordCase(c, tools);
-    expect(recorded.requests.map((r) => r.url)).toEqual([
-      '/sap/bc/adt/a',
-      '/sap/bc/adt/b',
-    ]);
-    await expect(
-      runPinCase({ ...c, expected: recorded.requests }, tools),
-    ).resolves.toBeUndefined();
+    assert.deepStrictEqual(
+      recorded.requests.map((r) => r.url),
+      ['/sap/bc/adt/a', '/sap/bc/adt/b'],
+    );
+    assert.equal(
+      await runPinCase({ ...c, expected: recorded.requests }, tools),
+      undefined,
+    );
   });
 
   it('fails on a request no matcher fits', async () => {
     const tools = { entries: entries(sender('/sap/bc/adt/a')) };
-    await expect(recordCase(sends([...SESSION]), tools)).rejects.toThrow(
+    await assertRejects(
+      recordCase(sends([...SESSION]), tools),
       'no matcher fits GET /sap/bc/adt/a',
     );
   });
@@ -586,12 +617,13 @@ describe('a matched case', () => {
     const tools = {
       entries: entries(sender('/sap/bc/adt/a', '/sap/bc/adt/a')),
     };
-    await expect(
+    await assertRejects(
       recordCase(
         sends([...SESSION, { method: 'GET', path: '/sap/bc/adt/a' }]),
         tools,
       ),
-    ).rejects.toThrow('GET /sap/bc/adt/a was sent 2 time(s), not 1');
+      'GET /sap/bc/adt/a was sent 2 time(s), not 1',
+    );
   });
 
   it('a held request never answered has settled once the case returned', async () => {
@@ -631,22 +663,22 @@ describe('a matched case', () => {
       ]),
       tools,
     );
-    expect(recorded.requests.map((r) => r.url)).toEqual([
-      '/sap/bc/adt/a',
-      '/sap/bc/adt/held',
-    ]);
+    assert.deepStrictEqual(
+      recorded.requests.map((r) => r.url),
+      ['/sap/bc/adt/a', '/sap/bc/adt/held'],
+    );
     // Settled by the stand-in's close, before the case returned: nothing
     // of it outlives the case.
-    expect(settled).toBe(true);
+    assert.equal(settled, true);
   });
 
   it('is refused beside answers, and on the recording stand', async () => {
-    await expect(
+    await assertRejects(
       recordCase({ ...sends([...SESSION]), answers: [] }),
-    ).rejects.toThrow('a case answers by matched or by answers, not both');
-    await expect(
+      'a case answers by matched or by answers, not both',
+    );
+    await assertRejects(
       recordCase({ ...sends([...SESSION]), stand: 'recording' }),
-    ).rejects.toThrow(
       "matched needs a stand-in: stand 'adtStandIn' or 'server'",
     );
   });

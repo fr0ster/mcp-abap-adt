@@ -10,6 +10,10 @@
  * `AbapDebugger`s over them, every envelope and every direct request counted.
  * Nothing reaches a system. The AMDP debugger batch: `amdpDebugBatch.test.ts`.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { AbapDebugger, AmdpDebugger } from '@mcp-abap-adt/adt-clients';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import {
@@ -60,6 +64,7 @@ import {
   fullToolSet,
 } from '../../../lib/toolSet';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   type EnvelopeAnswer,
   envelopeConnection,
@@ -334,295 +339,330 @@ async function settled<T>(promise: Promise<T>): Promise<T> {
 
 const SETS: SetKind[] = ['full', 'compact'];
 
-describe.each(SETS)('the debugger batch, %s set', (set) => {
-  let s: Stand;
-  beforeEach(async () => {
-    s = await stand(set);
-  });
-  afterEach(async () => {
-    await s.close();
-  });
-
-  it(`${set === 'full' ? 'DebugBatchEnd' : 'HandlerDebugBatch end'} sends exactly one envelope`, async () => {
-    await s.attach();
-    expect((await s.call(NAMES.begin[set], beginArgs(set))).isError).not.toBe(
-      true,
-    );
-    for (const [tool, args] of stepStackVariables(set, s.handle())) {
-      expect(await within(s.call(tool, args))).toEqual({ content: [] });
-    }
-    const ended = await settled(s.call(NAMES.end[set], endArgs(set)));
-    expect(ended.isError).not.toBe(true);
-    const envelopes = s.opened.flatMap((fake) => fake.envelopes);
-    expect(envelopes).toHaveLength(1);
-    expect(s.main.envelopes).toHaveLength(0);
-  });
-
-  it('begin needs an ABAP stop', async () => {
-    const answer = await s.call(NAMES.begin[set], beginArgs(set));
-    expect(answer.isError).toBe(true);
-    expect(textOf(answer)).toContain('no debuggee is stopped');
-    expect(s.owner.mode()).toBe('off');
-  });
-
-  it("step + stack + variables recorded into one debugger envelope on the stop's connection", async () => {
-    await s.attach();
-    const begun = await s.call(NAMES.begin[set], beginArgs(set));
-    expect(jsonOf(begun)).toEqual({
-      debug_batch: 'on',
-      state_handle: s.handle(),
+for (const set of SETS) {
+  describe(format('the debugger batch, %s set', set), () => {
+    let s: Stand;
+    beforeEach(async () => {
+      s = await stand(set);
     });
-    const sentBefore = s.opened.map((fake) => fake.directs.length);
-    for (const [tool, args] of stepStackVariables(set, s.handle())) {
-      expect(await within(s.call(tool, args))).toEqual({ content: [] });
-    }
-    // Recorded, never sent: no request left any connection.
-    expect(s.opened.map((fake) => fake.directs.length)).toEqual(sentBefore);
-    expect(s.opened.flatMap((fake) => fake.envelopes)).toHaveLength(0);
-    await settled(s.call(NAMES.end[set], endArgs(set)));
-    const stop = s.stopConnection();
-    expect(stop.envelopes).toHaveLength(1);
-    const [envelope] = stop.envelopes;
-    expect(envelope?.url).toBe('/sap/bc/adt/debugger/batch');
-    expect(envelope?.session).toBe('stateful');
-    expect(envelope?.parts.map((p) => `${p.method} ${p.url}`)).toEqual([
-      'POST /sap/bc/adt/debugger?method=stepOver',
-      'GET /sap/bc/adt/debugger/stack?emode=_&semanticURIs=true',
-      'POST /sap/bc/adt/debugger?method=getVariables',
-    ]);
-    // The stop's connection, nothing on any other.
-    for (const fake of s.opened)
-      if (fake !== stop) expect(fake.envelopes).toHaveLength(0);
-    expect(s.main.envelopes).toHaveLength(0);
-  });
-
-  it(`${NAMES.end[set]} answered with fewer parts than requests: batch_parts_mismatch, no map, every number answers it`, async () => {
-    await s.attach();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    for (const [tool, args] of stepStackVariables(set, s.handle())) {
-      expect(await within(s.call(tool, args))).toEqual({ content: [] });
-    }
-    s.envelope.answer = (parts) =>
-      envelopeResponse(parts.slice(0, 2).map(debuggerPart));
-    const ended = await settled(s.call(NAMES.end[set], endArgs(set)));
-    expect(ended.isError).toBe(true);
-    expect(jsonOf(ended)).toEqual({
-      error: 'batch_parts_mismatch',
-      message: batchPartsMismatchWords(2, 3),
+    afterEach(async () => {
+      await s.close();
     });
-    expect(s.owner.mode()).toBe('off');
-    const read = await s.call(
-      set === 'compact' ? 'HandlerDebugBatch' : 'DebugBatchAnswers',
-      set === 'compact'
-        ? { action: 'answers', numbers: [1, 2, 3] }
-        : { numbers: [1, 2, 3] },
-    );
-    for (const entry of jsonOf(read) as Array<{ content: unknown }>) {
-      expect(entry.content).toEqual(ended.content);
-    }
-  });
 
-  it('the second recorded call is recorded while the first waits', async () => {
-    await s.attach();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const [first, second] = stepStackVariables(set, s.handle());
-    expect(await within(s.call(first[0], first[1]))).toEqual({ content: [] });
-    // The first call's answer waits for the envelope; the second records now.
-    expect(await within(s.call(second[0], second[1]))).toEqual({
-      content: [],
-    });
-    const summary = jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))));
-    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
-    expect(s.stopConnection().envelopes[0]?.parts).toHaveLength(2);
-  });
-
-  it(`${NAMES.end[set]} keeps the answers by number, switches the mode off and leaves the stop as it was, also when a step's answer says the program ended`, async () => {
-    await s.attach();
-    const session = s.instance.abap as unknown as {
-      current?: { connection: unknown; view: unknown };
-    };
-    const stopBefore = session.current;
-    const viewBefore = structuredClone(stopBefore?.view);
-    s.part.answer = (inner) =>
-      inner.url.includes('method=stepOver')
-        ? { status: 500, headers: XML, body: ENDED }
-        : debuggerPart(inner);
-    await s.call(NAMES.begin[set], beginArgs(set));
-    for (const [tool, args] of stepStackVariables(set, s.handle())) {
-      expect(await within(s.call(tool, args))).toEqual({ content: [] });
-    }
-    const summary = jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))));
-    expect(summary).toEqual({ recorded: 3, sent: 3, received: 3 });
-    expect(s.owner.mode()).toBe('off');
-    const answers = await answersOf(s, set, [1, 2, 3]);
-    expect(answers.map((a) => a.number)).toEqual([1, 2, 3]);
-    expect(answers.every((a) => a.isError !== true)).toBe(true);
-    expect(JSON.parse(answers[0]?.content[0].text)).toMatchObject({
-      state: 'ended',
-      reason: 'debuggee_ended',
-    });
-    expect(answers[1]?.content[0].text).toContain('frames');
-    expect(answers[2]?.content[0].text).toContain('LV_COUNTER');
-    // The stop as it was: the same stop, the same view, its connection open.
-    expect(session.current).toBe(stopBefore);
-    expect(session.current?.view).toEqual(viewBefore);
-    expect(s.stopConnection().connection.disconnect).not.toHaveBeenCalled();
-  });
-
-  it("after the end the debug session opens from the call's own connection, and an ordinary debugger call that opens a connection succeeds", async () => {
-    await s.attach();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const [step] = stepStackVariables(set, s.handle());
-    expect(await within(s.call(step[0], step[1]))).toEqual({ content: [] });
-    await settled(s.call(NAMES.end[set], endArgs(set)));
-    // The sessions' origin is the recorded call's own context: an open
-    // before any other call binds them goes from the instance's connection.
-    const session = s.instance.abap as unknown as {
-      open(): Promise<unknown>;
-    };
-    await expect(session.open()).resolves.toBeDefined();
-    const openedBefore = s.opened.length;
-    const answer = await settled(
-      set === 'full'
-        ? s.call('DebugSetBreakpoints', {
-            state_handle: s.handle(),
-            breakpoints: [{ kind: 'statement', statement: 'WRITE' }],
-          })
-        : s.call('HandlerDebugSession', {
-            state_handle: s.handle(),
-            kind: 'abap',
-            operation: 'checkListener',
-          }),
-    );
-    expect(textOf(answer)).not.toContain(OPENED_FROM_ELSEWHERE);
-    expect(answer.isError).not.toBe(true);
-    expect(s.opened.length).toBe(openedBefore + 1);
-  });
-
-  it('begin while the debugger batch is open is refused batch_mode_on', async () => {
-    await s.attach();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const again = await s.call(NAMES.begin[set], beginArgs(set));
-    expect(again.isError).toBe(true);
-    expect(jsonOf(again)).toEqual({
-      error: 'batch_mode_on',
-      message: BATCH_MODE_ON_WORDS,
-    });
-    expect(s.owner.mode()).toBe('debugger');
-  });
-
-  // Batch mode is the compact sets': the full set serves no communication
-  // batch to meet the debugger batch.
-  if (set === 'compact') {
-    it('begin of either batch refused while the other is open', async () => {
+    it(`${set === 'full' ? 'DebugBatchEnd' : 'HandlerDebugBatch end'} sends exactly one envelope`, async () => {
       await s.attach();
-      const communication = {
-        begin: ['HandlerBatch', { action: 'begin' }],
-        end: ['HandlerBatch', { action: 'end' }],
-      };
-      await s.call(NAMES.begin[set], beginArgs(set));
-      const other = await s.call(
-        communication.begin[0] as string,
-        communication.begin[1] as Record<string, unknown>,
+      assert.notEqual(
+        (await s.call(NAMES.begin[set], beginArgs(set))).isError,
+        true,
       );
-      expect(other.isError).toBe(true);
-      expect(jsonOf(other)).toEqual({
-        error: 'batch_mode_other',
-        message: BATCH_MODE_OTHER_WORDS,
+      for (const [tool, args] of stepStackVariables(set, s.handle())) {
+        assert.deepStrictEqual(await within(s.call(tool, args)), {
+          content: [],
+        });
+      }
+      const ended = await settled(s.call(NAMES.end[set], endArgs(set)));
+      assert.notEqual(ended.isError, true);
+      const envelopes = s.opened.flatMap((fake) => fake.envelopes);
+      assert.equal(envelopes.length, 1);
+      assert.equal(s.main.envelopes.length, 0);
+    });
+
+    it('begin needs an ABAP stop', async () => {
+      const answer = await s.call(NAMES.begin[set], beginArgs(set));
+      assert.equal(answer.isError, true);
+      assert.ok(textOf(answer).includes('no debuggee is stopped'));
+      assert.equal(s.owner.mode(), 'off');
+    });
+
+    it("step + stack + variables recorded into one debugger envelope on the stop's connection", async () => {
+      await s.attach();
+      const begun = await s.call(NAMES.begin[set], beginArgs(set));
+      assert.deepStrictEqual(jsonOf(begun), {
+        debug_batch: 'on',
+        state_handle: s.handle(),
       });
-      expect(s.owner.mode()).toBe('debugger');
+      const sentBefore = s.opened.map((fake) => fake.directs.length);
+      for (const [tool, args] of stepStackVariables(set, s.handle())) {
+        assert.deepStrictEqual(await within(s.call(tool, args)), {
+          content: [],
+        });
+      }
+      // Recorded, never sent: no request left any connection.
+      assert.deepStrictEqual(
+        s.opened.map((fake) => fake.directs.length),
+        sentBefore,
+      );
+      assert.equal(s.opened.flatMap((fake) => fake.envelopes).length, 0);
       await settled(s.call(NAMES.end[set], endArgs(set)));
-      await s.call(
-        communication.begin[0] as string,
-        communication.begin[1] as Record<string, unknown>,
+      const stop = s.stopConnection();
+      assert.equal(stop.envelopes.length, 1);
+      const [envelope] = stop.envelopes;
+      assert.equal(envelope?.url, '/sap/bc/adt/debugger/batch');
+      assert.equal(envelope?.session, 'stateful');
+      assert.deepStrictEqual(
+        envelope?.parts.map((p) => `${p.method} ${p.url}`),
+        [
+          'POST /sap/bc/adt/debugger?method=stepOver',
+          'GET /sap/bc/adt/debugger/stack?emode=_&semanticURIs=true',
+          'POST /sap/bc/adt/debugger?method=getVariables',
+        ],
       );
-      expect(s.owner.mode()).toBe('communication');
-      const debug = await s.call(NAMES.begin[set], beginArgs(set));
-      expect(debug.isError).toBe(true);
-      expect(jsonOf(debug)).toEqual({
-        error: 'batch_mode_other',
-        message: BATCH_MODE_OTHER_WORDS,
-      });
-      expect(s.owner.mode()).toBe('communication');
+      // The stop's connection, nothing on any other.
+      for (const fake of s.opened)
+        if (fake !== stop) assert.equal(fake.envelopes.length, 0);
+      assert.equal(s.main.envelopes.length, 0);
     });
 
-    it('begin while the communication batch is open is refused batch_mode_other, with no stop too', async () => {
-      await s.call('HandlerBatch', { action: 'begin' });
-      const debug = await s.call(NAMES.begin[set], beginArgs(set));
-      expect(jsonOf(debug)).toEqual({
-        error: 'batch_mode_other',
-        message: BATCH_MODE_OTHER_WORDS,
+    it(`${NAMES.end[set]} answered with fewer parts than requests: batch_parts_mismatch, no map, every number answers it`, async () => {
+      await s.attach();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      for (const [tool, args] of stepStackVariables(set, s.handle())) {
+        assert.deepStrictEqual(await within(s.call(tool, args)), {
+          content: [],
+        });
+      }
+      s.envelope.answer = (parts) =>
+        envelopeResponse(parts.slice(0, 2).map(debuggerPart));
+      const ended = await settled(s.call(NAMES.end[set], endArgs(set)));
+      assert.equal(ended.isError, true);
+      assert.deepStrictEqual(jsonOf(ended), {
+        error: 'batch_parts_mismatch',
+        message: batchPartsMismatchWords(2, 3),
       });
-      expect(s.owner.mode()).toBe('communication');
+      assert.equal(s.owner.mode(), 'off');
+      const read = await s.call(
+        set === 'compact' ? 'HandlerDebugBatch' : 'DebugBatchAnswers',
+        set === 'compact'
+          ? { action: 'answers', numbers: [1, 2, 3] }
+          : { numbers: [1, 2, 3] },
+      );
+      for (const entry of jsonOf(read) as Array<{ content: unknown }>) {
+        assert.deepStrictEqual(entry.content, ended.content);
+      }
     });
-  }
 
-  it('breakpoint and listener tools refused while open', async () => {
-    await s.attach();
-    await s.call(NAMES.begin[set], beginArgs(set));
-    const handle = s.handle();
-    const refused: Array<[string, Record<string, unknown>]> =
-      set === 'full'
-        ? [
-            [
-              'DebugSetBreakpoints',
-              {
-                state_handle: handle,
-                breakpoints: [{ kind: 'statement', statement: 'WRITE' }],
-              },
-            ],
-            ['DebugListBreakpoints', { state_handle: handle }],
-            ['DebugWait', { state_handle: handle }],
-            ['DebugStep', { state_handle: handle, action: 'detach' }],
-          ]
-        : [
-            [
-              'HandlerDebugBreakpoints',
-              {
-                state_handle: handle,
-                kind: 'abap',
-                operation: 'setBreakpoints',
-                breakpoints: [{ statement: 'WRITE' }],
-              },
-            ],
-            [
-              'HandlerDebugSession',
-              {
-                state_handle: handle,
-                kind: 'abap',
-                operation: 'listen',
-                hold_seconds: 1,
-              },
-            ],
-            [
-              'HandlerDebugMaintain',
-              {
-                state_handle: handle,
-                kind: 'abap',
-                operation: 'getMemorySizes',
-              },
-            ],
-          ];
-    const sentBefore = s.opened.map((fake) => fake.directs.length);
-    for (const [tool, args] of refused) {
-      const answer = await s.call(tool, args);
-      expect(answer.isError).toBe(true);
-      expect(jsonOf(answer)).toEqual({
-        error: 'batch_not_recordable',
-        message: batchNotServedWords(tool),
+    it('the second recorded call is recorded while the first waits', async () => {
+      await s.attach();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      const [first, second] = stepStackVariables(set, s.handle());
+      assert.deepStrictEqual(await within(s.call(first[0], first[1])), {
+        content: [],
+      });
+      // The first call's answer waits for the envelope; the second records now.
+      assert.deepStrictEqual(await within(s.call(second[0], second[1])), {
+        content: [],
+      });
+      const summary = jsonOf(
+        await settled(s.call(NAMES.end[set], endArgs(set))),
+      );
+      assert.deepStrictEqual(summary, { recorded: 2, sent: 2, received: 2 });
+      assert.equal(s.stopConnection().envelopes[0]?.parts.length, 2);
+    });
+
+    it(`${NAMES.end[set]} keeps the answers by number, switches the mode off and leaves the stop as it was, also when a step's answer says the program ended`, async () => {
+      await s.attach();
+      const session = s.instance.abap as unknown as {
+        current?: { connection: unknown; view: unknown };
+      };
+      const stopBefore = session.current;
+      const viewBefore = structuredClone(stopBefore?.view);
+      s.part.answer = (inner) =>
+        inner.url.includes('method=stepOver')
+          ? { status: 500, headers: XML, body: ENDED }
+          : debuggerPart(inner);
+      await s.call(NAMES.begin[set], beginArgs(set));
+      for (const [tool, args] of stepStackVariables(set, s.handle())) {
+        assert.deepStrictEqual(await within(s.call(tool, args)), {
+          content: [],
+        });
+      }
+      const summary = jsonOf(
+        await settled(s.call(NAMES.end[set], endArgs(set))),
+      );
+      assert.deepStrictEqual(summary, { recorded: 3, sent: 3, received: 3 });
+      assert.equal(s.owner.mode(), 'off');
+      const answers = await answersOf(s, set, [1, 2, 3]);
+      assert.deepStrictEqual(
+        answers.map((a) => a.number),
+        [1, 2, 3],
+      );
+      assert.equal(
+        answers.every((a) => a.isError !== true),
+        true,
+      );
+      assertMatchObject(JSON.parse(answers[0]?.content[0].text), {
+        state: 'ended',
+        reason: 'debuggee_ended',
+      });
+      assert.ok(answers[1]?.content[0].text.includes('frames'));
+      assert.ok(answers[2]?.content[0].text.includes('LV_COUNTER'));
+      // The stop as it was: the same stop, the same view, its connection open.
+      assert.equal(session.current, stopBefore);
+      assert.deepStrictEqual(session.current?.view, viewBefore);
+      assert.equal(s.stopConnection().calls.disconnect, 0);
+    });
+
+    it("after the end the debug session opens from the call's own connection, and an ordinary debugger call that opens a connection succeeds", async () => {
+      await s.attach();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      const [step] = stepStackVariables(set, s.handle());
+      assert.deepStrictEqual(await within(s.call(step[0], step[1])), {
+        content: [],
+      });
+      await settled(s.call(NAMES.end[set], endArgs(set)));
+      // The sessions' origin is the recorded call's own context: an open
+      // before any other call binds them goes from the instance's connection.
+      const session = s.instance.abap as unknown as {
+        open(): Promise<unknown>;
+      };
+      assert.notEqual(await session.open(), undefined);
+      const openedBefore = s.opened.length;
+      const answer = await settled(
+        set === 'full'
+          ? s.call('DebugSetBreakpoints', {
+              state_handle: s.handle(),
+              breakpoints: [{ kind: 'statement', statement: 'WRITE' }],
+            })
+          : s.call('HandlerDebugSession', {
+              state_handle: s.handle(),
+              kind: 'abap',
+              operation: 'checkListener',
+            }),
+      );
+      assert.ok(!textOf(answer).includes(OPENED_FROM_ELSEWHERE));
+      assert.notEqual(answer.isError, true);
+      assert.equal(s.opened.length, openedBefore + 1);
+    });
+
+    it('begin while the debugger batch is open is refused batch_mode_on', async () => {
+      await s.attach();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      const again = await s.call(NAMES.begin[set], beginArgs(set));
+      assert.equal(again.isError, true);
+      assert.deepStrictEqual(jsonOf(again), {
+        error: 'batch_mode_on',
+        message: BATCH_MODE_ON_WORDS,
+      });
+      assert.equal(s.owner.mode(), 'debugger');
+    });
+
+    // Batch mode is the compact sets': the full set serves no communication
+    // batch to meet the debugger batch.
+    if (set === 'compact') {
+      it('begin of either batch refused while the other is open', async () => {
+        await s.attach();
+        const communication = {
+          begin: ['HandlerBatch', { action: 'begin' }],
+          end: ['HandlerBatch', { action: 'end' }],
+        };
+        await s.call(NAMES.begin[set], beginArgs(set));
+        const other = await s.call(
+          communication.begin[0] as string,
+          communication.begin[1] as Record<string, unknown>,
+        );
+        assert.equal(other.isError, true);
+        assert.deepStrictEqual(jsonOf(other), {
+          error: 'batch_mode_other',
+          message: BATCH_MODE_OTHER_WORDS,
+        });
+        assert.equal(s.owner.mode(), 'debugger');
+        await settled(s.call(NAMES.end[set], endArgs(set)));
+        await s.call(
+          communication.begin[0] as string,
+          communication.begin[1] as Record<string, unknown>,
+        );
+        assert.equal(s.owner.mode(), 'communication');
+        const debug = await s.call(NAMES.begin[set], beginArgs(set));
+        assert.equal(debug.isError, true);
+        assert.deepStrictEqual(jsonOf(debug), {
+          error: 'batch_mode_other',
+          message: BATCH_MODE_OTHER_WORDS,
+        });
+        assert.equal(s.owner.mode(), 'communication');
+      });
+
+      it('begin while the communication batch is open is refused batch_mode_other, with no stop too', async () => {
+        await s.call('HandlerBatch', { action: 'begin' });
+        const debug = await s.call(NAMES.begin[set], beginArgs(set));
+        assert.deepStrictEqual(jsonOf(debug), {
+          error: 'batch_mode_other',
+          message: BATCH_MODE_OTHER_WORDS,
+        });
+        assert.equal(s.owner.mode(), 'communication');
       });
     }
-    expect(s.opened.map((fake) => fake.directs.length)).toEqual(sentBefore);
-    expect(jsonOf(await settled(s.call(NAMES.end[set], endArgs(set))))).toEqual(
-      {
-        recorded: 0,
-        sent: 0,
-        received: 0,
-      },
-    );
-    expect(s.opened.flatMap((fake) => fake.envelopes)).toHaveLength(0);
+
+    it('breakpoint and listener tools refused while open', async () => {
+      await s.attach();
+      await s.call(NAMES.begin[set], beginArgs(set));
+      const handle = s.handle();
+      const refused: Array<[string, Record<string, unknown>]> =
+        set === 'full'
+          ? [
+              [
+                'DebugSetBreakpoints',
+                {
+                  state_handle: handle,
+                  breakpoints: [{ kind: 'statement', statement: 'WRITE' }],
+                },
+              ],
+              ['DebugListBreakpoints', { state_handle: handle }],
+              ['DebugWait', { state_handle: handle }],
+              ['DebugStep', { state_handle: handle, action: 'detach' }],
+            ]
+          : [
+              [
+                'HandlerDebugBreakpoints',
+                {
+                  state_handle: handle,
+                  kind: 'abap',
+                  operation: 'setBreakpoints',
+                  breakpoints: [{ statement: 'WRITE' }],
+                },
+              ],
+              [
+                'HandlerDebugSession',
+                {
+                  state_handle: handle,
+                  kind: 'abap',
+                  operation: 'listen',
+                  hold_seconds: 1,
+                },
+              ],
+              [
+                'HandlerDebugMaintain',
+                {
+                  state_handle: handle,
+                  kind: 'abap',
+                  operation: 'getMemorySizes',
+                },
+              ],
+            ];
+      const sentBefore = s.opened.map((fake) => fake.directs.length);
+      for (const [tool, args] of refused) {
+        const answer = await s.call(tool, args);
+        assert.equal(answer.isError, true);
+        assert.deepStrictEqual(jsonOf(answer), {
+          error: 'batch_not_recordable',
+          message: batchNotServedWords(tool),
+        });
+      }
+      assert.deepStrictEqual(
+        s.opened.map((fake) => fake.directs.length),
+        sentBefore,
+      );
+      assert.deepStrictEqual(
+        jsonOf(await settled(s.call(NAMES.end[set], endArgs(set)))),
+        {
+          recorded: 0,
+          sent: 0,
+          received: 0,
+        },
+      );
+      assert.equal(s.opened.flatMap((fake) => fake.envelopes).length, 0);
+    });
   });
-});
+}
 
 describe('a complete DebugStop ends the debugger batch answers with the debug state', () => {
   it('after the end the answers are kept; DebugStop drops them: nothing held, the handle answers not available', async () => {
@@ -633,16 +673,16 @@ describe('a complete DebugStop ends the debugger batch answers with the debug st
       await s.call('DebugBatchBegin', {});
       await within(s.call('DebugGetStack', { state_handle: handle }));
       await settled(s.call('DebugBatchEnd', {}));
-      expect(s.owner.holdsState()).toBe(true);
+      assert.equal(s.owner.holdsState(), true);
       const stopped = await settled(
         s.call('DebugStop', { state_handle: handle }),
       );
-      expect(stopped.isError).not.toBe(true);
-      expect(s.owner.holdsState()).toBe(false);
-      expect(s.holds()).toBe(false);
+      assert.notEqual(stopped.isError, true);
+      assert.equal(s.owner.holdsState(), false);
+      assert.equal(s.holds(), false);
       const after = await s.call('DebugGetStack', { state_handle: handle });
-      expect(after.isError).toBe(true);
-      expect(textOf(after)).toContain('state is not available');
+      assert.equal(after.isError, true);
+      assert.ok(textOf(after).includes('state is not available'));
     } finally {
       await s.close();
     }
@@ -726,40 +766,56 @@ const RECORD_PATHS: Array<{
   },
 ];
 
-describe.each(SETS)('every record path, %s set', (set) => {
-  it.each(RECORD_PATHS.map((p) => [p.path, p] as const))(
-    '%s records exactly its one request into the envelope',
-    async (_path, p) => {
-      const s = await stand(set);
-      try {
-        await s.attach();
-        await s.call(NAMES.begin[set], beginArgs(set));
-        const sentBefore = s.opened.map((fake) => fake.directs.length);
-        const [tool, args] = p[set];
-        expect(
-          await within(s.call(tool, { state_handle: s.handle(), ...args })),
-        ).toEqual({ content: [] });
-        // Recorded, never sent on its own.
-        expect(s.opened.map((fake) => fake.directs.length)).toEqual(sentBefore);
-        const summary = jsonOf(
-          await settled(s.call(NAMES.end[set], endArgs(set))),
-        );
-        expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
-        const envelopes = s.opened.flatMap((fake) => fake.envelopes);
-        expect(envelopes).toHaveLength(1);
-        const parts = (envelopes[0]?.parts ?? []).map(
-          (part) => `${part.method} ${part.url}`,
-        );
-        expect(parts).toHaveLength(1);
-        if (typeof p.request === 'string') expect(parts[0]).toBe(p.request);
-        else expect(parts[0]).toMatch(p.request);
-        expect(s.opened.map((fake) => fake.directs.length)).toEqual(sentBefore);
-      } finally {
-        await s.close();
-      }
-    },
-  );
-});
+for (const set of SETS) {
+  describe(format('every record path, %s set', set), () => {
+    for (const [_path, p] of RECORD_PATHS.map((p) => [p.path, p] as const)) {
+      it(
+        format('%s records exactly its one request into the envelope', _path),
+        async () => {
+          const s = await stand(set);
+          try {
+            await s.attach();
+            await s.call(NAMES.begin[set], beginArgs(set));
+            const sentBefore = s.opened.map((fake) => fake.directs.length);
+            const [tool, args] = p[set];
+            assert.deepStrictEqual(
+              await within(s.call(tool, { state_handle: s.handle(), ...args })),
+              { content: [] },
+            );
+            // Recorded, never sent on its own.
+            assert.deepStrictEqual(
+              s.opened.map((fake) => fake.directs.length),
+              sentBefore,
+            );
+            const summary = jsonOf(
+              await settled(s.call(NAMES.end[set], endArgs(set))),
+            );
+            assert.deepStrictEqual(summary, {
+              recorded: 1,
+              sent: 1,
+              received: 1,
+            });
+            const envelopes = s.opened.flatMap((fake) => fake.envelopes);
+            assert.equal(envelopes.length, 1);
+            const parts = (envelopes[0]?.parts ?? []).map(
+              (part) => `${part.method} ${part.url}`,
+            );
+            assert.equal(parts.length, 1);
+            if (typeof p.request === 'string')
+              assert.equal(parts[0], p.request);
+            else assert.match(parts[0] ?? '', p.request);
+            assert.deepStrictEqual(
+              s.opened.map((fake) => fake.directs.length),
+              sentBefore,
+            );
+          } finally {
+            await s.close();
+          }
+        },
+      );
+    }
+  });
+}
 
 describe('the debugger batch, compact step to line', () => {
   it('step to line without object_type/object_name refused', async () => {
@@ -778,16 +834,19 @@ describe('the debugger batch, compact step to line', () => {
         };
         delete args[missing];
         const answer = await s.call('HandlerDebugStep', args);
-        expect(answer.isError).toBe(true);
-        expect(textOf(answer)).toContain(
-          'object_type, object_name and line: needed for stepRunToLine',
+        assert.equal(answer.isError, true);
+        assert.ok(
+          textOf(answer).includes(
+            'object_type, object_name and line: needed for stepRunToLine',
+          ),
         );
       }
       // Refused before anything was recorded: no number, nothing sent.
-      expect(
+      assert.deepStrictEqual(
         jsonOf(await s.call('HandlerDebugBatch', { action: 'end' })),
-      ).toEqual({ recorded: 0, sent: 0, received: 0 });
-      expect(s.opened.flatMap((fake) => fake.envelopes)).toHaveLength(0);
+        { recorded: 0, sent: 0, received: 0 },
+      );
+      assert.equal(s.opened.flatMap((fake) => fake.envelopes).length, 0);
     } finally {
       await s.close();
     }
@@ -823,20 +882,20 @@ describe('which sets serve the debugger batch tools', () => {
           dataTools: false,
         }),
       );
-      expect(full.has('DebugBatchBegin')).toBe(true);
-      expect(full.has('DebugBatchEnd')).toBe(true);
+      assert.equal(full.has('DebugBatchBegin'), true);
+      assert.equal(full.has('DebugBatchEnd'), true);
       // The full set's reader of the debugger batch's answers.
-      expect(full.has('DebugBatchAnswers')).toBe(true);
-      expect(full.has('HandlerDebugBatch')).toBe(false);
-      expect(compact.has('HandlerDebugBatch')).toBe(true);
-      expect(compact.has('DebugBatchBegin')).toBe(false);
-      expect(compact.has('DebugBatchEnd')).toBe(false);
-      expect(compact.has('DebugBatchAnswers')).toBe(false);
+      assert.equal(full.has('DebugBatchAnswers'), true);
+      assert.equal(full.has('HandlerDebugBatch'), false);
+      assert.equal(compact.has('HandlerDebugBatch'), true);
+      assert.equal(compact.has('DebugBatchBegin'), false);
+      assert.equal(compact.has('DebugBatchEnd'), false);
+      assert.equal(compact.has('DebugBatchAnswers'), false);
       for (const ro of [fullRo, compactRo]) {
-        expect(ro.has('DebugBatchBegin')).toBe(false);
-        expect(ro.has('DebugBatchEnd')).toBe(false);
-        expect(ro.has('DebugBatchAnswers')).toBe(false);
-        expect(ro.has('HandlerDebugBatch')).toBe(false);
+        assert.equal(ro.has('DebugBatchBegin'), false);
+        assert.equal(ro.has('DebugBatchEnd'), false);
+        assert.equal(ro.has('DebugBatchAnswers'), false);
+        assert.equal(ro.has('HandlerDebugBatch'), false);
       }
     }
   });
@@ -848,12 +907,12 @@ describe("DebugBatchAnswers, the full set's reader of the debugger batch", () =>
   );
 
   it('works on no connection and takes number or numbers, each at least 1', () => {
-    expect(entry?.connectionless).toBe(true);
+    assert.equal(entry?.connectionless, true);
     const schema = DebugBatchAnswers_Tool.inputSchema;
-    expect(schema.safeParse({ number: 1 }).success).toBe(true);
-    expect(schema.safeParse({ numbers: [1, 2] }).success).toBe(true);
-    expect(schema.safeParse({ number: 0 }).success).toBe(false);
-    expect(schema.safeParse({ numbers: [] }).success).toBe(false);
+    assert.equal(schema.safeParse({ number: 1 }).success, true);
+    assert.equal(schema.safeParse({ numbers: [1, 2] }).success, true);
+    assert.equal(schema.safeParse({ number: 0 }).success, false);
+    assert.equal(schema.safeParse({ numbers: [] }).success, false);
   });
 
   it("means what HandlerDebugBatch's answers action means, in the same words", () => {
@@ -861,23 +920,26 @@ describe("DebugBatchAnswers, the full set's reader of the debugger batch", () =>
       '[read-only] [debug] ',
       '',
     );
-    expect(HANDLER_DEBUG_BATCH_DESCRIPTION).toContain(
-      `action 'answers' (with number or numbers): ${words}`,
+    assert.ok(
+      HANDLER_DEBUG_BATCH_DESCRIPTION.includes(
+        `action 'answers' (with number or numbers): ${words}`,
+      ),
     );
   });
 });
 
 describe('the end of the debugger batch', () => {
   it("DebugBatchEnd and HandlerDebugBatch with action 'end' end the debugger batch; with numbers it ends none", () => {
-    expect(endsBatch('DebugBatchEnd', {})).toBe('debugger');
-    expect(endsBatch('HandlerDebugBatch', { action: 'end' })).toBe('debugger');
-    expect(endsBatch('HandlerDebugBatch', { action: 'end', number: 1 })).toBe(
+    assert.equal(endsBatch('DebugBatchEnd', {}), 'debugger');
+    assert.equal(endsBatch('HandlerDebugBatch', { action: 'end' }), 'debugger');
+    assert.equal(
+      endsBatch('HandlerDebugBatch', { action: 'end', number: 1 }),
       undefined,
     );
     for (const action of ['begin', 'answers', undefined]) {
-      expect(endsBatch('HandlerDebugBatch', { action })).toBe(undefined);
+      assert.equal(endsBatch('HandlerDebugBatch', { action }), undefined);
     }
-    expect(endsBatch('HandlerBatch', { action: 'end' })).toBe('communication');
+    assert.equal(endsBatch('HandlerBatch', { action: 'end' }), 'communication');
   });
 
   it("HandlerDebugBatch action 'end' with a number is refused and the batch stays open", async () => {
@@ -888,9 +950,9 @@ describe('the end of the debugger batch', () => {
       const answer = await settled(
         s.call('HandlerDebugBatch', { action: 'end', number: 1 }),
       );
-      expect(answer.isError).toBe(true);
-      expect(textOf(answer)).toContain(NUMBER_WITHOUT_ANSWERS_WORDS);
-      expect(s.owner.mode()).toBe('debugger');
+      assert.equal(answer.isError, true);
+      assert.ok(textOf(answer).includes(NUMBER_WITHOUT_ANSWERS_WORDS));
+      assert.equal(s.owner.mode(), 'debugger');
     } finally {
       await s.close();
     }

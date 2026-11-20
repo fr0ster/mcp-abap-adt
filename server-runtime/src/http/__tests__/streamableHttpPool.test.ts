@@ -1,3 +1,13 @@
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
 /**
  * Over real HTTP, every request its own MCP session: the pool keeps the
@@ -125,284 +135,305 @@ async function until(cond: () => boolean, label: string) {
   if (!cond()) throw new Error(`never: ${label}`);
 }
 
-describe.each([
+for (const [_mode, enableJsonResponse] of [
   ['JSON', true],
   ['SSE', false],
-] as const)(
-  'StreamableHttpServer pool over real HTTP (%s)',
-  (_mode, enableJsonResponse) => {
-    let server: StreamableHttpServer;
-    let url: URL;
-    let previousType: string | undefined;
+] as const) {
+  describe(
+    format('StreamableHttpServer pool over real HTTP (%s)', _mode),
+    () => {
+      let server: StreamableHttpServer;
+      let url: URL;
+      let previousType: string | undefined;
 
-    beforeEach(async () => {
-      jest.spyOn(console, 'error').mockImplementation(() => {});
-      jest
-        .spyOn(BaseMcpServer.prototype as never, 'getConnection')
-        .mockResolvedValue(withSystemInformation() as never);
-      previousType = process.env.SAP_SYSTEM_TYPE;
-      process.env.SAP_SYSTEM_TYPE = 'onprem'; // the stub's lookup answers 404
-      currentGate = gate();
-      gateEntered = gate();
-      server = new StreamableHttpServer(probes, {
-        host: '127.0.0.1',
-        port: 0,
-        enableJsonResponse,
+      /** The logons: BaseMcpServer's getConnection, replaced for each test. */
+      let getConnection: Mock<() => Promise<unknown>>;
+
+      beforeEach(async () => {
+        mock.method(console, 'error', () => {});
+        const connection = withSystemInformation();
+        getConnection = mock.method(
+          BaseMcpServer.prototype as unknown as {
+            getConnection(): Promise<unknown>;
+          },
+          'getConnection',
+          async () => connection,
+        );
+        previousType = process.env.SAP_SYSTEM_TYPE;
+        process.env.SAP_SYSTEM_TYPE = 'onprem'; // the stub's lookup answers 404
+        currentGate = gate();
+        gateEntered = gate();
+        server = new StreamableHttpServer(probes, {
+          host: '127.0.0.1',
+          port: 0,
+          enableJsonResponse,
+        });
+        await server.start();
+        const { port } = (
+          server as unknown as { standaloneServer: { address(): AddressInfo } }
+        ).standaloneServer.address();
+        url = new URL(`http://127.0.0.1:${port}/mcp/stream/http`);
       });
-      await server.start();
-      const { port } = (
-        server as unknown as { standaloneServer: { address(): AddressInfo } }
-      ).standaloneServer.address();
-      url = new URL(`http://127.0.0.1:${port}/mcp/stream/http`);
-    });
 
-    afterEach(async () => {
-      currentGate.open();
-      await server.stop().catch(() => undefined);
-      if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
-      else process.env.SAP_SYSTEM_TYPE = previousType;
-      jest.restoreAllMocks();
-    });
-
-    const poolSize = () =>
-      (server as unknown as { pool: { size(): number } }).pool.size();
-
-    /** One call, its own client and its own MCP session. */
-    async function call(name: string, args: Args = {}, signal?: AbortSignal) {
-      const transport = new StreamableHTTPClientTransport(url, {
-        requestInit: { headers: CREDENTIALS },
-        fetch: (input, init) => {
-          const own = signal ?? init?.signal;
-          return fetch(input, {
-            ...init,
-            ...(own !== undefined && { signal: own }),
-          });
-        },
+      afterEach(async () => {
+        currentGate.open();
+        await server.stop().catch(() => undefined);
+        if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
+        else process.env.SAP_SYSTEM_TYPE = previousType;
+        mock.restoreAll();
       });
-      const client = new Client({ name: 'pool-test', version: '1.0.0' });
-      await client.connect(clientTransport(transport));
-      try {
-        const result = (await client.callTool({ name, arguments: args })) as {
-          content: Array<{ text: string }>;
-          isError?: boolean;
-        };
-        return {
-          text: result.content[0]?.text ?? '',
-          isError: !!result.isError,
-        };
-      } finally {
-        await client.close().catch(() => undefined);
-      }
-    }
 
-    async function hold(): Promise<string> {
-      const r = await call('PoolProbeHold');
-      if (r.isError) throw new Error(r.text); // the payload, not a bare boolean
-      return JSON.parse(r.text).state_handle;
-    }
+      const poolSize = () =>
+        (server as unknown as { pool: { size(): number } }).pool.size();
 
-    it('the handle comes back to the same instance', async () => {
-      const handle = await hold();
-      expect(handle).toMatch(/^[0-9A-F]{32}$/);
-      expect(await call('PoolProbeEcho', { state_handle: handle })).toEqual({
-        text: handle,
-        isError: false,
-      });
-      expect(poolSize()).toBe(1);
-    });
-
-    it('another handle is not available', async () => {
-      await hold();
-      const r = await call('PoolProbeEcho', { state_handle: 'F'.repeat(32) });
-      expect(r.isError).toBe(true);
-      expect(r.text).toContain('state is not available');
-    });
-
-    it('a second request for the handle waits for the lease', async () => {
-      const handle = await hold();
-      const gated = call('PoolProbeGate', { state_handle: handle });
-      await gateEntered.p;
-      let echoed = false;
-      const echo = call('PoolProbeEcho', { state_handle: handle }).then((r) => {
-        echoed = true;
-        return r;
-      });
-      for (let i = 0; i < 50; i++) await tick();
-      expect(echoed).toBe(false);
-      currentGate.open();
-      expect(await gated).toEqual({ text: handle, isError: false });
-      expect(await echo).toEqual({ text: handle, isError: false });
-    });
-
-    it('released state: the old handle is not available, and the pool is empty', async () => {
-      const handle = await hold();
-      expect(
-        (await call('PoolProbeRelease', { state_handle: handle })).isError,
-      ).toBe(false);
-      const r = await call('PoolProbeEcho', { state_handle: handle });
-      expect(r.isError).toBe(true);
-      expect(r.text).toContain('state is not available');
-      expect(poolSize()).toBe(0);
-    });
-
-    it('a client that disconnects during a held request: its transport closes at once, the lease lasts until the handler settled', async () => {
-      const handle = await hold();
-      const closeSpy = jest.spyOn(
-        StreamableHTTPServerTransport.prototype,
-        'close',
-      );
-      const abort = new AbortController();
-      const gated = call(
-        'PoolProbeGate',
-        { state_handle: handle },
-        abort.signal,
-      ).catch((e: unknown) => e);
-      await gateEntered.p;
-      const closesBefore = closeSpy.mock.calls.length;
-      abort.abort();
-      await until(
-        () => closeSpy.mock.calls.length > closesBefore,
-        'the server transport closed',
-      );
-      await gated;
-
-      let echoed = false;
-      const echo = call('PoolProbeEcho', { state_handle: handle }).then((r) => {
-        echoed = true;
-        return r;
-      });
-      for (let i = 0; i < 50; i++) await tick();
-      expect(echoed).toBe(false);
-      currentGate.open();
-      expect(await echo).toEqual({ text: handle, isError: false });
-    });
-
-    /** A tool call over its own client, the handle in `x-mcp-state-handle`; the logons it made. */
-    async function callWithHeader(
-      name: string,
-      handle: string,
-      args: Args = {},
-    ) {
-      const transport = new StreamableHTTPClientTransport(url, {
-        requestInit: {
-          headers: { ...CREDENTIALS, 'x-mcp-state-handle': handle },
-        },
-      });
-      const client = new Client({ name: 'pool-test', version: '1.0.0' });
-      await client.connect(clientTransport(transport));
-      try {
-        const result = (await client.callTool({ name, arguments: args })) as {
-          content: Array<{ text: string }>;
-          isError?: boolean;
-        };
-        return {
-          text: result.content[0]?.text ?? '',
-          isError: !!result.isError,
-        };
-      } finally {
-        await client.close().catch(() => undefined);
-      }
-    }
-    const logons = () =>
-      (
-        BaseMcpServer.prototype as unknown as {
-          getConnection: jest.Mock;
+      /** One call, its own client and its own MCP session. */
+      async function call(name: string, args: Args = {}, signal?: AbortSignal) {
+        const transport = new StreamableHTTPClientTransport(url, {
+          requestInit: { headers: CREDENTIALS },
+          fetch: (input, init) => {
+            const own = signal ?? init?.signal;
+            return fetch(input, {
+              ...init,
+              ...(own !== undefined && { signal: own }),
+            });
+          },
+        });
+        const client = new Client({ name: 'pool-test', version: '1.0.0' });
+        await client.connect(clientTransport(transport));
+        try {
+          const result = (await client.callTool({ name, arguments: args })) as {
+            content: Array<{ text: string }>;
+            isError?: boolean;
+          };
+          return {
+            text: result.content[0]?.text ?? '',
+            isError: !!result.isError,
+          };
+        } finally {
+          await client.close().catch(() => undefined);
         }
-      ).getConnection.mock.calls.length;
-    const instancesMade = () =>
-      jest.spyOn(
-        server as unknown as { createPerRequestServer: () => unknown },
-        'createPerRequestServer',
-      );
+      }
 
-    it.each([
-      ['an unknown handle', async () => 'F'.repeat(32)],
-      [
-        'the handle of a state that ended',
-        async () => {
-          const handle = await hold();
-          await call('PoolProbeRelease', { state_handle: handle });
-          return handle;
-        },
-      ],
-    ])(
-      '%s on a tool call: not available, answered by the pool — no logon',
-      async (_name, handleOf) => {
-        const handle = await handleOf();
-        const made = instancesMade();
+      async function hold(): Promise<string> {
+        const r = await call('PoolProbeHold');
+        if (r.isError) throw new Error(r.text); // the payload, not a bare boolean
+        return JSON.parse(r.text).state_handle;
+      }
+
+      it('the handle comes back to the same instance', async () => {
+        const handle = await hold();
+        assert.match(handle, /^[0-9A-F]{32}$/);
+        assert.deepStrictEqual(
+          await call('PoolProbeEcho', { state_handle: handle }),
+          {
+            text: handle,
+            isError: false,
+          },
+        );
+        assert.equal(poolSize(), 1);
+      });
+
+      it('another handle is not available', async () => {
+        await hold();
+        const r = await call('PoolProbeEcho', { state_handle: 'F'.repeat(32) });
+        assert.equal(r.isError, true);
+        assert.ok(r.text.includes('state is not available'));
+      });
+
+      it('a second request for the handle waits for the lease', async () => {
+        const handle = await hold();
+        const gated = call('PoolProbeGate', { state_handle: handle });
+        await gateEntered.p;
+        let echoed = false;
+        const echo = call('PoolProbeEcho', { state_handle: handle }).then(
+          (r) => {
+            echoed = true;
+            return r;
+          },
+        );
+        for (let i = 0; i < 50; i++) await tick();
+        assert.equal(echoed, false);
+        currentGate.open();
+        assert.deepStrictEqual(await gated, { text: handle, isError: false });
+        assert.deepStrictEqual(await echo, { text: handle, isError: false });
+      });
+
+      it('released state: the old handle is not available, and the pool is empty', async () => {
+        const handle = await hold();
+        assert.equal(
+          (await call('PoolProbeRelease', { state_handle: handle })).isError,
+          false,
+        );
+        const r = await call('PoolProbeEcho', { state_handle: handle });
+        assert.equal(r.isError, true);
+        assert.ok(r.text.includes('state is not available'));
+        assert.equal(poolSize(), 0);
+      });
+
+      it('a client that disconnects during a held request: its transport closes at once, the lease lasts until the handler settled', async (t) => {
+        const handle = await hold();
+        const closeSpy = t.mock.method(
+          StreamableHTTPServerTransport.prototype,
+          'close',
+        );
+        const abort = new AbortController();
+        const gated = call(
+          'PoolProbeGate',
+          { state_handle: handle },
+          abort.signal,
+        ).catch((e: unknown) => e);
+        await gateEntered.p;
+        const closesBefore = closeSpy.mock.calls.length;
+        abort.abort();
+        await until(
+          () => closeSpy.mock.calls.length > closesBefore,
+          'the server transport closed',
+        );
+        await gated;
+
+        let echoed = false;
+        const echo = call('PoolProbeEcho', { state_handle: handle }).then(
+          (r) => {
+            echoed = true;
+            return r;
+          },
+        );
+        for (let i = 0; i < 50; i++) await tick();
+        assert.equal(echoed, false);
+        currentGate.open();
+        assert.deepStrictEqual(await echo, { text: handle, isError: false });
+      });
+
+      /** A tool call over its own client, the handle in `x-mcp-state-handle`; the logons it made. */
+      async function callWithHeader(
+        name: string,
+        handle: string,
+        args: Args = {},
+      ) {
+        const transport = new StreamableHTTPClientTransport(url, {
+          requestInit: {
+            headers: { ...CREDENTIALS, 'x-mcp-state-handle': handle },
+          },
+        });
+        const client = new Client({ name: 'pool-test', version: '1.0.0' });
+        await client.connect(clientTransport(transport));
+        try {
+          const result = (await client.callTool({ name, arguments: args })) as {
+            content: Array<{ text: string }>;
+            isError?: boolean;
+          };
+          return {
+            text: result.content[0]?.text ?? '',
+            isError: !!result.isError,
+          };
+        } finally {
+          await client.close().catch(() => undefined);
+        }
+      }
+      const logons = () => getConnection.mock.callCount();
+      const instancesMade = () =>
+        mock.method(
+          server as unknown as { createPerRequestServer: () => unknown },
+          'createPerRequestServer',
+        );
+
+      for (const [_name, handleOf] of [
+        ['an unknown handle', async () => 'F'.repeat(32)],
+        [
+          'the handle of a state that ended',
+          async () => {
+            const handle = await hold();
+            await call('PoolProbeRelease', { state_handle: handle });
+            return handle;
+          },
+        ],
+      ] satisfies [string, () => Promise<string>][]) {
+        it(
+          format(
+            '%s on a tool call: not available, answered by the pool — no logon',
+            _name,
+          ),
+          async () => {
+            const handle = await handleOf();
+            const made = instancesMade();
+            const before = logons();
+            const byArgument = await call('PoolProbeEcho', {
+              state_handle: handle,
+            });
+            assert.deepStrictEqual(byArgument, {
+              text: 'state is not available',
+              isError: true,
+            });
+            const byHeader = await callWithHeader('PoolProbeEcho', handle, {
+              state_handle: handle,
+            });
+            assert.deepStrictEqual(byHeader, {
+              text: 'state is not available',
+              isError: true,
+            });
+            // No logon for either tool call: the pool answered them.
+            assert.equal(logons(), before);
+            made.mock.restore();
+          },
+        );
+      }
+
+      it('a JSON-RPC batch with a tool call and an unknown header handle: not available for each request, no logon', async () => {
         const before = logons();
-        const byArgument = await call('PoolProbeEcho', {
-          state_handle: handle,
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            ...CREDENTIALS,
+            'x-mcp-state-handle': 'F'.repeat(32),
+            'content-type': 'application/json',
+            accept: 'application/json, text/event-stream',
+          },
+          body: JSON.stringify([
+            {
+              jsonrpc: '2.0',
+              id: 7,
+              method: 'tools/call',
+              params: { name: 'PoolProbeHold', arguments: {} },
+            },
+          ]),
         });
-        expect(byArgument).toEqual({
-          text: 'state is not available',
-          isError: true,
-        });
-        const byHeader = await callWithHeader('PoolProbeEcho', handle, {
-          state_handle: handle,
-        });
-        expect(byHeader).toEqual({
-          text: 'state is not available',
-          isError: true,
-        });
-        // No logon for either tool call: the pool answered them.
-        expect(logons()).toBe(before);
-        made.mockRestore();
-      },
-    );
-
-    it('a JSON-RPC batch with a tool call and an unknown header handle: not available for each request, no logon', async () => {
-      const before = logons();
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          ...CREDENTIALS,
-          'x-mcp-state-handle': 'F'.repeat(32),
-          'content-type': 'application/json',
-          accept: 'application/json, text/event-stream',
-        },
-        body: JSON.stringify([
+        assert.equal(response.status, 200);
+        assert.deepStrictEqual(await response.json(), [
           {
             jsonrpc: '2.0',
             id: 7,
-            method: 'tools/call',
-            params: { name: 'PoolProbeHold', arguments: {} },
+            result: {
+              content: [{ type: 'text', text: 'state is not available' }],
+              isError: true,
+            },
           },
-        ]),
+        ]);
+        assert.equal(logons(), before);
       });
-      expect(response.status).toBe(200);
-      expect(await response.json()).toEqual([
-        {
-          jsonrpc: '2.0',
-          id: 7,
-          result: {
-            content: [{ type: 'text', text: 'state is not available' }],
-            isError: true,
-          },
-        },
-      ]);
-      expect(logons()).toBe(before);
-    });
 
-    it('a tool call without a handle still gets an instance', async () => {
-      const made = instancesMade();
-      const handle = await hold();
-      expect(handle).toMatch(/^[0-9A-F]{32}$/);
-      expect(made).toHaveBeenCalled();
-      made.mockRestore();
-    });
+      it('a tool call without a handle still gets an instance', async () => {
+        const made = instancesMade();
+        const before = logons();
+        const handle = await hold();
+        assert.match(handle, /^[0-9A-F]{32}$/);
+        assert.ok(made.mock.callCount() > 0);
+        // It logs on: the counter the "no logon" cases read does move.
+        assert.ok(logons() > before);
+        made.mock.restore();
+      });
 
-    it('stop() disposes the instance that holds state', async () => {
-      await hold();
-      const part = allParts[allParts.length - 1];
-      expect(part.held).toBe(true);
-      await server.stop();
-      expect(part.disposed).toBe(1);
-      expect(part.held).toBe(false);
-      expect(poolSize()).toBe(0);
-    });
-  },
-);
+      it('stop() disposes the instance that holds state', async () => {
+        await hold();
+        const part = allParts[allParts.length - 1];
+        assert.equal(part.held, true);
+        await server.stop();
+        assert.equal(part.disposed, 1);
+        assert.equal(part.held, false);
+        assert.equal(poolSize(), 0);
+      });
+    },
+  );
+}
 
 describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secret', () => {
   let server: StreamableHttpServer;
@@ -410,10 +441,15 @@ describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secre
   let previousType: string | undefined;
 
   beforeEach(async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    jest
-      .spyOn(BaseMcpServer.prototype as never, 'getConnection')
-      .mockResolvedValue(withSystemInformation() as never);
+    mock.method(console, 'error', () => {});
+    const connection = withSystemInformation();
+    mock.method(
+      BaseMcpServer.prototype as unknown as {
+        getConnection(): Promise<unknown>;
+      },
+      'getConnection',
+      async () => connection,
+    );
     previousType = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     server = new StreamableHttpServer(probes, {
@@ -431,7 +467,7 @@ describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secre
     await server.stop().catch(() => undefined);
     if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previousType;
-    jest.restoreAllMocks();
+    mock.restoreAll();
   });
 
   const token = {
@@ -472,29 +508,32 @@ describe('StreamableHttpServer pool over real HTTP: the handle is a bearer secre
     if (held.isError) throw new Error(held.text);
     const handle = JSON.parse(held.text).state_handle;
     for (const headers of [token, basic('one'), basic('two')]) {
-      expect(
+      assert.deepStrictEqual(
         await call(headers, 'PoolProbeEcho', { state_handle: handle }),
-      ).toEqual({
-        text: handle,
-        isError: false,
-      });
+        {
+          text: handle,
+          isError: false,
+        },
+      );
     }
-    expect(
+    assert.equal(
       (server as unknown as { pool: { size(): number } }).pool.size(),
-    ).toBe(1);
+      1,
+    );
   });
 
   it('a basic request creates state; another login reaches it with the handle, and nobody without it', async () => {
     const held = await call(basic('one'), 'PoolProbeHold');
     if (held.isError) throw new Error(held.text);
     const handle = JSON.parse(held.text).state_handle;
-    expect(
+    assert.equal(
       (await call(basic('two'), 'PoolProbeEcho', { state_handle: handle }))
         .text,
-    ).toBe(handle);
+      handle,
+    );
     const other = await call(token, 'PoolProbeEcho', {
       state_handle: 'F'.repeat(32),
     });
-    expect(other.text).toContain('state is not available');
+    assert.ok(other.text.includes('state is not available'));
   });
 });

@@ -12,6 +12,8 @@
  * dispatch: the run's connection is the real one the server builds.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { pending, resetProcessLatchForTests } from '../../../lib/activeTools';
 import type { StandInRequest } from '../../helpers/adtStandIn';
 import { isLogoff } from '../../helpers/adtStandIn';
@@ -64,13 +66,13 @@ const readsOf = (session: string): StandInRequest[] =>
 describe('a cancelled read run sends nothing more', () => {
   it('uncancelled, the run reads every package in its own session, one after another', async () => {
     const started = await stand.a.call('GetPackageTree', TREE);
-    expect(started.isError).toBe(false);
+    assert.equal(started.isError, false);
     await until(treeSettled);
     const first = stand.standIn.requests.find(isPackageRead);
     const session = first?.session ?? '';
     const reads = readsOf(session).filter(isPackageRead);
     // The multi-request run this suite cancels: a metadata read per package.
-    expect(reads.length).toBe(PACKAGES.length);
+    assert.equal(reads.length, PACKAGES.length);
   });
 
   it('discarded while its first read is held, it sends no request and no logon after the cancel', async () => {
@@ -85,7 +87,7 @@ describe('a cancelled read run sends nothing more', () => {
     const discarded = await stand.a.call('DiscardBackgroundRun', {
       run_handle: handle,
     });
-    expect(discarded.payload).toEqual({
+    assert.deepStrictEqual(discarded.payload, {
       run_handle: handle,
       state: 'cancelled',
     });
@@ -98,7 +100,7 @@ describe('a cancelled read run sends nothing more', () => {
     await until(treeSettled);
 
     // Nothing more in the run's session, and nothing in a new one either.
-    expect(readsOf(session).length).toBe(sentBefore);
-    expect(stand.standIn.requests.slice(after)).toEqual([]);
+    assert.equal(readsOf(session).length, sentBefore);
+    assert.deepStrictEqual(stand.standIn.requests.slice(after), []);
   });
 });

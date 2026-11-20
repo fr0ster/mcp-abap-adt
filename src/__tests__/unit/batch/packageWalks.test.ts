@@ -12,6 +12,10 @@
  * documents written as the captured `read-object-tree-structure` fixtures
  * write them) and, for the single-package cases, from that corpus itself.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -37,6 +41,7 @@ import { createBatchAvailability } from '../../../lib/batch/availability';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import { NODE_READ_CONCURRENCY } from '../../../lib/strategies/packageWalk';
 import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
   envelopeResponse as envelopeOf,
@@ -389,7 +394,10 @@ function eachPartKnownBefore(
   for (const envelope of envelopes) {
     for (const key of partKeys(envelope)) {
       if (key.startsWith('SEARCH|') || key.startsWith('GET ')) continue;
-      expect({ key, known: known.has(key) }).toEqual({ key, known: true });
+      assert.deepStrictEqual(
+        { key, known: known.has(key) },
+        { key, known: true },
+      );
     }
     for (const part of envelope.parts) {
       const key = keyOf(part.method, part.url);
@@ -440,12 +448,11 @@ describe('GetPackageContents', () => {
         ...walk,
       }),
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(payloadOf(a).map((i: { name: string }) => i.name)).toEqual([
-      'ZSUB_A',
-      'ZCL_A',
-      'ZPROG_A',
-    ]);
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(
+      payloadOf(a).map((i: { name: string }) => i.name),
+      ['ZSUB_A', 'ZCL_A', 'ZPROG_A'],
+    );
     // The corpus package answers the same both ways too.
     const c = await withinTurns(
       handleGetPackageContents(contextOn(system()), {
@@ -457,8 +464,8 @@ describe('GetPackageContents', () => {
         package_name: 'ZMCP_SHR_PKG',
       }),
     );
-    expect(textOf(c)).toBe(textOf(d));
-    expect(payloadOf(c).length).toBeGreaterThan(20);
+    assert.equal(textOf(c), textOf(d));
+    assert.ok(payloadOf(c).length > 20);
   });
 
   it("envelopes per spec §11's row (per level: roots, then type nodes)", async () => {
@@ -469,13 +476,13 @@ describe('GetPackageContents', () => {
         ...walk,
       }),
     );
-    expect(fake.envelopes.map(partKeys)).toEqual([
+    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       [nodeKey('DEVC/K', 'ZROOT_A')],
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
       [nodeKey('DEVC/K', 'ZSUB_A', '30')],
     ]);
-    expect(fake.directs).toHaveLength(0);
+    assert.equal(fake.directs.length, 0);
   });
 
   it('no envelope holds a request needing another of its parts', async () => {
@@ -507,17 +514,17 @@ describe('GetPackageContents', () => {
         ...walk,
       }),
     );
-    expect(two.envelopes).toHaveLength(one.envelopes.length);
-    expect(two.envelopes).toHaveLength(4);
+    assert.equal(two.envelopes.length, one.envelopes.length);
+    assert.equal(two.envelopes.length, 4);
     const entries = payloadOf(result);
-    expect(
+    assert.deepStrictEqual(
       entries.map((e: { package_name: string }) => e.package_name),
-    ).toEqual(['ZROOT_A', 'ZROOT_B']);
-    expect(entries[1].objects.map((i: { name: string }) => i.name)).toEqual([
-      'ZSUB_B',
-      'ZIF_B',
-      'ZPROG_B',
-    ]);
+      ['ZROOT_A', 'ZROOT_B'],
+    );
+    assert.deepStrictEqual(
+      entries[1].objects.map((i: { name: string }) => i.name),
+      ['ZSUB_B', 'ZIF_B', 'ZPROG_B'],
+    );
   });
 
   it("a part failure is that item's", async () => {
@@ -528,12 +535,12 @@ describe('GetPackageContents', () => {
         ...walk,
       }),
     );
-    expect((result as { isError?: boolean }).isError).toBe(false);
+    assert.equal((result as { isError?: boolean }).isError, false);
     const [a, b] = payloadOf(result);
-    expect(a.objects).toHaveLength(3);
-    expect(b.package_name).toBe('ZROOT_B');
-    expect(b.objects).toBeUndefined();
-    expect(b.error).toMatchObject({
+    assert.equal(a.objects.length, 3);
+    assert.equal(b.package_name, 'ZROOT_B');
+    assert.equal(b.objects, undefined);
+    assertMatchObject(b.error, {
       status: 500,
       step: 'read package node structure',
     });
@@ -549,9 +556,9 @@ describe('GetPackageContents', () => {
         ...walk,
       }),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(fake.envelopes.length, 1);
   });
 
   it('no communication batch → the sequential path', async () => {
@@ -562,9 +569,9 @@ describe('GetPackageContents', () => {
         ...walk,
       }),
     );
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs).toHaveLength(10);
-    expect(payloadOf(result)).toHaveLength(2);
+    assert.equal(fake.envelopes.length, 0);
+    assert.equal(fake.directs.length, 10);
+    assert.equal(payloadOf(result).length, 2);
   });
 
   it('credential refusal on the sequential path ends the call as it came', async () => {
@@ -577,20 +584,20 @@ describe('GetPackageContents', () => {
         ...walk,
       }),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.directs).toHaveLength(1);
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(fake.directs.length, 1);
   });
 
   it('a missing single argument keeps its words; both given is refused, by the schema', () => {
-    expect(
+    assert.ok(
       schemaWords(GetPackageContents, {
         package_name: 'ZROOT_A',
         package_names: ['ZROOT_B'],
-      }),
-    ).toContain('Give exactly one of package_name or package_names');
-    expect(schemaWords(GetPackageContents, {})).toContain(
-      'Package name is required',
+      }).includes('Give exactly one of package_name or package_names'),
+    );
+    assert.ok(
+      schemaWords(GetPackageContents, {}).includes('Package name is required'),
     );
   });
 });
@@ -615,8 +622,8 @@ describe('HandlerGet part contents', () => {
         contents({ package_name: 'ZMCP_SHR_PKG' }),
       ) as Promise<unknown>,
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(textOf(a).startsWith('name\ttype\tdescription')).toBe(true);
+    assert.equal(textOf(a), textOf(b));
+    assert.equal(textOf(a).startsWith('name\ttype\tdescription'), true);
   });
 
   it("envelopes per spec §11's row (per level: roots, then type nodes)", async () => {
@@ -627,7 +634,7 @@ describe('HandlerGet part contents', () => {
         contents({ package_name: 'ZROOT_A' }),
       ) as Promise<unknown>,
     );
-    expect(fake.envelopes.map(partKeys)).toEqual([
+    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       [nodeKey('DEVC/K', 'ZROOT_A')],
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
     ]);
@@ -655,9 +662,9 @@ describe('HandlerGet part contents', () => {
         contents({ package_names: ['ZROOT_A', 'ZROOT_B'] }),
       ) as Promise<unknown>,
     );
-    expect(fake.envelopes).toHaveLength(2);
+    assert.equal(fake.envelopes.length, 2);
     const entries = payloadOf(result);
-    expect(entries).toEqual([
+    assert.deepStrictEqual(entries, [
       {
         package_name: 'ZROOT_A',
         contents: 'name\ttype\tdescription\nZSUB_A\tDEVC/K\t\nZCL_A\tCLAS/OC\t',
@@ -678,8 +685,8 @@ describe('HandlerGet part contents', () => {
       ) as Promise<unknown>,
     );
     const [a, b] = payloadOf(result);
-    expect(a.contents).toContain('ZCL_A');
-    expect(b.error).toMatchObject({
+    assert.ok(a.contents.includes('ZCL_A'));
+    assertMatchObject(b.error, {
       status: 403,
       step: 'read package node structure',
     });
@@ -695,8 +702,8 @@ describe('HandlerGet part contents', () => {
         contents({ package_names: ['ZROOT_A', 'ZROOT_B'] }),
       ) as Promise<unknown>,
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
   });
 
   it('no communication batch → the sequential path', async () => {
@@ -707,8 +714,8 @@ describe('HandlerGet part contents', () => {
         contents({ package_names: ['ZROOT_A', 'ZROOT_B'] }),
       ) as Promise<unknown>,
     );
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs).toHaveLength(6);
+    assert.equal(fake.envelopes.length, 0);
+    assert.equal(fake.directs.length, 6);
   });
 });
 
@@ -722,13 +729,13 @@ describe('GetPackageTree', () => {
         package_name: 'ZROOT_A',
       }),
     );
-    expect(textOf(a)).toBe(textOf(b));
+    assert.equal(textOf(a), textOf(b));
     const tree = payloadOf(a).tree;
-    expect(tree.children.map((c: { name: string }) => c.name)).toEqual([
-      'ZSUB_A',
-      'ZCL_A',
-    ]);
-    expect(tree.children[0].children[0].name).toBe('ZPROG_A');
+    assert.deepStrictEqual(
+      tree.children.map((c: { name: string }) => c.name),
+      ['ZSUB_A', 'ZCL_A'],
+    );
+    assert.equal(tree.children[0].children[0].name, 'ZPROG_A');
   });
 
   it("envelopes per spec §11's row (metadata and root, then the walk's levels)", async () => {
@@ -736,7 +743,7 @@ describe('GetPackageTree', () => {
     await withinTurns(
       handleGetPackageTree(contextOn(fake), { package_name: 'ZROOT_A' }),
     );
-    expect(fake.envelopes.map(partKeys)).toEqual([
+    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       ['GET /sap/bc/adt/packages/zroot_a', nodeKey('DEVC/K', 'ZROOT_A')],
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
@@ -764,12 +771,13 @@ describe('GetPackageTree', () => {
         package_names: ['ZROOT_A', 'ZROOT_B'],
       }),
     );
-    expect(fake.envelopes).toHaveLength(4);
+    assert.equal(fake.envelopes.length, 4);
     const entries = payloadOf(result);
-    expect(
+    assert.deepStrictEqual(
       entries.map((e: { package_name: string }) => e.package_name),
-    ).toEqual(['ZROOT_A', 'ZROOT_B']);
-    expect(entries[1].tree.children[0].children[0].name).toBe('ZPROG_B');
+      ['ZROOT_A', 'ZROOT_B'],
+    );
+    assert.equal(entries[1].tree.children[0].children[0].name, 'ZPROG_B');
   });
 
   it("a part failure is that item's", async () => {
@@ -783,19 +791,20 @@ describe('GetPackageTree', () => {
       }),
     );
     const [a, b] = payloadOf(result);
-    expect(a.tree.children).toHaveLength(2);
-    expect(b.tree).toBeUndefined();
-    expect(b.error).toMatchObject({
+    assert.equal(a.tree.children.length, 2);
+    assert.equal(b.tree, undefined);
+    assertMatchObject(b.error, {
       status: 404,
       step: 'read package metadata',
     });
     // Nothing more of the package whose metadata failed is read.
-    expect(
+    assert.equal(
       fake.envelopes
         .slice(1)
         .flatMap(partKeys)
         .some((k) => k.includes('ZROOT_B') || k.includes('ZSUB_B')),
-    ).toBe(false);
+      false,
+    );
   });
 
   it('credential refusal ends the call as it came', async () => {
@@ -807,8 +816,8 @@ describe('GetPackageTree', () => {
         package_names: ['ZROOT_A', 'ZROOT_B'],
       }),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
   });
 
   it('no communication batch → the sequential path', async () => {
@@ -818,8 +827,8 @@ describe('GetPackageTree', () => {
         package_names: ['ZROOT_A', 'ZROOT_B'],
       }),
     );
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs).toHaveLength(12);
+    assert.equal(fake.envelopes.length, 0);
+    assert.equal(fake.directs.length, 12);
   });
 });
 
@@ -837,16 +846,17 @@ describe('GetObjectsList', () => {
     const b = await withinTurns(
       handleGetObjectsList(contextOn(system(), 'absent'), single),
     );
-    expect(textOf(a)).toBe(textOf(b));
-    expect(
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(
       payloadOf(a).objects.map((o: { OBJECT_NAME: string }) => o.OBJECT_NAME),
-    ).toEqual(['ZINCL_X1', 'ZFORM_X', 'ZEVENT_X']);
+      ['ZINCL_X1', 'ZFORM_X', 'ZEVENT_X'],
+    );
   });
 
   it("envelopes per spec §11's row (per level: every node of the level)", async () => {
     const fake = system();
     await withinTurns(handleGetObjectsList(contextOn(fake), single));
-    expect(fake.envelopes.map(partKeys)).toEqual([
+    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       [nodeKey('PROG/P', 'ZPROG_X')],
       [
         nodeKey('PROG/P', 'ZPROG_X', '101'),
@@ -882,16 +892,17 @@ describe('GetObjectsList', () => {
         ],
       }),
     );
-    expect(fake.envelopes).toHaveLength(3);
+    assert.equal(fake.envelopes.length, 3);
     const [x, y] = payloadOf(result);
-    expect(x).toMatchObject({
+    assertMatchObject(x, {
       parent_type: 'PROG/P',
       parent_name: 'ZPROG_X',
       total_objects: 3,
     });
-    expect(
+    assert.deepStrictEqual(
       y.objects.map((o: { OBJECT_NAME: string }) => o.OBJECT_NAME),
-    ).toEqual(['ZINCL_Y1', 'ZFORM_Y']);
+      ['ZINCL_Y1', 'ZFORM_Y'],
+    );
   });
 
   it("a part failure is that item's", async () => {
@@ -905,9 +916,9 @@ describe('GetObjectsList', () => {
       }),
     );
     const [x, y] = payloadOf(result);
-    expect(x.total_objects).toBe(3);
-    expect(y.objects).toBeUndefined();
-    expect(y.error).toMatchObject({ status: 500, step: 'read node structure' });
+    assert.equal(x.total_objects, 3);
+    assert.equal(y.objects, undefined);
+    assertMatchObject(y.error, { status: 500, step: 'read node structure' });
   });
 
   it('credential refusal ends the call as it came', async () => {
@@ -917,15 +928,15 @@ describe('GetObjectsList', () => {
     const result = await withinTurns(
       handleGetObjectsList(contextOn(fake), single),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
   });
 
   it('no communication batch → the sequential path', async () => {
     const fake = system();
     await withinTurns(handleGetObjectsList(contextOn(fake, 'absent'), single));
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs).toHaveLength(4);
+    assert.equal(fake.envelopes.length, 0);
+    assert.equal(fake.directs.length, 4);
   });
 });
 
@@ -943,24 +954,24 @@ describe('GetObjectInfo', () => {
     const b = await withinTurns(
       handleGetObjectInfo(contextOn(system(), 'absent'), single),
     );
-    expect(textOf(a)).toBe(textOf(b));
+    assert.equal(textOf(a), textOf(b));
     const tree = payloadOf(a);
-    expect(tree).toMatchObject({
+    assertMatchObject(tree, {
       OBJECT_NAME: 'ZROOT_A',
       OBJECT_PACKAGE: 'ZPARENT',
       OBJECT_DESCRIPTION: 'Found ZROOT_A',
     });
-    expect(tree.CHILDREN[0]).toMatchObject({
+    assertMatchObject(tree.CHILDREN[0], {
       OBJECT_NAME: 'ZSUB_A',
       OBJECT_DESCRIPTION: 'Found ZSUB_A',
     });
-    expect(tree.CHILDREN[0].CHILDREN[0].OBJECT_NAME).toBe('ZPROG_A');
+    assert.equal(tree.CHILDREN[0].CHILDREN[0].OBJECT_NAME, 'ZPROG_A');
   });
 
   it("envelopes per spec §11's row (per tier: roots, then type nodes; the searches last)", async () => {
     const fake = system();
     await withinTurns(handleGetObjectInfo(contextOn(fake), single));
-    expect(fake.envelopes.map(partKeys)).toEqual([
+    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       [nodeKey('DEVC/K', 'ZROOT_A')],
       [nodeKey('DEVC/K', 'ZROOT_A', '10'), nodeKey('DEVC/K', 'ZROOT_A', '20')],
       [nodeKey('DEVC/K', 'ZSUB_A')],
@@ -997,10 +1008,10 @@ describe('GetObjectInfo', () => {
         maxDepth: 2,
       }),
     );
-    expect(fake.envelopes).toHaveLength(5);
+    assert.equal(fake.envelopes.length, 5);
     const [a, b] = payloadOf(result);
-    expect(a.OBJECT_NAME).toBe('ZROOT_A');
-    expect(b.CHILDREN[0].CHILDREN[0].OBJECT_NAME).toBe('ZPROG_B');
+    assert.equal(a.OBJECT_NAME, 'ZROOT_A');
+    assert.equal(b.CHILDREN[0].CHILDREN[0].OBJECT_NAME, 'ZPROG_B');
   });
 
   it("a part failure is that item's", async () => {
@@ -1015,8 +1026,8 @@ describe('GetObjectInfo', () => {
       }),
     );
     const [a, b] = payloadOf(result);
-    expect(a.CHILDREN).toHaveLength(2);
-    expect(b).toMatchObject({
+    assert.equal(a.CHILDREN.length, 2);
+    assertMatchObject(b, {
       OBJECT_TYPE: 'DEVC/K',
       OBJECT_NAME: 'ZROOT_B',
       error: { status: 500, step: 'read node structure' },
@@ -1030,15 +1041,15 @@ describe('GetObjectInfo', () => {
     const result = await withinTurns(
       handleGetObjectInfo(contextOn(fake), single),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
   });
 
   it('no communication batch → the sequential path', async () => {
     const fake = system();
     await withinTurns(handleGetObjectInfo(contextOn(fake, 'absent'), single));
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs).toHaveLength(7);
+    assert.equal(fake.envelopes.length, 0);
+    assert.equal(fake.directs.length, 7);
   });
 });
 
@@ -1092,53 +1103,54 @@ const LIST_CALLS: Array<{ tool: string; call: Call; refused: string }> = [
   },
 ];
 
-describe.each(LIST_CALLS)(
-  '$tool: a 401 SAP answered to one root of a list',
-  ({ call, refused }) => {
+for (const { tool, call, refused } of LIST_CALLS) {
+  describe(`${tool}: a 401 SAP answered to one root of a list`, () => {
     it('batched: ends the call as it came; no envelope after it', async () => {
       const fake = system({ refuse: { [refused]: 401 } });
       const result = await withinTurns(call(contextOn(fake)));
-      expect((result as { isError?: boolean }).isError).toBe(true);
-      expect(textOf(result)).toContain('401');
+      assert.equal((result as { isError?: boolean }).isError, true);
+      assert.ok(textOf(result).includes('401'));
       const at = fake.envelopes.findIndex((e) => partKeys(e).includes(refused));
-      expect(at).toBeGreaterThanOrEqual(0);
-      expect(fake.envelopes).toHaveLength(at + 1);
+      assert.ok(at >= 0);
+      assert.equal(fake.envelopes.length, at + 1);
     });
 
     it('sequential: ends the call as it came; nothing is read after it', async () => {
       const fake = system({ refuse: { [refused]: 401 } });
       const result = await withinTurns(call(contextOn(fake, 'absent')));
-      expect((result as { isError?: boolean }).isError).toBe(true);
-      expect(textOf(result)).toContain('401');
+      assert.equal((result as { isError?: boolean }).isError, true);
+      assert.ok(textOf(result).includes('401'));
       const last = fake.directs[fake.directs.length - 1] as IAbapRequestOptions;
-      expect(keyOf(last.method, last.url, last.params)).toBe(refused);
+      assert.equal(keyOf(last.method, last.url, last.params), refused);
     });
-  },
-);
-
-describe.each(LIST_CALLS)('$tool: an envelope failure', ({ tool, call }) => {
-  it("is every item of that phase's failure, the envelope's error with its step", async () => {
-    const fake = system({}, () => {
-      throw statusError(500, 'Internal Server Error', 'placeholder');
-    });
-    const result = await withinTurns(call(contextOn(fake)));
-    expect(fake.envelopes).toHaveLength(1);
-    const entries = payloadOf(result) as Array<{ error?: unknown }>;
-    expect(entries).toHaveLength(2);
-    const step =
-      tool === 'GetPackageTree'
-        ? 'read package metadata'
-        : tool === 'GetPackageContents'
-          ? 'read package node structure'
-          : 'read node structure';
-    for (const entry of entries) {
-      expect(entry.error).toMatchObject({
-        message: 'Request failed with status code 500',
-        step,
-      });
-    }
   });
-});
+}
+
+for (const { tool, call } of LIST_CALLS) {
+  describe(`${tool}: an envelope failure`, () => {
+    it("is every item of that phase's failure, the envelope's error with its step", async () => {
+      const fake = system({}, () => {
+        throw statusError(500, 'Internal Server Error', 'placeholder');
+      });
+      const result = await withinTurns(call(contextOn(fake)));
+      assert.equal(fake.envelopes.length, 1);
+      const entries = payloadOf(result) as Array<{ error?: unknown }>;
+      assert.equal(entries.length, 2);
+      const step =
+        tool === 'GetPackageTree'
+          ? 'read package metadata'
+          : tool === 'GetPackageContents'
+            ? 'read package node structure'
+            : 'read node structure';
+      for (const entry of entries) {
+        assertMatchObject(entry.error, {
+          message: 'Request failed with status code 500',
+          step,
+        });
+      }
+    });
+  });
+}
 
 describe('GetObjectInfo: a credential refusal of the searches', () => {
   const two = {
@@ -1154,9 +1166,9 @@ describe('GetObjectInfo: a credential refusal of the searches', () => {
     const result = await withinTurns(
       handleGetObjectInfo(contextOn(fake, 'absent'), two),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({ status: 401 });
-    expect(fake.directs).toHaveLength(1);
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assertMatchObject(payloadOf(result), { status: 401 });
+    assert.equal(fake.directs.length, 1);
   });
 
   it('batched: a refused search envelope ends the call as it came', async () => {
@@ -1169,9 +1181,9 @@ describe('GetObjectInfo: a credential refusal of the searches', () => {
     const result = await withinTurns(
       handleGetObjectInfo(contextOn(fake as unknown as Fake), two),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(5);
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(fake.envelopes.length, 5);
   });
 });
 
@@ -1186,7 +1198,7 @@ describe('GetObjectsList: the cache', () => {
         objects: [{ parent_type: 'PROG/P', parent_name: 'ZPROG_X' }],
       }),
     );
-    expect(objectsListCache.getCache()).toBe(before);
+    assert.equal(objectsListCache.getCache(), before);
     await withinTurns(
       handleGetObjectsList(contextOn(system()), {
         parent_type: 'PROG/P',
@@ -1194,7 +1206,7 @@ describe('GetObjectsList: the cache', () => {
         parent_tech_name: 'ZPROG_X',
       }),
     );
-    expect(objectsListCache.getCache()).toMatchObject({
+    assertMatchObject(objectsListCache.getCache(), {
       parent_name: 'ZPROG_X',
       total_objects: 3,
     });
@@ -1203,20 +1215,22 @@ describe('GetObjectsList: the cache', () => {
 
 describe('the single arguments keep their words', () => {
   it('GetPackageTree without a package: its schema', () => {
-    expect(schemaWords(GetPackageTree, { package_name: '' })).toContain(
-      'package_name is required',
+    assert.ok(
+      schemaWords(GetPackageTree, { package_name: '' }).includes(
+        'package_name is required',
+      ),
     );
   });
 
   it('GetObjectsList: objects beside a single parent field is refused by its schema', () => {
     for (const field of ['parent_name', 'parent_type', 'parent_tech_name']) {
-      expect(
+      assert.ok(
         schemaWords(GetObjectsList, {
           objects: [{ parent_type: 'PROG/P', parent_name: 'ZPROG_X' }],
           [field]: 'ZPROG_X',
-        }),
-      ).toContain(
-        'Give exactly one of parent_name, parent_tech_name and parent_type, or objects',
+        }).includes(
+          'Give exactly one of parent_name, parent_tech_name and parent_type, or objects',
+        ),
       );
     }
   });
@@ -1233,13 +1247,13 @@ describe('GetPackageTree with descriptions: a metadata read SAP answered 401', (
         include_descriptions: true,
       }),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assertMatchObject(payloadOf(result), {
       status: 401,
       step: 'read package metadata',
     });
-    expect(fake.envelopes).toHaveLength(0);
-    expect(nodeReads(fake)).toHaveLength(0);
+    assert.equal(fake.envelopes.length, 0);
+    assert.equal(nodeReads(fake).length, 0);
   });
 
   it('more packages than are read at once: no metadata read starts after it', async () => {
@@ -1256,8 +1270,8 @@ describe('GetPackageTree with descriptions: a metadata read SAP answered 401', (
         include_descriptions: true,
       }),
     );
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assertMatchObject(payloadOf(result), {
       status: 401,
       step: 'read package metadata',
     });
@@ -1265,8 +1279,8 @@ describe('GetPackageTree with descriptions: a metadata read SAP answered 401', (
       r.url.includes('/sap/bc/adt/packages/'),
     );
     // Only the reads already started when the refusal answered.
-    expect(metadataReads).toHaveLength(NODE_READ_CONCURRENCY);
-    expect(nodeReads(fake)).toHaveLength(0);
+    assert.equal(metadataReads.length, NODE_READ_CONCURRENCY);
+    assert.equal(nodeReads(fake).length, 0);
   });
 });
 
@@ -1278,22 +1292,22 @@ describe('GetPackageTree: a metadata read SAP answered 401', () => {
   it('batched: ends the call as it came; nothing is walked', async () => {
     const fake = system(refused);
     const result = await withinTurns(call(contextOn(fake)));
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assertMatchObject(payloadOf(result), {
       status: 401,
       step: 'read package metadata',
     });
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal(fake.envelopes.length, 1);
   });
 
   it('sequential: ends the call as it came; nothing is read after it', async () => {
     const fake = system(refused);
     const result = await withinTurns(call(contextOn(fake, 'absent')));
-    expect(payloadOf(result)).toMatchObject({
+    assertMatchObject(payloadOf(result), {
       status: 401,
       step: 'read package metadata',
     });
-    expect(fake.directs).toHaveLength(1);
+    assert.equal(fake.directs.length, 1);
   });
 });
 
@@ -1445,38 +1459,40 @@ const describedIn = (answer: unknown): string[] => {
 const nodeReads = (fake: { directs: IAbapRequestOptions[] }) =>
   fake.directs.filter((r) => r.url.includes('/repository/nodestructure'));
 
-describe.each(LISTING_CALLS)(
-  '$tool: descriptions',
-  ({ call, expected, pick = describedIn }) => {
+for (const { tool, call, expected, pick = describedIn } of LISTING_CALLS) {
+  describe(`${tool}: descriptions`, () => {
     it('each node structure sent alone: every object, each with its own description', async () => {
       const leaking = leakingSystem();
       const result = await withinTurns(call(contextOn(leaking as Fake)));
-      expect(leaking.leaks.count).toBe(0);
-      expect((result as { isError?: boolean }).isError).toBe(false);
-      expect(pick(payloadOf(result))).toEqual(expected);
+      assert.equal(leaking.leaks.count, 0);
+      assert.equal((result as { isError?: boolean }).isError, false);
+      assert.deepStrictEqual(pick(payloadOf(result)), expected);
     });
 
     it('no node structure in an envelope, none asked without descriptions, no object metadata read', async () => {
       const fake = system();
       await withinTurns(call(contextOn(fake)));
-      expect(
+      assert.equal(
         fake.envelopes.flatMap(partKeys).some((k) => k.includes('|')),
-      ).toBe(false);
+        false,
+      );
       const asked = nodeReads(fake);
-      expect(asked.length).toBeGreaterThan(0);
-      expect(
+      assert.ok(asked.length > 0);
+      assert.equal(
         asked.every(
           (r) =>
             (r.params as { withShortDescriptions?: unknown })
               ?.withShortDescriptions === true,
         ),
-      ).toBe(true);
-      expect(
+        true,
+      );
+      assert.equal(
         [
           ...fake.envelopes.flatMap(partKeys),
           ...fake.directs.map((r) => r.url),
         ].some((k) => k.includes('/sap/bc/adt/oo/')),
-      ).toBe(false);
+        false,
+      );
     });
 
     it('no communication batch: the same requests, the same answer', async () => {
@@ -1484,13 +1500,12 @@ describe.each(LISTING_CALLS)(
       const absent = system();
       const a = await withinTurns(call(contextOn(served)));
       const b = await withinTurns(call(contextOn(absent, 'absent')));
-      expect(absent.envelopes).toHaveLength(0);
-      expect(textOf(b)).toBe(textOf(a));
-      expect(
+      assert.equal(absent.envelopes.length, 0);
+      assert.equal(textOf(b), textOf(a));
+      assert.deepStrictEqual(
         nodeReads(absent)
           .map((r) => keyOf(r.method, r.url, r.params))
           .sort(),
-      ).toEqual(
         nodeReads(served)
           .map((r) => keyOf(r.method, r.url, r.params))
           .sort(),
@@ -1502,9 +1517,9 @@ describe.each(LISTING_CALLS)(
         refuse: { [nodeKey('DEVC/K', 'ZROOT_A', '20')]: 500 },
       });
       const result = await withinTurns(call(contextOn(fake)));
-      expect((result as { isError?: boolean }).isError).toBe(false);
-      expect(textOf(result)).not.toContain('Class A');
-      expect(textOf(result)).toContain('Interface B');
+      assert.equal((result as { isError?: boolean }).isError, false);
+      assert.ok(!textOf(result).includes('Class A'));
+      assert.ok(textOf(result).includes('Interface B'));
     });
 
     it('a 401 SAP answered to a node structure ends the call as it came', async () => {
@@ -1512,8 +1527,8 @@ describe.each(LISTING_CALLS)(
         refuse: { [nodeKey('DEVC/K', 'ZROOT_A', '20')]: 401 },
       });
       const result = await withinTurns(call(contextOn(fake)));
-      expect((result as { isError?: boolean }).isError).toBe(true);
-      expect(textOf(result)).toContain('401');
+      assert.equal((result as { isError?: boolean }).isError, true);
+      assert.ok(textOf(result).includes('401'));
     });
 
     it("the connection's credential refusal ends the call as it came", async () => {
@@ -1521,11 +1536,11 @@ describe.each(LISTING_CALLS)(
         throw credential();
       });
       const result = await withinTurns(call(contextOn(fake)));
-      expect((result as { isError?: boolean }).isError).toBe(true);
-      expect(payloadOf(result).error).toBe('authentication_failed');
+      assert.equal((result as { isError?: boolean }).isError, true);
+      assert.equal(payloadOf(result).error, 'authentication_failed');
     });
-  },
-);
+  });
+}
 
 describe('GetObjectInfo: descriptions', () => {
   const call: Call = (c) =>
@@ -1545,10 +1560,10 @@ describe('GetObjectInfo: descriptions', () => {
       call(contextOn(leakingSystem() as Fake, 'absent')),
     );
     // The envelopes did carry another part's description.
-    expect(leaking.leaks.count).toBeGreaterThan(0);
-    expect((batched as { isError?: boolean }).isError).toBe(false);
-    expect(textOf(batched)).toBe(textOf(sequential));
-    expect(textOf(batched)).toContain('Class A');
+    assert.ok(leaking.leaks.count > 0);
+    assert.equal((batched as { isError?: boolean }).isError, false);
+    assert.equal(textOf(batched), textOf(sequential));
+    assert.ok(textOf(batched).includes('Class A'));
   });
 
   it('the metadata phase: one envelope, one GET per object, after the walk', async () => {
@@ -1557,22 +1572,26 @@ describe('GetObjectInfo: descriptions', () => {
     const metadata = fake.envelopes.filter((e) =>
       partKeys(e).includes('GET /sap/bc/adt/oo/classes/zcl_a'),
     );
-    expect(metadata).toHaveLength(1);
+    assert.equal(metadata.length, 1);
     const parts = (metadata[0] as SeenEnvelope).parts;
-    expect(parts.every((p) => p.method === 'GET')).toBe(true);
-    const keys = partKeys(metadata[0] as SeenEnvelope);
-    expect(new Set(keys).size).toBe(keys.length);
-    expect(keys).toEqual(
-      expect.arrayContaining(['GET /sap/bc/adt/oo/classes/zcl_a']),
+    assert.equal(
+      parts.every((p) => p.method === 'GET'),
+      true,
     );
+    const keys = partKeys(metadata[0] as SeenEnvelope);
+    assert.equal(new Set(keys).size, keys.length);
+    for (const key of ['GET /sap/bc/adt/oo/classes/zcl_a']) {
+      assert.ok(keys.some((e) => isDeepStrictEqual(e, key)));
+    }
     // No node structure is read after it.
     const at = fake.envelopes.indexOf(metadata[0] as SeenEnvelope);
-    expect(
+    assert.equal(
       fake.envelopes
         .slice(at + 1)
         .flatMap(partKeys)
         .some((k) => k.includes('|') && !k.startsWith('SEARCH|')),
-    ).toBe(false);
+      false,
+    );
   });
 
   it("a metadata part's failure: that object has no description; the call answers", async () => {
@@ -1580,10 +1599,10 @@ describe('GetObjectInfo: descriptions', () => {
       refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 500 },
     });
     const result = await withinTurns(call(contextOn(fake)));
-    expect((result as { isError?: boolean }).isError).toBe(false);
-    expect(textOf(result)).toContain('ZCL_A');
-    expect(textOf(result)).not.toContain('Class A');
-    expect(textOf(result)).toContain('Interface B');
+    assert.equal((result as { isError?: boolean }).isError, false);
+    assert.ok(textOf(result).includes('ZCL_A'));
+    assert.ok(!textOf(result).includes('Class A'));
+    assert.ok(textOf(result).includes('Interface B'));
   });
 
   it('a 401 SAP answered to a metadata part ends the call as it came', async () => {
@@ -1591,8 +1610,8 @@ describe('GetObjectInfo: descriptions', () => {
       refuse: { 'GET /sap/bc/adt/oo/classes/zcl_a': 401 },
     });
     const result = await withinTurns(call(contextOn(fake)));
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assertMatchObject(payloadOf(result), {
       status: 401,
       step: 'read object metadata',
     });
@@ -1610,18 +1629,19 @@ describe('GetObjectInfo: descriptions', () => {
       return envelopeOf(parts.map((p) => answerOf({}, p.method, p.url)));
     });
     const result = await withinTurns(call(contextOn(fake as unknown as Fake)));
-    expect((result as { isError?: boolean }).isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
+    assert.equal((result as { isError?: boolean }).isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
   });
 
   it('no communication batch: no metadata read, the descriptions of today', async () => {
     const fake = system();
     const result = await withinTurns(call(contextOn(fake, 'absent')));
-    expect(fake.envelopes).toHaveLength(0);
-    expect(
+    assert.equal(fake.envelopes.length, 0);
+    assert.equal(
       fake.directs.some((r) => r.url.startsWith('/sap/bc/adt/oo/classes/')),
-    ).toBe(false);
-    expect(textOf(result)).toContain('Class A');
+      false,
+    );
+    assert.ok(textOf(result).includes('Class A'));
   });
 });
 
@@ -1646,18 +1666,17 @@ describe('include_descriptions: false', () => {
         include_descriptions: false,
       }),
     );
-    expect((result as { isError?: boolean }).isError).toBe(false);
-    expect(fake.envelopes.map(partKeys)).toEqual([
+    assert.equal((result as { isError?: boolean }).isError, false);
+    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       [nodeKey('DEVC/K', 'ZROOT_A')],
       ...walkEnvelopes,
     ]);
-    expect(fake.directs).toHaveLength(0);
-    expect(payloadOf(result).map((i: { name: string }) => i.name)).toEqual([
-      'ZSUB_A',
-      'ZCL_A',
-      'ZPROG_A',
-    ]);
-    expect(textOf(result)).not.toContain('Class A');
+    assert.equal(fake.directs.length, 0);
+    assert.deepStrictEqual(
+      payloadOf(result).map((i: { name: string }) => i.name),
+      ['ZSUB_A', 'ZCL_A', 'ZPROG_A'],
+    );
+    assert.ok(!textOf(result).includes('Class A'));
   });
 
   it('GetPackageTree: the walk alone, no description in the answer', async () => {
@@ -1668,22 +1687,22 @@ describe('include_descriptions: false', () => {
         include_descriptions: false,
       }),
     );
-    expect((result as { isError?: boolean }).isError).toBe(false);
-    expect(fake.envelopes.map(partKeys)).toEqual([
+    assert.equal((result as { isError?: boolean }).isError, false);
+    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       ['GET /sap/bc/adt/packages/zroot_a', nodeKey('DEVC/K', 'ZROOT_A')],
       ...walkEnvelopes,
     ]);
-    expect(fake.directs).toHaveLength(0);
+    assert.equal(fake.directs.length, 0);
     const tree = payloadOf(result).tree;
-    expect(tree.children.map((c: { name: string }) => c.name)).toEqual([
-      'ZSUB_A',
-      'ZCL_A',
-    ]);
-    expect(textOf(result)).not.toContain('Class A');
+    assert.deepStrictEqual(
+      tree.children.map((c: { name: string }) => c.name),
+      ['ZSUB_A', 'ZCL_A'],
+    );
+    assert.ok(!textOf(result).includes('Class A'));
   });
 });
 
-describe.each([
+for (const { tool, call } of [
   {
     tool: 'GetPackageContents',
     call: ((c) =>
@@ -1715,34 +1734,38 @@ describe.each([
         maxDepth: 2,
       })) as Call,
   },
-])('$tool without include_descriptions', ({ call }) => {
-  it('batched: no metadata read, no description', async () => {
-    const fake = system();
-    const result = await withinTurns(call(contextOn(fake)));
-    expect((result as { isError?: boolean }).isError).toBe(false);
-    expect(
-      fake.envelopes
-        .flatMap(partKeys)
-        .some((k) => k.startsWith('GET /sap/bc/adt/oo/')),
-    ).toBe(false);
-    expect(textOf(result)).toContain('ZCL_A');
-    expect(textOf(result)).not.toContain('Class A');
-  });
+]) {
+  describe(`${tool} without include_descriptions`, () => {
+    it('batched: no metadata read, no description', async () => {
+      const fake = system();
+      const result = await withinTurns(call(contextOn(fake)));
+      assert.equal((result as { isError?: boolean }).isError, false);
+      assert.equal(
+        fake.envelopes
+          .flatMap(partKeys)
+          .some((k) => k.startsWith('GET /sap/bc/adt/oo/')),
+        false,
+      );
+      assert.ok(textOf(result).includes('ZCL_A'));
+      assert.ok(!textOf(result).includes('Class A'));
+    });
 
-  it('sequential: node structures asked without descriptions', async () => {
-    const fake = system();
-    const result = await withinTurns(call(contextOn(fake, 'absent')));
-    const asked = fake.directs.filter((r) =>
-      r.url.includes('/repository/nodestructure'),
-    );
-    expect(asked.length).toBeGreaterThan(0);
-    expect(
-      asked.every(
-        (r) =>
-          (r.params as { withShortDescriptions?: unknown })
-            ?.withShortDescriptions === false,
-      ),
-    ).toBe(true);
-    expect(textOf(result)).not.toContain('Class A');
+    it('sequential: node structures asked without descriptions', async () => {
+      const fake = system();
+      const result = await withinTurns(call(contextOn(fake, 'absent')));
+      const asked = fake.directs.filter((r) =>
+        r.url.includes('/repository/nodestructure'),
+      );
+      assert.ok(asked.length > 0);
+      assert.equal(
+        asked.every(
+          (r) =>
+            (r.params as { withShortDescriptions?: unknown })
+              ?.withShortDescriptions === false,
+        ),
+        true,
+      );
+      assert.ok(!textOf(result).includes('Class A'));
+    });
   });
-});
+}

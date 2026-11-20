@@ -13,6 +13,9 @@
  * connection — real adt-clients code, no SAP.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
@@ -154,24 +157,28 @@ function payloadOf(answered: {
 }
 
 describe("a message's object is the run's object its href points into", () => {
-  it.each([
+  for (const [_case, href, name] of [
     ['the uri itself', BROKEN_URI, BROKEN],
     ['a part under it', `${BROKEN_URI}/source/main`, BROKEN],
     ['a position in it', `${BROKEN_URI}#start=1,1`, BROKEN],
     ['a query on it', `${BROKEN_URI}?version=inactive`, BROKEN],
     ['a part with a position', `${BROKEN_URI}/source/main#start=7,4`, BROKEN],
-  ] as const)('%s', (_case, href, name) => {
-    expect(runObjectOf(href, REFERENCES)?.name).toBe(name);
-  });
+  ] as const) {
+    it(format('%s', _case), () => {
+      assert.equal(runObjectOf(href, REFERENCES)?.name, name);
+    });
+  }
 
-  it.each([
+  for (const [_case, href] of [
     ['an empty href', ''],
     ['no href', undefined],
     ['a uri that only begins with a run uri', `${BROKEN_URI}2/source/main`],
     ['a uri of no run object', '/sap/bc/adt/oo/classes/zobj_other'],
-  ] as const)('%s points into none', (_case, href) => {
-    expect(runObjectOf(href, REFERENCES)).toBeUndefined();
-  });
+  ] as const) {
+    it(format('%s points into none', _case), () => {
+      assert.equal(runObjectOf(href, REFERENCES), undefined);
+    });
+  }
 
   it('a namespaced uri matches its href whatever the case of its escapes and letters', () => {
     // buildObjectUri('/NS/ZBROKEN', 'CLAS/OC') sends the slashes as %2F; an
@@ -181,25 +188,27 @@ describe("a message's object is the run's object its href points into", () => {
       type: 'CLAS/OC',
       uri: buildObjectUri('/NS/ZBROKEN', 'CLAS/OC'),
     };
-    expect(sent.uri).toBe('/sap/bc/adt/oo/classes/%2Fns%2Fzbroken');
+    assert.equal(sent.uri, '/sap/bc/adt/oo/classes/%2Fns%2Fzbroken');
     for (const href of [
       '/sap/bc/adt/oo/classes/%2fns%2fzbroken/source/main#start=7,4',
       '/sap/bc/adt/oo/classes/%2FNS%2FZBROKEN/source/main#start=7,4',
       '/sap/bc/adt/oo/classes/%2Fns%2Fzbroken',
     ]) {
-      expect(runObjectOf(href, [sent])?.name).toBe('/NS/ZBROKEN');
+      assert.equal(runObjectOf(href, [sent])?.name, '/NS/ZBROKEN');
     }
-    expect(
+    assert.equal(
       runObjectOf('/sap/bc/adt/oo/classes/%2fns%2fzbroken2', [sent]),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('a reference with an empty uri is no object of any href', () => {
-    expect(
+    assert.equal(
       runObjectOf(`${BROKEN_URI}/source/main`, [
         { name: 'ZEMPTY', type: 'CLAS/OC', uri: '' },
       ]),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('the longest uri wins: a part addressed under its owner goes to the part', () => {
@@ -213,35 +222,42 @@ describe("a message's object is the run's object its href points into", () => {
       type: 'FUGR/FF',
       uri: '/sap/bc/adt/functions/groups/zgroup/fmodules/zmodule',
     };
-    expect(
+    assert.equal(
       runObjectOf(`${part.uri}/source/main#start=2,1`, [owner, part])?.name,
-    ).toBe('ZMODULE');
-    expect(
+      'ZMODULE',
+    );
+    assert.equal(
       runObjectOf(`${part.uri}/source/main#start=2,1`, [part, owner])?.name,
-    ).toBe('ZMODULE');
-    expect(runObjectOf(`${owner.uri}/source/main`, [part, owner])?.name).toBe(
+      'ZMODULE',
+    );
+    assert.equal(
+      runObjectOf(`${owner.uri}/source/main`, [part, owner])?.name,
       'ZGROUP',
     );
   });
 });
 
 describe("a message's object named by objName is the run's object of that name", () => {
-  it.each([
+  for (const [_case, name, type, expected] of [
     ['the name as sent', BROKEN, undefined, BROKEN],
     ['the name in lower case', 'zobj_broken', undefined, BROKEN],
     ['the name with the type of the sent object', BROKEN, 'clas/oc', BROKEN],
-  ] as const)('%s', (_case, name, type, expected) => {
-    expect(namedRunObject(name, type, REFERENCES)?.name).toBe(expected);
-  });
+  ] as const) {
+    it(format('%s', _case), () => {
+      assert.equal(namedRunObject(name, type, REFERENCES)?.name, expected);
+    });
+  }
 
-  it.each([
+  for (const [_case, name, type] of [
     ['no name', undefined, undefined],
     ['an empty name', '', undefined],
     ['a name no object of the run has', 'ZOBJ_OTHER', undefined],
     ['the name with another type', BROKEN, 'INTF/OI'],
-  ] as const)('%s names none', (_case, name, type) => {
-    expect(namedRunObject(name, type, REFERENCES)).toBeUndefined();
-  });
+  ] as const) {
+    it(format('%s names none', _case), () => {
+      assert.equal(namedRunObject(name, type, REFERENCES), undefined);
+    });
+  }
 });
 
 describe('a name sent as two types names neither, unless the message states its type', () => {
@@ -259,35 +275,37 @@ describe('a name sent as two types names neither, unless the message states its 
     `${HEAD}<msg type="E" objName="ZSHARED"><shortText><txt>A refusal</txt></shortText></msg>` +
     '</chkl:messages>';
 
-  it.each([
+  for (const [_order, sent] of [
     ['domain first', [DOMAIN, ELEMENT]],
     ['data element first', [ELEMENT, DOMAIN]],
-  ] as const)(
-    '%s: the message keeps its own name and no uri',
-    (_order, sent) => {
-      expect(namedRunObject('ZSHARED', undefined, sent)).toBeUndefined();
-      expect(activationMessagesOf(kept(NAMED), sent)).toEqual([
+  ] as const) {
+    it(format('%s: the message keeps its own name and no uri', _order), () => {
+      assert.equal(namedRunObject('ZSHARED', undefined, sent), undefined);
+      assert.deepStrictEqual(activationMessagesOf(kept(NAMED), sent), [
         { type: 'E', text: 'A refusal', objectName: 'ZSHARED' },
       ]);
-    },
-  );
+    });
+  }
 
-  it.each([
+  for (const [_order, sent] of [
     ['domain first', [DOMAIN, ELEMENT]],
     ['data element first', [ELEMENT, DOMAIN]],
-  ] as const)(
-    '%s: the type the message states picks the one',
-    (_order, sent) => {
-      expect(namedRunObject('ZSHARED', 'DTEL/DE', sent)?.uri).toBe(ELEMENT.uri);
-      expect(namedRunObject('zshared', 'doma/dd', sent)?.uri).toBe(DOMAIN.uri);
-    },
-  );
+  ] as const) {
+    it(format('%s: the type the message states picks the one', _order), () => {
+      assert.equal(
+        namedRunObject('ZSHARED', 'DTEL/DE', sent)?.uri,
+        ELEMENT.uri,
+      );
+      assert.equal(namedRunObject('zshared', 'doma/dd', sent)?.uri, DOMAIN.uri);
+    });
+  }
 
   it('a name sent once is its object, with no type stated', () => {
-    expect(namedRunObject('ZSHARED', undefined, [DOMAIN])?.uri).toBe(
+    assert.equal(
+      namedRunObject('ZSHARED', undefined, [DOMAIN])?.uri,
       DOMAIN.uri,
     );
-    expect(activationMessagesOf(kept(NAMED), [DOMAIN])).toEqual([
+    assert.deepStrictEqual(activationMessagesOf(kept(NAMED), [DOMAIN]), [
       { type: 'E', text: 'A refusal', objectName: 'ZSHARED', uri: DOMAIN.uri },
     ]);
   });
@@ -295,19 +313,22 @@ describe('a name sent as two types names neither, unless the message states its 
 
 describe('the measured results of a run with one broken class', () => {
   it('cloud: each error message names the broken class and its uri', () => {
-    expect(activationMessagesOf(kept(CLOUD), REFERENCES)).toEqual(READ_BROKEN);
-    expect(activationExecutedOf(kept(CLOUD))).toBe(false);
+    assert.deepStrictEqual(
+      activationMessagesOf(kept(CLOUD), REFERENCES),
+      READ_BROKEN,
+    );
+    assert.equal(activationExecutedOf(kept(CLOUD)), false);
   });
 
   it('on premise: the cancellation warning with an empty href is about no object', () => {
-    expect(activationMessagesOf(kept(ONPREM), REFERENCES)).toEqual([
+    assert.deepStrictEqual(activationMessagesOf(kept(ONPREM), REFERENCES), [
       { type: 'W', text: 'Activation was cancelled.' },
       ...READ_BROKEN,
     ]);
   });
 
   it('read with no references (a run read by its id), no message names an object', () => {
-    expect(activationMessagesOf(kept(CLOUD), [])).toEqual(READ_ALONE);
+    assert.deepStrictEqual(activationMessagesOf(kept(CLOUD), []), READ_ALONE);
   });
 });
 
@@ -338,7 +359,7 @@ describe('ActivateObjects answers the measured refusal', () => {
         { name: BROKEN, type: 'CLAS/OC' },
       ],
     });
-    expect(answered.isError).toBe(true);
+    assert.equal(answered.isError, true);
     return payloadOf(answered);
   }
 
@@ -349,10 +370,13 @@ describe('ActivateObjects answers the measured refusal', () => {
       `<msg type="E" objName="${BROKEN}"><shortText><txt>${LV}</txt></shortText></msg>` +
       '</chkl:messages>';
     const payload = await refused(mixed);
-    expect(payload.message).toContain(
-      `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
+    assert.ok(
+      typeof payload.message === 'string' &&
+        payload.message.includes(
+          `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
+        ),
     );
-    expect(payload.messages).toEqual([
+    assert.deepStrictEqual(payload.messages, [
       {
         type: 'E',
         text: DAAT,
@@ -366,35 +390,47 @@ describe('ActivateObjects answers the measured refusal', () => {
     ]);
   });
 
-  it.each([
+  for (const [_system, results, messages] of [
     ['cloud', CLOUD, READ_BROKEN],
     [
       'on premise',
       ONPREM,
       [{ type: 'W', text: 'Activation was cancelled.' }, ...READ_BROKEN],
     ],
-  ] as const)(
-    '%s: a refusal counting one refused object of two, naming it, and saying none was activated',
-    async (_system, results, messages) => {
-      const payload = await refused(results);
-      expect(payload.origin).toBe('refusal');
-      expect(payload.message).toContain(
-        `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
-      );
-      expect(payload.message).toContain(
-        'its results say activationExecuted="false": none of the 2 object(s) was activated',
-      );
-      expect(payload.message).toContain(`${BROKEN}: ${DAAT}`);
-      // A refusal answers each message's deprecated `line`: its position's.
-      expect(payload.messages).toEqual(
-        messages.map((message) =>
-          'position' in message
-            ? { ...message, line: String(message.position.line) }
-            : message,
-        ),
-      );
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        '%s: a refusal counting one refused object of two, naming it, and saying none was activated',
+        _system,
+      ),
+      async () => {
+        const payload = await refused(results);
+        assert.equal(payload.origin, 'refusal');
+        assert.ok(
+          typeof payload.message === 'string' &&
+            payload.message.includes(
+              `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
+            ),
+        );
+        assert.ok(
+          typeof payload.message === 'string' &&
+            payload.message.includes(
+              'its results say activationExecuted="false": none of the 2 object(s) was activated',
+            ),
+        );
+        assert.ok(payload.message.includes(`${BROKEN}: ${DAAT}`));
+        // A refusal answers each message's deprecated `line`: its position's.
+        assert.deepStrictEqual(
+          payload.messages,
+          messages.map((message) =>
+            'position' in message
+              ? { ...message, line: String(message.position.line) }
+              : message,
+          ),
+        );
+      },
+    );
+  }
 });
 
 /**
@@ -411,24 +447,33 @@ function referencesOf(run: (typeof MEASURED_RUNS)[number]): RunReference[] {
 describe('the measured runs of every type', () => {
   const runs = MEASURED_RUNS.map((run) => [run.system, run.kind, run] as const);
 
-  it.each(runs)(
-    '%s %s: each error message names the broken object, no other message names the good one',
-    (_system, _kind, run) => {
-      const [good, broken] = run.references;
-      const messages = activationMessagesOf(
-        kept(run.results),
-        referencesOf(run),
-      );
-      const errors = messages.filter((m) => m.type === 'E');
-      expect(errors.length).toBeGreaterThan(0);
-      for (const error of errors) {
-        expect(error.objectName).toBe(run.broken);
-        expect(error.uri).toBe(broken?.uri);
-      }
-      expect(messages.some((m) => m.objectName === good?.name)).toBe(false);
-      expect(activationExecutedOf(kept(run.results))).toBe(run.executed);
-    },
-  );
+  for (const [_system, _kind, run] of runs) {
+    it(
+      format(
+        '%s %s: each error message names the broken object, no other message names the good one',
+        _system,
+        _kind,
+      ),
+      () => {
+        const [good, broken] = run.references;
+        const messages = activationMessagesOf(
+          kept(run.results),
+          referencesOf(run),
+        );
+        const errors = messages.filter((m) => m.type === 'E');
+        assert.ok(errors.length > 0);
+        for (const error of errors) {
+          assert.equal(error.objectName, run.broken);
+          assert.equal(error.uri, broken?.uri);
+        }
+        assert.equal(
+          messages.some((m) => m.objectName === good?.name),
+          false,
+        );
+        assert.equal(activationExecutedOf(kept(run.results)), run.executed);
+      },
+    );
+  }
 
   const previous = process.env.SAP_SYSTEM_TYPE;
   beforeEach(() => {
@@ -447,32 +492,40 @@ describe('the measured runs of every type', () => {
   // A function module's reference is checked against its group first (one
   // metadata read per module), which this run's answers do not hold: its
   // naming is the case above.
-  it.each(runs.filter(([, kind]) => kind !== 'FUGR/FF'))(
-    '%s %s: ActivateObjects refuses one object of two',
-    async (_system, kind, run) => {
-      const connection = finishedRun(run.results);
-      declareSystemKind(connection, 'onprem');
-      const answered = await handleActivateObjects(
-        { connection },
-        {
-          objects: run.references.map((reference) => ({
-            name: reference.name,
-            type: kind,
-          })),
-        },
-      );
-      expect(answered.isError).toBe(true);
-      const payload = payloadOf(answered);
-      expect(payload.origin).toBe('refusal');
-      expect(payload.message).toContain(
-        `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
-      );
-      expect(
-        String(payload.message).includes(
-          'none of the 2 object(s) was activated',
-        ),
-      ).toBe(!run.executed);
-      expect(payload.message).toContain(`${run.broken}: `);
-    },
-  );
+  for (const [_system, kind, run] of runs.filter(
+    ([, kind]) => kind !== 'FUGR/FF',
+  )) {
+    it(
+      format('%s %s: ActivateObjects refuses one object of two', _system, kind),
+      async () => {
+        const connection = finishedRun(run.results);
+        declareSystemKind(connection, 'onprem');
+        const answered = await handleActivateObjects(
+          { connection },
+          {
+            objects: run.references.map((reference) => ({
+              name: reference.name,
+              type: kind,
+            })),
+          },
+        );
+        assert.equal(answered.isError, true);
+        const payload = payloadOf(answered);
+        assert.equal(payload.origin, 'refusal');
+        assert.ok(
+          typeof payload.message === 'string' &&
+            payload.message.includes(
+              `Activation run ${RUN_ID} finished and refused 1 of 2 object(s)`,
+            ),
+        );
+        assert.equal(
+          String(payload.message).includes(
+            'none of the 2 object(s) was activated',
+          ),
+          !run.executed,
+        );
+        assert.ok(payload.message.includes(`${run.broken}: `));
+      },
+    );
+  }
 });

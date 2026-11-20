@@ -5,6 +5,7 @@
  * `GetObjectNodeFromCache` answers a node of the list it cached and reads
  * the object its `OBJECT_URI` names (a minimal class document answers).
  */
+import { after, before, describe } from 'node:test';
 import { PIN_STAND_HOST, pinCases } from '../../helpers/pinCases';
 
 /** A package's class folder, as SAP's node structure answers it (shortened). */
@@ -59,11 +60,11 @@ const NODE_MATCHED = {
  */
 function statedAs(variant: 'onprem' | 'cloud'): void {
   let previous: string | undefined;
-  beforeAll(() => {
+  before(() => {
     previous = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = variant;
   });
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
   });

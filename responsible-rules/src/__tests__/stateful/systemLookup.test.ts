@@ -1,4 +1,8 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 /**
  * The ABAP Cloud system-context lookup (`systeminformation`) is asked once
  * per connection, before the first tool on it runs, inside the main flow
@@ -40,8 +44,6 @@ import type {
 import { CompositeHandlersRegistry } from '../../../../src/lib/handlers/registry/CompositeHandlersRegistry';
 import { requireSystemContextForCreate } from '../../../../src/lib/systemContextGuard';
 import { responsibleRules, StandServer } from '../helpers/withRules';
-
-jest.setTimeout(30_000);
 
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
 const of = (name: string) => (r: StandInRequest) =>
@@ -103,13 +105,14 @@ it('ABAP Cloud: the lookup is sent once per connection, before the first tool re
     await s.call('GetClass', { class_name: 'ZCL_FIRST' });
     await s.call('GetClass', { class_name: 'ZCL_SECOND' });
     const lookups = standIn.requests.filter(isLookup);
-    expect(lookups).toHaveLength(1);
+    assert.equal(lookups.length, 1);
     const lookup = standIn.requests.findIndex(isLookup);
     const firstTool = standIn.requests.findIndex(of('ZCL_FIRST'));
-    expect(lookup).toBeGreaterThanOrEqual(0);
-    expect(firstTool).toBeGreaterThan(lookup);
+    assert.ok(lookup >= 0);
+    assert.ok(firstTool > lookup);
     // In the instance's own session.
-    expect(lookups[0]?.session).toBe(
+    assert.equal(
+      lookups[0]?.session,
       standIn.requests.find(of('ZCL_FIRST'))?.session,
     );
   } finally {
@@ -126,7 +129,7 @@ it('ABAP Cloud: a background run sends no lookup on the instance’s connection,
       class_name: 'ZCL_BACKGROUND',
       background: true,
     });
-    expect(started.isError).toBe(false);
+    assert.equal(started.isError, false);
     await until(() => standIn.requests.some(isClassRun));
     await s.call('RuntimeRunClass', {
       class_name: 'ZCL_BACKGROUND_TWO',
@@ -136,12 +139,12 @@ it('ABAP Cloud: a background run sends no lookup on the instance’s connection,
     // The connect's one lookup — it names the runs' caller too — and none
     // of the runs'.
     const lookups = standIn.requests.filter(isLookup);
-    expect(lookups).toHaveLength(1);
+    assert.equal(lookups.length, 1);
     const runSessions = new Set(
       standIn.requests.filter(isClassRun).map((r) => r.session),
     );
     for (const lookup of lookups) {
-      expect(runSessions.has(lookup.session ?? '')).toBe(false);
+      assert.equal(runSessions.has(lookup.session ?? ''), false);
     }
   } finally {
     await s.close();
@@ -179,9 +182,10 @@ it('ABAP Cloud: a debugger wait sends no lookup; the injected connection is look
     await s.call('DebugWait', {});
     await s.call('GetClass', { class_name: 'ZCL_AFTER' });
     const lookups = s.standIn.requests.filter(isLookup);
-    expect(lookups).toHaveLength(1);
-    expect(s.standIn.requests.findIndex(of('ZCL_AFTER'))).toBeGreaterThan(
-      s.standIn.requests.findIndex(isLookup),
+    assert.equal(lookups.length, 1);
+    assert.ok(
+      s.standIn.requests.findIndex(of('ZCL_AFTER')) >
+        s.standIn.requests.findIndex(isLookup),
     );
   } finally {
     await s.close();
@@ -194,9 +198,10 @@ it('on-premise: the lookup is sent once per connection, before the first tool re
   try {
     await s.call('GetClass', { class_name: 'ZCL_ONPREM' });
     await s.call('GetClass', { class_name: 'ZCL_ONPREM_TWO' });
-    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
-    expect(standIn.requests.findIndex(of('ZCL_ONPREM'))).toBeGreaterThan(
-      standIn.requests.findIndex(isLookup),
+    assert.equal(standIn.requests.filter(isLookup).length, 1);
+    assert.ok(
+      standIn.requests.findIndex(of('ZCL_ONPREM')) >
+        standIn.requests.findIndex(isLookup),
     );
   } finally {
     await s.close();
@@ -204,7 +209,7 @@ it('on-premise: the lookup is sent once per connection, before the first tool re
   }
 });
 
-it.each([
+for (const [_case, answer, lookups] of [
   [
     'no systeminformation (404)',
     (standIn: AdtStandIn) => standIn.answer(isLookup, 404),
@@ -217,50 +222,60 @@ it.each([
       standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' })),
     1,
   ],
-] as const)(
-  'on-premise, %s: the stated user is taken and the tools run; the parameters made are kept for the destination, asked once',
-  async (_case, answer, lookups) => {
-    const standIn = await adtStandIn();
-    answer(standIn);
-    const s = await builtStand(standIn, 'onprem');
-    try {
-      expect(
-        (await s.call('GetClass', { class_name: 'ZCL_ONPREM' })).isError,
-      ).toBe(false);
-      expect(
-        (await s.call('GetClass', { class_name: 'ZCL_ONPREM_TWO' })).isError,
-      ).toBe(false);
-      expect(standIn.requests.filter(isLookup)).toHaveLength(lookups);
-      expect(
-        standIn.requests.filter((r) => !isLogoff(r.url)).length,
-      ).toBeGreaterThan(2);
-    } finally {
-      await s.close();
-      await standIn.close();
-    }
-  },
-);
+] as const) {
+  it(
+    format(
+      'on-premise, %s: the stated user is taken and the tools run; the parameters made are kept for the destination, asked once',
+      _case,
+    ),
+    async () => {
+      const standIn = await adtStandIn();
+      answer(standIn);
+      const s = await builtStand(standIn, 'onprem');
+      try {
+        assert.equal(
+          (await s.call('GetClass', { class_name: 'ZCL_ONPREM' })).isError,
+          false,
+        );
+        assert.equal(
+          (await s.call('GetClass', { class_name: 'ZCL_ONPREM_TWO' })).isError,
+          false,
+        );
+        assert.equal(standIn.requests.filter(isLookup).length, lookups);
+        assert.ok(standIn.requests.filter((r) => !isLogoff(r.url)).length > 2);
+      } finally {
+        await s.close();
+        await standIn.close();
+      }
+    },
+  );
+}
 
-it.each([
+for (const [_kind, kind] of [
   ['on-premise', 'onprem'],
   ['ABAP Cloud', 'cloud'],
-] as const)(
-  '%s, a 401 on the lookup: the credential failure as it came — no stated user stands in, the tool not run',
-  async (_kind, kind) => {
-    const standIn = await adtStandIn();
-    standIn.answer(isLookup, 401);
-    const s = await builtStand(standIn, kind);
-    try {
-      const answer = await s.call('GetClass', { class_name: 'ZCL_REFUSED' });
-      expect(answer.isError).toBe(true);
-      expect(answer.payload).toMatchObject({ error: 'authentication_failed' });
-      expect(standIn.requests.some(of('ZCL_REFUSED'))).toBe(false);
-    } finally {
-      await s.close();
-      await standIn.close();
-    }
-  },
-);
+] as const) {
+  it(
+    format(
+      '%s, a 401 on the lookup: the credential failure as it came — no stated user stands in, the tool not run',
+      _kind,
+    ),
+    async () => {
+      const standIn = await adtStandIn();
+      standIn.answer(isLookup, 401);
+      const s = await builtStand(standIn, kind);
+      try {
+        const answer = await s.call('GetClass', { class_name: 'ZCL_REFUSED' });
+        assert.equal(answer.isError, true);
+        assertMatchObject(answer.payload, { error: 'authentication_failed' });
+        assert.equal(standIn.requests.some(of('ZCL_REFUSED')), false);
+      } finally {
+        await s.close();
+        await standIn.close();
+      }
+    },
+  );
+}
 
 /**
  * A lookup that fails is the call's answer, asked before the tool runs —
@@ -324,26 +339,26 @@ describe('ABAP Cloud, the lookup refused', () => {
     const { standIn, s } = await refusedFirst();
     try {
       const first = await s.call('TwoStep', { id: 'one' });
-      expect(first.isError).toBe(true);
-      expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
-      expect(sent(standIn, 'before-one')).toBe(0);
+      assert.equal(first.isError, true);
+      assertMatchObject(first.payload, { error: 'system_lookup_failed' });
+      assert.equal(sent(standIn, 'before-one'), 0);
 
       const second = await s.call('TwoStep', { id: 'two' });
-      expect(second.isError).toBe(false);
-      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
+      assert.equal(second.isError, false);
+      assert.equal(standIn.requests.filter(isLookup).length, 2);
       // Ran once: one check, one create — nothing replayed.
-      expect(sent(standIn, 'before-two')).toBe(1);
-      expect(sent(standIn, 'create-CLOUD_USER')).toBe(1);
+      assert.equal(sent(standIn, 'before-two'), 1);
+      assert.equal(sent(standIn, 'create-CLOUD_USER'), 1);
       const lookup = standIn.requests.map(isLookup).lastIndexOf(true);
-      expect(
+      assert.ok(
         standIn.requests.findIndex(
           (r) => r.url === '/sap/bc/adt/probe/before-two',
-        ),
-      ).toBeGreaterThan(lookup);
+        ) > lookup,
+      );
       // Known from now on: asked no more.
       await s.call('TwoStep', { id: 'three' });
-      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
-      expect(sent(standIn, 'before-three')).toBe(1);
+      assert.equal(standIn.requests.filter(isLookup).length, 2);
+      assert.equal(sent(standIn, 'before-three'), 1);
     } finally {
       await s.close();
       await standIn.close();
@@ -354,14 +369,12 @@ describe('ABAP Cloud, the lookup refused', () => {
     const { standIn, s } = await refusedFirst();
     try {
       const first = await s.call('GetClass', { class_name: 'ZCL_READ' });
-      expect(first.isError).toBe(true);
-      expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
-      expect(standIn.requests.some(of('ZCL_READ'))).toBe(false);
+      assert.equal(first.isError, true);
+      assertMatchObject(first.payload, { error: 'system_lookup_failed' });
+      assert.equal(standIn.requests.some(of('ZCL_READ')), false);
       const second = await s.call('GetClass', { class_name: 'ZCL_AGAIN' });
-      expect(second.isError).toBe(false);
-      expect(standIn.requests.filter(of('ZCL_AGAIN')).length).toBeGreaterThan(
-        0,
-      );
+      assert.equal(second.isError, false);
+      assert.ok(standIn.requests.filter(of('ZCL_AGAIN')).length > 0);
     } finally {
       await s.close();
       await standIn.close();
@@ -374,10 +387,10 @@ describe('ABAP Cloud, the lookup refused', () => {
     try {
       for (const id of ['a', 'b', 'c']) {
         const answer = await s.call('TwoStep', { id });
-        expect(answer.payload).toMatchObject({ error: 'system_lookup_failed' });
-        expect(sent(standIn, `before-${id}`)).toBe(0);
+        assertMatchObject(answer.payload, { error: 'system_lookup_failed' });
+        assert.equal(sent(standIn, `before-${id}`), 0);
       }
-      expect(standIn.requests.filter(isLookup)).toHaveLength(3);
+      assert.equal(standIn.requests.filter(isLookup).length, 3);
     } finally {
       await s.close();
       await standIn.close();
@@ -391,17 +404,17 @@ describe('ABAP Cloud, the lookup refused', () => {
         class_name: 'ZCL_BACKGROUND',
         background: true,
       });
-      expect(first.isError).toBe(true);
-      expect(first.payload).toMatchObject({ error: 'system_lookup_failed' });
+      assert.equal(first.isError, true);
+      assertMatchObject(first.payload, { error: 'system_lookup_failed' });
       const second = await s.call('RuntimeRunClass', {
         class_name: 'ZCL_BACKGROUND',
         background: true,
       });
-      expect(second.isError).toBe(false);
+      assert.equal(second.isError, false);
       await until(() => standIn.requests.some(isClassRun));
-      expect(standIn.requests.filter(isClassRun)).toHaveLength(1);
+      assert.equal(standIn.requests.filter(isClassRun).length, 1);
       // The refused one and the next call's, which names the caller too.
-      expect(standIn.requests.filter(isLookup)).toHaveLength(2);
+      assert.equal(standIn.requests.filter(isLookup).length, 2);
     } finally {
       await s.close();
       await standIn.close();
@@ -437,12 +450,12 @@ it('ABAP Cloud, the lookup refused: a tool outside the flow is refused before it
   s.standIn.answerOnce(isLookup, 500);
   try {
     const answer = await s.call('DebugWait', {});
-    expect(answer.isError).toBe(true);
-    expect(ran).toBe(0);
+    assert.equal(answer.isError, true);
+    assert.equal(ran, 0);
     const again = await s.call('DebugWait', {});
-    expect(again.isError).toBeFalsy();
-    expect(ran).toBe(1);
-    expect(s.standIn.requests.filter(isLookup)).toHaveLength(2);
+    assert.ok(!again.isError);
+    assert.equal(ran, 1);
+    assert.equal(s.standIn.requests.filter(isLookup).length, 2);
   } finally {
     await s.close();
   }
@@ -497,24 +510,24 @@ it('a replacement after a lost session asks no lookup: the same credential on th
     registerHandlers: () => {},
   } as unknown as IHandlerGroup);
   try {
-    expect((await s.call('LoseSession', {})).isError).toBeFalsy();
-    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    assert.ok(!(await s.call('LoseSession', {})).isError);
+    assert.equal(standIn.requests.filter(isLookup).length, 1);
     // SAP would now name another user: never asked, the destination's kept.
     standIn.body(
       isLookup,
       JSON.stringify({ userName: 'OTHER_USER', systemID: 'OTH' }),
     );
     const after = await s.call('Responsible', {});
-    expect(after.isError).toBeFalsy();
-    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    assert.ok(!after.isError);
+    assert.equal(standIn.requests.filter(isLookup).length, 1);
     const lost = standIn.requests.find((r) =>
       r.url.endsWith('/probe/lose'),
     )?.session;
     const replaced = standIn.requests.find((r) =>
       r.url.endsWith('/probe/after/CLOUD_USER'),
     )?.session;
-    expect(replaced).toBeDefined();
-    expect(replaced).not.toBe(lost);
+    assert.notEqual(replaced, undefined);
+    assert.notEqual(replaced, lost);
   } finally {
     await s.close();
     await standIn.close();

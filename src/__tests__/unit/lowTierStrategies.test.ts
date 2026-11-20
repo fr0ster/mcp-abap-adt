@@ -33,6 +33,9 @@
  * to share a shape.
  */
 
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import {
   analyseActivation,
   analyseException,
@@ -87,6 +90,7 @@ import { handleActivateTable } from '../../handlers/table/low/handleActivateTabl
 import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
 import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import * as clients from '../../lib/clients';
 import { listedTool } from '../../lib/listedTool';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
@@ -94,6 +98,7 @@ import { structured, verbatim } from '../../lib/strategies/reading';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { sessionContext } from '../../lib/utils';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 import {
   fakeClientOf,
   fakeClientOfWithFactory,
@@ -108,6 +113,13 @@ import {
 } from '../helpers/functionModuleMetadata';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The declared variant the boundary checks a type argument against.
+// The declared variant: the kind stated, read by the real variantOf.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => fakeClient);
+mock.method(clients, 'createOnPremAdtClient', () => fakeClient);
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -124,12 +136,6 @@ const seen = recordAnalyse({
   },
 });
 let fakeClient: unknown = seen.client;
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => fakeClient,
-  createOnPremAdtClient: () => fakeClient,
-}));
 
 const context = {
   connection: { getSessionId: () => null } as any,
@@ -157,7 +163,7 @@ const callTo = (member: string) =>
  * with their handlers): each Activate handler that backs a high Activate
  * tool reaches its own factory's `activate` with `analyseActivation`.
  */
-it.each([
+for (const [_family, activate, factory, args] of [
   [
     'class',
     handleActivateClass,
@@ -282,25 +288,27 @@ it.each([
       lock_handle: 'h',
     },
   ],
-] as const)(
-  '%s activates on its own factory with analyseActivation',
-  async (_family, activate, factory, args) => {
-    await (activate as any)(context as any, args);
-    const activateCall = callTo('activate');
-    expect(activateCall?.factory).toBe(factory);
-    expect(activateCall?.carriedAnalyse).toBe(true);
-    expect(activateCall?.analyse).toBe(analyseActivation);
-  },
-);
+] as const) {
+  it(
+    format('%s activates on its own factory with analyseActivation', _family),
+    async () => {
+      await (activate as any)(context as any, args);
+      const activateCall = callTo('activate');
+      assert.equal(activateCall?.factory, factory);
+      assert.equal(activateCall?.carriedAnalyse, true);
+      assert.equal(activateCall?.analyse, analyseActivation);
+    },
+  );
+}
 
 describe('class', () => {
   it('CheckClassLow defaults the check member\'s status to "active" when version is omitted', async () => {
     await handleCheckClass(context as any, { class_name: 'ZCL_X' });
     const call = callTo('check');
-    expect(call?.factory).toBe('getClass');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.factory, 'getClass');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.equal(call?.args[1], 'active');
   });
 
   it('UpdateClassLow passes source via options, not config — the shipped AdtClass.update() only reads it there', async () => {
@@ -310,14 +318,14 @@ describe('class', () => {
       lock_handle: 'h',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getClass');
-    expect(call?.args[0]).toEqual({ className: 'ZCL_X' });
-    expect(call?.args[1]).toMatchObject({
+    assert.equal(call?.factory, 'getClass');
+    assert.deepStrictEqual(call?.args[0], { className: 'ZCL_X' });
+    assertMatchObject(call?.args[1], {
       source: 'CLASS zcl_x IMPLEMENTATION.\nENDCLASS.',
       lockHandle: 'h',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 });
 
@@ -325,10 +333,10 @@ describe('interface', () => {
   it("CheckInterfaceLow passes status 'active' to the check member when version is omitted", async () => {
     await handleCheckInterface(context as any, { interface_name: 'ZIF_X' });
     const call = callTo('check');
-    expect(call?.factory).toBe('getInterface');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.factory, 'getInterface');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.equal(call?.args[1], 'active');
   });
 
   it('UpdateInterfaceLow passes source via options, not config — the shipped AdtInterface.update() only reads it there', async () => {
@@ -338,14 +346,14 @@ describe('interface', () => {
       lock_handle: 'h',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getInterface');
-    expect(call?.args[0]).toEqual({ interfaceName: 'ZIF_X' });
-    expect(call?.args[1]).toMatchObject({
+    assert.equal(call?.factory, 'getInterface');
+    assert.deepStrictEqual(call?.args[0], { interfaceName: 'ZIF_X' });
+    assertMatchObject(call?.args[1], {
       source: 'INTERFACE zif_x.\nENDINTERFACE.',
       lockHandle: 'h',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('ActivateInterfaceLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -363,8 +371,8 @@ describe('interface', () => {
       interface_name: 'ZIF_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -375,10 +383,10 @@ describe('behavior_definition', () => {
   it("CheckBdefLow passes status 'active' to the check member when version is omitted", async () => {
     await handleCheckBehaviorDefinition(context as any, { name: 'ZBDEF_X' });
     const call = callTo('check');
-    expect(call?.factory).toBe('getBehaviorDefinition');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.factory, 'getBehaviorDefinition');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.equal(call?.args[1], 'active');
   });
 
   it('UpdateBehaviorDefinitionLow passes source via options and transportRequest via config — the shipped AdtBehaviorDefinition.update() only reads source there', async () => {
@@ -389,17 +397,17 @@ describe('behavior_definition', () => {
       transport_request: 'SIDK900001',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getBehaviorDefinition');
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.factory, 'getBehaviorDefinition');
+    assert.deepStrictEqual(call?.args[0], {
       name: 'ZBDEF_X',
       transportRequest: 'SIDK900001',
     });
-    expect(call?.args[1]).toMatchObject({
+    assertMatchObject(call?.args[1], {
       source: 'behavior definitions',
       lockHandle: 'h',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('CheckBdefLow reads a real corpus document (generic check-verdict fixture) through terseCheck', async () => {
@@ -416,8 +424,8 @@ describe('behavior_definition', () => {
       name: 'ZBDEF_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       ran: true,
       status_text: 'Object ZBP_MCP_SHR_I_ROOT has been checked',
     });
@@ -431,14 +439,14 @@ describe('ddl', () => {
       ddl_source: 'define view ZVW_X as select from t000 {client};',
     });
     const call = callTo('check');
-    expect(call?.factory).toBe('getDdl');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.factory, 'getDdl');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args[0], {
       ddlName: 'ZVW_X',
       source: 'define view ZVW_X as select from t000 {client};',
     });
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.args[1], 'active');
   });
 
   it('CheckDdlLow passes "active" through to the check member\'s second parameter when asked', async () => {
@@ -447,7 +455,7 @@ describe('ddl', () => {
       version: 'active',
     });
     const call = callTo('check');
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.args[1], 'active');
   });
 
   it('UpdateDdlLow passes source via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares', async () => {
@@ -457,14 +465,14 @@ describe('ddl', () => {
       lock_handle: 'h',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getDdl');
-    expect(call?.args[0]).toEqual({ ddlName: 'ZVW_X' });
-    expect(call?.args[1]).toMatchObject({
+    assert.equal(call?.factory, 'getDdl');
+    assert.deepStrictEqual(call?.args[0], { ddlName: 'ZVW_X' });
+    assertMatchObject(call?.args[1], {
       source: 'define view ZVW_X as select from t000 {client};',
       lockHandle: 'h',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('ActivateDdlLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -478,8 +486,8 @@ describe('ddl', () => {
       ddl_name: 'ZVW_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -500,11 +508,11 @@ describe('ddlx (metadataExtension)', () => {
   it('CheckMetadataExtensionLow asks for the active version and carries our analyse — checkMetadataExtension takes no source parameter at all', async () => {
     await handleCheckMetadataExtension(context as any, { name: 'ZI_X_DDLX' });
     const call = callTo('check');
-    expect(call?.factory).toBe('getMetadataExtension');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[0]).toEqual({ name: 'ZI_X_DDLX' });
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.factory, 'getMetadataExtension');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args[0], { name: 'ZI_X_DDLX' });
+    assert.equal(call?.args[1], 'active');
   });
 
   it('UpdateMetadataExtensionLow passes source via options, not config — the shipped AdtMetadataExtension.update() reads options.source only, with no config fallback (the exact empty-write shape found four times in cluster 14)', async () => {
@@ -514,17 +522,17 @@ describe('ddlx (metadataExtension)', () => {
       lock_handle: 'h',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getMetadataExtension');
-    expect(call?.args[0]).toEqual({ name: 'ZI_X_DDLX' });
-    expect(call?.args[1]).toMatchObject({
+    assert.equal(call?.factory, 'getMetadataExtension');
+    assert.deepStrictEqual(call?.args[0], { name: 'ZI_X_DDLX' });
+    assertMatchObject(call?.args[1], {
       source: '@Metadata.layer: #CORE\nannotate view ZI_X_DDLX with {}',
       lockHandle: 'h',
     });
     // The negative half of the assertion: config carries no source at
     // all, so a regression that moves it back cannot pass silently.
-    expect((call?.args[0] as any)?.source).toBeUndefined();
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal((call?.args[0] as any)?.source, undefined);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('ActivateMetadataExtensionLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -538,8 +546,8 @@ describe('ddlx (metadataExtension)', () => {
       name: 'ZI_X_DDLX',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -553,14 +561,14 @@ describe('structure', () => {
       ddl_code: 'define structure zst_x { client : abap.clnt; }',
     });
     const call = callTo('check');
-    expect(call?.factory).toBe('getStructure');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.factory, 'getStructure');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args[0], {
       structureName: 'ZST_X',
       source: 'define structure zst_x { client : abap.clnt; }',
     });
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.args[1], 'active');
   });
 
   it('CheckStructureLow passes "active" through to the check member\'s second parameter when asked', async () => {
@@ -569,7 +577,7 @@ describe('structure', () => {
       version: 'active',
     });
     const call = callTo('check');
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.args[1], 'active');
   });
 
   it('UpdateStructureLow passes source via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares', async () => {
@@ -579,14 +587,14 @@ describe('structure', () => {
       lock_handle: 'h',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getStructure');
-    expect(call?.args[0]).toEqual({ structureName: 'ZST_X' });
-    expect(call?.args[1]).toMatchObject({
+    assert.equal(call?.factory, 'getStructure');
+    assert.deepStrictEqual(call?.args[0], { structureName: 'ZST_X' });
+    assertMatchObject(call?.args[1], {
       source: 'define structure zst_x { client : abap.clnt; }',
       lockHandle: 'h',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('ActivateStructureLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -600,8 +608,8 @@ describe('structure', () => {
       structure_name: 'ZST_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -615,16 +623,16 @@ describe('table', () => {
       ddl_code: 'define table zt_x { client : abap.clnt; }',
     });
     const call = callTo('check');
-    expect(call?.factory).toBe('getTable');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.factory, 'getTable');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
     // adt-clients 43 sends `config.source` with the check run (#9), as the
     // structure check does: ddl_code reaches it.
-    expect(call?.args[0]).toEqual({
+    assert.deepStrictEqual(call?.args[0], {
       tableName: 'ZT_X',
       source: 'define table zt_x { client : abap.clnt; }',
     });
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.args[1], 'active');
   });
 
   it('CheckTableLow passes "active" through to the check member\'s second parameter when asked', async () => {
@@ -633,7 +641,7 @@ describe('table', () => {
       version: 'active',
     });
     const call = callTo('check');
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.args[1], 'active');
   });
 
   it('UpdateTableLow passes source via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares; transportRequest belongs in config, which the shipped member reads directly', async () => {
@@ -644,17 +652,17 @@ describe('table', () => {
       transport_request: 'SIDK900001',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getTable');
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.factory, 'getTable');
+    assert.deepStrictEqual(call?.args[0], {
       tableName: 'ZT_X',
       transportRequest: 'SIDK900001',
     });
-    expect(call?.args[1]).toMatchObject({
+    assertMatchObject(call?.args[1], {
       source: 'define table zt_x { client : abap.clnt; }',
       lockHandle: 'h',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('ActivateTableLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -668,8 +676,8 @@ describe('table', () => {
       table_name: 'ZT_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -680,11 +688,11 @@ describe('program', () => {
   it("CheckProgramLow passes status 'active' to the check member when version is omitted", async () => {
     await handleCheckProgram(context as any, { program_name: 'Z_X' });
     const call = callTo('check');
-    expect(call?.factory).toBe('getProgram');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[0]).toEqual({ programName: 'Z_X' });
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.factory, 'getProgram');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args[0], { programName: 'Z_X' });
+    assert.equal(call?.args[1], 'active');
   });
 
   it('UpdateProgramLow passes source via options, not config — the shipped AdtProgram.update() only reads it there', async () => {
@@ -694,14 +702,14 @@ describe('program', () => {
       lock_handle: 'h',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getProgram');
-    expect(call?.args[0]).toEqual({ programName: 'Z_X' });
-    expect(call?.args[1]).toMatchObject({
+    assert.equal(call?.factory, 'getProgram');
+    assert.deepStrictEqual(call?.args[0], { programName: 'Z_X' });
+    assertMatchObject(call?.args[1], {
       source: 'REPORT z_x.',
       lockHandle: 'h',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('ActivateProgramLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -715,8 +723,8 @@ describe('program', () => {
       program_name: 'Z_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -755,21 +763,26 @@ describe('program', () => {
       ],
     ];
 
-    it.each(rows)(
-      '%s with a JWT credential reaches its member',
-      async (_name, handler, member, args) => {
-        await sessionContext.run(jwtStore, () => handler(context, args));
-        expect(callTo(member)).toBeDefined();
-      },
-    );
+    for (const [_name, handler, member, args] of rows) {
+      it(
+        format('%s with a JWT credential reaches its member', _name),
+        async () => {
+          await sessionContext.run(jwtStore, () => handler(context, args));
+          assert.notEqual(callTo(member), undefined);
+        },
+      );
+    }
 
     it('the program writes are listed where onprem is declared, not where cloud is', () => {
       for (const definition of [ActivateProgramLowTool, UpdateProgramLowTool]) {
-        expect({
-          tool: definition.name,
-          onprem: listedTool(definition, 'onprem').listed,
-          cloud: listedTool(definition, 'cloud').listed,
-        }).toEqual({ tool: definition.name, onprem: true, cloud: false });
+        assert.deepStrictEqual(
+          {
+            tool: definition.name,
+            onprem: listedTool(definition, 'onprem').listed,
+            cloud: listedTool(definition, 'cloud').listed,
+          },
+          { tool: definition.name, onprem: true, cloud: false },
+        );
       }
     });
 
@@ -783,7 +796,7 @@ describe('program', () => {
       await sessionContext.run(jwtStore, () =>
         handleCheckProgram(typedContext, { program_name: 'Z_X' }),
       );
-      expect(callTo('check')).toBeDefined();
+      assert.notEqual(callTo('check'), undefined);
     });
   });
 });
@@ -794,11 +807,11 @@ describe('function (function group)', () => {
       function_group_name: 'ZFG_X',
     });
     const call = callTo('check');
-    expect(call?.factory).toBe('getFunctionGroup');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[0]).toEqual({ functionGroupName: 'ZFG_X' });
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.factory, 'getFunctionGroup');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args[0], { functionGroupName: 'ZFG_X' });
+    assert.equal(call?.args[1], 'active');
   });
 
   it('ActivateFunctionGroupLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -812,8 +825,8 @@ describe('function (function group)', () => {
       function_group_name: 'ZFG_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -827,14 +840,14 @@ describe('function (function module)', () => {
       function_module_name: 'ZFM_X',
     });
     const call = callTo('check');
-    expect(call?.factory).toBe('getFunctionModule');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.factory, 'getFunctionModule');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.deepStrictEqual(call?.args[0], {
       functionModuleName: 'ZFM_X',
       functionGroupName: 'ZFG_X',
     });
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.args[1], 'active');
   });
 
   it('CheckFunctionModuleLow passes "inactive" through to the check member\'s second parameter when asked', async () => {
@@ -844,7 +857,7 @@ describe('function (function module)', () => {
       version: 'inactive',
     });
     const call = callTo('check');
-    expect(call?.args[1]).toBe('inactive');
+    assert.equal(call?.args[1], 'inactive');
   });
 
   it('UpdateFunctionModuleLow passes source via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares; transportRequest belongs in config, which the shipped member reads directly', async () => {
@@ -856,18 +869,18 @@ describe('function (function module)', () => {
       transport_request: 'SIDK900001',
     });
     const call = callTo('update');
-    expect(call?.factory).toBe('getFunctionModule');
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.factory, 'getFunctionModule');
+    assert.deepStrictEqual(call?.args[0], {
       functionModuleName: 'ZFM_X',
       functionGroupName: 'ZFG_X',
       transportRequest: 'SIDK900001',
     });
-    expect(call?.args[1]).toMatchObject({
+    assertMatchObject(call?.args[1], {
       source: 'FUNCTION zfm_x.\nENDFUNCTION.',
       lockHandle: 'h',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('ActivateFunctionModuleLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -885,8 +898,8 @@ describe('function (function module)', () => {
       function_group_name: 'ZFG_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -904,10 +917,10 @@ describe('data_element', () => {
       data_element_name: 'ZDT_X',
     });
     const call = callTo('check');
-    expect(call?.factory).toBe('getDataElement');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
-    expect(call?.args[1]).toBe('active');
+    assert.equal(call?.factory, 'getDataElement');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
+    assert.equal(call?.args[1], 'active');
   });
 
   /**
@@ -924,7 +937,7 @@ describe('data_element', () => {
         version: 'active',
       } as any,
     );
-    expect(callTo('check')?.args[1]).toBe('active');
+    assert.equal(callTo('check')?.args[1], 'active');
   });
 
   it('CheckDomainLow passes version through to the check member, and sends active when not given', async () => {
@@ -935,14 +948,14 @@ describe('data_element', () => {
         version: 'active',
       } as any,
     );
-    expect(callTo('check')?.args[1]).toBe('active');
+    assert.equal(callTo('check')?.args[1], 'active');
     await handleCheckDomainLowForVersion(
       context as any,
       {
         domain_name: 'ZDM_X',
       } as any,
     );
-    expect(callTo('check')?.args[1]).toBe('active');
+    assert.equal(callTo('check')?.args[1], 'active');
   });
 
   it('CheckDataElementLow reads the real check-success-verdict fixture through terseCheck — pinning the projection, not only the analyse', async () => {
@@ -956,8 +969,8 @@ describe('data_element', () => {
       data_element_name: 'zd',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       ran: true,
       status_text: 'Object ZBP_MCP_SHR_I_ROOT has been checked',
     });
@@ -974,8 +987,8 @@ describe('data_element', () => {
       data_element_name: 'zd',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -1004,21 +1017,25 @@ describe('data_element', () => {
       lock_handle: 'h',
     });
 
-    expect(result.isError).toBe(false);
-    expect(double.factory).toBe('getDataElement');
-    expect(updateCall?.config).toEqual({
+    assert.equal(result.isError, false);
+    assert.equal(double.factory, 'getDataElement');
+    assert.deepStrictEqual(updateCall?.config, {
       dataElementName: 'ZDT_X',
       transportRequest: 'SIDK900001',
     });
-    expect(updateCall?.options).toEqual({
-      headers: DEFAULT_ADT_HEADERS['dataElement.updateMetadata'],
-      source: expect.stringContaining('adtcore:description="after"'),
-      lockHandle: 'h',
-      analyse: analyseException,
-    });
-    expect(
+    {
+      const { source, ...options } = updateCall?.options ?? {};
+      assert.ok(source.includes('adtcore:description="after"'));
+      assert.deepStrictEqual(options, {
+        headers: DEFAULT_ADT_HEADERS['dataElement.updateMetadata'],
+        lockHandle: 'h',
+        analyse: analyseException,
+      });
+    }
+    assert.equal(
       (updateCall?.config as { document?: unknown })?.document,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('UpdateDataElementLow patches typeKind/typeName/dataType into the document read from readMetadata', async () => {
@@ -1040,8 +1057,8 @@ describe('data_element', () => {
       lock_handle: 'h',
     });
 
-    expect(patched).toContain('<dtel:typeKind>domain</dtel:typeKind>');
-    expect(patched).toContain('<dtel:typeName>ZD_DOMAIN</dtel:typeName>');
+    assert.ok(patched.includes('<dtel:typeKind>domain</dtel:typeKind>'));
+    assert.ok(patched.includes('<dtel:typeName>ZD_DOMAIN</dtel:typeName>'));
   });
 
   // The bag is the model's own object: a type name given as a number failed
@@ -1065,8 +1082,8 @@ describe('data_element', () => {
       lock_handle: 'h',
     });
 
-    expect(result.isError).toBe(false);
-    expect(patched).toContain('<dtel:typeName>5</dtel:typeName>');
+    assert.equal(result.isError, false);
+    assert.ok(patched.includes('<dtel:typeName>5</dtel:typeName>'));
   });
 });
 
@@ -1074,10 +1091,10 @@ describe('service_binding — Activate only, over AdtServiceBinding', () => {
   it('ActivateServiceBindingLow reaches getServiceBinding with analyseActivation', async () => {
     await handleActivateServiceBinding(context as any, { name: 'ZSB_X' });
     const call = callTo('activate');
-    expect(call?.factory).toBe('getServiceBinding');
-    expect(call?.args[0]).toEqual({ bindingName: 'ZSB_X' });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseActivation);
+    assert.equal(call?.factory, 'getServiceBinding');
+    assert.deepStrictEqual(call?.args[0], { bindingName: 'ZSB_X' });
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseActivation);
   });
 
   it('ActivateServiceBindingLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -1091,8 +1108,8 @@ describe('service_binding — Activate only, over AdtServiceBinding', () => {
       name: 'ZSB_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -1126,9 +1143,9 @@ describe('service_binding — Activate only, over AdtServiceBinding', () => {
       name: 'ZSB_X',
     });
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.origin).toBe('refusal');
+    assert.equal(payload.origin, 'refusal');
   });
 });
 
@@ -1138,10 +1155,12 @@ describe('service_definition — Activate only', () => {
       name: 'ZI_X_SRVD',
     });
     const call = callTo('activate');
-    expect(call?.factory).toBe('getServiceDefinition');
-    expect(call?.args[0]).toEqual({ serviceDefinitionName: 'ZI_X_SRVD' });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseActivation);
+    assert.equal(call?.factory, 'getServiceDefinition');
+    assert.deepStrictEqual(call?.args[0], {
+      serviceDefinitionName: 'ZI_X_SRVD',
+    });
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseActivation);
   });
 
   it('ActivateServiceDefinitionLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -1155,8 +1174,8 @@ describe('service_definition — Activate only', () => {
       name: 'ZI_X_SRVD',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       activated: true,
       generated: true,
     });
@@ -1177,9 +1196,9 @@ describe('system — three getUtils() reads, each given analyseException (interf
       parent_name: 'ZP_X',
     });
     const call = callTo('fetchNodeStructure');
-    expect(call?.factory).toBe('getUtils');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.args).toEqual([
+    assert.equal(call?.factory, 'getUtils');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.deepStrictEqual(call?.args, [
       'DEVC/K',
       'ZP_X',
       // The root is `000000`: `0000` answers 200 with an empty body on premise
@@ -1212,8 +1231,8 @@ describe('system — three getUtils() reads, each given analyseException (interf
       node_id: '28',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       objects: [
         {
           name: 'ZMCP_BLD_SHR_FGR',
@@ -1234,7 +1253,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
     });
     // A non-blank body never triggers the disambiguating read — one request,
     // not two.
-    expect(calls).toEqual(['fetchNodeStructure']);
+    assert.deepStrictEqual(calls, ['fetchNodeStructure']);
   });
 
   // Fix round 2: a blank body from /repository/nodestructure is genuinely
@@ -1251,7 +1270,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
     const document = corpusBody(
       'read-empty-package-contents--01-nodestructure',
     );
-    expect(document).toBe('');
+    assert.equal(document, '');
     const calls: string[] = [];
     fakeClient = fakeClientOf({
       fetchNodeStructure: async () => {
@@ -1275,19 +1294,19 @@ describe('system — three getUtils() reads, each given analyseException (interf
       parent_name: 'ZMCP_BLD_PKG01',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       objects: [],
       childNodes: [],
     });
-    expect(calls).toEqual(['fetchNodeStructure', 'readMetadata']);
+    assert.deepStrictEqual(calls, ['fetchNodeStructure', 'readMetadata']);
   });
 
   it('GetNodeStructureLow answers an error naming the missing package for the real refusal-package-not-found-objectslist-empty fixture — the follow-up read refuses', async () => {
     const document = corpusBody(
       'refusal-package-not-found-objectslist-empty--01-nodestructure',
     );
-    expect(document).toBe('');
+    assert.equal(document, '');
     const calls: string[] = [];
     fakeClient = fakeClientOf({
       fetchNodeStructure: async () => {
@@ -1307,15 +1326,15 @@ describe('system — three getUtils() reads, each given analyseException (interf
       parent_name: 'ZMCP_BLD_NOPKG9X',
     });
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = JSON.parse(result.content[0].text);
     // The package's own refusal, forwarded — not a sentence this handler
     // composed about a call it never made. `origin: 'refusal'` (only set by
     // `failurePayload`, never by a plain thrown Error) is what proves this
     // came from the follow-up read and not from round 1's generic throw.
-    expect(payload.origin).toBe('refusal');
-    expect(payload.message).toBe('Package ZMCP_BLD_NOPKG9X does not exist');
-    expect(calls).toEqual(['fetchNodeStructure', 'readMetadata']);
+    assert.equal(payload.origin, 'refusal');
+    assert.equal(payload.message, 'Package ZMCP_BLD_NOPKG9X does not exist');
+    assert.deepStrictEqual(calls, ['fetchNodeStructure', 'readMetadata']);
   });
 
   // Measured, where the earlier draft of this test reasoned from the absence
@@ -1343,13 +1362,13 @@ describe('system — three getUtils() reads, each given analyseException (interf
       parent_name: 'CL_ABAP_CHAR_UTILITIES',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       objects: [],
       childNodes: [],
     });
     // No existence check exists for a class, so none is attempted.
-    expect(calls).toEqual(['fetchNodeStructure']);
+    assert.deepStrictEqual(calls, ['fetchNodeStructure']);
   });
 
   it("GetVirtualFoldersLow reaches getUtils, carrying analyseException, forwarding the caller's facets and defaulting the rest", async () => {
@@ -1358,9 +1377,9 @@ describe('system — three getUtils() reads, each given analyseException (interf
       preselection: [{ facet: 'package', values: ['ZP_X'] }],
     });
     const call = callTo('getVirtualFoldersContents');
-    expect(call?.factory).toBe('getUtils');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.factory, 'getUtils');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.deepStrictEqual(call?.args[0], {
       objectSearchPattern: 'Z*',
       preselection: [{ facet: 'package', values: ['ZP_X'] }],
       facetOrder: ['package', 'group', 'type'],
@@ -1387,11 +1406,11 @@ describe('package — no Activate tool (a package is a container, no activation)
       super_package: 'ZP',
     });
     const call = callTo('check');
-    expect(call?.factory).toBe('getPackage');
-    expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
-    expect(call?.args[1]).toBe('active');
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseException);
+    assert.equal(call?.factory, 'getPackage');
+    assert.deepStrictEqual(call?.args[0], { packageName: 'ZP_X' });
+    assert.equal(call?.args[1], 'active');
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseException);
   });
 
   it('CheckPackageLow reads the real check-success-verdict fixture through terseCheck — pinning the projection, not only the analyse', async () => {
@@ -1406,8 +1425,8 @@ describe('package — no Activate tool (a package is a container, no activation)
       super_package: 'zp',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       ran: true,
       status_text: 'Object ZBP_MCP_SHR_I_ROOT has been checked',
     });
@@ -1419,13 +1438,13 @@ describe('package — no Activate tool (a package is a container, no activation)
       transport_request: 'SIDK900001',
     });
     const call = callTo('delete');
-    expect(call?.factory).toBe('getPackage');
-    expect(call?.args[0]).toEqual({
+    assert.equal(call?.factory, 'getPackage');
+    assert.deepStrictEqual(call?.args[0], {
       packageName: 'ZP_X',
       transportRequest: 'SIDK900001',
     });
-    expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseDeletion);
+    assert.equal(call?.carriedAnalyse, true);
+    assert.equal(call?.analyse, analyseDeletion);
   });
 
   it('DeletePackage answers the structured delete-success fixture through terseDeletion', async () => {
@@ -1439,8 +1458,8 @@ describe('package — no Activate tool (a package is a container, no activation)
       package_name: 'zp_x',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       deleted: true,
       object: 'ZMCP_BLD_ANSCH01',
     });
@@ -1467,28 +1486,32 @@ describe('package — no Activate tool (a package is a container, no activation)
       lock_handle: 'h',
     });
 
-    expect(result.isError).toBe(false);
-    expect(double.factory).toBe('getPackage');
-    expect(updateCall?.config).toEqual({
+    assert.equal(result.isError, false);
+    assert.equal(double.factory, 'getPackage');
+    assert.deepStrictEqual(updateCall?.config, {
       packageName: 'ZMCP_SHR_PKG',
     });
-    expect(updateCall?.options.source).toEqual(
-      expect.stringContaining('adtcore:description="after"'),
+    assert.ok(
+      updateCall?.options.source.includes('adtcore:description="after"'),
     );
     // The real document's own super package (`ZADT_BLD_PKG03`) survives
     // unpatched — only the field the caller named changed.
-    expect(updateCall?.options.source).toContain(
-      'adtcore:name="ZADT_BLD_PKG03"',
+    assert.ok(
+      updateCall?.options.source.includes('adtcore:name="ZADT_BLD_PKG03"'),
     );
-    expect(updateCall?.options).toEqual({
-      headers: DEFAULT_ADT_HEADERS['package.updateMetadata'],
-      source: expect.stringContaining('adtcore:description="after"'),
-      lockHandle: 'h',
-      analyse: analyseException,
-    });
-    expect(
+    {
+      const { source, ...options } = updateCall?.options ?? {};
+      assert.ok(source.includes('adtcore:description="after"'));
+      assert.deepStrictEqual(options, {
+        headers: DEFAULT_ADT_HEADERS['package.updateMetadata'],
+        lockHandle: 'h',
+        analyse: analyseException,
+      });
+    }
+    assert.equal(
       (updateCall?.config as { document?: unknown })?.document,
-    ).toBeUndefined();
+      undefined,
+    );
   });
 });
 
@@ -1608,18 +1631,20 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
     ],
   ];
 
-  it.each(cases)(
-    '%s puts transport_request on config as transportRequest',
-    async (_tool, factory, run, key) => {
-      await run();
-      const call = callTo('update');
-      expect(call?.factory).toBe(factory);
-      expect(call?.args[0]).toMatchObject({
-        ...key,
-        transportRequest: 'SIDK900001',
-      });
-    },
-  );
+  for (const [_tool, factory, run, key] of cases) {
+    it(
+      format('%s puts transport_request on config as transportRequest', _tool),
+      async () => {
+        await run();
+        const call = callTo('update');
+        assert.equal(call?.factory, factory);
+        assertMatchObject(call?.args[0], {
+          ...key,
+          transportRequest: 'SIDK900001',
+        });
+      },
+    );
+  }
 });
 
 /**
@@ -1656,11 +1681,13 @@ describe('check tools pass version through to the check member', () => {
       { interface_name: 'ZIF_X' },
     ],
   ];
-  it.each(cases)('%s', async (_tool, path, fn, args) => {
-    const handler = require(path)[fn];
-    await handler(context as any, { ...args, version: 'active' });
-    expect(callTo('check')?.args[1]).toBe('active');
-    await handler(context as any, args);
-    expect(callTo('check')?.args[1]).toBe('active');
-  });
+  for (const [_tool, path, fn, args] of cases) {
+    it(format('%s', _tool), async () => {
+      const handler = require(path)[fn];
+      await handler(context as any, { ...args, version: 'active' });
+      assert.equal(callTo('check')?.args[1], 'active');
+      await handler(context as any, args);
+      assert.equal(callTo('check')?.args[1], 'active');
+    });
+  }
 });

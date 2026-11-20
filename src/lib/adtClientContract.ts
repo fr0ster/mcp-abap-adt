@@ -54,6 +54,8 @@ import type {
   IAdtServiceBindingTypes,
   IAdtServiceGroupReadable,
   IAdtTableSettingsPatchable,
+  IAdtTextElementsReadable,
+  IAdtTextElementsUpdatable,
   IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
   IAdtTransportSortAndCompress,
@@ -121,6 +123,8 @@ import type {
   ITableSettingsResults,
   ITableTypeConfig,
   ITableTypeResults,
+  ITextElementsConfig,
+  ITextElementsResults,
   ITransformationConfig,
   ITransformationResults,
   ITransportConfig,
@@ -573,6 +577,19 @@ export type TableSettingsApi<
     Extract<V, AdtModernVariant>
   > &
   IAdtLockable<ITableSettingsConfig>;
+
+/**
+ * What the server calls on `getTextElements()`'s answer: one part read at a
+ * stated version or the working area, one whole part written under the
+ * text elements' own lock (`TEXT`), and that lock. Reached through
+ * `textElementsClientOf` (`clients.ts`), not `IServerAdtClient`: one more
+ * member there makes some of its callers' inferred types too complex for
+ * the compiler (TS2590).
+ */
+export type TextElementsApi<R extends ITextElementsResults> =
+  IAdtTextElementsReadable<ReturnType<R['source']>> &
+    IAdtTextElementsUpdatable<ReturnType<R['updated']>> &
+    IAdtLockable<ITextElementsConfig, 'objectKind' | 'objectName'>;
 
 /** What the server calls on `getTableType()`'s answer. */
 export type DdicTableTypeApi<

@@ -258,6 +258,48 @@
     ],
     "ended": "answered"
   },
+  "onprem HandlerActivate PROGRAM_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/activation/runs?method=activate&preauditRequested=true",
+        "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/textelements/programs/obj_a\" adtcore:type=\"PROG/PX\" adtcore:name=\"OBJ_A\"/>\n</adtcore:objectReferences>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+  },
+  "onprem HandlerActivate FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/activation/runs?method=activate&preauditRequested=true",
+        "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/textelements/functiongroups/obj_a\" adtcore:type=\"PROG/PX\" adtcore:name=\"OBJ_A\"/>\n</adtcore:objectReferences>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+  },
+  "onprem HandlerActivate CLASS_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/activation/runs?method=activate&preauditRequested=true",
+        "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/textelements/classes/obj_a\" adtcore:type=\"CLAS/OCX\" adtcore:name=\"OBJ_A\"/>\n</adtcore:objectReferences>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+  },
   "onprem HandlerCheckRun CLASS": {
     "requests": [
       {
@@ -4168,6 +4210,48 @@
       }
     ],
     "ended": "answered"
+  },
+  "cloud HandlerActivate PROGRAM_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/activation/runs?method=activate&preauditRequested=true",
+        "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/textelements/programs/obj_a\" adtcore:type=\"PROG/PX\" adtcore:name=\"OBJ_A\"/>\n</adtcore:objectReferences>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+  },
+  "cloud HandlerActivate FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/activation/runs?method=activate&preauditRequested=true",
+        "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/textelements/functiongroups/obj_a\" adtcore:type=\"PROG/PX\" adtcore:name=\"OBJ_A\"/>\n</adtcore:objectReferences>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+  },
+  "cloud HandlerActivate CLASS_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/activation/runs?method=activate&preauditRequested=true",
+        "data": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/textelements/classes/obj_a\" adtcore:type=\"CLAS/OCX\" adtcore:name=\"OBJ_A\"/>\n</adtcore:objectReferences>",
+        "headers": {
+          "Accept": "application/xml",
+          "Content-Type": "application/xml"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
   },
   "cloud HandlerCheckRun CLASS": {
     "requests": [

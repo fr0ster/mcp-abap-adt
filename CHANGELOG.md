@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-11-20
+
+### Added
+
+- **A table's technical settings and the text elements are tools** ([#366](https://github.com/fr0ster/mcp-abap-adt/pull/366)), on onprem and cloud systems (a legacy system's discovery lists neither `/sap/bc/adt/ddic/db/settings` nor `/textelements`, recorded):
+  - `GetTableSettings` reads a table's technical settings (data class, size category, buffering, storage and sharing type, load unit, translation, logging, the description; on the cloud also `is_writable_by_amdp`) at the version asked.
+  - `UpdateTableSettings` writes the settings given and keeps the rest as read, in one call: it locks the settings, sends adt-clients' `patchMetadata` (one read and one PUT of the whole document), unlocks, and activates the table when `activate` (required) is true. An activation is judged by its messages: SAP stores a data class outside its value help and refuses it at activation (measured on both). On the cloud, `is_writable_by_amdp` true needs buffering `N`, logging off and no replacement object, or the activation answers SAP's DT 771 `E` message (Code and measured, cloud).
+  - `GetTextElements` reads the text symbols, selection texts and list and column headings of a program, a function group or a class (a class has symbols only), in the object's original language.
+  - `UpdateTextElements` writes each part given as its whole list (entries left out are deleted), under one lock of the text elements, and activates the object together with its text elements when `activate` (required) is true. On the cloud it writes a function group's and a class's; SAP's refusals (406 `SEDX_ADT/…`, `DS/512`) reach the answer as SAP gives them.
+- **`ActivateObjects` (and `ActivateObjectLow`) takes the text elements as references:** `PROG/PX` is a program's text elements, or with `parentName` a function group's (sent at `/sap/bc/adt/textelements/functiongroups/{group}`), and `CLAS/OCX` a class's. A text elements write lands inactive beside its object, and an activation naming the object alone runs nothing (measured on premise); naming both activates both. Nothing is added to an activation that does not name them, and the class pool's `PROG/PX` entry of the inactive list is matched to the `CLAS/OCX` reference by its uri.
+- **Compact `HandlerActivate` activates `PROGRAM_TEXT_ELEMENTS`, `FUNCTION_GROUP_TEXT_ELEMENTS` and `CLASS_TEXT_ELEMENTS`**, each as its code; on a stated legacy system they are refused before any request.
+- **`GetWhereUsed` (each `objects` entry, and `HandlerSystem`'s `where_used`) asks where-used of `PROG/PX`** with `container`, `program` or `function_group`: required with `PROG/PX`, refused beside any other type, before any request. SAP serves no where-used for `CLAS/OCX` and `TABL/DTT` (measured on both: "not supported", 0 results), so neither is a where-used type. **Migrating:** nothing for an existing call — `container` is new and optional; a call with `PROG/PX` names it.
+
+### Changed
+
+- **`@mcp-abap-adt/adt-clients` `^46.1.0`, `@mcp-abap-adt/adt-strategies` `^0.26.0`, `@mcp-abap-adt/interfaces-adt` `^30.1.0`**: the settings and text elements handlers, `patchMetadata`, the where-used `container`. The unused `@mcp-abap-adt/adt-clients-legacy` is no longer a dependency.
+- A main type never stands for a sub-resource code (`PROG/PX`, `CLAS/OCX`, `TABL/DTT`): `CLAS` stays `CLAS/OC` in activation, and `PROG` stays absent from the cloud's activation.
+
 ## [24.0.2] - 2026-11-20
 
 ### Fixed

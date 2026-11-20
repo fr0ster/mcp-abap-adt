@@ -74,7 +74,7 @@ import {
   tableDocuments,
   wireItself,
 } from '@mcp-abap-adt/adt-clients';
-import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
+import { buildObjectUri, TEXT_ELEMENTS } from '@mcp-abap-adt/adt-clients/core';
 import {
   analyseActivation,
   analyseException,
@@ -155,6 +155,15 @@ export function preauditDescription(variant: ProjectionVariant): string {
 }
 
 /**
+ * What the text elements' codes are, for `objects[].type`: a write of text
+ * elements lands inactive beside its object, and one activation naming both
+ * activates both (measured on premise and on the cloud,
+ * `texts-translation.md` §8, §10, §12.1, §13.4).
+ */
+const TEXT_ELEMENTS_SENTENCE =
+  "PROG/PX is a program's text elements, or with parentName a function group's; CLAS/OCX is a class's text elements; each is activated together with its object when both are named.";
+
+/**
  * What `objects[].type` takes on `variant`: a code a group activation takes
  * (`ACTIVATION_CODES`), or a name standing for one (`ACTIVATION_NAMES`); one
  * object alone also by the kind its own activation serves
@@ -165,7 +174,7 @@ export function activationTypeDescription(variant: ProjectionVariant): string {
   const kinds = SINGLE_ACTIVATION[variant].filter(
     (name) => !name.includes('/') && !named.has(name),
   );
-  return `Object type: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(ACTIVATION_CODES[variant], ACTIVATION_NAMES[variant])}. One object alone may also be named ${kinds.join(', ')}. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
+  return `Object type: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(ACTIVATION_CODES[variant], ACTIVATION_NAMES[variant])}. One object alone may also be named ${kinds.join(', ')}. ${TEXT_ELEMENTS_SENTENCE} ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
 }
 
 export const TOOL_DEFINITION = {
@@ -344,13 +353,53 @@ function groupReferences<C extends AdtUtilityCode, N extends TypeName>(
         codes,
       );
     }
-    references.push({ ...obj, type });
+    references.push({ ...obj, type, ...textElementsAddress(obj, type) });
   }
   const addressed = references.filter(namesItsParent);
   const unaddressed = references.find((obj) => !namesItsParent(obj));
   return unaddressed === undefined
     ? addressed
     : `objects[].parentName is required for ${unaddressed.name} (${unaddressed.type}): the name of the object it belongs to; nothing was sent`;
+}
+
+/**
+ * The address of a `PROG/PX` reference: a program's text elements, or with
+ * `parentName` a function group's, at
+ * `/sap/bc/adt/textelements/functiongroups/{group}` — the address decides
+ * which (measured on premise and on the cloud: the pair, and the text
+ * elements alone, activated, `texts-translation.md` §12.1, §13.4). The
+ * library sends a `PROG/PX` reference at its `uri` (adt-clients 46.1.0), so
+ * the address is set here, from the name or the parent, never taken as sent.
+ * Every other code is addressed by its code (`buildObjectUri`).
+ */
+function textElementsAddress(
+  obj: ActivationObject,
+  type: string,
+): { uri?: string } {
+  if (type !== 'PROG/PX') return {};
+  return {
+    uri:
+      obj.parentName === undefined
+        ? TEXT_ELEMENTS.uri('program', obj.name)
+        : TEXT_ELEMENTS.uri('functionGroup', obj.parentName),
+  };
+}
+
+/**
+ * The address a group activation sends a reference at, as the library builds
+ * it (`referenceUri`, adt-clients 46.1.0): a `PROG/PX` reference's own `uri`,
+ * else its code's address. The inactive list read after a silent run is
+ * matched against these.
+ */
+function sentUri(reference: {
+  readonly name: string;
+  readonly type: Parameters<typeof buildObjectUri>[1];
+  readonly uri?: string | undefined;
+  readonly parentName?: string | undefined;
+}): string {
+  return reference.type === 'PROG/PX' && reference.uri !== undefined
+    ? reference.uri
+    : buildObjectUri(reference.name, reference.type, reference.parentName);
 }
 
 /**
@@ -662,11 +711,7 @@ export async function handleActivateObject(
         plan.group.references.map((reference) => ({
           name: reference.name,
           type: reference.type,
-          uri: buildObjectUri(
-            reference.name,
-            reference.type,
-            reference.parentName,
-          ),
+          uri: sentUri(reference),
         })),
       );
       // Reading the run failed: the method's error as it is, with its step.

@@ -119,7 +119,11 @@ export function activationParentDescription(
       : parentedCodesOf(ACTIVATION_CODES[variant]).filter((code) =>
           codes.includes(code),
         );
-  return `The function group the object belongs to; its address is built from it. Required for ${codesWithNames(parented, codes === undefined ? ACTIVATION_NAMES[variant] : [])}.`;
+  const texts =
+    codes === undefined || codes.includes('PROG/PX')
+      ? ' With PROG/PX, the function group whose text elements are activated.'
+      : '';
+  return `The function group the object belongs to; its address is built from it. Required for ${codesWithNames(parented, codes === undefined ? ACTIVATION_NAMES[variant] : [])}.${texts}`;
 }
 
 /** One object of a group request, as a tool's argument names it. */

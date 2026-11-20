@@ -487,19 +487,11 @@ export function whereUsedTypeDescription(variant: ProjectionVariant): string {
 // ---------------------------------------------------------------------------
 
 /**
- * The codes ActivateObjects activates on `V` (`activateObjectsGroup`): the
- * text elements (`PROG/PX`, `CLAS/OCX`) wait for their address rule.
+ * The codes ActivateObjects activates on `V` (`activateObjectsGroup`), the
+ * text elements (`PROG/PX`, `CLAS/OCX`) among them: each an ordinary
+ * reference at its own address (`handleActivateObject`).
  */
-export type ActivationCode<V extends ProjectionVariant> = Exclude<
-  AdtActivationCode<V>,
-  (typeof NOT_ACTIVATED)[number]
->;
-
-/** The activation codes ActivateObjects leaves out ({@link ActivationCode}). */
-const NOT_ACTIVATED = [
-  'PROG/PX',
-  'CLAS/OCX',
-] as const satisfies readonly AdtTypeCode[];
+export type ActivationCode<V extends ProjectionVariant> = AdtActivationCode<V>;
 
 /** ActivateObjects' `objects[].type` codes: what a group activation takes. */
 export const ACTIVATION_CODES = projected<
@@ -535,6 +527,8 @@ export const ACTIVATION_CODES = projected<
     'ENHO/XHH',
     'ENHO/XHB',
     'ENHS/XSB',
+    'PROG/PX',
+    'CLAS/OCX',
   ],
   cloud: [
     'CLAS/OC',
@@ -562,6 +556,8 @@ export const ACTIVATION_CODES = projected<
     'ENHO/XHH',
     'ENHO/XHB',
     'ENHS/XSB',
+    'PROG/PX',
+    'CLAS/OCX',
   ],
 });
 

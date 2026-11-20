@@ -159,6 +159,7 @@ const TOOL_NEEDS_BY_NAME = {
   CreateTable: { api: 'table', operation: 'create' },
   UpdateTable: { api: 'table', operation: 'update' },
   UpdateTableSettings: { api: 'tableSettings', operation: 'updateMetadata' },
+  UpdateTextElements: { api: 'textElements', operation: 'update' },
   DeleteTable: { api: 'table', operation: 'delete' },
   CreateStructure: { api: 'structure', operation: 'create' },
   UpdateStructure: { api: 'structure', operation: 'update' },

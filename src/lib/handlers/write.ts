@@ -108,6 +108,7 @@ export { handleUpdateTableSettings } from '../../handlers/table/high/handleUpdat
 export { handleCreateTableType } from '../../handlers/table_type/high/handleCreateTableType.js';
 export { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType.js';
 export { handleUpdateTableType } from '../../handlers/table_type/high/handleUpdateTableType.js';
+export { handleUpdateTextElements } from '../../handlers/text_elements/high/handleUpdateTextElements.js';
 export { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport.js';
 export { handleMoveTransportObjects } from '../../handlers/transport/high/handleMoveTransportObjects.js';
 export { handleSortAndCompressTransportTask } from '../../handlers/transport/high/handleSortAndCompressTransportTask.js';

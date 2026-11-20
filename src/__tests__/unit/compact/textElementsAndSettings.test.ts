@@ -40,7 +40,10 @@ import {
   TOOL_DEFINITION as HandlerUpdate,
   handleHandlerUpdate,
 } from '../../../../compact-modify/src/handlers/handleHandlerUpdate';
-import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
+import {
+  TOOL_DEFINITION as HandlerGet,
+  handleHandlerGet,
+} from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { readOnlyToolNames } from '../../../lib/toolSet';
@@ -416,5 +419,22 @@ describe('HandlerLock and HandlerUnlock: the sub-resources', () => {
       }
     }
     assert.deepEqual(requests, []);
+  });
+});
+
+describe('the compact descriptions of the sub-resources', () => {
+  it('HandlerGet names source as the part of each, with its requests', () => {
+    const words = HandlerGet.variants.onprem.description;
+    assert.match(
+      words,
+      /PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS source \(symbols, selections and headings, one request each\)/,
+    );
+    assert.match(words, /TABLE_SETTINGS source \(the technical settings/);
+  });
+
+  it('HandlerUpdate states the requests of the settings and of the text parts', () => {
+    const words = HandlerUpdate.variants.onprem.description;
+    assert.match(words, /two requests/);
+    assert.match(words, /whole list, one request each/);
   });
 });

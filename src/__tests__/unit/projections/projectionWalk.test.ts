@@ -413,7 +413,16 @@ const WALKS: Readonly<Record<string, Walk>> = {
       }),
     routes: new Map(
       Object.entries(COMPACT_ACTIVATE_ROUTES).map(
-        ([name, code]): [string, Route] => [name, codeRoute(code)],
+        ([name, code]): [string, Route] => [
+          name,
+          // A function group's text elements are PROG/PX under the group.
+          name === 'FUNCTION_GROUP_TEXT_ELEMENTS'
+            ? {
+                collection: () => '/sap/bc/adt/textelements/functiongroups',
+                addressed: true,
+              }
+            : codeRoute(code),
+        ],
       ),
     ),
   }),

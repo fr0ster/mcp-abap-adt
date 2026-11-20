@@ -30,6 +30,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { after, before, describe, it, mock } from 'node:test';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
+import { SYSTEM_ACTIONS } from '../../../lib/compact';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import {
   field,
@@ -223,6 +224,29 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
         tools.some((t) => searchOf(t) !== undefined),
       ),
       true,
+    );
+  });
+
+  it('HandlerSystem’s member groups and semantic items in tools/tool-search.json name only SYSTEM_ACTIONS', () => {
+    const parsed: unknown = JSON.parse(
+      fs.readFileSync(TOOL_SEARCH_FILE, 'utf8'),
+    );
+    const entry = field(parsed, 'HandlerSystem');
+    const actions: readonly string[] = SYSTEM_ACTIONS;
+    const groups = keysOf(field(entry, 'members'));
+    const items = field(field(entry, 'semantic'), 'items');
+    const named = (Array.isArray(items) ? items : []).flatMap((item) => {
+      const member = field(item, 'member');
+      const members = field(item, 'members');
+      return [
+        ...(member === undefined ? [] : [String(member)]),
+        ...(Array.isArray(members) ? members.map(String) : []),
+      ];
+    });
+    assert.ok(groups.length > 0 && named.length > 0, 'nothing to check');
+    assert.deepEqual(
+      [...groups, ...named].filter((member) => !actions.includes(member)),
+      [],
     );
   });
 });

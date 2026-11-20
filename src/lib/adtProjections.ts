@@ -182,6 +182,17 @@ export const NAME_CASE_SENTENCE =
 // Main types: the TADIR type a code belongs to (spec 2.4)
 // ---------------------------------------------------------------------------
 
+/**
+ * The codes of an object's sub-resources: a program's or a function group's
+ * text elements (`PROG/PX`), a class's (`CLAS/OCX`) and a table's technical
+ * settings (`TABL/DTT`). Each is named as its code; its main type stands for
+ * the object itself, so a main type never resolves to one of these.
+ */
+export const SUB_RESOURCE_CODES = ['PROG/PX', 'CLAS/OCX', 'TABL/DTT'] as const;
+
+/** A code of {@link SUB_RESOURCE_CODES}. */
+export type SubResourceCode = (typeof SUB_RESOURCE_CODES)[number];
+
 /** The `codes` objects of table `T`, one per API that lists codes. */
 type CodesIn<T> = {
   [A in keyof T]: T[A] extends { readonly codes: infer C } ? C : never;
@@ -211,15 +222,16 @@ export type TableMainOf<C extends AdtUtilityCode> = MainStated<
 /**
  * The codes of projection `P` that carry a main type of their own: those
  * whose entry states a main type other than the code itself (a code without
- * a slash, `AUTH`, is its own main type and is just a code).
+ * a slash, `AUTH`, is its own main type and is just a code), sub-resources
+ * ({@link SUB_RESOURCE_CODES}) left out.
  */
 type CodeWithMainType<P extends AdtUtilityCode> = {
-  [C in P]: [TableMainOf<C>] extends [never]
+  [C in Exclude<P, SubResourceCode>]: [TableMainOf<C>] extends [never]
     ? never
     : TableMainOf<C> extends C
       ? never
       : C;
-}[P];
+}[Exclude<P, SubResourceCode>];
 
 /** The codes of projection `P` whose main type (`main`) is `M`. */
 export type CodesOfMainType<P extends AdtUtilityCode, M extends string> = {

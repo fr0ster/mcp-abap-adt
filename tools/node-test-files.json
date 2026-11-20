@@ -129,6 +129,7 @@
   "src/__tests__/unit/keepAlive/sessionKeepAlive.test.ts",
   "src/__tests__/unit/launchers/accessRestrictionsAtStart.test.ts",
   "src/__tests__/unit/launchers/dataToolsAtStart.test.ts",
+  "src/__tests__/unit/mainTypeSubResources.test.ts",
   "src/__tests__/unit/packageGuard.test.ts",
   "src/__tests__/unit/release/verifyRegistry.test.ts",
   "src/__tests__/unit/runner/build.test.ts",

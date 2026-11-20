@@ -17,6 +17,7 @@ import {
   ACTIVATION_NAMES,
   codesWithNames,
   type ProjectionVariant,
+  SUB_RESOURCE_CODES,
   TABLE_CODES,
   TYPE_NAME_VALUES,
   TYPE_NAMES,
@@ -144,16 +145,23 @@ export function namesItsParent<C extends AdtUtilityCode>(
 /**
  * The codes of `codes` whose main type `upper` (already upper-cased) names:
  * those whose entry states it as `main` ({@link MAIN_OF_CODE}). A code
- * whose main type is itself (`AUTH`) is named as a code.
+ * whose main type is itself (`AUTH`) is named as a code, and a sub-resource
+ * code ({@link SUB_RESOURCE_CODES}) is never a main type's.
  */
 function codesOfMain<C extends AdtUtilityCode>(
   upper: string,
   codes: readonly C[],
 ): C[] {
   return codes.filter(
-    (code) => code !== upper && MAIN_OF_CODE.get(code) === upper,
+    (code) =>
+      code !== upper &&
+      !SUB_RESOURCES.has(code) &&
+      MAIN_OF_CODE.get(code) === upper,
   );
 }
+
+/** The sub-resource codes, which no main type stands for. */
+const SUB_RESOURCES: ReadonlySet<string> = new Set(SUB_RESOURCE_CODES);
 
 /** The one code of `codes` whose main type `upper` names, else `undefined`. */
 function oneCodeOfMain<C extends AdtUtilityCode>(

@@ -29,6 +29,7 @@ import {
   expectAbsent,
   expectNameFree,
   liveCall,
+  livePrepare,
   liveSuite,
   recordCreated,
 } from '../helpers/live';
@@ -72,55 +73,46 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
     recordCreated('DeleteTable', { table_name: TABLE, ...onRequest() });
     succeeded(
       'CreateTable',
-      await liveCall('CreateTable', {
+      await livePrepare('CreateTable', {
         table_name: TABLE,
         description: DESCRIPTION,
         package_name: ownPackage(),
-        transport_request: request(),
+        ...onRequest(),
       }),
     );
     succeeded(
       'UpdateTable',
-      await liveCall('UpdateTable', {
+      await livePrepare('UpdateTable', {
         table_name: TABLE,
         ddl_code: DDL,
-        transport_request: request(),
         activate: false,
+        ...onRequest(),
       }),
     );
-    const read = succeeded(
-      'GetTableSettings',
-      await liveCall('GetTableSettings', {
-        table_name: TABLE,
-        version: 'inactive',
-      }),
-    );
-    const settings = payloadOf(read);
+    const read = await liveCall('GetTableSettings', {
+      table_name: TABLE,
+      version: 'inactive',
+    });
+    const settings = payloadOf(succeeded('GetTableSettings', read));
     assert.equal(member(settings, 'table_name'), TABLE);
     assert.equal(member(settings, 'data_class'), 'APPL0');
     assert.equal(member(settings, 'size_category'), '0');
   });
 
   it('UpdateTableSettings writes non-default settings and activates the table', async () => {
-    succeeded(
-      'UpdateTableSettings',
-      await liveCall('UpdateTableSettings', {
-        table_name: TABLE,
-        data_class: 'APPL1',
-        size_category: '1',
-        transport_request: request(),
-        activate: true,
-      }),
-    );
-    const settings = payloadOf(
-      succeeded(
-        'GetTableSettings active',
-        await liveCall('GetTableSettings', {
-          table_name: TABLE,
-          version: 'active',
-        }),
-      ),
-    );
+    const written = await liveCall('UpdateTableSettings', {
+      table_name: TABLE,
+      data_class: 'APPL1',
+      size_category: '1',
+      transport_request: request(),
+      activate: true,
+    });
+    succeeded('UpdateTableSettings', written);
+    const read = await liveCall('GetTableSettings', {
+      table_name: TABLE,
+      version: 'active',
+    });
+    const settings = payloadOf(succeeded('GetTableSettings active', read));
     assert.equal(member(settings, 'data_class'), 'APPL1');
     assert.equal(member(settings, 'size_category'), '1');
     assert.equal(member(member(settings, 'buffering'), 'allowed'), 'N');
@@ -137,11 +129,11 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
     assert.match(answer.text, /ZZNOP/);
     succeeded(
       'UpdateTableSettings back to APPL1',
-      await liveCall('UpdateTableSettings', {
+      await livePrepare('UpdateTableSettings', {
         table_name: TABLE,
         data_class: 'APPL1',
-        transport_request: request(),
         activate: true,
+        ...onRequest(),
       }),
     );
   });
@@ -156,24 +148,22 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
     const before = payloadOf(
       succeeded(
         'GetTableSettings before',
-        await liveCall('GetTableSettings', { table_name: TABLE }),
+        await livePrepare('GetTableSettings', { table_name: TABLE }),
       ),
     );
     const flag = member(before, 'is_writable_by_amdp');
     assert.equal(typeof flag, 'boolean');
-    succeeded(
-      'UpdateTableSettings size only',
-      await liveCall('UpdateTableSettings', {
-        table_name: TABLE,
-        size_category: '2',
-        transport_request: request(),
-        activate: true,
-      }),
-    );
+    const sized = await liveCall('UpdateTableSettings', {
+      table_name: TABLE,
+      size_category: '2',
+      transport_request: request(),
+      activate: true,
+    });
+    succeeded('UpdateTableSettings size only', sized);
     const kept = payloadOf(
       succeeded(
         'GetTableSettings kept',
-        await liveCall('GetTableSettings', { table_name: TABLE }),
+        await livePrepare('GetTableSettings', { table_name: TABLE }),
       ),
     );
     assert.equal(member(kept, 'is_writable_by_amdp'), flag);
@@ -186,21 +176,22 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
     });
     assert.equal(refused.isError, true, refused.text);
     assert.match(refused.text, /AMDP/);
+    const allowed = await liveCall('UpdateTableSettings', {
+      table_name: TABLE,
+      is_writable_by_amdp: true,
+      logging_enabled: false,
+      buffering: { allowed: 'N' },
+      transport_request: request(),
+      activate: true,
+    });
     succeeded(
       'UpdateTableSettings AMDP with buffering N and logging off',
-      await liveCall('UpdateTableSettings', {
-        table_name: TABLE,
-        is_writable_by_amdp: true,
-        logging_enabled: false,
-        buffering: { allowed: 'N' },
-        transport_request: request(),
-        activate: true,
-      }),
+      allowed,
     );
     const written = payloadOf(
       succeeded(
         'GetTableSettings AMDP active',
-        await liveCall('GetTableSettings', {
+        await livePrepare('GetTableSettings', {
           table_name: TABLE,
           version: 'active',
         }),

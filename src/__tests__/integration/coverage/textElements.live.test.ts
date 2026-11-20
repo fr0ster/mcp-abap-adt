@@ -63,7 +63,7 @@ async function create(
   );
 }
 
-/** The text elements `kind` `name` answers at `version`. */
+/** The text elements `kind` `name` answers at `version`, as a prerequisite read. */
 async function texts(
   kind: string,
   name: string,
@@ -72,7 +72,7 @@ async function texts(
   return payloadOf(
     succeeded(
       `GetTextElements ${kind} ${version}`,
-      await liveCall('GetTextElements', {
+      await livePrepare('GetTextElements', {
         object_kind: kind,
         object_name: name,
         version,
@@ -89,36 +89,25 @@ function symbolKeys(read: unknown): unknown[] {
     : [];
 }
 
-/** Writes two symbols and activates, then writes the first alone. */
-async function writeSymbols(kind: string, name: string): Promise<void> {
+/** Two symbols written, left inactive: the case then writes the first alone. */
+async function twoSymbols(kind: string, name: string): Promise<void> {
   succeeded(
-    `UpdateTextElements ${kind}`,
-    await liveCall('UpdateTextElements', {
+    `UpdateTextElements ${kind} two symbols`,
+    await livePrepare('UpdateTextElements', {
       object_kind: kind,
       object_name: name,
       symbols: [
         { key: '001', text: 'First symbol', max_length: 20 },
         { key: '002', text: 'Second symbol', max_length: 20 },
       ],
-      transport_request: request(),
       activate: false,
+      ...onRequest(),
     }),
   );
   assert.deepEqual(symbolKeys(await texts(kind, name, 'inactive')), [
     '001',
     '002',
   ]);
-  succeeded(
-    `UpdateTextElements ${kind} first alone, activated`,
-    await liveCall('UpdateTextElements', {
-      object_kind: kind,
-      object_name: name,
-      symbols: [{ key: '001', text: 'First symbol', max_length: 20 }],
-      transport_request: request(),
-      activate: true,
-    }),
-  );
-  assert.deepEqual(symbolKeys(await texts(kind, name, 'active')), ['001']);
 }
 
 liveSuite(['onprem', 'cloud'], 'Text elements', () => {
@@ -159,37 +148,31 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
         ...onRequest(),
       }),
     );
-    await writeSymbols('program', N.program);
-    succeeded(
-      'UpdateTextElements program selections and headings',
-      await liveCall('UpdateTextElements', {
-        object_kind: 'program',
-        object_name: N.program,
-        selections: [{ name: 'P_TEST', text: 'Test parameter' }],
-        headings: { list_header: 'List header', column_header_1: 'Column' },
-        transport_request: request(),
-        activate: true,
-      }),
-    );
-    const read = await texts('program', N.program, 'active');
-    assert.deepEqual(member(read, 'selections'), [
+    await twoSymbols('program', N.program);
+    const written = await liveCall('UpdateTextElements', {
+      object_kind: 'program',
+      object_name: N.program,
+      symbols: [{ key: '001', text: 'First symbol', max_length: 20 }],
+      selections: [{ name: 'P_TEST', text: 'Test parameter' }],
+      headings: { list_header: 'List header', column_header_1: 'Column' },
+      transport_request: request(),
+      activate: true,
+    });
+    succeeded('UpdateTextElements program', written);
+    const read = await liveCall('GetTextElements', {
+      object_kind: 'program',
+      object_name: N.program,
+      version: 'active',
+    });
+    const texts = payloadOf(succeeded('GetTextElements program', read));
+    assert.deepEqual(symbolKeys(texts), ['001']);
+    assert.deepEqual(member(texts, 'selections'), [
       { name: 'P_TEST', text: 'Test parameter', ddic_reference: false },
     ]);
     assert.equal(
-      member(member(read, 'headings'), 'list_header'),
+      member(member(texts, 'headings'), 'list_header'),
       'List header',
     );
-    succeeded(
-      'DeleteProgram',
-      await liveCall('DeleteProgram', {
-        program_name: N.program,
-        ...onRequest(),
-      }),
-    );
-    await expectAbsent({
-      tool: 'GetProgram',
-      args: { program_name: N.program },
-    });
   });
 
   it("a function group's symbols", async () => {
@@ -207,7 +190,24 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
         activate: true,
       },
     );
-    await writeSymbols('function_group', N.group);
+    await twoSymbols('function_group', N.group);
+    const written = await liveCall('UpdateTextElements', {
+      object_kind: 'function_group',
+      object_name: N.group,
+      symbols: [{ key: '001', text: 'First symbol', max_length: 20 }],
+      transport_request: request(),
+      activate: true,
+    });
+    succeeded('UpdateTextElements function group', written);
+    const read = await liveCall('GetTextElements', {
+      object_kind: 'function_group',
+      object_name: N.group,
+      version: 'active',
+    });
+    assert.deepEqual(
+      symbolKeys(payloadOf(succeeded('GetTextElements function group', read))),
+      ['001'],
+    );
   });
 
   it("a class's symbols", async () => {
@@ -221,7 +221,24 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
         package_name: ownPackage(),
       },
     );
-    await writeSymbols('class', N.class);
+    await twoSymbols('class', N.class);
+    const written = await liveCall('UpdateTextElements', {
+      object_kind: 'class',
+      object_name: N.class,
+      symbols: [{ key: '001', text: 'First symbol', max_length: 20 }],
+      transport_request: request(),
+      activate: true,
+    });
+    succeeded('UpdateTextElements class', written);
+    const read = await liveCall('GetTextElements', {
+      object_kind: 'class',
+      object_name: N.class,
+      version: 'active',
+    });
+    assert.deepEqual(
+      symbolKeys(payloadOf(succeeded('GetTextElements class', read))),
+      ['001'],
+    );
   });
 
   it('the text elements of a delivered program, read on the cloud', async () => {
@@ -239,7 +256,12 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       );
       return;
     }
-    const read = await texts('program', name, 'active');
-    assert.equal(member(read, 'object_name'), name.toUpperCase());
+    const read = await liveCall('GetTextElements', {
+      object_kind: 'program',
+      object_name: name,
+      version: 'active',
+    });
+    const texts = payloadOf(succeeded('GetTextElements delivered', read));
+    assert.equal(member(texts, 'object_name'), name.toUpperCase());
   });
 });

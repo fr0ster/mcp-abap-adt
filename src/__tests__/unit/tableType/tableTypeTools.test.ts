@@ -862,7 +862,10 @@ describe('the definition SAP stored, read at a stated version', () => {
     // SAP's refusal rejects, as the shipped connection rejects a non-2xx answer.
     const result = await handleUpdateTableType(
       {
-        connection: throwingAt(connection, `${TTYP}/ztt_x?lockHandle=${HANDLE}`),
+        connection: throwingAt(
+          connection,
+          `${TTYP}/ztt_x?lockHandle=${HANDLE}`,
+        ),
         logger: undefined,
       },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },

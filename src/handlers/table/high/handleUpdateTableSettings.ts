@@ -85,7 +85,19 @@ function settingsSchema(variant: ProjectionVariant) {
     variant === 'cloud'
       ? { ...SETTINGS_SHAPE, is_writable_by_amdp: AMDP_FLAG, ...TAIL }
       : { ...SETTINGS_SHAPE, ...TAIL };
-  return z.object(shape).superRefine((args, ctx) => {
+  // The on-premise object keeps keys it does not declare, so the refinement
+  // sees a cloud-only flag given there (`loose`).
+  const object = variant === 'cloud' ? z.object(shape) : z.looseObject(shape);
+  return object.superRefine((args, ctx) => {
+    // The on-premise table has no AMDP flag (S7): a call naming it is
+    // refused rather than written without it.
+    if (variant === 'onprem' && 'is_writable_by_amdp' in args) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'is_writable_by_amdp is taken on cloud systems',
+        path: ['is_writable_by_amdp'],
+      });
+    }
     const changes =
       variant === 'cloud' ? cloudChangesOf(args) : changesOf(args);
     if (changes === undefined) {
@@ -93,19 +105,6 @@ function settingsSchema(variant: ProjectionVariant) {
         code: 'custom',
         message: 'Name at least one setting to write',
         path: ['table_name'],
-      });
-    }
-    const buffering = args.buffering;
-    if (
-      buffering?.area_key_fields !== undefined &&
-      buffering.type !== undefined &&
-      buffering.type !== 'G'
-    ) {
-      ctx.addIssue({
-        code: 'custom',
-        message:
-          'buffering.area_key_fields goes with buffering type G, or with no type given',
-        path: ['buffering', 'area_key_fields'],
       });
     }
   });

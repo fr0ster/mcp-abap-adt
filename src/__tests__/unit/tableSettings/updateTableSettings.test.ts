@@ -362,5 +362,16 @@ describe('UpdateTableSettings', () => {
       // The on-premise schema has no such field: the flag alone names no setting.
       assert.equal(onpremParsed.success, false);
     });
+
+    it('refuses the AMDP flag on premise beside a setting it would write', () => {
+      const parsed = onprem.safeParse({
+        table_name: 'ZTS_X',
+        data_class: 'APPL1',
+        is_writable_by_amdp: false,
+        activate: false,
+      });
+      assert.equal(parsed.success, false);
+      assert.match(String(parsed.error?.message), /is_writable_by_amdp/);
+    });
   });
 });

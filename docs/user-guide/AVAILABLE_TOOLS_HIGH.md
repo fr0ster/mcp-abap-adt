@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 - Level: High-Level
-- Total tools: 188
+- Total tools: 190
 
 ## Navigation
 
@@ -193,6 +193,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
     - [DeleteTable](#deletetable-high-level-table)
     - [GetTable](#gettable-high-level-table)
     - [UpdateTable](#updatetable-high-level-table)
+    - [UpdateTableSettings](#updatetablesettings-high-level-table)
   - [Table Type](#high-level-table-type)
     - [ActivateTableType](#activatetabletype-high-level-table-type)
     - [CheckTableType](#checktabletype-high-level-table-type)
@@ -200,6 +201,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
     - [DeleteTableType](#deletetabletype-high-level-table-type)
     - [GetTableType](#gettabletype-high-level-table-type)
     - [UpdateTableType](#updatetabletype-high-level-table-type)
+  - [Text Elements](#high-level-text-elements)
+    - [UpdateTextElements](#updatetextelements-high-level-text-elements)
   - [Transport](#high-level-transport)
     - [AddTransportObject](#addtransportobject-high-level-transport)
     - [CreateTransport](#createtransport-high-level-transport)
@@ -2558,6 +2561,28 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 ---
 
+<a id="updatetablesettings-high-level-table"></a>
+#### UpdateTableSettings (High-Level / Table)
+**Description:** Writes technical settings of the existing database table named by table_name: each setting given is written over the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.
+
+**Source:** `src/handlers/table/high/handleUpdateTableSettings.ts`
+
+**Parameters:**
+- `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
+- `buffering` (object, optional) - Buffering; each field given replaces the stored one.
+- `data_class` (string, optional) - Data class. The value help lists APPL0 (master data), APPL1 (transaction data), APPL2 (organization and customizing) and DDIM, DFACT, DODS; SAP checks the value when the table is activated.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `load_unit` (string, optional) - Load unit.
+- `logging_enabled` (boolean, optional) - Whether changes to the table data are logged.
+- `sharing_type` (string, optional) - Sharing type.
+- `size_category` (string, optional) - Size category, a digit from 0 to 9.
+- `storage_type` (string, optional) - Storage type.
+- `table_name` (string, required) - Table name. The table must already exist.
+- `translation` (string, optional) - Translation value; the translation flags keep their stored values.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if the table is local or already in a transport request.
+
+---
+
 <a id="high-level-table-type"></a>
 ### High-Level / Table Type
 
@@ -2654,6 +2679,27 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `row_type_name` (string, optional) - Dictionary type used as the row type (ttyp:rowType/ttyp:typeName).
 - `table_type_name` (string, required) - Table type name. The table type must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
+
+---
+
+<a id="high-level-text-elements"></a>
+### High-Level / Text Elements
+
+<a id="updatetextelements-high-level-text-elements"></a>
+#### UpdateTextElements (High-Level / Text Elements)
+**Description:** Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers whether SAP saved each part and, when activated, whether SAP activated them, with its messages.
+
+**Source:** `src/handlers/text_elements/high/handleUpdateTextElements.ts`
+
+**Parameters:**
+- `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `headings` (object, optional) - The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
+- `object_kind` (string, required, one of: `program`, `function_group`, `class`) - Kind of object: program, function_group, class.
+- `object_name` (string, required) - Name of the program, function group or class.
+- `selections` (array, optional) - The selection texts (programs and function groups): the whole list; texts left out are deleted.
+- `symbols` (array, optional) - The text symbols: the whole list; symbols left out are deleted.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if the object is local or already in a transport request.
 
 ---
 
@@ -2999,4 +3045,4 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 On `mcp-abap-adt-http` (Streamable HTTP) every tool declares one more, optional argument, `state_handle` (string): "The state_handle a long session, a lock or a batch answered: the call runs on the server instance that holds that state. Without it the call runs on a new instance." A tool whose own schema declares `state_handle` (the debugger tools) keeps its own declaration, required where it is required. No stdio or SSE binary declares it; the parameters listed per tool on this page are the stdio ones, without it.
 
-*Last updated: 2026-11-18*
+*Last updated: 2026-11-20*

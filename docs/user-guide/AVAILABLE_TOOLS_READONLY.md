@@ -5,7 +5,7 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. Batch mode is the compact binaries' (`HandlerBatch`, [BATCH_MODE.md](BATCH_MODE.md)): none is served here. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 73
+- Total tools: 75
 
 ## Navigation
 
@@ -101,10 +101,13 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
     - [GetSqlQuery](#getsqlquery-read-only-system)
     - [SearchSource](#searchsource-read-only-system)
   - [Table](#read-only-table)
+    - [GetTableSettings](#gettablesettings-read-only-table)
     - [GetTable](#gettable-read-only-table)
     - [GetTableContents](#gettablecontents-read-only-table)
   - [Table Type](#read-only-table-type)
     - [GetTableType](#gettabletype-read-only-table-type)
+  - [Text Elements](#read-only-text-elements)
+    - [GetTextElements](#gettextelements-read-only-text-elements)
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
@@ -1106,6 +1109,18 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 <a id="read-only-table"></a>
 ### Read-Only / Table
 
+<a id="gettablesettings-read-only-table"></a>
+#### GetTableSettings (Read-Only / Table)
+**Description:** [read-only] Reads the technical settings of the database table named by table_name, at the version asked: data class, size category, buffering (allowed, type, number of key fields), storage type, sharing type, load unit, translation, logging, and the table's description; on ABAP Cloud also whether AMDP may write to the table.
+
+**Source:** `src/handlers/table/readonly/handleGetTableSettings.ts`
+
+**Parameters:**
+- `table_name` (string, required) - Table name.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
 <a id="gettable-read-only-table"></a>
 #### GetTable (Read-Only / Table)
 **Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
@@ -1148,6 +1163,23 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+---
+
+<a id="read-only-text-elements"></a>
+### Read-Only / Text Elements
+
+<a id="gettextelements-read-only-text-elements"></a>
+#### GetTextElements (Read-Only / Text Elements)
+**Description:** [read-only] Reads the text elements of the program, function group or class named by object_kind and object_name, in the object's original language, at the version asked: text symbols (key, text, maximum length), selection texts (name, text, and whether the text is the dictionary's label) and the list and column headings. A class has text symbols only. Reads the parts named by parts, every part of the object by default.
+
+**Source:** `src/handlers/text_elements/readonly/handleGetTextElements.ts`
+
+**Parameters:**
+- `object_kind` (string, required, one of: `program`, `function_group`, `class`) - Kind of object: program, function_group or class.
+- `object_name` (string, required) - Name of the program, function group or class.
+- `parts` (array, optional) - Parts to read: symbols, selections, headings. Default: every part of the object; a class has symbols only.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -1249,4 +1281,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-18*
+*Last updated: 2026-11-20*

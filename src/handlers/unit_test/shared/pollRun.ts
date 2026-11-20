@@ -34,14 +34,18 @@ import {
  */
 
 /**
- * The statuses an ABAP Unit run's `aunit:progress` was measured to answer
- * (on premise and on the cloud, 2026-11-05), and what each means here:
- * - `RUNNING`: the run is in progress, from right after its start: read
- *   again by long polling;
+ * The statuses an ABAP Unit run's `aunit:progress` answers, and what each
+ * means here. Code (cloud, 2026-11-20): `CL_AUL_RUN_RESULT->get_status`
+ * answers `FINISHED` for a run with a start and an end time, `RUNNING` for
+ * one with a start time alone, and `NOT_STARTED` otherwise. Measured (on
+ * premise and on the cloud, 2026-11-05; the cloud again 2026-11-20):
+ * - `RUNNING`: the run is in progress: read again by long polling;
  * - `FINISHED`: the run ended: its result is read;
- * - `NOT_STARTED`: what SAP answers for a run id it does not know, at once
- *   without long polling (and only after about 300 s with it): answered as
- *   it is.
+ * - `NOT_STARTED`: no start time is recorded yet. SAP answers it for a run
+ *   whose background task has not begun and for a run id it does not know
+ *   (an all-zero id answers `200` `NOT_STARTED`, measured on the cloud,
+ *   2026-11-20). What a reader does with it depends on whose run it is
+ *   (`readStartedRun`, `readGivenRun`).
  */
 const RUNNING = 'RUNNING';
 const FINISHED = 'FINISHED';
@@ -82,27 +86,48 @@ export type RunOutcome<TResult> =
     };
 
 function okOutcome<T>(value: T): IAdtResponse<T, IAdtError> {
-  return succeeded(value, 'readRunOnce');
+  return succeeded(value, 'readRun');
 }
 
 /** The step a status read is named by. */
 export const READ_STATUS = 'read status';
 
+/** A status read: by the run's id, long-polled or answered at once. */
+export type ReadRunStatus = (
+  runId: string,
+  withLongPolling: boolean,
+) => Promise<IAdtResponse<AdtReading<XmlRead>>>;
+
 /**
- * Read a run's status, waiting only for a run SAP says is running, and fetch
- * the result via `fetchResult` when SAP answers the run `FINISHED`.
+ * What a reader does with a `NOT_STARTED` answer to its first read:
+ * - `read again by long polling`: the tool started the run itself, right
+ *   before the read. Code (cloud, 2026-11-20): the start
+ *   (`CL_AUL_TEST_RUN->start_in_background`) dispatches the run as a new
+ *   task, waits 0.2 s and answers `201`, so the run's start time may still be
+ *   unrecorded at the first read. A long-polled read
+ *   (`CL_AUL_REST_RUN_STATUS`) re-reads on SAP's side until the run is
+ *   `FINISHED`, for up to 5 minutes; SAP bounds the wait.
+ * - `answered`: the caller passed the run id in; SAP's `NOT_STARTED` is
+ *   answered as SAP named it.
+ */
+type NotStartedReading = 'read again by long polling' | 'answered';
+
+/**
+ * Read the status of a run the tool itself just started, and fetch the
+ * result via `fetchResult` when SAP answers the run `FINISHED`.
  *
- * The first read asks for no long polling, so SAP answers at once. Only a
- * `RUNNING` answer is followed by a long-polled read (`withLongPolling`),
- * which ADT holds until the run has finished or about 300 s passed
- * (measured on premise, 2026-10-31: one poll held 97 s for a 90 s test and
- * 207 s for a 200 s one), and every further `RUNNING` answer by another,
- * with no limit and no timer of this package's. The read ends on:
+ * The first read is answered at once (no long polling). A `RUNNING` answer,
+ * and a `NOT_STARTED` answer to that first read, are followed by a
+ * long-polled read (`withLongPolling`): SAP holds it until the run has
+ * finished, for up to 5 minutes (Code, cloud, 2026-11-20; measured on
+ * premise, 2026-10-31: one poll held 97 s for a 90 s test and 207 s for a
+ * 200 s one). Every further `RUNNING` answer is followed by another, with no
+ * limit and no timer of this package's. The read ends on:
  *
  * - `FINISHED`: the result is fetched and answered with the status.
- * - `NOT_STARTED`: answered as SAP named it (`finished: false`), and the
- *   result is not fetched. An unknown run id answers it, at once.
- * - no `aunit:progress` status, or a status other than the three measured:
+ * - `NOT_STARTED` from a long-polled read: answered as SAP named it
+ *   (`finished: false`), and the result is not fetched.
+ * - no `aunit:progress` status, or a status other than the three named:
  *   a failure at the status step, whose message states what SAP sent.
  *
  * A failing `getStatus` call is returned exactly as it came (the caller's
@@ -110,16 +135,49 @@ export const READ_STATUS = 'read status';
  * once the run IS confirmed finished, is likewise returned as-is: never
  * swallowed into a null field under a false `success: true`.
  */
-export async function readRunOnce<TResult>(
-  getStatus: (
-    runId: string,
-    withLongPolling: boolean,
-  ) => Promise<IAdtResponse<AdtReading<XmlRead>>>,
+export function readStartedRun<TResult>(
+  getStatus: ReadRunStatus,
   runId: string,
   fetchResult: () => Promise<IAdtResponse<TResult>>,
 ): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
+  return readRun(getStatus, runId, fetchResult, 'read again by long polling');
+}
+
+/**
+ * Read the status of a run whose id the caller passed in, and fetch the
+ * result via `fetchResult` when SAP answers the run `FINISHED`.
+ *
+ * The first read is answered at once (no long polling). Only a `RUNNING`
+ * answer is followed by a long-polled read (`withLongPolling`), as
+ * `readStartedRun` reads it, and every further `RUNNING` answer by another.
+ * The read ends on:
+ *
+ * - `FINISHED`: the result is fetched and answered with the status.
+ * - `NOT_STARTED`: answered as SAP named it (`finished: false`), at once,
+ *   and the result is not fetched. An unknown run id answers it.
+ * - no `aunit:progress` status, or a status other than the three named:
+ *   a failure at the status step, whose message states what SAP sent.
+ *
+ * Failing `getStatus` and `getResult` calls are returned as they came, as in
+ * `readStartedRun`.
+ */
+export function readGivenRun<TResult>(
+  getStatus: ReadRunStatus,
+  runId: string,
+  fetchResult: () => Promise<IAdtResponse<TResult>>,
+): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
+  return readRun(getStatus, runId, fetchResult, 'answered');
+}
+
+async function readRun<TResult>(
+  getStatus: ReadRunStatus,
+  runId: string,
+  fetchResult: () => Promise<IAdtResponse<TResult>>,
+  notStarted: NotStartedReading,
+): Promise<IAdtResponse<RunOutcome<TResult>, IAdtError>> {
   const readStatus = atStep(READ_STATUS, getStatus);
-  let statusResponse = await readStatus(runId, false);
+  let longPolled = false;
+  let statusResponse = await readStatus(runId, longPolled);
   for (;;) {
     if (!statusResponse.ok) {
       return statusResponse;
@@ -127,10 +185,16 @@ export async function readRunOnce<TResult>(
     const status = statusResponse.getResult().value;
     const runStatus = runProgressStatus(status.value);
     if (runStatus === RUNNING) {
-      statusResponse = await readStatus(runId, true);
+      longPolled = true;
+      statusResponse = await readStatus(runId, longPolled);
       continue;
     }
     if (runStatus === NOT_STARTED) {
+      if (notStarted === 'read again by long polling' && !longPolled) {
+        longPolled = true;
+        statusResponse = await readStatus(runId, longPolled);
+        continue;
+      }
       return okOutcome<RunOutcome<TResult>>({
         finished: false,
         status,
@@ -146,7 +210,7 @@ export async function readRunOnce<TResult>(
         withStep(
           {
             origin: 'refusal',
-            message: `SAP answered the status of run ${runId} with ${named}, which is neither ${RUNNING} (read again), ${FINISHED} (the result is read) nor ${NOT_STARTED} (answered as it is): the read stops here, and the run's result is not read; the status document as SAP sent it: ${status.raw}`,
+            message: `SAP answered the status of run ${runId} with ${named}, which is neither ${RUNNING} (read again), ${FINISHED} (the result is read) nor ${NOT_STARTED}: the read stops here, and the run's result is not read; the status document as SAP sent it: ${status.raw}`,
           },
           READ_STATUS,
         ),

@@ -5,9 +5,9 @@
  * - `wait: false` sends the start alone and answers the run id;
  * - `wait: true`, and the default, read the status at once (no long
  *   polling), and long-poll (`?withLongPolling=true`) only while SAP answers
- *   `RUNNING`: `FINISHED` reads the result, `NOT_STARTED` is answered with
- *   the run id, and a status with no `aunit:progress` is a failure carrying
- *   SAP's document;
+ *   `RUNNING` or answers the first read `NOT_STARTED`: `FINISHED` reads the
+ *   result, a long-polled `NOT_STARTED` is answered with the run id, and a
+ *   status with no `aunit:progress` is a failure carrying SAP's document;
  * - `wait` with `runner: 'sync'` is refused with nothing sent, and a value
  *   that is not a boolean is refused with nothing sent;
  * - the readers (`GetUnitTestResult`, the library's `GetUnitTest`,
@@ -226,9 +226,10 @@ for (const tool of RUN_TOOLS) {
           assert.ok(JSON.stringify(answer.run_result).includes('TEST_METHOD'));
         });
 
-        it('a NOT_STARTED status: the run id and the status, one status read, no result read', async () => {
+        it('a NOT_STARTED status, long-polled NOT_STARTED again: the run id and the status, no result read', async () => {
           const connection = recordingConnection([
             STARTED,
+            NOT_STARTED,
             NOT_STARTED,
             FINISHED,
             RESULT,
@@ -237,10 +238,10 @@ for (const tool of RUN_TOOLS) {
           assert.equal(result.isError, false);
           assert.deepStrictEqual(
             statusReads(connection.requests).map((r) => r.url),
-            [STATUS_URL],
+            [STATUS_URL, LONG_POLL_URL],
           );
           assert.deepStrictEqual(resultReads(connection.requests), []);
-          assert.equal(connection.requests.length, 2);
+          assert.equal(connection.requests.length, 3);
           assert.deepStrictEqual(answerOf(result), {
             success: true,
             run_id: RUN,
@@ -545,7 +546,7 @@ describe('the schema', () => {
       );
       assert.ok(
         tool.description.includes(
-          'a run SAP reports unstarted (its answer for an unknown run_id) returns the run_id and that status',
+          'a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status',
         ),
       );
     });
@@ -566,7 +567,7 @@ describe('the schema', () => {
     );
     assert.ok(
       GetUnitTestResult_Tool.description.includes(
-        'a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once',
+        'a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once',
       ),
     );
   });

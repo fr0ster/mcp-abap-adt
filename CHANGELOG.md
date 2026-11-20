@@ -5,7 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-19
+## [Unreleased] - 2026-11-20
+
+### Fixed
+
+- **A run tool that waits re-reads an initial `NOT_STARTED` once, by long polling, for the run it has just started.** `RunUnitTest`, `RunCdsUnitTest`, `RunProgramUnitTest`, `RunFunctionGroupUnitTest`, `RunFunctionModuleUnitTest` and `RunAbapUnit` (with `wait` true or left out) answered `{ success, run_id, status: "NOT_STARTED" }` with no `finished` and no `run_result` once on the cloud system, right after the start. Code (cloud, 2026-11-20): the start (`CL_AUL_TEST_RUN->start_in_background`) runs the tests in a new task, waits 0.2 s and answers `201`, and the status (`CL_AUL_RUN_RESULT->get_status`) is `NOT_STARTED` until that task records its start time — the same answer SAP gives for a run id it does not know (measured on the cloud: an all-zero id answers `200` `NOT_STARTED`). The first status read answers at once, and the tools took its `NOT_STARTED` as final. After the tool's own start, a `NOT_STARTED` to the first read is now read once more with `withLongPolling=true`, as a `RUNNING` already was: SAP (`CL_AUL_REST_RUN_STATUS`) holds that read until the run is `FINISHED`, for up to 5 minutes, and the server adds no timer; a `NOT_STARTED` from the long-polled read is answered as before. The readers of a run id the caller passes in (`GetUnitTestResult`, and the library's `GetUnitTest`, `GetCdsUnitTest`, `GetCdsUnitTestResult`) keep answering `NOT_STARTED` at once, as SAP named it (`readGivenRun`; the run tools read through `readStartedRun`, `src/handlers/unit_test/shared/pollRun.ts`). The tool descriptions and the `wait` parameter say so; `src/__tests__/unit/unitTest/notStartedAfterStart.test.ts` covers both paths.
 
 ### Added
 

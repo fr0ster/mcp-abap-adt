@@ -4,7 +4,7 @@ import { answer } from '../../../lib/answer';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { readRunOnce, unfinishedRun } from '../shared/pollRun';
+import { readGivenRun, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+    '[read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
   inputSchema: z.object({
     run_id: requiredText('run_id is required').describe(
       'Run id a unit test run answered.',
@@ -39,7 +39,7 @@ export async function handleGetUnitTestResult(
   // this handler called polled status internally before ever answering a
   // result. This tool has no status of its own to poll (`with_long_polling`
   // is not in its surface), so — per the fix ruling — it polls status first
-  // via `readRunOnce` rather than guessing what `getResult` answers on
+  // via `readGivenRun` rather than guessing what `getResult` answers on
   // an unfinished run (uncaptured in the corpus). `getResult` takes
   // `analyseException` since adt-clients 23.
   const unitTest = testRunner(context, 'class');
@@ -48,7 +48,7 @@ export async function handleGetUnitTestResult(
   return answer(
     { tool: 'GetUnitTestResult', detail },
     () =>
-      readRunOnce(
+      readGivenRun(
         (id, withLongPolling) =>
           unitTest.getStatus(id, withLongPolling, {
             analyse: analyseException,

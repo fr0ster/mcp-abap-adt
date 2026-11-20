@@ -963,7 +963,7 @@ describe('the high-tier Get*/List* handlers answer through the adapter and surfa
  * bounded polling, no group-verification gate to defeat — are table-driven
  * below. Three that carry the identity in a POSITIONAL argument rather than
  * a config object (`getStatus`, `getServiceBindingTypes`), and the four
- * whose own `readRunOnce` read needs a fake client that actually
+ * whose own `readGivenRun` read needs a fake client that actually
  * answers a finished run to ever reach its second call, are each their own
  * `it` further down.
  */
@@ -1481,7 +1481,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
   });
 
   // CDS variants: `AdtCdsUnitTest extends AdtUnitTest` and inherits both
-  // members unchanged, so these exercise the identical `readRunOnce`
+  // members unchanged, so these exercise the identical `readGivenRun`
   // path through a different factory — synthetic markers throughout, since
   // no CDS run is captured in the corpus.
   const cdsStatus =

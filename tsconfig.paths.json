@@ -18,19 +18,42 @@
       "@mcp-abap-adt/lib/tool-set": ["./src/lib/toolSet.ts"],
       "@mcp-abap-adt/lib/adt-headers": ["./src/lib/adtHeaders/index.ts"],
       "@mcp-abap-adt/lib/tool-search": ["./src/lib/toolSearch/index.ts"],
-      "@mcp-abap-adt/background-runs-memory": ["./background-runs-memory/src/index.ts"],
+      "@mcp-abap-adt/lib/prompts": ["./src/lib/prompts/index.ts"],
+      "@mcp-abap-adt/background-runs-memory": [
+        "./background-runs-memory/src/index.ts"
+      ],
       "@mcp-abap-adt/responsible-rules": ["./responsible-rules/src/index.ts"],
-      "@mcp-abap-adt/compact-readonly-entries": ["./compact-readonly-entries/src/index.ts"],
-      "@mcp-abap-adt/compact-readonly-entries/routes": ["./compact-readonly-entries/src/handlers/compactReadRoutes.ts"],
+      "@mcp-abap-adt/compact-readonly-entries": [
+        "./compact-readonly-entries/src/index.ts"
+      ],
+      "@mcp-abap-adt/compact-readonly-entries/routes": [
+        "./compact-readonly-entries/src/handlers/compactReadRoutes.ts"
+      ],
       "@mcp-abap-adt/compact-modify": ["./compact-modify/src/index.ts"],
-      "@mcp-abap-adt/compact-modify/routes": ["./compact-modify/src/handlers/compactWriteRoutes.ts"],
-      "@mcp-abap-adt/server-runtime/stdio": ["./server-runtime/src/stdio/launcher.ts"],
-      "@mcp-abap-adt/server-runtime/stdio/server": ["./server-runtime/src/stdio/server.ts"],
-      "@mcp-abap-adt/server-runtime/auth": ["./server-runtime/src/stdio/auth/index.ts"],
-      "@mcp-abap-adt/server-runtime/http": ["./server-runtime/src/http/launcher.ts"],
-      "@mcp-abap-adt/server-runtime/http/server": ["./server-runtime/src/http/server.ts"],
-      "@mcp-abap-adt/server-runtime/sse": ["./server-runtime/src/sse/launcher.ts"],
-      "@mcp-abap-adt/server-runtime/sse/server": ["./server-runtime/src/sse/server.ts"],
+      "@mcp-abap-adt/compact-modify/routes": [
+        "./compact-modify/src/handlers/compactWriteRoutes.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/stdio": [
+        "./server-runtime/src/stdio/launcher.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/stdio/server": [
+        "./server-runtime/src/stdio/server.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/auth": [
+        "./server-runtime/src/stdio/auth/index.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/http": [
+        "./server-runtime/src/http/launcher.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/http/server": [
+        "./server-runtime/src/http/server.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/sse": [
+        "./server-runtime/src/sse/launcher.ts"
+      ],
+      "@mcp-abap-adt/server-runtime/sse/server": [
+        "./server-runtime/src/sse/server.ts"
+      ],
       "@mcp-abap-adt/core/launcher": ["./server/src/launcher.ts"],
       "@mcp-abap-adt/core/auth": ["./server/src/auth/index.ts"],
       "@mcp-abap-adt/http": ["./http/src/index.ts"],
@@ -44,8 +67,12 @@
       "@mcp-abap-adt/http-ro/launcher": ["./http-ro/src/launcher.ts"],
       "@mcp-abap-adt/sse-ro/launcher": ["./sse-ro/src/launcher.ts"],
       "@mcp-abap-adt/compact-ro/launcher": ["./compact-ro/src/launcher.ts"],
-      "@mcp-abap-adt/compact-http-ro/launcher": ["./compact-http-ro/src/launcher.ts"],
-      "@mcp-abap-adt/compact-sse-ro/launcher": ["./compact-sse-ro/src/launcher.ts"]
+      "@mcp-abap-adt/compact-http-ro/launcher": [
+        "./compact-http-ro/src/launcher.ts"
+      ],
+      "@mcp-abap-adt/compact-sse-ro/launcher": [
+        "./compact-sse-ro/src/launcher.ts"
+      ]
     }
   }
 }

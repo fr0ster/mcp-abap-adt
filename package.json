@@ -88,6 +88,11 @@
       "types": "./dist/lib/toolSearch/index.d.ts",
       "import": "./dist/lib/toolSearch/index.js",
       "require": "./dist/lib/toolSearch/index.js"
+    },
+    "./prompts": {
+      "types": "./dist/lib/prompts/index.d.ts",
+      "import": "./dist/lib/prompts/index.js",
+      "require": "./dist/lib/prompts/index.js"
     }
   },
   "typesVersions": {
@@ -139,6 +144,9 @@
       ],
       "tool-search": [
         "dist/lib/toolSearch/index.d.ts"
+      ],
+      "prompts": [
+        "dist/lib/prompts/index.d.ts"
       ]
     }
   },

@@ -117,12 +117,18 @@ const SETTINGS_SHAPE = {
     .describe('Whether changes to the table data are logged.'),
 };
 
-/** What `is_writable_by_amdp` says on the cloud (DT 771). */
+/**
+ * What `is_writable_by_amdp` says on the cloud: DT 771, the activation's
+ * refusal of a table writable by AMDP with buffering, logging or a
+ * replacement object (Code, cloud: `CL_DDACT_TABL_CHECK_TCHSET_CL` →
+ * `chk_writable_amdp_usage`; measured on the cloud, an `E` message and the
+ * table left inactive). The owner's wording.
+ */
 const AMDP_FLAG = z
   .boolean()
   .optional()
   .describe(
-    'true allows AMDP writes to the table; activation then needs buffering N, logging off and the table free of a replacement object.',
+    'true allows AMDP writes; activation then needs buffering N, logging off and no replacement object.',
   );
 
 /** The fields every variant's schema ends with. */

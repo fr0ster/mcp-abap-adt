@@ -20,6 +20,7 @@ import {
 import { READ_DEFINITIONS } from '@mcp-abap-adt/lib/handlers/read';
 import type * as z from 'zod';
 import { draftArgsOf } from './compactPartRoutes';
+import { textElementsArgsOf } from './compactReadRoutes';
 
 type Variant = keyof typeof COMPACT_MAIN_PROGRAMS;
 
@@ -84,6 +85,25 @@ export const SOURCE_REFUSALS: Partial<Record<CompactObjectType, RouteRefusal>> =
     BEHAVIOR_DEFINITION: of(D.GetBehaviorDefinition),
     BEHAVIOR_IMPLEMENTATION: of(D.GetBehaviorImplementation),
     METADATA_EXTENSION: of(D.GetMetadataExtension),
+    TABLE_SETTINGS: of(D.GetTableSettings),
+    PROGRAM_TEXT_ELEMENTS: (args, variant, ctx) =>
+      of(D.GetTextElements)(
+        textElementsArgsOf('program', args.program_name, args),
+        variant,
+        ctx,
+      ),
+    FUNCTION_GROUP_TEXT_ELEMENTS: (args, variant, ctx) =>
+      of(D.GetTextElements)(
+        textElementsArgsOf('function_group', args.function_group_name, args),
+        variant,
+        ctx,
+      ),
+    CLASS_TEXT_ELEMENTS: (args, variant, ctx) =>
+      of(D.GetTextElements)(
+        textElementsArgsOf('class', args.class_name, args),
+        variant,
+        ctx,
+      ),
   };
 
 /** `part: 'metadata'` (`compactMetadataRoutes`). */

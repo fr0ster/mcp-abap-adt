@@ -50,6 +50,7 @@ import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
 import { terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { unlockSubResource } from './subResourceLocks';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockObjectLow',
@@ -239,6 +240,11 @@ export async function unlockObject(
           .unlock({ dataElementName: objectName }, lock_handle, {
             analyse: analyseException,
           });
+      case 'table_settings':
+      case 'program_text_elements':
+      case 'function_group_text_elements':
+      case 'class_text_elements':
+        return unlockSubResource(context, objectType, objectName, lock_handle);
       case 'package':
         // Sent on the session holding the lock, which is then released
         // whatever the unlock answered.

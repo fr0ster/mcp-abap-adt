@@ -6,12 +6,9 @@ import {
   type CompactObjectType,
   compactActivateDescription,
   compactActivateSchemaWithNamesFor,
+  subResourceRefusal,
 } from '@mcp-abap-adt/lib/compact-shared';
-import {
-  type HandlerContext,
-  statedEnvironment,
-  variantOf,
-} from '@mcp-abap-adt/lib/handlers';
+import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import {
   activatePlanOnce,
   activationPlan,
@@ -47,27 +44,6 @@ function functionModuleReference(
     return `object_name names group ${group}, function_group_name names ${separate}: give the group once; nothing was sent`;
   }
   return { name: module, parentName: group };
-}
-
-/** The members that name an object's text elements. */
-const TEXT_ELEMENTS_MEMBERS: ReadonlySet<CompactObjectType> = new Set([
-  'PROGRAM_TEXT_ELEMENTS',
-  'FUNCTION_GROUP_TEXT_ELEMENTS',
-  'CLASS_TEXT_ELEMENTS',
-]);
-
-/** The refusal of the text elements on a stated legacy system. */
-export const LEGACY_TEXT_ELEMENTS_WORDS =
-  'The text elements are served on onprem and cloud systems; the stated system type is legacy, so nothing was sent.';
-
-/**
- * Whether the context states a legacy system: its discovery lists no
- * `/textelements` (recorded discovery of SAP_BASIS 7.40, 0 occurrences,
- * `texts-translation.md` §9). The connection reads legacy as on premise
- * (`statedSystemKind`), so the stated type decides.
- */
-function servesNoTextElements(context: HandlerContext): boolean {
-  return statedEnvironment(context.systemType) === 'legacy';
 }
 
 export const TOOL_DEFINITION = {
@@ -136,9 +112,8 @@ export async function handleHandlerActivate(
       `HandlerActivate cannot turn object_type "${args.object_type}" into an ADT type code — pass object_adt_type instead (e.g. "CLAS/OC"). Known without it: ${compactActivatableTypes(context.connection).join(', ')}.`,
     );
   }
-  if (TEXT_ELEMENTS_MEMBERS.has(member) && servesNoTextElements(context)) {
-    return return_error(LEGACY_TEXT_ELEMENTS_WORDS);
-  }
+  const legacy = subResourceRefusal(context, member);
+  if (legacy !== undefined) return return_error(legacy);
   const reference =
     member === 'FUNCTION_MODULE'
       ? functionModuleReference(args.object_name, args.function_group_name)

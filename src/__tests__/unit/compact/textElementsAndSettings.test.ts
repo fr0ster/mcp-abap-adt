@@ -1,4 +1,10 @@
 /**
+ * The compact sub-resource types: `TABLE_SETTINGS` and the three text
+ * elements types are read by HandlerGet, written by HandlerUpdate under the
+ * caller's lock (one operation: no lock, unlock or activation inside), and
+ * locked by HandlerLock / HandlerUnlock (the settings' TABT lock, the text
+ * elements' TEXT lock).
+ *
  * HandlerActivate and the text elements: `PROGRAM_TEXT_ELEMENTS` and
  * `FUNCTION_GROUP_TEXT_ELEMENTS` are activated as `PROG/PX` — a function
  * group's at `/sap/bc/adt/textelements/functiongroups/{group}` — and
@@ -22,10 +28,24 @@ import {
   handleHandlerActivate,
   TOOL_DEFINITION,
 } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
+import { handleHandlerLock } from '../../../../compact-modify/src/handlers/handleHandlerLock';
+import { handleHandlerUnlock } from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
+import {
+  TOOL_DEFINITION as HandlerUpdate,
+  handleHandlerUpdate,
+} from '../../../../compact-modify/src/handlers/handleHandlerUpdate';
+import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { readOnlyToolNames } from '../../../lib/toolSet';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { holding } from '../../helpers/heldLocks';
 import { setSystemContext } from '../../helpers/processSystemContext';
+import { LOCK_SUCCESS_XML } from '../../helpers/recordingConnection';
+import {
+  SETTINGS_ETAG,
+  settingsDocument,
+} from '../tableSettings/settingsStandIn';
 
 const RUN_ID = 'RUN0001';
 const ACTIVATED =
@@ -69,6 +89,20 @@ function system(variant: 'onprem' | 'cloud') {
         );
       if (url.startsWith(`/sap/bc/adt/activation/results/${RUN_ID}`))
         return answer(200, ACTIVATED);
+      if (url.includes('_action=LOCK')) return answer(200, LOCK_SUCCESS_XML);
+      if (
+        url.startsWith('/sap/bc/adt/ddic/db/settings/') &&
+        options.method === 'GET'
+      )
+        return answer(
+          200,
+          settingsDocument(
+            'ZMCP_TS',
+            'inactive',
+            variant === 'cloud' ? false : undefined,
+          ),
+          { etag: SETTINGS_ETAG },
+        );
       return answer(200);
     },
   };
@@ -149,4 +183,197 @@ describe('HandlerActivate: the text elements', () => {
       assert.deepEqual(requests, []);
     });
   }
+});
+
+const HANDLE = 'B92E65858E83454C783181344F429D4BFD8E395D';
+const SYMBOL = { key: '001', text: 'First symbol', max_length: 20 };
+
+/** `METHOD path` of each request but the discovery. */
+const lines = (requests: readonly IAbapRequestOptions[]) =>
+  requests
+    .filter((r) => !r.url.startsWith('/sap/bc/adt/discovery'))
+    .map((r) => `${r.method} ${r.url}`);
+
+describe('HandlerGet: the sub-resources', () => {
+  const reads = [
+    [
+      'TABLE_SETTINGS',
+      { table_name: 'ZMCP_TS' },
+      ['GET /sap/bc/adt/ddic/db/settings/zmcp_ts?version=active'],
+    ],
+    [
+      'CLASS_TEXT_ELEMENTS',
+      { class_name: 'ZCL_X' },
+      ['GET /sap/bc/adt/textelements/classes/zcl_x/source/symbols'],
+    ],
+    [
+      'FUNCTION_GROUP_TEXT_ELEMENTS',
+      { function_group_name: 'ZFG_X' },
+      [
+        'GET /sap/bc/adt/textelements/functiongroups/zfg_x/source/symbols',
+        'GET /sap/bc/adt/textelements/functiongroups/zfg_x/source/selections',
+        'GET /sap/bc/adt/textelements/functiongroups/zfg_x/source/headings',
+      ],
+    ],
+    [
+      'PROGRAM_TEXT_ELEMENTS',
+      { program_name: 'ZPROG_X' },
+      [
+        'GET /sap/bc/adt/textelements/programs/zprog_x/source/symbols',
+        'GET /sap/bc/adt/textelements/programs/zprog_x/source/selections',
+        'GET /sap/bc/adt/textelements/programs/zprog_x/source/headings',
+      ],
+    ],
+  ] as const;
+  for (const [objectType, names, sent] of reads) {
+    it(`reads ${objectType} through its full tool`, async () => {
+      const { connection, requests } = system('onprem');
+      const result = await handleHandlerGet(
+        { connection, logger: undefined },
+        { object_type: objectType, ...names },
+      );
+      // The stand answers each part empty: the requests are the read.
+      assert.ok(result !== undefined);
+      assert.deepEqual(
+        lines(requests).map((line) => line.split('?')[0]),
+        sent.map((line) => line.split('?')[0]),
+      );
+    });
+  }
+});
+
+describe("HandlerUpdate: the sub-resources under the caller's lock", () => {
+  it('writes TABLE_SETTINGS as the patch alone: its read and its PUT, no LOCK, UNLOCK or activation', async () => {
+    const { connection, requests } = system('onprem');
+    const result = await handleHandlerUpdate(
+      { connection, logger: undefined, heldLocks: holding(HANDLE) },
+      {
+        object_type: 'TABLE_SETTINGS',
+        table_name: 'ZMCP_TS',
+        data_class: 'APPL1',
+        lock_handle: HANDLE,
+      },
+    );
+    assert.notEqual(result.isError, true, JSON.stringify(result));
+    assert.deepEqual(
+      lines(requests).map((line) => line.split('?')[0]),
+      [
+        'GET /sap/bc/adt/ddic/db/settings/zmcp_ts',
+        'PUT /sap/bc/adt/ddic/db/settings/zmcp_ts',
+      ],
+    );
+    assert.ok(lines(requests)[1]?.includes(`lockHandle=${HANDLE}`));
+  });
+
+  it('writes the text elements parts given, each one PUT under the handle, nothing else', async () => {
+    const { connection, requests } = system('cloud');
+    const result = await handleHandlerUpdate(
+      { connection, logger: undefined, heldLocks: holding(HANDLE) },
+      {
+        object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+        function_group_name: 'ZFG_X',
+        symbols: [SYMBOL],
+        lock_handle: HANDLE,
+      },
+    );
+    assert.notEqual(result.isError, true, JSON.stringify(result));
+    assert.deepEqual(lines(requests), [
+      `PUT /sap/bc/adt/textelements/functiongroups/zfg_x/source/symbols?lockHandle=${HANDLE}`,
+    ]);
+  });
+
+  it('offers PROGRAM_TEXT_ELEMENTS on premise and not on the cloud', () => {
+    const membersOn = (variant: 'onprem' | 'cloud') =>
+      HandlerUpdate.variants[variant].members ?? [];
+    assert.ok(membersOn('onprem').includes('PROGRAM_TEXT_ELEMENTS'));
+    assert.ok(!membersOn('cloud').includes('PROGRAM_TEXT_ELEMENTS'));
+    for (const variant of ['onprem', 'cloud'] as const) {
+      for (const member of [
+        'TABLE_SETTINGS',
+        'FUNCTION_GROUP_TEXT_ELEMENTS',
+        'CLASS_TEXT_ELEMENTS',
+      ] as const) {
+        assert.ok(membersOn(variant).includes(member));
+      }
+    }
+  });
+
+  it('the read-only compact build reads the four types and writes none', () => {
+    const names = readOnlyToolNames();
+    assert.ok(names.has('HandlerGet'));
+    assert.ok(!names.has('HandlerUpdate'));
+  });
+});
+
+describe('HandlerLock and HandlerUnlock: the sub-resources', () => {
+  it("locks TABLE_SETTINGS with the settings' own lock", async () => {
+    const { connection, requests } = system('onprem');
+    const result = await handleHandlerLock(
+      { connection, logger: undefined, heldLocks: holding() },
+      { object_type: 'TABLE_SETTINGS', object_name: 'ZMCP_TS' },
+    );
+    assert.notEqual(result.isError, true, JSON.stringify(result));
+    assert.deepEqual(lines(requests), [
+      'POST /sap/bc/adt/ddic/db/settings/zmcp_ts?_action=LOCK&accessMode=MODIFY',
+    ]);
+  });
+
+  it("locks and unlocks a function group's text elements at their address", async () => {
+    const { connection, requests } = system('cloud');
+    const held = holding();
+    await handleHandlerLock(
+      { connection, logger: undefined, heldLocks: held },
+      { object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS', object_name: 'ZFG_X' },
+    );
+    const result = await handleHandlerUnlock(
+      { connection, logger: undefined, heldLocks: held },
+      {
+        object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+        object_name: 'ZFG_X',
+        lock_handle: HANDLE,
+      },
+    );
+    assert.notEqual(result.isError, true, JSON.stringify(result));
+    assert.deepEqual(lines(requests), [
+      'POST /sap/bc/adt/textelements/functiongroups/zfg_x?_action=LOCK&accessMode=MODIFY',
+      `POST /sap/bc/adt/textelements/functiongroups/zfg_x?_action=UNLOCK&lockHandle=${HANDLE}`,
+    ]);
+  });
+
+  it('refuses the four on a stated legacy system, with nothing sent', async () => {
+    const { connection, requests } = system('onprem');
+    const context = {
+      connection,
+      logger: undefined,
+      systemType: 'legacy',
+      heldLocks: holding(HANDLE),
+    };
+    for (const object_type of [
+      'TABLE_SETTINGS',
+      'PROGRAM_TEXT_ELEMENTS',
+      'FUNCTION_GROUP_TEXT_ELEMENTS',
+      'CLASS_TEXT_ELEMENTS',
+    ] as const) {
+      const answers = [
+        await handleHandlerGet(context, {
+          object_type,
+          table_name: 'T',
+          program_name: 'P',
+          function_group_name: 'G',
+          class_name: 'C',
+        }),
+        await handleHandlerLock(context, { object_type, object_name: 'O' }),
+        await handleHandlerUnlock(context, {
+          object_type,
+          object_name: 'O',
+          lock_handle: HANDLE,
+        }),
+      ];
+      for (const answered of answers) {
+        assert.equal(answered.isError, true);
+        assert.match(JSON.stringify(answered), /legacy/);
+      }
+    }
+    assert.deepEqual(requests, []);
+  });
 });

@@ -1,4 +1,13 @@
 import * as z from 'zod';
+import {
+  AMDP_FLAG,
+  SETTINGS_SHAPE,
+} from '../../handlers/table/high/handleUpdateTableSettings';
+import {
+  HEADINGS,
+  SELECTIONS,
+  SYMBOLS,
+} from '../../handlers/text_elements/high/handleUpdateTextElements';
 import { RUN_TARGET_OPTIONAL } from '../../handlers/unit_test/shared/runTarget';
 import {
   type ACTIVATION_CODES,
@@ -696,6 +705,10 @@ export const COMPACT_READ_TAKES = takesOf<
     UNIT_TEST: ['run_id'],
     CDS_UNIT_TEST: ['run_id'],
     TRANSPORT: ['transport_number'],
+    TABLE_SETTINGS: ['table_name', 'version'],
+    PROGRAM_TEXT_ELEMENTS: ['program_name', 'version'],
+    FUNCTION_GROUP_TEXT_ELEMENTS: ['function_group_name', 'version'],
+    CLASS_TEXT_ELEMENTS: ['class_name', 'version'],
   },
 });
 
@@ -819,6 +832,12 @@ export const compactGetSchema = compactGetSchemaWithNamesFor(
   HANDLER_GET_DRAFT_TYPES.onprem,
 );
 
+/** UpdateTableSettings' settings, each written over the stored one (TABLE_SETTINGS). */
+function settingsFields() {
+  const { table_name: _name, ...settings } = SETTINGS_SHAPE;
+  return settings;
+}
+
 const UPDATE_PROPERTIES = {
   lock_handle: z
     .string()
@@ -934,6 +953,13 @@ const UPDATE_PROPERTIES = {
     .enum(['published', 'unpublished'])
     .optional()
     .describe('Target publication state (service binding update).'),
+  ...settingsFields(),
+  is_writable_by_amdp: AMDP_FLAG.describe(
+    `TABLE_SETTINGS on the cloud: ${AMDP_FLAG.description ?? ''}`,
+  ),
+  symbols: SYMBOLS,
+  selections: SELECTIONS,
+  headings: HEADINGS,
 };
 
 /** A member of `HandlerUpdate`'s `object_type`. */
@@ -989,6 +1015,31 @@ export const COMPACT_UPDATE_TAKES = takesOf<
       'service_name',
       'service_version',
     ],
+    TABLE_SETTINGS: [
+      'table_name',
+      'data_class',
+      'size_category',
+      'buffering',
+      'storage_type',
+      'sharing_type',
+      'load_unit',
+      'translation',
+      'logging_enabled',
+      'is_writable_by_amdp',
+    ],
+    PROGRAM_TEXT_ELEMENTS: [
+      'program_name',
+      'symbols',
+      'selections',
+      'headings',
+    ],
+    FUNCTION_GROUP_TEXT_ELEMENTS: [
+      'function_group_name',
+      'symbols',
+      'selections',
+      'headings',
+    ],
+    CLASS_TEXT_ELEMENTS: ['class_name', 'symbols'],
   },
 });
 

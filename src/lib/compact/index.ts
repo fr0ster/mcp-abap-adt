@@ -128,3 +128,7 @@ export {
   textsOf,
   when,
 } from './memberTexts.js';
+export {
+  LEGACY_SUB_RESOURCE_WORDS,
+  subResourceRefusal,
+} from './subResources.js';

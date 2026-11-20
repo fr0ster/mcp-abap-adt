@@ -28,7 +28,8 @@ export type CompactObjectType =
   | 'RUNTIME_DUMP'
   | 'PROGRAM_TEXT_ELEMENTS'
   | 'FUNCTION_GROUP_TEXT_ELEMENTS'
-  | 'CLASS_TEXT_ELEMENTS';
+  | 'CLASS_TEXT_ELEMENTS'
+  | 'TABLE_SETTINGS';
 
 export const COMPACT_OBJECT_TYPES: CompactObjectType[] = [
   'PACKAGE',
@@ -61,4 +62,5 @@ export const COMPACT_OBJECT_TYPES: CompactObjectType[] = [
   'PROGRAM_TEXT_ELEMENTS',
   'FUNCTION_GROUP_TEXT_ELEMENTS',
   'CLASS_TEXT_ELEMENTS',
+  'TABLE_SETTINGS',
 ];

@@ -111,6 +111,11 @@ const READ_TOKENS: Tokens<ReadMember> = {
   UNIT_TEST: 'UNIT_TEST(run_id*)',
   CDS_UNIT_TEST: 'CDS_UNIT_TEST(run_id*)',
   TRANSPORT: 'TRANSPORT(transport_number*)',
+  TABLE_SETTINGS: 'TABLE_SETTINGS(table_name*)',
+  PROGRAM_TEXT_ELEMENTS: 'PROGRAM_TEXT_ELEMENTS(program_name*)',
+  FUNCTION_GROUP_TEXT_ELEMENTS:
+    'FUNCTION_GROUP_TEXT_ELEMENTS(function_group_name*)',
+  CLASS_TEXT_ELEMENTS: 'CLASS_TEXT_ELEMENTS(class_name*)',
 };
 
 /** The parts each kind of type has, the kinds whose members are all removed left out. */
@@ -211,6 +216,14 @@ const UPDATE_TOKENS: Tokens<UpdateMember> = {
     'METADATA_EXTENSION(name*, source_code*, transport_request)',
   SERVICE_BINDING:
     'SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version)',
+  TABLE_SETTINGS:
+    'TABLE_SETTINGS(table_name*, data_class, size_category, buffering, storage_type, sharing_type, load_unit, translation, logging_enabled, is_writable_by_amdp on the cloud, transport_request; at least one setting)',
+  PROGRAM_TEXT_ELEMENTS:
+    'PROGRAM_TEXT_ELEMENTS(program_name*, symbols, selections, headings, transport_request; at least one part)',
+  FUNCTION_GROUP_TEXT_ELEMENTS:
+    'FUNCTION_GROUP_TEXT_ELEMENTS(function_group_name*, symbols, selections, headings, transport_request; at least one part)',
+  CLASS_TEXT_ELEMENTS:
+    'CLASS_TEXT_ELEMENTS(class_name*, symbols*, transport_request)',
 };
 
 /** HandlerUpdate's description on `variant`, naming `members` (default: all the variant's). */
@@ -231,6 +244,11 @@ export function compactUpdateDescription(
     ].filter(serves),
     ...(serves('INCLUDE') ? ['INCLUDE with part metadata'] : []),
   ];
+  const texts = left.of<UpdateMember>([
+    'PROGRAM_TEXT_ELEMENTS',
+    'FUNCTION_GROUP_TEXT_ELEMENTS',
+    'CLASS_TEXT_ELEMENTS',
+  ]);
   const classIncludes = left.of<UpdateMember>([
     'LOCAL_TEST_CLASS',
     'LOCAL_TYPES',
@@ -243,7 +261,7 @@ export function compactUpdateDescription(
   const parted = serves('INCLUDE')
     ? ' part is taken by INCLUDE alone: source (when absent) writes its source, metadata its metadata document.'
     : '';
-  return `Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: ${named(members, UPDATE_TOKENS)}.${when(metadata.length > 0, ` For ${listed(metadata)}, source_code is the whole metadata document, sent as given.`)}${parted}${classIncludes.length > 0 ? ` For ${listed(classIncludes)}, lock_handle is the class's lock handle.` : ''}${when(left.has('SERVICE_BINDING'), ' For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding.')} transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.`;
+  return `Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the one write request of its type under lock_handle, the lock handle of the object, and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: ${named(members, UPDATE_TOKENS)}.${when(metadata.length > 0, ` For ${listed(metadata)}, source_code is the whole metadata document, sent as given.`)}${parted}${classIncludes.length > 0 ? ` For ${listed(classIncludes)}, lock_handle is the class's lock handle.` : ''}${when(left.has('TABLE_SETTINGS'), " For TABLE_SETTINGS, lock_handle is HandlerLock's handle of TABLE_SETTINGS; each setting given is written over the stored one and every other setting keeps its stored value.")}${when(texts.length > 0, ` For ${listed(texts)}, lock_handle is HandlerLock's handle of the same object_type; each part given (symbols, selections, headings; a class symbols alone) is written as that part's whole list.`)}${when(left.has('SERVICE_BINDING'), ' For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding.')} transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.`;
 }
 
 type DeleteMember = (typeof COMPACT_DELETE.onprem)[number];

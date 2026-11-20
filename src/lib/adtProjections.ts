@@ -1118,6 +1118,10 @@ export const COMPACT_READ_ROUTES = {
   UNIT_TEST: { api: 'class', operation: 'unitTestResult' },
   CDS_UNIT_TEST: { api: 'class', operation: 'unitTestResult' },
   TRANSPORT: { api: 'request', operation: 'readObjects' },
+  TABLE_SETTINGS: { api: 'tableSettings', operation: 'readMetadata' },
+  PROGRAM_TEXT_ELEMENTS: { api: 'textElements', operation: 'read' },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { api: 'textElements', operation: 'read' },
+  CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'read' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
 const READ_ONPREM = [
@@ -1146,6 +1150,10 @@ const READ_ONPREM = [
   'UNIT_TEST',
   'CDS_UNIT_TEST',
   'TRANSPORT',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
 
 /** HandlerGet's `object_type`: a program and an include are read on both variants. */
@@ -1183,6 +1191,10 @@ export const COMPACT_UPDATE_ROUTES = {
   },
   METADATA_EXTENSION: { api: 'metadataExtension', operation: 'update' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'update' },
+  TABLE_SETTINGS: { api: 'tableSettings', operation: 'updateMetadata' },
+  PROGRAM_TEXT_ELEMENTS: { api: 'textElements', operation: 'update' },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { api: 'textElements', operation: 'update' },
+  CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'update' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
 const UPDATE_ONPREM = [
@@ -1210,16 +1222,29 @@ const UPDATE_ONPREM = [
   'BEHAVIOR_IMPLEMENTATION',
   'METADATA_EXTENSION',
   'SERVICE_BINDING',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
 
 /** HandlerUpdate's `object_type`. */
 export const COMPACT_UPDATE = projected<
   ServedName<'onprem', typeof COMPACT_UPDATE_ROUTES>,
-  ServedName<'cloud', typeof COMPACT_UPDATE_ROUTES>
+  Exclude<
+    ServedName<'cloud', typeof COMPACT_UPDATE_ROUTES>,
+    'PROGRAM_TEXT_ELEMENTS'
+  >
 >()({
   onprem: UPDATE_ONPREM,
+  // ABAP Cloud holds no program of the customer's: neither it nor its text
+  // elements are written there (the text elements' lock refuses a delivered
+  // program, Code on the cloud: `RS_ACCESS_PERMISSION`, `RS_EXTEND_CHECK`).
   cloud: UPDATE_ONPREM.filter(
-    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+    (member) =>
+      member !== 'PROGRAM' &&
+      member !== 'INCLUDE' &&
+      member !== 'PROGRAM_TEXT_ELEMENTS',
   ),
 });
 
@@ -1316,6 +1341,10 @@ export const COMPACT_LOCK_ROUTES = {
   METADATA_EXTENSION: { api: 'metadataExtension', operation: 'lock' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'lock' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'lock' },
+  TABLE_SETTINGS: { api: 'tableSettings', operation: 'lock' },
+  PROGRAM_TEXT_ELEMENTS: { api: 'textElements', operation: 'lock' },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { api: 'textElements', operation: 'lock' },
+  CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'lock' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
 /** What `HandlerUnlock` unlocks, each with its API. */
@@ -1341,6 +1370,10 @@ export const COMPACT_UNLOCK_ROUTES = {
   METADATA_EXTENSION: { api: 'metadataExtension', operation: 'unlock' },
   SERVICE_DEFINITION: { api: 'serviceDefinition', operation: 'unlock' },
   SERVICE_BINDING: { api: 'serviceBinding', operation: 'unlock' },
+  TABLE_SETTINGS: { api: 'tableSettings', operation: 'unlock' },
+  PROGRAM_TEXT_ELEMENTS: { api: 'textElements', operation: 'unlock' },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { api: 'textElements', operation: 'unlock' },
+  CLASS_TEXT_ELEMENTS: { api: 'textElements', operation: 'unlock' },
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtNeed>>>;
 
 const LOCK_ONPREM = [
@@ -1362,6 +1395,10 @@ const LOCK_ONPREM = [
   'METADATA_EXTENSION',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
 
 /** HandlerLock's `object_type`. */
@@ -1709,6 +1746,10 @@ export const LOCK_KIND_ROUTES = {
   metadata_extension: { api: 'metadataExtension', operation: 'lock' },
   service_definition: { api: 'serviceDefinition', operation: 'lock' },
   service_binding: { api: 'serviceBinding', operation: 'lock' },
+  table_settings: { api: 'tableSettings', operation: 'lock' },
+  program_text_elements: { api: 'textElements', operation: 'lock' },
+  function_group_text_elements: { api: 'textElements', operation: 'lock' },
+  class_text_elements: { api: 'textElements', operation: 'lock' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;
 
 /** What `UnlockObjectLow` unlocks, by kind. */
@@ -1734,6 +1775,10 @@ export const UNLOCK_KIND_ROUTES = {
   metadata_extension: { api: 'metadataExtension', operation: 'unlock' },
   service_definition: { api: 'serviceDefinition', operation: 'unlock' },
   service_binding: { api: 'serviceBinding', operation: 'unlock' },
+  table_settings: { api: 'tableSettings', operation: 'unlock' },
+  program_text_elements: { api: 'textElements', operation: 'unlock' },
+  function_group_text_elements: { api: 'textElements', operation: 'unlock' },
+  class_text_elements: { api: 'textElements', operation: 'unlock' },
 } as const satisfies Readonly<Record<string, AdtNeed>>;
 
 /** A kind `LockObjectLow` locks. */
@@ -1761,6 +1806,10 @@ const LOCK_KIND_LIST = [
   'metadata_extension',
   'service_definition',
   'service_binding',
+  'table_settings',
+  'program_text_elements',
+  'function_group_text_elements',
+  'class_text_elements',
 ] as const;
 
 /** `LockObjectLow`'s `object_type`. */
@@ -1805,6 +1854,10 @@ export const COMPACT_LOCK_KINDS = {
   METADATA_EXTENSION: 'metadata_extension',
   SERVICE_DEFINITION: 'service_definition',
   SERVICE_BINDING: 'service_binding',
+  TABLE_SETTINGS: 'table_settings',
+  PROGRAM_TEXT_ELEMENTS: 'program_text_elements',
+  FUNCTION_GROUP_TEXT_ELEMENTS: 'function_group_text_elements',
+  CLASS_TEXT_ELEMENTS: 'class_text_elements',
 } as const satisfies KindsOf<
   typeof COMPACT_LOCK_ROUTES,
   typeof LOCK_KIND_ROUTES

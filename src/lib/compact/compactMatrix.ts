@@ -33,4 +33,8 @@ export const COMPACT_CRUD_MATRIX: Record<
   METADATA_EXTENSION: ['create', 'get', 'update', 'delete'],
   RUNTIME_PROFILE: [],
   RUNTIME_DUMP: [],
+  // Activated by HandlerActivate; no CRUD of their own here.
+  PROGRAM_TEXT_ELEMENTS: [],
+  FUNCTION_GROUP_TEXT_ELEMENTS: [],
+  CLASS_TEXT_ELEMENTS: [],
 };

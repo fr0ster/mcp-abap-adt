@@ -695,7 +695,9 @@ export const SINGLE_ACTIVATION_NAMES = projected<
  * activated as — through its family when {@link SINGLE_ACTIVATION} names it,
  * else in a group activation. A function module is activated in a group
  * activation under its function group, which the call names; a behaviour
- * implementation is a class.
+ * implementation is a class. The text elements are activated alone, as
+ * their codes (`PROG/PX` a program's or, with its group, a function
+ * group's; `CLAS/OCX` a class's).
  */
 export const COMPACT_ACTIVATE_ROUTES = {
   CLASS: 'CLAS/OC',
@@ -716,6 +718,9 @@ export const COMPACT_ACTIVATE_ROUTES = {
   SERVICE_BINDING: 'SRVB/SVB',
   FUNCTION_MODULE: 'FUGR/FF',
   BEHAVIOR_IMPLEMENTATION: 'CLAS/OC',
+  PROGRAM_TEXT_ELEMENTS: 'PROG/PX',
+  FUNCTION_GROUP_TEXT_ELEMENTS: 'PROG/PX',
+  CLASS_TEXT_ELEMENTS: 'CLAS/OCX',
 } as const satisfies Readonly<Partial<Record<CompactObjectType, AdtTypeCode>>>;
 
 /** HandlerActivate's `object_type`. */
@@ -742,6 +747,9 @@ export const COMPACT_ACTIVATE = projected<
     'SERVICE_BINDING',
     'FUNCTION_MODULE',
     'BEHAVIOR_IMPLEMENTATION',
+    'PROGRAM_TEXT_ELEMENTS',
+    'FUNCTION_GROUP_TEXT_ELEMENTS',
+    'CLASS_TEXT_ELEMENTS',
   ],
   cloud: [
     'CLASS',
@@ -760,6 +768,9 @@ export const COMPACT_ACTIVATE = projected<
     'SERVICE_BINDING',
     'FUNCTION_MODULE',
     'BEHAVIOR_IMPLEMENTATION',
+    'PROGRAM_TEXT_ELEMENTS',
+    'FUNCTION_GROUP_TEXT_ELEMENTS',
+    'CLASS_TEXT_ELEMENTS',
   ],
 });
 

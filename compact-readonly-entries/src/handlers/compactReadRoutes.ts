@@ -152,6 +152,10 @@ export const compactReadRouterMap: CompactRouterMap = {
   // No CRUD: a profiler run and a dump are read through their own tools.
   RUNTIME_PROFILE: {},
   RUNTIME_DUMP: {},
+  // Activated by HandlerActivate alone.
+  PROGRAM_TEXT_ELEMENTS: {},
+  FUNCTION_GROUP_TEXT_ELEMENTS: {},
+  CLASS_TEXT_ELEMENTS: {},
 };
 
 /** Route a compact read. The only operation this half carries is `get`. */

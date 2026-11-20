@@ -344,20 +344,25 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       'lock_handle',
     );
     assert.equal(typeof handle, 'string', locked.text);
-    const written = await liveCall('HandlerUpdate', {
-      object_type: 'PROGRAM_TEXT_ELEMENTS',
-      program_name: N.program,
-      symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
-      lock_handle: handle,
-      transport_request: request(),
-    });
-    const unlocked = await liveCall('HandlerUnlock', {
-      object_type: 'PROGRAM_TEXT_ELEMENTS',
-      object_name: N.program,
-      lock_handle: handle,
-    });
-    succeeded('HandlerUpdate PROGRAM_TEXT_ELEMENTS', written);
-    succeeded('HandlerUnlock PROGRAM_TEXT_ELEMENTS', unlocked);
+    // Once the handle is held, the unlock is sent whatever the write
+    // answered or threw.
+    try {
+      const written = await liveCall('HandlerUpdate', {
+        object_type: 'PROGRAM_TEXT_ELEMENTS',
+        program_name: N.program,
+        symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
+        lock_handle: handle,
+        transport_request: request(),
+      });
+      succeeded('HandlerUpdate PROGRAM_TEXT_ELEMENTS', written);
+    } finally {
+      const unlocked = await liveCall('HandlerUnlock', {
+        object_type: 'PROGRAM_TEXT_ELEMENTS',
+        object_name: N.program,
+        lock_handle: handle,
+      });
+      succeeded('HandlerUnlock PROGRAM_TEXT_ELEMENTS', unlocked);
+    }
     succeeded(
       'HandlerActivate PROGRAM_TEXT_ELEMENTS',
       await livePrepare('HandlerActivate', {
@@ -389,20 +394,25 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       'lock_handle',
     );
     assert.equal(typeof handle, 'string', locked.text);
-    const written = await liveCall('HandlerUpdate', {
-      object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
-      function_group_name: N.group,
-      symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
-      lock_handle: handle,
-      transport_request: request(),
-    });
-    const unlocked = await liveCall('HandlerUnlock', {
-      object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
-      object_name: N.group,
-      lock_handle: handle,
-    });
-    succeeded('HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS', written);
-    succeeded('HandlerUnlock FUNCTION_GROUP_TEXT_ELEMENTS', unlocked);
+    // Once the handle is held, the unlock is sent whatever the write
+    // answered or threw.
+    try {
+      const written = await liveCall('HandlerUpdate', {
+        object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+        function_group_name: N.group,
+        symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
+        lock_handle: handle,
+        transport_request: request(),
+      });
+      succeeded('HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS', written);
+    } finally {
+      const unlocked = await liveCall('HandlerUnlock', {
+        object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+        object_name: N.group,
+        lock_handle: handle,
+      });
+      succeeded('HandlerUnlock FUNCTION_GROUP_TEXT_ELEMENTS', unlocked);
+    }
     succeeded(
       'HandlerActivate FUNCTION_GROUP_TEXT_ELEMENTS',
       await livePrepare('HandlerActivate', {
@@ -434,20 +444,25 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       'lock_handle',
     );
     assert.equal(typeof handle, 'string', locked.text);
-    const written = await liveCall('HandlerUpdate', {
-      object_type: 'CLASS_TEXT_ELEMENTS',
-      class_name: N.class,
-      symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
-      lock_handle: handle,
-      transport_request: request(),
-    });
-    const unlocked = await liveCall('HandlerUnlock', {
-      object_type: 'CLASS_TEXT_ELEMENTS',
-      object_name: N.class,
-      lock_handle: handle,
-    });
-    succeeded('HandlerUpdate CLASS_TEXT_ELEMENTS', written);
-    succeeded('HandlerUnlock CLASS_TEXT_ELEMENTS', unlocked);
+    // Once the handle is held, the unlock is sent whatever the write
+    // answered or threw.
+    try {
+      const written = await liveCall('HandlerUpdate', {
+        object_type: 'CLASS_TEXT_ELEMENTS',
+        class_name: N.class,
+        symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
+        lock_handle: handle,
+        transport_request: request(),
+      });
+      succeeded('HandlerUpdate CLASS_TEXT_ELEMENTS', written);
+    } finally {
+      const unlocked = await liveCall('HandlerUnlock', {
+        object_type: 'CLASS_TEXT_ELEMENTS',
+        object_name: N.class,
+        lock_handle: handle,
+      });
+      succeeded('HandlerUnlock CLASS_TEXT_ELEMENTS', unlocked);
+    }
     succeeded(
       'HandlerActivate CLASS_TEXT_ELEMENTS',
       await livePrepare('HandlerActivate', {

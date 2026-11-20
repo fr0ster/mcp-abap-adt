@@ -128,20 +128,25 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
       'lock_handle',
     );
     assert.equal(typeof handle, 'string', locked.text);
-    const written = await liveCall('HandlerUpdate', {
-      object_type: 'TABLE_SETTINGS',
-      table_name: TABLE,
-      data_class: 'APPL2',
-      lock_handle: handle,
-      transport_request: request(),
-    });
-    const unlocked = await liveCall('HandlerUnlock', {
-      object_type: 'TABLE_SETTINGS',
-      object_name: TABLE,
-      lock_handle: handle,
-    });
-    succeeded('HandlerUpdate TABLE_SETTINGS', written);
-    succeeded('HandlerUnlock TABLE_SETTINGS', unlocked);
+    // Once the handle is held, the unlock is sent whatever the write
+    // answered or threw.
+    try {
+      const written = await liveCall('HandlerUpdate', {
+        object_type: 'TABLE_SETTINGS',
+        table_name: TABLE,
+        data_class: 'APPL2',
+        lock_handle: handle,
+        transport_request: request(),
+      });
+      succeeded('HandlerUpdate TABLE_SETTINGS', written);
+    } finally {
+      const unlocked = await liveCall('HandlerUnlock', {
+        object_type: 'TABLE_SETTINGS',
+        object_name: TABLE,
+        lock_handle: handle,
+      });
+      succeeded('HandlerUnlock TABLE_SETTINGS', unlocked);
+    }
     succeeded(
       'HandlerActivate TABLE',
       await livePrepare('HandlerActivate', {

@@ -21,6 +21,7 @@ import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
+  AdtTypeCode,
   IAdtError,
   IAdtResponse,
   IAdtWhereUsedScopeParamsOf,
@@ -91,9 +92,12 @@ export const CONTAINER_FIELD = z
     'With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.',
   );
 
+/** The text elements' where-used code. */
+const TEXT_ELEMENTS_CODE = 'PROG/PX' satisfies AdtTypeCode;
+
 /** Whether `type` names the text elements' code, in either case. */
 function isTextElementsType(type: string): boolean {
-  return type.trim().toUpperCase() === 'PROG/PX';
+  return type.trim().toUpperCase() === TEXT_ELEMENTS_CODE;
 }
 
 /**

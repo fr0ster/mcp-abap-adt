@@ -101,6 +101,9 @@ export function parentedCodesOf<C extends AdtUtilityCode>(
   return codes.filter((code) => PARENTED_CODES.has(code));
 }
 
+/** The code a function group's text elements are activated as, with its group. */
+const FUNCTION_GROUP_TEXTS = 'PROG/PX' satisfies AdtTypeCode;
+
 /**
  * What a `parentName` argument beside an activation's object type says on
  * `variant`: the codes of a group activation that need it
@@ -120,7 +123,7 @@ export function activationParentDescription(
           codes.includes(code),
         );
   const texts =
-    codes === undefined || codes.includes('PROG/PX')
+    codes === undefined || codes.includes(FUNCTION_GROUP_TEXTS)
       ? ' With PROG/PX, the function group whose text elements are activated.'
       : '';
   return `The function group the object belongs to; its address is built from it. Required for ${codesWithNames(parented, codes === undefined ? ACTIVATION_NAMES[variant] : [])}.${texts}`;

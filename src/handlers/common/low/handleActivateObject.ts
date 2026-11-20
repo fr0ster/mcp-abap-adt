@@ -374,7 +374,7 @@ function groupReferences<C extends AdtUtilityCode, N extends TypeName>(
  */
 function textElementsAddress(
   obj: ActivationObject,
-  type: string,
+  type: AdtUtilityCode,
 ): { uri?: string } {
   if (type !== 'PROG/PX') return {};
   return {

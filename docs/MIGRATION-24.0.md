@@ -682,12 +682,13 @@ the module whichever group the call named.
 polling, and long-poll only a run SAP answers `RUNNING`, again after each answer until SAP
 answers otherwise. 23.x long-polled from the first read, so a run id SAP does not know held the
 call for about 307 s before it answered `NOT_STARTED`.
-From 24.0.2 a run tool that waits also long-polls a `NOT_STARTED` answer to its first read once,
-since the run it just started may not have begun yet; `GetUnitTestResult` keeps answering
-`NOT_STARTED` at once.
+From 24.0.2 a run tool that waits, after its own start, reads a first `NOT_STARTED` once more
+with long polling, since the run it just started may not have begun yet.
 
 **What changes for you:**
-- A run id SAP does not know is answered at once: `{ success: true, run_id, status: "NOT_STARTED" }`.
+- A run id the caller supplies (`GetUnitTestResult`) that SAP does not know is answered at once:
+  `{ success: true, run_id, status: "NOT_STARTED" }`. A run tool answers the same after its
+  long-polled second read, which SAP holds for up to 5 minutes.
 - A run that is running is waited for until SAP answers it finished, however many long polls
   that takes; a long run under a client with a request time limit is still started with
   `wait: false` and read by its `run_id`.

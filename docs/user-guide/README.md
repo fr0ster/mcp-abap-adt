@@ -172,6 +172,40 @@ the sessions of many users. There, resuming a SAP session is yours to do if you 
 takes; otherwise SAP ends it on its own timeout, which releases its locks. Details:
 [MIGRATION-19.0](../MIGRATION-19.0.md#stdio-leftover-sap-sessions-of-a-killed-process).
 
+## Activation and check messages
+
+An activation (`ActivateObjects`, `ActivateObjectLow`, each `Activate…Low`, compact
+`HandlerActivate`) and a check (`Check…`, compact `HandlerCheckRun`) answer SAP's messages, in a
+success and in a refusal alike. Each message carries what SAP states of it:
+
+| Field | What it is |
+|---|---|
+| `type` | the severity: `E`, `W`, `I`, … |
+| `text` | SAP's words |
+| `object` | the object and its part, as SAP describes them (`Class ZCL_X, Method GET_VALUE`) |
+| `uri` | the source the message points into (`/sap/bc/adt/oo/classes/zcl_x/source/main`) |
+| `position` | where in that source: `{ line, column }`, with `end: { line, column }` where SAP gives a range; lines count from 1, columns from 0 |
+| `code` | SAP's message code (`MESSAGE(GTU)`, `D0(408)`) |
+| `line` | deprecated, in a refusal only: the source line of `position` as text (`String(position.line)`); read `position.line` |
+
+A field is present where SAP states it: a DDIC object's message names its uri alone, and a
+message about no object (`Activation was cancelled.`) carries its type and text. A message of an
+activation run (more than one object, or a type activated as a group) names the run's object it
+is about as `objectName` and `uri`, and its source as `source_uri` beside `position`.
+
+### Text elements
+
+A write of text elements (`UpdateTextElements` with `activate: false`) lands inactive beside its
+object, and an activation naming the object alone activates nothing: its answer lists the text
+elements in `still_inactive` (measured on premise). Name both: `PROG/PX` is a program's text
+elements, or with `parentName` a function group's; `CLAS/OCX` is a class's. Compact
+`HandlerActivate` names them `PROGRAM_TEXT_ELEMENTS`, `FUNCTION_GROUP_TEXT_ELEMENTS` and
+`CLASS_TEXT_ELEMENTS`; in compact the sequence is `HandlerLock`, `HandlerUpdate` (under the
+handle), `HandlerUnlock`, `HandlerActivate`, the same for `TABLE_SETTINGS` with the table
+activated as `TABLE`. `UpdateTextElements` with `activate: true` names both itself. Where-used of
+text elements is `GetWhereUsed` with `object_type: PROG/PX` and `container` (`program` or
+`function_group`).
+
 ## Package Tree Output
 
 `GetPackageTree` returns a package root with nested subpackages and a flat list of

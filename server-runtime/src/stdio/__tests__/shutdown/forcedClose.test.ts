@@ -14,6 +14,10 @@
  * timeout fire before that check (CI, ubuntu / Node 24, measured once).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
+import { format } from 'node:util';
+import { assertMatchObject } from '../../../../../src/__tests__/helpers/assertions';
 import { isUpdateOf } from '../../../../../src/__tests__/helpers/shutdownTools';
 import { ownedConnections } from '../../../../../src/lib/ownedConnections';
 import {
@@ -25,8 +29,6 @@ import {
   until,
 } from '../helpers/loginStand';
 
-jest.setTimeout(30_000);
-
 let s: Stand;
 let written: Deferred<void>;
 
@@ -36,63 +38,71 @@ beforeEach(() => {
 
 afterEach(async () => {
   written.resolve();
-  jest.restoreAllMocks();
+  mock.restoreAll();
   await s.close();
 });
 
-it.each([
+for (const [_name, timeoutMs] of [
   ['a second SIGTERM', undefined],
   ['--shutdown-timeout=1', 1_000],
-])(
-  '%s: every owned connection logged off once, exit 1 naming the request and the step',
-  async (_name, timeoutMs) => {
-    s = await stand({
-      kind: 'onprem',
-      shutdown: timeoutMs === undefined ? {} : { timeoutMs },
-    });
-    expect(await s.callTool('HoldState', { id: 'S' })).toMatchObject({
-      isError: false,
-    });
-    // The session writes never finish on their own.
-    const broker = await s.factory.getBroker('default');
-    jest.spyOn(broker, 'flush').mockImplementation(() => written.promise);
-    s.adt.hold((r) => isUpdateOf('A')(r.url));
-    void s.callTool('LockedUpdate', { id: 'A' });
-    await until(() => s.adt.requests.some((r) => isUpdateOf('A')(r.url)));
+] satisfies [string, number | undefined][]) {
+  it(
+    format(
+      '%s: every owned connection logged off once, exit 1 naming the request and the step',
+      _name,
+    ),
+    async (t) => {
+      s = await stand({
+        kind: 'onprem',
+        shutdown: timeoutMs === undefined ? {} : { timeoutMs },
+      });
+      assertMatchObject(await s.callTool('HoldState', { id: 'S' }), {
+        isError: false,
+      });
+      // The session writes never finish on their own.
+      const broker = await s.factory.getBroker('default');
+      t.mock.method(broker, 'flush', () => written.promise);
+      s.adt.hold((r) => isUpdateOf('A')(r.url));
+      void s.callTool('LockedUpdate', { id: 'A' });
+      await until(() => s.adt.requests.some((r) => isUpdateOf('A')(r.url)));
 
-    // The shutdown's own timer, taken when it is set, fired by the test.
-    let fire: (() => void) | undefined;
-    if (timeoutMs !== undefined) {
-      const real = globalThis.setTimeout;
-      const timers = jest
-        .spyOn(globalThis, 'setTimeout')
-        .mockImplementation((callback, ms) => {
-          if (ms !== timeoutMs || fire !== undefined) return real(callback, ms);
-          fire = () => callback();
-          timers.mockRestore();
-          // A handle the shutdown may clear; it fires nothing of its own.
-          return real(() => undefined, 0);
-        });
-    }
-    s.processLike.emit('SIGTERM');
-    await until(() => s.adt.logoffs() === 2);
-    await turns(20);
-    expect(s.exits).toEqual([]);
-    if (timeoutMs === undefined) s.processLike.emit('SIGTERM');
-    else {
-      expect(fire).toBeDefined();
-      fire?.();
-    }
-    expect(await s.exited).toBe(1);
-    expect(s.shutdownLines).toEqual([
-      '[MCP] Still running at the forced close: LockedUpdate',
-      '[MCP] Not finished at the forced close: the session writes',
-    ]);
-    expect(ownedConnections()).toEqual([]);
-    const connects = () =>
-      s.adt.requests.filter((r) => r.url.includes('discovery')).length;
-    // The instance's connection and the state's own: two logoffs, once each.
-    expect(s.adt.logoffs()).toBe(connects());
-    expect(s.adt.logoffs()).toBe(2);
-  },
-);
+      // The shutdown's own timer, taken when it is set, fired by the test.
+      let fire: (() => void) | undefined;
+      if (timeoutMs !== undefined) {
+        const real = globalThis.setTimeout;
+        const timers = t.mock.method(
+          globalThis,
+          'setTimeout',
+          (callback: () => void, ms?: number) => {
+            if (ms !== timeoutMs || fire !== undefined)
+              return real(callback, ms);
+            fire = () => callback();
+            timers.mock.restore();
+            // A handle the shutdown may clear; it fires nothing of its own.
+            return real(() => undefined, 0);
+          },
+        );
+      }
+      s.processLike.emit('SIGTERM');
+      await until(() => s.adt.logoffs() === 2);
+      await turns(20);
+      assert.deepStrictEqual(s.exits, []);
+      if (timeoutMs === undefined) s.processLike.emit('SIGTERM');
+      else {
+        assert.notEqual(fire, undefined);
+        fire?.();
+      }
+      assert.equal(await s.exited, 1);
+      assert.deepStrictEqual(s.shutdownLines, [
+        '[MCP] Still running at the forced close: LockedUpdate',
+        '[MCP] Not finished at the forced close: the session writes',
+      ]);
+      assert.deepStrictEqual(ownedConnections(), []);
+      const connects = () =>
+        s.adt.requests.filter((r) => r.url.includes('discovery')).length;
+      // The instance's connection and the state's own: two logoffs, once each.
+      assert.equal(s.adt.logoffs(), connects());
+      assert.equal(s.adt.logoffs(), 2);
+    },
+  );
+}

@@ -12,6 +12,8 @@
  * - another open connection's tool and instance are untouched.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
 import {
@@ -21,22 +23,20 @@ import {
 import { ownedConnections } from '../../../../src/lib/ownedConnections';
 import { type SseStand, sseStand, turns, until } from './shutdown/harness';
 
-jest.setTimeout(30_000);
-
 let s: SseStand;
-let letGo: jest.SpyInstance;
-let mcpClose: jest.SpyInstance;
+let letGo: Mock<BaseMcpServer['letGoOfState']>;
+let mcpClose: Mock<BaseMcpServer['close']>;
 
 beforeEach(async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  letGo = jest.spyOn(BaseMcpServer.prototype, 'letGoOfState');
-  mcpClose = jest.spyOn(BaseMcpServer.prototype, 'close');
+  mock.method(console, 'error', () => {});
+  letGo = mock.method(BaseMcpServer.prototype, 'letGoOfState');
+  mcpClose = mock.method(BaseMcpServer.prototype, 'close');
   s = await sseStand();
 });
 
 afterEach(async () => {
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const sessions = () =>
@@ -46,24 +46,24 @@ it('a connection with no tool in flight: the instance close ran once, the sessio
   const connection = await s.open();
   await connection.call('ProbeAdt', { id: 'p1' }, 1);
   await connection.answer(1);
-  expect(sessions().has(connection.sessionId)).toBe(true);
+  assert.equal(sessions().has(connection.sessionId), true);
 
   connection.close();
   await until(() => s.standIn.logoffs() === s.connects());
   await until(() => mcpClose.mock.calls.length === 1);
-  expect(letGo).toHaveBeenCalledTimes(1);
-  expect(sessions().has(connection.sessionId)).toBe(false);
-  expect(ownedConnections()).toEqual([]);
+  assert.equal(letGo.mock.callCount(), 1);
+  assert.equal(sessions().has(connection.sessionId), false);
+  assert.deepStrictEqual(ownedConnections(), []);
 
   const late = await fetch(`http://127.0.0.1:${s.port}${connection.postPath}`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'ping' }),
   });
-  expect(late.status).toBe(400);
-  expect(await late.text()).toBe('Invalid session');
+  assert.equal(late.status, 400);
+  assert.equal(await late.text(), 'Invalid session');
   await turns(10);
-  expect(letGo).toHaveBeenCalledTimes(1);
+  assert.equal(letGo.mock.callCount(), 1);
 });
 
 it('a connection closed while a tool holds a lock: its session is logged off at once, the tool not awaited, no UNLOCK; another connection is untouched', async () => {
@@ -81,20 +81,21 @@ it('a connection closed while a tool holds a lock: its session is logged off at 
   closing.close();
   // Logged off under the held update: nothing waited for the tool.
   await until(() => s.standIn.logoffs() === 1);
-  expect(s.standIn.requests.find((r) => isLogoff(r.url))?.session).toBe(
+  assert.equal(
+    s.standIn.requests.find((r) => isLogoff(r.url))?.session,
     sessionA,
   );
   await until(() => letGo.mock.calls.length === 1);
 
   holdA.release();
   await turns(20);
-  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
+  assert.equal(s.indexOf(isUnlockOf('A')), -1);
 
   // The other connection: its tool still held, its instance alive.
-  expect(s.indexOf(isUnlockOf('B'))).toBe(-1);
-  expect(sessions().has(other.sessionId)).toBe(true);
+  assert.equal(s.indexOf(isUnlockOf('B')), -1);
+  assert.equal(sessions().has(other.sessionId), true);
   holdB.release();
-  expect(await other.answer(1)).toEqual({ text: 'B', isError: false });
-  expect(letGo).toHaveBeenCalledTimes(1);
-  expect(s.standIn.logoffs()).toBe(1);
+  assert.deepStrictEqual(await other.answer(1), { text: 'B', isError: false });
+  assert.equal(letGo.mock.callCount(), 1);
+  assert.equal(s.standIn.logoffs(), 1);
 });

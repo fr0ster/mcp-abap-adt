@@ -1,12 +1,30 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
+import * as clients from '../../../lib/clients';
 import {
   createPackagePatternResolver,
   resolvePackagePatterns,
   type SearchObjectsArgs,
 } from '../../../lib/search-source/packageResolver';
 import { skipSapAnswers } from '../../../lib/search-source/readFailure';
+import { rejectionOf } from '../../helpers/assertions';
 import { okResponse } from '../../helpers/fakeClient';
+
+mock.method(clients, 'createAdtClient', (_conn: unknown, _logger: unknown) => ({
+  getUtils: () => ({
+    search: async ({ query }: { query: string }) =>
+      okResponse(
+        query === 'EMPTY*'
+          ? []
+          : [
+              { name: 'ZFI', type: 'DEVC', description: '' },
+              { name: 'ZFI_BUDGET', type: 'DEVC', description: '' },
+            ],
+      ),
+  }),
+}));
 
 /**
  * `searchObjects` is gone in adt-clients 19 — `createPackagePatternResolver`
@@ -17,21 +35,6 @@ import { okResponse } from '../../helpers/fakeClient';
  * XML for the resolver to walk by hand (see `packageResolver.ts`'s own
  * comment on the `getUtils()`-with-no-result-set asymmetry).
  */
-jest.mock('../../../lib/clients', () => ({
-  createAdtClient: (_conn: unknown, _logger: unknown) => ({
-    getUtils: () => ({
-      search: async ({ query }: { query: string }) =>
-        okResponse(
-          query === 'EMPTY*'
-            ? []
-            : [
-                { name: 'ZFI', type: 'DEVC', description: '' },
-                { name: 'ZFI_BUDGET', type: 'DEVC', description: '' },
-              ],
-        ),
-    }),
-  }),
-}));
 
 function neverCalled(): never {
   throw new Error('searchObjects must not be called for exact entries');
@@ -43,7 +46,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
       { searchObjects: neverCalled, sapAnswers: skipSapAnswers },
       ['ZFI_OBSOLETE', '$TMP', '/NS/ZFI'],
     );
-    expect(out).toEqual(['ZFI_OBSOLETE', '$TMP', '/NS/ZFI']);
+    assert.deepStrictEqual(out, ['ZFI_OBSOLETE', '$TMP', '/NS/ZFI']);
   });
 
   it('treats entries containing * as patterns', async () => {
@@ -58,8 +61,8 @@ describe('resolvePackagePatterns — wildcard detection', () => {
       },
       ['Z*'],
     );
-    expect(calls).toEqual(['Z*']);
-    expect(out).toEqual([]);
+    assert.deepStrictEqual(calls, ['Z*']);
+    assert.deepStrictEqual(out, []);
   });
 
   it('an entry with ? is a mask', async () => {
@@ -74,7 +77,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
       },
       ['Z?TEST'],
     );
-    expect(calls).toEqual(['Z?TEST']);
+    assert.deepStrictEqual(calls, ['Z?TEST']);
   });
 
   it('an entry with * is a mask', async () => {
@@ -89,7 +92,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
       },
       ['Z*', '/NS/Z*', 'Z*A*B*'],
     );
-    expect(calls).toEqual(['Z*', '/NS/Z*', 'Z*A*B*']);
+    assert.deepStrictEqual(calls, ['Z*', '/NS/Z*', 'Z*A*B*']);
   });
 
   it('+, _, % and # are literal', async () => {
@@ -97,7 +100,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
       { searchObjects: neverCalled, sapAnswers: skipSapAnswers },
       ['Z_PKG', 'Z+PKG', 'Z%PKG', 'Z#PKG'],
     );
-    expect(packages).toEqual(['Z_PKG', 'Z+PKG', 'Z%PKG', 'Z#PKG']);
+    assert.deepStrictEqual(packages, ['Z_PKG', 'Z+PKG', 'Z%PKG', 'Z#PKG']);
   });
 
   it('an entry with neither * nor ? is an exact name', async () => {
@@ -105,7 +108,7 @@ describe('resolvePackagePatterns — wildcard detection', () => {
       { searchObjects: neverCalled, sapAnswers: skipSapAnswers },
       ['ZEXACT', '/NS/ZEXACT'],
     );
-    expect(packages).toEqual(['ZEXACT', '/NS/ZEXACT']);
+    assert.deepStrictEqual(packages, ['ZEXACT', '/NS/ZEXACT']);
   });
 });
 
@@ -119,7 +122,7 @@ describe('createPackagePatternResolver — hits from `search`', () => {
       objectType: 'DEVC',
       maxResults: 1000,
     });
-    expect(names).toEqual(['ZFI', 'ZFI_BUDGET']);
+    assert.deepStrictEqual(names, ['ZFI', 'ZFI_BUDGET']);
   });
 
   it('returns empty array when search answers no hits', async () => {
@@ -129,7 +132,7 @@ describe('createPackagePatternResolver — hits from `search`', () => {
       objectType: 'DEVC',
       maxResults: 1000,
     });
-    expect(names).toEqual([]);
+    assert.deepStrictEqual(names, []);
   });
 });
 
@@ -142,7 +145,7 @@ describe('resolvePackagePatterns — merge semantics', () => {
       },
       ['Z_EXACT_1', 'Z*', 'Z_EXACT_2'],
     );
-    expect(out).toEqual([
+    assert.deepStrictEqual(out, [
       'Z_EXACT_1',
       'Z_EXACT_2',
       'Z_FROM_PATTERN_A',
@@ -158,7 +161,7 @@ describe('resolvePackagePatterns — merge semantics', () => {
       },
       ['zfi', 'ZFI_*'],
     );
-    expect(out).toEqual(['zfi', 'ZFI_BUDGET']);
+    assert.deepStrictEqual(out, ['zfi', 'ZFI_BUDGET']);
   });
 
   it('returns empty array when patterns resolve to no packages and no exact entries', async () => {
@@ -166,7 +169,7 @@ describe('resolvePackagePatterns — merge semantics', () => {
       { searchObjects: async () => [], sapAnswers: skipSapAnswers },
       ['ZZZ_NONEXISTENT*'],
     );
-    expect(out).toEqual([]);
+    assert.deepStrictEqual(out, []);
   });
 });
 
@@ -204,8 +207,11 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
       },
       ['Z*'],
     );
-    expect(asked.map((a) => a.maxResults)).toEqual([1000]);
-    expect(packages).toEqual(namesOf('Z', 3));
+    assert.deepStrictEqual(
+      asked.map((a) => a.maxResults),
+      [1000],
+    );
+    assert.deepStrictEqual(packages, namesOf('Z', 3));
   });
 
   it('a mask whose answer fills maxResults is asked again with maxResults doubled, until the answer is shorter', async () => {
@@ -217,13 +223,16 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
       },
       ['Z*'],
     );
-    expect(asked.map((a) => [a.query, a.maxResults])).toEqual([
-      ['Z*', 1000],
-      ['Z*', 2000],
-      ['Z*', 4000],
-      ['Z*', 8000],
-    ]);
-    expect(packages).toEqual(namesOf('Z', 5000));
+    assert.deepStrictEqual(
+      asked.map((a) => [a.query, a.maxResults]),
+      [
+        ['Z*', 1000],
+        ['Z*', 2000],
+        ['Z*', 4000],
+        ['Z*', 8000],
+      ],
+    );
+    assert.deepStrictEqual(packages, namesOf('Z', 5000));
   });
 
   it('an answer of exactly maxResults packages is asked again', async () => {
@@ -235,8 +244,11 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
       },
       ['Z*'],
     );
-    expect(asked.map((a) => a.maxResults)).toEqual([1000, 2000]);
-    expect(packages).toHaveLength(1000);
+    assert.deepStrictEqual(
+      asked.map((a) => a.maxResults),
+      [1000, 2000],
+    );
+    assert.equal(packages.length, 1000);
   });
 
   it('the packages of the last answer are walked, each once', async () => {
@@ -248,9 +260,9 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
       },
       ['Z000001', 'Z*'],
     );
-    expect(packages).toHaveLength(1500);
-    expect(packages[0]).toBe('Z000001');
-    expect(new Set(packages).size).toBe(1500);
+    assert.equal(packages.length, 1500);
+    assert.equal(packages[0], 'Z000001');
+    assert.equal(new Set(packages).size, 1500);
   });
 
   it('a mask SAP refuses at any round is skipped with no entry, and the other entries are scanned', async () => {
@@ -274,12 +286,17 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
       },
       ['Y*', 'X*', 'ZEXACT'],
     );
-    expect(resolved).toEqual({ packages: ['ZEXACT', ...namesOf('X', 2)] });
-    expect(asked.map((a) => [a.query, a.maxResults])).toEqual([
-      ['Y*', 1000],
-      ['Y*', 2000],
-      ['X*', 1000],
-    ]);
+    assert.deepStrictEqual(resolved, {
+      packages: ['ZEXACT', ...namesOf('X', 2)],
+    });
+    assert.deepStrictEqual(
+      asked.map((a) => [a.query, a.maxResults]),
+      [
+        ['Y*', 1000],
+        ['Y*', 2000],
+        ['X*', 1000],
+      ],
+    );
   });
 
   it('a credential failure at any round ends the call', async () => {
@@ -288,23 +305,29 @@ describe('resolvePackagePatterns — a mask is resolved completely (DO12)', () =
       'request',
     );
     const asked: SearchObjectsArgs[] = [];
-    await expect(
-      resolvePackagePatterns(
-        {
-          sapAnswers: skipSapAnswers,
-          searchObjects: async (args) => {
-            asked.push(args);
-            if (args.maxResults === 2000) throw refused;
-            return namesOf('Z', 1000);
+    assert.equal(
+      await rejectionOf(
+        resolvePackagePatterns(
+          {
+            sapAnswers: skipSapAnswers,
+            searchObjects: async (args) => {
+              asked.push(args);
+              if (args.maxResults === 2000) throw refused;
+              return namesOf('Z', 1000);
+            },
           },
-        },
-        ['Z*', 'X*'],
+          ['Z*', 'X*'],
+        ),
       ),
-    ).rejects.toBe(refused);
-    expect(asked.map((a) => [a.query, a.maxResults])).toEqual([
-      ['Z*', 1000],
-      ['Z*', 2000],
-    ]);
+      refused,
+    );
+    assert.deepStrictEqual(
+      asked.map((a) => [a.query, a.maxResults]),
+      [
+        ['Z*', 1000],
+        ['Z*', 2000],
+      ],
+    );
   });
 });
 
@@ -318,6 +341,6 @@ describe('resolvePackagePatterns — a mask of any size', () => {
       },
       ['Z*'],
     );
-    expect(packages).toHaveLength(300_000);
+    assert.equal(packages.length, 300_000);
   });
 });

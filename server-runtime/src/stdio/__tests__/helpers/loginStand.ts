@@ -474,8 +474,8 @@ export async function stand(options: StandOptions): Promise<Stand> {
     },
   );
 
-  // stderr captured by a plain replacement of its write, the same under
-  // Jest and node:test; `close()` puts the original back.
+  // stderr captured by a plain replacement of its write; `close()` puts
+  // the original back.
   const stderr: string[] = [];
   const writeStderr = process.stderr.write;
   process.stderr.write = (chunk: unknown): boolean => {

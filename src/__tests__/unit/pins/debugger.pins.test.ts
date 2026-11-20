@@ -18,6 +18,8 @@
  * that variant.
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe } from 'node:test';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { envelopeResponse } from '../../helpers/batchEnvelope';
@@ -89,7 +91,7 @@ const PLACED =
  */
 function expectPlaced(answer: { content: Array<{ text: string }> }): void {
   const listed: unknown = JSON.parse(answer.content[0]?.text ?? 'null');
-  expect(
+  assert.deepStrictEqual(
     Array.isArray(listed)
       ? listed.map((row: unknown) =>
           typeof row === 'object' && row !== null
@@ -97,7 +99,8 @@ function expectPlaced(answer: { content: Array<{ text: string }> }): void {
             : row,
         )
       : listed,
-  ).toEqual([PLACED]);
+    [PLACED],
+  );
 }
 
 /**
@@ -152,16 +155,17 @@ const ENVELOPE: Answer = envelopeResponse([
 /** DebugBatchBegin / `begin` sends nothing: the batch is on. */
 function expectBatchOn(answer: { content: Array<{ text: string }> }): void {
   const begun: unknown = JSON.parse(answer.content[0]?.text ?? 'null');
-  expect(
+  assert.equal(
     typeof begun === 'object' && begun !== null
       ? Reflect.get(begun, 'debug_batch')
       : begun,
-  ).toBe('on');
+    'on',
+  );
 }
 
 /** The batch end's summary: one call recorded, sent and answered. */
 function expectOneSent(answer: { content: Array<{ text: string }> }): void {
-  expect(JSON.parse(answer.content[0]?.text ?? 'null')).toEqual({
+  assert.deepStrictEqual(JSON.parse(answer.content[0]?.text ?? 'null'), {
     recorded: 1,
     sent: 1,
     received: 1,
@@ -173,7 +177,7 @@ function expectStackAnswered(answer: {
   content: Array<{ text: string }>;
 }): void {
   const entries: unknown = JSON.parse(answer.content[0]?.text ?? 'null');
-  expect(
+  assert.deepStrictEqual(
     Array.isArray(entries)
       ? entries.map((entry: unknown) =>
           typeof entry === 'object' && entry !== null
@@ -184,7 +188,8 @@ function expectStackAnswered(answer: {
             : entry,
         )
       : entries,
-  ).toEqual([[1, false]]);
+    [[1, false]],
+  );
 }
 
 /** A watchpoint document, as SAP answers its create and its list. */
@@ -226,11 +231,11 @@ const SNAPSHOT_TO = '0CC47A1E68C11FE1B2CA5067B3BB0002';
  */
 function statedAs(variant: 'onprem' | 'cloud'): void {
   let previous: string | undefined;
-  beforeAll(() => {
+  before(() => {
     previous = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = variant;
   });
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
   });

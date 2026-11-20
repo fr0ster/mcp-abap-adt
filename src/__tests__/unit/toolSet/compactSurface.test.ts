@@ -17,8 +17,11 @@
  * calls are `HandlerSystem`'s `search_object` and `where_used`; the fixture
  * holds `HandlerSystem` in their place.
  */
+
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import {
   compactDataEntries,
@@ -31,6 +34,7 @@ import {
 } from '../../../lib/compact/debug/group';
 import type { ToolDefinition } from '../../../lib/handlers/interfaces';
 import { declaredRequired, listedJson } from '../../helpers/listedJson';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
 interface Row {
   group: string;
@@ -52,7 +56,13 @@ function inputsOf(schema: ToolDefinition['inputSchema']): string {
 describe('the compact tool surface', () => {
   const frozen: Row[] = JSON.parse(
     readFileSync(
-      join(__dirname, '../../../../compact/tests/fixtures/surface.json'),
+      join(
+        repositoryRoot(__dirname),
+        'compact',
+        'tests',
+        'fixtures',
+        'surface.json',
+      ),
       'utf8',
     ),
   );
@@ -80,12 +90,13 @@ describe('the compact tool surface', () => {
   }));
 
   it('enumerates the whole facade, so the assertions below are not vacuous', () => {
-    expect(frozen).toHaveLength(34);
-    expect(current).toHaveLength(34);
+    assert.equal(frozen.length, 34);
+    assert.equal(current.length, 34);
   });
 
   it('has the same tools', () => {
-    expect(current.map((row) => row.name).sort()).toEqual(
+    assert.deepStrictEqual(
+      current.map((row) => row.name).sort(),
       frozen.map((row) => row.name).sort(),
     );
   });
@@ -104,12 +115,15 @@ describe('the compact tool surface', () => {
       const was = before.inputs === '(none)' ? [] : before.inputs.split(', ');
       const now = row.inputs === '(none)' ? [] : row.inputs.split(', ');
       // Every parameter that existed is still there, with the same requiredness.
-      expect({
-        tool: row.name,
-        missing: was.filter(
-          (p) => !now.includes(p) && !(REMOVED[row.name] ?? []).includes(p),
-        ),
-      }).toEqual({ tool: row.name, missing: [] });
+      assert.deepStrictEqual(
+        {
+          tool: row.name,
+          missing: was.filter(
+            (p) => !now.includes(p) && !(REMOVED[row.name] ?? []).includes(p),
+          ),
+        },
+        { tool: row.name, missing: [] },
+      );
     }
   });
 
@@ -117,10 +131,13 @@ describe('the compact tool surface', () => {
     const byName = new Map(frozen.map((row) => [row.name, row.available_in]));
     for (const row of current) {
       if (!byName.has(row.name)) continue;
-      expect({ tool: row.name, available: row.available_in }).toEqual({
-        tool: row.name,
-        available: byName.get(row.name),
-      });
+      assert.deepStrictEqual(
+        { tool: row.name, available: row.available_in },
+        {
+          tool: row.name,
+          available: byName.get(row.name),
+        },
+      );
     }
   });
 });

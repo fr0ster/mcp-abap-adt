@@ -10,6 +10,9 @@
  * answered and seen.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { handleGetCdsUnitTest } from '../../../handlers/unit_test/high/handleGetCdsUnitTest';
 import {
   handleGetCdsUnitTestResult,
@@ -84,74 +87,92 @@ function member(value: unknown, key: string): unknown {
 const urls = (connection: RecordingConnection): string[] =>
   connection.requests.map((request) => request.url);
 
-describe.each(READERS)('$name', (reader) => {
-  it('an unknown run answers NOT_STARTED at once', async () => {
-    const connection = recordingConnection([NOT_STARTED, FINISHED, RESULT]);
-    const result = await reader.call(connection);
-    expect(urls(connection)).toEqual([PLAIN]);
-    expect(result.isError).toBe(false);
-    expect(answerOf(result)).toEqual({
-      success: true,
-      run_id: RUN,
-      status: 'NOT_STARTED',
+for (const reader of READERS) {
+  describe(`${reader.name}`, () => {
+    it('an unknown run answers NOT_STARTED at once', async () => {
+      const connection = recordingConnection([NOT_STARTED, FINISHED, RESULT]);
+      const result = await reader.call(connection);
+      assert.deepStrictEqual(urls(connection), [PLAIN]);
+      assert.equal(result.isError, false);
+      assert.deepStrictEqual(answerOf(result), {
+        success: true,
+        run_id: RUN,
+        status: 'NOT_STARTED',
+      });
+    });
+
+    it('a running run is long-polled', async () => {
+      const connection = recordingConnection([RUNNING, FINISHED, RESULT]);
+      const result = await reader.call(connection);
+      {
+        const actual = urls(connection);
+        assert.equal(actual.length, 3);
+        assert.deepStrictEqual(actual[0], PLAIN);
+        assert.deepStrictEqual(actual[1], LONG_POLLED);
+        assert.ok(
+          typeof actual[2] === 'string' && actual[2].includes(RESULT_PATH),
+        );
+      }
+      assert.equal(result.isError, false);
+    });
+
+    it('a long poll that answers RUNNING is followed by another', async () => {
+      const connection = recordingConnection([
+        RUNNING,
+        RUNNING,
+        RUNNING,
+        FINISHED,
+        RESULT,
+      ]);
+      const result = await reader.call(connection);
+      {
+        const actual = urls(connection);
+        assert.equal(actual.length, 5);
+        assert.deepStrictEqual(actual[0], PLAIN);
+        assert.deepStrictEqual(actual[1], LONG_POLLED);
+        assert.deepStrictEqual(actual[2], LONG_POLLED);
+        assert.deepStrictEqual(actual[3], LONG_POLLED);
+        assert.ok(
+          typeof actual[4] === 'string' && actual[4].includes(RESULT_PATH),
+        );
+      }
+      assert.equal(result.isError, false);
+    });
+
+    it('a finished run is read without waiting', async () => {
+      const connection = recordingConnection([FINISHED, RESULT, FINISHED]);
+      const result = await reader.call(connection);
+      {
+        const actual = urls(connection);
+        assert.equal(actual.length, 2);
+        assert.deepStrictEqual(actual[0], PLAIN);
+        assert.ok(
+          typeof actual[1] === 'string' && actual[1].includes(RESULT_PATH),
+        );
+      }
+      assert.equal(result.isError, false);
+    });
+
+    it('a status no measurement has shown ends the read as a failure stating what SAP sent', async () => {
+      const connection = recordingConnection([
+        UNKNOWN_STATUS,
+        FINISHED,
+        RESULT,
+      ]);
+      const result = await reader.call(connection);
+      assert.deepStrictEqual(urls(connection), [PLAIN]);
+      assert.equal(result.isError, true);
+      const failure = answerOf(result);
+      assert.equal(member(failure, 'step'), 'read status');
+      const message = String(member(failure, 'message'));
+      assert.ok(message.includes('the status "PAUSED"'));
+      assert.ok(message.includes(UNKNOWN_STATUS_DOCUMENT));
     });
   });
-
-  it('a running run is long-polled', async () => {
-    const connection = recordingConnection([RUNNING, FINISHED, RESULT]);
-    const result = await reader.call(connection);
-    expect(urls(connection)).toEqual([
-      PLAIN,
-      LONG_POLLED,
-      expect.stringContaining(RESULT_PATH),
-    ]);
-    expect(result.isError).toBe(false);
-  });
-
-  it('a long poll that answers RUNNING is followed by another', async () => {
-    const connection = recordingConnection([
-      RUNNING,
-      RUNNING,
-      RUNNING,
-      FINISHED,
-      RESULT,
-    ]);
-    const result = await reader.call(connection);
-    expect(urls(connection)).toEqual([
-      PLAIN,
-      LONG_POLLED,
-      LONG_POLLED,
-      LONG_POLLED,
-      expect.stringContaining(RESULT_PATH),
-    ]);
-    expect(result.isError).toBe(false);
-  });
-
-  it('a finished run is read without waiting', async () => {
-    const connection = recordingConnection([FINISHED, RESULT, FINISHED]);
-    const result = await reader.call(connection);
-    expect(urls(connection)).toEqual([
-      PLAIN,
-      expect.stringContaining(RESULT_PATH),
-    ]);
-    expect(result.isError).toBe(false);
-  });
-
-  it('a status no measurement has shown ends the read as a failure stating what SAP sent', async () => {
-    const connection = recordingConnection([UNKNOWN_STATUS, FINISHED, RESULT]);
-    const result = await reader.call(connection);
-    expect(urls(connection)).toEqual([PLAIN]);
-    expect(result.isError).toBe(true);
-    const failure = answerOf(result);
-    expect(member(failure, 'step')).toBe('read status');
-    const message = String(member(failure, 'message'));
-    expect(message).toContain('the status "PAUSED"');
-    expect(message).toContain(UNKNOWN_STATUS_DOCUMENT);
-  });
-});
+}
 
 describe('the compact result tools still read only the result', () => {
-  it.each([
+  for (const [_name, call] of [
     [
       'handleGetUnitTestResultOnce',
       (connection: RecordingConnection) =>
@@ -162,11 +183,19 @@ describe('the compact result tools still read only the result', () => {
       (connection: RecordingConnection) =>
         handleGetCdsUnitTestResultOnce({ connection }, { run_id: RUN }),
     ],
-  ])('%s: one result GET, no status read', async (_name, call) => {
-    const connection = recordingConnection([RESULT, FINISHED]);
-    const result = await call(connection);
-    expect(result.isError).toBe(false);
-    expect(urls(connection)).toEqual([expect.stringContaining(RESULT_PATH)]);
-    expect(connection.requests[0]?.method).toBe('GET');
-  });
+  ] satisfies [string, (typeof READERS)[number]['call']][]) {
+    it(format('%s: one result GET, no status read', _name), async () => {
+      const connection = recordingConnection([RESULT, FINISHED]);
+      const result = await call(connection);
+      assert.equal(result.isError, false);
+      {
+        const actual = urls(connection);
+        assert.equal(actual.length, 1);
+        assert.ok(
+          typeof actual[0] === 'string' && actual[0].includes(RESULT_PATH),
+        );
+      }
+      assert.equal(connection.requests[0]?.method, 'GET');
+    });
+  }
 });

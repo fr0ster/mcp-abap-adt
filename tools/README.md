@@ -94,7 +94,12 @@ Run it after adding, removing or redescribing tools. The compact tool list is ge
 - `check-exports.js` — prints what `@mcp-abap-adt/connection` exports.
 - `check-todos.js` — lists TODO comments in `src/` (`npm run check-todos`).
 - `version-stats.sh [count]` — version statistics from the git tags (`npm run chrono`).
-- `test-package-read.js`, `run-program-hard-test.js` — one-off probes against a system.
+- `test-package-read.js` — a one-off probe against a system.
+- `run-program-hard-test.js` — one high-handler integration suite in hard mode, against a running
+  MCP server: `node tools/run-program-hard-test.js --transport=http|sse
+  --file=src/__tests__/integration/high/<area>/<Suite>.test.ts` (the program suite by default).
+  The file must exist under `src/__tests__/integration/high/`; the run is
+  `npm run test:high -- <file>`, a live script against the system the test config names.
 - `bulk-update-interface-handlers.sh` — a one-time migration script, kept for history.
 - `sample-service-key.json` — the shape of a service key, with placeholder values.
 

@@ -7,6 +7,9 @@
  * refused in its own words.)
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { recordingConnection } from '../../../src/__tests__/helpers/recordingConnection';
 import { declareSystemKind } from '../../../src/lib/systemKind';
 import { handleHandlerGet } from '../handlers/handleHandlerGet';
@@ -101,21 +104,29 @@ const CASES = [
 ] as const;
 
 describe('a compact read route parses with its target tool’s schema', () => {
-  it.each(CASES)(
-    '%s part %s without the name: refused by %s’s schema, naming %s, nothing sent',
-    async (objectType, part, target, argument) => {
-      const connection = recordingConnection();
-      declareSystemKind(connection, 'onprem');
-      const thrown = await handleHandlerGet(
-        { connection },
-        { object_type: objectType, part },
-      ).then(
-        () => '',
-        (error: Error) => error.message,
-      );
-      expect(thrown).toContain(`Invalid arguments for tool ${target}: `);
-      expect(thrown).toContain(` is required at ${argument}`);
-      expect(connection.requests).toEqual([]);
-    },
-  );
+  for (const [objectType, part, target, argument] of CASES) {
+    it(
+      format(
+        '%s part %s without the name: refused by %s’s schema, naming %s, nothing sent',
+        objectType,
+        part,
+        target,
+        argument,
+      ),
+      async () => {
+        const connection = recordingConnection();
+        declareSystemKind(connection, 'onprem');
+        const thrown = await handleHandlerGet(
+          { connection },
+          { object_type: objectType, part },
+        ).then(
+          () => '',
+          (error: Error) => error.message,
+        );
+        assert.ok(thrown.includes(`Invalid arguments for tool ${target}: `));
+        assert.ok(thrown.includes(` is required at ${argument}`));
+        assert.deepStrictEqual(connection.requests, []);
+      },
+    );
+  }
 });

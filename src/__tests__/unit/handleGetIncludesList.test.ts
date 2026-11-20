@@ -1,14 +1,23 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import type {
   AdtObjectIdentity,
   IIncludeConfig,
 } from '@mcp-abap-adt/interfaces-adt';
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
+import * as clients from '../../lib/clients';
 import {
   fakeClientOf,
   okResponse,
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The declared variant the boundary checks a type argument against.
+// The declared variant: the kind stated, read by the real variantOf.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => fakeClient);
 
 /**
  * GetIncludesList builds the include tree itself, from pieces adt-clients
@@ -25,11 +34,6 @@ import {
  */
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => fakeClient,
-}));
 
 const context = { connection: {} as any, logger: undefined };
 const body = (result: any) => JSON.parse(result.content[0].text);
@@ -69,7 +73,7 @@ describe('GetIncludesList', () => {
       }),
     );
 
-    expect(names(answered.tree)).toEqual([{ ZINC1: ['ZINC2'] }]);
+    assert.deepStrictEqual(names(answered.tree), [{ ZINC1: ['ZINC2'] }]);
   });
 
   it('treats SAPL<fg> as its function group: the direct includes are those no other include of the group includes', async () => {
@@ -104,7 +108,10 @@ describe('GetIncludesList', () => {
       }),
     );
 
-    expect(names(answered.tree)).toEqual(['LZFGTOP', { LZFGUXX: ['LZFGU01'] }]);
+    assert.deepStrictEqual(names(answered.tree), [
+      'LZFGTOP',
+      { LZFGUXX: ['LZFGU01'] },
+    ]);
   });
 
   it("answers a class's sections, which is what a class has instead of program includes", async () => {
@@ -125,7 +132,7 @@ describe('GetIncludesList', () => {
       }),
     );
 
-    expect(names(answered.tree)).toEqual([
+    assert.deepStrictEqual(names(answered.tree), [
       'definitions',
       'implementations',
       'main',
@@ -164,8 +171,8 @@ describe('GetIncludesList', () => {
 
     // The tree still holds both includes — the refusal is about what is under
     // ZSECRET, not about whether the program names it.
-    expect(names(answered.tree)).toEqual(['ZSECRET', 'ZOPEN']);
-    expect(answered.unreadable).toEqual([
+    assert.deepStrictEqual(names(answered.tree), ['ZSECRET', 'ZOPEN']);
+    assert.deepStrictEqual(answered.unreadable, [
       {
         name: 'ZSECRET',
         // The read's error as it is, with the step.
@@ -195,8 +202,8 @@ describe('GetIncludesList', () => {
       }),
     );
 
-    expect(names(answered.tree)).toEqual(['ZGONE']);
-    expect(answered.unreadable).toBeUndefined();
+    assert.deepStrictEqual(names(answered.tree), ['ZGONE']);
+    assert.equal(answered.unreadable, undefined);
   });
 
   /**
@@ -234,18 +241,18 @@ describe('GetIncludesList', () => {
     );
 
     const [za, zb, zloop] = answered.tree.children;
-    expect(za.name).toBe('ZA');
-    expect(za.children).toEqual([{ name: 'ZC', children: [] }]);
+    assert.equal(za.name, 'ZA');
+    assert.deepStrictEqual(za.children, [{ name: 'ZC', children: [] }]);
 
     // ZB names ZC too, which is what SAP refuses to activate — reported, and
     // not expanded a second time.
-    expect(zb.children).toEqual([
+    assert.deepStrictEqual(zb.children, [
       { name: 'ZC', children: [], duplicate: true },
     ]);
-    expect(zb.children[0].cyclic).toBeUndefined();
+    assert.equal(zb.children[0].cyclic, undefined);
 
     // A real cycle keeps its own name.
-    expect(zloop.children).toEqual([
+    assert.deepStrictEqual(zloop.children, [
       { name: 'ZLOOP', children: [], cyclic: true },
     ]);
   });

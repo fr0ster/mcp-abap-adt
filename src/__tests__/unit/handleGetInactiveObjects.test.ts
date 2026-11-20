@@ -3,6 +3,9 @@
  * 2026-09-26, through a real AdtClient — the reading the handler gets is the
  * one `structured` makes, where `ioc:object` is an array.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { handleGetInactiveObjects } from '../../handlers/system/readonly/handleGetInactiveObjects';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -34,13 +37,13 @@ async function run(body: string) {
     { connection: conn, logger: undefined } as any,
     {},
   );
-  expect(result.isError).toBe(false);
+  assert.equal(result.isError, false);
   return JSON.parse(result.content[0].text);
 }
 
 describe('GetInactiveObjects', () => {
   it('lists an inactive object (on premise answer, one entry)', async () => {
-    expect(await run(ONE_INACTIVE_BDEF)).toEqual({
+    assert.deepStrictEqual(await run(ONE_INACTIVE_BDEF), {
       success: true,
       count: 1,
       objects: [{ type: 'BDEF/BDO', name: 'ZI_MCP_SHR_ROOT' }],
@@ -48,14 +51,18 @@ describe('GetInactiveObjects', () => {
   });
 
   it('lists every entry', async () => {
-    expect((await run(TWO_INACTIVE)).objects).toEqual([
+    assert.deepStrictEqual((await run(TWO_INACTIVE)).objects, [
       { type: 'BDEF/BDO', name: 'ZI_MCP_SHR_ROOT' },
       { type: 'FUGR/F', name: 'ZMCP_SHR_FGRP' },
     ]);
   });
 
   it('answers none when nothing is inactive', async () => {
-    expect(await run(NONE)).toEqual({ success: true, count: 0, objects: [] });
+    assert.deepStrictEqual(await run(NONE), {
+      success: true,
+      count: 0,
+      objects: [],
+    });
   });
 
   // BASIS 7.40 answers the same request with another document: a flat
@@ -70,7 +77,7 @@ describe('GetInactiveObjects', () => {
     '</adtcore:objectReferences>';
 
   it('lists the objects of the older document (BASIS 7.40)', async () => {
-    expect((await run(LEGACY_TWO_INACTIVE)).objects).toEqual([
+    assert.deepStrictEqual((await run(LEGACY_TWO_INACTIVE)).objects, [
       { type: 'FUGR/F', name: 'ZOBJ_FGRP' },
       // The group travels with the module: an activation is addressed through
       // it, and without it the module's own name lands in the group's place.
@@ -81,7 +88,11 @@ describe('GetInactiveObjects', () => {
   it('answers none for an empty older document', async () => {
     const empty =
       '<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"/>';
-    expect(await run(empty)).toEqual({ success: true, count: 0, objects: [] });
+    assert.deepStrictEqual(await run(empty), {
+      success: true,
+      count: 0,
+      objects: [],
+    });
   });
 
   it('refuses a document it cannot read, rather than answer none', async () => {
@@ -92,6 +103,6 @@ describe('GetInactiveObjects', () => {
       { connection: conn, logger: undefined } as any,
       {},
     );
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
   });
 });

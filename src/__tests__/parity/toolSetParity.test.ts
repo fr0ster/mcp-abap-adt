@@ -32,11 +32,21 @@
  * transport (stdio), with the process's edges given to `main`.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -70,6 +80,7 @@ import {
   basicOf,
   isLogoff,
 } from '../helpers/adtStandIn';
+import { assertMatchObject } from '../helpers/assertions';
 import { clientTransport } from '../helpers/clientTransport';
 
 type TransportName = 'stdio' | 'http' | 'sse';
@@ -286,6 +297,9 @@ const open: { clients: Client[]; runs: Run[] } = { clients: [], runs: [] };
 let workdir: string;
 let standIn: AdtStandIn;
 
+/** The servers' console lines, silenced for each test and read back. */
+let consoleError: Mock<typeof console.error>;
+
 beforeEach(async () => {
   workdir = fs.realpathSync(
     fs.mkdtempSync(path.join(os.tmpdir(), 'tool-set-parity-')),
@@ -304,8 +318,8 @@ beforeEach(async () => {
   standIn = await adtStandIn();
   // The servers' own lines (the template notice, the state's lines) are not
   // the subject here; what a test observes comes through the edges.
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(process.stderr, 'write', () => true);
+  consoleError = mock.method(console, 'error', () => {});
 });
 
 afterEach(async () => {
@@ -320,7 +334,7 @@ afterEach(async () => {
   for (let turn = 0; turn < 5; turn += 1) {
     await new Promise((resolve) => setImmediate(resolve));
   }
-  jest.restoreAllMocks();
+  mock.restoreAll();
   await standIn.close();
   process.env = { ...savedEnv };
   fs.rmSync(workdir, { recursive: true, force: true });
@@ -382,6 +396,13 @@ async function run(
   return started;
 }
 
+/** A field of an observed value, read where the observation is untyped. */
+function fieldOf(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null && key in value
+    ? Reflect.get(value, key)
+    : undefined;
+}
+
 /**
  * The port the server a launcher just started announced on its listening
  * line: every server here is started on port 0, the system's choice read
@@ -392,9 +413,8 @@ function announcedPort(transportName: 'http' | 'sse'): number {
     transportName === 'http'
       ? '[StreamableHttpServer] Server started on '
       : '[SseServer] Server started on ';
-  const lines = jest
-    .mocked(console.error)
-    .mock.calls.map((call) => call.map(String).join(' '))
+  const lines = consoleError.mock.calls
+    .map((call) => call.arguments.map(String).join(' '))
     .filter((line) => line.startsWith(prefix));
   const last = lines[lines.length - 1];
   if (last === undefined) throw new Error('no server announced its port');
@@ -410,7 +430,7 @@ async function helpOf(
   transportName: TransportName,
 ): Promise<string> {
   const { stderr, exits } = await run(launcher, ['--help']);
-  expect(exits).toEqual([0]);
+  assert.deepStrictEqual(exits, [0]);
   return stderr
     .join('\n')
     .split(launcher.toolSet.toolsHelp(transportName))
@@ -429,7 +449,7 @@ async function templateOf(
   const { exits } = await run(launcher, [`--conf=${file}`]);
   const values = load(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
   fs.rmSync(file);
-  expect(values.exposition).toBeUndefined();
+  assert.equal(values.exposition, undefined);
   return { exits, values };
 }
 
@@ -789,252 +809,306 @@ const COMPACT_DEBUG = [
   'HandlerDebugStep',
 ];
 
-describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: the four binaries differ only in their tools',
-  (transportName) => {
-    jest.setTimeout(240_000);
+for (const transportName of [
+  'stdio',
+  'http',
+  'sse',
+] satisfies ReadonlyArray<TransportName>) {
+  describe(
+    format('%s: the four binaries differ only in their tools', transportName),
+    () => {
+      it('observes the same behaviour through the four launchers', async () => {
+        const full = await observe(transportName, 'full');
+        const fullRo = await observe(transportName, 'full-ro');
+        const compact = await observe(transportName, 'compact');
+        const compactRo = await observe(transportName, 'compact-ro');
 
-    it('observes the same behaviour through the four launchers', async () => {
-      const full = await observe(transportName, 'full');
-      const fullRo = await observe(transportName, 'full-ro');
-      const compact = await observe(transportName, 'compact');
-      const compactRo = await observe(transportName, 'compact-ro');
+        // Everything but the tools is the transport's, the same for every set.
+        assert.deepStrictEqual(fullRo.observed, full.observed);
+        assert.deepStrictEqual(compact.observed, full.observed);
+        assert.deepStrictEqual(compactRo.observed, full.observed);
 
-      // Everything but the tools is the transport's, the same for every set.
-      expect(fullRo.observed).toEqual(full.observed);
-      expect(compact.observed).toEqual(full.observed);
-      expect(compactRo.observed).toEqual(full.observed);
-
-      // What was observed is the transport's behaviour, not two empty answers.
-      const served = full.observed.served as Record<string, unknown>;
-      if (transportName === 'stdio') {
-        expect(served.credential).toEqual([
-          basicOf('PARITY_USER', 'parity-password'),
-        ]);
-        expect(served.answered).toEqual({ ok: true });
-        expect(served.runtimeFiles).toBe(1);
-        expect(served.refused).toMatchObject(USER_REFUSED);
-        expect(served.inspectionOnly).toMatchObject({
-          ok: false,
-          error: 'inspection_only',
-        });
-      } else {
-        const basic = served.basic as Record<string, unknown>;
-        const token = served.token as Record<string, unknown>;
-        expect(served.runtime).toEqual(['absent', 'absent']);
-        expect(basic.presented).toEqual([
-          basicOf('PARITY_USER', 'parity-password'),
-        ]);
-        expect(token.presented).toEqual(['Bearer parity-token.payload.sig']);
-        expect(basic.answered).toEqual({ ok: true });
-        expect(basic.refused).toMatchObject(USER_REFUSED);
-        expect(token.answered).toEqual({ ok: true });
-        expect(token.refused).toMatchObject({ ok: false });
-        expect(served.noCredentials).toEqual({
-          status: 400,
-          body: expect.stringContaining(CREDENTIALS_REQUIRED_WORDS),
-        });
-        expect(served.destinationHeader).toEqual({
-          status: 400,
-          body: expect.stringContaining(DESTINATIONS_ONLY_STDIO_WORDS),
-        });
-        expect(served.concurrent).toEqual({
-          a: [basicOf('USER_A', 'pass-a')],
-          b: [basicOf('USER_B', 'pass-b')],
-        });
-        if (transportName === 'sse') {
-          expect(served.sseOnly).toEqual({
-            postStatus: 202,
-            postPresented: [basicOf('USER_A', 'pass-a')],
-            destinationPost: {
-              status: 400,
-              body: expect.stringContaining(DESTINATIONS_ONLY_STDIO_WORDS),
-            },
+        // What was observed is the transport's behaviour, not two empty answers.
+        const served = full.observed.served as Record<string, unknown>;
+        if (transportName === 'stdio') {
+          assert.deepStrictEqual(served.credential, [
+            basicOf('PARITY_USER', 'parity-password'),
+          ]);
+          assert.deepStrictEqual(served.answered, { ok: true });
+          assert.equal(served.runtimeFiles, 1);
+          assertMatchObject(served.refused, USER_REFUSED);
+          assertMatchObject(served.inspectionOnly, {
+            ok: false,
+            error: 'inspection_only',
           });
+        } else {
+          const basic = served.basic as Record<string, unknown>;
+          const token = served.token as Record<string, unknown>;
+          assert.deepStrictEqual(served.runtime, ['absent', 'absent']);
+          assert.deepStrictEqual(basic.presented, [
+            basicOf('PARITY_USER', 'parity-password'),
+          ]);
+          assert.deepStrictEqual(token.presented, [
+            'Bearer parity-token.payload.sig',
+          ]);
+          assert.deepStrictEqual(basic.answered, { ok: true });
+          assertMatchObject(basic.refused, USER_REFUSED);
+          assert.deepStrictEqual(token.answered, { ok: true });
+          assertMatchObject(token.refused, { ok: false });
+          // { status, body: stringContaining(words) }: the body holds the
+          // words, then the equality over the rest with that body.
+          const noCredentialsBody = fieldOf(served.noCredentials, 'body');
+          assert.ok(
+            typeof noCredentialsBody === 'string' &&
+              noCredentialsBody.includes(CREDENTIALS_REQUIRED_WORDS),
+          );
+          assert.deepStrictEqual(served.noCredentials, {
+            status: 400,
+            body: noCredentialsBody,
+          });
+          const destinationBody = fieldOf(served.destinationHeader, 'body');
+          assert.ok(
+            typeof destinationBody === 'string' &&
+              destinationBody.includes(DESTINATIONS_ONLY_STDIO_WORDS),
+          );
+          assert.deepStrictEqual(served.destinationHeader, {
+            status: 400,
+            body: destinationBody,
+          });
+          assert.deepStrictEqual(served.concurrent, {
+            a: [basicOf('USER_A', 'pass-a')],
+            b: [basicOf('USER_B', 'pass-b')],
+          });
+          if (transportName === 'sse') {
+            const postBody = fieldOf(
+              fieldOf(served.sseOnly, 'destinationPost'),
+              'body',
+            );
+            assert.ok(
+              typeof postBody === 'string' &&
+                postBody.includes(DESTINATIONS_ONLY_STDIO_WORDS),
+            );
+            assert.deepStrictEqual(served.sseOnly, {
+              postStatus: 202,
+              postPresented: [basicOf('USER_A', 'pass-a')],
+              destinationPost: { status: 400, body: postBody },
+            });
+          }
         }
-      }
-      expect(full.observed.transportGone.exits).toEqual([1]);
-      expect(full.observed.transportGone.stderr.join('\n')).toContain(
-        '`--transport` is gone',
-      );
-      expect(full.observed.otherBinary.exits).toEqual([1]);
-      expect(full.observed.template.exits).toEqual([0]);
-
-      // The tools: the object-oriented surface, and the compact facade —
-      // each binary's list is fixed by the binary.
-      expect(full.tools).toContain('GetClass');
-      expect(full.tools).not.toContain('HandlerGet');
-      expect(compact.tools).not.toContain('GetClass');
-      // The leftover-session tools are stdio's: every one on
-      // a write binary and the list and logoff on a -ro one there; none on
-      // any http or sse binary, compact ones included.
-      const onStdio = transportName === 'stdio';
-      // The long session is Streamable HTTP's: SessionOpen and SessionClose
-      // on the full sets, HandlerSession on the compact ones, on http alone.
-      const onHttp = transportName === 'http';
-      const session = (tools: string[]) =>
-        tools.filter(
-          (n) =>
-            n === 'SessionOpen' ||
-            n === 'SessionClose' ||
-            n === 'HandlerSession',
+        assert.deepStrictEqual(full.observed.transportGone.exits, [1]);
+        assert.ok(
+          full.observed.transportGone.stderr
+            .join('\n')
+            .includes('`--transport` is gone'),
         );
-      expect({
-        full: session(full.tools),
-        fullRo: session(fullRo.tools),
-        compact: session(compact.tools),
-        compactRo: session(compactRo.tools),
-      }).toEqual(
-        onHttp
-          ? {
-              full: ['SessionClose', 'SessionOpen'],
-              fullRo: ['SessionClose', 'SessionOpen'],
-              compact: ['HandlerSession'],
-              compactRo: ['HandlerSession'],
-            }
-          : { full: [], fullRo: [], compact: [], compactRo: [] },
-      );
-      const leftover = (tools: string[]) =>
-        tools.filter((n) => n.includes('LeftoverSession'));
-      expect({
-        full: leftover(full.tools),
-        fullRo: leftover(fullRo.tools),
-        compact: leftover(compact.tools),
-        compactRo: leftover(compactRo.tools),
-      }).toEqual(
-        onStdio
-          ? {
-              full: ['ListLeftoverSessions', 'LogoffLeftoverSession'],
-              fullRo: ['ListLeftoverSessions'],
-              compact: [
-                'HandlerLeftoverSessionList',
-                'HandlerLeftoverSessionLogoff',
-              ],
-              compactRo: ['HandlerLeftoverSessionList'],
-            }
-          : { full: [], fullRo: [], compact: [], compactRo: [] },
-      );
-      // core: the debugger, high, background runs and the two debugger
-      // batch tools, always; on http SessionOpen and SessionClose. Started
-      // without --enable-data-tools: the data tools (GetSqlQuery,
-      // GetTableContents) are off, two fewer than with it.
-      // 24.0.0: GetObjectDraft, one more; batch mode is the compact sets'
-      // (BatchBegin, BatchEnd, BatchAnswers left), three fewer; the debugger
-      // batch reads its answers with DebugBatchAnswers, one more.
-      expect(full.tools).toHaveLength(onStdio ? 267 : onHttp ? 267 : 265);
-      expect(full.tools).toEqual(
-        expect.arrayContaining([
-          'DebugStartListener',
-          'DebugStop',
-          'CreateClass',
+        assert.deepStrictEqual(full.observed.otherBinary.exits, [1]);
+        assert.deepStrictEqual(full.observed.template.exits, [0]);
+
+        // The tools: the object-oriented surface, and the compact facade —
+        // each binary's list is fixed by the binary.
+        assert.ok(full.tools.includes('GetClass'));
+        assert.ok(!full.tools.includes('HandlerGet'));
+        assert.ok(!compact.tools.includes('GetClass'));
+        // The leftover-session tools are stdio's: every one on
+        // a write binary and the list and logoff on a -ro one there; none on
+        // any http or sse binary, compact ones included.
+        const onStdio = transportName === 'stdio';
+        // The long session is Streamable HTTP's: SessionOpen and SessionClose
+        // on the full sets, HandlerSession on the compact ones, on http alone.
+        const onHttp = transportName === 'http';
+        const session = (tools: string[]) =>
+          tools.filter(
+            (n) =>
+              n === 'SessionOpen' ||
+              n === 'SessionClose' ||
+              n === 'HandlerSession',
+          );
+        assert.deepStrictEqual(
+          {
+            full: session(full.tools),
+            fullRo: session(fullRo.tools),
+            compact: session(compact.tools),
+            compactRo: session(compactRo.tools),
+          },
+          onHttp
+            ? {
+                full: ['SessionClose', 'SessionOpen'],
+                fullRo: ['SessionClose', 'SessionOpen'],
+                compact: ['HandlerSession'],
+                compactRo: ['HandlerSession'],
+              }
+            : { full: [], fullRo: [], compact: [], compactRo: [] },
+        );
+        const leftover = (tools: string[]) =>
+          tools.filter((n) => n.includes('LeftoverSession'));
+        assert.deepStrictEqual(
+          {
+            full: leftover(full.tools),
+            fullRo: leftover(fullRo.tools),
+            compact: leftover(compact.tools),
+            compactRo: leftover(compactRo.tools),
+          },
+          onStdio
+            ? {
+                full: ['ListLeftoverSessions', 'LogoffLeftoverSession'],
+                fullRo: ['ListLeftoverSessions'],
+                compact: [
+                  'HandlerLeftoverSessionList',
+                  'HandlerLeftoverSessionLogoff',
+                ],
+                compactRo: ['HandlerLeftoverSessionList'],
+              }
+            : { full: [], fullRo: [], compact: [], compactRo: [] },
+        );
+        // core: the debugger, high, background runs and the two debugger
+        // batch tools, always; on http SessionOpen and SessionClose. Started
+        // without --enable-data-tools: the data tools (GetSqlQuery,
+        // GetTableContents) are off, two fewer than with it.
+        // 24.0.0: GetObjectDraft, one more; batch mode is the compact sets'
+        // (BatchBegin, BatchEnd, BatchAnswers left), three fewer; the debugger
+        // batch reads its answers with DebugBatchAnswers, one more.
+        // A table's technical settings and the text elements: four more.
+        assert.equal(full.tools.length, onStdio ? 271 : onHttp ? 271 : 269);
+        {
+          const actual = full.tools;
+          for (const expected of [
+            'DebugStartListener',
+            'DebugStop',
+            'CreateClass',
+            'GetBackgroundRun',
+            'DebugBatchBegin',
+            'DebugBatchEnd',
+            'DebugBatchAnswers',
+          ]) {
+            assert.ok(actual.some((e) => isDeepStrictEqual(e, expected)));
+          }
+        }
+        // core-ro: the readonly tools with system and search, the three
+        // background-run tools of the long reads (and, on stdio, the
+        // leftover-session list; on http SessionOpen and SessionClose); no
+        // write, run, debugger, logoff, resume or batch mode.
+        // A table's technical settings and the text elements: two more.
+        assert.equal(fullRo.tools.length, onStdio ? 73 : onHttp ? 74 : 72);
+        for (const name of [
           'GetBackgroundRun',
+          'ListBackgroundRuns',
+          'DiscardBackgroundRun',
+        ]) {
+          assert.ok(fullRo.tools.includes(name));
+        }
+        {
+          const actual = fullRo.tools;
+          for (const expected of [
+            'GetClass',
+            'GetWhereUsed',
+            'RunATC',
+            'GetATCRunStatus',
+            'GetATCFindings',
+            'SearchObject',
+          ]) {
+            assert.ok(actual.some((e) => isDeepStrictEqual(e, expected)));
+          }
+        }
+        // The ABAP Unit run tools start runs whose tests can change data:
+        // RunAbapUnit is served where RunUnitTest and its siblings are, on the
+        // full binary, and by no read-only one.
+        assert.deepStrictEqual(
+          {
+            full: ['RunUnitTest', 'RunAbapUnit'].map((n) =>
+              full.tools.includes(n),
+            ),
+            fullRo: ['RunUnitTest', 'RunAbapUnit'].map((n) =>
+              fullRo.tools.includes(n),
+            ),
+          },
+          { full: [true, true], fullRo: [false, false] },
+        );
+        for (const name of [
+          'CreateClass',
+          'DebugStartListener',
+          'ResumeLeftoverSession',
           'DebugBatchBegin',
           'DebugBatchEnd',
           'DebugBatchAnswers',
-        ]),
-      );
-      // core-ro: the readonly tools with system and search, the three
-      // background-run tools of the long reads (and, on stdio, the
-      // leftover-session list; on http SessionOpen and SessionClose); no
-      // write, run, debugger, logoff, resume or batch mode.
-      expect(fullRo.tools).toHaveLength(onStdio ? 71 : onHttp ? 72 : 70);
-      for (const name of [
-        'GetBackgroundRun',
-        'ListBackgroundRuns',
-        'DiscardBackgroundRun',
-      ]) {
-        expect(fullRo.tools).toContain(name);
-      }
-      expect(fullRo.tools).toEqual(
-        expect.arrayContaining([
-          'GetClass',
-          'GetWhereUsed',
-          'RunATC',
-          'GetATCRunStatus',
-          'GetATCFindings',
-          'SearchObject',
-        ]),
-      );
-      // The ABAP Unit run tools start runs whose tests can change data:
-      // RunAbapUnit is served where RunUnitTest and its siblings are, on the
-      // full binary, and by no read-only one.
-      expect({
-        full: ['RunUnitTest', 'RunAbapUnit'].map((n) => full.tools.includes(n)),
-        fullRo: ['RunUnitTest', 'RunAbapUnit'].map((n) =>
-          fullRo.tools.includes(n),
-        ),
-      }).toEqual({ full: [true, true], fullRo: [false, false] });
-      for (const name of [
-        'CreateClass',
-        'DebugStartListener',
-        'ResumeLeftoverSession',
-        'DebugBatchBegin',
-        'DebugBatchEnd',
-        'DebugBatchAnswers',
-        'RuntimeRunClass',
-        'RuntimeRunProgram',
-        'RuntimeCreateProfilerTraceParameters',
-        'LogoffLeftoverSession',
-      ]) {
-        expect({ name, served: fullRo.tools.includes(name) }).toEqual({
-          name,
-          served: false,
-        });
-      }
-      // compact: the 28, the four debugger tools, HandlerDebugBatch, the
-      // three background-run tools beside the run tool, HandlerBatch, and on
-      // stdio the leftover-session list and logoff (no set serves a resume);
-      // without --enable-data-tools, not HandlerGetData: 27 of the 28.
-      expect(compact.tools).toHaveLength(
-        27 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
-      );
-      expect(compact.tools).toEqual(
-        expect.arrayContaining([
-          ...COMPACT_RW,
+          'RuntimeRunClass',
+          'RuntimeRunProgram',
+          'RuntimeCreateProfilerTraceParameters',
+          'LogoffLeftoverSession',
+        ]) {
+          assert.deepStrictEqual(
+            { name, served: fullRo.tools.includes(name) },
+            {
+              name,
+              served: false,
+            },
+          );
+        }
+        // compact: the 28, the four debugger tools, HandlerDebugBatch, the
+        // three background-run tools beside the run tool, HandlerBatch, and on
+        // stdio the leftover-session list and logoff (no set serves a resume);
+        // without --enable-data-tools, not HandlerGetData: 27 of the 28.
+        assert.equal(
+          compact.tools.length,
+          27 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
+        );
+        {
+          const actual = compact.tools;
+          for (const expected of [
+            ...COMPACT_RW,
+            ...COMPACT_DEBUG,
+            'HandlerDebugBatch',
+            'HandlerBatch',
+          ]) {
+            assert.ok(actual.some((e) => isDeepStrictEqual(e, expected)));
+          }
+        }
+        // compact-ro: the 16 that change nothing, the three background-run
+        // tools of the long reads, HandlerBatch, and on stdio the
+        // leftover-session list; without --enable-data-tools, not
+        // HandlerGetData: 15 of the 16.
+        assert.equal(
+          compactRo.tools.length,
+          15 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
+        );
+        assert.ok(compactRo.tools.includes('HandlerBackgroundRunGet'));
+        assert.ok(compactRo.tools.includes('HandlerGet'));
+        assert.ok(compactRo.tools.includes('HandlerDeletionCheck'));
+        assert.ok(compactRo.tools.includes('HandlerBatch'));
+        // Batch mode is the compact sets': no full binary serves a batch tool.
+        for (const tools of [full.tools, fullRo.tools]) {
+          assert.ok(!tools.includes('HandlerBatch'));
+        }
+        for (const tools of [
+          full.tools,
+          fullRo.tools,
+          compact.tools,
+          compactRo.tools,
+        ]) {
+          assert.deepStrictEqual(
+            tools.filter((n) => n.startsWith('Batch')),
+            [],
+          );
+        }
+        for (const name of [
+          ...COMPACT_RW.filter((n) => n !== 'HandlerGet'),
           ...COMPACT_DEBUG,
+          'HandlerProfileRun',
+          'HandlerLeftoverSessionResume',
+          'HandlerLeftoverSessionLogoff',
           'HandlerDebugBatch',
-          'HandlerBatch',
-        ]),
-      );
-      // compact-ro: the 16 that change nothing, the three background-run
-      // tools of the long reads, HandlerBatch, and on stdio the
-      // leftover-session list; without --enable-data-tools, not
-      // HandlerGetData: 15 of the 16.
-      expect(compactRo.tools).toHaveLength(
-        15 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
-      );
-      expect(compactRo.tools).toContain('HandlerBackgroundRunGet');
-      expect(compactRo.tools).toContain('HandlerGet');
-      expect(compactRo.tools).toContain('HandlerDeletionCheck');
-      expect(compactRo.tools).toContain('HandlerBatch');
-      // Batch mode is the compact sets': no full binary serves a batch tool.
-      for (const tools of [full.tools, fullRo.tools]) {
-        expect(tools).not.toContain('HandlerBatch');
-      }
-      for (const tools of [
-        full.tools,
-        fullRo.tools,
-        compact.tools,
-        compactRo.tools,
-      ]) {
-        expect(tools.filter((n) => n.startsWith('Batch'))).toEqual([]);
-      }
-      for (const name of [
-        ...COMPACT_RW.filter((n) => n !== 'HandlerGet'),
-        ...COMPACT_DEBUG,
-        'HandlerProfileRun',
-        'HandlerLeftoverSessionResume',
-        'HandlerLeftoverSessionLogoff',
-        'HandlerDebugBatch',
-      ]) {
-        expect({ name, served: compactRo.tools.includes(name) }).toEqual({
-          name,
-          served: false,
-        });
-      }
-    });
-  },
-);
+        ]) {
+          assert.deepStrictEqual(
+            { name, served: compactRo.tools.includes(name) },
+            {
+              name,
+              served: false,
+            },
+          );
+        }
+      });
+    },
+  );
+}
 
 const SETS: readonly SetName[] = ['full', 'full-ro', 'compact', 'compact-ro'];
 
@@ -1086,86 +1160,124 @@ const GONE = 'is gone (19.0.0): the binary fixes its tool set, so remove it';
  * word, naming the binary of its own transport — through the binary, not
  * only the table.
  */
-describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: --exposition and the config file’s exposition stop every binary',
-  (transportName) => {
-    jest.setTimeout(60_000);
-    const b = BINARIES_OF[transportName];
-    const named = (set: SetName) => `\`${b[set].bin}\` (\`${b[set].pkg}\`)`;
+for (const transportName of [
+  'stdio',
+  'http',
+  'sse',
+] satisfies ReadonlyArray<TransportName>) {
+  describe(
+    format(
+      '%s: --exposition and the config file’s exposition stop every binary',
+      transportName,
+    ),
+    () => {
+      const b = BINARIES_OF[transportName];
+      const named = (set: SetName) => `\`${b[set].bin}\` (\`${b[set].pkg}\`)`;
 
-    const conf = (exposition: string) => {
-      const file = path.join(workdir, 'exposition.yaml');
-      fs.writeFileSync(file, `exposition: ${exposition}\n`);
-      return `--conf=${file}`;
-    };
+      const conf = (exposition: string) => {
+        const file = path.join(workdir, 'exposition.yaml');
+        fs.writeFileSync(file, `exposition: ${exposition}\n`);
+        return `--conf=${file}`;
+      };
 
-    it.each(SETS)('%s', async (set) => {
-      const launcher = LAUNCHERS[transportName][set];
-      expect(await refusalOf(launcher, ['--exposition=readonly'])).toEqual({
-        stderr: [
-          `[MCP] --exposition ${GONE}; the readonly tools alone (with system and search) are served by ${named('full-ro')}`,
-        ],
-        exits: [1],
-      });
-      expect(await refusalOf(launcher, ['--exposition', 'ro,debug'])).toEqual({
-        stderr: [
-          familyOf(set) === 'full'
-            ? `[MCP] --exposition ${GONE}; the debugger is always served by ${named('full')}, and by no -ro binary`
-            : `[MCP] --exposition ${GONE}; the compact debugger is always served by ${named('compact')}, and by no -ro binary`,
-        ],
-        exits: [1],
-      });
-      expect(await refusalOf(launcher, ['--exposition=rw'])).toEqual({
-        stderr: [
-          `[MCP] --exposition ${GONE}; all compact tools are served by ${named('compact')}`,
-        ],
-        exits: [1],
-      });
-      // The config file: refused before anything starts, naming the file.
-      const fromFile = await refusalOf(launcher, [conf('readonly,high')]);
-      expect(fromFile.exits).toEqual([1]);
-      expect(fromFile.stderr.join('\n')).toContain(
-        'exposition.yaml is refused',
-      );
-      expect(fromFile.stderr.join('\n')).toContain(
-        `exposition (config file) ${GONE}; the high tools are served, beside the readonly ones, by ${named('full')}`,
-      );
-    });
-  },
-);
-
-describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: each binary’s help names its own tools and the other binaries of its transport',
-  (transportName) => {
-    const b = BINARIES_OF[transportName];
-
-    it.each(SETS)('%s', async (set) => {
-      const launcher = LAUNCHERS[transportName][set];
-      expect(launcher.program).toBe(b[set].bin);
-      const help = (await run(launcher, ['--help'])).stderr.join('\n');
-      expect(help).toContain(
-        `\nTOOLS:\n  ${b[set].bin} serves one fixed tool set`,
-      );
-      expect(help).not.toContain('--exposition=');
-      // The write binary names its -ro one, and the -ro one its write one.
-      const pair: SetName =
-        set === 'full'
-          ? 'full-ro'
-          : set === 'full-ro'
-            ? 'full'
-            : set === 'compact'
-              ? 'compact-ro'
-              : 'compact';
-      expect(help).toContain(`npm i -g ${b[pair].pkg}, then ${b[pair].bin}\n`);
-      for (const other of ['stdio', 'http', 'sse'] as const) {
-        if (other === transportName) continue;
-        for (const binary of Object.values(BINARIES_OF[other])) {
-          expect(help).not.toContain(`npm i -g ${binary.pkg},`);
-        }
+      for (const set of SETS) {
+        it(format('%s', set), async () => {
+          const launcher = LAUNCHERS[transportName][set];
+          assert.deepStrictEqual(
+            await refusalOf(launcher, ['--exposition=readonly']),
+            {
+              stderr: [
+                `[MCP] --exposition ${GONE}; the readonly tools alone (with system and search) are served by ${named('full-ro')}`,
+              ],
+              exits: [1],
+            },
+          );
+          assert.deepStrictEqual(
+            await refusalOf(launcher, ['--exposition', 'ro,debug']),
+            {
+              stderr: [
+                familyOf(set) === 'full'
+                  ? `[MCP] --exposition ${GONE}; the debugger is always served by ${named('full')}, and by no -ro binary`
+                  : `[MCP] --exposition ${GONE}; the compact debugger is always served by ${named('compact')}, and by no -ro binary`,
+              ],
+              exits: [1],
+            },
+          );
+          assert.deepStrictEqual(
+            await refusalOf(launcher, ['--exposition=rw']),
+            {
+              stderr: [
+                `[MCP] --exposition ${GONE}; all compact tools are served by ${named('compact')}`,
+              ],
+              exits: [1],
+            },
+          );
+          // The config file: refused before anything starts, naming the file.
+          const fromFile = await refusalOf(launcher, [conf('readonly,high')]);
+          assert.deepStrictEqual(fromFile.exits, [1]);
+          assert.ok(
+            fromFile.stderr.join('\n').includes('exposition.yaml is refused'),
+          );
+          assert.ok(
+            fromFile.stderr
+              .join('\n')
+              .includes(
+                `exposition (config file) ${GONE}; the high tools are served, beside the readonly ones, by ${named('full')}`,
+              ),
+          );
+        });
       }
-    });
-  },
-);
+    },
+  );
+}
+
+for (const transportName of [
+  'stdio',
+  'http',
+  'sse',
+] satisfies ReadonlyArray<TransportName>) {
+  describe(
+    format(
+      '%s: each binary’s help names its own tools and the other binaries of its transport',
+      transportName,
+    ),
+    () => {
+      const b = BINARIES_OF[transportName];
+
+      for (const set of SETS) {
+        it(format('%s', set), async () => {
+          const launcher = LAUNCHERS[transportName][set];
+          assert.equal(launcher.program, b[set].bin);
+          const help = (await run(launcher, ['--help'])).stderr.join('\n');
+          assert.ok(
+            help.includes(
+              `\nTOOLS:\n  ${b[set].bin} serves one fixed tool set`,
+            ),
+          );
+          assert.ok(!help.includes('--exposition='));
+          // The write binary names its -ro one, and the -ro one its write one.
+          const pair: SetName =
+            set === 'full'
+              ? 'full-ro'
+              : set === 'full-ro'
+                ? 'full'
+                : set === 'compact'
+                  ? 'compact-ro'
+                  : 'compact';
+          assert.ok(
+            help.includes(`npm i -g ${b[pair].pkg}, then ${b[pair].bin}\n`),
+          );
+          for (const other of ['stdio', 'http', 'sse'] as const) {
+            if (other === transportName) continue;
+            for (const binary of Object.values(BINARIES_OF[other])) {
+              assert.ok(!help.includes(`npm i -g ${binary.pkg},`));
+            }
+          }
+        });
+      }
+    },
+  );
+}
 
 /**
  * A `-ro` binary changes nothing in the system (the owner's decision): it
@@ -1174,113 +1286,126 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
  * binary's run tool offers `background` and starts a run. On each
  * transport, through the binary.
  */
-describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: a -ro binary serves no run tool and no background run',
-  (transportName) => {
-    jest.setTimeout(60_000);
-
-    /** One `RuntimeRunClass` call with `background: true` through `set`'s binary. */
-    const backgroundCall = async (set: SetName) => {
-      const launcher = LAUNCHERS[transportName][set];
-      const client = new Client({ name: 'parity', version: '1.0.0' });
-      open.clients.push(client);
-      let started: Run;
-      if (transportName === 'stdio') {
-        const envFile = path.join(workdir, 'background.env');
-        fs.writeFileSync(
-          envFile,
-          [
-            `SAP_URL=${standIn.url}`,
-            'SAP_CLIENT=100',
-            'SAP_AUTH_TYPE=basic',
-            'SAP_CONNECTION_TYPE=http',
-            'SAP_USERNAME=PARITY_USER',
-            'SAP_PASSWORD=parity-password',
-            '',
-          ].join('\n'),
-        );
-        const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-        started = await run(
-          launcher,
-          [`--env-path=${envFile}`, '--system-type=onprem'],
-          serverSide,
-        );
-        await client.connect(clientSide);
-      } else {
-        started = await run(launcher, [
-          ...(transportName === 'http'
-            ? ['--host=127.0.0.1', '--port=0']
-            : ['--sse-host=127.0.0.1', '--sse-port=0']),
-          '--system-type=onprem',
-        ]);
-        const port = announcedPort(transportName);
-        const url =
-          transportName === 'http'
-            ? `http://127.0.0.1:${port}/mcp/stream/http`
-            : `http://127.0.0.1:${port}/sse`;
-        const headers = basicHeaders();
-        await client.connect(
-          clientTransport(
+for (const transportName of [
+  'stdio',
+  'http',
+  'sse',
+] satisfies ReadonlyArray<TransportName>) {
+  describe(
+    format(
+      '%s: a -ro binary serves no run tool and no background run',
+      transportName,
+    ),
+    () => {
+      /** One `RuntimeRunClass` call with `background: true` through `set`'s binary. */
+      const backgroundCall = async (set: SetName) => {
+        const launcher = LAUNCHERS[transportName][set];
+        const client = new Client({ name: 'parity', version: '1.0.0' });
+        open.clients.push(client);
+        let started: Run;
+        if (transportName === 'stdio') {
+          const envFile = path.join(workdir, 'background.env');
+          fs.writeFileSync(
+            envFile,
+            [
+              `SAP_URL=${standIn.url}`,
+              'SAP_CLIENT=100',
+              'SAP_AUTH_TYPE=basic',
+              'SAP_CONNECTION_TYPE=http',
+              'SAP_USERNAME=PARITY_USER',
+              'SAP_PASSWORD=parity-password',
+              '',
+            ].join('\n'),
+          );
+          const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+          started = await run(
+            launcher,
+            [`--env-path=${envFile}`, '--system-type=onprem'],
+            serverSide,
+          );
+          await client.connect(clientSide);
+        } else {
+          started = await run(launcher, [
+            ...(transportName === 'http'
+              ? ['--host=127.0.0.1', '--port=0']
+              : ['--sse-host=127.0.0.1', '--sse-port=0']),
+            '--system-type=onprem',
+          ]);
+          const port = announcedPort(transportName);
+          const url =
             transportName === 'http'
-              ? new StreamableHTTPClientTransport(new URL(url), {
-                  requestInit: { headers },
-                })
-              : new SSEClientTransport(new URL(url), {
-                  requestInit: { headers },
-                }),
-          ),
+              ? `http://127.0.0.1:${port}/mcp/stream/http`
+              : `http://127.0.0.1:${port}/sse`;
+          const headers = basicHeaders();
+          await client.connect(
+            clientTransport(
+              transportName === 'http'
+                ? new StreamableHTTPClientTransport(new URL(url), {
+                    requestInit: { headers },
+                  })
+                : new SSEClientTransport(new URL(url), {
+                    requestInit: { headers },
+                  }),
+            ),
+          );
+        }
+        const listed = (await client.listTools()).tools.find(
+          (tool) => tool.name === 'RuntimeRunClass',
         );
-      }
-      const listed = (await client.listTools()).tools.find(
-        (tool) => tool.name === 'RuntimeRunClass',
-      );
-      const offered = Object.hasOwn(
-        (listed?.inputSchema.properties ?? {}) as object,
-        'background',
-      );
-      const from = standIn.requests.length;
-      const text = await client
-        .callTool({
-          name: 'RuntimeRunClass',
-          arguments: { class_name: 'ZCL_PARITY_RUN', background: true },
-        })
-        .then(
-          (result) => JSON.stringify(result.content),
-          (error: unknown) => String(error),
+        const offered = Object.hasOwn(
+          (listed?.inputSchema.properties ?? {}) as object,
+          'background',
         );
-      const reached = standIn.requests.length - from;
-      await client.close();
-      await started.stop();
-      return {
-        listed: listed !== undefined,
-        offered,
-        reached,
-        runHandle: text.includes('run_handle'),
+        const from = standIn.requests.length;
+        const text = await client
+          .callTool({
+            name: 'RuntimeRunClass',
+            arguments: { class_name: 'ZCL_PARITY_RUN', background: true },
+          })
+          .then(
+            (result) => JSON.stringify(result.content),
+            (error: unknown) => String(error),
+          );
+        const reached = standIn.requests.length - from;
+        await client.close();
+        await started.stop();
+        return {
+          listed: listed !== undefined,
+          offered,
+          reached,
+          runHandle: text.includes('run_handle'),
+        };
       };
-    };
 
-    it('full-ro lists no RuntimeRunClass and a call of it reaches no system; full offers background and starts a run', async () => {
-      const ro = await backgroundCall('full-ro');
-      expect({
-        listed: ro.listed,
-        offered: ro.offered,
-        runHandle: ro.runHandle,
-        reached: ro.reached,
-      }).toEqual({
-        listed: false,
-        offered: false,
-        runHandle: false,
-        reached: 0,
+      it('full-ro lists no RuntimeRunClass and a call of it reaches no system; full offers background and starts a run', async () => {
+        const ro = await backgroundCall('full-ro');
+        assert.deepStrictEqual(
+          {
+            listed: ro.listed,
+            offered: ro.offered,
+            runHandle: ro.runHandle,
+            reached: ro.reached,
+          },
+          {
+            listed: false,
+            offered: false,
+            runHandle: false,
+            reached: 0,
+          },
+        );
+        const full = await backgroundCall('full');
+        assert.deepStrictEqual(
+          {
+            listed: full.listed,
+            offered: full.offered,
+            runHandle: full.runHandle,
+          },
+          { listed: true, offered: true, runHandle: true },
+        );
       });
-      const full = await backgroundCall('full');
-      expect({
-        listed: full.listed,
-        offered: full.offered,
-        runHandle: full.runHandle,
-      }).toEqual({ listed: true, offered: true, runHandle: true });
-    });
-  },
-);
+    },
+  );
+}
 
 /** Turns of the event loop on short real waits until `done()` holds. */
 async function until(done: () => boolean, limitMs = 10_000): Promise<void> {
@@ -1360,8 +1485,11 @@ async function cancelledRead(
   // A cancel (sse) or a dropped request (http) aborts nothing: the call is
   // live, its signal not aborted.
   await new Promise((resolve) => setTimeout(resolve, 150));
-  expect(activeTools().length).toBeGreaterThan(0);
-  expect(activeTools().every((tool) => !tool.signal.aborted)).toBe(true);
+  assert.ok(activeTools().length > 0);
+  assert.equal(
+    activeTools().every((tool) => !tool.signal.aborted),
+    true,
+  );
   hold.release();
   await until(() => activeTools().length === 0);
   await done;
@@ -1380,24 +1508,29 @@ async function cancelledRead(
  * process has its system information from its start; a queued call that
  * is sent a cancel keeps its place: `stateful/noCallCancel.test.ts`).
  */
-describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
-  '%s: a call during its system lookup, then a cancel or a dropped request, on both sets',
-  (transportName) => {
-    jest.setTimeout(60_000);
-
-    it(
-      transportName === 'http'
-        ? 'the request closed ends no call: the read reaches the system'
-        : 'an MCP cancel aborts nothing: the read reaches the system',
-      async () => {
-        const full = await cancelledRead(transportName, 'full');
-        const compact = await cancelledRead(transportName, 'compact');
-        expect(full).toEqual({ reached: true, exit: 0 });
-        expect(compact).toEqual(full);
-      },
-    );
-  },
-);
+for (const transportName of ['http', 'sse'] satisfies ReadonlyArray<
+  Exclude<TransportName, 'stdio'>
+>) {
+  describe(
+    format(
+      '%s: a call during its system lookup, then a cancel or a dropped request, on both sets',
+      transportName,
+    ),
+    () => {
+      it(
+        transportName === 'http'
+          ? 'the request closed ends no call: the read reaches the system'
+          : 'an MCP cancel aborts nothing: the read reaches the system',
+        async () => {
+          const full = await cancelledRead(transportName, 'full');
+          const compact = await cancelledRead(transportName, 'compact');
+          assert.deepStrictEqual(full, { reached: true, exit: 0 });
+          assert.deepStrictEqual(compact, full);
+        },
+      );
+    },
+  );
+}
 
 /**
  * http and sse on ABAP Cloud: the first call that reaches the system asks
@@ -1405,68 +1538,76 @@ describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
  * call's answer, its tool never run; the next call is not barred — it asks
  * again, and its tool runs once.
  */
-describe.each<Exclude<TransportName, 'stdio'>>(['http', 'sse'])(
-  '%s: a refused system lookup is the call’s answer, and the next call asks again',
-  (transportName) => {
-    jest.setTimeout(60_000);
-
-    it.each<SetName>(['full', 'compact'])('%s', async (set) => {
-      const launcher = LAUNCHERS[transportName][set];
-      const started = await run(launcher, [
-        ...(transportName === 'http'
-          ? ['--host=127.0.0.1', '--port=0']
-          : ['--sse-host=127.0.0.1', '--sse-port=0']),
-        '--system-type=cloud',
-      ]);
-      const port = announcedPort(transportName);
-      const url =
-        transportName === 'http'
-          ? `http://127.0.0.1:${port}/mcp/stream/http`
-          : `http://127.0.0.1:${port}/sse`;
-      const client = new Client({ name: 'parity', version: '1.0.0' });
-      open.clients.push(client);
-      await client.connect(
-        clientTransport(
-          transportName === 'http'
-            ? new StreamableHTTPClientTransport(new URL(url), {
-                requestInit: { headers: basicHeaders() },
-              })
-            : new SSEClientTransport(new URL(url), {
-                requestInit: { headers: basicHeaders() },
-              }),
-        ),
-      );
-      const isLookup = (r: { url: string }) =>
-        r.url.includes('systeminformation');
-      const reads = (className: string) =>
-        standIn.requests.filter(
-          (r) => !isLogoff(r.url) && r.url.includes(className.toLowerCase()),
-        ).length;
-      const lookups = () => standIn.requests.filter(isLookup).length;
-      const from = lookups();
-      standIn.answerOnce(isLookup, 500);
-      try {
-        const refused = outcomeOf(
-          await client.callTool(readCall(set, 'ZCL_PARITY_LOOKUP_ONE')),
-        );
-        expect(refused).toMatchObject({
-          ok: false,
-          error: 'system_lookup_failed',
+for (const transportName of ['http', 'sse'] satisfies ReadonlyArray<
+  Exclude<TransportName, 'stdio'>
+>) {
+  describe(
+    format(
+      '%s: a refused system lookup is the call’s answer, and the next call asks again',
+      transportName,
+    ),
+    () => {
+      for (const set of ['full', 'compact'] satisfies ReadonlyArray<SetName>) {
+        it(format('%s', set), async () => {
+          const launcher = LAUNCHERS[transportName][set];
+          const started = await run(launcher, [
+            ...(transportName === 'http'
+              ? ['--host=127.0.0.1', '--port=0']
+              : ['--sse-host=127.0.0.1', '--sse-port=0']),
+            '--system-type=cloud',
+          ]);
+          const port = announcedPort(transportName);
+          const url =
+            transportName === 'http'
+              ? `http://127.0.0.1:${port}/mcp/stream/http`
+              : `http://127.0.0.1:${port}/sse`;
+          const client = new Client({ name: 'parity', version: '1.0.0' });
+          open.clients.push(client);
+          await client.connect(
+            clientTransport(
+              transportName === 'http'
+                ? new StreamableHTTPClientTransport(new URL(url), {
+                    requestInit: { headers: basicHeaders() },
+                  })
+                : new SSEClientTransport(new URL(url), {
+                    requestInit: { headers: basicHeaders() },
+                  }),
+            ),
+          );
+          const isLookup = (r: { url: string }) =>
+            r.url.includes('systeminformation');
+          const reads = (className: string) =>
+            standIn.requests.filter(
+              (r) =>
+                !isLogoff(r.url) && r.url.includes(className.toLowerCase()),
+            ).length;
+          const lookups = () => standIn.requests.filter(isLookup).length;
+          const from = lookups();
+          standIn.answerOnce(isLookup, 500);
+          try {
+            const refused = outcomeOf(
+              await client.callTool(readCall(set, 'ZCL_PARITY_LOOKUP_ONE')),
+            );
+            assertMatchObject(refused, {
+              ok: false,
+              error: 'system_lookup_failed',
+            });
+            assert.equal(reads('ZCL_PARITY_LOOKUP_ONE'), 0);
+            const answered = outcomeOf(
+              await client.callTool(readCall(set, 'ZCL_PARITY_LOOKUP_TWO')),
+            );
+            assert.deepStrictEqual(answered, { ok: true });
+            assert.equal(lookups() - from, 2);
+            assert.equal(reads('ZCL_PARITY_LOOKUP_TWO'), 1);
+          } finally {
+            await client.close();
+            assert.equal(await started.stop(), 0);
+          }
         });
-        expect(reads('ZCL_PARITY_LOOKUP_ONE')).toBe(0);
-        const answered = outcomeOf(
-          await client.callTool(readCall(set, 'ZCL_PARITY_LOOKUP_TWO')),
-        );
-        expect(answered).toEqual({ ok: true });
-        expect(lookups() - from).toBe(2);
-        expect(reads('ZCL_PARITY_LOOKUP_TWO')).toBe(1);
-      } finally {
-        await client.close();
-        expect(await started.stop()).toBe(0);
       }
-    });
-  },
-);
+    },
+  );
+}
 
 /**
  * A write of one class on each set: the full set's lock, update, unlock; the
@@ -1806,21 +1947,22 @@ async function shutdownCase(transportName: TransportName, set: SetName) {
   };
 }
 
-describe.each<TransportName>(['stdio', 'http', 'sse'])(
-  '%s: the shutdown, on both sets',
-  (transportName) => {
-    jest.setTimeout(60_000);
-
+for (const transportName of [
+  'stdio',
+  'http',
+  'sse',
+] satisfies ReadonlyArray<TransportName>) {
+  describe(format('%s: the shutdown, on both sets', transportName), () => {
     it('a held write is not awaited: its session logged off under it, exit 0, no UNLOCK; a call after the latch reaches no tool', async () => {
       const full = await shutdownCase(transportName, 'full');
       const compact = await shutdownCase(transportName, 'compact');
-      expect(full).toEqual({
+      assert.deepStrictEqual(full, {
         exit: 0,
         loggedOffUnderHold: true,
         unlockSent: false,
         lateReached: false,
       });
-      expect(compact).toEqual(full);
+      assert.deepStrictEqual(compact, full);
     });
-  },
-);
+  });
+}

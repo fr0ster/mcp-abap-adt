@@ -1,4 +1,13 @@
 import * as z from 'zod';
+import {
+  AMDP_FLAG,
+  SETTINGS_SHAPE,
+} from '../../handlers/table/tableSettingsFields';
+import {
+  HEADINGS,
+  SELECTIONS,
+  SYMBOLS,
+} from '../../handlers/text_elements/textElementsShared';
 import { RUN_TARGET_OPTIONAL } from '../../handlers/unit_test/shared/runTarget';
 import {
   type ACTIVATION_CODES,
@@ -451,6 +460,10 @@ const BACKGROUND_READS = [
   'BEHAVIOR_IMPLEMENTATION',
   'METADATA_EXTENSION',
   'TRANSPORT',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
 
 /** HandlerGet's `background`, listing the read types left. */
@@ -696,6 +709,10 @@ export const COMPACT_READ_TAKES = takesOf<
     UNIT_TEST: ['run_id'],
     CDS_UNIT_TEST: ['run_id'],
     TRANSPORT: ['transport_number'],
+    TABLE_SETTINGS: ['table_name', 'version'],
+    PROGRAM_TEXT_ELEMENTS: ['program_name', 'version'],
+    FUNCTION_GROUP_TEXT_ELEMENTS: ['function_group_name', 'version'],
+    CLASS_TEXT_ELEMENTS: ['class_name', 'version'],
   },
 });
 
@@ -819,6 +836,12 @@ export const compactGetSchema = compactGetSchemaWithNamesFor(
   HANDLER_GET_DRAFT_TYPES.onprem,
 );
 
+/** UpdateTableSettings' settings, each written over the stored one (TABLE_SETTINGS). */
+function settingsFields() {
+  const { table_name: _name, ...settings } = SETTINGS_SHAPE;
+  return settings;
+}
+
 const UPDATE_PROPERTIES = {
   lock_handle: z
     .string()
@@ -934,6 +957,13 @@ const UPDATE_PROPERTIES = {
     .enum(['published', 'unpublished'])
     .optional()
     .describe('Target publication state (service binding update).'),
+  ...settingsFields(),
+  is_writable_by_amdp: AMDP_FLAG.describe(
+    `TABLE_SETTINGS on the cloud: ${AMDP_FLAG.description ?? ''}`,
+  ),
+  symbols: SYMBOLS,
+  selections: SELECTIONS,
+  headings: HEADINGS,
 };
 
 /** A member of `HandlerUpdate`'s `object_type`. */
@@ -989,6 +1019,31 @@ export const COMPACT_UPDATE_TAKES = takesOf<
       'service_name',
       'service_version',
     ],
+    TABLE_SETTINGS: [
+      'table_name',
+      'data_class',
+      'size_category',
+      'buffering',
+      'storage_type',
+      'sharing_type',
+      'load_unit',
+      'translation',
+      'logging_enabled',
+      'is_writable_by_amdp',
+    ],
+    PROGRAM_TEXT_ELEMENTS: [
+      'program_name',
+      'symbols',
+      'selections',
+      'headings',
+    ],
+    FUNCTION_GROUP_TEXT_ELEMENTS: [
+      'function_group_name',
+      'symbols',
+      'selections',
+      'headings',
+    ],
+    CLASS_TEXT_ELEMENTS: ['class_name', 'symbols'],
   },
 });
 
@@ -2245,6 +2300,15 @@ function systemProperties(
           where_used: whereUsedTypeDescription(variant),
         }),
       ),
+    container: z
+      .enum(['program', 'function_group'])
+      .optional()
+      .describe(
+        said(actions, {
+          where_used:
+            'with object_type PROG/PX, required: whose text elements they are, program or function_group; taken by PROG/PX alone.',
+        }),
+      ),
     maxResults: z
       .number()
       .optional()
@@ -2275,6 +2339,12 @@ function systemProperties(
           object_type: z
             .string()
             .describe('Type of the ABAP object, as object_type takes it'),
+          container: z
+            .enum(['program', 'function_group'])
+            .optional()
+            .describe(
+              'With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.',
+            ),
         }),
       )
       .optional()
@@ -2445,6 +2515,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
     where_used: [
       'object_name',
       'object_type',
+      'container',
       'objects',
       'enable_all_types',
       'enable_only_types',
@@ -2529,7 +2600,7 @@ const ACTION_SENTENCES: Readonly<Record<SystemAction, string>> = {
   search_object:
     'search_object(object_name*, object_type, maxResults, detail) the objects whose name matches object_name, a name or a mask',
   where_used:
-    'where_used(object_name* and object_type*, or objects*; enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package',
+    'where_used(object_name* and object_type*, or objects*; container, enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package',
   package_tree:
     'package_tree(package_name* or package_names*; include_subpackages, max_depth, include_descriptions, debug) the subpackages and objects of a package as a tree',
   transports:

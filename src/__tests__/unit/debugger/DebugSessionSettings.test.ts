@@ -1,10 +1,14 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import {
   DebugSession,
   type DebugSettings,
   DebugStateError,
 } from '../../../lib/debugger/DebugSession';
 import { readSettings } from '../../../lib/debugger/readings';
+import { assertMatchObject, assertRejects } from '../../helpers/assertions';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
+import { useFakeTimers, useRealTimers } from '../../helpers/fakeTime';
 import {
   fakeWorld,
   IDS,
@@ -19,8 +23,13 @@ const sent = (world: ReturnType<typeof fakeWorld>) =>
   world.calls.filter((c) => c.startsWith('settings:'));
 
 describe('the debugger settings', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   async function caught(settings?: DebugSettings, world = fakeWorld()) {
     const session = new DebugSession(world.ports, IDS).bind('origin');
@@ -40,16 +49,17 @@ describe('the debugger settings', () => {
 
   it('the preferences are applied after the attach, and the stop reports the settings in force', async () => {
     const { session, world } = await caught({ systemDebugging: true });
-    expect(sent(world)).toEqual(['settings:{"systemDebugging":true}']);
+    assert.deepStrictEqual(sent(world), ['settings:{"systemDebugging":true}']);
     const state = await session.wait(0);
-    expect(state.state === 'stopped' && state.stop.settings).toEqual(
+    assert.deepStrictEqual(
+      state.state === 'stopped' && state.stop.settings,
       readSettings(settingsXml({ systemDebugging: true })),
     );
   });
 
   it('no preferences: nothing is sent at an attach', async () => {
     const { world } = await caught();
-    expect(sent(world)).toEqual([]);
+    assert.deepStrictEqual(sent(world), []);
   });
 
   it('again after a re-attach: a catch after detach, and after release_debugger', async () => {
@@ -62,7 +72,8 @@ describe('the debugger settings', () => {
     await until(() => world.polls.length === 4);
     world.polls[3].resolve(LISTEN_CATCH());
     await until(() => sent(world).length === 3);
-    expect(sent(world)).toEqual(
+    assert.deepStrictEqual(
+      sent(world),
       Array(3).fill('settings:{"updateDebugging":true}'),
     );
   });
@@ -74,38 +85,42 @@ describe('the debugger settings', () => {
       () => okResponse(settingsXml({ systemDebugging: false })),
     );
     const { session } = await caught({ systemDebugging: false }, world);
-    expect(sent(world)).toEqual(
+    assert.deepStrictEqual(
+      sent(world),
       Array(2).fill('settings:{"systemDebugging":false}'),
     );
-    expect(session.settingsInForce()).toMatchObject({ systemDebugging: false });
+    assertMatchObject(session.settingsInForce(), { systemDebugging: false });
   });
 
   it('setSettings merges into the preferences, applies them, and answers the last answer', async () => {
     const { session, world } = await caught({ systemDebugging: true });
     const answer = await session.setSettings({ createExceptionObject: true });
-    expect(sent(world).at(-1)).toBe(
+    assert.equal(
+      sent(world).at(-1),
       'settings:{"systemDebugging":true,"createExceptionObject":true}',
     );
-    expect(answer.value).toEqual(
+    assert.deepStrictEqual(
+      answer.value,
       readSettings(
         settingsXml({ systemDebugging: true, createExceptionObject: true }),
       ),
     );
-    expect(session.preferredSettings()).toEqual({
+    assert.deepStrictEqual(session.preferredSettings(), {
       systemDebugging: true,
       createExceptionObject: true,
     });
-    expect(session.settingsInForce()).toEqual(answer.value);
+    assert.deepStrictEqual(session.settingsInForce(), answer.value);
   });
 
   it('setSettings as the first call after an attach, with system_debugging false, sends it twice', async () => {
     const { session, world } = await caught();
     await session.setSettings({ systemDebugging: false });
-    expect(sent(world)).toEqual(
+    assert.deepStrictEqual(
+      sent(world),
       Array(2).fill('settings:{"systemDebugging":false}'),
     );
     await session.setSettings({ systemDebugging: false });
-    expect(sent(world)).toHaveLength(3);
+    assert.equal(sent(world).length, 3);
   });
 
   it('setSettings without a stop is refused and sends nothing', async () => {
@@ -115,10 +130,11 @@ describe('the debugger settings', () => {
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_NOTHING());
     await s;
-    await expect(
+    await assertRejects(
       session.setSettings({ systemDebugging: true }),
-    ).rejects.toThrow(DebugStateError);
-    expect(sent(world)).toEqual([]);
+      DebugStateError,
+    );
+    assert.deepStrictEqual(sent(world), []);
   });
 
   // Review Focus 4.
@@ -132,8 +148,8 @@ describe('the debugger settings', () => {
     await until(() => world.polls.length === 1);
     world.polls[0].resolve(LISTEN_CATCH());
     const state = await s;
-    expect(sent(world)).toEqual(['settings:{"updateDebugging":true}']);
-    expect(state.state === 'stopped' && state.stop.settings).toMatchObject({
+    assert.deepStrictEqual(sent(world), ['settings:{"updateDebugging":true}']);
+    assertMatchObject(state.state === 'stopped' && state.stop.settings, {
       updateDebugging: true,
     });
   });
@@ -146,8 +162,8 @@ describe('the debugger settings', () => {
     };
     const { session } = await caught(undefined, world);
     const state = await session.wait(0);
-    expect(state.state).toBe('stopped');
-    expect(state.state === 'stopped' && state.stop.stackError).toEqual({
+    assert.equal(state.state, 'stopped');
+    assert.deepStrictEqual(state.state === 'stopped' && state.stop.stackError, {
       message: 'Stack not readable',
       origin: 'refusal',
       step: 'read stack',
@@ -160,21 +176,24 @@ describe('the debugger settings', () => {
     world.settingsAnswers.push(() => refusedResponse('Settings not allowed'));
     const { session } = await caught({ systemDebugging: true }, world);
     const state = await session.wait(0);
-    expect(state.state).toBe('stopped');
-    expect(state.state === 'stopped' && state.stop.settingsError).toEqual({
-      message: 'Settings not allowed',
-      origin: 'refusal',
-      step: 'set settings',
-    });
+    assert.equal(state.state, 'stopped');
+    assert.deepStrictEqual(
+      state.state === 'stopped' && state.stop.settingsError,
+      {
+        message: 'Settings not allowed',
+        origin: 'refusal',
+        step: 'set settings',
+      },
+    );
   });
 
   it('a failed first call after an attach does not count: a later system_debugging false is still sent twice', async () => {
     const world = fakeWorld();
     world.settingsAnswers.push(() => refusedResponse('Settings not allowed'));
     const { session } = await caught({ systemDebugging: true }, world);
-    expect(sent(world)).toHaveLength(1);
+    assert.equal(sent(world).length, 1);
     await session.setSettings({ systemDebugging: false });
-    expect(sent(world)).toEqual([
+    assert.deepStrictEqual(sent(world), [
       'settings:{"systemDebugging":true}',
       'settings:{"systemDebugging":false}',
       'settings:{"systemDebugging":false}',
@@ -183,20 +202,23 @@ describe('the debugger settings', () => {
 
   it("a re-attach whose settings fail reports no settings, not the previous attach's", async () => {
     const { session, world } = await caught({ updateDebugging: true });
-    expect(session.settingsInForce()).toMatchObject({ updateDebugging: true });
+    assertMatchObject(session.settingsInForce(), { updateDebugging: true });
     await session.detach();
     await until(() => world.polls.length === 3);
     world.settingsAnswers.push(() => refusedResponse('Settings not allowed'));
     world.polls[2].resolve(LISTEN_CATCH());
     await until(() => sent(world).length === 2);
     const state = await session.wait(0);
-    expect(state.state).toBe('stopped');
-    expect(session.settingsInForce()).toBeUndefined();
-    expect(state.state === 'stopped' && state.stop.settings).toBeUndefined();
-    expect(state.state === 'stopped' && state.stop.settingsError).toEqual({
-      message: 'Settings not allowed',
-      origin: 'refusal',
-      step: 'set settings',
-    });
+    assert.equal(state.state, 'stopped');
+    assert.equal(session.settingsInForce(), undefined);
+    assert.equal(state.state === 'stopped' && state.stop.settings, undefined);
+    assert.deepStrictEqual(
+      state.state === 'stopped' && state.stop.settingsError,
+      {
+        message: 'Settings not allowed',
+        origin: 'refusal',
+        step: 'set settings',
+      },
+    );
   });
 });

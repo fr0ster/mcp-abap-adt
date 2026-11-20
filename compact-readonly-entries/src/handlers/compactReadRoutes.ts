@@ -41,13 +41,31 @@ import {
   handleGetServiceDefinition,
   handleGetStructure,
   handleGetTable,
+  handleGetTableSettings,
   handleGetTableType,
+  handleGetTextElements,
   handleGetUnitTestResultOnce,
   handleReadTransportObjects,
   READ_DEFINITIONS,
 } from '@mcp-abap-adt/lib/handlers/read';
 
 const D = READ_DEFINITIONS;
+
+/** GetTextElements' entry: the text elements reads go through it. */
+const textElements = defineTool(D.GetTextElements, handleGetTextElements).call;
+
+/** GetTextElements' arguments for the object HandlerGet names. */
+export function textElementsArgsOf(
+  kind: 'program' | 'function_group' | 'class',
+  name: unknown,
+  args: ToolArgs,
+): ToolArgs {
+  return {
+    object_kind: kind,
+    object_name: name,
+    ...(args.version === undefined ? {} : { version: args.version }),
+  };
+}
 
 /** Each read route: the call of its target tool's entry. */
 const route = {
@@ -103,6 +121,21 @@ const route = {
     D.GetMetadataExtension,
     handleGetMetadataExtension,
   ).call,
+  TABLE_SETTINGS: defineTool(D.GetTableSettings, handleGetTableSettings).call,
+  // The text elements of the object HandlerGet names by its own argument:
+  // GetTextElements' read of every part the kind has.
+  PROGRAM_TEXT_ELEMENTS: (context, args) =>
+    textElements(
+      context,
+      textElementsArgsOf('program', args.program_name, args),
+    ),
+  FUNCTION_GROUP_TEXT_ELEMENTS: (context, args) =>
+    textElements(
+      context,
+      textElementsArgsOf('function_group', args.function_group_name, args),
+    ),
+  CLASS_TEXT_ELEMENTS: (context, args) =>
+    textElements(context, textElementsArgsOf('class', args.class_name, args)),
 } as const satisfies Partial<Record<CompactObjectType, CompactHandler>>;
 
 /** An include's read of `part`: GetInclude's, with the part fixed. */
@@ -152,6 +185,10 @@ export const compactReadRouterMap: CompactRouterMap = {
   // No CRUD: a profiler run and a dump are read through their own tools.
   RUNTIME_PROFILE: {},
   RUNTIME_DUMP: {},
+  TABLE_SETTINGS: { get: route.TABLE_SETTINGS },
+  PROGRAM_TEXT_ELEMENTS: { get: route.PROGRAM_TEXT_ELEMENTS },
+  FUNCTION_GROUP_TEXT_ELEMENTS: { get: route.FUNCTION_GROUP_TEXT_ELEMENTS },
+  CLASS_TEXT_ELEMENTS: { get: route.CLASS_TEXT_ELEMENTS },
 };
 
 /** Route a compact read. The only operation this half carries is `get`. */

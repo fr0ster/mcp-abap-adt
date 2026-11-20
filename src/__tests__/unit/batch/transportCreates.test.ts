@@ -8,15 +8,20 @@
  * `batch_not_recordable`, takes no number, and sends nothing — no connection
  * receives a request, no envelope is executed.
  */
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(),
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-}));
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { batchNotRecordableWords } from '../../../lib/auth/serverRefusal';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import { batchStand, payloadOf } from '../../helpers/batchStand';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time); the names not replaced stay real.
+// Every case restores every mock after it: they are replaced before each.
+beforeEach(() => {
+  mock.method(connectionFactory, 'createAbapConnection', () => undefined);
+});
 
 // The process declares its system type, as every launcher requires.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
@@ -31,29 +36,32 @@ const CALLS: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ['HandlerCreate', { object_type: 'TRANSPORT', description: 'text' }],
 ];
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 describe('the transport creates in a batch', () => {
-  it.each(CALLS)(
-    '%s is refused batch_not_recordable; nothing is sent',
-    async (tool, args) => {
-      const s = await batchStand({
-        tools: [...new Set(CALLS.map(([name]) => name))],
-        part: () => ({ status: 200, statusText: 'OK' }),
-      });
-      s.begin();
-      const answer = await s.call(tool, args);
-      expect(answer.isError).toBe(true);
-      expect(payloadOf(answer)).toEqual({
-        error: 'batch_not_recordable',
-        message: batchNotRecordableWords(tool),
-      });
-      expect(s.owner.opened()?.recorded ?? []).toEqual([]);
-      expect(
-        s.built.map((b) => b.connection.makeAdtRequest.mock.calls.length),
-      ).toEqual(s.built.map(() => 0));
-      expect(s.executes).not.toHaveBeenCalled();
-      await s.close();
-    },
-  );
+  for (const [tool, args] of CALLS) {
+    it(
+      format('%s is refused batch_not_recordable; nothing is sent', tool),
+      async () => {
+        const s = await batchStand({
+          tools: [...new Set(CALLS.map(([name]) => name))],
+          part: () => ({ status: 200, statusText: 'OK' }),
+        });
+        s.begin();
+        const answer = await s.call(tool, args);
+        assert.equal(answer.isError, true);
+        assert.deepStrictEqual(payloadOf(answer), {
+          error: 'batch_not_recordable',
+          message: batchNotRecordableWords(tool),
+        });
+        assert.deepStrictEqual(s.owner.opened()?.recorded ?? [], []);
+        assert.deepStrictEqual(
+          s.built.map((b) => b.calls.makeAdtRequest.length),
+          s.built.map(() => 0),
+        );
+        assert.equal(s.executes.mock.callCount(), 0);
+        await s.close();
+      },
+    );
+  }
 });

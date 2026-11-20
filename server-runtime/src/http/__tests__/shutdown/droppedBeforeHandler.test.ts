@@ -1,4 +1,7 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import * as z from 'zod';
+import { assertMatchObject } from '../../../../../src/__tests__/helpers/assertions';
 /**
  * The client's disconnect, http: a dropped request ends no call. Each
  * request has a transport of its own, and the response's close closes it —
@@ -26,14 +29,12 @@ import {
   until,
 } from './harness';
 
-jest.setTimeout(30_000);
-
 let s: HttpStand;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 let previousType: string | undefined;
 
 beforeEach(async () => {
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
   s = await httpStand({ groups: [loseGroup] });
   previousType = process.env.SAP_SYSTEM_TYPE;
 });
@@ -42,7 +43,7 @@ afterEach(async () => {
   await s.close();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
 /** `LoseSession`: marks its connection's session lost, as SAP's answer would. */
@@ -78,7 +79,7 @@ async function loseMainSession(handle: string): Promise<void> {
     {},
     { ...basicHeaders(s.standIn.url), 'x-mcp-state-handle': handle },
   );
-  expect(lost.isError).toBe(false);
+  assert.equal(lost.isError, false);
 }
 
 /** A request the stand-in received that is not a logoff. */
@@ -119,7 +120,7 @@ const count = (match: (url: string) => boolean) =>
 const sessionOf = (match: (url: string) => boolean) =>
   s.standIn.requests.find((r) => match(r.url))?.session;
 
-const loggedOff = () =>
+const loggedOff = (): (string | undefined)[] =>
   s.standIn.requests.filter((r) => isLogoff(r.url)).map((r) => r.session);
 
 /**
@@ -129,7 +130,7 @@ const loggedOff = () =>
  */
 async function pooled(id: string): Promise<string> {
   const held = await s.call('HoldState', { id });
-  expect(held.isError).toBe(false);
+  assert.equal(held.isError, false);
   await loseMainSession(held.text);
   return held.text;
 }
@@ -137,14 +138,14 @@ async function pooled(id: string): Promise<string> {
 /** The handle still reaches its instance and its state, which is not logged off. */
 async function stillPooled(handle: string, stateId: string, nextId: string) {
   const stateSession = sessionOf((url) => url.startsWith(listenUrl(stateId)));
-  expect(stateSession).toBeDefined();
-  expect(loggedOff()).not.toContain(stateSession);
+  assert.notEqual(stateSession, undefined);
+  assert.ok(!loggedOff().includes(stateSession));
   const again = await s.call('LockedUpdate', {
     id: nextId,
     state_handle: handle,
   });
-  expect(again).toMatchObject({ text: nextId, isError: false });
-  expect(loggedOff()).not.toContain(stateSession);
+  assertMatchObject(again, { text: nextId, isError: false });
+  assert.ok(!loggedOff().includes(stateSession));
 }
 
 it('dropped while its call waits for the connection: the handler still runs exactly once, and the instance stays in the pool', async () => {
@@ -157,22 +158,28 @@ it('dropped while its call waits for the connection: the handler still runs exac
     toolCall(77, 'LockedUpdate', { id: 'C', state_handle: handle }),
   );
   await hold.arrived;
-  expect(s.standIn.requests.filter(notLogoff).length).toBe(before + 1);
-  expect(count(isLockOf('C'))).toBe(0);
+  assert.equal(s.standIn.requests.filter(notLogoff).length, before + 1);
+  assert.equal(count(isLockOf('C')), 0);
 
   call.drop();
-  expect(await call.sent).toBe('dropped');
+  assert.equal(await call.sent, 'dropped');
   await pause();
   // The call is still live, its signal not aborted.
-  expect(activeTools().map((t) => t.name)).toEqual(['LockedUpdate']);
-  expect(activeTools().every((t) => !t.signal.aborted)).toBe(true);
+  assert.deepStrictEqual(
+    activeTools().map((t) => t.name),
+    ['LockedUpdate'],
+  );
+  assert.equal(
+    activeTools().every((t) => !t.signal.aborted),
+    true,
+  );
 
   hold.release();
   await until(() => count(isUnlockOf('C')) === 1);
   await until(() => activeTools().length === 0);
   await turns(20);
-  expect(count(isLockOf('C'))).toBe(1);
-  expect(count(isUpdateOf('C'))).toBe(1);
+  assert.equal(count(isLockOf('C')), 1);
+  assert.equal(count(isUpdateOf('C')), 1);
   await stillPooled(handle, 'P', 'C2');
 });
 
@@ -186,21 +193,27 @@ it('dropped while its call waits for the system lookup: the handler still runs e
     toolCall(78, 'LockedUpdate', { id: 'L', state_handle: handle }),
   );
   await hold.arrived;
-  expect(count(isLookup)).toBe(lookupsBefore + 1);
-  expect(count(isLockOf('L'))).toBe(0);
+  assert.equal(count(isLookup), lookupsBefore + 1);
+  assert.equal(count(isLockOf('L')), 0);
 
   call.drop();
-  expect(await call.sent).toBe('dropped');
+  assert.equal(await call.sent, 'dropped');
   await pause();
-  expect(activeTools().map((t) => t.name)).toEqual(['LockedUpdate']);
-  expect(activeTools().every((t) => !t.signal.aborted)).toBe(true);
+  assert.deepStrictEqual(
+    activeTools().map((t) => t.name),
+    ['LockedUpdate'],
+  );
+  assert.equal(
+    activeTools().every((t) => !t.signal.aborted),
+    true,
+  );
 
   hold.release();
   await until(() => count(isUnlockOf('L')) === 1);
   await until(() => activeTools().length === 0);
   await turns(20);
-  expect(count(isLockOf('L'))).toBe(1);
-  expect(count(isUpdateOf('L'))).toBe(1);
+  assert.equal(count(isLockOf('L')), 1);
+  assert.equal(count(isUpdateOf('L')), 1);
   await stillPooled(handle, 'Q', 'L2');
 });
 
@@ -213,29 +226,31 @@ it('dropped while a call waits for its turn in the main flow: both handlers run 
   ]);
   await hold.arrived;
   await until(() => activeTools().length === 2);
-  expect(count(isLockOf('F2'))).toBe(0);
+  assert.equal(count(isLockOf('F2')), 0);
 
   call.drop();
-  expect(await call.sent).toBe('dropped');
+  assert.equal(await call.sent, 'dropped');
   await pause();
   // Both calls live, none aborted; no logoff under the running one.
-  expect(activeTools()).toHaveLength(2);
-  expect(activeTools().every((t) => !t.signal.aborted)).toBe(true);
-  expect(s.standIn.logoffs()).toBe(0);
+  assert.equal(activeTools().length, 2);
+  assert.equal(
+    activeTools().every((t) => !t.signal.aborted),
+    true,
+  );
+  assert.equal(s.standIn.logoffs(), 0);
 
   hold.release();
   await until(() => count(isUnlockOf('F2')) === 1);
   await until(() => activeTools().length === 0);
   await turns(20);
-  expect(count(isLockOf('F1'))).toBe(1);
-  expect(count(isLockOf('F2'))).toBe(1);
-  expect(count(isUpdateOf('F2'))).toBe(1);
-  expect(s.indexOf(isLockOf('F2'))).toBeGreaterThan(
-    s.indexOf(isUnlockOf('F1')),
-  );
+  assert.equal(count(isLockOf('F1')), 1);
+  assert.equal(count(isLockOf('F2')), 1);
+  assert.equal(count(isUpdateOf('F2')), 1);
+  assert.ok(s.indexOf(isLockOf('F2')) > s.indexOf(isUnlockOf('F1')));
   // Its work ended: the instance without state leaves, logged off after it.
   await until(() => s.standIn.logoffs() === 1);
-  expect(s.standIn.requests.findIndex((r) => isLogoff(r.url))).toBeGreaterThan(
-    s.indexOf(isUnlockOf('F2')),
+  assert.ok(
+    s.standIn.requests.findIndex((r) => isLogoff(r.url)) >
+      s.indexOf(isUnlockOf('F2')),
   );
 });

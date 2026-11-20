@@ -4,8 +4,8 @@ node_modules/
 # Build output
 dist/
 build/
-# Jest's coverage output, at the repository root only: the coverage guard's
-# tests and the live coverage suites under src/ are sources.
+# Coverage output, at the repository root only: the coverage guard's tests
+# and the live coverage suites under src/ are sources.
 /coverage/
 .smithery/
 *.mcpb
@@ -122,7 +122,7 @@ desktop.ini
 dist-portable/
 .superpowers/
 
-# The node:test build (D27): `npm run test:build`, removed before each build.
+# The test build (D27): `npm run test:build`, removed before each build.
 /.test-build/
 # The runner's tests write their fixture repositories here (D27).
 /.test-fixtures/

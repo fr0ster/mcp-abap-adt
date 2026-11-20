@@ -1,5 +1,9 @@
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 /**
  * The corpus is committed, so what is in it is published.
@@ -15,7 +19,7 @@ import { join } from 'node:path';
  * scrubs is not a check that it scrubbed — this is the check, and it reads the
  * committed files rather than the code that wrote them.
  */
-const CORPUS = join(__dirname, '../../../tests/fixtures/adt');
+const CORPUS = join(repositoryRoot(__dirname), 'tests', 'fixtures', 'adt');
 
 const files = (() => {
   try {
@@ -32,10 +36,10 @@ describe('the recorded corpus', () => {
   it('is there to check', () => {
     // A corpus that stopped being found would make every assertion below
     // vacuously true.
-    expect(files.length).toBeGreaterThan(100);
+    assert.ok(files.length > 100);
   });
 
-  it.each([
+  for (const [_what, pattern] of [
     ['an application server name', /appserver-[a-z0-9]/i],
     ['a bearer token', /Bearer\s+[A-Za-z0-9._-]{16,}/],
     ['an Authorization header value', /"authorization"\s*:\s*"(?!REDACTED)/i],
@@ -43,9 +47,14 @@ describe('the recorded corpus', () => {
     ['a CSRF token', /"x-csrf-token"\s*:\s*"(?!REDACTED)/i],
     ['a host name', /[a-z0-9-]+\.(?:hana\.ondemand|ondemand)\.com/i],
     ['an IP address', /\b(?:\d{1,3}\.){3}\d{1,3}\b/],
-  ])('carries no %s', (_what, pattern) => {
-    expect(files.filter((name) => pattern.test(text(name)))).toEqual([]);
-  });
+  ] satisfies Array<[string, RegExp]>) {
+    it(format('carries no %s', _what), () => {
+      assert.deepStrictEqual(
+        files.filter((name) => pattern.test(text(name))),
+        [],
+      );
+    });
+  }
 
   /**
    * The placeholders are the other half: a scrub that deleted the field would
@@ -54,7 +63,7 @@ describe('the recorded corpus', () => {
    */
   it('keeps the user placeholder it promises', () => {
     const withUser = files.filter((name) => /SAPUSER01/.test(text(name)));
-    expect(withUser.length).toBeGreaterThan(0);
+    assert.ok(withUser.length > 0);
   });
 
   /**
@@ -84,6 +93,6 @@ describe('the recorded corpus', () => {
           offenders.push(`${name}: ${who}`);
       }
     }
-    expect(offenders).toEqual([]);
+    assert.deepStrictEqual(offenders, []);
   });
 });

@@ -41,6 +41,9 @@
  * table controls anyway) — keep both.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -71,6 +74,7 @@ import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
 import { handleDeleteTableType } from '../../handlers/table_type/high/handleDeleteTableType';
 import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleDeleteUnitTest } from '../../handlers/unit_test/high/handleDeleteUnitTest';
+import { assertMatchObject } from '../helpers/assertions';
 import { moduleInGroup } from '../helpers/functionModuleMetadata';
 import {
   LOCK_SUCCESS_XML,
@@ -339,9 +343,8 @@ const deletionServiceCases: DeletionCase[] = [
   },
 ];
 
-describe.each(deletionServiceCases)(
-  '$name',
-  ({ expectedUri, run, first = [] }) => {
+for (const { name, expectedUri, run, first = [] } of deletionServiceCases) {
+  describe(`${name}`, () => {
     const objectName = expectedUri.split('/').pop() as string;
 
     it(`checks, then reaches /sap/bc/adt/deletion/delete, POSTs a request naming adtcore:uri="${expectedUri}", and takes no lock`, async () => {
@@ -353,20 +356,24 @@ describe.each(deletionServiceCases)(
 
       const result: any = await run(conn);
 
-      expect(result?.isError).toBe(false);
+      assert.equal(result?.isError, false);
 
       const hits = requestsTo(
         conn.requests,
         'POST',
         '/sap/bc/adt/deletion/delete',
       );
-      expect(hits.length).toBeGreaterThan(0);
+      assert.ok(hits.length > 0);
       // The exact object — type and name both, not a name-only substring
       // match a wrong-family or wrong-type delete could still satisfy.
-      expect(hits.some((r) => carriesUri(r, expectedUri))).toBe(true);
+      assert.equal(
+        hits.some((r) => carriesUri(r, expectedUri)),
+        true,
+      );
       // A held lock is what makes ADT refuse a deletion; these must never
       // take one.
-      expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
+      assert.equal(
+        conn.requests.some((r) => r.url.includes('_action=LOCK')),
         false,
       );
       // The check went first, for the same object.
@@ -378,8 +385,8 @@ describe.each(deletionServiceCases)(
       const deleteAt = conn.requests.findIndex((r) =>
         r.url.includes('/sap/bc/adt/deletion/delete'),
       );
-      expect(checkAt).toBeGreaterThanOrEqual(0);
-      expect(checkAt).toBeLessThan(deleteAt);
+      assert.ok(checkAt >= 0);
+      assert.ok(checkAt < deleteAt);
     });
 
     it('sends the delete when the check permits it, though its W says the object does not exist (#1, #11)', async () => {
@@ -391,14 +398,15 @@ describe.each(deletionServiceCases)(
 
       const result: any = await run(conn);
 
-      expect(result?.isError).toBe(false);
-      expect(JSON.parse(result.content[0].text)).toMatchObject({
+      assert.equal(result?.isError, false);
+      assertMatchObject(JSON.parse(result.content[0].text), {
         deleted: true,
         object: objectName,
       });
-      expect(
-        requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
-      ).toHaveLength(1);
+      assert.equal(
+        requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete').length,
+        1,
+      );
     });
 
     it("answers the check's refusal and never sends the delete", async () => {
@@ -409,14 +417,15 @@ describe.each(deletionServiceCases)(
 
       const result: any = await run(conn);
 
-      expect(result?.isError).toBe(true);
-      expect(result.content[0].text).toContain('Object does not exist');
-      expect(
-        requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
-      ).toHaveLength(0);
+      assert.equal(result?.isError, true);
+      assert.ok(result.content[0].text.includes('Object does not exist'));
+      assert.equal(
+        requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete').length,
+        0,
+      );
     });
-  },
-);
+  });
+}
 
 interface IncludeDeleteCase {
   name: string;
@@ -454,60 +463,76 @@ const includeDeleteCases: IncludeDeleteCase[] = [
   },
 ];
 
-describe.each(includeDeleteCases)('$name', ({ urlContains, run }) => {
-  it(`PUTs ${urlContains} for the caller's class, carrying the lock handle it took`, async () => {
-    const className = 'ZCL_INC_DEL_X';
-    const conn = recordingConnection();
+for (const { name, urlContains, run } of includeDeleteCases) {
+  describe(`${name}`, () => {
+    it(`PUTs ${urlContains} for the caller's class, carrying the lock handle it took`, async () => {
+      const className = 'ZCL_INC_DEL_X';
+      const conn = recordingConnection();
 
-    const result: any = await run(className, conn);
+      const result: any = await run(className, conn);
 
-    expect(result?.isError).toBe(false);
+      assert.equal(result?.isError, false);
 
-    // The lock this handler took, and released — not a caller-supplied
-    // handle, since there is no such parameter on this tool.
-    expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
-      true,
-    );
+      // The lock this handler took, and released — not a caller-supplied
+      // handle, since there is no such parameter on this tool.
+      assert.equal(
+        conn.requests.some((r) => r.url.includes('_action=LOCK')),
+        true,
+      );
 
-    const hits = requestsTo(conn.requests, 'PUT', urlContains);
-    expect(hits.length).toBeGreaterThan(0);
-    // The caller's own class name reached the URL...
-    expect(hits.some((r) => carries(r, className))).toBe(true);
-    // ...and so did the lock handle the lock call answered with — proof
-    // this write is not the unlocked 400 `AdtLocalDefinitions.d.ts` warns
-    // about (the shape fix round 1 of task 20 restored).
-    expect(hits.some((r) => carries(r, `lockhandle=${LOCK_HANDLE}`))).toBe(
-      true,
-    );
+      const hits = requestsTo(conn.requests, 'PUT', urlContains);
+      assert.ok(hits.length > 0);
+      // The caller's own class name reached the URL...
+      assert.equal(
+        hits.some((r) => carries(r, className)),
+        true,
+      );
+      // ...and so did the lock handle the lock call answered with — proof
+      // this write is not the unlocked 400 `AdtLocalDefinitions.d.ts` warns
+      // about (the shape fix round 1 of task 20 restored).
+      assert.equal(
+        hits.some((r) => carries(r, `lockhandle=${LOCK_HANDLE}`)),
+        true,
+      );
+    });
   });
-});
+}
 
-describe.each([
+for (const [_toolName, handler, args] of [
   [
     'DeleteMetadataExtension',
     handleDeleteMetadataExtension,
     { metadata_extension_name: 'ZI_DDLX_DEL_X' },
   ],
-] as const)(
-  '%s: a plain DELETE on its own URL, not the deletion service',
-  (_toolName, handler, args) => {
-    it("DELETEs /ddic/ddlx/sources/{name} for the caller's name, and takes no lock", async () => {
-      const conn = recordingConnection();
-      const objectName = args.metadata_extension_name;
+] as const) {
+  describe(
+    format(
+      '%s: a plain DELETE on its own URL, not the deletion service',
+      _toolName,
+    ),
+    () => {
+      it("DELETEs /ddic/ddlx/sources/{name} for the caller's name, and takes no lock", async () => {
+        const conn = recordingConnection();
+        const objectName = args.metadata_extension_name;
 
-      const result: any = await (handler as any)(ctx(conn) as any, args);
+        const result: any = await (handler as any)(ctx(conn) as any, args);
 
-      expect(result?.isError).toBe(false);
+        assert.equal(result?.isError, false);
 
-      const hits = requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources');
-      expect(hits.length).toBeGreaterThan(0);
-      expect(hits.some((r) => carries(r, objectName))).toBe(true);
-      expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
-        false,
-      );
-    });
-  },
-);
+        const hits = requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources');
+        assert.ok(hits.length > 0);
+        assert.equal(
+          hits.some((r) => carries(r, objectName)),
+          true,
+        );
+        assert.equal(
+          conn.requests.some((r) => r.url.includes('_action=LOCK')),
+          false,
+        );
+      });
+    },
+  );
+}
 
 describe('DeleteMessageClassMessage: a PUT of the parent class, the message moved to deletedmessages', () => {
   it("PUTs the class for the caller's class name, moving the caller's msgno into <mc:deletedmessages>", async () => {
@@ -529,17 +554,21 @@ describe('DeleteMessageClassMessage: a PUT of the parent class, the message move
       { message_class_name: className, msgno },
     );
 
-    expect(result?.isError).toBe(false);
+    assert.equal(result?.isError, false);
 
     const hits = requestsTo(conn.requests, 'PUT', '/sap/bc/adt/messageclass/');
-    expect(hits.length).toBeGreaterThan(0);
-    expect(hits.some((r) => carries(r, className))).toBe(true);
-    expect(
+    assert.ok(hits.length > 0);
+    assert.equal(
+      hits.some((r) => carries(r, className)),
+      true,
+    );
+    assert.equal(
       hits.some(
         (r) =>
           carries(r, 'mc:deletedmessages') && carries(r, `mc:msgno="${msgno}"`),
       ),
-    ).toBe(true);
+      true,
+    );
   });
 });
 
@@ -552,11 +581,14 @@ describe('DeleteUnitTest', () => {
       class_name: 'ZCL_X',
     });
 
-    expect(result.isError).toBe(false);
-    expect(requests.some((r) => r.method === 'DELETE')).toBe(false);
+    assert.equal(result.isError, false);
+    assert.equal(
+      requests.some((r) => r.method === 'DELETE'),
+      false,
+    );
     const writes = requestsTo(requests, 'PUT', '/includes/testclasses');
-    expect(writes).toHaveLength(1);
-    expect(String(writes[0].data ?? '')).toBe('');
-    expect(carries(writes[0], `lockHandle=${LOCK_HANDLE}`)).toBe(true);
+    assert.equal(writes.length, 1);
+    assert.equal(String(writes[0].data ?? ''), '');
+    assert.equal(carries(writes[0], `lockHandle=${LOCK_HANDLE}`), true);
   });
 });

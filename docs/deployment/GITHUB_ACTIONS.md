@@ -19,8 +19,9 @@ hung test ends the run instead of GitHub's 6-hour default.
    `responsible-rules`, `server-runtime`, `compact-http`, `compact-sse` and the six `-ro` packages)
 3. `npm run build`
 4. Test type-check: `npm run test:check`
-5. `npm test` — every package's suites, once: the root `package.json` holds the one Jest configuration, and its roots
-   name the root `src` and every package's `src`
+5. `npm test` — every package's suites, once: the test build, then the node:test runner
+   (`tools/run-tests.mjs`), whose walk finds every `….test.ts` under a `__tests__` directory of the root
+   `src` and every package's `src`
 6. The server-runtime, server, http, sse, background-runs-memory and responsible-rules test type-check:
    `npm --prefix <dir> run test:check` (since 19.2.0 the transports' launch code and its suites live in `server-runtime`;
    `server`, `http` and `sse` keep the test of their own entry points)
@@ -28,8 +29,8 @@ hung test ends the run instead of GitHub's 6-hour default.
 Every step gates the run; none is `continue-on-error`.
 
 **On Ubuntu / Node 22 only:**
-- `npm audit --audit-level=moderate` — every known advisory of moderate severity or above fails the
-  run, dev dependencies included
+- `npm audit --audit-level=moderate` — every known advisory of moderate severity or above in the
+  whole tree, dev dependencies included, fails the run
 - `npm pack` of all eighteen packages (`lib`, `background-runs-memory`, `responsible-rules`, `compact-readonly-entries`,
   `compact-modify`, `server-runtime`, `http`, `sse`, `core`, `compact`, `compact-http`, `compact-sse`, `core-ro`,
   `http-ro`, `sse-ro`, `compact-ro`, `compact-http-ro`, `compact-sse-ro`)

@@ -7,9 +7,12 @@
  * success from SAP_URL. Nothing is sent: the provider is built, never used.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   createTestFactory,
   exportSettings,
@@ -53,9 +56,9 @@ describe('exportSettings', () => {
       client: '100',
       authType: 'basic',
     });
-    expect(process.env.SAP_URL).toBe('https://system.example.test');
-    expect(process.env.SAP_CLIENT).toBe('100');
-    expect(process.env.SAP_ASHOST).toBeUndefined();
+    assert.equal(process.env.SAP_URL, 'https://system.example.test');
+    assert.equal(process.env.SAP_CLIENT, '100');
+    assert.equal(process.env.SAP_ASHOST, undefined);
   });
 
   it('RFC, an application server: its address, client and language; no SAP_URL', () => {
@@ -68,13 +71,13 @@ describe('exportSettings', () => {
       ashost: 'host.example.test',
       sysnr: '00',
     });
-    expect(process.env.SAP_URL).toBeUndefined();
-    expect(process.env.SAP_CONNECTION_TYPE).toBe('rfc');
-    expect(process.env.SAP_ASHOST).toBe('host.example.test');
-    expect(process.env.SAP_SYSNR).toBe('00');
-    expect(process.env.SAP_CLIENT).toBe('100');
-    expect(process.env.SAP_LANGUAGE).toBe('EN');
-    expect(process.env.SAP_MSHOST).toBeUndefined();
+    assert.equal(process.env.SAP_URL, undefined);
+    assert.equal(process.env.SAP_CONNECTION_TYPE, 'rfc');
+    assert.equal(process.env.SAP_ASHOST, 'host.example.test');
+    assert.equal(process.env.SAP_SYSNR, '00');
+    assert.equal(process.env.SAP_CLIENT, '100');
+    assert.equal(process.env.SAP_LANGUAGE, 'EN');
+    assert.equal(process.env.SAP_MSHOST, undefined);
   });
 
   it('RFC, a message server: its keys, none of the application server', () => {
@@ -88,12 +91,12 @@ describe('exportSettings', () => {
       sysid: 'SYX',
       saprouter: '/H/router.example.test/S/3299/H/',
     });
-    expect(process.env.SAP_MSHOST).toBe('ms.example.test');
-    expect(process.env.SAP_GROUP).toBe('G');
-    expect(process.env.SAP_SYSID).toBe('SYX');
-    expect(process.env.SAP_SAPROUTER).toBe('/H/router.example.test/S/3299/H/');
-    expect(process.env.SAP_ASHOST).toBeUndefined();
-    expect(process.env.SAP_URL).toBeUndefined();
+    assert.equal(process.env.SAP_MSHOST, 'ms.example.test');
+    assert.equal(process.env.SAP_GROUP, 'G');
+    assert.equal(process.env.SAP_SYSID, 'SYX');
+    assert.equal(process.env.SAP_SAPROUTER, '/H/router.example.test/S/3299/H/');
+    assert.equal(process.env.SAP_ASHOST, undefined);
+    assert.equal(process.env.SAP_URL, undefined);
   });
 });
 
@@ -130,11 +133,11 @@ describe('setupAuthBrokerForTests over RFC', () => {
         ].join('\n'),
       );
       process.env.MCP_TEST_CONFIG = config;
-      await expect(setupAuthBrokerForTests()).resolves.toBe(true);
-      expect(process.env.SAP_URL).toBeUndefined();
-      expect(process.env.SAP_ASHOST).toBe('host.example.test');
-      expect(process.env.SAP_SYSNR).toBe('00');
-      expect(process.env.SAP_LANGUAGE).toBe('EN');
+      assert.equal(await setupAuthBrokerForTests(), true);
+      assert.equal(process.env.SAP_URL, undefined);
+      assert.equal(process.env.SAP_ASHOST, 'host.example.test');
+      assert.equal(process.env.SAP_SYSNR, '00');
+      assert.equal(process.env.SAP_LANGUAGE, 'EN');
     } finally {
       fs.rmSync(dir, { recursive: true, force: true });
     }
@@ -164,7 +167,7 @@ describe('the test factory takes the wire from the test config', () => {
         },
         'STAND',
       );
-      await expect(factory.settingsFor('STAND')).resolves.toMatchObject({
+      assertMatchObject(await factory.settingsFor('STAND'), {
         url: 'https://system.example.test',
         connectionType: 'http',
       });

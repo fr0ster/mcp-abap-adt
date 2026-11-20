@@ -13,6 +13,9 @@
  * Real handler, real clients, real `AdtBatchConnection`; only the connection
  * is a fake, answering from a small repository model.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { TOOL_DEFINITION } from '../../../handlers/system/readonly/handleSearchSource';
@@ -130,9 +133,9 @@ describe('SearchSource on internal batches', () => {
     const sequential = system();
     const a = await search(batched);
     const b = await search(sequential, {}, true);
-    expect(isError(a)).toBe(false);
-    expect(textOf(a)).toBe(textOf(b));
-    expect(hitNames(a)).toEqual([
+    assert.equal(isError(a), false);
+    assert.equal(textOf(a), textOf(b));
+    assert.deepStrictEqual(hitNames(a), [
       'ZPROG_O/ZPROG_O',
       'LZFG_ATOP@ZFG_A',
       'ZPROG_A/ZPROG_A',
@@ -143,24 +146,24 @@ describe('SearchSource on internal batches', () => {
     // ZPROG_B, the module VIEWFRAME_ZFG and the include LZFG_AUXX have no
     // hit: they are not listed, and they count as read; the group's modules
     // and includes each count as an object (DO18, DO27).
-    expect(payloadOf(a).no_hits).toBeUndefined();
-    expect(payloadOf(a).scanned).toEqual({
+    assert.equal(payloadOf(a).no_hits, undefined);
+    assert.deepStrictEqual(payloadOf(a).scanned, {
       objects: 8,
       sources: 8,
       objects_with_hits: 5,
     });
-    expect(batched.directs).toHaveLength(0);
-    expect(sequential.envelopes).toHaveLength(0);
+    assert.equal(batched.directs.length, 0);
+    assert.equal(sequential.envelopes.length, 0);
     // Comments dropped: the same both ways too.
     const c = await search(system(), { exclude_comments: true });
     const d = await search(system(), { exclude_comments: true }, true);
-    expect(textOf(c)).toBe(textOf(d));
+    assert.equal(textOf(c), textOf(d));
   });
 
   it('phases: masks, walk levels, the sources of every target', async () => {
     const fake = system();
     await search(fake);
-    expect(fake.envelopes.map(partKeys)).toEqual([
+    assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       // (1) the quickSearch of every mask
       ['SEARCH ZR*'],
       // (2) the walk: level 1 roots (exact names first, then the masks'
@@ -200,7 +203,7 @@ describe('SearchSource on internal batches', () => {
   it('orders the targets by (package, type, name): the sources are read in that order', async () => {
     const fake = system();
     await search(fake);
-    expect(partKeys(fake.envelopes[5])).toEqual([
+    assert.deepStrictEqual(partKeys(fake.envelopes[5]), [
       'PROGRAM ZPROG_O',
       'STRUCTURE ZFG_A',
       'PROGRAM ZPROG_A',
@@ -214,36 +217,36 @@ describe('SearchSource on internal batches', () => {
   });
 
   it('no concurrency in the schema', () => {
-    expect(Object.keys(TOOL_DEFINITION.inputSchema)).not.toContain(
-      'concurrency',
+    assert.ok(
+      !Object.keys(TOOL_DEFINITION.inputSchema).includes('concurrency'),
     );
-    expect(TOOL_DEFINITION.description).not.toContain('concurrency');
+    assert.ok(!TOOL_DEFINITION.description.includes('concurrency'));
   });
 
   it('a part that cannot be read is skipped; the others answer', async () => {
     const model = { refuse: { 'PROGRAM ZPROG_A': 500 } };
     const fake = system(model);
     const result = await search(fake);
-    expect(isError(result)).toBe(false);
+    assert.equal(isError(result), false);
     const payload = payloadOf(result);
-    expect(payload.failures).toBeUndefined();
-    expect(hitNames(result)).toEqual([
+    assert.equal(payload.failures, undefined);
+    assert.deepStrictEqual(hitNames(result), [
       'ZPROG_O/ZPROG_O',
       'LZFG_ATOP@ZFG_A',
       'Z_FM_A@ZFG_A',
       'ZCL_A/ZCL_A',
     ]);
     const sequential = await search(system(model), {}, true);
-    expect(textOf(result)).toBe(textOf(sequential));
+    assert.equal(textOf(result), textOf(sequential));
   });
 
   it('a 404 on a source the structure listed is skipped, as on the sequential path', async () => {
     const model = { refuse: { 'FINCLUDE ZFG_A/LZFG_ATOP': 404 } };
     const result = await search(system(model));
-    expect(payloadOf(result).failures).toBeUndefined();
-    expect(hitNames(result)).not.toContain('LZFG_ATOP@ZFG_A');
+    assert.equal(payloadOf(result).failures, undefined);
+    assert.ok(!hitNames(result).includes('LZFG_ATOP@ZFG_A'));
     const sequential = await search(system(model), {}, true);
-    expect(textOf(result)).toBe(textOf(sequential));
+    assert.equal(textOf(result), textOf(sequential));
   });
 
   it('a credential refusal ends the call as it came', async () => {
@@ -256,8 +259,8 @@ describe('SearchSource on internal batches', () => {
       },
     );
     const result = await search(fake);
-    expect(isError(result)).toBe(true);
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal(isError(result), true);
+    assert.equal(fake.envelopes.length, 1);
     const sequential = system(
       {},
       {
@@ -267,26 +270,26 @@ describe('SearchSource on internal batches', () => {
       },
     );
     const answered = await search(sequential, {}, true);
-    expect(textOf(result)).toBe(textOf(answered));
+    assert.equal(textOf(result), textOf(answered));
   });
 
   it('a 401 SAP answered for one source ends the call; nothing after it is read', async () => {
     const model = { refuse: { 'PROGRAM ZPROG_A': 401 } };
     const fake = system(model);
     const result = await search(fake);
-    expect(isError(result)).toBe(true);
+    assert.equal(isError(result), true);
     // The function group's sources were never asked.
-    expect(fake.envelopes).toHaveLength(6);
+    assert.equal(fake.envelopes.length, 6);
     const sequential = await search(system(model), {}, true);
-    expect(textOf(result)).toBe(textOf(sequential));
+    assert.equal(textOf(result), textOf(sequential));
   });
 
   it('no communication batch: the sequential path', async () => {
     const fake = system();
     const result = await search(fake, {}, true);
-    expect(fake.envelopes).toHaveLength(0);
-    expect(fake.directs.length).toBeGreaterThan(0);
-    expect(hitNames(result)).toHaveLength(6);
+    assert.equal(fake.envelopes.length, 0);
+    assert.ok(fake.directs.length > 0);
+    assert.equal(hitNames(result).length, 6);
   });
 
   it('an outer 404 to the first envelope: the sequential path runs', async () => {
@@ -299,8 +302,8 @@ describe('SearchSource on internal batches', () => {
       },
     );
     const result = await search(fake);
-    expect(fake.envelopes).toHaveLength(1);
-    expect(fake.directs.length).toBeGreaterThan(0);
-    expect(textOf(result)).toBe(textOf(await search(system(), {}, true)));
+    assert.equal(fake.envelopes.length, 1);
+    assert.ok(fake.directs.length > 0);
+    assert.equal(textOf(result), textOf(await search(system(), {}, true)));
   });
 });

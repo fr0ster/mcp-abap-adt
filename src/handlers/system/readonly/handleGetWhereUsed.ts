@@ -21,15 +21,17 @@ import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
-  AdtWhereUsedCode,
+  AdtTypeCode,
   IAdtError,
   IAdtResponse,
+  IAdtWhereUsedScopeParamsOf,
 } from '@mcp-abap-adt/interfaces-adt';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
   type ProjectionVariant,
   WHERE_USED_CODES,
   WHERE_USED_NAMES,
+  type WhereUsedCode,
   whereUsedTypeDescription,
 } from '../../../lib/adtProjections';
 import { acceptedCodeOf, notAccepted } from '../../../lib/adtTypeCode';
@@ -74,6 +76,81 @@ import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
 import type { XmlRead } from '../../../lib/xml/tree';
 
+/** Whose text elements `PROG/PX` names, as the tool takes it. */
+export type TextElementsContainer = 'program' | 'function_group';
+
+/**
+ * `container`: whose text elements `PROG/PX` names. Where-used of a
+ * program's and of a function group's text elements answered
+ * `globalType="PROG/PX"` on premise and on the cloud (measured,
+ * `texts-translation.md` §11, §12.6, §13.6); the address decides which.
+ */
+export const CONTAINER_FIELD = z
+  .enum(['program', 'function_group'])
+  .optional()
+  .describe(
+    'With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.',
+  );
+
+/** The text elements' where-used code. */
+const TEXT_ELEMENTS_CODE = 'PROG/PX' satisfies AdtTypeCode;
+
+/** Whether `type` names the text elements' code, in either case. */
+function isTextElementsType(type: string): boolean {
+  return type.trim().toUpperCase() === TEXT_ELEMENTS_CODE;
+}
+
+/**
+ * The refusal of a `container` that does not fit `type`: required with
+ * `PROG/PX`, refused with any other type (the library's rule,
+ * `IGetWhereUsedParams`); `undefined` when it fits.
+ */
+export function containerRefusal(
+  type: string,
+  container: TextElementsContainer | undefined,
+): string | undefined {
+  if (isTextElementsType(type)) {
+    return container === undefined
+      ? 'container is required with PROG/PX: program or function_group; nothing was sent'
+      : undefined;
+  }
+  return container === undefined
+    ? undefined
+    : `container is taken by PROG/PX alone, not by ${type}; nothing was sent`;
+}
+
+/** One `objects` entry's `container` against its `object_type`. */
+function containerRule(
+  entry: { object_type: string; container?: TextElementsContainer | undefined },
+  ctx: z.RefinementCtx,
+): void {
+  const wrong = containerRefusal(entry.object_type, entry.container);
+  if (wrong !== undefined)
+    ctx.addIssue({ code: 'custom', message: wrong, path: ['container'] });
+}
+
+/**
+ * The where-used target of `name`, `code` and `container`, as the library
+ * takes it: `PROG/PX` with its container, any other code alone. A
+ * container that does not fit the code is refused in fixed words.
+ */
+export function whereUsedTargetOf(
+  name: string,
+  code: WhereUsedCode<ProjectionVariant>,
+  container: TextElementsContainer | undefined,
+): IAdtWhereUsedScopeParamsOf | string {
+  const wrong = containerRefusal(code, container);
+  if (wrong !== undefined) return wrong;
+  if (code === 'PROG/PX') {
+    return {
+      object_name: name,
+      object_type: code,
+      container: container === 'function_group' ? 'functionGroup' : 'program',
+    };
+  }
+  return { object_name: name, object_type: code };
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
   available_in: ['onprem', 'cloud'] as const,
@@ -111,6 +188,7 @@ function oneWhereUsedForm(variant: RuleVariant) {
     args: {
       object_name?: string | undefined;
       object_type?: string | undefined;
+      container?: TextElementsContainer | undefined;
       objects?: readonly object[] | undefined;
     },
     ctx: z.RefinementCtx,
@@ -127,8 +205,17 @@ function oneWhereUsedForm(variant: RuleVariant) {
         whereUsedCodeOn(variant, args.object_type) === undefined
       ) {
         refuse(notWhereUsedOn(variant, args.object_type), 'object_type');
+      } else {
+        const wrong = containerRefusal(args.object_type, args.container);
+        if (wrong !== undefined) refuse(wrong, 'container');
       }
       return;
+    }
+    if (args.container !== undefined) {
+      refuse(
+        'container goes in each objects entry beside its object_type',
+        'container',
+      );
     }
     if (
       args.object_name !== undefined ||
@@ -156,18 +243,22 @@ function whereUsedFields(variant: ProjectionVariant) {
       .string()
       .optional()
       .describe(whereUsedTypeDescription(variant)),
+    container: CONTAINER_FIELD,
     objects: z
       .array(
-        z.object({
-          object_name: z
-            .string()
-            .describe(
-              "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
-            ),
-          object_type: z
-            .string()
-            .describe('Type of the ABAP object, as object_type takes it'),
-        }),
+        z
+          .object({
+            object_name: z
+              .string()
+              .describe(
+                "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
+              ),
+            object_type: z
+              .string()
+              .describe('Type of the ABAP object, as object_type takes it'),
+            container: CONTAINER_FIELD,
+          })
+          .superRefine(containerRule),
       )
       .optional()
       .describe(
@@ -251,6 +342,12 @@ async function whereUsedOf(
   if (objectType === undefined) {
     return return_error(notWhereUsed(connection, args.object_type));
   }
+  const target = whereUsedTargetOf(
+    args.object_name,
+    objectType,
+    args.container,
+  );
+  if (typeof target === 'string') return return_error(target);
 
   const typedArgs = {
     ...args,
@@ -275,13 +372,10 @@ async function whereUsedOf(
       context,
       'utils.getWhereUsedScope',
       (headers) =>
-        utils.getWhereUsedScope(
-          {
-            object_name: typedArgs.object_name,
-            object_type: objectType,
-          },
-          { headers, analyse: analyseException },
-        ),
+        utils.getWhereUsedScope(target, {
+          headers,
+          analyse: analyseException,
+        }),
     );
     if (!scopeResponse.ok) {
       return answerFailure(
@@ -306,8 +400,7 @@ async function whereUsedOf(
     { tool: 'GetWhereUsed', detail: 'terse' },
     () =>
       fetchWhereUsedReferences(whereUsedOn(context, utils), {
-        object_name: typedArgs.object_name,
-        object_type: objectType,
+        ...target,
         enableAllTypes: typedArgs.enable_all_types,
         enableOnlyTypes: typedArgs.enable_only_types,
         disableTypes: typedArgs.disable_types,
@@ -316,6 +409,7 @@ async function whereUsedOf(
       const formattedResponse = jsonFields({
         object_name: typedArgs.object_name,
         object_type: typedArgs.object_type,
+        container: typedArgs.container,
         enable_all_types: typedArgs.enable_all_types || false,
         enable_only_types: typedArgs.enable_only_types,
         disable_types: typedArgs.disable_types,
@@ -398,6 +492,12 @@ async function whereUsedFromAnswers(
   if (objectType === undefined) {
     return return_error(notWhereUsed(connection, typedArgs.object_type));
   }
+  const target = whereUsedTargetOf(
+    typedArgs.object_name,
+    objectType,
+    typedArgs.container,
+  );
+  if (typeof target === 'string') return return_error(target);
   logger?.info(
     `Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`,
   );
@@ -425,8 +525,7 @@ async function whereUsedFromAnswers(
           getWhereUsed: () => answered(references),
         },
         {
-          object_name: typedArgs.object_name,
-          object_type: objectType,
+          ...target,
           enableAllTypes: typedArgs.enable_all_types,
           enableOnlyTypes: typedArgs.enable_only_types,
           disableTypes: typedArgs.disable_types,
@@ -436,6 +535,7 @@ async function whereUsedFromAnswers(
       const formattedResponse = jsonFields({
         object_name: typedArgs.object_name,
         object_type: typedArgs.object_type,
+        container: typedArgs.container,
         enable_all_types: typedArgs.enable_all_types || false,
         enable_only_types: typedArgs.enable_only_types,
         disable_types: typedArgs.disable_types,
@@ -505,12 +605,15 @@ async function whereUsedInEnvelopes(
     const code = name
       ? whereUsedCodeOf(context.connection, target.object_type ?? '')
       : undefined;
-    return !name || code === undefined ? [] : [{ target, i, code, name }];
+    const asked =
+      !name || code === undefined
+        ? undefined
+        : whereUsedTargetOf(name, code, target.container);
+    return asked === undefined || typeof asked === 'string'
+      ? []
+      : [{ target, i, asked }];
   });
-  const params = (entry: { name: string; code: AdtWhereUsedCode }) => ({
-    object_name: entry.name,
-    object_type: entry.code,
-  });
+  const params = (entry: { asked: IAdtWhereUsedScopeParamsOf }) => entry.asked;
   type Answered = PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
   const scopes = new Map<number, Answered>();
   const references = new Map<number, Answered>();
@@ -729,6 +832,7 @@ export async function handleGetWhereUsed(
   const objects = listed.map((o) => ({
     object_name: o?.object_name,
     object_type: o?.object_type,
+    container: o?.container,
   }));
   const { objects: _list, ...rest } = args;
   const targets: WhereUsedArgs[] = objects.map((o) => ({ ...rest, ...o }));

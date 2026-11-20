@@ -21,6 +21,9 @@
  *   any request, pointing to the full set.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { compactCreateSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
@@ -321,7 +324,8 @@ describe('HandlerCreate is one POST', () => {
       .filter(([, routes]) => routes.create !== undefined)
       .map(([type]) => type)
       .sort();
-    expect(withCreate).toEqual(
+    assert.deepStrictEqual(
+      withCreate,
       [...TYPES.map(([type]) => type), ...CHAINS.map(([type]) => type)].sort(),
     );
   });
@@ -340,23 +344,27 @@ describe('HandlerCreate is one POST', () => {
       fullCreate('TRANSPORT', fields),
       TRANSPORT_DOCUMENT,
     );
-    expect(held.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
-      'POST /sap/bc/adt/cts/transportrequests',
-    ]);
-    expect(answered.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
-      'POST /sap/bc/adt/cts/transportrequests',
-      'GET /sap/bc/adt/cts/transportrequests/XXXK900001',
-      'PUT /sap/bc/adt/cts/transportrequests/XXXK900002',
-    ]);
-    expect(String(answered.sent[2]?.data)).toContain(
-      'tm:useraction="changetasktype"',
+    assert.deepStrictEqual(
+      held.sent.map((sent) => `${sent.method} ${sent.url}`),
+      ['POST /sap/bc/adt/cts/transportrequests'],
     );
-    expect(answered.answer?.isError).not.toBe(true);
+    assert.deepStrictEqual(
+      answered.sent.map((sent) => `${sent.method} ${sent.url}`),
+      [
+        'POST /sap/bc/adt/cts/transportrequests',
+        'GET /sap/bc/adt/cts/transportrequests/XXXK900001',
+        'PUT /sap/bc/adt/cts/transportrequests/XXXK900002',
+      ],
+    );
+    assert.ok(
+      String(answered.sent[2]?.data).includes('tm:useraction="changetasktype"'),
+    );
+    assert.notEqual(answered.answer?.isError, true);
     // A refused create is the answer: nothing follows it.
-    expect(notFound.sent).toEqual(held.sent);
-    expect(notFound.answer?.isError).toBe(true);
+    assert.deepStrictEqual(notFound.sent, held.sent);
+    assert.equal(notFound.answer?.isError, true);
     // The same requests as the full set's CreateTransport.
-    expect(full.sent).toEqual(answered.sent);
+    assert.deepStrictEqual(full.sent, answered.sent);
   });
 
   it('TRANSPORT task_type R: the task is typed R, as the full set’s CreateTransport types it', async () => {
@@ -371,16 +379,21 @@ describe('HandlerCreate is one POST', () => {
       fullCreate('TRANSPORT', fields),
       TRANSPORT_DOCUMENT,
     );
-    expect(answered.answer?.isError).not.toBe(true);
-    expect(answered.sent.map((sent) => `${sent.method} ${sent.url}`)).toEqual([
-      'POST /sap/bc/adt/cts/transportrequests',
-      'GET /sap/bc/adt/cts/transportrequests/XXXK900001',
-      'PUT /sap/bc/adt/cts/transportrequests/XXXK900002',
-    ]);
-    expect(String(answered.sent[2]?.data)).toContain(
-      '<tm:task tm:number="XXXK900002" tm:type="R"/>',
+    assert.notEqual(answered.answer?.isError, true);
+    assert.deepStrictEqual(
+      answered.sent.map((sent) => `${sent.method} ${sent.url}`),
+      [
+        'POST /sap/bc/adt/cts/transportrequests',
+        'GET /sap/bc/adt/cts/transportrequests/XXXK900001',
+        'PUT /sap/bc/adt/cts/transportrequests/XXXK900002',
+      ],
     );
-    expect(full.sent).toEqual(answered.sent);
+    assert.ok(
+      String(answered.sent[2]?.data).includes(
+        '<tm:task tm:number="XXXK900002" tm:type="R"/>',
+      ),
+    );
+    assert.deepStrictEqual(full.sent, answered.sent);
   });
 
   it('TRANSPORT task_type X: the task stays as SAP created it, no type change sent', async () => {
@@ -395,43 +408,47 @@ describe('HandlerCreate is one POST', () => {
       fullCreate('TRANSPORT', fields),
       TRANSPORT_DOCUMENT,
     );
-    expect(answered.answer?.isError).not.toBe(true);
-    expect(answered.sent.map((sent) => sent.method)).not.toContain('PUT');
-    expect(full.sent).toEqual(answered.sent);
+    assert.notEqual(answered.answer?.isError, true);
+    assert.ok(!answered.sent.map((sent) => sent.method).includes('PUT'));
+    assert.deepStrictEqual(full.sent, answered.sent);
   });
 
-  it.each(TYPES.filter(([type]) => type !== 'TRANSPORT'))(
-    '%s: exactly one request, the create’s POST',
-    async (objectType, fields) => {
-      const held = await run('pending', create(objectType, fields));
-      const answered = await run(
-        'answered',
-        create(objectType, fields),
-        BODY[objectType],
-      );
-      const notFound = await run('not-found', create(objectType, fields));
-      const badRequest = await run('bad-request', create(objectType, fields));
-      const full = await run(
-        'answered',
-        fullCreate(objectType, fields),
-        BODY[objectType],
-      );
+  for (const [objectType, fields] of TYPES.filter(
+    ([type]) => type !== 'TRANSPORT',
+  )) {
+    it(
+      format('%s: exactly one request, the create’s POST', objectType),
+      async () => {
+        const held = await run('pending', create(objectType, fields));
+        const answered = await run(
+          'answered',
+          create(objectType, fields),
+          BODY[objectType],
+        );
+        const notFound = await run('not-found', create(objectType, fields));
+        const badRequest = await run('bad-request', create(objectType, fields));
+        const full = await run(
+          'answered',
+          fullCreate(objectType, fields),
+          BODY[objectType],
+        );
 
-      expect(held.sent).toHaveLength(1);
-      expect(held.sent[0].method).toBe('POST');
-      expect(answered.sent).toEqual(held.sent);
-      expect(notFound.sent).toEqual(held.sent);
-      expect(badRequest.sent).toEqual(held.sent);
-      expect(answered.answer?.isError).not.toBe(true);
-      expect(notFound.answer?.isError).toBe(true);
-      expect(badRequest.answer?.isError).toBe(true);
-      // The one request is the create the full set's Create<Type> sends: no
-      // validation, no lock — a request of the full chain, byte for byte.
-      expect(held.sent[0].url).not.toContain('validation');
-      expect(held.sent[0].url).not.toContain('_action=');
-      expect(full.sent).toContainEqual(held.sent[0]);
-    },
-  );
+        assert.equal(held.sent.length, 1);
+        assert.equal(held.sent[0].method, 'POST');
+        assert.deepStrictEqual(answered.sent, held.sent);
+        assert.deepStrictEqual(notFound.sent, held.sent);
+        assert.deepStrictEqual(badRequest.sent, held.sent);
+        assert.notEqual(answered.answer?.isError, true);
+        assert.equal(notFound.answer?.isError, true);
+        assert.equal(badRequest.answer?.isError, true);
+        // The one request is the create the full set's Create<Type> sends: no
+        // validation, no lock — a request of the full chain, byte for byte.
+        assert.ok(!held.sent[0].url.includes('validation'));
+        assert.ok(!held.sent[0].url.includes('_action='));
+        assert.ok(full.sent.some((e) => isDeepStrictEqual(e, held.sent[0])));
+      },
+    );
+  }
 
   it('SERVICE_BINDING sends no service-group read', async () => {
     const fields = new Map(TYPES).get('SERVICE_BINDING') ?? {};
@@ -439,9 +456,15 @@ describe('HandlerCreate is one POST', () => {
     // The full create, answered, does read it — the reference proves the
     // probe sees the read when it is sent.
     const full = await run('answered', fullCreate('SERVICE_BINDING', fields));
-    expect(full.sent.filter((sent) => sent.method === 'GET')).not.toEqual([]);
-    expect(answered.sent).toHaveLength(1);
-    expect(answered.sent.filter((sent) => sent.method === 'GET')).toEqual([]);
+    assert.notDeepStrictEqual(
+      full.sent.filter((sent) => sent.method === 'GET'),
+      [],
+    );
+    assert.equal(answered.sent.length, 1);
+    assert.deepStrictEqual(
+      answered.sent.filter((sent) => sent.method === 'GET'),
+      [],
+    );
   });
 
   it('FUNCTION_GROUP sends no read-back after a 400 — the 400 is the answer', async () => {
@@ -449,11 +472,11 @@ describe('HandlerCreate is one POST', () => {
     const answered = await run('bad-request', create('FUNCTION_GROUP', fields));
     const full = await run('bad-request', fullCreate('FUNCTION_GROUP', fields));
     // The full create reads itself back after a 400; the compact one does not.
-    expect(full.sent.length).toBeGreaterThan(1);
-    expect(answered.sent).toHaveLength(1);
-    expect(answered.sent[0].method).toBe('POST');
-    expect(answered.answer?.isError).toBe(true);
-    expect(textOf(answered.answer)).toContain('has not been created');
+    assert.ok(full.sent.length > 1);
+    assert.equal(answered.sent.length, 1);
+    assert.equal(answered.sent[0].method, 'POST');
+    assert.equal(answered.answer?.isError, true);
+    assert.ok(textOf(answered.answer).includes('has not been created'));
   });
 
   // 24.0.0 (D2, the owner): a program create takes no program type — SAP
@@ -468,17 +491,19 @@ describe('HandlerCreate is one POST', () => {
         program_type: 'include',
       }),
     );
-    expect(answered.sent).toEqual([]);
-    expect(answered.answer?.isError).toBe(true);
-    expect(textOf(answered.answer)).toContain(
-      'program_type is not an argument of HandlerCreate',
+    assert.deepStrictEqual(answered.sent, []);
+    assert.equal(answered.answer?.isError, true);
+    assert.ok(
+      textOf(answered.answer).includes(
+        'program_type is not an argument of HandlerCreate',
+      ),
     );
   });
 
   // A type whose create is a target tool's is parsed with that tool's
   // schema: what the target requires or lists is refused in its words,
   // naming the target, before any request (spec §3).
-  it.each([
+  for (const [objectType, change, target, at] of [
     ['PACKAGE', { super_package: undefined }, 'CreatePackage', 'super_package'],
     ['PACKAGE', { package_type: 'X' }, 'CreatePackage', 'package_type'],
     ['TRANSPORT', { description: undefined }, 'CreateTransport', 'description'],
@@ -499,21 +524,31 @@ describe('HandlerCreate is one POST', () => {
       'function_module_name',
     ],
     ['INCLUDE', { include_name: undefined }, 'CreateInclude', 'include_name'],
-  ])(
-    "%s with %o: refused by %s's schema at %s, before any request",
-    async (objectType, change, target, at) => {
-      const answered = await run(
-        'answered',
-        create(objectType, { ...fieldsOf(objectType), ...change }),
-      );
-      expect(answered.sent).toEqual([]);
-      expect(answered.answer?.isError).toBe(true);
-      expect(textOf(answered.answer)).toContain(
-        `Input validation error: Invalid arguments for tool ${target}: `,
-      );
-      expect(textOf(answered.answer)).toContain(` at ${at}`);
-    },
-  );
+  ] satisfies [string, Record<string, unknown>, string, string][]) {
+    it(
+      format(
+        "%s with %o: refused by %s's schema at %s, before any request",
+        objectType,
+        change,
+        target,
+        at,
+      ),
+      async () => {
+        const answered = await run(
+          'answered',
+          create(objectType, { ...fieldsOf(objectType), ...change }),
+        );
+        assert.deepStrictEqual(answered.sent, []);
+        assert.equal(answered.answer?.isError, true);
+        assert.ok(
+          textOf(answered.answer).includes(
+            `Input validation error: Invalid arguments for tool ${target}: `,
+          ),
+        );
+        assert.ok(textOf(answered.answer).includes(` at ${at}`));
+      },
+    );
+  }
 
   it('BEHAVIOR_IMPLEMENTATION without behavior_definition: refused before any request', async () => {
     for (const behavior_definition of [undefined, '']) {
@@ -524,10 +559,10 @@ describe('HandlerCreate is one POST', () => {
           behavior_definition,
         }),
       );
-      expect(answered.sent).toEqual([]);
-      expect(answered.answer?.isError).toBe(true);
-      expect(textOf(answered.answer)).toContain(
-        'behavior_definition is required',
+      assert.deepStrictEqual(answered.sent, []);
+      assert.equal(answered.answer?.isError, true);
+      assert.ok(
+        textOf(answered.answer).includes('behavior_definition is required'),
       );
     }
   });
@@ -537,32 +572,47 @@ describe('HandlerCreate is one POST', () => {
       'pending',
       create('BEHAVIOR_IMPLEMENTATION', fieldsOf('BEHAVIOR_IMPLEMENTATION')),
     );
-    expect(held.sent).toHaveLength(1);
-    expect(held.sent[0].method).toBe('POST');
+    assert.equal(held.sent.length, 1);
+    assert.equal(held.sent[0].method, 'POST');
   });
 
-  it.each(CHAINS)(
-    '%s: its create is a chain — refused before any request, pointing to %s',
-    async (objectType, fullTool, fields) => {
-      const answered = await run('answered', create(objectType, fields));
-      expect(answered.sent).toEqual([]);
-      expect(answered.answer?.isError).toBe(true);
-      expect(textOf(answered.answer)).toContain(
-        `HandlerCreate does not create ${objectType}: its create is a chain of requests, not one — use ${fullTool} of the full set`,
-      );
-    },
-  );
+  for (const [objectType, fullTool, fields] of CHAINS) {
+    it(
+      format(
+        '%s: its create is a chain — refused before any request, pointing to %s',
+        objectType,
+        fullTool,
+      ),
+      async () => {
+        const answered = await run('answered', create(objectType, fields));
+        assert.deepStrictEqual(answered.sent, []);
+        assert.equal(answered.answer?.isError, true);
+        assert.ok(
+          textOf(answered.answer).includes(
+            `HandlerCreate does not create ${objectType}: its create is a chain of requests, not one — use ${fullTool} of the full set`,
+          ),
+        );
+      },
+    );
+  }
 
-  it.each(['LOCAL_TYPES', 'RUNTIME_DUMP', 'NO_SUCH_TYPE'])(
-    '%s: a type with no create answers in the create route’s words',
-    async (objectType) => {
-      const answered = await run('answered', create(objectType, {}));
-      expect(answered.sent).toEqual([]);
-      expect(textOf(answered.answer)).toContain(
-        `Unsupported create for object_type: ${objectType}`,
-      );
-    },
-  );
+  for (const objectType of ['LOCAL_TYPES', 'RUNTIME_DUMP', 'NO_SUCH_TYPE']) {
+    it(
+      format(
+        '%s: a type with no create answers in the create route’s words',
+        objectType,
+      ),
+      async () => {
+        const answered = await run('answered', create(objectType, {}));
+        assert.deepStrictEqual(answered.sent, []);
+        assert.ok(
+          textOf(answered.answer).includes(
+            `Unsupported create for object_type: ${objectType}`,
+          ),
+        );
+      },
+    );
+  }
 });
 
 /**
@@ -774,54 +824,80 @@ const NOT_SENT_WORDS =
 describe('HandlerCreate refuses an argument its create does not send', () => {
   withSystemContext();
 
-  it.each(NOT_SENT_CASES)(
-    '%s with %s = %s: refused before any request, naming it',
-    async (objectType, name, _shown, value) => {
-      const answered = await run(
-        'answered',
-        create(objectType, { ...fieldsOf(objectType), [name]: value }),
-      );
-      expect(answered.sent).toEqual([]);
-      expect(answered.answer?.isError).toBe(true);
-      expect(textOf(answered.answer)).toContain(
-        `HandlerCreate sends the create request alone: ${name} is not sent — ${NOT_SENT_WORDS}`,
-      );
-    },
-  );
+  for (const [objectType, name, _shown, value] of NOT_SENT_CASES) {
+    it(
+      format(
+        '%s with %s = %s: refused before any request, naming it',
+        objectType,
+        name,
+        _shown,
+      ),
+      async () => {
+        const answered = await run(
+          'answered',
+          create(objectType, { ...fieldsOf(objectType), [name]: value }),
+        );
+        assert.deepStrictEqual(answered.sent, []);
+        assert.equal(answered.answer?.isError, true);
+        assert.ok(
+          textOf(answered.answer).includes(
+            `HandlerCreate sends the create request alone: ${name} is not sent — ${NOT_SENT_WORDS}`,
+          ),
+        );
+      },
+    );
+  }
 
-  it.each(ENUM_CASES)(
-    '%s with %s outside its listed values: refused by the schema before any request, naming it',
-    async (objectType, name) => {
-      const answered = await run(
-        'answered',
-        create(objectType, {
-          ...fieldsOf(objectType),
-          [name]: 'NOT_A_LISTED_VALUE',
-        }),
-      );
-      expect(answered.sent).toEqual([]);
-      expect(answered.answer?.isError).toBe(true);
-      expect(textOf(answered.answer)).toContain(
-        'Input validation error: Invalid arguments for tool HandlerCreate: Invalid option',
-      );
-      expect(textOf(answered.answer)).toContain(`at ${name}`);
-    },
-  );
+  for (const [objectType, name] of ENUM_CASES) {
+    it(
+      format(
+        '%s with %s outside its listed values: refused by the schema before any request, naming it',
+        objectType,
+        name,
+      ),
+      async () => {
+        const answered = await run(
+          'answered',
+          create(objectType, {
+            ...fieldsOf(objectType),
+            [name]: 'NOT_A_LISTED_VALUE',
+          }),
+        );
+        assert.deepStrictEqual(answered.sent, []);
+        assert.equal(answered.answer?.isError, true);
+        assert.ok(
+          textOf(answered.answer).includes(
+            'Input validation error: Invalid arguments for tool HandlerCreate: Invalid option',
+          ),
+        );
+        assert.ok(textOf(answered.answer).includes(`at ${name}`));
+      },
+    );
+  }
 
-  it.each(UNDECLARED_CASES)(
-    '%s with %s = %s, which the schema does not declare: refused before any request, naming it',
-    async (objectType, name, _shown, value) => {
-      const answered = await run(
-        'answered',
-        create(objectType, { ...fieldsOf(objectType), [name]: value }),
-      );
-      expect(answered.sent).toEqual([]);
-      expect(answered.answer?.isError).toBe(true);
-      expect(textOf(answered.answer)).toContain(
-        `${name} is not an argument of HandlerCreate`,
-      );
-    },
-  );
+  for (const [objectType, name, _shown, value] of UNDECLARED_CASES) {
+    it(
+      format(
+        '%s with %s = %s, which the schema does not declare: refused before any request, naming it',
+        objectType,
+        name,
+        _shown,
+      ),
+      async () => {
+        const answered = await run(
+          'answered',
+          create(objectType, { ...fieldsOf(objectType), [name]: value }),
+        );
+        assert.deepStrictEqual(answered.sent, []);
+        assert.equal(answered.answer?.isError, true);
+        assert.ok(
+          textOf(answered.answer).includes(
+            `${name} is not an argument of HandlerCreate`,
+          ),
+        );
+      },
+    );
+  }
 
   // Named in the schema's order: the parse hands the handler its arguments so.
   it('names every argument it does not send', async () => {
@@ -833,9 +909,11 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
         program_name: 'ZPROG_A',
       }),
     );
-    expect(answered.sent).toEqual([]);
-    expect(textOf(answered.answer)).toContain(
-      'HandlerCreate sends the create request alone: program_name, application are not sent',
+    assert.deepStrictEqual(answered.sent, []);
+    assert.ok(
+      textOf(answered.answer).includes(
+        'HandlerCreate sends the create request alone: program_name, application are not sent',
+      ),
     );
   });
 
@@ -847,7 +925,7 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
       'pending',
       create('DOMAIN', { ...fieldsOf('DOMAIN'), superclass: undefined }),
     );
-    expect(held.sent).toHaveLength(1);
+    assert.equal(held.sent.length, 1);
   });
 
   it('an undeclared argument given as undefined is refused, naming it', async () => {
@@ -855,67 +933,82 @@ describe('HandlerCreate refuses an argument its create does not send', () => {
       'answered',
       create('DOMAIN', { ...fieldsOf('DOMAIN'), activate: undefined }),
     );
-    expect(answered.sent).toEqual([]);
-    expect(textOf(answered.answer)).toContain(
-      'activate is not an argument of HandlerCreate',
+    assert.deepStrictEqual(answered.sent, []);
+    assert.ok(
+      textOf(answered.answer).includes(
+        'activate is not an argument of HandlerCreate',
+      ),
     );
   });
 
-  it.each(TYPES.map(([type]) => [type]))(
-    '%s: every argument it accepts, given at once, still sends the one create',
-    async (objectType) => {
-      const fields: Record<string, unknown> = { ...fieldsOf(objectType) };
-      for (const name of [
-        'transport_request',
-        'package_name',
-        'description',
-        'detail',
-        ...CARRIES[objectType],
-      ]) {
-        if (fields[name] === undefined) {
-          fields[name] =
-            name === 'detail' ? 'full' : (SAMPLE[name] ?? `ZACC_${name}`);
+  for (const [objectType] of TYPES.map(([type]) => [type])) {
+    it(
+      format(
+        '%s: every argument it accepts, given at once, still sends the one create',
+        objectType,
+      ),
+      async () => {
+        const fields: Record<string, unknown> = { ...fieldsOf(objectType) };
+        for (const name of [
+          'transport_request',
+          'package_name',
+          'description',
+          'detail',
+          ...CARRIES[objectType],
+        ]) {
+          if (fields[name] === undefined) {
+            fields[name] =
+              name === 'detail' ? 'full' : (SAMPLE[name] ?? `ZACC_${name}`);
+          }
         }
-      }
-      const held = await run('pending', create(objectType, fields));
-      expect(held.sent).toHaveLength(1);
-      expect(held.sent[0].method).toBe('POST');
-    },
-  );
+        const held = await run('pending', create(objectType, fields));
+        assert.equal(held.sent.length, 1);
+        assert.equal(held.sent[0].method, 'POST');
+      },
+    );
+  }
 
-  it.each(TYPES.map(([type]) => [type]))(
-    '%s: each accepted string argument reaches the create request',
-    async (objectType) => {
-      const unsent = new Set(ACCEPTED_NOT_SENT[objectType] ?? []);
-      const probed = [
-        'transport_request',
-        'package_name',
-        'description',
-        ...CARRIES[objectType],
-      ].filter((name) => !unsent.has(name) && SAMPLE[name] === undefined);
-      for (const name of new Set(probed)) {
-        const marker = `QPROBE${name.replace(/_/g, '').toUpperCase()}`;
-        const held = await run(
-          'pending',
-          create(objectType, { ...fieldsOf(objectType), [name]: marker }),
-        );
-        const wire = held.sent
-          .map((sent) => `${sent.url} ${String(sent.data)}`)
-          .join(' ')
-          .toUpperCase();
-        expect({ name, carried: wire.includes(marker) }).toEqual({
-          name,
-          carried: true,
-        });
-      }
-    },
-  );
+  for (const [objectType] of TYPES.map(([type]) => [type])) {
+    it(
+      format(
+        '%s: each accepted string argument reaches the create request',
+        objectType,
+      ),
+      async () => {
+        const unsent = new Set(ACCEPTED_NOT_SENT[objectType] ?? []);
+        const probed = [
+          'transport_request',
+          'package_name',
+          'description',
+          ...CARRIES[objectType],
+        ].filter((name) => !unsent.has(name) && SAMPLE[name] === undefined);
+        for (const name of new Set(probed)) {
+          const marker = `QPROBE${name.replace(/_/g, '').toUpperCase()}`;
+          const held = await run(
+            'pending',
+            create(objectType, { ...fieldsOf(objectType), [name]: marker }),
+          );
+          const wire = held.sent
+            .map((sent) => `${sent.url} ${String(sent.data)}`)
+            .join(' ')
+            .toUpperCase();
+          assert.deepStrictEqual(
+            { name, carried: wire.includes(marker) },
+            {
+              name,
+              carried: true,
+            },
+          );
+        }
+      },
+    );
+  }
 });
 
 describe('the HandlerCreate schema and description', () => {
   it('create_only is not in the schema', () => {
-    expect(Object.keys(schemaJson.properties ?? {})).not.toContain(
-      'create_only',
+    assert.ok(
+      !Object.keys(schemaJson.properties ?? {}).includes('create_only'),
     );
   });
 
@@ -924,18 +1017,19 @@ describe('the HandlerCreate schema and description', () => {
       ...ACCEPTED_EVERYWHERE,
       ...Object.values(CARRIES).flat(),
     ]);
-    expect(
+    assert.deepStrictEqual(
       Object.keys(schemaJson.properties ?? {}).filter(
         (name) => !sent.has(name),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('advertises per type only what that type’s create sends', () => {
     // Only the per-type list: from `object_type required:` to its end.
     const description: string = TOOL_DEFINITION.description;
     const start = description.indexOf('object_type required:');
-    expect(start).toBeGreaterThanOrEqual(0);
+    assert.ok(start >= 0);
     const tail = description.slice(start);
     const segment = tail.slice(0, tail.indexOf('. '));
     const advertised = [...segment.matchAll(/([A-Z_]+)\(([^)]*)\)/g)].map(
@@ -947,15 +1041,19 @@ describe('the HandlerCreate schema and description', () => {
           .filter((arg) => arg.length > 0),
       ],
     ) as Array<[string, string[]]>;
-    expect(advertised.map(([type]) => type).sort()).toEqual(
+    assert.deepStrictEqual(
+      advertised.map(([type]) => type).sort(),
       TYPES.map(([type]) => type).sort(),
     );
     for (const [type, args] of advertised) {
       const accepted = new Set([...ACCEPTED_EVERYWHERE, ...CARRIES[type]]);
-      expect({
-        type,
-        foreign: args.filter((arg) => !accepted.has(arg)),
-      }).toEqual({ type, foreign: [] });
+      assert.deepStrictEqual(
+        {
+          type,
+          foreign: args.filter((arg) => !accepted.has(arg)),
+        },
+        { type, foreign: [] },
+      );
     }
   });
 });

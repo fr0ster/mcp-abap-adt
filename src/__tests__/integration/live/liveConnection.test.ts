@@ -252,7 +252,7 @@ if (ENV_PATHS.length === 0) {
 
         // Guarded: the parent logs on with the same destination first, and
         // every answer is read for a credential refusal; no SDK client, no
-        // timer — Jest's test timeout is the only deadline.
+        // timer, and the runner sets no test timeout.
         const destination = statedDestination(envPath);
         const server = await step('initialize', () =>
           launchStdioScript({

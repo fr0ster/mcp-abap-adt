@@ -9,6 +9,9 @@
  * checked here, and each half is checked for carrying only its own operations.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, test } from 'node:test';
+import { format } from 'node:util';
 import { compactWriteRouterMap } from '@mcp-abap-adt/compact-modify/routes';
 import { compactReadRouterMap } from '@mcp-abap-adt/compact-readonly-entries/routes';
 import {
@@ -22,23 +25,24 @@ const routesFor = (objectType: (typeof COMPACT_OBJECT_TYPES)[number]) => ({
 });
 
 describe('Compact Router Coverage', () => {
-  test.each(COMPACT_OBJECT_TYPES)(
-    'should define CRUD router maps for %s',
-    (objectType) => {
-      expect(compactReadRouterMap[objectType]).toBeDefined();
-      expect(compactWriteRouterMap[objectType]).toBeDefined();
-    },
-  );
+  for (const objectType of COMPACT_OBJECT_TYPES) {
+    test(format('should define CRUD router maps for %s', objectType), () => {
+      assert.notEqual(compactReadRouterMap[objectType], undefined);
+      assert.notEqual(compactWriteRouterMap[objectType], undefined);
+    });
+  }
 
-  test.each(Object.entries(COMPACT_CRUD_MATRIX))(
-    'should expose expected CRUD routes for %s',
-    (objectType, expectedOps) => {
-      const operations = Object.keys(
-        routesFor(objectType as (typeof COMPACT_OBJECT_TYPES)[number]),
-      ).sort();
-      expect(operations).toEqual([...expectedOps].sort());
-    },
-  );
+  for (const [objectType, expectedOps] of Object.entries(COMPACT_CRUD_MATRIX)) {
+    test(
+      format('should expose expected CRUD routes for %s', objectType),
+      () => {
+        const operations = Object.keys(
+          routesFor(objectType as (typeof COMPACT_OBJECT_TYPES)[number]),
+        ).sort();
+        assert.deepStrictEqual(operations, [...expectedOps].sort());
+      },
+    );
+  }
 
   it('keeps each half to its own operations', () => {
     const read = new Set(
@@ -51,7 +55,7 @@ describe('Compact Router Coverage', () => {
         Object.keys(routes),
       ),
     );
-    expect([...read].sort()).toEqual(['get']);
-    expect([...write].sort()).toEqual(['create', 'delete', 'update']);
+    assert.deepStrictEqual([...read].sort(), ['get']);
+    assert.deepStrictEqual([...write].sort(), ['create', 'delete', 'update']);
   });
 });

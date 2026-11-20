@@ -2,7 +2,11 @@
  * An activation answer's reading: its text, its `data` member, or the
  * answer written as JSON; no answer at all in fast-xml-parser's own words.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { parseActivationResponse } from '../../lib/utils';
+import { assertMatchObject } from '../helpers/assertions';
 
 const DOCUMENT =
   '<chkl:messages xmlns:chkl="http://www.sap.com/abapxml/checklist">' +
@@ -11,7 +15,7 @@ const DOCUMENT =
 
 describe('an activation answer is read from its text', () => {
   it('as text', () => {
-    expect(parseActivationResponse(DOCUMENT)).toMatchObject({
+    assertMatchObject(parseActivationResponse(DOCUMENT), {
       activated: true,
       checked: true,
       generated: false,
@@ -19,14 +23,14 @@ describe('an activation answer is read from its text', () => {
   });
 
   it('from its data member', () => {
-    expect(parseActivationResponse({ data: DOCUMENT })).toMatchObject({
+    assertMatchObject(parseActivationResponse({ data: DOCUMENT }), {
       activated: true,
       checked: true,
     });
   });
 
   it('an answer without a data member, written as JSON: nothing activated', () => {
-    expect(parseActivationResponse({ other: 1 })).toMatchObject({
+    assertMatchObject(parseActivationResponse({ other: 1 }), {
       activated: false,
       checked: false,
       messages: [],
@@ -35,8 +39,9 @@ describe('an activation answer is read from its text', () => {
 
   it('no answer at all is the parser refusal, named', () => {
     const reading = parseActivationResponse(undefined);
-    expect(reading.activated).toBe(false);
-    expect(reading.messages[0]?.text).toBe(
+    assert.equal(reading.activated, false);
+    assert.equal(
+      reading.messages[0]?.text,
       'Failed to parse activation response: TypeError: XML data is accepted in String or Bytes[] form.',
     );
   });

@@ -4,19 +4,12 @@
  * and `authorization` only for a jwt / authorization_code destination.
  */
 
-jest.mock('@mcp-abap-adt/auth-broker', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/auth-broker');
-  return {
-    ...actual,
-    AuthBroker: jest.fn(
-      (config: unknown, logger: unknown) =>
-        new actual.AuthBroker(config, logger),
-    ),
-  };
-});
-
-import { AuthBroker as AuthBrokerCtor } from '@mcp-abap-adt/auth-broker';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { IRenewalStrategy } from '@mcp-abap-adt/interfaces-auth';
+import { assertRejects } from '../../../../../src/__tests__/helpers/assertions';
+import { authBroker as authBrokerModule } from '../../../../../src/__tests__/helpers/packageFiles';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
 import {
   authorizationCodeLines,
@@ -27,7 +20,16 @@ import {
   recordingLogins,
 } from '../helpers/factoryFixture';
 
-const constructed = AuthBrokerCtor as unknown as jest.Mock;
+/** A member the config type leaves optional, which the case requires. */
+function present<T>(value: T | undefined): T {
+  assert.ok(value !== undefined);
+  return value;
+}
+
+// Every broker the factory constructs, recorded: AuthBroker watched on the
+// module that defines it (the package index re-exports it by getter, read at
+// call time); the real broker is still constructed.
+const constructed = mock.method(authBrokerModule, 'AuthBroker');
 
 /** What the strategy decides with nothing to refresh: login, or stop. */
 function decisionWithoutRefreshToken(strategy: IRenewalStrategy): unknown {
@@ -46,7 +48,7 @@ let logins: ReturnType<typeof recordingLogins>;
 beforeEach(() => {
   base = brokerBase('broker-options');
   logins = recordingLogins();
-  constructed.mockClear();
+  constructed.mock.resetCalls();
 });
 
 afterEach(() => base.remove());
@@ -58,16 +60,16 @@ async function brokerConfigOf(
   await new AuthBrokerFactory(factoryConfig(base, logins, over)).getBroker(
     destination,
   );
-  expect(constructed).toHaveBeenCalledTimes(1);
-  return constructed.mock.calls[0][0];
+  assert.equal(constructed.mock.callCount(), 1);
+  return constructed.mock.calls[0]?.arguments[0];
 }
 
 describe('renewal', () => {
   it('refreshThenLogin() by default', async () => {
     base.writeSession('dest', authorizationCodeLines());
     const config = await brokerConfigOf('dest');
-    const strategy = config.renewal('dest', 'authorization_code');
-    expect(decisionWithoutRefreshToken(strategy)).toBe('login');
+    const strategy = present(config.renewal)('dest', 'authorization_code');
+    assert.equal(decisionWithoutRefreshToken(strategy), 'login');
   });
 
   it('refreshThenLogin() under --renewal=refresh-then-login', async () => {
@@ -75,46 +77,49 @@ describe('renewal', () => {
     const config = await brokerConfigOf('dest', {
       renewal: 'refresh-then-login',
     });
-    const strategy = config.renewal('dest', 'authorization_code');
-    expect(decisionWithoutRefreshToken(strategy)).toBe('login');
+    const strategy = present(config.renewal)('dest', 'authorization_code');
+    assert.equal(decisionWithoutRefreshToken(strategy), 'login');
   });
 
   it('refreshOnly() under --renewal=refresh-only', async () => {
     base.writeSession('dest', authorizationCodeLines());
     const config = await brokerConfigOf('dest', { renewal: 'refresh-only' });
-    const strategy = config.renewal('dest', 'authorization_code');
-    expect(decisionWithoutRefreshToken(strategy)).toBe('stop');
+    const strategy = present(config.renewal)('dest', 'authorization_code');
+    assert.equal(decisionWithoutRefreshToken(strategy), 'stop');
   });
 });
 
 describe('onWriteFailure, by the destination store', () => {
   it("a named destination: 'continue'", async () => {
     base.writeSession('dest', basicLines());
-    expect((await brokerConfigOf('dest')).onWriteFailure).toBe('continue');
+    assert.equal((await brokerConfigOf('dest')).onWriteFailure, 'continue');
   });
 
   it("a named destination with --unsafe: 'continue'", async () => {
     base.writeSession('dest', basicLines());
-    expect(
+    assert.equal(
       (await brokerConfigOf('dest', { unsafe: true })).onWriteFailure,
-    ).toBe('continue');
+      'continue',
+    );
   });
 
-  it.each(['--env', '--env-path'])("the %s file: 'fail'", async (source) => {
-    const file = base.writeFile('conn.env', basicLines());
-    const config = await brokerConfigOf('default', {
-      envFile: { path: file, source },
+  for (const source of ['--env', '--env-path']) {
+    it(format("the %s file: 'fail'", source), async () => {
+      const file = base.writeFile('conn.env', basicLines());
+      const config = await brokerConfigOf('default', {
+        envFile: { path: file, source },
+      });
+      assert.equal(config.onWriteFailure, 'fail');
     });
-    expect(config.onWriteFailure).toBe('fail');
-  });
+  }
 });
 
 describe('authDebug and authorization', () => {
   it('basic: authDebug false, no authorization', async () => {
     base.writeSession('dest', basicLines());
     const config = await brokerConfigOf('dest');
-    expect(config.authDebug).toBe(false);
-    expect(Object.keys(config).sort()).toEqual([
+    assert.equal(config.authDebug, false);
+    assert.deepStrictEqual(Object.keys(config).sort(), [
       'authDebug',
       'onWriteFailure',
       'renewal',
@@ -130,14 +135,13 @@ describe('authDebug and authorization', () => {
       'SAP_GRANT_TYPE=none',
       'SAP_JWT_TOKEN=placeholder-token',
     ]);
-    await expect(
+    await assertRejects(
       brokerConfigOf('default', {
         envFile: { path: file, source: '--env' },
       }),
-    ).rejects.toThrow(
       'Destination "default" uses jwt / none, which this server does not support',
     );
-    expect(constructed).not.toHaveBeenCalled();
+    assert.equal(constructed.mock.callCount(), 0);
   });
 
   it('jwt / authorization_code: authorization, built from the browser and the port', async () => {
@@ -147,20 +151,23 @@ describe('authDebug and authorization', () => {
       browser,
       browserAuthPort: 61005,
     });
-    expect(config.authDebug).toBe(false);
-    expect(typeof config.authorization).toBe('function');
-    const strategy = config.authorization('dest', 'authorization_code');
+    assert.equal(config.authDebug, false);
+    assert.equal(typeof config.authorization, 'function');
+    const strategy = present(config.authorization)(
+      'dest',
+      'authorization_code',
+    );
     const outcome = await strategy.authorize({
       buildAuthorizationUrl: async () => 'https://idp.example.test/authorize',
     });
-    expect(outcome.payload).toBe('code-1');
-    expect(logins.built).toEqual([{ browser, port: 61005 }]);
+    assert.equal(outcome.payload, 'code-1');
+    assert.deepStrictEqual(logins.built, [{ browser, port: 61005 }]);
   });
 
   it('jwt / authorization_code with --browser=none: no browser, the strategy keeps its port', async () => {
     base.writeSession('dest', authorizationCodeLines());
     const config = await brokerConfigOf('dest');
-    config.authorization('dest', 'authorization_code');
-    expect(logins.built).toEqual([{}]);
+    present(config.authorization)('dest', 'authorization_code');
+    assert.deepStrictEqual(logins.built, [{}]);
   });
 });

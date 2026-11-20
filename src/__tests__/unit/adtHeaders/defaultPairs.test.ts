@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 
 /**
@@ -6,7 +8,7 @@ import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
  */
 describe('DEFAULT_ADT_HEADERS: the corrected pairs', () => {
   it("sends the enhancement's check as every other check: checkmessages / checkobjects", () => {
-    expect(DEFAULT_ADT_HEADERS['enhancement.check']).toEqual({
+    assert.deepStrictEqual(DEFAULT_ADT_HEADERS['enhancement.check'], {
       accept: 'application/vnd.sap.adt.checkmessages+xml',
       contentType: 'application/vnd.sap.adt.checkobjects+xml',
     });
@@ -18,17 +20,24 @@ describe('DEFAULT_ADT_HEADERS: the corrected pairs', () => {
         accept.includes('checkrun.v1+xml') ||
         contentType.includes('checkrun.v1+xml'),
     );
-    expect(named).toEqual([]);
+    assert.deepStrictEqual(named, []);
   });
 
   it('has no entry for the members that take no pair: validate and the application log reads', () => {
     const keys = Object.keys(DEFAULT_ADT_HEADERS);
-    expect(keys.filter((key) => key.endsWith('.validate'))).toEqual([]);
-    expect(keys.filter((key) => key.startsWith('applicationLog.'))).toEqual([]);
+    assert.deepStrictEqual(
+      keys.filter((key) => key.endsWith('.validate')),
+      [],
+    );
+    assert.deepStrictEqual(
+      keys.filter((key) => key.startsWith('applicationLog.')),
+      [],
+    );
   });
 
   it("sends the include's metadata update as its create (measured on premise, 2026-11-01)", () => {
-    expect(DEFAULT_ADT_HEADERS['include.updateMetadata']).toEqual(
+    assert.deepStrictEqual(
+      DEFAULT_ADT_HEADERS['include.updateMetadata'],
       DEFAULT_ADT_HEADERS['include.create'],
     );
   });

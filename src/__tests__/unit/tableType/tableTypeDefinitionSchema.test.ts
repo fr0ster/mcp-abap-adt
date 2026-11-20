@@ -7,6 +7,10 @@
  * value is refused by the SDK before the handler, hence before any request.
  * A property not given reaches the handler absent: no schema `default`.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -14,6 +18,7 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import type * as z from 'zod';
 import { TOOL_DEFINITION as CreateTableType } from '../../../handlers/table_type/high/handleCreateTableType';
 import { TOOL_DEFINITION as UpdateTableType } from '../../../handlers/table_type/high/handleUpdateTableType';
+import { assertNoProperty } from '../../helpers/assertions';
 import { jsonAt, listedJson } from '../../helpers/listedJson';
 
 const TOOLS = [
@@ -72,71 +77,82 @@ async function call(
   return { seen, refused: result.isError === true };
 }
 
-describe.each(CASES)(
-  '$tool.name $property',
-  ({ tool, args, property, value }) => {
+for (const { tool, args, property, value } of CASES) {
+  describe(`${tool.name} ${property}`, () => {
     it(`takes ${value}`, async () => {
       const { seen, refused } = await call(tool, {
         ...args,
         [property]: value,
       });
-      expect(refused).toBe(false);
-      expect(seen).toHaveProperty(property, value);
+      assert.equal(refused, false);
+      // The properties are flat names: the path is one step.
+      assert.ok(property in Object(seen));
+      assert.deepStrictEqual(Reflect.get(Object(seen), property), value);
     });
-  },
-);
+  });
+}
 
-describe.each(TOOLS)('$tool.name', ({ tool, args }) => {
-  it.each(Object.keys(MEASURED))(
-    'refuses an unlisted %s before the handler',
-    async (property) => {
-      const { seen, refused } = await call(tool, {
-        ...args,
-        [property]: 'unlistedValue',
-      });
-      expect(refused).toBe(true);
-      expect(seen).toBeUndefined();
-    },
-  );
-
-  it('fills no definition property that was not given', async () => {
-    const { seen, refused } = await call(tool, args);
-    expect(refused).toBe(false);
-    for (const property of [
-      ...Object.keys(MEASURED),
-      'row_type_name',
-      'data_type',
-      'length',
-      'decimals',
-    ]) {
-      expect(seen).not.toHaveProperty(property);
+for (const { tool, args } of TOOLS) {
+  describe(`${tool.name}`, () => {
+    for (const property of Object.keys(MEASURED)) {
+      it(
+        format('refuses an unlisted %s before the handler', property),
+        async () => {
+          const { seen, refused } = await call(tool, {
+            ...args,
+            [property]: 'unlistedValue',
+          });
+          assert.equal(refused, true);
+          assert.equal(seen, undefined);
+        },
+      );
     }
-  });
 
-  it('declares no default for a definition property', () => {
-    const properties = listedJson(tool.inputSchema).properties ?? {};
-    expect(properties.row_type_kind).not.toHaveProperty('default');
-    expect(properties.row_type_name).not.toHaveProperty('default');
-    expect(properties.data_type).not.toHaveProperty('default');
-    expect(properties.length).not.toHaveProperty('default');
-    expect(properties.decimals).not.toHaveProperty('default');
-    expect(properties.access_type).not.toHaveProperty('default');
-    expect(properties.key_definition).not.toHaveProperty('default');
-    expect(properties.key_kind).not.toHaveProperty('default');
-  });
+    it('fills no definition property that was not given', async () => {
+      const { seen, refused } = await call(tool, args);
+      assert.equal(refused, false);
+      for (const property of [
+        ...Object.keys(MEASURED),
+        'row_type_name',
+        'data_type',
+        'length',
+        'decimals',
+      ]) {
+        assertNoProperty(seen, property);
+      }
+    });
 
-  it('lists exactly the measured values', () => {
-    const schema = listedJson(tool.inputSchema);
-    const values = (name: string) => [...(jsonAt(schema, name).enum ?? [])];
-    expect(values('row_type_kind').sort()).toEqual(
-      [...MEASURED.row_type_kind].sort(),
-    );
-    expect(values('access_type').sort()).toEqual(
-      [...MEASURED.access_type].sort(),
-    );
-    expect(values('key_definition').sort()).toEqual(
-      [...MEASURED.key_definition].sort(),
-    );
-    expect(values('key_kind').sort()).toEqual([...MEASURED.key_kind].sort());
+    it('declares no default for a definition property', () => {
+      const properties = listedJson(tool.inputSchema).properties ?? {};
+      assertNoProperty(properties.row_type_kind, 'default');
+      assertNoProperty(properties.row_type_name, 'default');
+      assertNoProperty(properties.data_type, 'default');
+      assertNoProperty(properties.length, 'default');
+      assertNoProperty(properties.decimals, 'default');
+      assertNoProperty(properties.access_type, 'default');
+      assertNoProperty(properties.key_definition, 'default');
+      assertNoProperty(properties.key_kind, 'default');
+    });
+
+    it('lists exactly the measured values', () => {
+      const schema = listedJson(tool.inputSchema);
+      const values = (name: string) => [...(jsonAt(schema, name).enum ?? [])];
+      assert.deepStrictEqual(
+        values('row_type_kind').sort(),
+        [...MEASURED.row_type_kind].sort(),
+      );
+      assert.deepStrictEqual(
+        values('access_type').sort(),
+        [...MEASURED.access_type].sort(),
+      );
+      assert.deepStrictEqual(
+        values('key_definition').sort(),
+        [...MEASURED.key_definition].sort(),
+      );
+      assert.deepStrictEqual(
+        values('key_kind').sort(),
+        [...MEASURED.key_kind].sort(),
+      );
+    });
   });
-});
+}

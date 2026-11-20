@@ -134,16 +134,10 @@ upgrade waiting to happen. Measured 2026-09-24:
   `typescript` peer at all, and CAP's docs name no version — `cds watch` runs
   `cds-tsx`, which transpiles without type checking. But cds-typer and cds-types
   both devDepend on `typescript ^6.0.3`, so 6 is what SAP tests.
-- `ts-jest` caps it: the latest, 29.4.14, declares
-  `peerDependencies.typescript: ">=4.3 <7"`, and every suite here runs through
-  it. `.npmrc` sets `legacy-peer-deps=true`, so npm would install the conflict
-  silently rather than refuse it.
 - cloud-llm-hub type-checks against this project's `.d.ts` on TypeScript 6 with
   `moduleResolution: node`.
 
-The cheap signal, if the question ever comes back:
-`npm view ts-jest peerDependencies.typescript`. Even then SAP moving is the
-deciding condition, not ts-jest.
+If the question comes back, SAP moving is the deciding condition.
 
 ### No dependency runs an install script
 
@@ -159,11 +153,11 @@ scripts and steal npm and GitHub tokens. So:
   images, the portable build and any install outside this checkout use
   `npm ci --ignore-scripts` / `npm install --ignore-scripts`. Our own `prepare` (husky)
   is run explicitly where it is wanted.
-- `npm audit --audit-level=moderate` gates CI and the release, the whole tree. An
-  advisory with no fixed release is answered with an `overrides` entry whose reason
-  is in the CHANGELOG (today: `argparse` 2 under `js-yaml` 3), or by dropping the
-  package — never by making the audit non-gating.
-- Never `npx`: scripts call the package's own bin (`biome`, `tsc`, `lint-staged`), a
+- `npm audit --audit-level=moderate` gates CI and the release: the whole tree, dev
+  dependencies included. An advisory in a dependency with no fixed release is answered
+  with an `overrides` entry whose reason is in the CHANGELOG (today: `argparse` 2 under
+  `js-yaml` 3), or by dropping the package — never by making the audit non-gating.
+- Never `npx`: scripts call the package's own bin (`biome`, `tsc`), a
   test spawns `process.execPath` with the resolved CLI.
 
 ## The SAP errata: ambiguity we account for, not defects we fix
@@ -251,7 +245,11 @@ user does, in every layout and proves one `@mcp-abap-adt/lib` per process (19.1.
 loaded two when a wrapper and its base were installed in one command: a binary
 depended on another binary; none may now). Before a release, make sure `npm run test:install` ran
 (it runs both; CI runs it as its own step), and after publishing run
-`docs/deployment/RELEASE.md` step 9; when adding a bin, add it to both. And treat
+`npm run release:verify` (every package of the release visible on the registry, a
+clean install from it with a registry-only lockfile, each bin's `--version`
+answering the release version; exit 2 means "not visible yet", rerun it) and
+`docs/deployment/RELEASE.md` step 9 (the global wrapper-and-base install); when
+adding a bin, add it to both tests. And treat
 any `__dirname`-relative path in `server-runtime/` and in the binary packages'
 version modules as suspect: count the levels for both layouts.
 

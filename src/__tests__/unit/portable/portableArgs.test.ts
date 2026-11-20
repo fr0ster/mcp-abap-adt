@@ -3,74 +3,91 @@
  * and the platform are chosen by the command, and anything it cannot build is
  * refused before anything is installed or downloaded.
  */
-const args = require('../../../../scripts/portable/args.cjs');
+
+import assert from 'node:assert/strict';
+import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { assertThrows } from '../../helpers/assertions';
+import { repositoryRoot } from '../../helpers/repoRoot';
+
+const args = require(
+  path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'args.cjs'),
+);
 
 describe('portable build arguments', () => {
   it('maps the platform of the running process', () => {
-    expect(args.currentPlatform('linux', 'x64')).toBe('linux-x64');
-    expect(args.currentPlatform('win32', 'x64')).toBe('win-x64');
-    expect(args.currentPlatform('darwin', 'arm64')).toBe('macos-arm64');
+    assert.equal(args.currentPlatform('linux', 'x64'), 'linux-x64');
+    assert.equal(args.currentPlatform('win32', 'x64'), 'win-x64');
+    assert.equal(args.currentPlatform('darwin', 'arm64'), 'macos-arm64');
   });
 
   it('defaults to both servers on the current platform', () => {
-    expect(args.parseArgs([], 'linux-x64')).toEqual({
+    assert.deepStrictEqual(args.parseArgs([], 'linux-x64'), {
       which: 'all',
       platform: 'linux-x64',
     });
   });
 
   it('takes the server and a version', () => {
-    expect(
+    assert.deepStrictEqual(
       args.parseArgs(['compact', '--version=17.0.1'], 'linux-x64'),
-    ).toEqual({ which: 'compact', platform: 'linux-x64', version: '17.0.1' });
+      { which: 'compact', platform: 'linux-x64', version: '17.0.1' },
+    );
   });
 
   it('refuses an unknown server, naming the valid ones', () => {
-    expect(() => args.parseArgs(['both'], 'linux-x64')).toThrow(
+    assertThrows(
+      () => args.parseArgs(['both'], 'linux-x64'),
       /full, compact or all/,
     );
   });
 
   it('refuses an unknown platform, naming the valid ones', () => {
-    expect(() => args.parseArgs(['--platform=win-arm64'], 'linux-x64')).toThrow(
+    assertThrows(
+      () => args.parseArgs(['--platform=win-arm64'], 'linux-x64'),
       /linux-x64, win-x64, macos-arm64/,
     );
   });
 
   it('refuses another platform before anything is downloaded', () => {
-    expect(() => args.parseArgs(['--platform=win-x64'], 'linux-x64')).toThrow(
+    assertThrows(
+      () => args.parseArgs(['--platform=win-x64'], 'linux-x64'),
       /^builds only for the platform it runs on \(linux-x64\), not win-x64$/,
     );
   });
 
   it('refuses an unknown option', () => {
-    expect(() => args.parseArgs(['--fast'], 'linux-x64')).toThrow(
+    assertThrows(
+      () => args.parseArgs(['--fast'], 'linux-x64'),
       /unknown option --fast/,
     );
   });
 
   it('refuses a version that is neither a semver nor a dist-tag', () => {
-    expect(() => args.parseArgs(['--version=1.0.0&calc'], 'linux-x64')).toThrow(
+    assertThrows(
+      () => args.parseArgs(['--version=1.0.0&calc'], 'linux-x64'),
       /not a version/,
     );
-    expect(args.parseArgs(['--version=latest'], 'linux-x64').version).toBe(
+    assert.equal(
+      args.parseArgs(['--version=latest'], 'linux-x64').version,
       'latest',
     );
   });
 
   it('names an unsupported host as such, not as an unknown platform', () => {
-    expect(() => args.parseArgs([], 'linux-arm64')).toThrow(
+    assertThrows(
+      () => args.parseArgs([], 'linux-arm64'),
       /this machine \(linux-arm64\) cannot build portable executables.*linux-x64, win-x64, macos-arm64/,
     );
   });
 
   it('describes every platform the spec names', () => {
-    expect(Object.keys(args.PLATFORMS).sort()).toEqual([
+    assert.deepStrictEqual(Object.keys(args.PLATFORMS).sort(), [
       'linux-x64',
       'macos-arm64',
       'win-x64',
     ]);
-    expect(args.SERVERS.full.pkg).toBe('@mcp-abap-adt/core');
-    expect(args.SERVERS.compact.name).toBe('mcp-abap-adt-compact');
+    assert.equal(args.SERVERS.full.pkg, '@mcp-abap-adt/core');
+    assert.equal(args.SERVERS.compact.name, 'mcp-abap-adt-compact');
   });
 });

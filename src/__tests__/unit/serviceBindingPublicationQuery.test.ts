@@ -14,6 +14,9 @@
  * through this server could not succeed. These two cases are that regression's
  * guard: the fields reach the wire for `ODATA_V2_*` and do not for `ODATA_V4_*`.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
 import {
@@ -57,9 +60,9 @@ describe('the publication job UpdateServiceBinding issues', () => {
     );
 
     const job = jobOf(connection);
-    expect(job?.url).toContain('/businessservices/odatav2/publishjobs');
+    assert.ok(job?.url.includes('/businessservices/odatav2/publishjobs'));
     // Upper-cased, as the name is in the repository.
-    expect(job?.params).toEqual({
+    assert.deepStrictEqual(job?.params, {
       servicename: 'ZMCP_X_SRV',
       serviceversion: '0002',
     });
@@ -83,8 +86,8 @@ describe('the publication job UpdateServiceBinding issues', () => {
 
     // Web API, same protocol, same demand — the category is not the axis.
     const job = jobOf(connection);
-    expect(job?.url).toContain('/businessservices/odatav2/publishjobs');
-    expect(job?.params).toEqual({
+    assert.ok(job?.url.includes('/businessservices/odatav2/publishjobs'));
+    assert.deepStrictEqual(job?.params, {
       servicename: 'ZMCP_X_SRV',
       serviceversion: '0001',
     });
@@ -108,9 +111,9 @@ describe('the publication job UpdateServiceBinding issues', () => {
     );
 
     const job = jobOf(connection);
-    expect(job?.url).toContain('/businessservices/odatav4/publishjobs');
+    assert.ok(job?.url.includes('/businessservices/odatav4/publishjobs'));
     // Left exactly as it was measured working; sending it there was never measured.
-    expect(job?.params).toBeUndefined();
+    assert.equal(job?.params, undefined);
   });
 
   it('refuses a 200 that names no lock handle, instead of publishing on it', async () => {
@@ -134,9 +137,9 @@ describe('the publication job UpdateServiceBinding issues', () => {
       } as never,
     );
 
-    expect((answered as { isError?: boolean }).isError).toBe(true);
+    assert.equal((answered as { isError?: boolean }).isError, true);
     // And no job was posted on the strength of it.
-    expect(jobOf(connection)).toBeUndefined();
+    assert.equal(jobOf(connection), undefined);
   });
 
   it('publishes without a handle when the lock answered 403', async () => {
@@ -162,14 +165,15 @@ describe('the publication job UpdateServiceBinding issues', () => {
     );
 
     const job = jobOf(connection);
-    expect(job?.url).toContain('/businessservices/odatav2/publishjobs');
-    expect(job?.params).toEqual({
+    assert.ok(job?.url.includes('/businessservices/odatav2/publishjobs'));
+    assert.deepStrictEqual(job?.params, {
       servicename: 'ZMCP_X_SRV',
       serviceversion: '0001',
     });
     // Nothing to release: no UNLOCK on the wire.
-    expect(
+    assert.equal(
       connection.requests.some((r) => r.url.includes('_action=UNLOCK')),
-    ).toBe(false);
+      false,
+    );
   });
 });

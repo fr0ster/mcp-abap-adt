@@ -7,9 +7,13 @@
  * Each case counts the connections the ports opened and closed and fails on
  * any difference.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { InstanceState } from '../../../lib/state/InstanceState';
+import { assertRejects } from '../../helpers/assertions';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
 import {
   AMDP_BREAK,
@@ -99,9 +103,9 @@ describe('every connection an AMDP session opens is closed once', () => {
   it('a stop at a break with a run in flight: events, commands and the run', async () => {
     const w = await atBreak();
     await w.session.stop();
-    expect(w.opened).toHaveLength(3);
-    expect(w.balanced()).toBe(true);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(w.opened.length, 3);
+    assert.equal(w.balanced(), true);
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('a run that ends after the stop closes nothing twice', async () => {
@@ -109,7 +113,7 @@ describe('every connection an AMDP session opens is closed once', () => {
     await w.session.stop();
     w.run.resolve({ ok: true, output: '' });
     await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(w.balanced()).toBe(true);
+    assert.equal(w.balanced(), true);
   });
 
   it('a start whose breakpoint sync fails', async () => {
@@ -117,25 +121,25 @@ describe('every connection an AMDP session opens is closed once', () => {
     // The start's sync refused; the cleanup's clear (an empty list) answered.
     w.dbg.syncBreakpoints = async (_m: string, b: unknown[]) =>
       b.length ? refusedResponse('no sync') : okResponse({});
-    await expect(
+    await assertRejects(
       w.session.start({
         stopExisting: false,
         breakpoints: [{ class_name: 'ZCL_A', line: 14 }],
       }),
-    ).rejects.toThrow();
+    );
     await until(() => w.balanced());
-    expect(w.opened).toHaveLength(2);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(w.opened.length, 2);
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('a start whose start request fails', async () => {
     const w = world();
     w.dbg.start = async () => refusedResponse('DEBUGGEE_CONTEXT_LOCKED_BY_ME');
-    await expect(
+    await assertRejects(
       w.session.start({ stopExisting: false, breakpoints: [] }),
-    ).rejects.toThrow();
-    expect(w.opened).toHaveLength(2);
-    expect(w.balanced()).toBe(true);
+    );
+    assert.equal(w.opened.length, 2);
+    assert.equal(w.balanced(), true);
   });
 
   it('a failed event read, then the stop', async () => {
@@ -144,32 +148,32 @@ describe('every connection an AMDP session opens is closed once', () => {
     await until(() => w.closed.length >= 2);
     await w.session.wait(0).catch(() => undefined);
     await w.session.stop().catch(() => undefined);
-    expect(w.balanced()).toBe(true);
+    assert.equal(w.balanced(), true);
   });
 
   it('a cleanup that fails keeps the connections, and the next stop closes them', async () => {
     const w = await atBreak();
     const stop = w.dbg.stop;
     w.dbg.stop = async () => refusedResponse('not stopped');
-    await expect(w.session.stop()).rejects.toThrow();
-    expect(w.closed.filter((c) => c !== w.opened[2])).toHaveLength(0);
+    await assertRejects(w.session.stop());
+    assert.equal(w.closed.filter((c) => c !== w.opened[2]).length, 0);
     w.dbg.stop = stop;
     await w.session.stop();
-    expect(w.balanced()).toBe(true);
+    assert.equal(w.balanced(), true);
   });
 
   it('the one-request session: its end, and its stop', async () => {
     const ended = world();
     await ended.session.startOnce(false);
     await ended.session.endOnce();
-    expect(ended.opened).toHaveLength(2);
-    expect(ended.balanced()).toBe(true);
+    assert.equal(ended.opened.length, 2);
+    assert.equal(ended.balanced(), true);
 
     const stopped = world();
     await stopped.session.startOnce(false);
     await stopped.session.stop();
-    expect(stopped.opened).toHaveLength(2);
-    expect(stopped.balanced()).toBe(true);
+    assert.equal(stopped.opened.length, 2);
+    assert.equal(stopped.balanced(), true);
   });
 
   it('the one-request session whose stop finds its connection spent: both dropped, none closed, the stop completes', async () => {
@@ -180,11 +184,11 @@ describe('every connection an AMDP session opens is closed once', () => {
         origin: 'connection',
         sessionError: 'ADT_SESSION_REPLACED',
       });
-    await expect(w.session.stop()).resolves.toBeUndefined();
-    expect(w.opened).toHaveLength(2);
-    expect(w.dropped).toHaveLength(2);
-    expect(w.closed).toHaveLength(0);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(await w.session.stop(), undefined);
+    assert.equal(w.opened.length, 2);
+    assert.equal(w.dropped.length, 2);
+    assert.equal(w.closed.length, 0);
+    assert.equal(w.session.holdsState(), false);
   });
 
   // The compact operation `stop` (stopOnce): a spent answer is answered as
@@ -201,12 +205,12 @@ describe('every connection an AMDP session opens is closed once', () => {
         sessionLost: 'ADT_SESSION_REPLACED',
       });
     };
-    await expect(w.session.stopOnce()).rejects.toThrow();
-    expect(w.dropped).toHaveLength(2);
-    expect(w.closed).toHaveLength(0);
-    expect(w.session.holdsState()).toBe(false);
-    await expect(w.session.stop()).resolves.toBeUndefined();
-    expect(stops).toBe(1);
+    await assertRejects(w.session.stopOnce());
+    assert.equal(w.dropped.length, 2);
+    assert.equal(w.closed.length, 0);
+    assert.equal(w.session.holdsState(), false);
+    assert.equal(await w.session.stop(), undefined);
+    assert.equal(stops, 1);
   });
 
   it("the debugger's dispose and the instance's shutdown", async () => {
@@ -231,9 +235,9 @@ describe('every connection an AMDP session opens is closed once', () => {
       } else {
         const state = new InstanceState();
         state.attach(instance);
-        expect(await state.shutdown()).toEqual([]);
+        assert.deepStrictEqual(await state.shutdown(), []);
       }
-      expect(w.balanced()).toBe(true);
+      assert.equal(w.balanced(), true);
     }
   });
 });

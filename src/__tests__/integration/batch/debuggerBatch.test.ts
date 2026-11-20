@@ -52,7 +52,7 @@
  * Each measured answer is one `debugger-batch-live` line on stderr; a state
  * handle never reaches it.
  *
- * Run (HTTP): npm test -- src/__tests__/integration/batch/debuggerBatch.test.ts --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
+ * Run (HTTP): npm run test:integration -- src/__tests__/integration/batch/debuggerBatch.test.ts
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
  *             the RFC SDK's libraries on LD_LIBRARY_PATH and SAPNWRFC_HOME set.
  */

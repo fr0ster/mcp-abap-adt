@@ -1,9 +1,10 @@
 /**
  * Running ABAP Unit tests for a tool: start the run and, with `wait` (the
- * default), read its status as `readRunOnce` does — at once, then by long
+ * default), read its status as `readStartedRun` does — at once, then by long
  * polling (SAP holds each read until the run finished) while SAP answers it
- * `RUNNING` — and answer the result of a run SAP answered `FINISHED`, or the
- * run id and SAP's status for a run it answered `NOT_STARTED`. With
+ * `RUNNING`, or `NOT_STARTED` to that first read — and answer the result of a
+ * run SAP answered `FINISHED`, or the run id and SAP's status for a run a
+ * long-polled read answered `NOT_STARTED`. With
  * `wait: false` the call answers the run id right after the start, and the
  * run is read by its id: a client with a request time limit shorter than the run would cut the
  * waiting call and lose the id (measured with a 60 s client limit and a
@@ -33,7 +34,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import type { XmlRead } from '../../../lib/xml/tree';
-import { type RunOutcome, readRunOnce, unfinishedRun } from './pollRun';
+import { type RunOutcome, readStartedRun, unfinishedRun } from './pollRun';
 
 /** The object types a run can be started for, each with its own runner. */
 export type TestCarrier =
@@ -98,7 +99,7 @@ export interface StartedRun {
 
 /**
  * Start a run of every test the named object holds; with `wait`, read its
- * status as `readRunOnce` does and fetch the result of a finished run.
+ * status as `readStartedRun` does and fetch the result of a finished run.
  */
 export async function runAndWait(
   context: HandlerContext,
@@ -119,7 +120,7 @@ export async function runAndWait(
 
 /**
  * Start a run with `start` — whose answer is the run's id — and, with `wait`,
- * read its status with `runner` as `readRunOnce` does and fetch the result
+ * read its status with `runner` as `readStartedRun` does and fetch the result
  * of a finished run; without, answer the id alone.
  */
 export async function waitForRun(
@@ -133,7 +134,7 @@ export async function waitForRun(
   }
   const runId = started.getResult().value;
   const outcome = wait
-    ? await readRunOnce(
+    ? await readStartedRun(
         (id, withLongPolling) =>
           runner.getStatus(id, withLongPolling, { analyse: analyseException }),
         runId,
@@ -157,7 +158,8 @@ export async function waitForRun(
 
 /**
  * What a run tool answers: the result of a run SAP answered `FINISHED`; the
- * run id and SAP's status for a run SAP answered `NOT_STARTED`; the run id
+ * run id and SAP's status for a run a long-polled read answered
+ * `NOT_STARTED`; the run id
  * alone for a run it did not wait for. `raw` answers the wire document,
  * `terse` and `full` the parse — no fixture proves a further reduction of a
  * test-run result is safe.

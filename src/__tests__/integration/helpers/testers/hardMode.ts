@@ -40,8 +40,8 @@
  * themselves (`McpSession`): a request is answered by its matching
  * response, or ends with the transport's close.
  *
- * **Readiness**, raced against the child's exit — Jest's test timeout is the
- * only deadline:
+ * **Readiness**, raced against the child's exit — no deadline: the runner
+ * sets no test timeout, and an interrupt ends the run:
  * - stdio: the answer to the MCP `initialize` sent over the child's stdin
  *   (`stdioReady`);
  * - Streamable HTTP: the listening line the server writes on stderr

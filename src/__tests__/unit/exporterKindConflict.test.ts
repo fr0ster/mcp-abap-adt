@@ -5,6 +5,8 @@
  * stating none, runs as before. Nothing is sent: the handler never runs.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import * as z from 'zod';
@@ -15,6 +17,11 @@ import type {
   HandlerContext,
   HandlerEntry,
 } from '../../lib/handlers/interfaces';
+import {
+  assertMatchObject,
+  assertRejects,
+  rejectionOf,
+} from '../helpers/assertions';
 
 const SETTINGS: SapConfig = {
   url: 'https://sap.example.invalid',
@@ -37,11 +44,11 @@ const probe = {
 
 beforeEach(() => {
   ran = 0;
-  jest
-    .spyOn(ReadOnlyHandlersGroup.prototype, 'getHandlers')
-    .mockReturnValue([probe]);
+  // One list, made when the spy is told it.
+  const handlers = [probe];
+  mock.method(ReadOnlyHandlersGroup.prototype, 'getHandlers', () => handlers);
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 function call(exporterKind: 'onprem' | 'cloud' | undefined) {
   const connection = createAbapConnection(
@@ -65,17 +72,18 @@ function call(exporterKind: 'onprem' | 'cloud' | undefined) {
 }
 
 it('built for onprem, the exporter states cloud: refused naming both, the handler not run', async () => {
-  await expect(call('cloud')).rejects.toMatchObject({
+  assertMatchObject(await rejectionOf(call('cloud')), {
     serverRefusal: 'system_type_conflict',
   });
-  await expect(call('cloud')).rejects.toThrow(
+  await assertRejects(
+    call('cloud'),
     'the connection was built for onprem and the server, registration or exporter states cloud',
   );
-  expect(ran).toBe(0);
+  assert.equal(ran, 0);
 });
 
 it('the same kind, or none stated, runs', async () => {
   await call('onprem');
   await call(undefined);
-  expect(ran).toBe(2);
+  assert.equal(ran, 2);
 });

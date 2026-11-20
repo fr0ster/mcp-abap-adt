@@ -1,0 +1,26 @@
+{
+  "case": "activation-class-text-elements-s4-2025",
+  "step": 1,
+  "stepTag": "inactiveobjects",
+  "capturedAt": "2026-11-19",
+  "note": "Recorded 2026-11-19 by the owner-approved probe through @mcp-abap-adt/connection (the research for interfaces-adt 30.1.0 and adt-clients 46.1.0); objects created by the probe and deleted at its end, in a local package with no transport. Scrubbed of host, user (SAPUSER01), system id, package (ZLOCAL_PKG) and lock handle. S/4HANA 2025 on premise: the inactive list after a class's text elements were written: the part is listed as PROG/PX with the class pool's name (ZCL_...====CP), its uri /textelements/classes/{class} and the class as parentUri.",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/activation/inactiveobjects",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/activation/inactiveobjects",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.inactivectsobjects.v1+xml, application/xml;q=0.8"
+    },
+    "headersNote": "The headers the library sends for this request (the probe log records the request line and body only). The lock handle is not recorded.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.inactivectsobjects.v1+xml; charset=utf-8"
+    },
+    "bodyFile": "activation-class-text-elements-s4-2025--01-inactiveobjects.body.xml"
+  }
+}

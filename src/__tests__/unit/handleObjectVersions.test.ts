@@ -7,28 +7,33 @@
  * SAP-free via a mocked AdtClient.
  */
 
-const mockClassGetVersions = jest.fn();
-const mockClassGetVersionSource = jest.fn();
-const mockTableGetVersions = jest.fn();
-const mockGetClass = jest.fn();
-const mockGetTable = jest.fn();
-
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => ({
-    getClass: mockGetClass,
-    getTable: mockGetTable,
-  }),
-}));
-
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { handleGetObjectVersionSource } from '../../handlers/common/readonly/handleGetObjectVersionSource';
 import {
   TOOL_DEFINITION as GET_OBJECT_VERSIONS,
   handleGetObjectVersions,
 } from '../../handlers/common/readonly/handleGetObjectVersions';
+import * as clients from '../../lib/clients';
 import { defineTool } from '../../lib/handlers/interfaces';
+import { assertRejects } from '../helpers/assertions';
 import { okResponse } from '../helpers/fakeClient';
+import { stateSystemKind } from '../helpers/systemKind';
+
+const mockClassGetVersions = mock.fn<(...args: any[]) => any>();
+const mockClassGetVersionSource = mock.fn<(...args: any[]) => any>();
+const mockTableGetVersions = mock.fn<(...args: any[]) => any>();
+const mockGetClass = mock.fn<(...args: any[]) => any>();
+const mockGetTable = mock.fn<(...args: any[]) => any>();
+
+// The declared variant the boundary checks a type argument against.
+// The declared variant: the kind stated, read by the real variantOf.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => ({
+  getClass: mockGetClass,
+  getTable: mockGetTable,
+}));
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -40,19 +45,24 @@ function payload(result: any) {
 
 describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
   beforeEach(() => {
-    mockClassGetVersions.mockReset();
-    mockClassGetVersionSource.mockReset();
-    mockTableGetVersions.mockReset();
-    mockGetClass.mockReset();
-    mockGetTable.mockReset();
-    mockGetClass.mockReturnValue({
+    mockClassGetVersions.mock.resetCalls();
+    mockClassGetVersions.mock.mockImplementation(() => undefined);
+    mockClassGetVersionSource.mock.resetCalls();
+    mockClassGetVersionSource.mock.mockImplementation(() => undefined);
+    mockTableGetVersions.mock.resetCalls();
+    mockTableGetVersions.mock.mockImplementation(() => undefined);
+    mockGetClass.mock.resetCalls();
+    mockGetClass.mock.mockImplementation(() => undefined);
+    mockGetTable.mock.resetCalls();
+    mockGetTable.mock.mockImplementation(() => undefined);
+    mockGetClass.mock.mockImplementation(() => ({
       getVersions: mockClassGetVersions,
       getVersionSource: mockClassGetVersionSource,
-    });
-    mockGetTable.mockReturnValue({
+    }));
+    mockGetTable.mock.mockImplementation(() => ({
       getVersions: mockTableGetVersions,
-      getVersionSource: jest.fn(),
-    });
+      getVersionSource: mock.fn<(...args: any[]) => any>(),
+    }));
   });
 
   it('dispatches a class to getClass().getVersions with className', async () => {
@@ -65,26 +75,32 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
         contentUri: '/sap/bc/adt/...;version=00001',
       },
     ];
-    mockClassGetVersions.mockResolvedValue(okResponse(versions));
+    mockClassGetVersions.mock.mockImplementation(async () =>
+      okResponse(versions),
+    );
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'class',
       object_name: 'zcl_my_class',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockGetClass).toHaveBeenCalled();
-    expect(mockClassGetVersions).toHaveBeenCalledWith(
-      {
-        className: 'ZCL_MY_CLASS',
-      },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(mockGetClass.mock.callCount() > 0);
+    assert.ok(
+      mockClassGetVersions.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            className: 'ZCL_MY_CLASS',
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
     const data = payload(result);
-    expect(data.success).toBe(true);
-    expect(data.object_type).toBe('class');
-    expect(data.object_name).toBe('ZCL_MY_CLASS');
-    expect(data.versions).toEqual(versions);
+    assert.equal(data.success, true);
+    assert.equal(data.object_type, 'class');
+    assert.equal(data.object_name, 'ZCL_MY_CLASS');
+    assert.deepStrictEqual(data.versions, versions);
   });
 
   it('passes through transportRequest/transportDescription per version (adt-clients 7.2.0)', async () => {
@@ -99,40 +115,46 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
         contentUri: '/sap/bc/adt/...;version=00002',
       },
     ];
-    mockClassGetVersions.mockResolvedValue(okResponse(versions));
+    mockClassGetVersions.mock.mockImplementation(async () =>
+      okResponse(versions),
+    );
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'class',
       object_name: 'zcl_my_class',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const v = payload(result).versions[0];
-    expect(v.transportRequest).toBe('DS4K901917');
-    expect(v.transportDescription).toBe('My change');
+    assert.equal(v.transportRequest, 'DS4K901917');
+    assert.equal(v.transportDescription, 'My change');
   });
 
   it('dispatches a table to getTable().getVersions with tableName', async () => {
-    mockTableGetVersions.mockResolvedValue(okResponse([]));
+    mockTableGetVersions.mock.mockImplementation(async () => okResponse([]));
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'table',
       object_name: 'zmy_table',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockGetTable).toHaveBeenCalled();
-    expect(mockTableGetVersions).toHaveBeenCalledWith(
-      {
-        tableName: 'ZMY_TABLE',
-      },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(mockGetTable.mock.callCount() > 0);
+    assert.ok(
+      mockTableGetVersions.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            tableName: 'ZMY_TABLE',
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
-    expect(payload(result).versions).toEqual([]);
+    assert.deepStrictEqual(payload(result).versions, []);
   });
 
   it('forwards content_uri to getVersionSource', async () => {
-    mockClassGetVersionSource.mockResolvedValue(
+    mockClassGetVersionSource.mock.mockImplementation(async () =>
       okResponse('CLASS zcl_x DEFINITION.'),
     );
 
@@ -141,24 +163,32 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
       content_uri: '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockClassGetVersionSource).toHaveBeenCalledWith(
-      '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockClassGetVersionSource.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(
+            a[0],
+            '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+          ) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
     const data = payload(result);
-    expect(data.success).toBe(true);
-    expect(data.source).toBe('CLASS zcl_x DEFINITION.');
+    assert.equal(data.success, true);
+    assert.equal(data.source, 'CLASS zcl_x DEFINITION.');
   });
 
   it('refuses an unknown object_type at the schema', async () => {
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(GET_OBJECT_VERSIONS, handleGetObjectVersions).call(ctx, {
         object_type: 'nonsense',
         object_name: 'X',
       }),
-    ).rejects.toThrow('Invalid arguments for tool GetObjectVersions: ');
+      'Invalid arguments for tool GetObjectVersions: ',
+    );
     await refused;
-    expect(mockClassGetVersions).not.toHaveBeenCalled();
+    assert.equal(mockClassGetVersions.mock.callCount(), 0);
   });
 });

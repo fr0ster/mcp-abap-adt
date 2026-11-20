@@ -1,8 +1,11 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../helpers/repoRoot';
 
-const SRC = path.resolve(__dirname, '../..');
+const SRC = path.resolve(repositoryRoot(__dirname), 'src');
 
 // The single permitted home of the `McpError` identifier: the compatibility
 // re-export in this file, and only in an `export` declaration.
@@ -69,6 +72,6 @@ describe('McpError is confined to the compat re-export in src (#155)', () => {
       visit(sf);
     }
 
-    expect(offenders).toEqual([]);
+    assert.deepStrictEqual(offenders, []);
   });
 });

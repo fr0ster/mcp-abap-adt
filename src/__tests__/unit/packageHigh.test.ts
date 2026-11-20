@@ -14,8 +14,10 @@
  *   types.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
 import { handleDeletePackage } from '../../handlers/package/high/handleDeletePackage';
@@ -33,6 +35,7 @@ import {
   silentLogger,
 } from '../helpers/lowToCompact';
 import { recordingConnection } from '../helpers/recordingConnection';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -43,7 +46,7 @@ const lowRequestsOf = (tool: string) =>
   (
     JSON.parse(
       fs.readFileSync(
-        path.join(__dirname, '..', '..', '..', 'tools', 'low-to-compact.json'),
+        path.join(repositoryRoot(__dirname), 'tools', 'low-to-compact.json'),
         'utf-8',
       ),
     ) as { rows: Array<{ tool: string; low_requests: unknown[] }> }
@@ -93,16 +96,16 @@ describe('UpdatePackage (high)', () => {
       description: 'New text',
       transport_request: 'XXXK900001',
     })) as { isError?: boolean };
-    expect(answered.isError).toBeFalsy();
-    expect(shape(connection.requests)).toEqual([
+    assert.ok(!answered.isError);
+    assert.deepStrictEqual(shape(connection.requests), [
       'POST /sap/bc/adt/packages/pkg_a LOCK',
       'GET /sap/bc/adt/packages/pkg_a',
       'PUT /sap/bc/adt/packages/pkg_a',
       'POST /sap/bc/adt/packages/pkg_a UNLOCK',
     ]);
     const put = connection.requests[2];
-    expect(put?.url).toContain('corrNr=XXXK900001');
-    expect(String(put?.data)).toContain('adtcore:description="New text"');
+    assert.ok(put?.url.includes('corrNr=XXXK900001'));
+    assert.ok(String(put?.data).includes('adtcore:description="New text"'));
   });
 
   it('a refused write is answered as refused, and the unlock is still sent', async () => {
@@ -115,8 +118,8 @@ describe('UpdatePackage (high)', () => {
       package_name: 'pkg_a',
       description: 'New text',
     })) as { isError?: boolean };
-    expect(answered.isError).toBe(true);
-    expect(shape(connection.requests)).toEqual([
+    assert.equal(answered.isError, true);
+    assert.deepStrictEqual(shape(connection.requests), [
       'POST /sap/bc/adt/packages/pkg_a LOCK',
       'GET /sap/bc/adt/packages/pkg_a',
       'PUT /sap/bc/adt/packages/pkg_a',
@@ -132,8 +135,8 @@ describe('UpdatePackage (high)', () => {
       package_name: 'pkg_a',
       description: 'New text',
     })) as { isError?: boolean };
-    expect(answered.isError).toBe(true);
-    expect(shape(connection.requests)).toEqual([
+    assert.equal(answered.isError, true);
+    assert.deepStrictEqual(shape(connection.requests), [
       'POST /sap/bc/adt/packages/pkg_a LOCK',
     ]);
   });
@@ -145,17 +148,21 @@ describe('UpdatePackage (high)', () => {
       description: 'New text',
       transport_request: 'XXXK900001',
     });
-    expect(high.requests.length).toBe(4);
+    assert.equal(high.requests.length, 4);
     // Inside the lock, the write the low tool sent under the caller's lock —
     // the same GET and PUT, with the lock handle the stand-in answered.
     const inner = parityRequests(high.requests.slice(1, 3));
     const low = lowRequestsOf('UpdatePackageLow') as Array<{ url: string }>;
-    expect(low).toHaveLength(2);
-    expect(inner.map((r) => r.method)).toEqual(['GET', 'PUT']);
-    expect(inner[0]).toEqual(low[0]);
+    assert.equal(low.length, 2);
+    assert.deepStrictEqual(
+      inner.map((r) => r.method),
+      ['GET', 'PUT'],
+    );
+    assert.deepStrictEqual(inner[0], low[0]);
     // The table carries the system as a placeholder; the corpus answer the
     // stand-in serves carries the recorded one.
-    expect(neutral(inner[1]?.data)).toEqual(
+    assert.deepStrictEqual(
+      neutral(inner[1]?.data),
       neutral((low[1] as { data?: unknown }).data),
     );
   });
@@ -175,8 +182,8 @@ describe('compact PACKAGE update: HandlerGet part metadata, then HandlerUpdate u
       package_name: 'PKG_A',
       part: 'metadata',
     })) as { isError?: boolean };
-    expect(read.isError).toBeFalsy();
-    expect(connection.requests).toHaveLength(1);
+    assert.ok(!read.isError);
+    assert.equal(connection.requests.length, 1);
     // The caller changes the document it read and passes all of it back.
     const written = (await compactTool(
       connection,
@@ -188,8 +195,8 @@ describe('compact PACKAGE update: HandlerGet part metadata, then HandlerUpdate u
       lock_handle: 'LOCK_HANDLE_PLACEHOLDER',
       transport_request: 'XXXK900001',
     })) as { isError?: boolean };
-    expect(written.isError).toBeFalsy();
-    expect(parityRequests(connection.requests)).toEqual(low);
+    assert.ok(!written.isError);
+    assert.deepStrictEqual(parityRequests(connection.requests), low);
   });
 });
 
@@ -200,11 +207,11 @@ describe('DeletePackage (high)', () => {
       package_name: 'PKG_A',
       transport_request: 'XXXK900001',
     });
-    expect(shape(connection.requests)).toEqual([
+    assert.deepStrictEqual(shape(connection.requests), [
       'POST /sap/bc/adt/deletion/check',
       'POST /sap/bc/adt/deletion/delete',
     ]);
-    expect(String(connection.requests[1]?.data)).toContain('pkg_a');
+    assert.ok(String(connection.requests[1]?.data).includes('pkg_a'));
   });
 
   it('a refused check sends no delete', async () => {
@@ -216,8 +223,8 @@ describe('DeletePackage (high)', () => {
     const answered = (await handleDeletePackage(ctx(connection), {
       package_name: 'PKG_A',
     })) as { isError?: boolean };
-    expect(answered.isError).toBe(true);
-    expect(shape(connection.requests)).toEqual([
+    assert.equal(answered.isError, true);
+    assert.deepStrictEqual(shape(connection.requests), [
       'POST /sap/bc/adt/deletion/check',
     ]);
   });
@@ -232,7 +239,7 @@ describe('DeletePackage (high)', () => {
       '</del:object></del:checkResponse>';
     const connection = recordingConnection([{ data: permitted }]);
     await handleDeletePackage(ctx(connection), { package_name: 'PKG_A' });
-    expect(shape(connection.requests)).toEqual([
+    assert.deepStrictEqual(shape(connection.requests), [
       'POST /sap/bc/adt/deletion/check',
       'POST /sap/bc/adt/deletion/delete',
     ]);
@@ -246,8 +253,8 @@ describe('DeletePackage (high)', () => {
     const answered = (await handleDeletePackage(ctx(connection), {
       package_name: 'PKG_A',
     })) as { isError?: boolean };
-    expect(answered.isError).toBe(true);
-    expect(connection.requests).toHaveLength(2);
+    assert.equal(answered.isError, true);
+    assert.equal(connection.requests.length, 2);
   });
 
   it('sends the check, then exactly what compact’s HandlerDelete PACKAGE sends', async () => {
@@ -265,13 +272,15 @@ describe('DeletePackage (high)', () => {
       package_name: 'PKG_A',
       transport_request: 'XXXK900001',
     });
-    expect(high.requests).toHaveLength(2);
+    assert.equal(high.requests.length, 2);
     // Compact sends the deletion alone — the low tool's request; the high
     // tool asks the check first.
-    expect(parityRequests(compact.requests)).toEqual(
+    assert.deepStrictEqual(
+      parityRequests(compact.requests),
       parityRequests(high.requests.slice(1)),
     );
-    expect(parityRequests(compact.requests)).toEqual(
+    assert.deepStrictEqual(
+      parityRequests(compact.requests),
       lowRequestsOf('DeletePackageLow'),
     );
   });

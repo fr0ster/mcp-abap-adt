@@ -4,7 +4,7 @@
  * UpdateFunctionGroupUnitTest. The suite builds its own group and module and
  * deletes the group.
  *
- * Run: npm test -- --testPathPatterns=integration/high/unitTest/FunctionGroupUnitTestHighHandlers
+ * Run: npm run test:integration -- src/__tests__/integration/high/unitTest/FunctionGroupUnitTestHighHandlers.test.ts
  */
 
 import { after, afterEach, before, beforeEach, it } from 'node:test';

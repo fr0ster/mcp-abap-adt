@@ -9,6 +9,8 @@
  * user is SAP's `systeminformation` answer).
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
@@ -19,8 +21,6 @@ import {
 } from '../../helpers/adtStandIn';
 import { callerOn } from '../backgroundRuns/harness';
 import { type LeftoverStand, leftoverStand } from '../leftoverSessions/harness';
-
-jest.setTimeout(30_000);
 
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
 
@@ -61,9 +61,9 @@ it('a second background start with a token credential answers at once while a ca
       class_name: 'ZCL_FIRST',
       background: true,
     });
-    expect(first.isError).toBe(false);
+    assert.equal(first.isError, false);
     const lookups = standIn.requests.filter(isLookup).length;
-    expect(lookups).toBeGreaterThan(0);
+    assert.ok(lookups > 0);
 
     // A call on the instance's connection, held at the stand-in.
     const held = standIn.hold((r) => r.url === `${PROBE_PATH}holder`);
@@ -77,9 +77,9 @@ it('a second background start with a token credential answers at once while a ca
     const outcome = await settlesWithin(second, 2_000);
     held.release();
     await holder;
-    expect(outcome).toBe('settled');
-    expect((await second).isError).toBe(false);
-    expect(standIn.requests.filter(isLookup).length).toBe(lookups);
+    assert.equal(outcome, 'settled');
+    assert.equal((await second).isError, false);
+    assert.equal(standIn.requests.filter(isLookup).length, lookups);
   } finally {
     await caller.close();
     await standIn.close();
@@ -100,11 +100,11 @@ it('a leftover-session tool with a token credential answers at once while a call
 
     const listed = stand.call('ListLeftoverSessions');
     const outcome = await settlesWithin(listed, 2_000);
-    expect(stand.standIn.requests.length).toBe(sent);
+    assert.equal(stand.standIn.requests.length, sent);
     held.release();
     await holder;
-    expect(outcome).toBe('settled');
-    expect((await listed).isError).toBe(false);
+    assert.equal(outcome, 'settled');
+    assert.equal((await listed).isError, false);
   } finally {
     await stand.close();
   }

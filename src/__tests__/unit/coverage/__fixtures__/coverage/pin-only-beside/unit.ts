@@ -1,3 +1,4 @@
+import { describe, it } from 'node:test';
 import { pinCases } from '../../../../../helpers/pinCases';
 describe('thing pins', () => {
   pinCases([

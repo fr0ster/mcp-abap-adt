@@ -6,12 +6,12 @@
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "24.0.0",
+  "version": "24.1.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/core",
-      "version": "24.0.0",
+      "version": "24.1.0",
       "transport": {
         "type": "stdio"
       },
@@ -58,10 +58,7 @@
           "name": "SAP_CONNECTION_TYPE",
           "description": "Connection type: http or rfc. SNC needs rfc (and the SAP NW RFC SDK).",
           "format": "string",
-          "choices": [
-            "http",
-            "rfc"
-          ],
+          "choices": ["http", "rfc"],
           "default": "http"
         },
         {
@@ -69,11 +66,7 @@
           "description": "System type, required (here or as --system-type; no default, never guessed): the tools offered (e.g. Programs are onprem-only), the connector, and how the system's answers are read. Without it a destination does not start.",
           "format": "string",
           "isRequired": true,
-          "choices": [
-            "cloud",
-            "onprem",
-            "legacy"
-          ]
+          "choices": ["cloud", "onprem", "legacy"]
         },
         {
           "name": "MCP_ENABLE_DATA_TOOLS",

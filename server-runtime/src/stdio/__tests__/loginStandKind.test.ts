@@ -3,6 +3,8 @@
  * credential (the owner's rule: nothing is derived from the authorization).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { type Stand, stand } from './helpers/loginStand';
 
 let saved: string | undefined;
@@ -23,11 +25,11 @@ afterEach(async () => {
 describe('the login stand takes the kind it is given, whatever the credential', () => {
   it('a JWT credential with onprem stated is on premise', async () => {
     s = await stand({ kind: 'onprem', auth: 'jwt' });
-    expect(process.env.SAP_SYSTEM_TYPE).toBe('onprem');
+    assert.equal(process.env.SAP_SYSTEM_TYPE, 'onprem');
   });
 
   it('a basic credential with cloud stated is cloud', async () => {
     s = await stand({ kind: 'cloud', auth: 'basic' });
-    expect(process.env.SAP_SYSTEM_TYPE).toBe('cloud');
+    assert.equal(process.env.SAP_SYSTEM_TYPE, 'cloud');
   });
 });

@@ -5,16 +5,21 @@
  * its own over a shutdown (fake time).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
+import {
+  getTimerCount,
+  useFakeTimers,
+  useRealTimers,
+} from '../../../../../src/__tests__/helpers/fakeTime';
 import { deferred, setup, turns } from './harness';
 
 beforeEach(() => {
-  jest.useFakeTimers({
-    doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
-  });
+  useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
 });
 
 afterEach(() => {
-  jest.useRealTimers();
+  useRealTimers();
 });
 
 it('a write held by the store lands before exit, however long it takes; no timer pending', async () => {
@@ -22,23 +27,23 @@ it('a write held by the store lands before exit, however long it takes; no timer
   const s = setup({ settle: () => write.promise });
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(s.order).toContain('settle');
-  expect(jest.getTimerCount()).toBe(0);
+  assert.ok(s.order.includes('settle'));
+  assert.equal(getTimerCount(), 0);
   // An hour passes: nothing gives up on the write.
-  jest.advanceTimersByTime(60 * 60_000);
+  mock.timers.tick(60 * 60_000);
   await turns();
-  expect(s.exits).toEqual([]);
+  assert.deepStrictEqual(s.exits, []);
   write.resolve({ notStored: [] });
   await turns();
-  expect(s.order.slice(-2)).toEqual(['settled', 'exit(0)']);
-  expect(s.exits).toEqual([0]);
+  assert.deepStrictEqual(s.order.slice(-2), ['settled', 'exit(0)']);
+  assert.deepStrictEqual(s.exits, [0]);
 });
 
 it('with --shutdown-timeout one timer is pending, and cleared once the sequence ends', async () => {
   const s = setup({ shutdownTimeoutMs: 60_000 });
   s.processLike.emit('SIGTERM');
-  expect(jest.getTimerCount()).toBe(1);
+  assert.equal(getTimerCount(), 1);
   await turns();
-  expect(s.exits).toEqual([0]);
-  expect(jest.getTimerCount()).toBe(0);
+  assert.deepStrictEqual(s.exits, [0]);
+  assert.equal(getTimerCount(), 0);
 });

@@ -28,10 +28,9 @@
  * SearchSource. Tools of Tasks 25–27, on the config's shared objects
  * (`shared_dependencies`, those served on the system): GetIncludesList (two
  * function groups), GetStructuresList (two structures), GetEnhancements (two
- * classes), ListTransports (modifiable), DescribeByList (a class, a table and
- * a structure), GetWhereUsed (two tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
+ * classes), DescribeByList (a class, a table and a structure), GetWhereUsed (two tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
  *
- * Run (HTTP): npm test -- --testPathPatterns='batchedReadsTiming' --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
+ * Run (HTTP): npm run test:integration -- src/__tests__/integration/batch/batchedReadsTiming.test.ts
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
  *             the RFC SDK's libraries on LD_LIBRARY_PATH.
  */
@@ -52,7 +51,6 @@ import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGet
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { handleRuntimeListFeeds } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleSearchSource } from '../../../handlers/system/readonly/handleSearchSource';
-import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import {
   type BatchAvailability,
   createBatchAvailability,
@@ -70,7 +68,6 @@ import { assertEquals } from '../helpers/liveAssert';
 import { createTestLogger } from '../helpers/loggerHelpers';
 import { skipRunningTest } from '../helpers/runningTest';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
-import { transportSearchMissing } from '../helpers/transportSearch';
 
 const testLogger = createTestLogger('batched-reads-timing');
 
@@ -317,12 +314,6 @@ const SHARED_CASES: SharedCase[] = [
           })),
         });
     },
-  },
-  {
-    tool: 'ListTransports',
-    prepare: async (connection) =>
-      (await transportSearchMissing(connection)) ??
-      ((context) => handleListTransports(context, { modifiable_only: true })),
   },
   {
     tool: 'DescribeByList',

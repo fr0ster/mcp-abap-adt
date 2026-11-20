@@ -3,6 +3,10 @@
  * test ends is killed and awaited by the helper's `afterEach`, and one given
  * a `signal` is killed when it aborts.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { assertRejects } from '../helpers/assertions';
 import { runPlainNode } from '../helpers/plainNode';
 
 const HANG = 'src/__tests__/unit/scenarios/hang.scenario.ts';
@@ -30,15 +34,15 @@ describe('a hanging scenario', () => {
       void runPlainNode(HANG, [], { onStart: resolve }).catch(() => undefined);
     });
     pid = await started;
-    expect(alive(pid)).toBe(true);
+    assert.equal(alive(pid), true);
     // The test ends with the child still running.
   });
 
   it('is gone once that test has ended', () => {
     const left = pid !== undefined && alive(pid);
     reap(pid);
-    expect(pid).toBeDefined();
-    expect(left).toBe(false);
+    assert.notEqual(pid, undefined);
+    assert.equal(left, false);
   });
 });
 
@@ -51,10 +55,10 @@ it('a signal kills a hanging scenario: its run rejects, the child is gone', asyn
       pid = started;
     },
   });
-  const rejected = expect(run).rejects.toThrow('the scenario wrote no report');
+  const rejected = assertRejects(run, 'the scenario wrote no report');
   controller.abort();
   await rejected;
   const left = pid !== undefined && alive(pid);
   reap(pid);
-  expect(left).toBe(false);
+  assert.equal(left, false);
 });

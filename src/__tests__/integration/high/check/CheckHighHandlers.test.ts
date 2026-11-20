@@ -5,7 +5,7 @@
  * Each handler wraps a low-level check, strips session fields,
  * and adds normalized object_name field.
  *
- * Run: npm test -- --testPathPattern=integration/high/check
+ * Run: npm run test:integration -- src/__tests__/integration/high/check/CheckHighHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

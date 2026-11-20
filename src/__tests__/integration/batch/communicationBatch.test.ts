@@ -47,7 +47,7 @@
  * Every phase's time (recording and `end`) is written to stderr, one
  * `batch-live` line each.
  *
- * Run (HTTP): npm test -- src/__tests__/integration/batch/communicationBatch.test.ts --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
+ * Run (HTTP): npm run test:integration -- src/__tests__/integration/batch/communicationBatch.test.ts
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
  *             the RFC SDK's libraries on LD_LIBRARY_PATH and SAPNWRFC_HOME set.
  */

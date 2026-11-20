@@ -80,7 +80,8 @@ so that no package goes out on top of a dependency that is missing.
 4. **Build and test**:
    ```bash
    npm ci --ignore-scripts   # as the workflows do: no dependency's install script runs
-   npm run prepare           # only to install this checkout's git hook (husky)
+   npm run prepare           # only to install this checkout's git hook (husky): it runs
+                             # `biome check --staged` on the staged files, then the build
    npm run build          # all eighteen packages
    npm run test:check
    npm test               # every package's suites, once
@@ -113,6 +114,23 @@ so that no package goes out on top of a dependency that is missing.
    ```
    On the first package a browser window may open for 2FA. If a publish fails (often a dropped
    login: `npm whoami`, `npm login`), re-run: packages already on npm are skipped.
+
+   Then check the release as the registry serves it:
+   ```bash
+   npm run release:verify               # the root package.json's version
+   npm run release:verify -- <version>  # another one
+   ```
+   `scripts/verify-registry.mjs` takes the eighteen packages from `scripts/publish-all.sh` and
+   checks each `<name>@<version>` with `npm view`. While any is not visible yet it says
+   `not visible yet` with the count and exits `2`: the registry can lag a few minutes behind a
+   publish, so run it again (it does not wait itself). Then it installs all eighteen together
+   into a fresh temporary directory outside the repository (`npm install --ignore-scripts`),
+   fails on any `"link": true` in the lockfile and on any package not resolved from
+   `https://registry.npmjs.org/`, reports the installed `adt-clients`, `adt-strategies` and
+   `connection`, and runs every bin each package declares as `node <bin> --version`, which must
+   answer exactly `<version>`. It exits `0` with one `OK: …` line only when all of that holds,
+   and removes the directory. It does not cover the global wrapper-and-base layout: that is
+   step 9.
 8. **Publish the registry entries** — twelve commands, one per server package
    (`mcp-publisher publish` alone takes `./server.json` only):
    ```bash

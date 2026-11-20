@@ -1,7 +1,7 @@
 /**
  * A tool's arguments typed by its zod schema, checked by the compiler with
  * the installed zod and MCP SDK (plan step 4): `npm run test:check` compiles
- * this file. Nothing runs here: it is not a test file, and Jest never loads it.
+ * this file. Nothing runs here: it is not a test file, and the runner never loads it.
  *
  * In order:
  * (a) a zod `inputSchema`, whose output is the handler's argument type;

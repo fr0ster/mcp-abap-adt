@@ -4,7 +4,7 @@ import { answer } from '../../../lib/answer';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { readRunOnce, unfinishedRun } from '../shared/pollRun';
+import { readGivenRun, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
@@ -12,7 +12,7 @@ export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve CDS unit test run result for a run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+    '[read-only] Retrieve CDS unit test run result for a run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
   inputSchema: z.object({
     run_id: requiredText('run_id is required').describe(
       'Run identifier returned by unit test run.',
@@ -37,7 +37,7 @@ export async function handleGetCdsUnitTestResult(
   args: GetCdsUnitTestResultArgs,
 ) {
   const { run_id, with_navigation_uris, format } = args; // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getResult` unchanged
-  // — same `readRunOnce` reconstruction as `GetUnitTestResult`, for
+  // — same `readGivenRun` reconstruction as `GetUnitTestResult`, for
   // the same reason (no status of its own to poll on this tool's surface).
   const cdsUnitTest = testRunner(context, 'class');
   const detail = detailOf(args);
@@ -45,7 +45,7 @@ export async function handleGetCdsUnitTestResult(
   return answer(
     { tool: 'GetCdsUnitTestResult', detail },
     () =>
-      readRunOnce(
+      readGivenRun(
         (id, withLongPolling) =>
           cdsUnitTest.getStatus(id, withLongPolling, {
             analyse: analyseException,

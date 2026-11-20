@@ -6,7 +6,14 @@
  *
  * Both run the real client over a recording connection and are compared whole.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { handleReadTransportObjects } from '@mcp-abap-adt/lib/handlers/read';
+import {
+  assertMatchObject,
+  assertRejects,
+} from '../../../src/__tests__/helpers/assertions';
 import { listedJson } from '../../../src/__tests__/helpers/listedJson';
 import { TOOL_DEFINITION as FullRead } from '../../../src/handlers/transport/readonly/handleReadTransportObjects';
 import { compactReadOnlyEntries } from '../group';
@@ -71,17 +78,17 @@ function recording(document: string = DOCUMENT) {
 
 describe('HandlerGet with object_type TRANSPORT', () => {
   it('routes to the full set’s ReadTransportObjects, and the matrix says get', () => {
-    expect(compactReadRouterMap.TRANSPORT.get).toBeDefined();
-    expect(CompactGet.inputSchema.shape.transport_number).toBeDefined();
-    expect(CompactGet.description).toContain('TRANSPORT(transport_number*)');
-    expect(listedJson(FullRead.inputSchema).required).toEqual([
+    assert.notEqual(compactReadRouterMap.TRANSPORT.get, undefined);
+    assert.notEqual(CompactGet.inputSchema.shape.transport_number, undefined);
+    assert.ok(CompactGet.description.includes('TRANSPORT(transport_number*)'));
+    assert.deepStrictEqual(listedJson(FullRead.inputSchema).required, [
       'transport_number',
     ]);
   });
 
   it('is still the one HandlerGet tool', () => {
     const names = compactReadOnlyEntries().map((e) => e.toolDefinition.name);
-    expect(names.filter((n) => n === 'HandlerGet')).toHaveLength(1);
+    assert.equal(names.filter((n) => n === 'HandlerGet').length, 1);
   });
 
   it('answers what the full read answers, each object with its position', async () => {
@@ -96,23 +103,23 @@ describe('HandlerGet with object_type TRANSPORT', () => {
       transport_number: NUMBER,
     });
 
-    expect(compact.sent).toHaveLength(1);
-    expect(compact.sent).toEqual(full.sent);
-    expect(compactAnswer).toEqual(fullAnswer);
-    expect(compactAnswer.isError).toBe(false);
+    assert.equal(compact.sent.length, 1);
+    assert.deepStrictEqual(compact.sent, full.sent);
+    assert.deepStrictEqual(compactAnswer, fullAnswer);
+    assert.equal(compactAnswer.isError, false);
     const body = JSON.parse(compactAnswer.content[0]?.text ?? '{}');
-    expect(body.count).toBe(2);
-    expect(body.objects).toEqual([
-      expect.objectContaining({
+    assert.equal(body.count, 2);
+    assertMatchObject(body.objects, [
+      {
         type: 'CLAS',
         name: 'ZCL_A',
         position: '000001',
-      }),
-      expect.objectContaining({
+      },
+      {
         type: 'TABL',
         name: 'ZTAB',
         position: '000002',
-      }),
+      },
     ]);
   });
 
@@ -128,30 +135,30 @@ describe('HandlerGet with object_type TRANSPORT', () => {
       transport_number: NUMBER,
     });
 
-    expect(compact.sent).toHaveLength(1);
-    expect(compactAnswer).toEqual(fullAnswer);
+    assert.equal(compact.sent.length, 1);
+    assert.deepStrictEqual(compactAnswer, fullAnswer);
     const body = JSON.parse(compactAnswer.content[0]?.text ?? '{}');
-    expect(body.count).toBe(3);
-    expect(
+    assert.equal(body.count, 3);
+    assert.deepStrictEqual(
       body.objects.map(
         (o: { task?: string; name: string; position: string }) =>
           `${o.task}|${o.name}|${o.position}`,
       ),
-    ).toEqual([
-      'SIDK900102|ZCL_A|000001',
-      'SIDK900102|ZTAB|000002',
-      'SIDK900103|ZPROG|000001',
-    ]);
+      [
+        'SIDK900102|ZCL_A|000001',
+        'SIDK900102|ZTAB|000002',
+        'SIDK900103|ZPROG|000001',
+      ],
+    );
   });
 
   it('refuses a missing transport_number by the full read’s schema, sending nothing', async () => {
     const compact = recording();
-    await expect(
+    await assertRejects(
       handleHandlerGet(compact.context, { object_type: 'TRANSPORT' }),
-    ).rejects.toThrow(
       'Invalid arguments for tool ReadTransportObjects: transport_number is required at transport_number',
     );
-    expect(compact.sent).toEqual([]);
+    assert.deepStrictEqual(compact.sent, []);
   });
 
   it('offers no other part: a metadata or urls read is refused naming source', async () => {
@@ -161,8 +168,8 @@ describe('HandlerGet with object_type TRANSPORT', () => {
       part: 'metadata',
       transport_number: NUMBER,
     })) as { isError: boolean };
-    expect(refused.isError).toBe(true);
-    expect(JSON.stringify(refused)).toMatch(/offers: source/);
-    expect(compact.sent).toEqual([]);
+    assert.equal(refused.isError, true);
+    assert.match(JSON.stringify(refused), /offers: source/);
+    assert.deepStrictEqual(compact.sent, []);
   });
 });

@@ -6,12 +6,16 @@
  * the flow. Plain code over the sources: comments and imports skipped.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { DEBUGGER_OWN_CONNECTION_TOOLS } from '../../../lib/debugger/ownConnectionTools';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 const HANDLER_DIRS = ['src/handlers/debugger', 'src/lib/compact/debug'];
 
 function tsFiles(dir: string): string[] {
@@ -111,14 +115,16 @@ function connectionReads(file: string): string[] {
 }
 
 describe('the debugger tools outside the main flow read no call connection', () => {
-  it.each(DEBUGGER_OWN_CONNECTION_TOOLS.map((tool) => [tool]))(
-    '%s: its handler is found and reads no `.connection`',
-    (tool) => {
-      const file = handlerFileOf(REPO, tool);
-      expect(file).toBeDefined();
-      expect(connectionReads(file as string)).toEqual([]);
-    },
-  );
+  for (const [tool] of DEBUGGER_OWN_CONNECTION_TOOLS.map((tool) => [tool])) {
+    it(
+      format('%s: its handler is found and reads no `.connection`', tool),
+      () => {
+        const file = handlerFileOf(REPO, tool);
+        assert.notEqual(file, undefined);
+        assert.deepStrictEqual(connectionReads(file as string), []);
+      },
+    );
+  }
 
   it('the memory-snapshot tools read it, and are not listed', () => {
     for (const tool of [
@@ -127,9 +133,9 @@ describe('the debugger tools outside the main flow read no call connection', () 
       'MemorySnapshotDelta',
     ]) {
       const file = handlerFileOf(REPO, tool);
-      expect(file).toBeDefined();
-      expect(connectionReads(file as string).length).toBeGreaterThan(0);
-      expect(DEBUGGER_OWN_CONNECTION_TOOLS).not.toContain(tool);
+      assert.notEqual(file, undefined);
+      assert.ok(connectionReads(file as string).length > 0);
+      assert.ok(!DEBUGGER_OWN_CONNECTION_TOOLS.includes(tool));
     }
   });
 
@@ -153,8 +159,8 @@ describe('the debugger tools outside the main flow read no call connection', () 
         'export const helper = (context) => context.connection.makeAdtRequest({});\n',
       );
       const file = handlerFileOf(root, 'ProbeTool');
-      expect(file).toBeDefined();
-      expect(connectionReads(file as string)).toEqual([
+      assert.notEqual(file, undefined);
+      assert.deepStrictEqual(connectionReads(file as string), [
         'helper.ts: export const helper = (context) => context.connection.makeAdtRequest({});',
       ]);
     } finally {

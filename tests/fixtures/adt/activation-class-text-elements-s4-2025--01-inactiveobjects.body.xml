@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?><ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects">
+  <ioc:entry>
+    <ioc:object ioc:user="SAPUSER01" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/oo/classes/zcl_mcp_tv70d2" adtcore:type="CLAS/OC" adtcore:name="ZCL_MCP_TV70D2" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="SAPUSER01" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/textelements/classes/zcl_mcp_tv70d2" adtcore:type="PROG/PX" adtcore:name="ZCL_MCP_TV70D2================CP" adtcore:parentUri="/sap/bc/adt/oo/classes/zcl_mcp_tv70d2" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="SAPUSER01" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/ddic/tables/zmcp_tv70d2" adtcore:type="TABL/DT" adtcore:name="ZMCP_TV70D2" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+  <ioc:entry>
+    <ioc:object ioc:user="SAPUSER01" ioc:deleted="false">
+      <ioc:ref adtcore:uri="/sap/bc/adt/ddic/db/settings/zmcp_tv70d2" adtcore:type="TABL/DTT" adtcore:name="ZMCP_TV70D2" adtcore:parentUri="/sap/bc/adt/ddic/tables/zmcp_tv70d2" xmlns:adtcore="http://www.sap.com/adt/core"/>
+    </ioc:object>
+    <ioc:transport/>
+  </ioc:entry>
+</ioc:inactiveObjects>

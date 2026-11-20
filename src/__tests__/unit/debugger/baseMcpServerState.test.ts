@@ -1,3 +1,12 @@
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as z from 'zod';
@@ -7,6 +16,7 @@ import { MockAbapConnection } from '../../../embeddable/MockAbapConnection';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
+import { assertThrows } from '../../helpers/assertions';
 import { withSystemInformation } from '../../helpers/systemInformationStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 
@@ -25,14 +35,14 @@ describe('the server instance owns its state', () => {
   it('two instances, two handles; nothing held at first; dispose with nothing held resolves', async () => {
     const a = make();
     const b = make();
-    expect(a.stateHandle).not.toBe(b.stateHandle);
-    expect(a.holdsState()).toBe(false);
-    await expect(a.dispose()).resolves.toBeUndefined();
+    assert.notEqual(a.stateHandle, b.stateHandle);
+    assert.equal(a.holdsState(), false);
+    assert.equal(await a.dispose(), undefined);
   });
   it('the debugger is created once, on first use, and attached to the state', () => {
     const a = make();
     const d1 = (a as any).debuggerFor();
-    expect((a as any).debuggerFor()).toBe(d1);
+    assert.equal((a as any).debuggerFor(), d1);
   });
 });
 
@@ -104,17 +114,17 @@ describe('idle(): every tool call of the instance has settled', () => {
     const client = await connected(server);
     const calling = client.callTool({ name: 'Gated', arguments: {} });
     for (let i = 0; i < 5 && server.seen.length === 0; i++) await tick();
-    expect(server.seen).toHaveLength(1);
+    assert.equal(server.seen.length, 1);
     let idle = false;
     const idling = server.idle().then(() => {
       idle = true;
     });
     await tick();
-    expect(idle).toBe(false);
+    assert.equal(idle, false);
     g.open();
     await calling;
     await idling;
-    expect(idle).toBe(true);
+    assert.equal(idle, true);
     await client.close();
   });
 
@@ -124,17 +134,17 @@ describe('idle(): every tool call of the instance has settled', () => {
     const client = await connected(server);
     const calling = client.callTool({ name: 'Gated', arguments: {} });
     for (let i = 0; i < 5; i++) await tick();
-    expect(server.seen).toHaveLength(0); // still acquiring its connection
+    assert.equal(server.seen.length, 0); // still acquiring its connection
     let idle = false;
     const idling = server.idle().then(() => {
       idle = true;
     });
     await tick();
-    expect(idle).toBe(false);
+    assert.equal(idle, false);
     conn.open();
     await calling;
     await idling;
-    expect(idle).toBe(true);
+    assert.equal(idle, true);
     await client.close();
   });
 
@@ -143,32 +153,32 @@ describe('idle(): every tool call of the instance has settled', () => {
     const client = await connected(server);
     await client.callTool({ name: 'Gated', arguments: {} });
     const [context] = server.seen;
-    expect(context.state).toBe(server.state);
-    expect(context.debugger?.()).toBe((server as any).debuggerFor());
-    expect(server.holdsState()).toBe(false);
+    assert.equal(context.state, server.state);
+    assert.equal(context.debugger?.(), (server as any).debuggerFor());
+    assert.equal(server.holdsState(), false);
     await client.close();
   });
 });
 
 describe('the idle bound: a tool call is the user activity', () => {
-  it('the call marks its start when it enters and its end when it settles — the connection wait included', async () => {
+  it('the call marks its start when it enters and its end when it settles — the connection wait included', async (t) => {
     const conn = gate();
     const handler = gate();
     const server = new GatedServer(handler.opened, conn.opened);
-    const started = jest.spyOn(server.state, 'callStarted');
-    const ended = jest.spyOn(server.state, 'callEnded');
+    const started = t.mock.method(server.state, 'callStarted');
+    const ended = t.mock.method(server.state, 'callEnded');
     const client = await connected(server);
     const calling = client.callTool({ name: 'Gated', arguments: {} });
-    for (let i = 0; i < 5 && started.mock.calls.length === 0; i++) await tick();
-    expect(started).toHaveBeenCalledTimes(1);
-    expect(ended).not.toHaveBeenCalled(); // still acquiring its connection
+    for (let i = 0; i < 5 && started.mock.callCount() === 0; i++) await tick();
+    assert.equal(started.mock.callCount(), 1);
+    assert.equal(ended.mock.callCount(), 0); // still acquiring its connection
     conn.open();
     for (let i = 0; i < 5; i++) await tick();
-    expect(ended).not.toHaveBeenCalled(); // the handler waits on the server
+    assert.equal(ended.mock.callCount(), 0); // the handler waits on the server
     handler.open();
     await calling;
     await server.idle();
-    expect(ended).toHaveBeenCalledTimes(1);
+    assert.equal(ended.mock.callCount(), 1);
     await client.close();
   });
 
@@ -179,9 +189,9 @@ describe('the idle bound: a tool call is the user activity', () => {
         exposition: ['readonly'],
         stateIdleMinutes,
       } as any);
-    expect(make().state.idleMinutes).toBe(30);
-    expect(at(45).state.idleMinutes).toBe(45);
-    expect(() => at(29)).toThrow(/at least 30/);
+    assert.equal(make().state.idleMinutes, 30);
+    assert.equal(at(45).state.idleMinutes, 45);
+    assertThrows(() => at(29), /at least 30/);
   });
 });
 
@@ -200,23 +210,22 @@ describe('where the state reports', () => {
     });
   };
   const logger = () => ({
-    info: jest.fn(),
-    error: jest.fn(),
-    warn: jest.fn(),
-    debug: jest.fn(),
+    info: mock.fn(),
+    error: mock.fn(),
+    warn: mock.fn(),
+    debug: mock.fn(),
   });
   let written: string[];
-  let spy: jest.SpyInstance;
+  let restoreStderr: () => void;
   beforeEach(() => {
     written = [];
-    spy = jest
-      .spyOn(process.stderr, 'write')
-      .mockImplementation((chunk: unknown) => {
-        written.push(String(chunk));
-        return true;
-      });
+    const spy = mock.method(process.stderr, 'write', (chunk: unknown) => {
+      written.push(String(chunk));
+      return true;
+    });
+    restoreStderr = () => spy.mock.restore();
   });
-  afterEach(() => spy.mockRestore());
+  afterEach(() => restoreStderr());
 
   it("an embedder's explicit logger receives the state's lines when no state logger is given", () => {
     const log = logger();
@@ -226,15 +235,24 @@ describe('where the state reports', () => {
       logger: log,
     } as any);
     provoke(server);
-    expect(log.error).toHaveBeenCalledWith(
-      expect.stringContaining('observer broke'),
+    // toHaveBeenCalledWith(stringContaining): a call of one string argument
+    // holding the words.
+    assert.ok(
+      log.error.mock.calls.some((c) => {
+        const [line, ...rest] = c.arguments as unknown[];
+        return (
+          rest.length === 0 &&
+          typeof line === 'string' &&
+          line.includes('observer broke')
+        );
+      }),
     );
-    expect(written.join('')).not.toContain('observer broke');
+    assert.ok(!written.join('').includes('observer broke'));
   });
 
   it('no logger given: stderr', () => {
     provoke(make());
-    expect(written.join('')).toContain('observer broke');
+    assert.ok(written.join('').includes('observer broke'));
   });
 
   it('an explicit state logger wins over the logger', () => {
@@ -247,7 +265,7 @@ describe('where the state reports', () => {
       stateLogger: { error: (m: string) => lines.push(m) },
     } as any);
     provoke(server);
-    expect(lines.join('')).toContain('observer broke');
-    expect(log.error).not.toHaveBeenCalled();
+    assert.ok(lines.join('').includes('observer broke'));
+    assert.equal(log.error.mock.callCount(), 0);
   });
 });

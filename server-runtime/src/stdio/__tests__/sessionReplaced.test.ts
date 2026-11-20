@@ -11,6 +11,8 @@
  * left no session of the replaced connection.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { AdtOnPremConnector, type SapConfig } from '@mcp-abap-adt/connection';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
@@ -25,19 +27,17 @@ import {
 import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
 import { StdioServer } from '../StdioServer.js';
 
-jest.setTimeout(30_000);
-
 let standIn: AdtStandIn;
 
 beforeEach(async () => {
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   standIn = await adtStandIn();
 });
 
 afterEach(async () => {
   await standIn.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 async function serveAtStart() {
@@ -78,9 +78,9 @@ async function serveAtStart() {
 const sessionOfProbe = (id: string) =>
   standIn.requests.find((r) => r.url === `${PROBE_PATH}${id}`)?.session;
 
-it("stdio: a stateless call that meets a session SAP replaced keeps SAP's answer and logs off the replacing session; the next call logs on again, runs on the new session, and the replaced connection is ended", async () => {
+it("stdio: a stateless call that meets a session SAP replaced keeps SAP's answer and logs off the replacing session; the next call logs on again, runs on the new session, and the replaced connection is ended", async (t) => {
   // Every disconnect() of the real connector, with the instance it ended.
-  const disconnect = jest.spyOn(AdtOnPremConnector.prototype, 'disconnect');
+  const disconnect = t.mock.method(AdtOnPremConnector.prototype, 'disconnect');
   const { server, client, call } = await serveAtStart();
   let closed = false;
   try {
@@ -88,38 +88,42 @@ it("stdio: a stateless call that meets a session SAP replaced keeps SAP's answer
       standIn.requests.filter((r) => r.url === '/sap/bc/adt/core/discovery')
         .length;
     // The start logged on once.
-    expect(logons()).toBe(1);
-    expect(await call('one')).toEqual({ text: 'one', isError: false });
+    assert.equal(logons(), 1);
+    assert.deepStrictEqual(await call('one'), { text: 'one', isError: false });
     const first = sessionOfProbe('one');
-    expect(first).toBeDefined();
+    assert.notEqual(first, undefined);
 
     // SAP ended the start's session: the next request on it lands in another.
     standIn.endSession(first as string);
     const replaced = await call('two');
     // connection 23 (#354): a stateless request keeps SAP's answer, marked
     // `sessionLost`; the instance is spent, and nothing is sent again.
-    expect(replaced).toEqual({ text: 'two', isError: false });
-    expect(
-      standIn.requests.filter((r) => r.url === `${PROBE_PATH}two`),
-    ).toHaveLength(1);
-    expect(logons()).toBe(1);
+    assert.deepStrictEqual(replaced, { text: 'two', isError: false });
+    assert.equal(
+      standIn.requests.filter((r) => r.url === `${PROBE_PATH}two`).length,
+      1,
+    );
+    assert.equal(logons(), 1);
     // The probe landed in a session SAP opened for it.
     const replacing = sessionOfProbe('two');
-    expect(replacing).toBeDefined();
-    expect(replacing).not.toBe(first);
+    assert.notEqual(replacing, undefined);
+    assert.notEqual(replacing, first);
 
     // The next call logs on again and runs on the new session.
-    expect(await call('three')).toEqual({ text: 'three', isError: false });
-    expect(logons()).toBe(2);
+    assert.deepStrictEqual(await call('three'), {
+      text: 'three',
+      isError: false,
+    });
+    assert.equal(logons(), 2);
     const third = sessionOfProbe('three');
-    expect(third).toBeDefined();
-    expect(third).not.toBe(first);
-    expect(third).not.toBe(sessionOfProbe('two'));
+    assert.notEqual(third, undefined);
+    assert.notEqual(third, first);
+    assert.notEqual(third, sessionOfProbe('two'));
 
     // The replaced connection is ended — once, and not the one in use.
-    expect(disconnect).toHaveBeenCalledTimes(1);
-    const retired = disconnect.mock.contexts[0] as AdtOnPremConnector;
-    expect(retired.isConnected()).toBe(false);
+    assert.equal(disconnect.mock.callCount(), 1);
+    const retired = disconnect.mock.calls[0]?.this as AdtOnPremConnector;
+    assert.equal(retired.isConnected(), false);
 
     await client.close();
     await server.terminalClose();
@@ -129,9 +133,9 @@ it("stdio: a stateless call that meets a session SAP replaced keeps SAP's answer
     // connection when it raised the loss (connection 18.0.1, the answer not
     // awaited there); the replaced connection's disconnect() wrote no second
     // one, its cookies already dropped.
-    expect(disconnect).toHaveBeenCalledTimes(2);
-    expect(disconnect.mock.contexts[1]).not.toBe(retired);
-    expect(standIn.loggedOff()).toEqual([replacing, third]);
+    assert.equal(disconnect.mock.callCount(), 2);
+    assert.notEqual(disconnect.mock.calls[1]?.this, retired);
+    assert.deepStrictEqual(standIn.loggedOff(), [replacing, third]);
   } finally {
     if (!closed) {
       await client.close();

@@ -5,6 +5,9 @@
  * tests (`runtimeProfiling.test.ts`) exercise it only through two handlers and
  * one happy path.
  */
+
+import assert from 'node:assert/strict';
+import { it, mock } from 'node:test';
 import { newTraceAfter } from '../../lib/strategies/newTrace';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
@@ -15,7 +18,7 @@ const never = async () => {
 };
 
 it('answers on the first read when a new id is already there, without waiting', async () => {
-  const list = jest.fn(async () =>
+  const list = mock.fn(async () =>
     feed(entry('new-1', '2026-09-14T09:00:00Z')),
   );
   const found = await newTraceAfter({ list } as any, new Set(), {
@@ -24,8 +27,8 @@ it('answers on the first read when a new id is already there, without waiting', 
     sleep: never,
   });
   if (!found.ok) throw new Error('expected a found id');
-  expect(found.getResult().value).toBe('new-1');
-  expect(list).toHaveBeenCalledTimes(1);
+  assert.equal(found.getResult().value, 'new-1');
+  assert.equal(list.mock.callCount(), 1);
 });
 
 it('ignores every id that was already in the snapshot', async () => {
@@ -43,7 +46,7 @@ it('ignores every id that was already in the snapshot', async () => {
   );
   // Nothing new, so no id — and a SUCCESS, because nothing refused anything.
   if (!found.ok) throw new Error('expected a success with no id');
-  expect(found.getResult().value).toBeUndefined();
+  assert.equal(found.getResult().value, undefined);
 });
 
 it('picks the newest of several new ids, by time and not by text — and not by document position either', async () => {
@@ -63,12 +66,12 @@ it('picks the newest of several new ids, by time and not by text — and not by 
     { attempts: 1, delayMs: 0, sleep: never },
   );
   if (!found.ok) throw new Error('expected a found id');
-  expect(found.getResult().value).toBe('new-late');
+  assert.equal(found.getResult().value, 'new-late');
 });
 
 it('waits between attempts and stops at the count it was given', async () => {
   const slept: number[] = [];
-  const list = jest.fn(async () => feed());
+  const list = mock.fn(async () => feed());
   const found = await newTraceAfter({ list } as any, new Set(), {
     attempts: 3,
     delayMs: 250,
@@ -76,25 +79,25 @@ it('waits between attempts and stops at the count it was given', async () => {
       slept.push(ms);
     },
   });
-  expect(list).toHaveBeenCalledTimes(3);
+  assert.equal(list.mock.callCount(), 3);
   // Two waits for three attempts: none after the last.
-  expect(slept).toEqual([250, 250]);
+  assert.deepStrictEqual(slept, [250, 250]);
   if (!found.ok) throw new Error('expected a success with no id');
-  expect(found.getResult().value).toBeUndefined();
+  assert.equal(found.getResult().value, undefined);
 });
 
 it('hands a refused read straight back and stops asking', async () => {
-  const list = jest.fn(async () => refusedResponse('Session expired'));
+  const list = mock.fn(async () => refusedResponse('Session expired'));
   const found = await newTraceAfter({ list } as any, new Set(), {
     attempts: 5,
     delayMs: 0,
     sleep: never,
   });
   if (found.ok) throw new Error('expected the refusal');
-  expect(found.getError().message).toBe('Session expired');
+  assert.equal(found.getError().message, 'Session expired');
   // Once. Retrying past a refusal is asking a question already answered, and
   // exhausting the attempts would turn it into "no trace yet".
-  expect(list).toHaveBeenCalledTimes(1);
+  assert.equal(list.mock.callCount(), 1);
 });
 
 // Pinned per the repository owner's ruling on task 24: a search that skips the
@@ -122,5 +125,5 @@ it('is not fooled by a pre-existing entry that is both newest by time and last i
     { attempts: 1, delayMs: 0, sleep: never },
   );
   if (!found.ok) throw new Error('expected a found id');
-  expect(found.getResult().value).toBe('fresh-1');
+  assert.equal(found.getResult().value, 'fresh-1');
 });

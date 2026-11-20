@@ -1,9 +1,10 @@
 /**
  * What the runner's tests share (D27): the repository's tools run in a child
  * process, and fixture repositories — a temporary directory holding its own
- * node:test list (`tools/node-test-files.json`), its own
+ * sources (the runner walks its `src/__tests__`), its own
  * `tsconfig.node-test.json` (the repository's, by `extends`, built into the
- * fixture's own `.test-build/tree/`) and its sources. Uses no test runner.
+ * fixture's own `.test-build/tree/`) and its own placement list. Uses no
+ * test runner.
  */
 import { type SpawnSyncReturns, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -11,7 +12,6 @@ import * as path from 'node:path';
 import { repositoryRoot } from '../../helpers/repoRoot';
 
 export const REPO = repositoryRoot(__dirname);
-export const JEST = require.resolve('jest/bin/jest');
 
 export interface ToolRun {
   status: number | null;
@@ -72,13 +72,8 @@ export function environment(
 
 /**
  * Where the fixtures live: `.test-fixtures/` at the repository root
- * (gitignored, under none of Jest's roots), not the system's temporary
- * directory. A Jest run over a fixture root in the Windows runner's
- * temporary directory (`C:\Users\RUNNER~1\…`, another drive than the
- * checkout) found no test, while the same run passed on Linux and macOS
- * (CI, measured; which part of that path Jest refused is not established).
- * Under the checkout, the fixtures are on its drive and under its spelling,
- * as every root Jest finds tests in is.
+ * (gitignored, under none of the test roots, so the walk never reaches a
+ * fixture), on the checkout's drive and under its spelling.
  */
 export const FIXTURES = path.join(REPO, '.test-fixtures');
 
@@ -136,63 +131,19 @@ export function filesUnder(dir: string): string[] {
   return found.sort();
 }
 
-/** The characters a regular expression gives a meaning to. */
-const SPECIAL = '\\^$.*+?()[]{}|';
-
-/** `text` as a pattern matching exactly itself, as `jest.config.js` writes one. */
-function literal(text: string): string {
-  let pattern = '';
-  for (const character of text) {
-    pattern += SPECIAL.includes(character) ? `\\${character}` : character;
-  }
-  return `^${pattern}$`;
-}
-
 /**
- * A fixture repository's own Jest configuration: its directory is the root
- * directory and the one root, so no run over it reaches this repository's
- * suite, with or without `--roots`; Jest's files are found as in
- * `jest.config.js` (`testMatch` of `__tests__` `.test.ts` files, ts-jest with this
- * repository's `tsconfig.test.json`), and every file of the fixture's
- * node:test list is ignored by its exact path, as the repository's are.
- */
-function fixtureJestConfig(dir: string, listed: readonly string[]): string {
-  const root = dir.split(path.sep).join('/');
-  const config = {
-    rootDir: dir,
-    roots: ['<rootDir>'],
-    testMatch: ['**/__tests__/**/*.test.ts'],
-    transform: {
-      '^.+\\.ts$': [
-        require.resolve('ts-jest'),
-        { tsconfig: path.join(REPO, 'tsconfig.test.json') },
-      ],
-    },
-    moduleFileExtensions: ['ts', 'js', 'json'],
-    testPathIgnorePatterns: [
-      '/node_modules/',
-      ...listed.map((source) => literal(`${root}/${source}`)),
-    ],
-  };
-  return `module.exports = ${JSON.stringify(config, null, 2)};\n`;
-}
-
-/**
- * A fixture repository: `sources` (path → text, written with `/`), a
- * node:test list of `listed` and an empty placement list
- * (`tools/node-test-placed.json`). Its `tsconfig.node-test.json` extends the
- * repository's and builds into its own `.test-build/tree/`; it names one stub
- * file, as the repository's names its preload. Its `jest.config.js` is its
- * own (`fixtureJestConfig`); `npm-test.mjs --repo` hands it to Jest.
+ * A fixture repository: `sources` (path → text, written with `/`; its tests
+ * are the `….test.ts` under a test root's `__tests__`, as the runner walks
+ * them) and an empty placement list (`tools/node-test-placed.json`). Its
+ * `tsconfig.node-test.json` extends the repository's and builds into its own
+ * `.test-build/tree/`; it names one stub file, as the repository's names its
+ * preload.
  */
 export function fixtureRepo(
   dir: string,
-  listed: readonly string[],
   sources: Readonly<Record<string, string>>,
 ): string {
-  writeAt(dir, 'tools/node-test-files.json', JSON.stringify(listed));
   writeAt(dir, 'tools/node-test-placed.json', '[]\n');
-  writeAt(dir, 'jest.config.js', fixtureJestConfig(dir, listed));
   writeAt(dir, 'stub.ts', 'export {};\n');
   writeAt(
     dir,
@@ -216,18 +167,6 @@ export function nodeTestSource(word: string, failOn: string): string {
     `test('${word}', () => {`,
     `  appendFileSync(process.env.RECORD ?? '', '${word}\\n');`,
     `  if (process.env.${failOn} === '1') throw new Error('asked to fail');`,
-    '});',
-    '',
-  ].join('\n');
-}
-
-/** A Jest source that appends `word` to `$RECORD` and fails on `$failOn`. */
-export function jestSource(word: string, failOn: string): string {
-  return [
-    "import { appendFileSync } from 'node:fs';",
-    `test('${word}', () => {`,
-    `  appendFileSync(process.env.RECORD ?? '', '${word}\\n');`,
-    `  expect(process.env.${failOn}).not.toBe('1');`,
     '});',
     '',
   ].join('\n');

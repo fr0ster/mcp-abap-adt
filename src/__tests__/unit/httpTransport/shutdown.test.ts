@@ -7,7 +7,9 @@
  * logoff is still being written forces: exit `1` naming the step.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { it } from 'node:test';
 import {
   isLatched,
   registerActiveTool,
@@ -54,11 +56,15 @@ it('SIGTERM: latch and begin in its tick, stop listening, the logoffs at once wi
   );
   s.processLike.emit('SIGTERM');
   // The logoff is asked for in the trigger's tick, the interruption beside it.
-  expect(s.order).toEqual(['begin latched=true', 'stop listening', 'logoff']);
-  expect(controller.signal.aborted).toBe(true);
+  assert.deepStrictEqual(s.order, [
+    'begin latched=true',
+    'stop listening',
+    'logoff',
+  ]);
+  assert.equal(controller.signal.aborted, true);
   await turns();
   // The tool never settled: the exit does not wait for it.
-  expect(s.order).toEqual([
+  assert.deepStrictEqual(s.order, [
     'begin latched=true',
     'stop listening',
     'logoff',
@@ -82,15 +88,15 @@ it('a second signal while a logoff is still being written: exit 1 naming the ste
   );
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(s.exits).toEqual([]);
+  assert.deepStrictEqual(s.exits, []);
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(s.exits).toEqual([]);
+  assert.deepStrictEqual(s.exits, []);
   // The forced close joins the logoff under way: exit once it is written.
   written();
   await turns();
-  expect(s.exits).toEqual([1]);
-  expect(s.stderr).toEqual([
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.deepStrictEqual(s.stderr, [
     '[MCP] Not finished at the forced close: the logoffs',
   ]);
 });

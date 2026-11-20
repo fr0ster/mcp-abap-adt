@@ -9,6 +9,9 @@
  * only the connection is a fake, answering every request — an envelope's
  * part or a request outside a batch — from one model of SAP.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type {
   IAbapConnection,
@@ -23,6 +26,7 @@ import {
 import { DEFAULT_ADT_HEADERS } from '../../../lib/adtHeaders/defaultPairs';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { runPhase } from '../../../lib/batch/phases';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
   type PartAnswer,
@@ -162,7 +166,7 @@ describe('the format correction of an internal batch phase', () => {
     const port = new AdtHeaderPairs().forSystem('S1');
     const results = await phase(fake, port);
 
-    expect(envelopeParts(fake)).toEqual([
+    assert.deepStrictEqual(envelopeParts(fake), [
       [
         ['item_a', DEFAULT.accept, DEFAULT.contentType],
         ['item_b', DEFAULT.accept, DEFAULT.contentType],
@@ -170,8 +174,11 @@ describe('the format correction of an internal batch phase', () => {
       ],
       [['item_b', NEWER, DEFAULT.contentType]],
     ]);
-    expect(fake.directs).toHaveLength(0);
-    expect(results.map((r) => r.ok && r.value.ok)).toEqual([true, true, true]);
+    assert.equal(fake.directs.length, 0);
+    assert.deepStrictEqual(
+      results.map((r) => r.ok && r.value.ok),
+      [true, true, true],
+    );
   });
 
   it('the answers equal the sequential answers for the same SAP', async () => {
@@ -189,20 +196,23 @@ describe('the format correction of an internal batch phase', () => {
         ),
       );
     }
-    expect(results).toEqual(values.map((value) => ({ ok: true, value })));
+    assert.deepStrictEqual(
+      results,
+      values.map((value) => ({ ok: true, value })),
+    );
   });
 
   it('the corrected pair is kept for the system; a later phase sends it directly', async () => {
     const fake = system(acceptsNewer);
     const port = new AdtHeaderPairs().forSystem('S1');
     await phase(fake, port);
-    expect(port.pairFor(OP)).toEqual({
+    assert.deepStrictEqual(port.pairFor(OP), {
       accept: NEWER,
       contentType: DEFAULT.contentType,
     });
 
     await phase(fake, port);
-    expect(envelopeParts(fake).slice(2)).toEqual([
+    assert.deepStrictEqual(envelopeParts(fake).slice(2), [
       [
         ['item_a', NEWER, DEFAULT.contentType],
         ['item_b', NEWER, DEFAULT.contentType],
@@ -218,11 +228,12 @@ describe('the format correction of an internal batch phase', () => {
       'ITEM_B',
       first.connection as unknown as IAbapConnection,
     );
-    expect(
+    assert.deepStrictEqual(
       first.directs.map((r) => headerOf(r.headers as never, 'accept')),
-    ).toEqual([DEFAULT.accept, NEWER]);
+      [DEFAULT.accept, NEWER],
+    );
     await phase(first, port);
-    expect(envelopeParts(first)).toEqual([
+    assert.deepStrictEqual(envelopeParts(first), [
       [
         ['item_a', NEWER, DEFAULT.contentType],
         ['item_b', NEWER, DEFAULT.contentType],
@@ -237,9 +248,10 @@ describe('the format correction of an internal batch phase', () => {
       'ITEM_B',
       second.connection as unknown as IAbapConnection,
     );
-    expect(
+    assert.deepStrictEqual(
       second.directs.map((r) => headerOf(r.headers as never, 'accept')),
-    ).toEqual([NEWER]);
+      [NEWER],
+    );
   });
 
   it('a 415 part is recorded again with the Content-Type it names', async () => {
@@ -255,11 +267,14 @@ describe('the format correction of an internal batch phase', () => {
     );
     const port = new AdtHeaderPairs().forSystem('S1');
     const results = await phase(fake, port);
-    expect(envelopeParts(fake)[1]).toEqual([
+    assert.deepStrictEqual(envelopeParts(fake)[1], [
       ['item_b', DEFAULT.accept, NEWER_BODY],
     ]);
-    expect(results.map((r) => r.ok && r.value.ok)).toEqual([true, true, true]);
-    expect(port.pairFor(OP)).toEqual({
+    assert.deepStrictEqual(
+      results.map((r) => r.ok && r.value.ok),
+      [true, true, true],
+    );
+    assert.deepStrictEqual(port.pairFor(OP), {
       accept: DEFAULT.accept,
       contentType: NEWER_BODY,
     });
@@ -273,12 +288,12 @@ describe('the format correction of an internal batch phase', () => {
     );
     const port = new AdtHeaderPairs().forSystem('S1');
     const results = await phase(fake, port);
-    expect(fake.envelopes).toHaveLength(1);
-    expect(results[1]).toEqual({
-      ok: true,
-      value: expect.objectContaining({ ok: false, status: 406 }),
-    });
-    expect(port.pairFor(OP)).toEqual(DEFAULT);
+    assert.equal(fake.envelopes.length, 1);
+    const second = results[1];
+    assert.ok(second?.ok === true);
+    assertMatchObject(second.value, { ok: false, status: 406 });
+    assert.deepStrictEqual(Object.keys(second).sort(), ['ok', 'value']);
+    assert.deepStrictEqual(port.pairFor(OP), DEFAULT);
   });
 
   it('the correction envelope’s answer is the call’s answer, a second 406 included: one round', async () => {
@@ -290,14 +305,16 @@ describe('the format correction of an internal batch phase', () => {
         : { status: 200, statusText: 'OK', body: item },
     );
     const results = await phase(fake, new AdtHeaderPairs().forSystem('S1'));
-    expect(fake.envelopes).toHaveLength(2);
+    assert.equal(fake.envelopes.length, 2);
     const second = results[1] as {
       ok: true;
       value: { ok: boolean; status?: number; data?: string };
     };
-    expect(second.value.ok).toBe(false);
-    expect(second.value.status).toBe(406);
+    assert.equal(second.value.ok, false);
+    assert.equal(second.value.status, 406);
     // The correction's answer, not the first one.
-    expect(second.value.data).toContain('application/xml');
+    const { data } = second.value;
+    assert.ok(typeof data === 'string');
+    assert.ok(data.includes('application/xml'));
   });
 });

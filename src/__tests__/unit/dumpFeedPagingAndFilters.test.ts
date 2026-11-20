@@ -8,6 +8,27 @@
  * and sanitised: the user is `SAPUSER01`, the objects and packages are
  * placeholders.
  */
+
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, type Mock, mock } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
+import { mockModuleExports } from '../helpers/moduleMock';
+
+// adt-clients replaced for this file before any module under test loads: the
+// handlers and src/lib/clients bind it when they load (node:test mock.module,
+// helpers/moduleMock.ts; its other exports stay the real ones).
+const AdtRuntimeClientMock = mock.fn<(...args: any[]) => any>(
+  function AdtRuntimeClient() {
+    return {
+      getFeeds: () => feeds,
+      getDumps: () => dumps,
+    };
+  },
+);
+mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
+  AdtRuntimeClient: AdtRuntimeClientMock,
+});
+
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import {
@@ -28,20 +49,13 @@ import {
   nextToOf,
   secondBefore,
 } from '../../lib/strategies/feedPages';
+import { assertMatchObject, assertThrows } from '../helpers/assertions';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 const context = { connection: {} as any, logger: undefined };
 
-let feeds: Record<string, jest.Mock>;
-let dumps: Record<string, jest.Mock>;
-
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  AdtRuntimeClient: jest.fn(() => ({
-    getFeeds: () => feeds,
-    getDumps: () => dumps,
-  })),
-}));
+let feeds: Record<string, Mock<(...args: any[]) => any>>;
+let dumps: Record<string, Mock<(...args: any[]) => any>>;
 
 const body = (result: any) => JSON.parse(result.content[0].text);
 
@@ -63,49 +77,55 @@ function page(first: number, count: number, next?: string) {
 
 describe('nextToOf', () => {
   it("reads the next link's to, attributes in any order, &amp; or not", () => {
-    expect(
+    assert.equal(
       nextToOf(
         '<atom:feed><atom:link href="/sap/bc/adt/runtime/dumps?$top=100&amp;to=20260930043748" rel="next"/></atom:feed>',
       ),
-    ).toBe('20260930043748');
-    expect(
+      '20260930043748',
+    );
+    assert.equal(
       nextToOf(
         '<feed><link rel="next" type="application/atom+xml" href="/x?to=20260101000000&$top=100"/></feed>',
       ),
-    ).toBe('20260101000000');
+      '20260101000000',
+    );
   });
 
   it('reads a next link whose attributes are quoted with apostrophes, as XML allows', () => {
-    expect(
+    assert.equal(
       nextToOf(
         "<atom:feed xmlns:atom=\"http://www.w3.org/2005/Atom\"><atom:link rel='next' href='/sap/bc/adt/runtime/dumps?$top=100&amp;to=20260930043748'/></atom:feed>",
       ),
-    ).toBe('20260930043748');
+      '20260930043748',
+    );
   });
 
   it('reads a next link that is not self-closing', () => {
-    expect(
+    assert.equal(
       nextToOf(
         '<atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:link href="/x?$top=100&amp;to=2026" rel="next"></atom:link></atom:feed>',
       ),
-    ).toBe('2026');
+      '2026',
+    );
   });
 
   it('answers nothing without a next link', () => {
-    expect(
+    assert.equal(
       nextToOf('<atom:feed><atom:link href="/x?to=1" rel="self"/></atom:feed>'),
-    ).toBeUndefined();
-    expect(nextToOf('')).toBeUndefined();
+      undefined,
+    );
+    assert.equal(nextToOf(''), undefined);
   });
 
   it('feedPage keeps the entries reading and adds the next page', () => {
     const read = feedPage((() => [{ id: 'a' }]) as never);
-    expect(
+    assert.deepStrictEqual(
       read({
         data: '<feed><link rel="next" href="/x?$top=100&amp;to=2026"/></feed>',
       } as never),
-    ).toEqual({ entries: [{ id: 'a' }], next_to: '2026' });
-    expect(read({ data: '<feed/>' } as never)).toEqual({
+      { entries: [{ id: 'a' }], next_to: '2026' },
+    );
+    assert.deepStrictEqual(read({ data: '<feed/>' } as never), {
       entries: [{ id: 'a' }],
     });
   });
@@ -135,49 +155,56 @@ describe('feedPages', () => {
   }
 
   it('follows the next link until the count is reached, and answers where to go on', async () => {
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(page(0, 100, 'T1'))
-      .mockResolvedValueOnce(page(100, 100, 'T2'))
-      .mockResolvedValueOnce(page(200, 51, 'T3'));
+    const fetch = ((fn) => {
+      fn.mock.mockImplementationOnce(async () => page(0, 100, 'T1'), 0);
+      fn.mock.mockImplementationOnce(async () => page(100, 100, 'T2'), 1);
+      fn.mock.mockImplementationOnce(async () => page(200, 51, 'T3'), 2);
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
 
     const value = pageValue(
       await feedPages(fetch, { maxResults: 250, to: 'T0' }, byId),
     );
 
     // One entry beyond the count is read: it marks where the answer ends.
-    expect(fetch.mock.calls.map(([p]) => p)).toEqual([
-      { maxResults: 100, to: 'T0' },
-      { maxResults: 100, to: 'T1' },
-      { maxResults: 51, to: 'T2' },
-    ]);
-    expect(value.entries).toHaveLength(250);
+    assert.deepStrictEqual(
+      fetch.mock.calls.map((c) => c.arguments[0]),
+      [
+        { maxResults: 100, to: 'T0' },
+        { maxResults: 100, to: 'T1' },
+        { maxResults: 51, to: 'T2' },
+      ],
+    );
+    assert.equal(value.entries.length, 250);
     // Entries without a time: SAP's own link is the continuation.
-    expect(value.next_to).toBe('T3');
+    assert.equal(value.next_to, 'T3');
   });
 
   it('stops where SAP offers no next page, and says nothing remains', async () => {
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(page(0, 100, 'T1'))
-      .mockResolvedValueOnce(page(100, 30));
+    const fetch = ((fn) => {
+      fn.mock.mockImplementationOnce(async () => page(0, 100, 'T1'), 0);
+      fn.mock.mockImplementationOnce(async () => page(100, 30), 1);
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
 
     const value = pageValue(await feedPages(fetch, { maxResults: 500 }, byId));
 
-    expect(fetch).toHaveBeenCalledTimes(2);
-    expect(value.entries).toHaveLength(130);
-    expect(value.next_to).toBeUndefined();
+    assert.equal(fetch.mock.callCount(), 2);
+    assert.equal(value.entries.length, 130);
+    assert.equal(value.next_to, undefined);
   });
 
   it('keeps an entry on both sides of a page boundary once', async () => {
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(page(0, 3, 'T1'))
-      .mockResolvedValueOnce(page(2, 3));
+    const fetch = ((fn) => {
+      fn.mock.mockImplementationOnce(async () => page(0, 3, 'T1'), 0);
+      fn.mock.mockImplementationOnce(async () => page(2, 3), 1);
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
 
     const value = pageValue(await feedPages(fetch, { maxResults: 10 }, byId));
 
-    expect(value.entries.map((e: any) => e.id)).toEqual(
+    assert.deepStrictEqual(
+      value.entries.map((e: any) => e.id),
       [0, 1, 2, 3, 4].map(entryId),
     );
   });
@@ -195,27 +222,31 @@ describe('feedPages', () => {
       ...first.slice(96),
       ...seconds(100, 60, Date.UTC(2026, 8, 30, 5, 37, 31) + 100_000),
     ];
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(
-        okResponse({ entries: first, next_to: '20260930053732' }),
-      )
-      .mockImplementationOnce(async ({ maxResults }: any) =>
-        okResponse({
-          entries: second.slice(0, maxResults),
-          next_to: '20260930050000',
-        }),
+    const fetch = ((fn) => {
+      fn.mock.mockImplementationOnce(
+        async () => okResponse({ entries: first, next_to: '20260930053732' }),
+        0,
       );
+      fn.mock.mockImplementationOnce(
+        async ({ maxResults }: any) =>
+          okResponse({
+            entries: second.slice(0, maxResults),
+            next_to: '20260930050000',
+          }),
+        1,
+      );
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
 
     const value = pageValue(await feedPages(fetch, { maxResults: 150 }, byId));
 
     // 151 to read, 100 read, 4 of them to come again.
-    expect(fetch.mock.calls[1][0]).toEqual({
+    assert.deepStrictEqual(fetch.mock.calls[1]?.arguments[0], {
       maxResults: 55,
       to: '20260930053732',
     });
-    expect(value.entries).toHaveLength(150);
-    expect(new Set(value.entries.map((e: any) => e.id)).size).toBe(150);
+    assert.equal(value.entries.length, 150);
+    assert.equal(new Set(value.entries.map((e: any) => e.id)).size, 150);
   });
 
   it('never ends an answer inside a second, so reading on repeats nothing and skips nothing', async () => {
@@ -227,7 +258,7 @@ describe('feedPages', () => {
       '2026-10-01T07:00:01Z',
     ]);
     // The feed as SAP answers it: entries at or before `to`, inclusive.
-    const feed = jest.fn(async ({ maxResults, to }: any) => {
+    const feed = mock.fn(async ({ maxResults, to }: any) => {
       const from = to
         ? all.filter((e) => e.updated.replace(/\D/g, '') <= to)
         : all;
@@ -242,84 +273,99 @@ describe('feedPages', () => {
 
     const first = pageValue(await feedPages(feed, { maxResults: 2 }, byId));
     // s2's two entries are left whole to the next call.
-    expect(first.entries.map((e: any) => e.id)).toEqual([entryId(0)]);
-    expect(first.next_to).toBe('20261001070002');
+    assert.deepStrictEqual(
+      first.entries.map((e: any) => e.id),
+      [entryId(0)],
+    );
+    assert.equal(first.next_to, '20261001070002');
 
     const second = pageValue(
       await feedPages(feed, { maxResults: 10, to: first.next_to }, byId),
     );
-    expect(second.entries.map((e: any) => e.id)).toEqual(
+    assert.deepStrictEqual(
+      second.entries.map((e: any) => e.id),
       [1, 2, 3].map(entryId),
     );
-    expect(second.next_to).toBeUndefined();
+    assert.equal(second.next_to, undefined);
   });
 
   it('answers a second holding more than asked whole, and reads on from the second before it', async () => {
     const crowded = '2026-10-01T07:00:00Z';
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(
-        okResponse({
-          entries: stamped(0, Array(3).fill(crowded)),
-          next_to: '20261001070000',
-        }),
-      )
-      .mockResolvedValueOnce(
-        okResponse({
-          entries: stamped(0, [
-            ...Array(4).fill(crowded),
-            '2026-10-01T06:59:59Z',
-          ]),
-          next_to: '20261001065959',
-        }),
+    const fetch = ((fn) => {
+      fn.mock.mockImplementationOnce(
+        async () =>
+          okResponse({
+            entries: stamped(0, Array(3).fill(crowded)),
+            next_to: '20261001070000',
+          }),
+        0,
       );
+      fn.mock.mockImplementationOnce(
+        async () =>
+          okResponse({
+            entries: stamped(0, [
+              ...Array(4).fill(crowded),
+              '2026-10-01T06:59:59Z',
+            ]),
+            next_to: '20261001065959',
+          }),
+        1,
+      );
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
 
     const value = pageValue(await feedPages(fetch, { maxResults: 2 }, byId));
 
-    expect(fetch.mock.calls[1][0]).toEqual({
+    assert.deepStrictEqual(fetch.mock.calls[1]?.arguments[0], {
       maxResults: 100,
       to: '20261001070000',
     });
     // All four of that second, more than asked; the next read starts past it.
-    expect(value.entries.map((e: any) => e.id)).toEqual(
+    assert.deepStrictEqual(
+      value.entries.map((e: any) => e.id),
       [0, 1, 2, 3].map(entryId),
     );
-    expect(value.next_to).toBe('20261001065959');
-    expect(value.incomplete_second).toBeUndefined();
+    assert.equal(value.next_to, '20261001065959');
+    assert.equal(value.incomplete_second, undefined);
   });
 
   it('says so when a second holds more than one request answers', async () => {
     const crowded = '2026-10-01T07:00:00Z';
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(
-        okResponse({
-          entries: stamped(0, Array(3).fill(crowded)),
-          next_to: '20261001070000',
-        }),
-      )
-      .mockResolvedValueOnce(
-        okResponse({
-          entries: stamped(0, Array(100).fill(crowded)),
-          next_to: '20261001070000',
-        }),
+    const fetch = ((fn) => {
+      fn.mock.mockImplementationOnce(
+        async () =>
+          okResponse({
+            entries: stamped(0, Array(3).fill(crowded)),
+            next_to: '20261001070000',
+          }),
+        0,
       );
+      fn.mock.mockImplementationOnce(
+        async () =>
+          okResponse({
+            entries: stamped(0, Array(100).fill(crowded)),
+            next_to: '20261001070000',
+          }),
+        1,
+      );
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
 
     const value = pageValue(await feedPages(fetch, { maxResults: 2 }, byId));
 
-    expect(value.entries).toHaveLength(100);
-    expect(value.next_to).toBe('20261001065959');
-    expect(value.incomplete_second).toBe('20261001070000');
+    assert.equal(value.entries.length, 100);
+    assert.equal(value.next_to, '20261001065959');
+    assert.equal(value.incomplete_second, '20261001070000');
   });
 
   it('steps a bound back one second across a day', () => {
-    expect(secondBefore('20261001000000')).toBe('20260930235959');
-    expect(secondBefore('20261001070000')).toBe('20261001065959');
+    assert.equal(secondBefore('20261001000000'), '20260930235959');
+    assert.equal(secondBefore('20261001070000'), '20261001065959');
   });
 
   it(`never collects more than ${FEED_ENTRIES_CEILING}`, async () => {
     let n = 0;
-    const fetch = jest.fn(async ({ maxResults }: any) => {
+    const fetch = mock.fn(async ({ maxResults }: any) => {
       const answered = page(n, maxResults, `T${n + maxResults}`);
       n += maxResults;
       return answered;
@@ -329,9 +375,9 @@ describe('feedPages', () => {
       await feedPages(fetch as never, { maxResults: 5000 }, byId),
     );
 
-    expect(fetch).toHaveBeenCalledTimes(FEED_ENTRIES_CEILING / 100 + 1);
-    expect(value.entries).toHaveLength(FEED_ENTRIES_CEILING);
-    expect(value.next_to).toBe(`T${FEED_ENTRIES_CEILING + 1}`);
+    assert.equal(fetch.mock.callCount(), FEED_ENTRIES_CEILING / 100 + 1);
+    assert.equal(value.entries.length, FEED_ENTRIES_CEILING);
+    assert.equal(value.next_to, `T${FEED_ENTRIES_CEILING + 1}`);
   });
 
   it("reads the default count the same way when no count is given — its next_to is ours, not SAP's inclusive link", async () => {
@@ -341,30 +387,35 @@ describe('feedPages', () => {
       '2026-10-01T07:00:08Z',
       '2026-10-01T07:00:07Z',
     ]);
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(
-        okResponse({ entries: all.slice(0, 51), next_to: '20261001070008' }),
+    const fetch = ((fn) => {
+      fn.mock.mockImplementationOnce(
+        async () =>
+          okResponse({ entries: all.slice(0, 51), next_to: '20261001070008' }),
+        0,
       );
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
 
     const value = pageValue(await feedPages(fetch, { to: 'T0' }, byId));
 
-    expect(fetch.mock.calls).toEqual([
-      [{ maxResults: FEED_PAGE_DEFAULT + 1, to: 'T0' }],
-    ]);
+    assert.deepStrictEqual(
+      fetch.mock.calls.map((c) => c.arguments),
+      [[{ maxResults: FEED_PAGE_DEFAULT + 1, to: 'T0' }]],
+    );
     // The second ending at the cut goes whole to the next read.
-    expect(value.entries).toHaveLength(49);
-    expect(value.next_to).toBe('20261001070008');
+    assert.equal(value.entries.length, 49);
+    assert.equal(value.next_to, '20261001070008');
   });
 
   it('answers a failing page as itself', async () => {
     const refused = refusedResponse('page two refused');
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(page(0, 100, 'T1'))
-      .mockResolvedValueOnce(refused);
+    const fetch = ((fn) => {
+      fn.mock.mockImplementationOnce(async () => page(0, 100, 'T1'), 0);
+      fn.mock.mockImplementationOnce(async () => refused, 1);
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
 
-    expect(await feedPages(fetch, { maxResults: 200 }, byId)).toBe(refused);
+    assert.equal(await feedPages(fetch, { maxResults: 200 }, byId), refused);
   });
 });
 
@@ -372,12 +423,12 @@ describe('feedPages', () => {
 
 describe('the dumps feed query', () => {
   it('is nothing when no filter is given', () => {
-    expect(dumpQueryOf({})).toBeUndefined();
-    expect(dumpQueryOf({ user: '  ' })).toBeUndefined();
+    assert.equal(dumpQueryOf({}), undefined);
+    assert.equal(dumpQueryOf({ user: '  ' }), undefined);
   });
 
   it('puts the user as equals and the rest as contains, in one and ( … )', () => {
-    expect(
+    assert.equal(
       dumpQueryOf({
         user: 'SAPUSER01',
         runtime_error: 'CONVT_NO_NUMBER',
@@ -386,7 +437,6 @@ describe('the dumps feed query', () => {
         package: 'ZPLACEHOLDER',
         component: 'BC-ABA',
       }),
-    ).toBe(
       'and ( equals ( user , SAPUSER01 ) , contains ( runtimeError , CONVT_NO_NUMBER ) , ' +
         'contains ( exception , CX_SY_CONVERSION ) , contains ( objectName , ZCL_PLACEHOLDER ) , ' +
         'contains ( package , ZPLACEHOLDER ) , contains ( component , BC-ABA ) )',
@@ -394,9 +444,9 @@ describe('the dumps feed query', () => {
   });
 
   it('refuses a value that would end its operand', () => {
-    expect(() => dumpQueryOf({ runtime_error: 'A B' })).toThrow(/blanks/);
-    expect(() => dumpQueryOf({ package: 'A,B' })).toThrow(/commas/);
-    expect(() => dumpQueryOf({ exception: 'A)' })).toThrow(/parentheses/);
+    assertThrows(() => dumpQueryOf({ runtime_error: 'A B' }), /blanks/);
+    assertThrows(() => dumpQueryOf({ package: 'A,B' }), /commas/);
+    assertThrows(() => dumpQueryOf({ exception: 'A)' }), /parentheses/);
   });
 });
 
@@ -404,14 +454,15 @@ describe('the dumps feed query', () => {
 
 describe('RuntimeListFeeds — dumps', () => {
   beforeEach(() => {
-    (AdtRuntimeClient as unknown as jest.Mock).mockClear();
+    AdtRuntimeClientMock.mock.resetCalls();
   });
 
   it('sends the filters as one query, pages on, and gives each entry its dump_id', async () => {
-    const dumpsMember = jest
-      .fn()
-      .mockResolvedValueOnce(page(0, 100, 'T1'))
-      .mockResolvedValueOnce(page(100, 21, 'T2'));
+    const dumpsMember = ((fn) => {
+      fn.mock.mockImplementationOnce(async () => page(0, 100, 'T1'), 0);
+      fn.mock.mockImplementationOnce(async () => page(100, 21, 'T2'), 1);
+      return fn;
+    })(mock.fn<(...args: any[]) => any>());
     feeds = { dumps: dumpsMember };
 
     const result: any = await handleRuntimeListFeeds(context as any, {
@@ -422,51 +473,53 @@ describe('RuntimeListFeeds — dumps', () => {
       from: '20260901000000',
     });
 
-    expect(result.isError).toBe(false);
-    expect(dumpsMember).toHaveBeenNthCalledWith(1, {
-      user: 'SAPUSER01',
-      query:
-        'and ( equals ( user , SAPUSER01 ) , contains ( runtimeError , CONVT ) )',
-      from: '20260901000000',
-      analyse: analyseException,
-      maxResults: 100,
-      to: undefined,
-    });
-    expect(dumpsMember.mock.calls[1][0]).toMatchObject({
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(dumpsMember.mock.calls[1 - 1]?.arguments, [
+      {
+        user: 'SAPUSER01',
+        query:
+          'and ( equals ( user , SAPUSER01 ) , contains ( runtimeError , CONVT ) )',
+        from: '20260901000000',
+        analyse: analyseException,
+        maxResults: 100,
+        to: undefined,
+      },
+    ]);
+    assertMatchObject(dumpsMember.mock.calls[1]?.arguments[0], {
       maxResults: 21,
       to: 'T1',
     });
     const answered = body(result);
-    expect(answered.count).toBe(120);
-    expect(answered.next_to).toBe('T2');
-    expect(answered.entries[0]).toEqual({
+    assert.equal(answered.count, 120);
+    assert.equal(answered.next_to, 'T2');
+    assert.deepStrictEqual(answered.entries[0], {
       dump_id: 'ID0%20X',
       id: entryId(0),
     });
   });
 
   it('refuses a dumps filter on another feed rather than dropping it', async () => {
-    feeds = { systemMessages: jest.fn() };
+    feeds = { systemMessages: mock.fn() };
 
     const result: any = await handleRuntimeListFeeds(context as any, {
       feed_type: 'system_messages',
       runtime_error: 'CONVT',
     });
 
-    expect(result.isError).toBe(true);
-    expect(feeds.systemMessages).not.toHaveBeenCalled();
+    assert.equal(result.isError, true);
+    assert.equal(feeds.systemMessages.mock.callCount(), 0);
   });
 
   it('refuses a value that would break the query, before any request', async () => {
-    feeds = { dumps: jest.fn() };
+    feeds = { dumps: mock.fn() };
 
     const result: any = await handleRuntimeListFeeds(context as any, {
       feed_type: 'dumps',
       object_name: 'A B',
     });
 
-    expect(result.isError).toBe(true);
-    expect(feeds.dumps).not.toHaveBeenCalled();
+    assert.equal(result.isError, true);
+    assert.equal(feeds.dumps.mock.callCount(), 0);
   });
 });
 
@@ -495,14 +548,17 @@ const dumpXml =
 
 describe('RuntimeGetDumpById', () => {
   it('takes the id out of a feed entry URI, or the id as it is', () => {
-    expect(dumpIdFrom('/sap/bc/adt/vit/runtime/dumps/ID1%20X')).toBe('ID1%20X');
-    expect(dumpIdFrom('/sap/bc/adt/runtime/dumps/ID1')).toBe('ID1');
-    expect(dumpIdFrom(' ID1 ')).toBe('ID1');
-    expect(dumpIdOf(entryId(7))).toBe(dumpIdFrom(entryId(7)));
+    assert.equal(
+      dumpIdFrom('/sap/bc/adt/vit/runtime/dumps/ID1%20X'),
+      'ID1%20X',
+    );
+    assert.equal(dumpIdFrom('/sap/bc/adt/runtime/dumps/ID1'), 'ID1');
+    assert.equal(dumpIdFrom(' ID1 '), 'ID1');
+    assert.equal(dumpIdOf(entryId(7)), dumpIdFrom(entryId(7)));
   });
 
   it('summarises the root: runtime error, exception, program, time, user, termination', () => {
-    expect(dumpSummaryOf(dumpXml)).toEqual({
+    assert.deepStrictEqual(dumpSummaryOf(dumpXml), {
       runtime_error: 'RAISE_SHORTDUMP',
       exception: 'CX_SY_ZERODIVIDE',
       title: 'Runtime error RAISE_SHORTDUMP',
@@ -517,12 +573,12 @@ describe('RuntimeGetDumpById', () => {
   });
 
   it('has no summary for a document without the root', () => {
-    expect(dumpSummaryOf('plain formatted text')).toBeUndefined();
-    expect(dumpSummaryOf('<html><body/></html>')).toBeUndefined();
+    assert.equal(dumpSummaryOf('plain formatted text'), undefined);
+    assert.equal(dumpSummaryOf('<html><body/></html>'), undefined);
   });
 
   it('reads the dump a URI names, and answers the summary alone when asked', async () => {
-    const getById = jest.fn(async () => okResponse(dumpXml));
+    const getById = mock.fn(async () => okResponse(dumpXml));
     dumps = { getById };
 
     const result: any = await handleRuntimeGetDumpById(context as any, {
@@ -530,13 +586,20 @@ describe('RuntimeGetDumpById', () => {
       response_mode: 'summary',
     });
 
-    expect(getById).toHaveBeenCalledWith('ID1%20X', {
-      analyse: analyseException,
-      view: 'default',
-    });
+    assert.ok(
+      getById.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'ID1%20X',
+          {
+            analyse: analyseException,
+            view: 'default',
+          },
+        ]),
+      ),
+    );
     const answered = body(result);
-    expect(answered.summary.runtime_error).toBe('RAISE_SHORTDUMP');
-    expect(answered.summary.termination.line).toBe(42);
-    expect(answered.payload).toBeUndefined();
+    assert.equal(answered.summary.runtime_error, 'RAISE_SHORTDUMP');
+    assert.equal(answered.summary.termination.line, 42);
+    assert.equal(answered.payload, undefined);
   });
 });

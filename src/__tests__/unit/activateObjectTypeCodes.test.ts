@@ -25,7 +25,25 @@ const families = () => ({
   getMetadataExtension: activates('metadataExtension'),
 });
 
-jest.mock('../../lib/clients', () => {
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
+import { TOOL_DEFINITION as ActivateObjects } from '../../handlers/common/high/handleActivateObjects';
+import {
+  TOOL_DEFINITION as ActivateObjectLow,
+  handleActivateObject,
+} from '../../handlers/common/low/handleActivateObject';
+import {
+  SINGLE_ACTIVATION,
+  SINGLE_ACTIVATION_NAMES,
+  SINGLE_ACTIVATION_ROUTES,
+  TYPE_NAMES,
+} from '../../lib/adtProjections';
+import * as clients from '../../lib/clients';
+import { jsonAt, listedJson } from '../helpers/listedJson';
+import { stateSystemKind } from '../helpers/systemKind';
+
+{
   const client = () => ({
     ...families(),
     getUtils: () => ({
@@ -46,27 +64,12 @@ jest.mock('../../lib/clients', () => {
       },
     }),
   });
-  return {
-    variantOf: () => 'onprem',
-    // A program's activation and an on-premise group activation are the
-    // on-premise client's.
-    createOnPremAdtClient: client,
-    createAdtClient: client,
-  };
-});
-
-import { TOOL_DEFINITION as ActivateObjects } from '../../handlers/common/high/handleActivateObjects';
-import {
-  TOOL_DEFINITION as ActivateObjectLow,
-  handleActivateObject,
-} from '../../handlers/common/low/handleActivateObject';
-import {
-  SINGLE_ACTIVATION,
-  SINGLE_ACTIVATION_NAMES,
-  SINGLE_ACTIVATION_ROUTES,
-  TYPE_NAMES,
-} from '../../lib/adtProjections';
-import { jsonAt, listedJson } from '../helpers/listedJson';
+  stateSystemKind('onprem');
+  // A program's activation and an on-premise group activation are the
+  // on-premise client's.
+  mock.method(clients, 'createOnPremAdtClient', client);
+  mock.method(clients, 'createAdtClient', client);
+}
 
 /**
  * Which ADT type code reaches which family's own `activate()`.
@@ -86,7 +89,7 @@ describe('ActivateObject: each type code and where it goes', () => {
     familyCalls.length = 0;
   });
 
-  it.each([
+  for (const [code, api] of [
     ['clas/oc', 'class'],
     ['prog/p', 'program'],
     ['intf/oi', 'interface'],
@@ -98,71 +101,84 @@ describe('ActivateObject: each type code and where it goes', () => {
     ['dtel/de', 'dataElement'],
     ['bdef/bdo', 'behaviorDefinition'],
     ['ddlx/ex', 'metadataExtension'],
-  ])('%s reaches the %s activation', async (code, api) => {
-    await handleActivateObject(context, {
-      objects: [{ name: 'zobj', type: code }],
-    } as never);
-    expect(familyCalls).toHaveLength(1);
-    expect(familyCalls[0]?.startsWith(`${api}:`)).toBe(true);
-    expect(groupObjects).toBeUndefined();
-  });
+  ]) {
+    it(format('%s reaches the %s activation', code, api), async () => {
+      await handleActivateObject(context, {
+        objects: [{ name: 'zobj', type: code }],
+      } as never);
+      assert.equal(familyCalls.length, 1);
+      assert.equal(familyCalls[0]?.startsWith(`${api}:`), true);
+      assert.equal(groupObjects, undefined);
+    });
+  }
 
   // The served codes (`DOMA/DD`, `BDEF/BDO`) are pinned above; the codes no
   // release lists that the old map read are refused, nothing sent.
-  it.each(['doma/dm', 'bdef/bd', 'ttyp/st'])(
-    '%s is no code a single activation or a group takes',
-    async (code) => {
-      const answered = (await handleActivateObject(context, {
-        objects: [{ name: 'zobj', type: code }],
-      } as never)) as { isError?: boolean; content: { text: string }[] };
-      expect(answered.isError).toBe(true);
-      expect(answered.content[0]?.text).toContain(
-        `objects[].type "${code}" is not one of: CLAS/OC`,
-      );
-      expect(familyCalls).toEqual([]);
-      expect(groupObjects).toBeUndefined();
-    },
-  );
-
-  it.each(['ttyp/da', 'ttyp'])('%s has no single activation', (code) => {
-    expect(Object.hasOwn(SINGLE_ACTIVATION_ROUTES, code)).toBe(false);
-    expect(Object.hasOwn(SINGLE_ACTIVATION_ROUTES, code.toUpperCase())).toBe(
-      false,
+  for (const code of ['doma/dm', 'bdef/bd', 'ttyp/st']) {
+    it(
+      format('%s is no code a single activation or a group takes', code),
+      async () => {
+        const answered = (await handleActivateObject(context, {
+          objects: [{ name: 'zobj', type: code }],
+        } as never)) as { isError?: boolean; content: { text: string }[] };
+        assert.equal(answered.isError, true);
+        assert.ok(
+          answered.content[0]?.text.includes(
+            `objects[].type "${code}" is not one of: CLAS/OC`,
+          ),
+        );
+        assert.deepStrictEqual(familyCalls, []);
+        assert.equal(groupObjects, undefined);
+      },
     );
-  });
+  }
+
+  for (const code of ['ttyp/da', 'ttyp']) {
+    it(format('%s has no single activation', code), () => {
+      assert.equal(Object.hasOwn(SINGLE_ACTIVATION_ROUTES, code), false);
+      assert.equal(
+        Object.hasOwn(SINGLE_ACTIVATION_ROUTES, code.toUpperCase()),
+        false,
+      );
+    });
+  }
 
   it("activates a TABL/DS through the structure family's own activate()", async () => {
     await handleActivateObject(context, {
       objects: [{ name: 'zs_x', type: 'TABL/DS' }],
     } as never);
-    expect(familyCalls).toEqual(['structure:{"structureName":"ZS_X"}']);
-    expect(groupObjects).toBeUndefined();
+    assert.deepStrictEqual(familyCalls, ['structure:{"structureName":"ZS_X"}']);
+    assert.equal(groupObjects, undefined);
   });
 
-  it.each(['TTYP/DA', 'TTYP'])(
-    'sends a table type (%s) to group activation',
-    async (type) => {
-      await handleActivateObject(context, {
-        objects: [{ name: 'zt_x', type }],
-      } as never);
-      expect(familyCalls).toEqual([]);
-      // A bare main type is read as the code of the tables it names.
-      expect(groupObjects).toEqual([{ name: 'ZT_X', type: 'TTYP/DA' }]);
-    },
-  );
+  for (const type of ['TTYP/DA', 'TTYP']) {
+    it(
+      format('sends a table type (%s) to group activation', type),
+      async () => {
+        await handleActivateObject(context, {
+          objects: [{ name: 'zt_x', type }],
+        } as never);
+        assert.deepStrictEqual(familyCalls, []);
+        // A bare main type is read as the code of the tables it names.
+        assert.deepStrictEqual(groupObjects, [
+          { name: 'ZT_X', type: 'TTYP/DA' },
+        ]);
+      },
+    );
+  }
 
   it('ActivateObjects names the codes a table type and a structure are activated by', () => {
     const typeText =
       jsonAt(listedJson(ActivateObjects.inputSchema), 'objects', '[]', 'type')
         .description ?? '';
     // Each code, with the names that stand for it (`ACTIVATION_NAMES`).
-    expect(typeText).toContain('TABL/DS (structure, stru)');
+    assert.ok(typeText.includes('TABL/DS (structure, stru)'));
     // A main type is no name: `TTYP` reads as `TTYP/DA` through the
     // projection, so `ttyp` stands beside no code.
-    expect(typeText).toContain('TTYP/DA, ');
-    expect(typeText).not.toContain('(ttyp)');
+    assert.ok(typeText.includes('TTYP/DA, '));
+    assert.ok(!typeText.includes('(ttyp)'));
     // A bare main type no table lists is not offered.
-    expect(typeText).not.toContain('ENHO (');
+    assert.ok(!typeText.includes('ENHO ('));
   });
 });
 
@@ -176,7 +192,7 @@ describe('the preaudit text names exactly the codes the map routes to a family',
   const codesIn = (text: string) => {
     const marker = 'single-object activation: ';
     const start = text.indexOf(marker);
-    expect(start).toBeGreaterThanOrEqual(0);
+    assert.ok(start >= 0);
     const end = text.indexOf('.', start);
     return text
       .slice(start + marker.length, end)
@@ -185,7 +201,7 @@ describe('the preaudit text names exactly the codes the map routes to a family',
       .sort();
   };
 
-  it.each([
+  for (const [_tool, text] of [
     [
       'ActivateObjects',
       jsonAt(listedJson(ActivateObjects.inputSchema), 'preaudit').description ??
@@ -196,27 +212,30 @@ describe('the preaudit text names exactly the codes the map routes to a family',
       jsonAt(listedJson(ActivateObjectLow.inputSchema), 'preaudit')
         .description ?? '',
     ],
-  ])('%s', (_tool, text) => {
-    // The projection of the variant (`SINGLE_ACTIVATION`), every value of
-    // which `SINGLE_ACTIVATION_ROUTES` routes to its API's activation, then
-    // the names standing for those codes (`SINGLE_ACTIVATION_NAMES`), each
-    // routed as its code; the codes no table holds (`doma/dm`, `bdef/bd`)
-    // are not offered.
-    expect(codesIn(text)).toEqual(
-      [...SINGLE_ACTIVATION.onprem, ...SINGLE_ACTIVATION_NAMES.onprem]
-        .map((code) => code.toLowerCase())
-        .sort(),
-    );
-    const routed = [
-      ...Object.keys(SINGLE_ACTIVATION_ROUTES),
-      ...SINGLE_ACTIVATION_NAMES.onprem.filter((name) =>
-        Object.hasOwn(SINGLE_ACTIVATION_ROUTES, TYPE_NAMES[name]),
-      ),
-    ].map((code) => code.toLowerCase());
-    for (const code of codesIn(text)) {
-      expect(routed).toContain(code);
-    }
-    expect(codesIn(text)).not.toContain('clas');
-    expect(codesIn(text)).not.toContain('doma/dm');
-  });
+  ]) {
+    it(format('%s', _tool), () => {
+      // The projection of the variant (`SINGLE_ACTIVATION`), every value of
+      // which `SINGLE_ACTIVATION_ROUTES` routes to its API's activation, then
+      // the names standing for those codes (`SINGLE_ACTIVATION_NAMES`), each
+      // routed as its code; the codes no table holds (`doma/dm`, `bdef/bd`)
+      // are not offered.
+      assert.deepStrictEqual(
+        codesIn(text),
+        [...SINGLE_ACTIVATION.onprem, ...SINGLE_ACTIVATION_NAMES.onprem]
+          .map((code) => code.toLowerCase())
+          .sort(),
+      );
+      const routed = [
+        ...Object.keys(SINGLE_ACTIVATION_ROUTES),
+        ...SINGLE_ACTIVATION_NAMES.onprem.filter((name) =>
+          Object.hasOwn(SINGLE_ACTIVATION_ROUTES, TYPE_NAMES[name]),
+        ),
+      ].map((code) => code.toLowerCase());
+      for (const code of codesIn(text)) {
+        assert.ok(routed.includes(code));
+      }
+      assert.ok(!codesIn(text).includes('clas'));
+      assert.ok(!codesIn(text).includes('doma/dm'));
+    });
+  }
 });

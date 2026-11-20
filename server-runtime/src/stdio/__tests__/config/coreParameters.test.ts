@@ -5,9 +5,12 @@
  * and its YAML template and validation come from it.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { YamlConfig } from '@mcp-abap-adt/lib/config';
 import {
   generateYamlConfigTemplate,
@@ -18,6 +21,7 @@ import {
 import { NO_IDLE_BOUND } from '@mcp-abap-adt/lib/state';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { load } from 'js-yaml';
+import { assertThrows } from '../../../../../src/__tests__/helpers/assertions';
 import { CORE_PARAMETERS, readCoreConfig } from '../../config/coreParameters';
 import { coreHelp, main } from '../../launcher';
 import { StdioServer } from '../../StdioServer';
@@ -50,7 +54,7 @@ function cleanEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
 }
 
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   process.argv = savedArgv;
   process.env = savedEnv;
 });
@@ -61,21 +65,24 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
   process.env = cleanEnv(env);
   const written: string[] = [];
   const exits: number[] = [];
-  jest.spyOn(process.stderr, 'write').mockImplementation((chunk) => {
+  mock.method(process.stderr, 'write', (chunk: string | Uint8Array) => {
     written.push(String(chunk));
     return true;
   });
-  jest.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+  mock.method(process, 'exit', ((code?: number) => {
     exits.push(code ?? 0);
   }) as never);
   // A start that is not stopped serves nothing here: no socket, no stdin.
-  const served = jest
-    .spyOn(StdioServer.prototype, 'start')
-    .mockResolvedValue(undefined);
+  const served = mock.method(
+    StdioServer.prototype,
+    'start',
+    async () => undefined,
+  );
   // The connection at start is the launcher's own step: not made here.
-  jest
-    .spyOn(StdioServer.prototype, 'connectAtStart')
-    .mockResolvedValue({ session: 'logged_on' });
+  const atStart: Awaited<ReturnType<StdioServer['connectAtStart']>> = {
+    session: 'logged_on',
+  };
+  mock.method(StdioServer.prototype, 'connectAtStart', async () => atStart);
   await main({
     toolSet: fullToolSet,
     program: 'mcp-abap-adt',
@@ -87,14 +94,16 @@ async function start(argv: string[], env: NodeJS.ProcessEnv = {}) {
     exits,
     served: served.mock.calls.length,
     /** The servers whose start was called. */
-    servers: served.mock.contexts,
+    servers: served.mock.calls.map((call) =>
+      call.this instanceof StdioServer ? call.this : undefined,
+    ),
   };
 }
 
 describe("core's help", () => {
   const help = coreHelp();
 
-  it.each([
+  for (const name of [
     '--transport',
     '--host',
     '--port',
@@ -113,11 +122,13 @@ describe("core's help", () => {
     'MCP_STATE_IDLE_MINUTES',
     'state-idle-minutes',
     'HELD STATE',
-  ])('lists no %s', (name) => {
-    expect(help).not.toContain(name);
-  });
+  ]) {
+    it(format('lists no %s', name), () => {
+      assert.ok(!help.includes(name));
+    });
+  }
 
-  it.each([
+  for (const name of [
     '--mcp',
     '--env',
     '--env-path',
@@ -137,43 +148,52 @@ describe("core's help", () => {
     'MCP_SHUTDOWN_TIMEOUT',
     'SAP_DEBUG_TERMINAL_ID',
     'SAP_DEBUG_IDE_ID',
-  ])('lists %s', (name) => {
-    expect(help).toContain(name);
-  });
+  ]) {
+    it(format('lists %s', name), () => {
+      assert.ok(help.includes(name));
+    });
+  }
 
   it("names the debugger ids' sources: the destination's .env, then the environment", () => {
     const block = help.slice(help.indexOf('SAP_DEBUG_TERMINAL_ID'));
-    expect(block.replace(/\s+/g, ' ')).toContain(
-      "First found: the destination's .env; the environment.",
+    assert.ok(
+      block
+        .replace(/\s+/g, ' ')
+        .includes("First found: the destination's .env; the environment."),
     );
   });
 });
 
 describe('--shutdown-timeout is a row of core', () => {
   it('no default: absent unless given', () => {
-    expect(readCoreConfig([], {}).shutdownTimeout).toBeUndefined();
+    assert.equal(readCoreConfig([], {}).shutdownTimeout, undefined);
   });
 
   it('CLI, env and YAML reach the config, in seconds', () => {
-    expect(readCoreConfig(['--shutdown-timeout=5'], {}).shutdownTimeout).toBe(
+    assert.equal(
+      readCoreConfig(['--shutdown-timeout=5'], {}).shutdownTimeout,
       5,
     );
-    expect(
+    assert.equal(
       readCoreConfig([], { MCP_SHUTDOWN_TIMEOUT: '7' }).shutdownTimeout,
-    ).toBe(7);
-    expect(
+      7,
+    );
+    assert.equal(
       readCoreConfig([], {}, { 'shutdown-timeout': 9 }).shutdownTimeout,
-    ).toBe(9);
+      9,
+    );
   });
 
-  it.each(['0', '1.5', 'abc', '86401'])('%s stops the start', async (value) => {
-    const { stderr, exits, served } = await start([
-      `--shutdown-timeout=${value}`,
-    ]);
-    expect(stderr).toContain('Invalid --shutdown-timeout');
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  for (const value of ['0', '1.5', 'abc', '86401']) {
+    it(format('%s stops the start', value), async () => {
+      const { stderr, exits, served } = await start([
+        `--shutdown-timeout=${value}`,
+      ]);
+      assert.ok(stderr.includes('Invalid --shutdown-timeout'));
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 });
 
 // stdio has no idle bound (20.1.1): the parameter is gone from core's table.
@@ -185,45 +205,62 @@ describe('--state-idle-minutes is gone from core', () => {
   const GONE =
     'was removed from `mcp-abap-adt` in 20.1.1: stdio has no idle bound — held state ends by its stop tool, the client closing stdin, the backend or the shutdown; remove it from the configuration (the HTTP and SSE binaries keep it)';
 
-  it.each([
-    [['--state-idle-minutes=45'], {}, '--state-idle-minutes'],
-    [['--state-idle-minutes', '45'], {}, '--state-idle-minutes'],
-  ])('%p %p stops the start, naming %s', async (argv, env, form) => {
-    const { stderr, exits, served } = await start(argv, env);
-    expect(stderr).toContain(`[MCP] ${form} ${GONE}`);
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  // Each row's title, written as shown.
+  for (const [shown, argv, env, form] of [
+    [
+      '["--state-idle-minutes=45"] {}',
+      ['--state-idle-minutes=45'],
+      {},
+      '--state-idle-minutes',
+    ],
+    [
+      '["--state-idle-minutes", "45"] {}',
+      ['--state-idle-minutes', '45'],
+      {},
+      '--state-idle-minutes',
+    ],
+  ] satisfies [string, string[], NodeJS.ProcessEnv, string][]) {
+    it(format('%s stops the start, naming %s', shown, form), async () => {
+      const { stderr, exits, served } = await start(argv, env);
+      assert.ok(stderr.includes(`[MCP] ${form} ${GONE}`));
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 
   it('the CLI flag and the YAML key are refused by the reader', () => {
-    expect(() => readCoreConfig(['--state-idle-minutes=45'], {})).toThrow(
+    assertThrows(
+      () => readCoreConfig(['--state-idle-minutes=45'], {}),
       `--state-idle-minutes ${GONE}`,
     );
-    expect(() => readCoreConfig([], {}, { 'state-idle-minutes': 45 })).toThrow(
+    assertThrows(
+      () => readCoreConfig([], {}, { 'state-idle-minutes': 45 }),
       `state-idle-minutes (config file) ${GONE}`,
     );
-    expect(
+    assert.deepStrictEqual(
       validateYamlConfig(CORE_PARAMETERS, { 'state-idle-minutes': 45 }).errors,
-    ).toEqual([`state-idle-minutes (config file) ${GONE}`]);
+      [`state-idle-minutes (config file) ${GONE}`],
+    );
   });
 
   it('the config carries no bound', () => {
-    expect('stateIdleMinutes' in readCoreConfig([], {})).toBe(false);
+    assert.equal('stateIdleMinutes' in readCoreConfig([], {}), false);
   });
 
   it('an inherited MCP_STATE_IDLE_MINUTES is not read: stdio starts, with no bound', async () => {
-    expect(
+    assert.equal(
       'stateIdleMinutes' in
         readCoreConfig([], { MCP_STATE_IDLE_MINUTES: '45' }),
-    ).toBe(false);
+      false,
+    );
     const { stderr, exits, served, servers } = await start(
       ['--system-type=onprem'],
       { MCP_STATE_IDLE_MINUTES: '45' },
     );
-    expect(stderr).not.toContain('MCP_STATE_IDLE_MINUTES');
-    expect(exits).toEqual([]);
-    expect(served).toBe(1);
-    expect(servers[0]?.state.idleMinutes).toBe(NO_IDLE_BOUND);
+    assert.ok(!stderr.includes('MCP_STATE_IDLE_MINUTES'));
+    assert.deepStrictEqual(exits, []);
+    assert.equal(served, 1);
+    assert.equal(servers[0]?.state.idleMinutes, NO_IDLE_BOUND);
   });
 });
 
@@ -231,14 +268,14 @@ describe('--state-idle-minutes is gone from core', () => {
 // each word answered with the binary of this transport that serves it.
 describe('--exposition is gone', () => {
   it('the flag stops the start, naming the binary its words ask for', () => {
-    expect(() => readCoreConfig(['--exposition=readonly'], {})).toThrow(
+    assertThrows(
+      () => readCoreConfig(['--exposition=readonly'], {}),
       new ParameterRefusal(
         '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`)',
       ),
     );
-    expect(() =>
-      readCoreConfig(['--exposition', 'readonly,high,debug'], {}),
-    ).toThrow(
+    assertThrows(
+      () => readCoreConfig(['--exposition', 'readonly,high,debug'], {}),
       new ParameterRefusal(
         '--exposition is gone (19.0.0): the binary fixes its tool set, so remove it; the high tools are served, beside the readonly ones, by `mcp-abap-adt` (`@mcp-abap-adt/core`)',
       ),
@@ -246,7 +283,8 @@ describe('--exposition is gone', () => {
   });
 
   it('in the config file too, and the help lists no such option', () => {
-    expect(() => readCoreConfig([], {}, { exposition: 'readonly' })).toThrow(
+    assertThrows(
+      () => readCoreConfig([], {}, { exposition: 'readonly' }),
       new ParameterRefusal(
         'exposition (config file) is gone (19.0.0): the binary fixes its tool set, so remove it; the readonly tools alone (with system and search) are served by `mcp-abap-adt-ro` (`@mcp-abap-adt/core-ro`)',
       ),
@@ -255,28 +293,31 @@ describe('--exposition is gone', () => {
 });
 
 describe('--transport, with any value, stops the start with the sentence of the binary that serves it', () => {
-  it.each([
+  for (const [argv, env] of [
     [['--transport=stdio'], {}],
     [['--transport=http'], {}],
     [['--transport=sse'], {}],
     [['--transport', 'stdio'], {}],
     [[], { MCP_TRANSPORT: 'stdio' }],
-  ] as const)('%j %j', async (argv, env) => {
-    const { stderr, exits, served } = await start([...argv], { ...env });
-    expect(stderr).toBe(`[MCP] ${STDIO_SENTENCE}\n`);
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  ] as const) {
+    it(format('%j %j', argv, env), async () => {
+      const { stderr, exits, served } = await start([...argv], { ...env });
+      assert.equal(stderr, `[MCP] ${STDIO_SENTENCE}\n`);
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 
   it('in the config file too', () => {
-    expect(() => readCoreConfig([], {}, { transport: 'stdio' })).toThrow(
+    assertThrows(
+      () => readCoreConfig([], {}, { transport: 'stdio' }),
       STDIO_SENTENCE,
     );
   });
 });
 
 describe('every removed parameter stops core with its words', () => {
-  it.each([
+  for (const [arg, form, words] of [
     ['--sse-host=0.0.0.0', '--sse-host', SSE_WORDS],
     ['--sse-port=3001', '--sse-port', SSE_WORDS],
     ['--sse-path=/sse', '--sse-path', SSE_WORDS],
@@ -301,14 +342,16 @@ describe('every removed parameter stops core with its words', () => {
     ['--tls-cert=/c.pem', '--tls-cert', TLS_WORDS],
     ['--tls-key=/k.pem', '--tls-key', TLS_WORDS],
     ['--tls-ca=/ca.pem', '--tls-ca', TLS_WORDS],
-  ])('%s', async (arg, form, words) => {
-    const { stderr, exits, served } = await start([arg]);
-    expect(stderr).toBe(`[MCP] ${form}: ${words}\n`);
-    expect(exits).toEqual([1]);
-    expect(served).toBe(0);
-  });
+  ]) {
+    it(format('%s', arg), async () => {
+      const { stderr, exits, served } = await start([arg]);
+      assert.equal(stderr, `[MCP] ${form}: ${words}\n`);
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
 
-  it.each([
+  for (const [_family, env] of [
     [
       'MCP_SSE_*',
       {
@@ -331,50 +374,61 @@ describe('every removed parameter stops core with its words', () => {
       'MCP_TLS_*',
       { MCP_TLS_CERT: '/c.pem', MCP_TLS_KEY: '/k.pem', MCP_TLS_CA: '/ca.pem' },
     ],
-  ] as const)(
-    "another binary's %s is not read: the start proceeds and the value is not used",
-    (_family, env) => {
-      const lines: string[] = [];
-      const exits: number[] = [];
-      const config = readStartupConfig(
-        CORE_PARAMETERS,
-        [],
-        { ...env },
-        {
-          stderr: (line) => lines.push(line),
-          exit: (code) => exits.push(code),
-        },
-        readCoreConfig,
-      );
-      expect(lines).toEqual([]);
-      expect(exits).toEqual([]);
-      expect(config).toEqual(readCoreConfig([], {}));
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        "another binary's %s is not read: the start proceeds and the value is not used",
+        _family,
+      ),
+      () => {
+        const lines: string[] = [];
+        const exits: number[] = [];
+        const config = readStartupConfig(
+          CORE_PARAMETERS,
+          [],
+          { ...env },
+          {
+            stderr: (line) => lines.push(line),
+            exit: (code) => exits.push(code),
+          },
+          readCoreConfig,
+        );
+        assert.deepStrictEqual(lines, []);
+        assert.deepStrictEqual(exits, []);
+        assert.deepStrictEqual(config, readCoreConfig([], {}));
+      },
+    );
+  }
 
-  it.each([
+  for (const [key, words] of [
     ['sse', SSE_WORDS],
     ['http', HTTP_WORDS],
-  ])('YAML %s', (key, words) => {
-    expect(() => readCoreConfig([], {}, { [key]: { port: 1 } })).toThrow(
-      `${key} (config file): ${words}`,
-    );
-  });
+  ]) {
+    it(format('YAML %s', key), () => {
+      assertThrows(
+        () => readCoreConfig([], {}, { [key]: { port: 1 } }),
+        `${key} (config file): ${words}`,
+      );
+    });
+  }
 
   it('--allow-destination-header, in each form', () => {
-    expect(() => readCoreConfig(['--allow-destination-header'], {})).toThrow(
+    assertThrows(
+      () => readCoreConfig(['--allow-destination-header'], {}),
       '--allow-destination-header is gone: `mcp-abap-adt` serves the destination it is started with',
     );
-    expect(() =>
-      readCoreConfig([], {}, { 'allow-destination-header': true }),
-    ).toThrow('allow-destination-header (config file) is gone');
+    assertThrows(
+      () => readCoreConfig([], {}, { 'allow-destination-header': true }),
+      'allow-destination-header (config file) is gone',
+    );
   });
 
   it("16.0.0's --auth-broker stays refused", () => {
-    expect(() => readCoreConfig(['--auth-broker'], {})).toThrow(
+    assertThrows(
+      () => readCoreConfig(['--auth-broker'], {}),
       '--auth-broker was removed in 16.0.0 — remove it from the configuration',
     );
-    expect(() => readCoreConfig(['--auth-broker-path=/x'], {})).not.toThrow();
+    readCoreConfig(['--auth-broker-path=/x'], {});
   });
 });
 
@@ -383,13 +437,17 @@ describe('the YAML template and validation come from the table', () => {
   const parsed = load(template) as YamlConfig;
 
   it('the template is valid and sets only defaults', () => {
-    expect(validateYamlConfig(CORE_PARAMETERS, parsed).errors).toEqual([]);
+    assert.deepStrictEqual(
+      validateYamlConfig(CORE_PARAMETERS, parsed).errors,
+      [],
+    );
     const config = readCoreConfig([], {}, parsed);
-    expect(config.mcpDestination).toBeUndefined();
+    assert.equal(config.mcpDestination, undefined);
   });
 
   it('holds core rows and no other binary keys', () => {
-    expect(Object.keys(parsed).sort()).toEqual(
+    assert.deepStrictEqual(
+      Object.keys(parsed).sort(),
       [
         'ashost',
         'auth-broker-path',
@@ -414,6 +472,7 @@ describe('the YAML template and validation come from the table', () => {
         'restore-session',
         'restrictions',
         'saprouter',
+        'session-keep-alive-minutes',
         'shutdown-timeout',
         'sysid',
         'sysnr',
@@ -429,7 +488,7 @@ describe('the YAML template and validation come from the table', () => {
       sse: { port: 3001 },
       http: { port: 3000 },
     });
-    expect(errors).toEqual([
+    assert.deepStrictEqual(errors, [
       STDIO_SENTENCE,
       `sse (config file): ${SSE_WORDS}`,
       `http (config file): ${HTTP_WORDS}`,
@@ -448,18 +507,18 @@ describe('the YAML template and validation come from the table', () => {
     it('a missing file gets the template and the start ends 0', async () => {
       const file = path.join(dir, 'conf.yaml');
       const { exits, served } = await start([`--conf=${file}`]);
-      expect(exits).toEqual([0]);
-      expect(served).toBe(0);
-      expect(fs.readFileSync(file, 'utf8')).toBe(template);
+      assert.deepStrictEqual(exits, [0]);
+      assert.equal(served, 0);
+      assert.equal(fs.readFileSync(file, 'utf8'), template);
     });
 
     it('a file with another binary key stops the start with its words', async () => {
       const file = path.join(dir, 'conf.yaml');
       fs.writeFileSync(file, 'sse:\n  port: 3001\n');
       const { stderr, exits, served } = await start([`--conf=${file}`]);
-      expect(stderr).toContain(`sse (config file): ${SSE_WORDS}`);
-      expect(exits).toEqual([1]);
-      expect(served).toBe(0);
+      assert.ok(stderr.includes(`sse (config file): ${SSE_WORDS}`));
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
     });
   });
 });

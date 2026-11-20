@@ -13,9 +13,12 @@
  * Words are split with plain code, no regular expression: letters and
  * apostrophes are word characters, anything else a separator.
  */
+import assert from 'node:assert/strict';
 import { readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, relative } from 'node:path';
+import { describe, it } from 'node:test';
 import type { ToolSetKind } from '../../../lib/config/binaries';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   SETS,
   type ServedTool,
@@ -251,7 +254,7 @@ async function everyServed(kind: ToolSetKind): Promise<ServedTool[]> {
 
 describe('tool descriptions are purely functional', () => {
   it('splits words with letters and apostrophes, everything else a separator', () => {
-    expect(wordsOf("Doesn't lock; (not)-given, can’t x2y")).toEqual([
+    assert.deepEqual(wordsOf("Doesn't lock; (not)-given, can’t x2y"), [
       "doesn't",
       'lock',
       'not',
@@ -263,12 +266,13 @@ describe('tool descriptions are purely functional', () => {
   });
 
   it('reads every contracted negation, straight or curly, in any case', () => {
-    expect(
+    assert.deepEqual(
       wordsOf("wouldn’t SHOULDN'T Aren’t WASN'T hasn't Doesn’t").map(
         isNegation,
       ),
-    ).toEqual([true, true, true, true, true, true]);
-    expect(wordsOf("NOT Never NOTHING tool's runs").map(isNegation)).toEqual([
+      [true, true, true, true, true, true],
+    );
+    assert.deepEqual(wordsOf("NOT Never NOTHING tool's runs").map(isNegation), [
       true,
       true,
       true,
@@ -278,16 +282,17 @@ describe('tool descriptions are purely functional', () => {
   });
 
   it('reads identifiers, first sentences and read tools with plain code', () => {
-    expect(identifiersOf('names GetClass_x, (DebugBatchEnd)-done')).toEqual([
+    assert.deepEqual(identifiersOf('names GetClass_x, (DebugBatchEnd)-done'), [
       'names',
       'GetClass_x',
       'DebugBatchEnd',
       'done',
     ]);
-    expect(firstSentence('Reads X (e.g. Y). Then Z.')).toBe(
+    assert.equal(
+      firstSentence('Reads X (e.g. Y). Then Z.'),
       'Reads X (e.g. Y).',
     );
-    expect(firstSentence('No end')).toBe('No end');
+    assert.equal(firstSentence('No end'), 'No end');
     const tool = (name: string, description: string): ServedTool => ({
       name,
       description,
@@ -316,7 +321,7 @@ describe('tool descriptions are purely functional', () => {
       'HandlerProfileList',
       'Getaway',
     ]) {
-      expect([name, marked(name)]).toEqual([name, true]);
+      assert.deepEqual([name, marked(name)], [name, true]);
     }
     for (const name of [
       'UpdateClass',
@@ -346,13 +351,12 @@ describe('tool descriptions are purely functional', () => {
       'HandlerDebugStep',
       'HandlerDebugBatch',
     ]) {
-      expect([name, marked(name)]).toEqual([name, false]);
+      assert.deepEqual([name, marked(name)], [name, false]);
     }
   });
 
-  it.each(SETS.map(([kind]) => kind))(
-    'every served tool of %s states only what it does, its parameters and its result',
-    async (kind) => {
+  for (const [kind] of SETS) {
+    it(`every served tool of ${kind} states only what it does, its parameters and its result`, async () => {
       const tools = await everyServed(kind);
       const names = new Set(tools.map((tool) => tool.name));
       const negations: string[] = [];
@@ -395,27 +399,35 @@ describe('tool descriptions are purely functional', () => {
       const shared = [...firstSentences.entries()]
         .filter(([, sharing]) => sharing.length > 1)
         .map(([sentence, sharing]) => `${sharing.join(', ')}: "${sentence}"`);
-      expect(tools.length).toBeGreaterThan(10);
-      expect({
-        set: kind,
-        negations,
-        otherTools,
-        unmarked,
-        vague,
-        shared,
-      }).toEqual({
-        set: kind,
-        negations: [],
-        otherTools: [],
-        unmarked: [],
-        vague: [],
-        shared: [],
-      });
-    },
-  );
+      assert.ok(tools.length > 10);
+      assert.deepEqual(
+        {
+          set: kind,
+          negations,
+          otherTools,
+          unmarked,
+          vague,
+          shared,
+        },
+        {
+          set: kind,
+          negations: [],
+          otherTools: [],
+          unmarked: [],
+          vague: [],
+          shared: [],
+        },
+      );
+    });
+  }
 });
 
-/** The handler files that declare a tool, a set serving it or not (the low ones aside). */
+/**
+ * The handler sources that declare a tool, a set serving it or not (the low
+ * ones aside): walked in the repository's `src/handlers`, so a handler the
+ * test build did not compile is required, and fails, rather than skipped.
+ * The build compiles every one (`tsconfig.node-test.json`, `include`).
+ */
 function handlerFiles(directory: string): string[] {
   const files: string[] = [];
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -434,8 +446,13 @@ describe('every declared tool carries [read-only] when it changes nothing in the
   it('holds for each TOOL_DEFINITION under src/handlers, the unserved ones too', () => {
     const wrong: string[] = [];
     let seen = 0;
-    for (const file of handlerFiles(join(__dirname, '../../../handlers'))) {
-      const module = require(file) as {
+    const sources = join(repositoryRoot(__dirname), 'src', 'handlers');
+    const compiled = join(__dirname, '../../../handlers');
+    for (const file of handlerFiles(sources)) {
+      const source = relative(sources, file);
+      const module = require(
+        join(compiled, `${source.slice(0, -'.ts'.length)}.js`),
+      ) as {
         TOOL_DEFINITION?: { name?: unknown; description?: unknown };
       };
       const definition = module.TOOL_DEFINITION;
@@ -451,8 +468,8 @@ describe('every declared tool carries [read-only] when it changes nothing in the
         wrong.push(definition.name);
       }
     }
-    expect(seen).toBeGreaterThan(100);
-    expect(wrong).toEqual([]);
+    assert.ok(seen > 100);
+    assert.deepEqual(wrong, []);
   });
 });
 
@@ -483,11 +500,10 @@ const READ_ONLY_CHECK_RUN = [
 ];
 
 describe('a read-only set serves only tools that change nothing in the system', () => {
-  it.each(READ_ONLY_SETS)(
-    'every tool %s serves carries [read-only] and changes nothing in the system',
-    async (kind) => {
+  for (const kind of READ_ONLY_SETS) {
+    it(`every tool ${kind} serves carries [read-only] and changes nothing in the system`, async () => {
       const tools = await everyServed(kind);
-      expect(tools.length).toBeGreaterThan(10);
+      assert.ok(tools.length > 10);
       const changing = tools
         .filter(
           (tool) =>
@@ -495,9 +511,9 @@ describe('a read-only set serves only tools that change nothing in the system', 
             !tool.description.startsWith('[read-only]'),
         )
         .map((tool) => tool.name);
-      expect({ set: kind, changing }).toEqual({ set: kind, changing: [] });
-    },
-  );
+      assert.deepEqual({ set: kind, changing }, { set: kind, changing: [] });
+    });
+  }
 
   it('the tools that left the read-only sets carry no [read-only], are served by the full set and by no read-only set', async () => {
     const served = new Map<ToolSetKind, ServedTool[]>();
@@ -517,7 +533,8 @@ describe('a read-only set serves only tools that change nothing in the system', 
         };
       },
     );
-    expect(found).toEqual(
+    assert.deepEqual(
+      found,
       Object.keys(LEFT_THE_READ_ONLY_SETS).map((name) => ({
         name,
         inFull: true,
@@ -530,7 +547,7 @@ describe('a read-only set serves only tools that change nothing in the system', 
 
   it('the ATC run and its readers stay read-only: core-ro serves them, marked', async () => {
     const tools = await everyServed('core-ro');
-    expect(
+    assert.deepEqual(
       READ_ONLY_CHECK_RUN.map((name) => {
         const named = tools.filter((tool) => tool.name === name);
         return [
@@ -539,6 +556,7 @@ describe('a read-only set serves only tools that change nothing in the system', 
             named.every((tool) => tool.description.startsWith('[read-only]')),
         ];
       }),
-    ).toEqual(READ_ONLY_CHECK_RUN.map((name) => [name, true]));
+      READ_ONLY_CHECK_RUN.map((name) => [name, true]),
+    );
   });
 });

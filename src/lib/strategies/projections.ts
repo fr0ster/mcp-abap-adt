@@ -10,6 +10,11 @@ import {
   type XmlRead,
 } from '../xml/tree';
 import type { AdtReading } from './reading';
+import {
+  checklistMessage,
+  checkRunMessage,
+  type MessageLocation,
+} from './sourceMessages';
 
 /**
  * What `detail` picks out of a reading.
@@ -179,7 +184,10 @@ export type TerseActivationAnswer = {
   activated: boolean;
   generated?: boolean;
   nothing_to_activate?: true;
-  messages?: { type: string | undefined; text: string | undefined }[];
+  messages?: (MessageLocation & {
+    type: string | undefined;
+    text: string | undefined;
+  })[];
 };
 
 /** The terse answer of each form; every form has one. */
@@ -189,10 +197,7 @@ export function terseActivationAnswer(
   switch (answer.form) {
     case 'checklist': {
       const root = answer.checklist;
-      const messages = listOf(child(root, 'msg')).map((m) => ({
-        type: attrOf(m, 'type'),
-        text: textOf(childAt(m, 'shortText', 'txt')) || attrOf(m, 'objDescr'),
-      }));
+      const messages = listOf(child(root, 'msg')).map(checklistMessage);
       const properties = child(root, 'chkl:properties');
       const activated = attrOf(properties, 'activationExecuted') === 'true';
       return {
@@ -253,14 +258,7 @@ export const terseCheck = (value: XmlRead, _status?: number) => {
   if (!report) return undefined;
   const messages = listOf(
     childAt(report, 'chkrun:checkMessageList', 'chkrun:checkMessage'),
-  ).map((m) => {
-    const code = attrOf(m, 'chkrun:code');
-    return {
-      type: attrOf(m, 'chkrun:type'),
-      text: attrOf(m, 'chkrun:shortText'),
-      ...(code ? { code } : {}),
-    };
-  });
+  ).map(checkRunMessage);
   return {
     ran: attrOf(report, 'chkrun:status') === 'processed',
     status_text: attrOf(report, 'chkrun:statusText'),

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import * as z from 'zod';
 /**
  * Compact's lock chain over Streamable HTTP: every request is an MCP session
@@ -21,8 +23,6 @@ import {
   turns,
   until,
 } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const placeholder = { connection: undefined } as unknown as HandlerContext;
 
@@ -86,7 +86,7 @@ const UPDATE = {
 };
 
 beforeEach(async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
   s = await httpStand({
     groups: [new CompactModifyHandlersGroup(placeholder), loseGroup, echoGroup],
   });
@@ -96,7 +96,7 @@ afterEach(async () => {
   // The server logs a request's end after its answer went out.
   await turns(20);
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const withHeader = (
@@ -109,42 +109,42 @@ const withHeader = (
 
 async function lock(): Promise<{ lockHandle: string; stateHandle: string }> {
   const locked = await s.call('HandlerLock', LOCK);
-  expect(locked.status).toBe(200);
-  expect(locked.isError).toBe(false);
+  assert.equal(locked.status, 200);
+  assert.equal(locked.isError, false);
   const answer = JSON.parse(locked.text) as {
     lock_handle: string;
     state_handle: string;
   };
-  expect(answer.lock_handle).not.toBe('');
-  expect(typeof answer.state_handle).toBe('string');
+  assert.notEqual(answer.lock_handle, '');
+  assert.equal(typeof answer.state_handle, 'string');
   return { lockHandle: answer.lock_handle, stateHandle: answer.state_handle };
 }
 
 it('lock, update, unlock over three requests with the header: one SAP session, the state ends at the UNLOCK', async () => {
   const { lockHandle, stateHandle } = await lock();
-  expect(poolSize()).toBe(1);
+  assert.equal(poolSize(), 1);
 
   const updated = await s.call(
     'HandlerUpdate',
     { ...UPDATE, lock_handle: lockHandle },
     withHeader(stateHandle),
   );
-  expect(updated.isError).toBe(false);
+  assert.equal(updated.isError, false);
 
   const unlocked = await s.call(
     'HandlerUnlock',
     { ...LOCK, lock_handle: lockHandle },
     withHeader(stateHandle),
   );
-  expect(unlocked.isError).toBe(false);
+  assert.equal(unlocked.isError, false);
 
-  expect(lockRequests()).toHaveLength(1);
-  expect(puts()).toHaveLength(1);
-  expect(unlocks()).toHaveLength(1);
+  assert.equal(lockRequests().length, 1);
+  assert.equal(puts().length, 1);
+  assert.equal(unlocks().length, 1);
   const session = lockRequests()[0]?.session;
-  expect(puts()[0]?.session).toBe(session);
-  expect(unlocks()[0]?.session).toBe(session);
-  expect(puts()[0]?.url).toContain(`lockHandle=${lockHandle}`);
+  assert.equal(puts()[0]?.session, session);
+  assert.equal(unlocks()[0]?.session, session);
+  assert.ok(puts()[0]?.url.includes(`lockHandle=${lockHandle}`));
   // Nothing held after the UNLOCK: the instance leaves the pool.
   await until(() => poolSize() === 0);
 });
@@ -155,29 +155,29 @@ const NOT_HELD_WORDS =
 
 it('lock, update, unlock over three requests with the state_handle argument alone, no header: one SAP session, the state ends at the UNLOCK', async () => {
   const { lockHandle, stateHandle } = await lock();
-  expect(poolSize()).toBe(1);
+  assert.equal(poolSize(), 1);
 
   const updated = await s.call('HandlerUpdate', {
     ...UPDATE,
     lock_handle: lockHandle,
     state_handle: stateHandle,
   });
-  expect(updated.isError).toBe(false);
+  assert.equal(updated.isError, false);
 
   const unlocked = await s.call('HandlerUnlock', {
     ...LOCK,
     lock_handle: lockHandle,
     state_handle: stateHandle,
   });
-  expect(unlocked.isError).toBe(false);
+  assert.equal(unlocked.isError, false);
 
-  expect(lockRequests()).toHaveLength(1);
-  expect(puts()).toHaveLength(1);
-  expect(unlocks()).toHaveLength(1);
+  assert.equal(lockRequests().length, 1);
+  assert.equal(puts().length, 1);
+  assert.equal(unlocks().length, 1);
   const session = lockRequests()[0]?.session;
-  expect(puts()[0]?.session).toBe(session);
-  expect(unlocks()[0]?.session).toBe(session);
-  expect(puts()[0]?.url).toContain(`lockHandle=${lockHandle}`);
+  assert.equal(puts()[0]?.session, session);
+  assert.equal(unlocks()[0]?.session, session);
+  assert.ok(puts()[0]?.url.includes(`lockHandle=${lockHandle}`));
   await until(() => poolSize() === 0);
 });
 
@@ -187,10 +187,10 @@ it('the declared state_handle routes the call and reaches no handler that does n
     value: 'v',
     state_handle: stateHandle,
   });
-  expect(echoed.isError).toBe(false);
-  expect(JSON.parse(echoed.text)).toEqual({ value: 'v' });
+  assert.equal(echoed.isError, false);
+  assert.deepStrictEqual(JSON.parse(echoed.text), { value: 'v' });
   // Routed to the lock's instance: no second instance in the pool.
-  expect(poolSize()).toBe(1);
+  assert.equal(poolSize(), 1);
 });
 
 it('without the header or the argument the write and the unlock are refused, sending nothing, in words naming the argument', async () => {
@@ -201,32 +201,33 @@ it('without the header or the argument the write and the unlock are refused, sen
     ...UPDATE,
     lock_handle: lockHandle,
   });
-  expect(updated.isError).toBe(true);
-  expect(updated.text).toContain(NOT_HELD_WORDS);
+  assert.equal(updated.isError, true);
+  assert.ok(updated.text.includes(NOT_HELD_WORDS));
 
   const unlocked = await s.call('HandlerUnlock', {
     ...LOCK,
     lock_handle: lockHandle,
   });
-  expect(unlocked.isError).toBe(true);
-  expect(unlocked.text).toContain(NOT_HELD_WORDS);
+  assert.equal(unlocked.isError, true);
+  assert.ok(unlocked.text.includes(NOT_HELD_WORDS));
 
-  expect(puts()).toEqual([]);
-  expect(unlocks()).toEqual([]);
+  assert.deepStrictEqual(puts(), []);
+  assert.deepStrictEqual(unlocks(), []);
   // Only the logons of the refused calls' own instances, nothing written.
-  expect(
+  assert.deepStrictEqual(
     s.standIn.requests
       .slice(before)
       .filter((r) => r.method === 'PUT' || isUnlock(r.url)),
-  ).toEqual([]);
+    [],
+  );
   // The lock's instance still holds it.
-  expect(poolSize()).toBe(1);
+  assert.equal(poolSize(), 1);
 });
 
 it('a request with another credential (a renewed token) works on the held connection: same SAP session, the lock kept, the write sent with the new credential', async () => {
   const { lockHandle, stateHandle } = await lock();
   const lockedWith = lockRequests()[0]?.authorization;
-  expect(lockedWith?.startsWith('Basic ')).toBe(true);
+  assert.equal(lockedWith?.startsWith('Basic '), true);
   const renewed = {
     'x-sap-url': s.standIn.url,
     'x-sap-client': '100',
@@ -237,37 +238,37 @@ it('a request with another credential (a renewed token) works on the held connec
     { ...UPDATE, lock_handle: lockHandle },
     withHeader(stateHandle, renewed),
   );
-  expect(updated.isError).toBe(false);
-  expect(puts()).toHaveLength(1);
+  assert.equal(updated.isError, false);
+  assert.equal(puts().length, 1);
   const session = lockRequests()[0]?.session;
-  expect(puts()[0]?.session).toBe(session);
-  expect(puts()[0]?.authorization).toBe('Bearer renewed-token');
-  expect(puts()[0]?.url).toContain(`lockHandle=${lockHandle}`);
+  assert.equal(puts()[0]?.session, session);
+  assert.equal(puts()[0]?.authorization, 'Bearer renewed-token');
+  assert.ok(puts()[0]?.url.includes(`lockHandle=${lockHandle}`));
   // Nothing logged off: the session lives on.
-  expect(s.standIn.loggedOff()).toEqual([]);
+  assert.deepStrictEqual(s.standIn.loggedOff(), []);
 
   const unlocked = await s.call(
     'HandlerUnlock',
     { ...LOCK, lock_handle: lockHandle },
     withHeader(stateHandle, renewed),
   );
-  expect(unlocked.isError).toBe(false);
-  expect(unlocks()).toHaveLength(1);
-  expect(unlocks()[0]?.session).toBe(session);
-  expect(unlocks()[0]?.authorization).toBe('Bearer renewed-token');
+  assert.equal(unlocked.isError, false);
+  assert.equal(unlocks().length, 1);
+  assert.equal(unlocks()[0]?.session, session);
+  assert.equal(unlocks()[0]?.authorization, 'Bearer renewed-token');
   await until(() => poolSize() === 0);
 });
 
 it('a session SAP lost takes its locks with it: the write on the replacement session is refused, sending nothing', async () => {
   const { lockHandle, stateHandle } = await lock();
   const lost = await s.call('LoseSession', {}, withHeader(stateHandle));
-  expect(lost.isError).toBe(false);
+  assert.equal(lost.isError, false);
   const updated = await s.call(
     'HandlerUpdate',
     { ...UPDATE, lock_handle: lockHandle },
     withHeader(stateHandle),
   );
-  expect(updated.isError).toBe(true);
-  expect(updated.text).toContain('lock_handle is not held by this instance');
-  expect(puts()).toEqual([]);
+  assert.equal(updated.isError, true);
+  assert.ok(updated.text.includes('lock_handle is not held by this instance'));
+  assert.deepStrictEqual(puts(), []);
 });

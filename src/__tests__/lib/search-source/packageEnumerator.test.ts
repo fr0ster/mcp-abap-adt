@@ -1,8 +1,11 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   enumerateScanTargets,
   type PackageContentItem,
   type PackageContentsFetcher,
 } from '../../../lib/search-source/packageEnumerator';
+import { rejectionOf } from '../../helpers/assertions';
 import { listing } from '../../helpers/sourceReaderFake';
 
 function item(
@@ -29,7 +32,7 @@ describe('enumerateScanTargets', () => {
       include_subpackages: false,
       object_types: ['PROG', 'CLAS'],
     });
-    expect(out).toEqual([
+    assert.deepStrictEqual(out, [
       {
         devclass: 'ZPKG',
         object_type: 'CLAS',
@@ -60,11 +63,10 @@ describe('enumerateScanTargets', () => {
       include_subpackages: true,
       object_types: ['PROG'],
     });
-    expect(out.map((o) => `${o.devclass}/${o.object_name}`)).toEqual([
-      'ZA/ZA_PROG_2',
-      'ZA_SUB/ZA_PROG_1',
-      'ZB/ZB_PROG',
-    ]);
+    assert.deepStrictEqual(
+      out.map((o) => `${o.devclass}/${o.object_name}`),
+      ['ZA/ZA_PROG_2', 'ZA_SUB/ZA_PROG_1', 'ZB/ZB_PROG'],
+    );
   });
 
   it('applies object_filter glob ("Z_FOO*" matches Z_FOO_1 and Z_FOO_BAR, not Y_FOO)', async () => {
@@ -80,7 +82,10 @@ describe('enumerateScanTargets', () => {
       object_types: ['PROG'],
       object_filter: 'Z_FOO*',
     });
-    expect(out.map((o) => o.object_name)).toEqual(['Z_FOO_1', 'Z_FOO_BAR']);
+    assert.deepStrictEqual(
+      out.map((o) => o.object_name),
+      ['Z_FOO_1', 'Z_FOO_BAR'],
+    );
   });
 
   it('deduplicates objects appearing in overlapping subpackage results', async () => {
@@ -98,7 +103,7 @@ describe('enumerateScanTargets', () => {
       include_subpackages: true,
       object_types: ['PROG'],
     });
-    expect(out).toEqual([
+    assert.deepStrictEqual(out, [
       {
         devclass: 'ZA_SUB',
         object_type: 'PROG',
@@ -119,7 +124,7 @@ describe('enumerateScanTargets', () => {
       include_subpackages: false,
       object_types: ['PROG', 'INTF'],
     });
-    expect(targets).toEqual([
+    assert.deepStrictEqual(targets, [
       {
         devclass: 'ZPKG',
         object_type: 'INTF',
@@ -144,8 +149,11 @@ describe('enumerateScanTargets', () => {
       include_subpackages: true,
       object_types: ['PROG'],
     });
-    expect(result.targets.map((t) => t.object_name)).toEqual(['P_ZA', 'P_ZB']);
-    expect(Object.keys(result)).toEqual(['targets']);
+    assert.deepStrictEqual(
+      result.targets.map((t) => t.object_name),
+      ['P_ZA', 'P_ZB'],
+    );
+    assert.deepStrictEqual(Object.keys(result), ['targets']);
   });
 
   it("a failure the walk passes on is not the enumerator's to decide: it passes through (DO22)", async () => {
@@ -153,12 +161,15 @@ describe('enumerateScanTargets', () => {
     const fetch: PackageContentsFetcher = async () => {
       throw decided;
     };
-    await expect(
-      enumerateScanTargets(fetch, {
-        packages: ['ZA'],
-        include_subpackages: true,
-        object_types: ['PROG'],
-      }),
-    ).rejects.toBe(decided);
+    assert.equal(
+      await rejectionOf(
+        enumerateScanTargets(fetch, {
+          packages: ['ZA'],
+          include_subpackages: true,
+          object_types: ['PROG'],
+        }),
+      ),
+      decided,
+    );
   });
 });

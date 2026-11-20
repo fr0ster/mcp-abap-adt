@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { IDebuggerBreakpoint } from '@mcp-abap-adt/interfaces-adt';
 import {
   definitionKey,
@@ -34,15 +36,17 @@ describe('the arming contract', () => {
   it('deduplicates by kind, target and condition; a kept definition keeps its tag, a new one takes the next', () => {
     const next = counter();
     const kept = mergeDefinitions([], [line(10)], next);
-    expect(kept).toEqual([tagged('bp1', line(10))]);
-    expect(
+    assert.deepStrictEqual(kept, [tagged('bp1', line(10))]);
+    assert.deepStrictEqual(
       mergeDefinitions(kept, [line(10), line(10, 'lv_a = 1'), EXC, EXC], next),
-    ).toEqual([
-      tagged('bp1', line(10)),
-      tagged('bp2', line(10, 'lv_a = 1')),
-      tagged('bp3', EXC),
-    ]);
-    expect(definitionKey(line(10))).not.toBe(
+      [
+        tagged('bp1', line(10)),
+        tagged('bp2', line(10, 'lv_a = 1')),
+        tagged('bp3', EXC),
+      ],
+    );
+    assert.notEqual(
+      definitionKey(line(10)),
       definitionKey(line(10, 'lv_a = 1')),
     );
   });
@@ -50,8 +54,11 @@ describe('the arming contract', () => {
   // Review Focus 6.
   it('the wire form carries the session tag, never a clientId the definition brought', () => {
     const own = { ...EXC, clientId: 'own' } as IDebuggerBreakpoint;
-    expect(wireOf(tagged('bp7', own))).toEqual({ ...EXC, clientId: 'bp7' });
-    expect(definitionKey(own)).toBe(definitionKey(EXC));
+    assert.deepStrictEqual(wireOf(tagged('bp7', own)), {
+      ...EXC,
+      clientId: 'bp7',
+    });
+    assert.equal(definitionKey(own), definitionKey(EXC));
   });
 
   it('rows out of the request order, several of one kind: each pairs by its tag, whatever its URI says', () => {
@@ -75,17 +82,23 @@ describe('the arming contract', () => {
         { kind: 'line', id: 'L40', clientId: 'bp3', uri: line(40).uri },
       ]),
     );
-    expect(p.requested).toEqual([sent[0], sent[2]]);
-    expect(p.paired).toEqual(
+    assert.deepStrictEqual(p.requested, [sent[0], sent[2]]);
+    assert.deepStrictEqual(
+      p.paired,
       new Map([
         ['L9', 'bp1'],
         ['L40', 'bp3'],
       ]),
     );
-    expect(p.placed.map((r) => r.id)).toEqual(['L9', 'L40']);
-    expect(p.refused).toEqual([{ requested: line(1), error: NOT_HERE }]);
-    expect(p.lost).toEqual([]);
-    expect(p.unexpected).toEqual([]);
+    assert.deepStrictEqual(
+      p.placed.map((r) => r.id),
+      ['L9', 'L40'],
+    );
+    assert.deepStrictEqual(p.refused, [
+      { requested: line(1), error: NOT_HERE },
+    ]);
+    assert.deepStrictEqual(p.lost, []);
+    assert.deepStrictEqual(p.unexpected, []);
   });
 
   it('an earlier breakpoint that comes back refused is lost, not refused', () => {
@@ -101,11 +114,11 @@ describe('the arming contract', () => {
         },
       ]),
     );
-    expect(p.lost).toEqual([
+    assert.deepStrictEqual(p.lost, [
       { requested: EXC, error: 'Exception class does not exist' },
     ]);
-    expect(p.refused).toEqual([]);
-    expect(p.requested).toEqual([tagged('bp2', STMT)]);
+    assert.deepStrictEqual(p.refused, []);
+    assert.deepStrictEqual(p.requested, [tagged('bp2', STMT)]);
   });
 
   it('a definition no row answers is not placed: refused without a reason, or lost', () => {
@@ -114,9 +127,9 @@ describe('the arming contract', () => {
       new Set(['bp1']),
       rows([]),
     );
-    expect(p.lost).toEqual([{ requested: EXC }]);
-    expect(p.refused).toEqual([{ requested: STMT }]);
-    expect(p.requested).toEqual([]);
+    assert.deepStrictEqual(p.lost, [{ requested: EXC }]);
+    assert.deepStrictEqual(p.refused, [{ requested: STMT }]);
+    assert.deepStrictEqual(p.requested, []);
   });
 
   it('a row without a tag, with a tag not sent, or a second row for one tag is unexpected; a placed one stays placed and pairs with nothing', () => {
@@ -141,16 +154,19 @@ describe('the arming contract', () => {
         { kind: 'line', clientId: 'bp9', error: NOT_HERE },
       ]),
     );
-    expect(p.requested).toEqual(sent);
-    expect(p.paired).toEqual(new Map([['E1', 'bp1']]));
-    expect(p.placed.map((r) => r.id)).toEqual(['E1', 'E2', 'S1']);
-    expect(p.unexpected).toEqual([
+    assert.deepStrictEqual(p.requested, sent);
+    assert.deepStrictEqual(p.paired, new Map([['E1', 'bp1']]));
+    assert.deepStrictEqual(
+      p.placed.map((r) => r.id),
+      ['E1', 'E2', 'S1'],
+    );
+    assert.deepStrictEqual(p.unexpected, [
       { kind: 'exception', id: 'E2', clientId: 'bp1' },
       { kind: 'statement', id: 'S1' },
       { kind: 'line', clientId: 'bp9', error: NOT_HERE },
     ]);
-    expect(p.refused).toEqual([]);
-    expect(p.lost).toEqual([]);
+    assert.deepStrictEqual(p.refused, []);
+    assert.deepStrictEqual(p.lost, []);
   });
 
   it('the recorded answer, captured without tags: both rows unexpected, both definitions refused without a reason', () => {
@@ -159,16 +175,24 @@ describe('the arming contract', () => {
       none,
       readBreakpoints(corpusBody('debugger-conversation--01-breakpoints-set')),
     );
-    expect(p.unexpected).toEqual([
-      { kind: 'line', error: NOT_HERE },
-      { kind: 'line', id: expect.any(String) },
-    ]);
-    expect(p.placed).toHaveLength(1);
-    expect(p.paired.size).toBe(0);
-    expect(p.refused).toEqual([
+    // expect.any(String) for the second id: its type, then the rest.
+    assert.equal(p.unexpected.length, 2);
+    assert.deepStrictEqual(p.unexpected[0], { kind: 'line', error: NOT_HERE });
+    const second = p.unexpected[1];
+    assert.equal(typeof second?.id, 'string');
+    assert.deepStrictEqual(
+      { ...second, id: undefined },
+      {
+        kind: 'line',
+        id: undefined,
+      },
+    );
+    assert.equal(p.placed.length, 1);
+    assert.equal(p.paired.size, 0);
+    assert.deepStrictEqual(p.refused, [
       { requested: line(32, 'lv_a = 1') },
       { requested: line(1) },
     ]);
-    expect(p.requested).toEqual([]);
+    assert.deepStrictEqual(p.requested, []);
   });
 });

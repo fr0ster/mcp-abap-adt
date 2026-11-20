@@ -12,6 +12,8 @@
  * through V8's own flag.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { setFlagsFromString } from 'node:v8';
 import { runInNewContext } from 'node:vm';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -68,7 +70,7 @@ describe('the kept system parameters retain no per-request connection', () => {
         undefined,
         rules,
       );
-      expect(seen).toBe('ran');
+      assert.equal(seen, 'ran');
     }
 
     for (let index = 0; index < REQUESTS; index++) {
@@ -81,7 +83,7 @@ describe('the kept system parameters retain no per-request connection', () => {
         finalized.credentials === REQUESTS,
     );
 
-    expect(finalized).toEqual({
+    assert.deepStrictEqual(finalized, {
       connections: REQUESTS,
       credentials: REQUESTS,
     });

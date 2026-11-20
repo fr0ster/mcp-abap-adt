@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { debugAnswer, debugStateAnswer } from '../../../lib/debugger/answer';
 import { DebugListenerError } from '../../../lib/debugger/DebugSession';
 import {
@@ -6,11 +8,12 @@ import {
   readStack,
 } from '../../../lib/debugger/readings';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject } from '../../helpers/assertions';
 
 describe('debug answers', () => {
   const view = { value: { a: 1, b: 2 }, raw: '<x/>' };
   it('terse by default; full parses; raw is the document', async () => {
-    expect(
+    assert.deepStrictEqual(
       JSON.parse(
         (
           await debugAnswer(
@@ -20,8 +23,9 @@ describe('debug answers', () => {
           )
         ).content[0].text,
       ),
-    ).toEqual({ a: 1 });
-    expect(
+      { a: 1 },
+    );
+    assert.deepStrictEqual(
       JSON.parse(
         (
           await debugAnswer(
@@ -31,8 +35,9 @@ describe('debug answers', () => {
           )
         ).content[0].text,
       ),
-    ).toEqual({ a: 1, b: 2 });
-    expect(
+      { a: 1, b: 2 },
+    );
+    assert.deepStrictEqual(
       JSON.parse(
         (
           await debugAnswer(
@@ -43,8 +48,9 @@ describe('debug answers', () => {
           )
         ).content[0].text,
       ),
-    ).toEqual({ parsed: 2 });
-    expect(
+      { parsed: 2 },
+    );
+    assert.equal(
       (
         await debugAnswer(
           { detail: 'raw' },
@@ -52,14 +58,15 @@ describe('debug answers', () => {
           () => 0,
         )
       ).content[0].text,
-    ).toBe('<x/>');
+      '<x/>',
+    );
   });
   it("a conflict is a tool error with SAP's message", async () => {
     const r = await debugStateAnswer({}, async () => {
       throw new DebugListenerError('Another debugger … SY 530');
     });
-    expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain('SY 530');
+    assert.equal(r.isError, true);
+    assert.ok(r.content[0].text.includes('SY 530'));
   });
   it('the handle survives every detail: merged under terse and full, a block of its own under raw', async () => {
     const view = { value: { state: 'listening' }, raw: '<x/>' };
@@ -71,7 +78,7 @@ describe('debug answers', () => {
         (v) => v,
         () => ({ state_handle: 'H' }),
       );
-      expect(JSON.parse(r.content[0].text)).toMatchObject({
+      assertMatchObject(JSON.parse(r.content[0].text), {
         state_handle: 'H',
       });
     }
@@ -82,8 +89,10 @@ describe('debug answers', () => {
       (v) => v,
       () => ({ state_handle: 'H' }),
     );
-    expect(raw.content[0].text).toBe('<x/>');
-    expect(JSON.parse(raw.content[1].text)).toEqual({ state_handle: 'H' });
+    assert.equal(raw.content[0].text, '<x/>');
+    assert.deepStrictEqual(JSON.parse(raw.content[1].text), {
+      state_handle: 'H',
+    });
   });
   it('extra fields (handle, ids) join a state', async () => {
     const r = await debugStateAnswer(
@@ -91,7 +100,7 @@ describe('debug answers', () => {
       async () => ({ state: 'listening' }),
       () => ({ state_handle: 'H' }),
     );
-    expect(JSON.parse(r.content[0].text)).toEqual({
+    assert.deepStrictEqual(JSON.parse(r.content[0].text), {
       state: 'listening',
       state_handle: 'H',
     });
@@ -117,7 +126,7 @@ describe('debug answers', () => {
     const terse = JSON.parse(
       (await debugStateAnswer({}, work)).content[0].text,
     );
-    expect(terse).toMatchObject({
+    assertMatchObject(terse, {
       state: 'stopped',
       attach_impossible: true,
       is_post_mortem: true,
@@ -125,8 +134,8 @@ describe('debug answers', () => {
     const full = JSON.parse(
       (await debugStateAnswer({ detail: 'full' }, work)).content[0].text,
     );
-    expect(full.stop.debuggee.attachImpossible).toBe(true);
-    expect(full.stop.attach.isPostMortem).toBe(true);
+    assert.equal(full.stop.debuggee.attachImpossible, true);
+    assert.equal(full.stop.attach.isPostMortem, true);
   });
 
   it('a terse stop names the settings in force and a settings failure', async () => {
@@ -154,10 +163,10 @@ describe('debug answers', () => {
       },
     }));
     const json = JSON.parse((r.content[0] as { text: string }).text);
-    expect(json.settings).toEqual({ system_debugging: true });
+    assert.deepStrictEqual(json.settings, { system_debugging: true });
     // Each failure in the shape of every other: the method's error as it is,
     // with its step — not text.
-    expect(json.settings_error).toEqual(SETTINGS_REFUSED);
-    expect(json.stack_error).toEqual(STACK_REFUSED);
+    assert.deepStrictEqual(json.settings_error, SETTINGS_REFUSED);
+    assert.deepStrictEqual(json.stack_error, STACK_REFUSED);
   });
 });

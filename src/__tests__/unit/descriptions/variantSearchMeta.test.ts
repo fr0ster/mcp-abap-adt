@@ -10,8 +10,10 @@
  * under a member, in any entry) that none of its members is.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { after, describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
@@ -22,8 +24,7 @@ import type { ServerVariant } from '../../../lib/clients';
 import { TOOL_SEARCH_META_KEY, toolSearchText } from '../../../lib/toolSearch';
 import { registryOf, type ToolSet } from '../../../lib/toolSet';
 import { PROJECTED_ARGUMENTS } from '../../helpers/projectedArguments';
-
-jest.setTimeout(120_000);
+import { repositoryRoot } from '../../helpers/repoRoot';
 
 /**
  * The words a user names a member with (this test's own reading, not the
@@ -106,7 +107,7 @@ function namesWord(text: string, word: string): boolean {
 function searchTable(): object {
   const table: unknown = JSON.parse(
     fs.readFileSync(
-      path.join(__dirname, '..', '..', '..', '..', 'tools', 'tool-search.json'),
+      path.join(repositoryRoot(__dirname), 'tools', 'tool-search.json'),
       'utf8',
     ),
   );
@@ -128,7 +129,7 @@ function groupsOf(entry: unknown): ReadonlyMap<string, readonly string[]> {
 describe('a compact tool’s search texts name only the members its variant offers', () => {
   const previous = process.env.SAP_SYSTEM_TYPE;
 
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
     resetProcessLatchForTests();
@@ -158,8 +159,8 @@ describe('a compact tool’s search texts name only the members its variant offe
           }
         }
       }
-      expect(checked).toBeGreaterThanOrEqual(kind === 'compact' ? 8 : 1);
-      expect(naming).toEqual([]);
+      assert.ok(checked >= (kind === 'compact' ? 8 : 1));
+      assert.deepStrictEqual(naming, []);
     });
 
     it(`${kind} on onprem: every tool carries the table's own search texts`, async () => {
@@ -176,7 +177,7 @@ describe('a compact tool’s search texts name only the members its variant offe
           differing.push(tool.name);
         }
       }
-      expect(differing).toEqual([]);
+      assert.deepStrictEqual(differing, []);
     });
   }
 
@@ -204,8 +205,8 @@ describe('a compact tool’s search texts name only the members its variant offe
         }
       }
     }
-    expect(grouped).toBeGreaterThan(0);
-    expect(misgrouped).toEqual([]);
+    assert.ok(grouped > 0);
+    assert.deepStrictEqual(misgrouped, []);
   });
 
   it('names in its keywords only the object kinds its members are', () => {
@@ -245,7 +246,7 @@ describe('a compact tool’s search texts name only the members its variant offe
         }
       }
     }
-    expect(checked).toBeGreaterThanOrEqual(8);
-    expect(foreign).toEqual([]);
+    assert.ok(checked >= 8);
+    assert.deepStrictEqual(foreign, []);
   });
 });

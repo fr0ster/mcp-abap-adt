@@ -217,7 +217,7 @@ Key examples of high-value workflows and tools:
 - **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`
 - **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
 - **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
-- **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `ListATCResults`, `GetATCResult` (the stored ATC results — central and users' runs — listed by user, kind and age, one read by its Display ID), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (`runner: 'async'`, the default, starts the run; with `wait: true`, the default, the call reads the run's status at once and long-polls it only while SAP answers it running, and answers the result of a run SAP answers finished, lasting as long as the run, or the `run_id` and `NOT_STARTED` at once for a run SAP does not know; with `wait: false` it answers the `run_id` right after the start, which `GetUnitTestResult` reads — the way to start a long run under a client with a request time limit; `runner: 'sync'` is one request to `/abapunit/testruns` answering the finished result — for a system that has that endpoint alone; a function module's synchronous run takes `function_group_name` and covers every test of its group), and `RunAbapUnit` (with the same `wait`) for any ABAP Unit run target: an object of any type of the run registry (`CLAS/OCL`, `DDLS/DF`, …) or a package, with or without its subpackages; a CDS view's tests are assigned tests and execute with `scope.foreign_tests: true` — `CheckClass` and the rest of the `Check*` family
+- **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `ListATCResults`, `GetATCResult` (the stored ATC results — central and users' runs — listed by user, kind and age, one read by its Display ID), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (`runner: 'async'`, the default, starts the run; with `wait: true`, the default, the call reads the run's status at once and long-polls it while SAP answers it running, and once more when SAP answers that first read `NOT_STARTED` (the run it just started may not have begun yet), and answers the result of a run SAP answers finished, lasting as long as the run, or the `run_id` and `NOT_STARTED` when the long-polled read still answers it; `GetUnitTestResult`, given a `run_id`, answers `NOT_STARTED` at once; with `wait: false` it answers the `run_id` right after the start, which `GetUnitTestResult` reads — the way to start a long run under a client with a request time limit; `runner: 'sync'` is one request to `/abapunit/testruns` answering the finished result — for a system that has that endpoint alone; a function module's synchronous run takes `function_group_name` and covers every test of its group), and `RunAbapUnit` (with the same `wait`) for any ABAP Unit run target: an object of any type of the run registry (`CLAS/OCL`, `DDLS/DF`, …) or a package, with or without its subpackages; a CDS view's tests are assigned tests and execute with `scope.foreign_tests: true` — `CheckClass` and the rest of the `Check*` family
 
 ### Long reads run in the background
 
@@ -281,6 +281,8 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **📝 Program Management**: `GetProgram`, `CreateProgram`, `UpdateProgram` - Create, retrieve, and update ABAP programs
 - **🔧 Behavior Definition (BDEF) Management**: `GetBehaviorDefinition`, `CreateBehaviorDefinition`, `UpdateBehaviorDefinition` - Create and manage ABAP Behavior Definitions with support for Managed, Unmanaged, Abstract, and Projection types
 - **📋 Metadata Extension (DDLX) Management**: `CreateMetadataExtension`, `UpdateMetadataExtension` - Create and manage ABAP Metadata Extensions
+- **⚙️ Table Technical Settings**: `GetTableSettings`, `UpdateTableSettings` - Read a table's technical settings and write the settings given, the rest kept as stored; the update activates the table when asked (on premise and cloud)
+- **🔤 Text Elements**: `GetTextElements`, `UpdateTextElements` - Read and write the text symbols, selection texts and headings of a program, a function group or a class; each part given is written as its whole list, and the update activates the object together with its text elements when asked (on premise and cloud; on the cloud a function group's and a class's)
 - **⚡ Activation**: `ActivateObject` - Universal activation for any ABAP object
 - **🚚 Transport Management**: `CreateTransport`, `GetTransport` - Create and retrieve transport requests
 - **🔍 Enhancement Analysis**: `GetEnhancements`, `GetEnhancementImpl`, `GetEnhancementSpot` - Enhancement discovery and analysis
@@ -584,7 +586,7 @@ See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete
 
 ### Testing
 ```bash
-npm test                  # the unit run: Jest, then node:test — no SAP system, no outside service
+npm test                  # the unit run on node:test — no SAP system, no outside service
 npm run test:install      # packs and installs the release (the npm registry): the install suites
 npm run test:retrieval    # vector tool retrieval through a local Ollama
 npm run test:integration  # the live suites, against the system tests/test-config.yaml names
@@ -636,6 +638,7 @@ order ([Release](docs/deployment/RELEASE.md)):
 ```bash
 npm run release:dry        # rehearses every package, touches nothing
 npm run release:publish    # @mcp-abap-adt/lib first, then the packages that depend on it
+npm run release:verify     # the published release: registry, clean install, every bin's --version
 ```
 
 `release:publish` skips a version already on the registry, so re-running after

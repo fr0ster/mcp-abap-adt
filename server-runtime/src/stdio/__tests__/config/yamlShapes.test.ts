@@ -6,6 +6,9 @@
  * value and YAML null are not given, as before.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   type ParameterTable,
   validateYamlConfig,
@@ -27,38 +30,44 @@ const errorsOf = (table: ParameterTable, text: string) =>
   validateYamlConfig(table, yaml(text)).errors;
 
 describe('a section of the wrong shape is refused, naming its key', () => {
-  it.each([
+  for (const [_case, text, key] of [
     [
       'restrictions as a list',
       'restrictions:\n  - deny-actions: DeleteClass\n',
       'restrictions',
     ],
     ['restrictions as a value', 'restrictions: all\n', 'restrictions'],
-  ])('%s', (_case, text, key) => {
-    const errors = errorsOf(CORE_PARAMETERS, text);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain(`"${key}"`);
-    expect(errors[0]).toContain('mapping');
-  });
+  ]) {
+    it(format('%s', _case), () => {
+      const errors = errorsOf(CORE_PARAMETERS, text);
+      assert.equal(errors.length, 1);
+      assert.ok(errors[0].includes(`"${key}"`));
+      assert.ok(errors[0].includes('mapping'));
+    });
+  }
 });
 
 describe('a value of the wrong shape is refused, naming its key', () => {
-  it.each([
+  for (const [_case, text, key] of [
     ['a string as a list', 'env: [a, b]\n', 'env'],
     ['an enum as a mapping', 'renewal: {a: b}\n', 'renewal'],
-  ])('%s', (_case, text, key) => {
-    const errors = errorsOf(CORE_PARAMETERS, text);
-    expect(errors).toHaveLength(1);
-    expect(errors[0]).toContain(key);
-  });
+  ]) {
+    it(format('%s', _case), () => {
+      const errors = errorsOf(CORE_PARAMETERS, text);
+      assert.equal(errors.length, 1);
+      assert.ok(errors[0].includes(key));
+    });
+  }
 });
 
 describe('an empty value and null are not given', () => {
-  it.each([
+  for (const [_case, text] of [
     ['restrictions null', 'restrictions:\n'],
     ['restrictions empty', "restrictions: ''\n"],
     ['env empty', "env: ''\n"],
-  ])('%s', (_case, text) => {
-    expect(errorsOf(CORE_PARAMETERS, text)).toEqual([]);
-  });
+  ]) {
+    it(format('%s', _case), () => {
+      assert.deepStrictEqual(errorsOf(CORE_PARAMETERS, text), []);
+    });
+  }
 });

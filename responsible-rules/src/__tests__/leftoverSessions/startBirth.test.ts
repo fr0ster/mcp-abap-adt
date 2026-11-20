@@ -1,4 +1,11 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
+import {
+  assertMatchObject,
+  rejectionOf,
+} from '../../../../src/__tests__/helpers/assertions';
 /**
  * A stdio instance's connection is born at its start, before any tool call
  * (`bornAtStart`), with the rules core passes: its parameters are made with
@@ -41,22 +48,20 @@ const leftoverStand = (
 ): Promise<LeftoverStand> =>
   libLeftoverStand({ systemContextRules: responsibleRules, ...options });
 
-jest.setTimeout(30_000);
-
 let stand: LeftoverStand;
 let previousType: string | undefined;
 
 beforeEach(() => {
   previousType = process.env.SAP_SYSTEM_TYPE;
   process.env.SAP_SYSTEM_TYPE = 'onprem';
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 
 afterEach(async () => {
   await stand?.close();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
-  jest.restoreAllMocks();
+  mock.restoreAll();
   resetProcessLatchForTests();
 });
 
@@ -115,70 +120,85 @@ const NO_INFORMATION: Array<[string, () => void]> = [
 ];
 
 describe('on-premise without the information: the start needs a stated user', () => {
-  it.each(NO_INFORMATION)(
-    'a passwordless logon, %s, no user stated: the start fails as system_user_unknown, the logon logged off, nothing owned',
-    async (_case, answer) => {
-      stand = await leftoverStand({ token: {} });
-      answer();
-      const refused = await stand.start().then(
-        () => undefined,
-        (error: unknown) => error,
-      );
-      expect(refused).toBeInstanceOf(ServerRefusal);
-      expect((refused as ServerRefusal).serverRefusal).toBe(
-        'system_user_unknown',
-      );
-      await until(() => stand.standIn.logoffs() === 1);
-      expect(ownedConnections(stand.server)).toEqual([]);
-    },
-  );
+  for (const [_case, answer] of NO_INFORMATION) {
+    it(
+      format(
+        'a passwordless logon, %s, no user stated: the start fails as system_user_unknown, the logon logged off, nothing owned',
+        _case,
+      ),
+      async () => {
+        stand = await leftoverStand({ token: {} });
+        answer();
+        const refused = await stand.start().then(
+          () => undefined,
+          (error: unknown) => error,
+        );
+        assert.ok(refused instanceof ServerRefusal);
+        assert.equal(
+          (refused as ServerRefusal).serverRefusal,
+          'system_user_unknown',
+        );
+        await until(() => stand.standIn.logoffs() === 1);
+        assert.deepStrictEqual(ownedConnections(stand.server), []);
+      },
+    );
+  }
 
   it('a blank user stated counts as none', async () => {
     stand = await leftoverStand({ token: { statedUser: '  ' } });
     stand.standIn.answer(isLookup, 404);
-    await expect(stand.start()).rejects.toMatchObject({
+    assertMatchObject(await rejectionOf(stand.start()), {
       serverRefusal: 'system_user_unknown',
     });
   });
 
-  it.each(NO_INFORMATION)(
-    '%s with a responsible stated and no login: the start succeeds',
-    async (_case, answer) => {
-      stand = await leftoverStand({ token: { statedResponsible: 'RESP' } });
-      answer();
-      expect(await stand.start()).toEqual({ session: 'logged_on' });
-      expect(stand.standIn.logoffs()).toBe(0);
-    },
-  );
+  for (const [_case, answer] of NO_INFORMATION) {
+    it(
+      format(
+        '%s with a responsible stated and no login: the start succeeds',
+        _case,
+      ),
+      async () => {
+        stand = await leftoverStand({ token: { statedResponsible: 'RESP' } });
+        answer();
+        assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
+        assert.equal(stand.standIn.logoffs(), 0);
+      },
+    );
+  }
 
   it('a blank responsible stated and no login counts as none', async () => {
     stand = await leftoverStand({ token: { statedResponsible: '  ' } });
     stand.standIn.answer(isLookup, 404);
-    await expect(stand.start()).rejects.toMatchObject({
+    assertMatchObject(await rejectionOf(stand.start()), {
       serverRefusal: 'system_user_unknown',
     });
   });
 
-  it.each(NO_INFORMATION)(
-    '%s with both a responsible and a login stated: the start succeeds',
-    async (_case, answer) => {
-      stand = await leftoverStand({
-        token: { statedUser: 'STATED', statedResponsible: 'RESP' },
-      });
-      answer();
-      expect(await stand.start()).toEqual({ session: 'logged_on' });
-    },
-  );
+  for (const [_case, answer] of NO_INFORMATION) {
+    it(
+      format(
+        '%s with both a responsible and a login stated: the start succeeds',
+        _case,
+      ),
+      async () => {
+        stand = await leftoverStand({
+          token: { statedUser: 'STATED', statedResponsible: 'RESP' },
+        });
+        answer();
+        assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
+      },
+    );
+  }
 
-  it.each(NO_INFORMATION)(
-    '%s with a user stated: the start succeeds',
-    async (_case, answer) => {
+  for (const [_case, answer] of NO_INFORMATION) {
+    it(format('%s with a user stated: the start succeeds', _case), async () => {
       stand = await leftoverStand({ token: { statedUser: 'STATED' } });
       answer();
-      expect(await stand.start()).toEqual({ session: 'logged_on' });
-      expect(stand.standIn.logoffs()).toBe(0);
-    },
-  );
+      assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
+      assert.equal(stand.standIn.logoffs(), 0);
+    });
+  }
 });
 
 describe('ABAP Cloud: the system information at the start', () => {
@@ -192,18 +212,21 @@ describe('ABAP Cloud: the system information at the start', () => {
       isLookup,
       JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
     );
-    expect(await stand.start()).toEqual({ session: 'logged_on' });
-    expect(stand.standIn.requests.filter(isLookup)).toHaveLength(1);
+    assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
+    assert.equal(stand.standIn.requests.filter(isLookup).length, 1);
     const [handle] = stand.files();
-    expect(stand.file(handle ?? '')).toMatchObject({
+    assertMatchObject(stand.file(handle ?? ''), {
       format: 3,
       system: { responsible: 'CLOUD_USER', master_system: 'CLD' },
     });
 
     const before = stand.standIn.requests.length;
     const created = await stand.call('NeedsResponsible');
-    expect(created).toEqual({ text: 'CLOUD_USER', isError: false });
-    expect(stand.standIn.requests.slice(before).filter(isLookup)).toEqual([]);
+    assert.deepStrictEqual(created, { text: 'CLOUD_USER', isError: false });
+    assert.deepStrictEqual(
+      stand.standIn.requests.slice(before).filter(isLookup),
+      [],
+    );
   });
 
   it('a leftover whose file carries it: picked up with no lookup at all, and the create reads it', async () => {
@@ -211,15 +234,18 @@ describe('ABAP Cloud: the system information at the start', () => {
     const { handle, session } = await stand.leftover({
       system: { responsible: 'FILE_USER', masterSystem: 'FIL' },
     });
-    expect(await stand.start()).toEqual({ session: 'picked_up', handle });
-    expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
-    expect(stand.file(handle)).toMatchObject({
+    assert.deepStrictEqual(await stand.start(), {
+      session: 'picked_up',
+      handle,
+    });
+    assert.deepStrictEqual(stand.standIn.requests.filter(isLookup), []);
+    assertMatchObject(stand.file(handle), {
       system: { responsible: 'FILE_USER', master_system: 'FIL' },
     });
     const created = await stand.call('NeedsResponsible');
-    expect(created).toEqual({ text: 'FILE_USER', isError: false });
-    expect(sessionOf('FILE_USER')).toBe(session);
-    expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
+    assert.deepStrictEqual(created, { text: 'FILE_USER', isError: false });
+    assert.equal(sessionOf('FILE_USER'), session);
+    assert.deepStrictEqual(stand.standIn.requests.filter(isLookup), []);
   });
 
   it('a gone leftover whose file carries it: the new session asks none — the same destination — and the create reads the file’s', async () => {
@@ -232,13 +258,13 @@ describe('ABAP Cloud: the system information at the start', () => {
       isLookup,
       JSON.stringify({ userName: 'OTHER_USER', systemID: 'OTH' }),
     );
-    expect(await stand.start()).toEqual({ session: 'new', handle });
-    expect(stand.file(handle)).toMatchObject({
+    assert.deepStrictEqual(await stand.start(), { session: 'new', handle });
+    assertMatchObject(stand.file(handle), {
       system: { responsible: 'FILE_USER', master_system: 'FIL' },
     });
     const created = await stand.call('NeedsResponsible');
-    expect(created).toEqual({ text: 'FILE_USER', isError: false });
-    expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
+    assert.deepStrictEqual(created, { text: 'FILE_USER', isError: false });
+    assert.deepStrictEqual(stand.standIn.requests.filter(isLookup), []);
   });
 
   it('a leftover whose file carries none: asked at the start, in the resumed session', async () => {
@@ -249,16 +275,19 @@ describe('ABAP Cloud: the system information at the start', () => {
     );
     const { handle, session } = await stand.leftover();
     const from = stand.standIn.requests.length;
-    expect(await stand.start()).toEqual({ session: 'picked_up', handle });
+    assert.deepStrictEqual(await stand.start(), {
+      session: 'picked_up',
+      handle,
+    });
     const lookups = stand.standIn.requests.slice(from).filter(isLookup);
-    expect(lookups).toHaveLength(1);
-    expect(lookups[0]?.session).toBe(session);
-    expect(stand.file(handle)).toMatchObject({
+    assert.equal(lookups.length, 1);
+    assert.equal(lookups[0]?.session, session);
+    assertMatchObject(stand.file(handle), {
       system: { responsible: 'CLOUD_USER', master_system: 'CLD' },
     });
   });
 
-  it.each([
+  for (const [_case, answer, code] of [
     [
       'no systeminformation (404)',
       () => stand.standIn.answer(isLookup, 404),
@@ -280,28 +309,42 @@ describe('ABAP Cloud: the system information at the start', () => {
       },
       'system_lookup_failed',
     ],
-  ] as const)(
-    '%s: one step to the error — the start fails as $2, a stated user not used',
-    async (_case, answer, code) => {
-      stand = await leftoverStand({ token: { statedUser: 'STATED' } });
-      answer();
-      await expect(stand.start()).rejects.toMatchObject({
-        serverRefusal: code,
-      });
-      await until(() => stand.standIn.logoffs() === 1);
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        '%s: one step to the error — the start fails as $2, a stated user not used',
+        _case,
+      ),
+      async () => {
+        stand = await leftoverStand({ token: { statedUser: 'STATED' } });
+        answer();
+        assertMatchObject(await rejectionOf(stand.start()), {
+          serverRefusal: code,
+        });
+        await until(() => stand.standIn.logoffs() === 1);
+      },
+    );
+  }
 
   it('no system information to be had: the start fails, and the logon made for it is logged off', async () => {
     stand = await leftoverStand();
     stand.standIn.answer(isLookup, 500);
-    await expect(stand.start()).rejects.toMatchObject({
-      message: expect.stringContaining('systeminformation'),
-    });
+    {
+      // toMatchObject({ message: stringContaining }): a message present,
+      // a string, holding the words.
+      const reason = await rejectionOf(stand.start());
+      const message =
+        typeof reason === 'object' && reason !== null && 'message' in reason
+          ? reason.message
+          : undefined;
+      assert.ok(
+        typeof message === 'string' && message.includes('systeminformation'),
+      );
+    }
     await until(() => stand.standIn.logoffs() === 1);
     // The file goes once the logoff completed (its flush), not at its write.
     await logoffsAnswered();
-    expect(stand.files()).toEqual([]);
+    assert.deepStrictEqual(stand.files(), []);
   });
 
   it('a gone leftover whose new logon then finds no system information: the start fails, and the new session is logged off', async () => {
@@ -309,11 +352,11 @@ describe('ABAP Cloud: the system information at the start', () => {
     const { session } = await stand.leftover();
     stand.standIn.answer((r) => r.session === session, 401);
     stand.standIn.answer(isLookup, 500);
-    await expect(stand.start()).rejects.toBeDefined();
+    assert.notEqual(await rejectionOf(stand.start()), undefined);
     await until(() => stand.standIn.logoffs() === 1);
     // The file goes once the logoff completed (its flush), not at its write.
     await logoffsAnswered();
-    expect(stand.files()).toEqual([]);
+    assert.deepStrictEqual(stand.files(), []);
   });
 
   it('latched while its system information is asked: the start is refused, and the picked-up session ends with its logoff', async () => {
@@ -325,19 +368,19 @@ describe('ABAP Cloud: the system information at the start', () => {
     const { session } = await stand.leftover();
     const held = stand.standIn.hold(isLookup);
     const started = stand.start();
-    const refused = expect(started).rejects.toBeInstanceOf(
-      ClosedInstanceRefusal,
+    const refused = rejectionOf(started).then((reason) =>
+      assert.ok(reason instanceof ClosedInstanceRefusal),
     );
     await held.arrived;
     latch();
     held.release();
     await refused;
     await until(() => stand.standIn.logoffs() === 1);
-    expect(stand.standIn.loggedOff()).toEqual([session]);
-    expect(ownedConnections(stand.server)).toEqual([]);
+    assert.deepStrictEqual(stand.standIn.loggedOff(), [session]);
+    assert.deepStrictEqual(ownedConnections(stand.server), []);
     // Logged off: its file is gone with it, once the logoff completed.
     await logoffsAnswered();
-    expect(stand.files()).toEqual([]);
+    assert.deepStrictEqual(stand.files(), []);
   });
 
   it('latched while a leftover carrying its system information is resumed: the start is refused, the file a leftover again, nothing owned', async () => {
@@ -349,25 +392,25 @@ describe('ABAP Cloud: the system information at the start', () => {
       (r) => r.session === session && !isLogoff(r.url),
     );
     const started = stand.start();
-    const refused = expect(started).rejects.toBeInstanceOf(
-      ClosedInstanceRefusal,
+    const refused = rejectionOf(started).then((reason) =>
+      assert.ok(reason instanceof ClosedInstanceRefusal),
     );
     await held.arrived;
     latch();
     held.release();
     await refused;
-    expect(stand.files()).toEqual([handle]);
-    expect(stand.file(handle)).toMatchObject({ pid: 111 });
-    expect(ownedConnections(stand.server)).toEqual([]);
-    expect(stand.standIn.requests.filter(isLookup)).toEqual([]);
+    assert.deepStrictEqual(stand.files(), [handle]);
+    assertMatchObject(stand.file(handle), { pid: 111 });
+    assert.deepStrictEqual(ownedConnections(stand.server), []);
+    assert.deepStrictEqual(stand.standIn.requests.filter(isLookup), []);
   });
 
   it('no system information for a picked-up session: the start fails, and the session is not logged off', async () => {
     stand = await leftoverStand();
     const { handle } = await stand.leftover();
     stand.standIn.answer(isLookup, 500);
-    await expect(stand.start()).rejects.toBeDefined();
-    expect(stand.standIn.logoffs()).toBe(0);
-    expect(stand.files()).toEqual([handle]);
+    assert.notEqual(await rejectionOf(stand.start()), undefined);
+    assert.equal(stand.standIn.logoffs(), 0);
+    assert.deepStrictEqual(stand.files(), [handle]);
   });
 });

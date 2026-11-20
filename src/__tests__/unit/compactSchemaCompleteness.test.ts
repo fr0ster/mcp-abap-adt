@@ -4,6 +4,9 @@
  * compact schema — a description never names an argument the SDK would strip.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import {
   compactCreateSchema,
@@ -77,11 +80,9 @@ for (const op of ['create', 'update', 'delete'] as const) {
   describe(`compact ${op} facade description only advertises schema-backed args`, () => {
     const props = Object.keys(listedJson(SCHEMA[op]).properties ?? {});
     const advertised = parseDescriptionArgs(FACADE[op].description);
-    if (advertised.length === 0) {
-      it('(no advertised required args)', () => expect(true).toBe(true));
-    } else {
-      it.each(advertised)('%s(%s*) is backed by schema', (_type, arg) => {
-        expect(props).toContain(arg);
+    for (const [_type, arg] of advertised) {
+      it(format('%s(%s*) is backed by schema', _type, arg), () => {
+        assert.ok(props.includes(arg));
       });
     }
   });

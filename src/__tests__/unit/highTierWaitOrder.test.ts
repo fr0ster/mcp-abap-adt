@@ -10,6 +10,9 @@
  * `activate` for every plain update (there is no separate check call for
  * the wait to precede).
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { handleCreateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
 import { handleUpdateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleCreateDataElement } from '../../handlers/data_element/high/handleCreateDataElement';
@@ -19,12 +22,14 @@ import { handleUpdateMetadataExtension } from '../../handlers/ddlx/high/handleUp
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
 import { handleUpdateFunctionModule } from '../../handlers/function/high/handleUpdateFunctionModule';
 import { handleUpdateServiceDefinition } from '../../handlers/service_definition/high/handleUpdateServiceDefinition';
+import * as clients from '../../lib/clients';
 import { corpusBody } from '../helpers/adtCorpus';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 const context = {
   connection: { getSessionId: () => null } as any,
@@ -77,8 +82,8 @@ describe('the restored long-polling wait: call order, per handler', () => {
       root_entity: 'ZI_ROOT',
       implementation_type: 'Managed',
     });
-    expect(result.isError).toBe(false);
-    expect(order).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(order, [
       'create',
       'lock',
       'check',
@@ -116,8 +121,14 @@ describe('the restored long-polling wait: call order, per handler', () => {
       name: 'ZI_X',
       source_code: 'x',
     });
-    expect(result.isError).toBe(false);
-    expect(order).toEqual(['lock', 'update', 'unlock', 'wait', 'activate']);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(order, [
+      'lock',
+      'update',
+      'unlock',
+      'wait',
+      'activate',
+    ]);
   });
 
   it('MetadataExtension create: create, lock, check, unlock, wait, activate', async () => {
@@ -152,8 +163,8 @@ describe('the restored long-polling wait: call order, per handler', () => {
       name: 'ZI_X',
       package_name: 'ZP',
     });
-    expect(result.isError).toBe(false);
-    expect(order).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(order, [
       'create',
       'lock',
       'check',
@@ -191,8 +202,14 @@ describe('the restored long-polling wait: call order, per handler', () => {
       name: 'ZI_X',
       source_code: 'x',
     });
-    expect(result.isError).toBe(false);
-    expect(order).toEqual(['lock', 'update', 'unlock', 'wait', 'activate']);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(order, [
+      'lock',
+      'update',
+      'unlock',
+      'wait',
+      'activate',
+    ]);
   });
 
   it('DataElement create: validate, create, lock, read, update, unlock, wait, check, activate', async () => {
@@ -235,10 +252,10 @@ describe('the restored long-polling wait: call order, per handler', () => {
       data_element_name: 'ZDT_X',
       package_name: 'ZP',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     // The second 'read' is the wait — it sits right before 'check', the
     // first call after the write that reads it back, not after 'check'.
-    expect(order).toEqual([
+    assert.deepStrictEqual(order, [
       'validate',
       'create',
       'lock',
@@ -283,10 +300,10 @@ describe('the restored long-polling wait: call order, per handler', () => {
       data_element_name: 'ZDT_X',
       package_name: 'ZP',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     // The second 'read' is the wait, between 'unlock' and 'activate' — check
     // already ran earlier, still under the lock.
-    expect(order).toEqual([
+    assert.deepStrictEqual(order, [
       'lock',
       'read',
       'update',
@@ -329,8 +346,8 @@ describe('the restored long-polling wait: call order, per handler', () => {
       domain_name: 'ZD',
       package_name: 'ZP',
     });
-    expect(result.isError).toBe(false);
-    expect(order).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(order, [
       'lock',
       'read',
       'update',
@@ -380,8 +397,8 @@ describe('the restored long-polling wait: call order, per handler', () => {
       source_code: 'x',
       activate: true,
     });
-    expect(result.isError).toBe(false);
-    expect(order).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(order, [
       'metadata',
       'lock',
       'update',
@@ -424,8 +441,8 @@ describe('the restored long-polling wait: call order, per handler', () => {
       service_definition_name: 'ZSD_X',
       source_code: 'x',
     });
-    expect(result.isError).toBe(false);
-    expect(order).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(order, [
       'lock',
       'update',
       'check',

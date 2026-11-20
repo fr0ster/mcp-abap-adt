@@ -4,11 +4,15 @@
  * answers an on-premise system sent on 2026-09-26
  * (integration run 8), trimmed to the elements the reading looks at.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import {
   analyseDeletion,
   readDeletionRefusal,
 } from '../../lib/strategies/deletionRefusal';
+import { assertMatchObject } from '../helpers/assertions';
 
 const NS =
   'xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"';
@@ -52,11 +56,11 @@ const DDLS_DELETED_UNTYPED_MESSAGE =
 
 describe('readDeletionRefusal (adt-strategies, re-exported)', () => {
   it('an untyped message on a deleted object is no refusal', () => {
-    expect(readDeletionRefusal(DDLS_DELETED_UNTYPED_MESSAGE)).toBeNull();
+    assert.equal(readDeletionRefusal(DDLS_DELETED_UNTYPED_MESSAGE), null);
   });
 
   it('keeps every message SAP sent, not the reference-count fallback', () => {
-    expect(readDeletionRefusal(SRVB_CHECK_TWO_MESSAGES)).toMatchObject({
+    assertMatchObject(readDeletionRefusal(SRVB_CHECK_TWO_MESSAGES), {
       message: 'ADT refuses to delete ZMCP_BLD_SRVB01',
       messages: [
         { type: 'W', text: 'ZMCP_BLD_SRVB01: ZMCP_BLD_SRVB01 does not exist' },
@@ -70,7 +74,7 @@ describe('readDeletionRefusal (adt-strategies, re-exported)', () => {
   });
 
   it('refuses only the object not deleted, with its own message', () => {
-    expect(readDeletionRefusal(TABL_DELETE_TWO_OBJECTS)).toMatchObject({
+    assertMatchObject(readDeletionRefusal(TABL_DELETE_TWO_OBJECTS), {
       message: 'ADT refuses to delete ZMCP_BLD_TAB_H1',
       messages: [
         {
@@ -82,7 +86,7 @@ describe('readDeletionRefusal (adt-strategies, re-exported)', () => {
   });
 
   it('carries the T100 key and its values from the long-text link', () => {
-    expect(readDeletionRefusal(BDEF_DELETE_T100)?.messages).toEqual([
+    assert.deepStrictEqual(readDeletionRefusal(BDEF_DELETE_T100)?.messages, [
       {
         type: 'E',
         text: 'ZMCP_BLD_I_BDEF: Error while deleting object ZMCP_BLD_I_BDEF from the database',
@@ -92,30 +96,34 @@ describe('readDeletionRefusal (adt-strategies, re-exported)', () => {
   });
 
   it('falls back to the reference counts only when SAP gave no text', () => {
-    expect(readDeletionRefusal(CHECK_REFUSED_BY_REFERENCES)?.messages).toEqual([
-      {
-        type: 'E',
-        text: 'ZMCP_SHR_RTABL: 5 strong and 3 weak external references',
-      },
-    ]);
+    assert.deepStrictEqual(
+      readDeletionRefusal(CHECK_REFUSED_BY_REFERENCES)?.messages,
+      [
+        {
+          type: 'E',
+          text: 'ZMCP_SHR_RTABL: 5 strong and 3 weak external references',
+        },
+      ],
+    );
   });
 
   it('a permitted object is no refusal; an E message on it is', () => {
-    expect(readDeletionRefusal(CHECK_DELETABLE)).toBeNull();
-    expect(
+    assert.equal(readDeletionRefusal(CHECK_DELETABLE), null);
+    assert.deepStrictEqual(
       readDeletionRefusal(
         CHECK_DELETABLE.replace(
           '/>',
           '><del:message del:type="E"><del:text>locked</del:text></del:message></del:object>',
         ),
       )?.messages,
-    ).toEqual([{ type: 'E', text: 'ZX: locked' }]);
+      [{ type: 'E', text: 'ZX: locked', t100: undefined }],
+    );
   });
 
   it('no document, or no del:object, is no refusal', () => {
-    expect(readDeletionRefusal('')).toBeNull();
-    expect(readDeletionRefusal(undefined)).toBeNull();
-    expect(readDeletionRefusal('<other/>')).toBeNull();
+    assert.equal(readDeletionRefusal(''), null);
+    assert.equal(readDeletionRefusal(undefined), null);
+    assert.equal(readDeletionRefusal('<other/>'), null);
   });
 });
 
@@ -126,20 +134,21 @@ describe('analyseDeletion (adt-strategies, re-exported)', () => {
       status: 200,
       request: { method: 'POST', url: '/sap/bc/adt/deletion/check' },
     } as any);
-    expect(failure).toMatchObject({
+    assertMatchObject(failure, {
       origin: 'refusal',
       message: 'ADT refuses to delete ZMCP_BLD_SRVB01',
       request: { method: 'POST', url: '/sap/bc/adt/deletion/check' },
     });
-    expect(failure.messages).toHaveLength(2);
+    assert.equal(failure.messages.length, 2);
   });
 
   it('leaves a permitted answer a success', () => {
-    expect(
+    assert.equal(
       analyseDeletion(ADT_NO_FAILURE, {
         data: CHECK_DELETABLE,
         status: 200,
       } as any),
-    ).toBe(ADT_NO_FAILURE);
+      ADT_NO_FAILURE,
+    );
   });
 });

@@ -48,6 +48,7 @@ import {
 } from '../../../lib/strategies/lockAnswer';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { lockSubResource } from './subResourceLocks';
 
 export const TOOL_DEFINITION = {
   name: 'LockObjectLow',
@@ -275,6 +276,11 @@ export async function lockObject(
             );
         case 'package':
           return lockPackage();
+        case 'table_settings':
+        case 'program_text_elements':
+        case 'function_group_text_elements':
+        case 'class_text_elements':
+          return lockSubResource(context, objectType, objectName);
       }
     },
     (lockHandle: string) => ({

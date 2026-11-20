@@ -7,6 +7,45 @@
  * red — see the task's fix-round-1 report for the reintroduction log.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
+import { mockModuleExports } from '../helpers/moduleMock';
+
+// adt-clients replaced for this file before any module under test loads: the
+// handlers and src/lib/clients bind it when they load (node:test mock.module,
+// helpers/moduleMock.ts; its other exports stay the real ones).
+const AdtRuntimeClientMock = mock.fn<(...args: any[]) => any>(
+  function AdtRuntimeClient() {
+    return {
+      getProfiler: () => profiler,
+      getFeeds: (results?: any) =>
+        results?.feeds === feedVariantsOf
+          ? {
+              list: async () => ({
+                ok: true,
+                getResult: () => ({
+                  value: results.feeds({ data: feedListXml }),
+                }),
+              }),
+            }
+          : feeds,
+      getDumps: () => dumps,
+    };
+  },
+);
+const AdtExecutorMock = mock.fn<(...args: any[]) => any>(
+  function AdtExecutor() {
+    return {
+      getClassExecutor: () => classExecutor,
+    };
+  },
+);
+mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
+  AdtRuntimeClient: AdtRuntimeClientMock,
+  AdtExecutor: AdtExecutorMock,
+});
+
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetPackageTree } from '../../handlers/system/high/handleGetPackageTree';
@@ -19,8 +58,11 @@ import { handleRuntimeListFeeds } from '../../handlers/system/readonly/handleRun
 import { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { handleRuntimeListSystemMessages } from '../../handlers/system/readonly/handleRuntimeListSystemMessages';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
+import * as clients from '../../lib/clients';
 import { feedVariantsOf } from '../../lib/strategies/feedVariants';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+
+mock.method(clients, 'createAdtClient', () => packageClient);
 
 const context = { connection: {} as any, logger: undefined };
 
@@ -30,36 +72,10 @@ let dumps: Record<string, unknown>;
 let classExecutor: Record<string, unknown>;
 let packageClient: Record<string, unknown>;
 
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-  AdtRuntimeClient: jest.fn(() => ({
-    getProfiler: () => profiler,
-    // RuntimeListFeeds reads the variants with a feed set of its own reading
-    // (`feedVariantsOf` in the `feeds` slot): the fake answers the feed list
-    // and applies that reading to it. Any other set gets the test's fake.
-    getFeeds: (results?: any) =>
-      results?.feeds === feedVariantsOf
-        ? {
-            list: async () => ({
-              ok: true,
-              getResult: () => ({
-                value: results.feeds({ data: feedListXml }),
-              }),
-            }),
-          }
-        : feeds,
-    getDumps: () => dumps,
-  })),
-  AdtExecutor: jest.fn(() => ({ getClassExecutor: () => classExecutor })),
-}));
-
 // `handleGetPackageTree` is the only handler in this file that reaches
 // `createAdtClient` (`../../lib/clients`) rather than `AdtRuntimeClient`/
 // `AdtExecutor` — mocked at module scope, same as the two above, so the
 // factory can close over a `let` the individual test assigns.
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => packageClient,
-}));
 
 /**
  * A cut of an on-premise system's `GET /sap/bc/adt/feeds` (2026-09-26): the dumps feed with its
@@ -81,16 +97,16 @@ const feedListXml =
 describe('RuntimeListProfilerTraceFiles', () => {
   it('answers the parsed entries and their count — not a reader that returns nothing', async () => {
     const entry = { id: 'trace-1', recordedAt: '2026-01-01T00:00:00Z' };
-    profiler = { list: jest.fn(async () => okResponse([entry])) };
+    profiler = { list: mock.fn(async () => okResponse([entry])) };
 
     const result: any = await handleRuntimeListProfilerTraceFiles(
       context as any,
     );
     const body = JSON.parse(result.content[0].text);
 
-    expect(result.isError).toBe(false);
-    expect(body.count).toBe(1);
-    expect(body.entries).toEqual([entry]);
+    assert.equal(result.isError, false);
+    assert.equal(body.count, 1);
+    assert.deepStrictEqual(body.entries, [entry]);
   });
 });
 
@@ -98,7 +114,7 @@ describe('RuntimeListProfilerTraceFiles', () => {
 
 describe('RuntimeGetDumpById', () => {
   it('passes dump_id and view through to getById — a dropped view argument would silently read the default view', async () => {
-    const getById = jest.fn(async () => okResponse('<dump>content</dump>'));
+    const getById = mock.fn(async () => okResponse('<dump>content</dump>'));
     dumps = { getById };
 
     await handleRuntimeGetDumpById(
@@ -110,10 +126,17 @@ describe('RuntimeGetDumpById', () => {
       } as any,
     );
 
-    expect(getById).toHaveBeenCalledWith('DUMP-1', {
-      view: 'formatted',
-      analyse: analyseException,
-    });
+    assert.ok(
+      getById.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'DUMP-1',
+          {
+            view: 'formatted',
+            analyse: analyseException,
+          },
+        ]),
+      ),
+    );
   });
 });
 
@@ -121,7 +144,7 @@ describe('RuntimeGetDumpById', () => {
 
 describe('RuntimeGetProfilerTraceData', () => {
   it('hitlist view: reads the hitlist view and passes with_system_events — an ignored view would call the wrong key', async () => {
-    const read = jest.fn(async () => okResponse({ entries: [] }));
+    const read = mock.fn(async () => okResponse({ entries: [] }));
     profiler = { read };
 
     await handleRuntimeGetProfilerTraceData(context as any, {
@@ -130,14 +153,22 @@ describe('RuntimeGetProfilerTraceData', () => {
       with_system_events: true,
     });
 
-    expect(read).toHaveBeenCalledWith('trace-1', 'hitlist', {
-      withSystemEvents: true,
-      analyse: analyseException,
-    });
+    assert.ok(
+      read.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'trace-1',
+          'hitlist',
+          {
+            withSystemEvents: true,
+            analyse: analyseException,
+          },
+        ]),
+      ),
+    );
   });
 
   it('statements view: reads the statements view with id/withDetails/autoDrillDownThreshold — a dropped argument would omit one', async () => {
-    const read = jest.fn(async () => okResponse({ statements: [] }));
+    const read = mock.fn(async () => okResponse({ statements: [] }));
     profiler = { read };
 
     await handleRuntimeGetProfilerTraceData(context as any, {
@@ -148,17 +179,25 @@ describe('RuntimeGetProfilerTraceData', () => {
       auto_drill_down_threshold: 5,
     });
 
-    expect(read).toHaveBeenCalledWith('trace-1', 'statements', {
-      id: 42,
-      withDetails: true,
-      autoDrillDownThreshold: 5,
-      withSystemEvents: undefined,
-      analyse: analyseException,
-    });
+    assert.ok(
+      read.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'trace-1',
+          'statements',
+          {
+            id: 42,
+            withDetails: true,
+            autoDrillDownThreshold: 5,
+            withSystemEvents: undefined,
+            analyse: analyseException,
+          },
+        ]),
+      ),
+    );
   });
 
   it('db_accesses view: reads the dbAccesses view — a wrong member name would silently call a different one', async () => {
-    const read = jest.fn(async () => okResponse({ accesses: [] }));
+    const read = mock.fn(async () => okResponse({ accesses: [] }));
     profiler = { read };
 
     await handleRuntimeGetProfilerTraceData(context as any, {
@@ -166,10 +205,18 @@ describe('RuntimeGetProfilerTraceData', () => {
       view: 'db_accesses',
     });
 
-    expect(read).toHaveBeenCalledWith('trace-1', 'dbAccesses', {
-      withSystemEvents: undefined,
-      analyse: analyseException,
-    });
+    assert.ok(
+      read.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          'trace-1',
+          'dbAccesses',
+          {
+            withSystemEvents: undefined,
+            analyse: analyseException,
+          },
+        ]),
+      ),
+    );
   });
 });
 
@@ -208,7 +255,7 @@ describe('RuntimeAnalyzeProfilerTrace', () => {
         },
       ],
     };
-    profiler = { read: jest.fn(async () => okResponse(hitList)) };
+    profiler = { read: mock.fn(async () => okResponse(hitList)) };
 
     const result: any = await handleRuntimeAnalyzeProfilerTrace(
       context as any,
@@ -216,14 +263,14 @@ describe('RuntimeAnalyzeProfilerTrace', () => {
     );
     const body = JSON.parse(result.content[0].text);
 
-    expect(body.summary.total_records).toBe(3);
-    expect(body.summary.top_records).toHaveLength(2);
-    expect(body.summary.top_records[0].description).toBe('slow');
-    expect(body.summary.top_records[1].description).toBe('medium');
+    assert.equal(body.summary.total_records, 3);
+    assert.equal(body.summary.top_records.length, 2);
+    assert.equal(body.summary.top_records[0].description, 'slow');
+    assert.equal(body.summary.top_records[1].description, 'medium');
     // The ranking field survives into the compact row, flattened — the
     // second half of the bug (a nested object was dropped as "not a
     // primitive", so even a correct ranking would have shown `{}` rows).
-    expect(body.summary.top_records[0].grossTime_time).toBe(900);
+    assert.equal(body.summary.top_records[0].grossTime_time, 900);
   });
 
   it('db_accesses: ranks by accessTime.total, a different field from hitlist/statements', async () => {
@@ -241,7 +288,7 @@ describe('RuntimeAnalyzeProfilerTrace', () => {
         },
       ],
     };
-    profiler = { read: jest.fn(async () => okResponse(dbAccesses)) };
+    profiler = { read: mock.fn(async () => okResponse(dbAccesses)) };
 
     const result: any = await handleRuntimeAnalyzeProfilerTrace(
       context as any,
@@ -249,8 +296,8 @@ describe('RuntimeAnalyzeProfilerTrace', () => {
     );
     const body = JSON.parse(result.content[0].text);
 
-    expect(body.summary.total_records).toBe(2);
-    expect(body.summary.top_records[0].tableName).toBe('T2');
+    assert.equal(body.summary.total_records, 2);
+    assert.equal(body.summary.top_records[0].tableName, 'T2');
   });
 });
 
@@ -258,7 +305,7 @@ describe('RuntimeAnalyzeProfilerTrace', () => {
 
 describe('RuntimeCreateProfilerTraceParameters', () => {
   it('schedules a trace with every parameter mapped — a dropped argument would silently omit one', async () => {
-    const scheduleTrace = jest.fn(async () => okResponse('request-uri-1'));
+    const scheduleTrace = mock.fn(async () => okResponse('request-uri-1'));
     classExecutor = { scheduleTrace };
 
     const result: any = await handleRuntimeCreateProfilerTraceParameters(
@@ -282,25 +329,31 @@ describe('RuntimeCreateProfilerTraceParameters', () => {
     );
     const body = JSON.parse(result.content[0].text);
 
-    expect(scheduleTrace).toHaveBeenCalledWith({
-      headers: DEFAULT_ADT_HEADERS['classExecutor.scheduleTrace'],
-      description: 'my trace',
-      allMiscAbapStatements: true,
-      allProceduralUnits: true,
-      allInternalTableEvents: false,
-      allDynproEvents: false,
-      aggregate: true,
-      explicitOnOff: false,
-      withRfcTracing: true,
-      allSystemKernelEvents: false,
-      sqlTrace: true,
-      allDbEvents: false,
-      maxSizeForTraceFile: 1000,
-      amdpTrace: false,
-      maxTimeForTracing: 60,
-      analyse: analyseException,
-    });
-    expect(body.profiler_id).toBe('request-uri-1');
+    assert.ok(
+      scheduleTrace.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, [
+          {
+            headers: DEFAULT_ADT_HEADERS['classExecutor.scheduleTrace'],
+            description: 'my trace',
+            allMiscAbapStatements: true,
+            allProceduralUnits: true,
+            allInternalTableEvents: false,
+            allDynproEvents: false,
+            aggregate: true,
+            explicitOnOff: false,
+            withRfcTracing: true,
+            allSystemKernelEvents: false,
+            sqlTrace: true,
+            allDbEvents: false,
+            maxSizeForTraceFile: 1000,
+            amdpTrace: false,
+            maxTimeForTracing: 60,
+            analyse: analyseException,
+          },
+        ]),
+      ),
+    );
+    assert.equal(body.profiler_id, 'request-uri-1');
   });
 });
 
@@ -309,7 +362,7 @@ describe('RuntimeCreateProfilerTraceParameters', () => {
 describe('RuntimeListSystemMessages', () => {
   it('unwraps the IAdtResponse envelope and does not mask a refusal as success', async () => {
     feeds = {
-      systemMessages: jest.fn(async () => refusedResponse('no authorization')),
+      systemMessages: mock.fn(async () => refusedResponse('no authorization')),
     };
 
     const result: any = await handleRuntimeListSystemMessages(
@@ -317,12 +370,12 @@ describe('RuntimeListSystemMessages', () => {
       {},
     );
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
   });
 
   it('answers count/messages on success', async () => {
     const msg = { id: '1', title: 't', text: 'x', severity: 'I' };
-    feeds = { systemMessages: jest.fn(async () => okResponse([msg])) };
+    feeds = { systemMessages: mock.fn(async () => okResponse([msg])) };
 
     const result: any = await handleRuntimeListSystemMessages(
       context as any,
@@ -330,8 +383,8 @@ describe('RuntimeListSystemMessages', () => {
     );
     const body = JSON.parse(result.content[0].text);
 
-    expect(body.count).toBe(1);
-    expect(body.messages).toEqual([msg]);
+    assert.equal(body.count, 1);
+    assert.deepStrictEqual(body.messages, [msg]);
   });
 });
 
@@ -340,21 +393,21 @@ describe('RuntimeListSystemMessages', () => {
 describe('RuntimeGetGatewayErrorLog', () => {
   it('error_url branch answers the actual detail document — the fixed masking bug (used to serialise the raw envelope)', async () => {
     const detail = { type: 'E', shortText: 'boom' };
-    feeds = { gatewayErrorDetail: jest.fn(async () => okResponse(detail)) };
+    feeds = { gatewayErrorDetail: mock.fn(async () => okResponse(detail)) };
 
     const result: any = await handleRuntimeGetGatewayErrorLog(context as any, {
       error_url: 'https://example/feed/1',
     });
     const body = JSON.parse(result.content[0].text);
 
-    expect(body.mode).toBe('detail');
-    expect(body.error).toEqual(detail);
-    expect(body.error.ok).toBeUndefined();
+    assert.equal(body.mode, 'detail');
+    assert.deepStrictEqual(body.error, detail);
+    assert.equal(body.error.ok, undefined);
   });
 
   it('list branch answers count/errors', async () => {
     const err = { type: 'E', shortText: 'x' };
-    feeds = { gatewayErrors: jest.fn(async () => okResponse([err])) };
+    feeds = { gatewayErrors: mock.fn(async () => okResponse([err])) };
 
     const result: any = await handleRuntimeGetGatewayErrorLog(
       context as any,
@@ -362,15 +415,15 @@ describe('RuntimeGetGatewayErrorLog', () => {
     );
     const body = JSON.parse(result.content[0].text);
 
-    expect(body.mode).toBe('list');
-    expect(body.count).toBe(1);
+    assert.equal(body.mode, 'list');
+    assert.equal(body.count, 1);
   });
 });
 
 // ---------------------------------------------------------------------------
 
 describe('RuntimeListFeeds', () => {
-  it.each([
+  for (const [feedType, member, _options] of [
     ['descriptors', 'list', {}],
     [
       'dumps',
@@ -402,14 +455,13 @@ describe('RuntimeListFeeds', () => {
         to: undefined,
       },
     ],
-  ] as const)(
-    'feed_type %s calls feeds.%s',
-    async (feedType, member, _options) => {
+  ] as const) {
+    it(format('feed_type %s calls feeds.%s', feedType, member), async () => {
       // The entries readings are wrapped to keep SAP's next page link, so a
       // feed member answers a page: its entries, and `next_to` when there is
       // more.
       const entries = [{ id: '1', transactionId: '1' }];
-      const spy = jest.fn(async () =>
+      const spy = mock.fn(async () =>
         okResponse(member === 'list' ? entries : { entries }),
       );
       feeds = { [member]: spy };
@@ -422,10 +474,10 @@ describe('RuntimeListFeeds', () => {
       );
       const body = JSON.parse(result.content[0].text);
 
-      expect(spy).toHaveBeenCalledTimes(1);
-      expect(body.count).toBe(1);
-    },
-  );
+      assert.equal(spy.mock.callCount(), 1);
+      assert.equal(body.count, 1);
+    });
+  }
 
   it("feed_type variants reads each feed's query variants out of the feed list", async () => {
     const result: any = await handleRuntimeListFeeds(
@@ -435,12 +487,12 @@ describe('RuntimeListFeeds', () => {
       } as any,
     );
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const body = JSON.parse(result.content[0].text);
-    expect(body.feed_type).toBe('variants');
+    assert.equal(body.feed_type, 'variants');
     // The feed with no variant is left out.
-    expect(body.count).toBe(1);
-    expect(body.entries[0]).toEqual({
+    assert.equal(body.count, 1);
+    assert.deepStrictEqual(body.entries[0], {
       feed: '/sap/bc/adt/runtime/dumps',
       title: 'ABAP Runtime Errors',
       variants: [
@@ -463,7 +515,7 @@ describe('RuntimeListFeeds', () => {
 
 describe('GetPackageTree', () => {
   it('a refused existence check short-circuits before any walk, and answers the error of the read as it is with its step — a disabled check would proceed to walk regardless', async () => {
-    const readMetadata = jest.fn(async () =>
+    const readMetadata = mock.fn(async () =>
       refusedResponse('object not found'),
     );
     packageClient = {
@@ -478,9 +530,9 @@ describe('GetPackageTree', () => {
       } as any,
     );
 
-    expect(readMetadata).toHaveBeenCalledTimes(1);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.equal(readMetadata.mock.callCount(), 1);
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       message: 'object not found',
       origin: 'refusal',
       step: 'read package metadata',
@@ -488,8 +540,8 @@ describe('GetPackageTree', () => {
   });
 
   it('an existing package walks the tree', async () => {
-    const readMetadata = jest.fn(async () => okResponse('<pak:package/>'));
-    const fetchNodeStructure = jest.fn(async () =>
+    const readMetadata = mock.fn(async () => okResponse('<pak:package/>'));
+    const fetchNodeStructure = mock.fn(async () =>
       okResponse({ objects: [], childNodes: [] }),
     );
     packageClient = {
@@ -508,15 +560,15 @@ describe('GetPackageTree', () => {
     // mocked), against a root node with no objects and no children — this
     // test is about the existence check letting a good package through to
     // the walk, not about the walk's own recursion.
-    expect(readMetadata).toHaveBeenCalledTimes(1);
-    expect(fetchNodeStructure).toHaveBeenCalled();
-    expect(result.isError).toBe(false);
+    assert.equal(readMetadata.mock.callCount(), 1);
+    assert.ok(fetchNodeStructure.mock.callCount() > 0);
+    assert.equal(result.isError, false);
   });
 });
 
 describe('feedVariantsOf', () => {
   it('reads each feed with variants from the recorded feed list', () => {
-    expect(feedVariantsOf({ data: feedListXml })).toEqual([
+    assert.deepStrictEqual(feedVariantsOf({ data: feedListXml }), [
       {
         feed: '/sap/bc/adt/runtime/dumps',
         title: 'ABAP Runtime Errors',
@@ -545,7 +597,7 @@ describe('feedVariantsOf', () => {
       "<feed:queryVariant title='Mine &amp; yours' queryString='equals ( user , X )' isDefault='true'/>" +
       '</feed:queryVariants></feed:extendedData></atom:entry>' +
       '</atom:feed>';
-    expect(feedVariantsOf({ data: xml })).toEqual([
+    assert.deepStrictEqual(feedVariantsOf({ data: xml }), [
       {
         feed: '/sap/bc/adt/runtime/dumps',
         title: 'Errors & dumps',

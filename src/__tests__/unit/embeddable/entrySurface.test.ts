@@ -8,10 +8,13 @@
  * exported at all.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { it } from 'node:test';
 import * as embeddable from '../../../embeddable';
 import * as state from '../../../lib/state';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
 const REMOVED_VALUES = [
   'latch',
@@ -43,22 +46,22 @@ const REMOVED_TYPES = [
 ];
 
 it('exports closeInstance and activeTools, and none of the launcher machinery', () => {
-  expect(typeof embeddable.closeInstance).toBe('function');
-  expect(typeof embeddable.activeTools).toBe('function');
+  assert.equal(typeof embeddable.closeInstance, 'function');
+  assert.equal(typeof embeddable.activeTools, 'function');
   for (const name of REMOVED_VALUES) {
-    expect(Object.keys(embeddable)).not.toContain(name);
+    assert.ok(!Object.keys(embeddable).includes(name));
   }
 });
 
 it('names none of the removed types', () => {
   const source = fs.readFileSync(
-    path.join(__dirname, '../../../embeddable/index.ts'),
+    path.join(repositoryRoot(__dirname), 'src', 'embeddable', 'index.ts'),
     'utf8',
   );
   for (const name of REMOVED_TYPES) {
-    expect(source).not.toContain(name);
+    assert.ok(!source.includes(name));
   }
-  expect(source).toContain('ClosableInstance');
+  assert.ok(source.includes('ClosableInstance'));
 });
 
 it('the launchers reach what they need through lib/state', () => {
@@ -68,6 +71,6 @@ it('the launchers reach what they need through lib/state', () => {
     'SHUTDOWN_SENTENCE',
     'installShutdownSequence',
   ]) {
-    expect(Object.keys(state)).toContain(name);
+    assert.ok(Object.keys(state).includes(name));
   }
 });

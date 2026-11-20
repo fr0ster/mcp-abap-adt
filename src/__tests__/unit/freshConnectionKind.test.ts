@@ -7,6 +7,9 @@
  * then runs on that kind whatever `SAP_SYSTEM_TYPE` says — unset or another.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
+import { format } from 'node:util';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { resetProcessLatchForTests } from '../../lib/activeTools';
 import { systemKindOf } from '../../lib/connectionFactory';
@@ -34,18 +37,23 @@ function hostConnection(): IAbapConnection {
   return connection as IAbapConnection;
 }
 
-it.each([
+for (const [_label, env] of [
   ['unset', undefined],
   ['cloud', 'cloud'],
-] as const)(
-  'declared onprem, SAP_SYSTEM_TYPE %s: the fresh connection is onprem',
-  async (_label, env) => {
-    if (env === undefined) delete process.env.SAP_SYSTEM_TYPE;
-    else process.env.SAP_SYSTEM_TYPE = env;
-    const main = hostConnection();
-    declareSystemKind(main, 'onprem');
-    registerFreshConnectionFactory(main, async () => hostConnection());
-    const fresh = await openFreshConnection(main, silent);
-    expect(systemKindOf(fresh)).toBe('onprem');
-  },
-);
+] as const) {
+  it(
+    format(
+      'declared onprem, SAP_SYSTEM_TYPE %s: the fresh connection is onprem',
+      _label,
+    ),
+    async () => {
+      if (env === undefined) delete process.env.SAP_SYSTEM_TYPE;
+      else process.env.SAP_SYSTEM_TYPE = env;
+      const main = hostConnection();
+      declareSystemKind(main, 'onprem');
+      registerFreshConnectionFactory(main, async () => hostConnection());
+      const fresh = await openFreshConnection(main, silent);
+      assert.equal(systemKindOf(fresh), 'onprem');
+    },
+  );
+}

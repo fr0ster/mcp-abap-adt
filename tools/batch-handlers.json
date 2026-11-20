@@ -7,9 +7,7 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "source"
-        ]
+        "equals": ["source"]
       },
       {
         "argument": "object_type",
@@ -30,7 +28,8 @@
           "INTERFACE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]
@@ -43,9 +42,7 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "metadata"
-        ]
+        "equals": ["metadata"]
       },
       {
         "argument": "object_type",
@@ -80,9 +77,7 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "object_structure"
-        ]
+        "equals": ["object_structure"]
       }
     ]
   },
@@ -94,9 +89,7 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "node_structure"
-        ]
+        "equals": ["node_structure"]
       },
       {
         "argument": "object_adt_type",
@@ -112,9 +105,7 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "virtual_folders"
-        ]
+        "equals": ["virtual_folders"]
       }
     ]
   },
@@ -126,9 +117,7 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "activation_status"
-        ]
+        "equals": ["activation_status"]
       },
       {
         "argument": "run_id",
@@ -144,9 +133,7 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "activation_results"
-        ]
+        "equals": ["activation_results"]
       },
       {
         "argument": "run_id",
@@ -162,16 +149,11 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "source"
-        ]
+        "equals": ["source"]
       },
       {
         "argument": "object_type",
-        "equals": [
-          "UNIT_TEST",
-          "CDS_UNIT_TEST"
-        ]
+        "equals": ["UNIT_TEST", "CDS_UNIT_TEST"]
       },
       {
         "argument": "run_id",
@@ -187,9 +169,7 @@
     "when": [
       {
         "argument": "part",
-        "equals": [
-          "draft"
-        ]
+        "equals": ["draft"]
       }
     ]
   },
@@ -303,9 +283,7 @@
     "when": [
       {
         "argument": "object_type",
-        "equals": [
-          "PACKAGE"
-        ]
+        "equals": ["PACKAGE"]
       }
     ],
     "connection": "http"
@@ -334,7 +312,11 @@
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "INCLUDE",
-          "TABLE_TYPE"
+          "TABLE_TYPE",
+          "TABLE_SETTINGS",
+          "PROGRAM_TEXT_ELEMENTS",
+          "FUNCTION_GROUP_TEXT_ELEMENTS",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]
@@ -347,9 +329,7 @@
     "when": [
       {
         "argument": "object_type",
-        "equals": [
-          "PACKAGE"
-        ]
+        "equals": ["PACKAGE"]
       }
     ],
     "connection": "http"
@@ -378,7 +358,11 @@
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "INCLUDE",
-          "TABLE_TYPE"
+          "TABLE_TYPE",
+          "TABLE_SETTINGS",
+          "PROGRAM_TEXT_ELEMENTS",
+          "FUNCTION_GROUP_TEXT_ELEMENTS",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]
@@ -391,9 +375,7 @@
     "when": [
       {
         "argument": "object_type",
-        "equals": [
-          "PACKAGE"
-        ]
+        "equals": ["PACKAGE"]
       }
     ],
     "connection": "http"
@@ -432,7 +414,8 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "INCLUDE",
-          "TABLE_TYPE"
+          "TABLE_TYPE",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]
@@ -449,9 +432,7 @@
       },
       {
         "argument": "object_type",
-        "equals": [
-          "PACKAGE"
-        ]
+        "equals": ["PACKAGE"]
       }
     ],
     "connection": "http"
@@ -612,7 +593,10 @@
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "INCLUDE",
-          "TABLE_TYPE"
+          "TABLE_TYPE",
+          "PROGRAM_TEXT_ELEMENTS",
+          "FUNCTION_GROUP_TEXT_ELEMENTS",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]
@@ -625,9 +609,7 @@
     "when": [
       {
         "argument": "object_type",
-        "notEquals": [
-          "FUNCTION_MODULE"
-        ]
+        "notEquals": ["FUNCTION_MODULE"]
       }
     ]
   },
@@ -639,9 +621,7 @@
     "when": [
       {
         "argument": "object_type",
-        "notEquals": [
-          "FUNCTION_MODULE"
-        ]
+        "notEquals": ["FUNCTION_MODULE"]
       }
     ]
   },
@@ -689,9 +669,7 @@
     "when": [
       {
         "argument": "runner",
-        "equals": [
-          "sync"
-        ]
+        "equals": ["sync"]
       }
     ]
   },
@@ -703,9 +681,7 @@
     "when": [
       {
         "argument": "runner",
-        "equals": [
-          "async"
-        ]
+        "equals": ["async"]
       }
     ]
   },
@@ -717,9 +693,7 @@
     "when": [
       {
         "argument": "action",
-        "equals": [
-          "search_object"
-        ]
+        "equals": ["search_object"]
       }
     ]
   },
@@ -731,9 +705,7 @@
     "when": [
       {
         "argument": "action",
-        "equals": [
-          "where_used"
-        ]
+        "equals": ["where_used"]
       },
       {
         "argument": "objects",
@@ -741,9 +713,7 @@
       },
       {
         "argument": "enable_all_types",
-        "notEquals": [
-          "true"
-        ]
+        "notEquals": ["true"]
       },
       {
         "argument": "enable_only_types",
@@ -773,9 +743,7 @@
     "when": [
       {
         "argument": "action",
-        "equals": [
-          "atc_findings"
-        ]
+        "equals": ["atc_findings"]
       }
     ]
   },
@@ -787,9 +755,7 @@
     "when": [
       {
         "argument": "action",
-        "equals": [
-          "atc_results"
-        ]
+        "equals": ["atc_results"]
       }
     ]
   },
@@ -801,9 +767,7 @@
     "when": [
       {
         "argument": "action",
-        "equals": [
-          "atc_result"
-        ]
+        "equals": ["atc_result"]
       }
     ]
   }

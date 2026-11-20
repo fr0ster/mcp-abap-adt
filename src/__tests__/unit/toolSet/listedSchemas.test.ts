@@ -25,8 +25,10 @@
  * writes the fixture first (refused under CI).
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { after, before, describe, it, mock } from 'node:test';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import {
@@ -37,15 +39,14 @@ import {
   renderListedSchemas,
   searchOf,
 } from '../../helpers/fixtureRenderings';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   type Listing,
   listBinaries,
   type SystemType,
 } from '../../helpers/servedTools';
 
-jest.setTimeout(300_000);
-
-const REPO = path.join(__dirname, '..', '..', '..', '..');
+const REPO = repositoryRoot(__dirname);
 const FIXTURE = path.join(
   REPO,
   'tests',
@@ -90,8 +91,8 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
   let search: Grouped = {};
   let savedSystemType: string | undefined;
 
-  beforeAll(async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+  before(async () => {
+    mock.method(console, 'error', () => {});
     resetProcessLatchForTests();
     savedSystemType = process.env.SAP_SYSTEM_TYPE;
     standIn = await adtStandIn();
@@ -106,12 +107,12 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
     }
   });
 
-  afterAll(async () => {
+  after(async () => {
     await standIn?.close();
     if (savedSystemType === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = savedSystemType;
     resetProcessLatchForTests();
-    jest.restoreAllMocks();
+    mock.restoreAll();
   });
 
   /** The fixture's `section`, as the file states it. */
@@ -123,23 +124,29 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
       const bins = listings
         .filter((listing) => listing.systemType === systemType)
         .map((listing) => listing.bin);
-      expect({ systemType, bins: new Set(bins).size }).toEqual({
-        systemType,
-        bins: 12,
-      });
+      assert.deepStrictEqual(
+        { systemType, bins: new Set(bins).size },
+        {
+          systemType,
+          bins: 12,
+        },
+      );
     }
     for (const listing of listings) {
       if (listing.systemType === 'legacy') continue;
-      expect(listing.tools.length).toBeGreaterThan(10);
+      assert.ok(listing.tools.length > 10);
     }
   });
 
   it('every binary on every system type lists exactly the input schemas of the fixture', () => {
     const fixture = frozen('schemas');
     for (const [tool, listed] of Object.entries(schemas)) {
-      expect({ tool, listed }).toEqual({ tool, listed: field(fixture, tool) });
+      assert.deepStrictEqual(
+        { tool, listed },
+        { tool, listed: field(fixture, tool) },
+      );
     }
-    expect(Object.keys(schemas)).toEqual(keysOf(fixture));
+    assert.deepStrictEqual(Object.keys(schemas), keysOf(fixture));
   });
 
   it('GetObjectOutline is listed with the kinds SAP serves an outline for on each system type, and the three ABAP-parsing tools are gone (D5)', () => {
@@ -148,10 +155,13 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
       'GetAbapSemanticAnalysis',
       'GetAbapSystemSymbols',
     ]) {
-      expect({ removed, listed: field(schemas, removed) }).toEqual({
-        removed,
-        listed: undefined,
-      });
+      assert.deepStrictEqual(
+        { removed, listed: field(schemas, removed) },
+        {
+          removed,
+          listed: undefined,
+        },
+      );
     }
     const listed = field(schemas, 'GetObjectOutline');
     const kinds = new Map<string, unknown>();
@@ -168,7 +178,7 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
         }
       }
     }
-    expect(Object.fromEntries(kinds)).toEqual({
+    assert.deepStrictEqual(Object.fromEntries(kinds), {
       onprem: ['CLAS/OC', 'INTF/OI', 'PROG/P', 'FUGR/F'],
       cloud: ['CLAS/OC', 'INTF/OI', 'FUGR/F'],
     });
@@ -177,9 +187,12 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
   it('every binary on every system type lists exactly the search texts of the fixture', () => {
     const fixture = frozen('search');
     for (const [tool, listed] of Object.entries(search)) {
-      expect({ tool, listed }).toEqual({ tool, listed: field(fixture, tool) });
+      assert.deepStrictEqual(
+        { tool, listed },
+        { tool, listed: field(fixture, tool) },
+      );
     }
-    expect(Object.keys(search)).toEqual(keysOf(fixture));
+    assert.deepStrictEqual(Object.keys(search), keysOf(fixture));
   });
 
   it('every listed tool has its entry in tools/tool-search.json, and every keyword it lists is the file’s', () => {
@@ -198,14 +211,18 @@ describe('the input schema every binary lists, per system type (WRITE_LISTED_SCH
         }
       }
     }
-    expect({ missing: [...missing], foreign: [...foreign] }).toEqual({
-      missing: [],
-      foreign: [],
-    });
-    expect(
+    assert.deepStrictEqual(
+      { missing: [...missing], foreign: [...foreign] },
+      {
+        missing: [],
+        foreign: [],
+      },
+    );
+    assert.equal(
       listings.some(({ tools }) =>
         tools.some((t) => searchOf(t) !== undefined),
       ),
-    ).toBe(true);
+      true,
+    );
   });
 });

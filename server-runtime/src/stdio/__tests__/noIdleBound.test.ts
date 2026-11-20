@@ -7,12 +7,21 @@
  * of stdin ends the process.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { browserCallbackStrategy } from '@mcp-abap-adt/lib/auth';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { NO_IDLE_BOUND, type StatePart } from '@mcp-abap-adt/lib/state';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import {
+  getTimerCount,
+  reset,
+  useFakeTimers,
+  useRealTimers,
+} from '../../../../src/__tests__/helpers/fakeTime';
 import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
 import { readCoreConfig } from '../config/coreParameters';
 import { launch } from '../launcher.js';
@@ -24,7 +33,7 @@ const MINUTE = 60_000;
 const heldPart = () => {
   let held = false;
   let tell: () => void = () => {};
-  const dispose = jest.fn(async () => {
+  const dispose = mock.fn(async () => {
     held = false;
     tell();
   });
@@ -48,10 +57,19 @@ const heldPart = () => {
 };
 
 describe('stdio: no idle bound on held state', () => {
-  beforeEach(() => jest.useFakeTimers());
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
   afterEach(() => {
-    jest.clearAllTimers();
-    jest.useRealTimers();
+    // clearAllTimers() -> reset(), then enabled again with the same options
+    // (spec §3.7); the useRealTimers after it, as before.
+    reset();
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    });
+    useRealTimers();
   });
 
   it('the stdio server states no bound', () => {
@@ -59,7 +77,7 @@ describe('stdio: no idle bound on held state', () => {
       new CompositeHandlersRegistry([]),
       undefined,
     );
-    expect(server.state.idleMinutes).toBe(NO_IDLE_BOUND);
+    assert.equal(server.state.idleMinutes, NO_IDLE_BOUND);
   });
 
   it('held state and no call: no timer is armed, and a day later the state is still held, nothing disposed, nothing said', async () => {
@@ -82,66 +100,71 @@ describe('stdio: no idle bound on held state', () => {
     server.state.callEnded();
     const handle = server.state.handle;
 
-    expect(jest.getTimerCount()).toBe(0);
-    jest.advanceTimersByTime(24 * 60 * MINUTE);
+    assert.equal(getTimerCount(), 0);
+    mock.timers.tick(24 * 60 * MINUTE);
     for (let i = 0; i < 5; i++) await Promise.resolve();
 
-    expect(jest.getTimerCount()).toBe(0);
-    expect(dispose).not.toHaveBeenCalled();
-    expect(server.state.holdsState()).toBe(true);
-    expect(server.state.handle).toBe(handle);
-    expect(() => server.state.check(handle)).not.toThrow();
-    expect(lines).toEqual([]);
+    assert.equal(getTimerCount(), 0);
+    assert.equal(dispose.mock.callCount(), 0);
+    assert.equal(server.state.holdsState(), true);
+    assert.equal(server.state.handle, handle);
+    server.state.check(handle);
+    assert.deepStrictEqual(lines, []);
   });
 });
 
 describe('stdio: the end of stdin ends the process', () => {
   beforeEach(() => resetProcessLatchForTests());
   afterEach(() => {
-    jest.restoreAllMocks();
+    mock.restoreAll();
     resetProcessLatchForTests();
   });
 
-  it.each(['end', 'close'])(
-    "the launcher's server exits 0 when the client closes stdin (%s)",
-    async (event) => {
-      jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
-      const stderr: string[] = [];
-      const exits: number[] = [];
-      const processLike = Object.assign(new EventEmitter(), {
-        stdin: new EventEmitter(),
-      });
-      const [, serverSide] = InMemoryTransport.createLinkedPair();
-      // No destination: inspection-only mode, nothing reaches a system; it
-      // lists the tools of the stated system type's table.
-      const config = readCoreConfig(['--system-type=onprem'], {}, null);
-      await launch(
-        config,
-        {
-          toolSet: fullToolSet,
-          program: 'mcp-abap-adt',
-          version: '0.0.0-test',
-          packageName: '@mcp-abap-adt/core',
-        },
-        {
-          // Inspection-only mode starts no login: the program's strategy, unused.
-          browserStrategy: browserCallbackStrategy,
-          stderr: (line) => stderr.push(line),
-          exit: (code) => {
-            exits.push(code);
+  for (const event of ['end', 'close']) {
+    it(
+      format(
+        "the launcher's server exits 0 when the client closes stdin (%s)",
+        event,
+      ),
+      async (t) => {
+        t.mock.method(process.stderr, 'write', () => true);
+        const stderr: string[] = [];
+        const exits: number[] = [];
+        const processLike = Object.assign(new EventEmitter(), {
+          stdin: new EventEmitter(),
+        });
+        const [, serverSide] = InMemoryTransport.createLinkedPair();
+        // No destination: inspection-only mode, nothing reaches a system; it
+        // lists the tools of the stated system type's table.
+        const config = readCoreConfig(['--system-type=onprem'], {}, null);
+        await launch(
+          config,
+          {
+            toolSet: fullToolSet,
+            program: 'mcp-abap-adt',
+            version: '0.0.0-test',
+            packageName: '@mcp-abap-adt/core',
           },
-          processLike,
-          platform: 'linux',
-          transport: serverSide,
-        },
-      );
-      expect(exits).toEqual([]);
+          {
+            // Inspection-only mode starts no login: the program's strategy, unused.
+            browserStrategy: browserCallbackStrategy,
+            stderr: (line) => stderr.push(line),
+            exit: (code) => {
+              exits.push(code);
+            },
+            processLike,
+            platform: 'linux',
+            transport: serverSide,
+          },
+        );
+        assert.deepStrictEqual(exits, []);
 
-      processLike.stdin.emit(event);
-      for (let i = 0; i < 200 && exits.length === 0; i++) {
-        await new Promise((r) => setImmediate(r));
-      }
-      expect(exits).toEqual([0]);
-    },
-  );
+        processLike.stdin.emit(event);
+        for (let i = 0; i < 200 && exits.length === 0; i++) {
+          await new Promise((r) => setImmediate(r));
+        }
+        assert.deepStrictEqual(exits, [0]);
+      },
+    );
+  }
 });

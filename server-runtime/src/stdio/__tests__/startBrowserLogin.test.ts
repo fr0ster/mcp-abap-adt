@@ -11,10 +11,13 @@
  * URL and plays no user): nothing launches a browser or a program.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -22,6 +25,10 @@ import {
   type AdtStandIn,
   adtStandIn,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import {
+  assertMatchObject,
+  rejectionOf,
+} from '../../../../src/__tests__/helpers/assertions';
 import { resetProcessLatchForTests } from '../../../../src/lib/activeTools';
 import { readCoreConfig } from '../config/coreParameters';
 import { launch } from '../launcher.js';
@@ -33,8 +40,6 @@ import {
   type TokenEndpoint,
   tokenEndpoint,
 } from './helpers/loginStand';
-
-jest.setTimeout(30_000);
 
 /** What the exit stub throws: execution stops at the first exit. */
 const EXITED = Symbol('exited');
@@ -85,87 +90,94 @@ afterEach(async () => {
   await adt.close();
   fs.rmSync(root, { recursive: true, force: true });
   process.env = { ...savedEnv };
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
-it.each<['end' | 'close']>([['end'], ['close']])(
-  'stdin %s while the start is in its browser login: exit 1 once, never 0, the start-failed line, the transport never opens, the callback port free',
-  async (event) => {
-    const config = {
-      ...readCoreConfig(
-        [
-          `--env-path=${envFile}`,
-          `--auth-broker-path=${root}`,
-          '--system-type=cloud',
-        ],
-        process.env,
-        null,
-      ),
-      // An ephemeral callback port (no flag reads 0): the browser names it.
-      browserAuthPort: 0,
-    };
-    const [, serverSide] = InMemoryTransport.createLinkedPair();
-    let opened = 0;
-    const open = serverSide.start.bind(serverSide);
-    serverSide.start = async () => {
-      opened += 1;
-      return open();
-    };
-    const stderr: string[] = [];
-    const exits: number[] = [];
-    const processLike = Object.assign(new EventEmitter(), {
-      stdin: new EventEmitter(),
-    });
-    jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
-    const launched = launch(
-      config,
-      {
-        toolSet: fullToolSet,
-        program: 'mcp-abap-adt',
-        version: '0.0.0-test',
-        packageName: '@mcp-abap-adt/core',
-      },
-      {
-        // The program's strategy, with the test's browser in place of the
-        // platform's: nothing is launched.
-        browserStrategy: (options) =>
-          browserCallbackStrategy({ ...options, browser: browser.browser }),
-        stderr: (line) => stderr.push(line),
-        // A real exit ends the process at its first call: this one stops
-        // the caller there too, so a later exit cannot hide the first.
-        exit: (code) => {
-          exits.push(code);
-          throw EXITED;
+for (const [event] of [['end'], ['close']] satisfies ReadonlyArray<
+  ['end' | 'close']
+>) {
+  it(
+    format(
+      'stdin %s while the start is in its browser login: exit 1 once, never 0, the start-failed line, the transport never opens, the callback port free',
+      event,
+    ),
+    async (t) => {
+      const config = {
+        ...readCoreConfig(
+          [
+            `--env-path=${envFile}`,
+            `--auth-broker-path=${root}`,
+            '--system-type=cloud',
+          ],
+          process.env,
+          null,
+        ),
+        // An ephemeral callback port (no flag reads 0): the browser names it.
+        browserAuthPort: 0,
+      };
+      const [, serverSide] = InMemoryTransport.createLinkedPair();
+      let opened = 0;
+      const open = serverSide.start.bind(serverSide);
+      serverSide.start = async () => {
+        opened += 1;
+        return open();
+      };
+      const stderr: string[] = [];
+      const exits: number[] = [];
+      const processLike = Object.assign(new EventEmitter(), {
+        stdin: new EventEmitter(),
+      });
+      t.mock.method(process.stderr, 'write', () => true);
+      const launched = launch(
+        config,
+        {
+          toolSet: fullToolSet,
+          program: 'mcp-abap-adt',
+          version: '0.0.0-test',
+          packageName: '@mcp-abap-adt/core',
         },
-        processLike,
-        platform: 'linux',
-        transport: serverSide,
-      },
-    ).catch((error: unknown) => {
-      if (error !== EXITED) throw error;
-    });
+        {
+          // The program's strategy, with the test's browser in place of the
+          // platform's: nothing is launched.
+          browserStrategy: (options) =>
+            browserCallbackStrategy({ ...options, browser: browser.browser }),
+          stderr: (line) => stderr.push(line),
+          // A real exit ends the process at its first call: this one stops
+          // the caller there too, so a later exit cannot hide the first.
+          exit: (code) => {
+            exits.push(code);
+            throw EXITED;
+          },
+          processLike,
+          platform: 'linux',
+          transport: serverSide,
+        },
+      ).catch((error: unknown) => {
+        if (error !== EXITED) throw error;
+      });
 
-    // The login is open: the browser was given its URL, the callback listens.
-    await browser.opened(1);
-    const port = browser.ports[0] ?? 0;
-    expect(port).toBeGreaterThan(0);
-    await expect(bindsFree(port)).rejects.toMatchObject({
-      code: 'EADDRINUSE',
-    });
+      // The login is open: the browser was given its URL, the callback listens.
+      await browser.opened(1);
+      const port = browser.ports[0] ?? 0;
+      assert.ok(port > 0);
+      assertMatchObject(await rejectionOf(bindsFree(port)), {
+        code: 'EADDRINUSE',
+      });
 
-    processLike.stdin.emit(event);
-    const end = Date.now() + 10_000;
-    while (exits.length === 0 && Date.now() < end) {
-      await new Promise((r) => setTimeout(r, 5));
-    }
-    // Long enough for a second exit, were there one, to be recorded.
-    await new Promise((r) => setTimeout(r, 50));
+      processLike.stdin.emit(event);
+      const end = Date.now() + 10_000;
+      while (exits.length === 0 && Date.now() < end) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      // Long enough for a second exit, were there one, to be recorded.
+      await new Promise((r) => setTimeout(r, 50));
 
-    expect(exits).toEqual([1]);
-    expect(stderr).toContain(SHUTDOWN_BEFORE_START_LINE);
-    expect(opened).toBe(0);
-    // The login ended with the start: its callback port binds again.
-    await bindsFree(port);
-    await launched;
-  },
-);
+      assert.deepStrictEqual(exits, [1]);
+      assert.ok(stderr.includes(SHUTDOWN_BEFORE_START_LINE));
+      assert.equal(opened, 0);
+      // The login ended with the start: its callback port binds again.
+      await bindsFree(port);
+      await launched;
+    },
+  );
+}

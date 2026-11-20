@@ -1,5 +1,23 @@
 [
   {
+    "file": "src/embeddable/BaseMcpServer.ts",
+    "function": "BaseMcpServer.pingInTurn",
+    "site": "setSessionType('stateful')",
+    "count": 1,
+    "window": "the session keep-alive's one discovery GET, in its own turn of the instance's main flow (no tool call beside it), on the instance's held connection: into that connection's stateful session",
+    "stateless": "the finally right after the ping puts back the session mode the connection had before it (setSessionType(mode))",
+    "whose": "server"
+  },
+  {
+    "file": "src/embeddable/BaseMcpServer.ts",
+    "function": "BaseMcpServer.pingInTurn",
+    "site": "setSessionType(mode)",
+    "count": 1,
+    "window": "none of its own: puts back the session mode the held connection had before the keep-alive's ping",
+    "stateless": "the mode as it was before the ping: stateless unless a lock had left it stateful",
+    "whose": "server"
+  },
+  {
     "file": "src/lib/backgroundRuns/run.ts",
     "function": "startBackgroundRun",
     "site": "setSessionType('stateless')",
@@ -792,6 +810,24 @@
     "whose": "adt-clients"
   },
   {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/tableSettings/AdtTableSettings.js",
+    "function": "lock",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the LOCK alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the LOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/tableSettings/AdtTableSettings.js",
+    "function": "unlock",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the UNLOCK alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the UNLOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
     "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/tabletype/AdtDdicTableType.js",
     "function": "lock",
     "site": "inStatefulSession",
@@ -816,6 +852,24 @@
     "count": 1,
     "window": "the UNLOCK alone (one request)",
     "stateless": "in the same call: a finally sets it stateless, also when the UNLOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/textElements/AdtTextElements.js",
+    "function": "lock",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the LOCK alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the LOCK is refused or throws",
+    "whose": "adt-clients"
+  },
+  {
+    "file": "node_modules/@mcp-abap-adt/adt-clients/dist/core/textElements/AdtTextElements.js",
+    "function": "unlock",
+    "site": "inStatefulSession",
+    "count": 1,
+    "window": "the UNLOCK alone (one request, inStatefulSession)",
+    "stateless": "in the same call: inStatefulSession's finally sets it stateless, also when the UNLOCK is refused or throws",
     "whose": "adt-clients"
   },
   {

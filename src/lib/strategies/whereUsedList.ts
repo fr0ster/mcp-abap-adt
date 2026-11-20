@@ -217,6 +217,23 @@ function noResult<T>(value: T): IAdtResponse<T, IAdtError> {
  * this migration exists to remove. A refused scope fetch is returned as the
  * refusal it is.
  */
+/**
+ * The object a where-used request names, as `params` names it: its name and
+ * code, and with `PROG/PX` its container (interfaces-adt 30: required with
+ * `PROG/PX`, refused with every other code).
+ */
+export function whereUsedTarget(
+  params: IAdtWhereUsedScopeParamsOf,
+): IAdtWhereUsedScopeParamsOf {
+  return params.object_type === 'PROG/PX'
+    ? {
+        object_name: params.object_name,
+        object_type: params.object_type,
+        container: params.container,
+      }
+    : { object_name: params.object_name, object_type: params.object_type };
+}
+
 export async function fetchWhereUsedReferences(
   utils: WhereUsedSource,
   params: IAdtWhereUsedScopeParamsOf & WhereUsedFilter,
@@ -225,10 +242,7 @@ export async function fetchWhereUsedReferences(
 
   if (needsScope(params)) {
     const scope = await atStep('read where-used scope', () =>
-      utils.getWhereUsedScope({
-        object_name: params.object_name,
-        object_type: params.object_type,
-      }),
+      utils.getWhereUsedScope(whereUsedTarget(params)),
     )();
     if (!scope.ok) {
       return scope;
@@ -243,8 +257,7 @@ export async function fetchWhereUsedReferences(
 
   const result = await atStep('read where-used', () =>
     utils.getWhereUsed({
-      object_name: params.object_name,
-      object_type: params.object_type,
+      ...whereUsedTarget(params),
       ...(scopeXml !== undefined ? { scopeXml } : {}),
     }),
   )();

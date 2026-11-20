@@ -9,6 +9,10 @@
  * alike (the batch proof's three modes). The state a call works on is set up
  * first, on answering connections, and the count starts after it.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { AbapDebugger, AmdpDebugger } from '@mcp-abap-adt/adt-clients';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import {
@@ -32,6 +36,16 @@ import {
   compactToolSetOf,
 } from '../../../lib/toolSet';
 import { corpusBody } from '../../helpers/adtCorpus';
+import {
+  assertMatchObject,
+  assertNoProperty,
+  assertThrows,
+} from '../../helpers/assertions';
+import {
+  advanceTimersByTimeAsync,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
 import { declaredRequired, jsonAt, listedJson } from '../../helpers/listedJson';
 import { toolAnswer } from '../../helpers/toolAnswer';
 
@@ -205,7 +219,7 @@ async function prepare(t: ReturnType<typeof install>, setup: Setup) {
             operation: 'attach',
             debuggee_id: 'DEBUGGEE1',
           });
-  expect(answer.isError).not.toBe(true);
+  assert.notEqual(answer.isError, true);
   return { state_handle: jsonOf(answer).state_handle as string };
 }
 
@@ -516,12 +530,15 @@ const CASES: Array<{
 describe('the compact debugger is four tools', () => {
   const entries = compactDebugEntries();
   it('HandlerDebugBreakpoints, HandlerDebugSession, HandlerDebugStep, HandlerDebugMaintain', () => {
-    expect(entries.map((e) => e.toolDefinition.name)).toEqual([
-      'HandlerDebugBreakpoints',
-      'HandlerDebugSession',
-      'HandlerDebugStep',
-      'HandlerDebugMaintain',
-    ]);
+    assert.deepStrictEqual(
+      entries.map((e) => e.toolDefinition.name),
+      [
+        'HandlerDebugBreakpoints',
+        'HandlerDebugSession',
+        'HandlerDebugStep',
+        'HandlerDebugMaintain',
+      ],
+    );
   });
 
   it('HandlerDebugStart, HandlerDebugView and HandlerDebugWait are not served', () => {
@@ -538,15 +555,18 @@ describe('the compact debugger is four tools', () => {
       'HandlerDebugView',
       'HandlerDebugWait',
     ]) {
-      expect({ name, served: served.includes(name) }).toEqual({
-        name,
-        served: false,
-      });
-      expect(DEBUGGER_OWN_CONNECTION_TOOLS).not.toContain(name);
+      assert.deepStrictEqual(
+        { name, served: served.includes(name) },
+        {
+          name,
+          served: false,
+        },
+      );
+      assert.ok(!DEBUGGER_OWN_CONNECTION_TOOLS.includes(name));
     }
     for (const e of entries) {
-      expect(served).toContain(e.toolDefinition.name);
-      expect(DEBUGGER_OWN_CONNECTION_TOOLS).toContain(e.toolDefinition.name);
+      assert.ok(served.includes(e.toolDefinition.name));
+      assert.ok(DEBUGGER_OWN_CONNECTION_TOOLS.includes(e.toolDefinition.name));
     }
     const ro = compactReadOnlyToolSetOf({
       readOnly: compactReadOnlyEntries,
@@ -554,7 +574,10 @@ describe('the compact debugger is four tools', () => {
     })
       .groups({ connection: undefined } as never, 'stdio', { dataTools: false })
       .flatMap((g) => g.getHandlers().map((e) => e.toolDefinition.name));
-    expect(ro.filter((n) => n.startsWith('HandlerDebug'))).toEqual([]);
+    assert.deepStrictEqual(
+      ro.filter((n) => n.startsWith('HandlerDebug')),
+      [],
+    );
   });
 
   it('every operation of the cases is in its tool, and every tool operation has a case', () => {
@@ -568,29 +591,38 @@ describe('the compact debugger is four tools', () => {
           (c) => c.args.operation as string,
         ),
       );
-      expect({ tool: e.toolDefinition.name, ops: [...ops].sort() }).toEqual({
-        tool: e.toolDefinition.name,
-        ops: [...covered].sort(),
-      });
+      assert.deepStrictEqual(
+        { tool: e.toolDefinition.name, ops: [...ops].sort() },
+        {
+          tool: e.toolDefinition.name,
+          ops: [...covered].sort(),
+        },
+      );
     }
   });
 
   it('every parameter is described and every tool takes kind, operation and detail', () => {
     for (const e of entries) {
       const schema = listedJson(e.toolDefinition.inputSchema);
-      expect(declaredRequired(e.toolDefinition.inputSchema)).toEqual(
-        expect.arrayContaining(['kind', 'operation']),
-      );
-      expect(schema.properties?.detail).toBeDefined();
+      {
+        const actual = declaredRequired(e.toolDefinition.inputSchema);
+        for (const expected of ['kind', 'operation']) {
+          assert.ok(actual.some((e) => isDeepStrictEqual(e, expected)));
+        }
+      }
+      assert.notEqual(schema.properties?.detail, undefined);
       for (const [name, p] of Object.entries(schema.properties ?? {}))
         if (name !== 'detail')
-          expect({
-            name,
-            described: typeof p === 'object' && !!p.description,
-          }).toEqual({
-            name,
-            described: true,
-          });
+          assert.deepStrictEqual(
+            {
+              name,
+              described: typeof p === 'object' && !!p.description,
+            },
+            {
+              name,
+              described: true,
+            },
+          );
     }
   });
 });
@@ -602,32 +634,42 @@ describe('descriptions, positive', () => {
   const description = (name: string) => byName.get(name)!.description as string;
 
   it("a step answers SAP's step result and the stopped position is read from the stack", () => {
-    expect(description('HandlerDebugStep')).toContain(
-      "a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack.",
+    assert.ok(
+      description('HandlerDebugStep').includes(
+        "a step answers SAP's step result, or ended when SAP reports the program's end, and the stopped position is read from the stack.",
+      ),
     );
   });
 
   it('terminate answers 500 when it succeeds', () => {
-    expect(description('HandlerDebugSession')).toContain(
-      "terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger; each answers SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end);",
+    assert.ok(
+      description('HandlerDebugSession').includes(
+        "terminateDebuggee ends the debuggee where it stands and terminateDebugger frees the debugger; each answers SAP's answer as it came, which is a 500 when it succeeded, and the next answer shows the success (noSessionAttached, or the program's end);",
+      ),
     );
   });
 
   it('detach releases the debuggee on the attaching session', () => {
-    expect(description('HandlerDebugSession')).toContain(
-      'detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on;',
+    assert.ok(
+      description('HandlerDebugSession').includes(
+        'detachDebugger sends detachDebugger on the attaching session, which releases the debuggee, and the program runs on;',
+      ),
     );
   });
 
   it("listen holds for the caller's hold_seconds", () => {
-    expect(description('HandlerDebugSession')).toContain(
-      "listen waits for a debuggee for exactly hold_seconds, SAP's hold,",
+    assert.ok(
+      description('HandlerDebugSession').includes(
+        "listen waits for a debuggee for exactly hold_seconds, SAP's hold,",
+      ),
     );
   });
 
   it('end logs off: an attached debuggee runs on, an AMDP debug session ends, the breakpoints stay set until stopListener removes them', () => {
-    expect(description('HandlerDebugSession')).toContain(
-      "end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set until stopListener removes them;",
+    assert.ok(
+      description('HandlerDebugSession').includes(
+        "end, for either kind, takes state_handle and logs off each connection the debug state opened, one logoff each: an attached debuggee runs on, an AMDP debug session ends, and the user's breakpoints stay set until stopListener removes them;",
+      ),
     );
   });
 
@@ -642,11 +684,14 @@ describe('descriptions, positive', () => {
         ),
       ];
       for (const text of texts) {
-        expect({ name, text, negation: NEGATION.test(text) }).toEqual({
-          name,
-          text,
-          negation: false,
-        });
+        assert.deepStrictEqual(
+          { name, text, negation: NEGATION.test(text) },
+          {
+            name,
+            text,
+            negation: false,
+          },
+        );
         for (const other of [
           ...byName.keys(),
           'HandlerDebugStart',
@@ -654,49 +699,61 @@ describe('descriptions, positive', () => {
           'HandlerDebugWait',
         ])
           if (other !== name)
-            expect({ name, text, names: text.includes(other) }).toEqual({
-              name,
-              text,
-              names: false,
-            });
+            assert.deepStrictEqual(
+              { name, text, names: text.includes(other) },
+              {
+                name,
+                text,
+                names: false,
+              },
+            );
       }
     }
   });
 });
 
 describe('each call is exactly one request (held / document / 404)', () => {
-  it.each(
-    CASES.map((c) => [`${c.tool} ${c.args.kind} ${c.args.operation}`, c]),
-  )('%s: exactly one request, the named method', async (_label, c) => {
-    const [held, documented, refused] = await Promise.all(
-      MODES.map((mode) => runIn(mode, c.tool, c.args, c.setup)),
+  for (const [_label, c] of CASES.map((c): [string, (typeof CASES)[number]] => [
+    `${c.tool} ${c.args.kind} ${c.args.operation}`,
+    c,
+  ])) {
+    it(
+      format('%s: exactly one request, the named method', _label),
+      async () => {
+        const [held, documented, refused] = await Promise.all(
+          MODES.map((mode) => runIn(mode, c.tool, c.args, c.setup)),
+        );
+        assert.equal(held.sent.length, 1);
+        if (typeof c.request === 'string')
+          assert.equal(held.sent[0], c.request);
+        else assert.match(held.sent[0] ?? '', c.request);
+        assert.deepStrictEqual(documented.sent, held.sent);
+        assert.deepStrictEqual(refused.sent, held.sent);
+
+        assert.notEqual(documented.answer?.isError, true);
+        assert.match(jsonOf(documented.answer).state_handle, /^[0-9A-F]{32}$/);
+
+        assert.equal(refused.answer?.isError, true);
+        const failed = jsonOf(refused.answer);
+        assert.equal(failed.status, 404);
+        assert.equal(failed.step, c.step);
+        // The failure answers the handle beside the error: the state holds what the call fixed.
+        const handleBlock = refused.answer?.content
+          .map((block) => JSON.parse(block.text) as Record<string, unknown>)
+          .find((block) => 'state_handle' in block);
+        const shownHandle = handleBlock?.state_handle;
+        assert.ok(typeof shownHandle === 'string');
+        assert.match(shownHandle, /^[0-9A-F]{32}$/);
+      },
     );
-    expect(held.sent).toHaveLength(1);
-    if (typeof c.request === 'string') expect(held.sent[0]).toBe(c.request);
-    else expect(held.sent[0]).toMatch(c.request);
-    expect(documented.sent).toEqual(held.sent);
-    expect(refused.sent).toEqual(held.sent);
-
-    expect(documented.answer?.isError).not.toBe(true);
-    expect(jsonOf(documented.answer).state_handle).toMatch(/^[0-9A-F]{32}$/);
-
-    expect(refused.answer?.isError).toBe(true);
-    const failed = jsonOf(refused.answer);
-    expect(failed.status).toBe(404);
-    expect(failed.step).toBe(c.step);
-    // The failure answers the handle beside the error: the state holds what the call fixed.
-    const handleBlock = refused.answer?.content
-      .map((block) => JSON.parse(block.text) as Record<string, unknown>)
-      .find((block) => 'state_handle' in block);
-    expect(handleBlock?.state_handle).toMatch(/^[0-9A-F]{32}$/);
-  });
+  }
 });
 
 describe("the chain is the consumer's", () => {
   it('no background listen loop: nothing is sent between calls', async () => {
-    jest.useFakeTimers({
-      doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
-    });
+    // setImmediate, nextTick and queueMicrotask real: setImmediate
+    // left out of the faked APIs (the other two are never faked here).
+    useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
     try {
       const t = install((_m, url) =>
         url.includes('/listeners?') ? LISTEN_CATCH : '',
@@ -714,15 +771,13 @@ describe("the chain is the consumer's", () => {
         operation: 'listen',
         hold_seconds: 5,
       });
-      expect(jsonOf(caught)).toMatchObject({
-        caught: true,
-        debuggee_id: expect.any(String),
-      });
-      expect(t.wire.sent).toHaveLength(2);
+      assertMatchObject(jsonOf(caught), { caught: true });
+      assert.equal(typeof jsonOf(caught).debuggee_id, 'string');
+      assert.equal(t.wire.sent.length, 2);
       // A catch is the consumer's to attach; nothing listens again, nothing attaches.
-      await jest.advanceTimersByTimeAsync(120_000);
+      await advanceTimersByTimeAsync(120_000);
       await settle();
-      expect(t.wire.sent).toHaveLength(2);
+      assert.equal(t.wire.sent.length, 2);
       const stepped = await t.call('HandlerDebugSession', {
         state_handle: handle,
         kind: 'abap',
@@ -730,18 +785,18 @@ describe("the chain is the consumer's", () => {
         debuggee_id: jsonOf(caught).debuggee_id,
         server: jsonOf(caught).server,
       });
-      expect(stepped.isError).not.toBe(true);
+      assert.notEqual(stepped.isError, true);
       await t.call('HandlerDebugStep', {
         state_handle: handle,
         kind: 'abap',
         operation: 'stepOver',
       });
-      await jest.advanceTimersByTimeAsync(120_000);
+      await advanceTimersByTimeAsync(120_000);
       await settle();
-      expect(t.wire.sent).toHaveLength(4);
-      expect(t.wire.sent[3]).toBe('POST /sap/bc/adt/debugger?method=stepOver');
+      assert.equal(t.wire.sent.length, 4);
+      assert.equal(t.wire.sent[3], 'POST /sap/bc/adt/debugger?method=stepOver');
     } finally {
-      jest.useRealTimers();
+      useRealTimers();
     }
   });
 
@@ -753,9 +808,9 @@ describe("the chain is the consumer's", () => {
         { kind: 'abap', operation: 'listen', hold_seconds: hold },
         'none',
       );
-      expect(sent).toHaveLength(1);
+      assert.equal(sent.length, 1);
       const query = new URLSearchParams(sent[0].split('?')[1]);
-      expect(query.get('timeout')).toBe(String(hold));
+      assert.equal(query.get('timeout'), String(hold));
     }
   });
 
@@ -766,39 +821,46 @@ describe("the chain is the consumer's", () => {
       { kind: 'abap', operation: 'listen' },
       'none',
     );
-    expect(sent).toEqual([]);
-    expect(answer?.isError).toBe(true);
-    expect(answer?.content[0].text).toContain(
-      'hold_seconds: needed for listen',
+    assert.deepStrictEqual(sent, []);
+    assert.equal(answer?.isError, true);
+    assert.ok(
+      answer?.content[0].text.includes('hold_seconds: needed for listen'),
     );
   });
 
-  it.each(['stepRunToLine', 'stepJumpToLine'])(
-    '%s: stepToLine without an address refused before any request',
-    async (operation) => {
-      for (const missing of ['object_type', 'object_name', 'line']) {
-        const args: Record<string, unknown> = {
-          kind: 'abap',
-          operation,
-          object_type: 'CLAS',
-          object_name: 'class_a',
-          line: 9,
-        };
-        delete args[missing];
-        const { sent, answer } = await runIn(
-          'document',
-          'HandlerDebugStep',
-          args,
-          'attached',
-        );
-        expect({ missing, sent }).toEqual({ missing, sent: [] });
-        expect(answer?.isError).toBe(true);
-        expect(answer?.content[0].text).toContain(
-          `object_type, object_name and line: needed for ${operation}`,
-        );
-      }
-    },
-  );
+  for (const operation of ['stepRunToLine', 'stepJumpToLine']) {
+    it(
+      format(
+        '%s: stepToLine without an address refused before any request',
+        operation,
+      ),
+      async () => {
+        for (const missing of ['object_type', 'object_name', 'line']) {
+          const args: Record<string, unknown> = {
+            kind: 'abap',
+            operation,
+            object_type: 'CLAS',
+            object_name: 'class_a',
+            line: 9,
+          };
+          delete args[missing];
+          const { sent, answer } = await runIn(
+            'document',
+            'HandlerDebugStep',
+            args,
+            'attached',
+          );
+          assert.deepStrictEqual({ missing, sent }, { missing, sent: [] });
+          assert.equal(answer?.isError, true);
+          assert.ok(
+            answer?.content[0].text.includes(
+              `object_type, object_name and line: needed for ${operation}`,
+            ),
+          );
+        }
+      },
+    );
+  }
 
   it('detach sends detachDebugger without an id on the attaching session', async () => {
     const t = install();
@@ -826,12 +888,12 @@ describe("the chain is the consumer's", () => {
       kind: 'abap',
       operation: 'detachDebugger',
     });
-    expect(detached.isError).not.toBe(true);
-    expect(t.wire.sent).toEqual([
+    assert.notEqual(detached.isError, true);
+    assert.deepStrictEqual(t.wire.sent, [
       'POST /sap/bc/adt/debugger?method=detachDebugger',
     ]);
-    expect(seen).toEqual([on]);
-    expect(t.wire.closed).toBe(0);
+    assert.deepStrictEqual(seen, [on]);
+    assert.equal(t.wire.closed, 0);
   });
 
   it('a call of one kind is refused while the instance holds the other, before any request', async () => {
@@ -843,10 +905,12 @@ describe("the chain is the consumer's", () => {
       kind: 'abap',
       operation: 'stepOver',
     });
-    expect(t.wire.sent).toEqual([]);
-    expect(answer.isError).toBe(true);
-    expect(answer.content[0].text).toContain(
-      'a amdp debug session is already open on this server',
+    assert.deepStrictEqual(t.wire.sent, []);
+    assert.equal(answer.isError, true);
+    assert.ok(
+      answer.content[0].text.includes(
+        'a amdp debug session is already open on this server',
+      ),
     );
   });
 
@@ -859,10 +923,12 @@ describe("the chain is the consumer's", () => {
       kind: 'amdp',
       operation: 'getStack',
     });
-    expect(t.wire.sent).toEqual([]);
-    expect(answer.isError).toBe(true);
-    expect(answer.content[0].text).toContain(
-      'operation: kind amdp takes getDataPreview; getStack is outside them',
+    assert.deepStrictEqual(t.wire.sent, []);
+    assert.equal(answer.isError, true);
+    assert.ok(
+      answer.content[0].text.includes(
+        'operation: kind amdp takes getDataPreview; getStack is outside them',
+      ),
     );
   });
 
@@ -875,8 +941,8 @@ describe("the chain is the consumer's", () => {
       operation: 'setBreakpoints',
       breakpoints: [{ statement: 'WRITE' }],
     });
-    expect(t.wire.sent).toEqual([]);
-    expect(answer.isError).toBe(true);
+    assert.deepStrictEqual(t.wire.sent, []);
+    assert.equal(answer.isError, true);
   });
 
   it('the first abap call fixes the identity; a call stating another is refused before any request', async () => {
@@ -887,7 +953,7 @@ describe("the chain is the consumer's", () => {
       breakpoints: [{ statement: 'WRITE' }],
       request_user: 'other_user',
     });
-    expect(jsonOf(armed)).toMatchObject({
+    assertMatchObject(jsonOf(armed), {
       request_user: 'OTHER_USER',
       debugging_mode: 'user',
       terminal_id: IDS.terminalId,
@@ -906,18 +972,18 @@ describe("the chain is the consumer's", () => {
         hold_seconds: 5,
         ...stated,
       });
-      expect(answer.isError).toBe(true);
+      assert.equal(answer.isError, true);
     }
-    expect(t.wire.sent).toEqual([]);
+    assert.deepStrictEqual([...t.wire.sent], []);
     const same = await t.call('HandlerDebugSession', {
       state_handle: handle,
       kind: 'abap',
       operation: 'stopListener',
       request_user: 'Other_User',
     });
-    expect(same.isError).not.toBe(true);
-    expect(t.wire.sent).toHaveLength(1);
-    expect(t.wire.sent[0]).toContain('requestUser=OTHER_USER');
+    assert.notEqual(same.isError, true);
+    assert.equal(t.wire.sent.length, 1);
+    assert.ok(t.wire.sent[0].includes('requestUser=OTHER_USER'));
   });
 
   // The two shapes a success has been answered in: an ADT exception with the
@@ -925,40 +991,47 @@ describe("the chain is the consumer's", () => {
   // reaches the caller as SAP sent it, a 500 failure with its step.
   const TERMINATE_500 = (subType: string) =>
     `<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="AdiFailed"/><message lang="EN">Debuggee terminated</message><localizedMessage lang="EN">Debuggee terminated</localizedMessage><properties><entry key="com.sap.adt.communicationFramework.subType">${subType}</entry></properties></exc:exception>`;
-  it.each([
+  for (const [operation, step, data] of [
     [
       'terminateDebuggee',
       'terminate debuggee',
       TERMINATE_500('terminateDebuggee'),
     ],
     ['terminateDebugger', 'terminate debugger', ''],
-  ])(
-    '%s: the 500 SAP answers when it succeeded reaches the caller as SAP sent it',
-    async (operation, step, data) => {
-      const t = install();
-      const handle = (await prepare(t, 'attached')).state_handle;
-      t.wire.mode = 'document';
-      t.wire.refusalOf = (_m, url) =>
-        url.includes(`method=${operation}`) ? { status: 500, data } : undefined;
-      const answer = await t.call('HandlerDebugSession', {
-        state_handle: handle,
-        kind: 'abap',
+  ]) {
+    it(
+      format(
+        '%s: the 500 SAP answers when it succeeded reaches the caller as SAP sent it',
         operation,
-      });
-      expect(t.wire.sent).toEqual([
-        `POST /sap/bc/adt/debugger?method=${operation}`,
-      ]);
-      expect(answer.isError).toBe(true);
-      const failed = jsonOf(answer);
-      expect(failed.status).toBe(500);
-      expect(failed.step).toBe(step);
-    },
-  );
+      ),
+      async () => {
+        const t = install();
+        const handle = (await prepare(t, 'attached')).state_handle;
+        t.wire.mode = 'document';
+        t.wire.refusalOf = (_m, url) =>
+          url.includes(`method=${operation}`)
+            ? { status: 500, data }
+            : undefined;
+        const answer = await t.call('HandlerDebugSession', {
+          state_handle: handle,
+          kind: 'abap',
+          operation,
+        });
+        assert.deepStrictEqual(t.wire.sent, [
+          `POST /sap/bc/adt/debugger?method=${operation}`,
+        ]);
+        assert.equal(answer.isError, true);
+        const failed = jsonOf(answer);
+        assert.equal(failed.status, 500);
+        assert.equal(failed.step, step);
+      },
+    );
+  }
 
   it('AMDP: no background event read, nothing is sent between calls', async () => {
-    jest.useFakeTimers({
-      doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
-    });
+    // setImmediate, nextTick and queueMicrotask real: setImmediate
+    // left out of the faked APIs (the other two are never faked here).
+    useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
     try {
       const onBreak = corpusBody('amdp-debugger--05-events-on-break');
       const t = install((method, url) =>
@@ -976,21 +1049,21 @@ describe("the chain is the consumer's", () => {
         operation: 'syncBreakpoints',
         breakpoints: [{ object_name: 'class_a', line: 14 }],
       });
-      await jest.advanceTimersByTimeAsync(120_000);
+      await advanceTimersByTimeAsync(120_000);
       await settle();
-      expect(t.wire.sent).toHaveLength(2);
+      assert.equal(t.wire.sent.length, 2);
       const events = await t.call('HandlerDebugSession', {
         state_handle: handle,
         kind: 'amdp',
         operation: 'getEvents',
       });
-      expect(jsonOf(events).events.length).toBeGreaterThan(0);
-      await jest.advanceTimersByTimeAsync(120_000);
+      assert.ok(jsonOf(events).events.length > 0);
+      await advanceTimersByTimeAsync(120_000);
       await settle();
-      expect(t.wire.sent).toHaveLength(3);
-      expect(t.wire.sent[2]).toBe(`GET ${MAIN}/MAIN1`);
+      assert.equal(t.wire.sent.length, 3);
+      assert.equal(t.wire.sent[2], `GET ${MAIN}/MAIN1`);
     } finally {
-      jest.useRealTimers();
+      useRealTimers();
     }
   });
 
@@ -1005,42 +1078,44 @@ describe("the chain is the consumer's", () => {
       operation: 'attach',
       debuggee_id: 'DEBUGGEE2',
     });
-    expect(second.isError).not.toBe(true);
-    expect(t.wire.sent).toHaveLength(1);
-    expect(t.wire.sent[0]).toContain('debuggeeId=DEBUGGEE2');
-    expect(t.wire.opened).toBe(opened);
+    assert.notEqual(second.isError, true);
+    assert.equal(t.wire.sent.length, 1);
+    assert.ok(t.wire.sent[0].includes('debuggeeId=DEBUGGEE2'));
+    assert.equal(t.wire.opened, opened);
   });
 
-  it.each([
+  for (const [kind, operation, extra] of [
     ['abap', 'listen', { hold_seconds: 60 }],
     ['amdp', 'getEvents', {}],
-  ] as const)(
-    '%s %s while one holds goes to SAP as it is',
-    async (kind, operation, extra) => {
-      const t = install();
-      const handle =
-        kind === 'amdp' ? (await prepare(t, 'amdp')).state_handle : undefined;
-      t.wire.mode = 'pending';
-      const first = t.call('HandlerDebugSession', {
-        ...(handle ? { state_handle: handle } : {}),
-        kind,
-        operation,
-        ...extra,
-      });
-      first.catch(() => undefined);
-      await settle();
-      const second = t.call('HandlerDebugSession', {
-        state_handle: handle ?? t.state.handle,
-        kind,
-        operation,
-        ...extra,
-      });
-      second.catch(() => undefined);
-      await settle();
-      expect(t.wire.sent).toHaveLength(2);
-      expect(t.wire.sent[1]).toBe(t.wire.sent[0]);
-    },
-  );
+  ] as const) {
+    it(
+      format('%s %s while one holds goes to SAP as it is', kind, operation),
+      async () => {
+        const t = install();
+        const handle =
+          kind === 'amdp' ? (await prepare(t, 'amdp')).state_handle : undefined;
+        t.wire.mode = 'pending';
+        const first = t.call('HandlerDebugSession', {
+          ...(handle ? { state_handle: handle } : {}),
+          kind,
+          operation,
+          ...extra,
+        });
+        first.catch(() => undefined);
+        await settle();
+        const second = t.call('HandlerDebugSession', {
+          state_handle: handle ?? t.state.handle,
+          kind,
+          operation,
+          ...extra,
+        });
+        second.catch(() => undefined);
+        await settle();
+        assert.equal(t.wire.sent.length, 2);
+        assert.equal(t.wire.sent[1], t.wire.sent[0]);
+      },
+    );
+  }
 
   describe('end logs off the debug state', () => {
     const end = (
@@ -1070,7 +1145,7 @@ describe("the chain is the consumer's", () => {
       return handle;
     }
 
-    it.each([
+    for (const [_label, setup, logoffs] of [
       [
         'ABAP attached: the attaching session, the listener, the control connection',
         'attached',
@@ -1082,46 +1157,53 @@ describe("the chain is the consumer's", () => {
         2,
       ],
       ['AMDP: the events and the commands connection', 'amdp', 2],
-    ] as const)(
-      '%s — exactly the logoffs, nothing else is sent',
-      async (_label, setup, logoffs) => {
-        const t = install((_m, url) =>
-          url.includes('/listeners?') ? LISTEN_CATCH : '',
-        );
-        let handle: string;
-        if (setup === 'amdp') handle = (await prepare(t, 'amdp')).state_handle!;
-        else {
-          handle = await listening(t);
-          if (setup === 'attached')
-            await t.call('HandlerDebugSession', {
-              state_handle: handle,
-              kind: 'abap',
-              operation: 'attach',
-              debuggee_id: 'DEBUGGEE1',
-            });
-        }
-        expect(t.wire.opened).toBe(logoffs);
-        expect(t.wire.closed).toBe(0);
-        t.wire.mode = 'document';
-        const answer = await end(t, handle, setup === 'amdp' ? 'amdp' : 'abap');
-        expect(answer.isError).not.toBe(true);
-        expect(jsonOf(answer)).toMatchObject({ ended: true, logoffs });
-        expect(jsonOf(answer)).not.toHaveProperty('state_handle');
-        expect(t.wire.sent).toEqual([]);
-        expect(t.wire.closed).toBe(logoffs);
-        expect(t.state.holdsState()).toBe(false);
-        // The handle is gone: every call on it is not available.
-        const after = await t.call('HandlerDebugStep', {
-          state_handle: handle,
-          kind: setup === 'amdp' ? 'amdp' : 'abap',
-          operation: 'stepOver',
-          debuggee_id: 'D1',
-        });
-        expect(after.isError).toBe(true);
-        expect(after.content[0].text).toContain('state is not available');
-        expect(t.wire.sent).toEqual([]);
-      },
-    );
+    ] as const) {
+      it(
+        format('%s — exactly the logoffs, nothing else is sent', _label),
+        async () => {
+          const t = install((_m, url) =>
+            url.includes('/listeners?') ? LISTEN_CATCH : '',
+          );
+          let handle: string;
+          if (setup === 'amdp')
+            handle = (await prepare(t, 'amdp')).state_handle!;
+          else {
+            handle = await listening(t);
+            if (setup === 'attached')
+              await t.call('HandlerDebugSession', {
+                state_handle: handle,
+                kind: 'abap',
+                operation: 'attach',
+                debuggee_id: 'DEBUGGEE1',
+              });
+          }
+          assert.equal(t.wire.opened, logoffs);
+          assert.equal(t.wire.closed, 0);
+          t.wire.mode = 'document';
+          const answer = await end(
+            t,
+            handle,
+            setup === 'amdp' ? 'amdp' : 'abap',
+          );
+          assert.notEqual(answer.isError, true);
+          assertMatchObject(jsonOf(answer), { ended: true, logoffs });
+          assertNoProperty(jsonOf(answer), 'state_handle');
+          assert.deepStrictEqual(t.wire.sent, []);
+          assert.equal(t.wire.closed, logoffs);
+          assert.equal(t.state.holdsState(), false);
+          // The handle is gone: every call on it is not available.
+          const after = await t.call('HandlerDebugStep', {
+            state_handle: handle,
+            kind: setup === 'amdp' ? 'amdp' : 'abap',
+            operation: 'stepOver',
+            debuggee_id: 'D1',
+          });
+          assert.equal(after.isError, true);
+          assert.ok(after.content[0].text.includes('state is not available'));
+          assert.deepStrictEqual(t.wire.sent, []);
+        },
+      );
+    }
 
     it('a new debug state of the other kind, and of another identity, opens after end', async () => {
       const t = install();
@@ -1132,10 +1214,10 @@ describe("the chain is the consumer's", () => {
         kind: 'amdp',
         operation: 'start',
       });
-      expect(started.isError).not.toBe(true);
+      assert.notEqual(started.isError, true);
       const amdpHandle = jsonOf(started).state_handle as string;
-      expect(amdpHandle).toMatch(/^[0-9A-F]{32}$/);
-      expect(amdpHandle).not.toBe(handle);
+      assert.match(amdpHandle, /^[0-9A-F]{32}$/);
+      assert.notEqual(amdpHandle, handle);
       await end(t, amdpHandle, 'amdp');
       const other = await t.call('HandlerDebugBreakpoints', {
         kind: 'abap',
@@ -1143,16 +1225,16 @@ describe("the chain is the consumer's", () => {
         breakpoints: [{ statement: 'WRITE' }],
         request_user: 'another_user',
       });
-      expect(other.isError).not.toBe(true);
-      expect(jsonOf(other).request_user).toBe('ANOTHER_USER');
+      assert.notEqual(other.isError, true);
+      assert.equal(jsonOf(other).request_user, 'ANOTHER_USER');
     });
 
     it('end with the other kind than the state holds ends it all the same', async () => {
       const t = install();
       const handle = await listening(t);
       const answer = await end(t, handle, 'amdp');
-      expect(answer.isError).not.toBe(true);
-      expect(t.state.holdsState()).toBe(false);
+      assert.notEqual(answer.isError, true);
+      assert.equal(t.state.holdsState(), false);
     });
 
     it('end without a handle is refused before any request', async () => {
@@ -1160,11 +1242,11 @@ describe("the chain is the consumer's", () => {
       await listening(t);
       t.wire.mode = 'document';
       const answer = await end(t, undefined);
-      expect(answer.isError).toBe(true);
-      expect(answer.content[0].text).toContain('state is not available');
-      expect(t.wire.sent).toEqual([]);
-      expect(t.wire.closed).toBe(0);
-      expect(t.state.holdsState()).toBe(true);
+      assert.equal(answer.isError, true);
+      assert.ok(answer.content[0].text.includes('state is not available'));
+      assert.deepStrictEqual(t.wire.sent, []);
+      assert.equal(t.wire.closed, 0);
+      assert.equal(t.state.holdsState(), true);
     });
 
     it('the kind refusal names the end operation', async () => {
@@ -1175,8 +1257,10 @@ describe("the chain is the consumer's", () => {
         kind: 'abap',
         operation: 'stepOver',
       });
-      expect(answer.content[0].text).toContain(
-        'HandlerDebugSession operation end, with its state_handle, ends it',
+      assert.ok(
+        answer.content[0].text.includes(
+          'HandlerDebugSession operation end, with its state_handle, ends it',
+        ),
       );
     });
   });
@@ -1184,13 +1268,13 @@ describe("the chain is the consumer's", () => {
   it('the cleanup closes the connections the calls opened, and the handle ends', async () => {
     const t = install();
     const handle = (await prepare(t, 'attached')).state_handle;
-    expect(t.state.holdsState()).toBe(true);
+    assert.equal(t.state.holdsState(), true);
     t.wire.mode = 'document';
     await t.instance.stop();
     // The attachment ends with its connection's logoff: no release step is sent.
-    expect(t.wire.sent).toEqual([]);
-    expect(t.wire.closed).toBe(t.wire.opened);
-    expect(t.state.holdsState()).toBe(false);
-    expect(() => t.state.check(handle)).toThrow('state is not available');
+    assert.deepStrictEqual(t.wire.sent, []);
+    assert.equal(t.wire.closed, t.wire.opened);
+    assert.equal(t.state.holdsState(), false);
+    assertThrows(() => t.state.check(handle), 'state is not available');
   });
 });

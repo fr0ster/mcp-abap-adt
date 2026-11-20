@@ -8,6 +8,8 @@
  * and the empty `200` both actions answer (measured on premise).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe } from 'node:test';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { type McpResult, pinCases } from '../../helpers/pinCases';
 import { setSystemContext } from '../../helpers/processSystemContext';
@@ -23,8 +25,8 @@ const answered = (result: McpResult): Record<string, unknown> => {
 const taskIs =
   (number: string | null, type: string | null) => (result: McpResult) => {
     const json = JSON.stringify(answered(result));
-    expect(json).toContain(`"task_number":${JSON.stringify(number)}`);
-    expect(json).toContain(`"task_type":${JSON.stringify(type)}`);
+    assert.ok(json.includes(`"task_number":${JSON.stringify(number)}`));
+    assert.ok(json.includes(`"task_type":${JSON.stringify(type)}`));
   };
 
 /** A request is created for its owner: the responsible stated here. */
@@ -195,8 +197,10 @@ describe('onprem', () => {
       ],
       ran: (result) => {
         taskIs('PINK900002', 'X')(result);
-        expect(JSON.stringify(answered(result))).toContain(
-          'You can only change the type of tasks in workbench requests',
+        assert.ok(
+          JSON.stringify(answered(result)).includes(
+            'You can only change the type of tasks in workbench requests',
+          ),
         );
       },
     },
@@ -376,8 +380,10 @@ describe('cloud', () => {
       ],
       ran: (result) => {
         taskIs('PINK900002', 'X')(result);
-        expect(JSON.stringify(answered(result))).toContain(
-          'You can only change the type of tasks in workbench requests',
+        assert.ok(
+          JSON.stringify(answered(result)).includes(
+            'You can only change the type of tasks in workbench requests',
+          ),
         );
       },
     },

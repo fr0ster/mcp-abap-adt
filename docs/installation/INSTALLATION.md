@@ -211,7 +211,7 @@ their settings. A `.env` there is read only when you name it (`--env-path=./.env
 git clone https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
 npm ci --ignore-scripts
-npm run prepare      # the git hooks (husky), if you will commit
+npm run prepare      # the git hook (husky), if you will commit: Biome on the staged files, then the build
 npm run build
 npm test             # unit tests; integration tests need a system, see docs/development/tests
 ```

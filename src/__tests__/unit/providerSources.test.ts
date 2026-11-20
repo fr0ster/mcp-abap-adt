@@ -18,11 +18,14 @@
  * its initialiser within the file.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../helpers/repoRoot';
 
-const REPO = path.resolve(__dirname, '../../..');
+const REPO = repositoryRoot(__dirname);
 const ROOTS = [
   'src',
   'server/src',
@@ -371,7 +374,8 @@ function callSites(): CallSite[] {
 describe('provider sources (H0)', () => {
   it('finds the call sites it is meant to judge', () => {
     const files = new Set(callSites().map((site) => site.where.split(':')[0]));
-    expect(files).toEqual(
+    assert.deepStrictEqual(
+      files,
       new Set([
         'src/embeddable/BaseMcpServer.ts',
         'src/lib/packageSessions.ts',
@@ -384,7 +388,7 @@ describe('provider sources (H0)', () => {
     const offences = callSites()
       .filter((site) => site.verdict !== undefined)
       .map((site) => `${site.where}: ${site.verdict}`);
-    expect(offences).toEqual([]);
+    assert.deepStrictEqual(offences, []);
   });
 
   it('every credential binding in the server is a source', () => {
@@ -397,7 +401,7 @@ describe('provider sources (H0)', () => {
         offences.push(...credentialBindingOffences(parse(fileName), false));
       }
     }
-    expect(offences).toEqual([]);
+    assert.deepStrictEqual(offences, []);
   });
 
   it('no credential is constructed outside the sources and the broker handlers', () => {
@@ -422,6 +426,6 @@ describe('provider sources (H0)', () => {
         }
       }
     }
-    expect(offences).toEqual([]);
+    assert.deepStrictEqual(offences, []);
   });
 });

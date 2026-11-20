@@ -176,7 +176,7 @@ describe('production sources', () => {
         'src/lib/batch/phases.ts',
         'scripts/list-tools.ts',
         'server-runtime/src/stdio/launcher.ts',
-        'tools/npm-test.mjs',
+        'tools/run-tests.mjs',
         'server/bin/mcp-abap-adt.js',
       ].filter((file) => !scanned.includes(file)),
       [],

@@ -14,6 +14,7 @@ import {
 import { refusalOf } from '../lib/access/listedAccessChecks.js';
 import { lazyPackageReader } from '../lib/access/packageReader.js';
 import {
+  isLatched,
   registerActiveTool,
   shutdownRefusalAnswer,
 } from '../lib/activeTools.js';
@@ -165,6 +166,13 @@ import {
 } from '../lib/requestSystemResolution.js';
 import type { LineMatchStrategy } from '../lib/search-source/lineMatch.js';
 import type { SapAnswerStrategy } from '../lib/search-source/readFailure.js';
+import {
+  DEFAULT_SESSION_KEEP_ALIVE_MINUTES,
+  requestMark,
+  sendSessionKeepAlive,
+  sessionKeepAliveMsOf,
+  withRequestMark,
+} from '../lib/sessionKeepAlive.js';
 import { HeldLocks, lockNotHeldWords } from '../lib/state/heldLocks.js';
 import {
   InstanceState,
@@ -352,6 +360,24 @@ export abstract class BaseMcpServer extends McpServer {
 
   /** Every tool call of this instance still running, tracked from its entry. */
   private readonly inFlight = new Set<Promise<void>>();
+
+  /** The session keep-alive's interval in milliseconds; `0`: off. */
+  private readonly keepAliveMs: number;
+
+  /** The session keep-alive's pending tick; `undefined`: none armed. */
+  private keepAliveTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** The close stopped the keep-alive: no tick arms it again. */
+  private keepAliveStopped = false;
+
+  /** A tick is running: its end arms the next one, nothing else does. */
+  private keepAliveTicking = false;
+
+  /** Aborted by the close: a pending ping is waited for no longer. */
+  private readonly keepAliveClose = new AbortController();
+
+  /** The held connection and its request mark, as the previous tick saw them. */
+  private keepAliveSeen: { connection: object; mark: number } | undefined;
 
   /** The built entry of each connection handed out: what a release counts down. */
   private readonly entries = new WeakMap<IAbapConnection, BuiltConnection>();
@@ -582,8 +608,33 @@ export abstract class BaseMcpServer extends McpServer {
      * no call is checked, and no `AccessCall` is built.
      */
     accessChecks?: IAccessChecks | undefined;
+    /**
+     * The session keep-alive's interval, in milliseconds
+     * (`--session-keep-alive-minutes` × 60 000 in the launchers): one
+     * background timer ticks this often, and a tick that finds no request
+     * on the connection this instance built and holds since the previous
+     * tick sends one stateful `GET` of the ADT discovery on it, in its own
+     * session and its own main-flow turn, so SAP does not end the idle
+     * session. `0`: off. Default: 10 minutes. A whole
+     * number from 0 to 2^31-1; anything else is refused. An injected
+     * connection is the host's and is never pinged.
+     */
+    sessionKeepAliveMs?: number | undefined;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
+    const keepAliveMs =
+      options.sessionKeepAliveMs === undefined
+        ? DEFAULT_SESSION_KEEP_ALIVE_MINUTES * 60_000
+        : sessionKeepAliveMsOf(
+            options.sessionKeepAliveMs,
+            'sessionKeepAliveMs',
+          );
+    // The session keep-alive: the owner's named exception to "no timers in
+    // production" (2026-11-18). One timer per instance, unref'd so it never
+    // keeps the process alive, armed once the instance's connection is
+    // born, re-armed after each tick settled while that connection lives,
+    // stopped by the instance's close.
+    this.keepAliveMs = keepAliveMs;
     this.logger = options.logger ?? getDefaultLogger();
     this.accessChecks = options.accessChecks;
     this.readOnlyTools =
@@ -719,7 +770,128 @@ export abstract class BaseMcpServer extends McpServer {
    * never conditional on it.
    */
   terminalClose(): Promise<void> {
+    this.stopKeepAlive();
     return closeOwnedConnections(this);
+  }
+
+  /** The MCP server's close: the keep-alive stops with it. */
+  override async close(): Promise<void> {
+    this.stopKeepAlive();
+    await super.close();
+  }
+
+  private stopKeepAlive(): void {
+    this.keepAliveStopped = true;
+    this.keepAliveClose.abort();
+    if (this.keepAliveTimer !== undefined) clearTimeout(this.keepAliveTimer);
+    this.keepAliveTimer = undefined;
+  }
+
+  /**
+   * Arms the next tick, one interval from now — when the instance's
+   * connection is born, and at the end of each tick, after its ping settled,
+   * while a live connection is held — so ticks never overlap. Never after
+   * the close, never with an interval of `0`, never a second one.
+   */
+  private armKeepAlive(): void {
+    if (this.keepAliveStopped || this.keepAliveMs === 0) return;
+    // One tick chain: none beside a pending timer or a running tick.
+    if (this.keepAliveTimer !== undefined || this.keepAliveTicking) return;
+    this.keepAliveTimer = setTimeout(() => {
+      this.keepAliveTimer = undefined;
+      void this.keepAliveTick();
+    }, this.keepAliveMs);
+    this.keepAliveTimer.unref(); // never keeps the process alive
+  }
+
+  /**
+   * A tick of the keep-alive: the connection this instance built and holds,
+   * when it is live — connected, not spent, not ended, not replaced, the
+   * instance not closed, so a request needs no logon — and its request mark
+   * unchanged since the previous tick, gets one ping. Nothing else: no
+   * connection is built or connected here, and an injected one is the
+   * host's.
+   */
+  private async keepAliveTick(): Promise<void> {
+    this.keepAliveTicking = true;
+    try {
+      const connection = this.liveBuilt();
+      const mark =
+        connection === undefined ? undefined : requestMark(connection);
+      if (connection === undefined || mark === undefined) {
+        // Nothing live to keep: not armed again until the next birth.
+        this.keepAliveSeen = undefined;
+        return;
+      }
+      const seen = this.keepAliveSeen;
+      if (seen?.connection === connection && seen.mark === mark) {
+        await this.pingInTurn(connection, mark);
+      }
+      // After the ping settled, so the ping itself is not read as a request.
+      this.keepAliveSeen = {
+        connection,
+        mark: requestMark(connection) ?? mark,
+      };
+    } catch {
+      // The close aborted the wait: nothing more to do.
+    } finally {
+      this.keepAliveTicking = false;
+      if (this.liveBuilt() !== undefined) this.armKeepAlive();
+    }
+  }
+
+  /**
+   * The ping, in its own turn of the main flow — the serialisation tool
+   * calls use — so it never runs beside a call; sent only if, once the turn
+   * came, the connection is still the live one and no request went out
+   * while it waited (its mark unchanged). It is a stateful request:
+   * it goes into the connection's own stateful session (HTTP: the stateful
+   * session header and its context; RFC: the persistent conversation),
+   * which is the session SAP would otherwise end — a stateless request gets
+   * a session of its own each time and keeps nothing alive. The
+   * connection's session mode is put back as it was. The close aborts the
+   * wait for the turn and for the answer; no deadline of the server's own.
+   */
+  private async pingInTurn(
+    connection: IAbapConnection,
+    mark: number,
+  ): Promise<void> {
+    const signal = this.keepAliveClose.signal;
+    const leave = await this.enterMainFlow(signal);
+    try {
+      if (this.liveBuilt() !== connection) return;
+      // A request went out while the ping waited for its turn: not idle.
+      if (requestMark(connection) !== mark) return;
+      const mode = connection.getSessionMode?.() ?? 'stateless';
+      try {
+        // Inside the try: a setter that throws still has the mode put back.
+        connection.setSessionType('stateful');
+        // Never rejects: a failure is its debug line.
+        await raceRequestSignal(
+          sendSessionKeepAlive(connection, this.logger),
+          signal,
+        );
+      } finally {
+        connection.setSessionType(mode);
+      }
+    } finally {
+      leave();
+    }
+  }
+
+  /** The held connection this instance built, while it is live; else `undefined`. */
+  private liveBuilt(): IAbapConnection | undefined {
+    if (this.connectionContext?.kind !== 'built') return undefined;
+    if (isLatched(this)) return undefined;
+    const entry = this.built;
+    if (entry === undefined || entry.retired) return undefined;
+    const ready = entry.ready;
+    if (ready === undefined || isSpent(ready)) return undefined;
+    try {
+      return ready.isConnected?.() === true ? ready : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**
@@ -1364,6 +1536,8 @@ export abstract class BaseMcpServer extends McpServer {
     connecting.then(
       (connection) => {
         entry.ready = connection;
+        // Born: the keep-alive ticks from now on (one timer per instance).
+        this.armKeepAlive();
       },
       () => undefined,
     );
@@ -1448,14 +1622,17 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<IAbapConnection> {
     // A closed instance logs on nowhere: nothing is built or sent.
     refuseIfClosed(this);
-    // Built for the instance's kind, with its logger.
-    const connection = createAbapConnection(
-      resolved.settings,
-      resolved.credential,
-      this.logger,
-      undefined,
-      undefined,
-      this.builtKind(),
+    // Built for the instance's kind, with its logger; its requests marked
+    // for the keep-alive (`withRequestMark`).
+    const connection = withRequestMark(
+      createAbapConnection(
+        resolved.settings,
+        resolved.credential,
+        this.logger,
+        undefined,
+        undefined,
+        this.builtKind(),
+      ),
     );
     // The instance's own from here on: it ends with a logoff.
     own(connection, { owner: this, role: 'built' });
@@ -1507,13 +1684,15 @@ export abstract class BaseMcpServer extends McpServer {
   ): Promise<IAbapConnection> {
     let connection: IAbapConnection;
     try {
-      connection = createAbapConnection(
-        resolved.settings,
-        resolved.credential,
-        this.logger,
-        undefined,
-        claimed.cookies,
-        this.builtKind(),
+      connection = withRequestMark(
+        createAbapConnection(
+          resolved.settings,
+          resolved.credential,
+          this.logger,
+          undefined,
+          claimed.cookies,
+          this.builtKind(),
+        ),
       );
     } catch (error) {
       owner.release(claimed);

@@ -1350,6 +1350,19 @@ include_cloud_read:
         # cloud: needed — a delivered include readable on the cloud system.
         include_name: ""
 
+# Text elements on ABAP cloud: the read of a delivered program's text
+# elements. Read by coverage/textElements.live.test.ts. cloud.
+text_elements_cloud_read:
+  test_cases:
+    - name: "read_delivered_program"
+      # enabled, available_in: no longer read (where it runs is decided in code).
+      enabled: true
+      available_in: ["cloud"]
+      description: "Read a delivered program's text elements on ABAP cloud"
+      params:
+        # cloud: needed — a delivered program readable on the cloud system.
+        program_name: ""
+
 # Table type (TableType) — on premise and on ABAP cloud. On cloud the suite
 # works in environment.default_package (the build package).
 # Read by high/table_type/TableTypeHighHandlers.test.ts. Object name and

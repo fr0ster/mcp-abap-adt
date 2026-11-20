@@ -5,12 +5,16 @@
  * and with a `404`; held open, both requests are out, where `pair()` sent one.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import { failureOf } from '../../../lib/auth/failures';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import * as sequenceModule from '../../../lib/strategies/sequence';
 import { both, pair } from '../../../lib/strategies/sequence';
 import { resetSystemContextCache } from '../../../lib/systemContext';
+import { rejectionOf } from '../../helpers/assertions';
 import type { BatchEntryCase } from '../../helpers/batchEntryCases';
 import { runCase, servedTools } from '../../helpers/batchHarness';
 import { silentLogger } from '../../helpers/lowToCompact';
@@ -49,34 +53,42 @@ describe('reads whose two requests go out together', () => {
     }),
   );
   afterEach(() => {
-    jest.restoreAllMocks();
+    mock.restoreAll();
     resetSystemContextCache();
   });
 
   /** `both` as `pair` was: the second request only after the first answer. */
   const asPair = () =>
-    jest
-      .spyOn(sequenceModule, 'both')
-      .mockImplementation((first, second) => pair(first, () => second()));
+    mock.method(
+      sequenceModule,
+      'both',
+      (...[first, second]: Parameters<typeof sequenceModule.both>) =>
+        pair(first, () => second()),
+    );
 
-  it.each(TOGETHER.map((c) => [c.tool, c] as const))(
-    '%s: answers as with pair(), and sends both requests before any answer',
-    async (_tool, c) => {
-      const held = await runCase(tools, context, c, 'pending');
-      const documented = await runCase(tools, context, c, 'document');
-      const refused = await runCase(tools, context, c, 'not-found');
-      asPair();
-      const heldBefore = await runCase(tools, context, c, 'pending');
-      const documentedBefore = await runCase(tools, context, c, 'document');
-      const refusedBefore = await runCase(tools, context, c, 'not-found');
+  for (const [_tool, c] of TOGETHER.map((c) => [c.tool, c] as const)) {
+    it(
+      format(
+        '%s: answers as with pair(), and sends both requests before any answer',
+        _tool,
+      ),
+      async () => {
+        const held = await runCase(tools, context, c, 'pending');
+        const documented = await runCase(tools, context, c, 'document');
+        const refused = await runCase(tools, context, c, 'not-found');
+        asPair();
+        const heldBefore = await runCase(tools, context, c, 'pending');
+        const documentedBefore = await runCase(tools, context, c, 'document');
+        const refusedBefore = await runCase(tools, context, c, 'not-found');
 
-      expect(held.sent).toHaveLength(2);
-      expect(heldBefore.sent).toHaveLength(1);
-      expect(documented.answer).toEqual(documentedBefore.answer);
-      expect(documented.sent).toEqual(documentedBefore.sent);
-      expect(refused.answer).toEqual(refusedBefore.answer);
-    },
-  );
+        assert.equal(held.sent.length, 2);
+        assert.equal(heldBefore.sent.length, 1);
+        assert.deepStrictEqual(documented.answer, documentedBefore.answer);
+        assert.deepStrictEqual(documented.sent, documentedBefore.sent);
+        assert.deepStrictEqual(refused.answer, refusedBefore.answer);
+      },
+    );
+  }
 });
 
 describe('both()', () => {
@@ -105,50 +117,59 @@ describe('both()', () => {
       },
     );
     await Promise.resolve();
-    expect(order).toEqual(['first sent', 'second sent']);
+    assert.deepStrictEqual(order, ['first sent', 'second sent']);
     answerFirst(ok('a'));
     const answered = await result;
-    expect(answered.ok && answered.getResult().value).toEqual(['a', 'b']);
+    assert.deepStrictEqual(answered.ok && answered.getResult().value, [
+      'a',
+      'b',
+    ]);
   });
 
   it("answers the first failure as it came, the first's before the second's", async () => {
     const firstFails = no('first');
-    expect(
+    assert.equal(
       await both(
         async () => firstFails,
         async () => no('second'),
       ),
-    ).toBe(firstFails);
+      firstFails,
+    );
     const secondFails = no('second');
-    expect(
+    assert.equal(
       await both(
         async () => ok('a'),
         async () => secondFails,
       ),
-    ).toBe(secondFails);
+      secondFails,
+    );
   });
 
   it('rejects as pair() does, and leaves no rejection unhandled', async () => {
     const thrown = new Error('first threw');
-    await expect(
-      both(
-        async () => {
-          throw thrown;
-        },
-        async () => {
-          throw new Error('second threw');
-        },
+    assert.equal(
+      await rejectionOf(
+        both(
+          async () => {
+            throw thrown;
+          },
+          async () => {
+            throw new Error('second threw');
+          },
+        ),
       ),
-    ).rejects.toBe(thrown);
+      thrown,
+    );
     const failed = no('first');
-    expect(
+    assert.equal(
       await both(
         async () => failed,
         async () => {
           throw new Error('second threw');
         },
       ),
-    ).toBe(failed);
+      failed,
+    );
   });
 
   /** A second request held open until `release()`, and whether `both()` has settled. */
@@ -175,10 +196,10 @@ describe('both()', () => {
       return v;
     });
     await flush();
-    expect(settled).toBe(false);
+    assert.equal(settled, false);
     held.release();
-    expect(await result).toBe(failed);
-    expect(settled).toBe(true);
+    assert.equal(await result, failed);
+    assert.equal(settled, true);
   });
 
   it('does not settle on a rejected first call while the second request is in flight', async () => {
@@ -196,12 +217,14 @@ describe('both()', () => {
         throw error;
       },
     );
-    const rejected = expect(result).rejects.toBe(thrown);
+    const rejected = rejectionOf(result).then((reason) =>
+      assert.equal(reason, thrown),
+    );
     await flush();
-    expect(settled).toBe(false);
+    assert.equal(settled, false);
     held.release();
     await rejected;
-    expect(settled).toBe(true);
+    assert.equal(settled, true);
   });
 
   it('a credential refusal ends the call as it came, in either position', async () => {
@@ -217,9 +240,9 @@ describe('both()', () => {
       },
       async () => ok('b'),
     );
-    await expect(asFirst).rejects.toBe(first);
+    assert.equal(await rejectionOf(asFirst), first);
     await asFirst.catch((thrown) =>
-      expect(failureOf(thrown)).toEqual(failureOf(refusal())),
+      assert.deepStrictEqual(failureOf(thrown), failureOf(refusal())),
     );
     // The first answers, the second rejects with it: the same.
     const second = refusal();
@@ -229,10 +252,10 @@ describe('both()', () => {
         throw second;
       },
     );
-    await expect(asSecond).rejects.toBe(second);
+    assert.equal(await rejectionOf(asSecond), second);
     await asSecond.catch((thrown) =>
-      expect(failureOf(thrown)).toEqual(failureOf(refusal())),
+      assert.deepStrictEqual(failureOf(thrown), failureOf(refusal())),
     );
-    expect(failureOf(second)).toBeDefined();
+    assert.notEqual(failureOf(second), undefined);
   });
 });

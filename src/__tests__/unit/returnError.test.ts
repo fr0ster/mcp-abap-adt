@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { AxiosError } from 'axios';
 import { return_error } from '../../lib/utils';
 
@@ -6,18 +8,19 @@ const textOf = (r: any): string => r.content[0].text;
 describe('return_error emits a bare message (#155)', () => {
   it('returns a string input verbatim, with no prefix', () => {
     const result = return_error('Object name is required');
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toBe('Object name is required');
+    assert.equal(result.isError, true);
+    assert.equal(textOf(result), 'Object name is required');
   });
 
   it('returns an Error message with no prefix', () => {
     const result = return_error(new Error('Domain ZD_NOPE not found'));
-    expect(textOf(result)).toBe('Domain ZD_NOPE not found');
+    assert.equal(textOf(result), 'Domain ZD_NOPE not found');
   });
 
   it('never emits a service prefix', () => {
     for (const input of ['plain', new Error('boom'), 12345, null]) {
-      expect(textOf(return_error(input))).not.toMatch(
+      assert.doesNotMatch(
+        textOf(return_error(input)),
         /\bMcpError:\s|\bMCP error -?\d+: |(?:^|\s)(?:Error|ADT error): /,
       );
     }
@@ -30,7 +33,7 @@ describe('return_error emits a bare message (#155)', () => {
       statusText: 'Not Found',
       data: '<exc:exception>Resource not found</exc:exception>',
     };
-    expect(textOf(return_error(err))).toContain('Resource not found');
+    assert.ok(textOf(return_error(err)).includes('Resource not found'));
   });
 
   // Since @mcp-abap-adt/connection 25 an HTTP failure is not the axios
@@ -52,21 +55,21 @@ describe('return_error emits a bare message (#155)', () => {
         data: '<exc:exception>Resource not found</exc:exception>',
       },
     });
-    expect(textOf(return_error(err))).toContain('Resource not found');
+    assert.ok(textOf(return_error(err)).includes('Resource not found'));
   });
 
   it("says a refused connection by the connection's failure code", () => {
     const err = connectionFailure('The request failed: ECONNREFUSED', {
       code: 'ECONNREFUSED',
     });
-    expect(textOf(return_error(err))).toContain('Connection refused');
+    assert.ok(textOf(return_error(err)).includes('Connection refused'));
   });
 
   it('keeps DNS diagnostics for ENOTFOUND', () => {
     const err = new AxiosError('getaddrinfo ENOTFOUND sap.example.com');
     (err as any).code = 'ENOTFOUND';
     const text = textOf(return_error(err));
-    expect(text).toContain('DNS resolution failed');
-    expect(text).toContain('sap.example.com');
+    assert.ok(text.includes('DNS resolution failed'));
+    assert.ok(text.includes('sap.example.com'));
   });
 });

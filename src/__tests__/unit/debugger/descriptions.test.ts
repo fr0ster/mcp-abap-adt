@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
 import type { ToolDefinition } from '../../../lib/handlers/interfaces';
@@ -32,22 +35,24 @@ const START_TOOLS = ['DebugStartListener', 'DebugTakeOverListener'];
 
 describe('the debugger descriptions', () => {
   it('no breakpoint description says every kind takes a condition', () => {
+    // not.toEqual({ tool: tool.name, text: stringMatching(re) }) with the
+    // same tool: the text does not match (named, spec §3.2).
     for (const tool of [
       ...coreDebugTools(),
       ...compactDebugEntries().map((e) => e.toolDefinition),
     ])
       for (const text of textsOf(tool))
-        expect({ tool: tool.name, text }).not.toEqual({
-          tool: tool.name,
-          text: expect.stringMatching(
-            /each with an optional condition|with an optional condition/,
-          ),
-        });
+        assert.doesNotMatch(
+          text,
+          /each with an optional condition|with an optional condition/,
+          tool.name,
+        );
   });
 
   it('the breakpoint descriptions say a line breakpoint may carry a condition', () => {
     const set = coreDebugTools().find((t) => t.name === 'DebugSetBreakpoints')!;
-    expect(textsOf(set).join('\n')).toMatch(
+    assert.match(
+      textsOf(set).join('\n'),
       /a line breakpoint may carry a condition/,
     );
   });
@@ -55,10 +60,11 @@ describe('the debugger descriptions', () => {
   it('the set is described as shared by the key and rewritten as a whole', () => {
     for (const name of ['DebugSetBreakpoints', ...START_TOOLS]) {
       const tool = coreDebugTools().find((t) => t.name === name)!;
-      expect(tool.description).toMatch(
+      assert.match(
+        tool.description,
         /shared by every IDE of the same SAP user \(in user mode, debugging the same request user; in terminal mode, whatever its ids\)/,
       );
-      expect(tool.description).toMatch(/rewrites that set as a whole/);
+      assert.match(tool.description, /rewrites that set as a whole/);
     }
   });
 
@@ -73,16 +79,20 @@ describe('the debugger descriptions', () => {
         'system_debugging',
       ])
         if (jsonFind(schema, key)) {
-          expect({ key, default: jsonFind(schema, key)?.default }).toEqual({
-            key,
-            default: undefined,
-          });
+          assert.deepStrictEqual(
+            { key, default: jsonFind(schema, key)?.default },
+            {
+              key,
+              default: undefined,
+            },
+          );
           for (const inner of Object.values(
             jsonFind(schema, key)?.properties ?? {},
           ))
-            expect(
+            assert.equal(
               typeof inner === 'object' ? inner.default : undefined,
-            ).toBeUndefined();
+              undefined,
+            );
         }
     }
   });
@@ -90,17 +100,19 @@ describe('the debugger descriptions', () => {
   // The AMDP session takes no mode and no request user: it is the connected user's.
   it('the AMDP tools name no request user and no mode', () => {
     const amdp = coreDebugTools().filter((t) => t.name.startsWith('Amdp'));
-    expect(amdp.length).toBeGreaterThan(0);
+    assert.ok(amdp.length > 0);
+    // not.toEqual({ tool: tool.name, text: stringMatching(re) }) with the
+    // same tool: the text does not match (named, spec §3.2).
     for (const tool of amdp)
       for (const text of textsOf(tool))
-        expect({ tool: tool.name, text }).not.toEqual({
-          tool: tool.name,
-          text: expect.stringMatching(
-            /request user|request_user|user mode|terminal mode|debugging mode/i,
-          ),
-        });
+        assert.doesNotMatch(
+          text,
+          /request user|request_user|user mode|terminal mode|debugging mode/i,
+          tool.name,
+        );
     for (const name of ['AmdpDebugStart', 'AmdpDebugSetBreakpoints'])
-      expect(amdp.find((t) => t.name === name)!.description).toMatch(
+      assert.match(
+        amdp.find((t) => t.name === name)!.description,
         /every request of the connected SAP user/,
       );
   });
@@ -109,10 +121,12 @@ describe('the debugger descriptions', () => {
     const description = (name: string) =>
       compactDebugEntries().find((e) => e.toolDefinition.name === name)!
         .toolDefinition.description as string;
-    expect(description('HandlerDebugBreakpoints')).toMatch(
+    assert.match(
+      description('HandlerDebugBreakpoints'),
       /In user mode the breakpoints catch every request of the request user/,
     );
-    expect(description('HandlerDebugSession')).toMatch(
+    assert.match(
+      description('HandlerDebugSession'),
       /kind amdp: start opens an AMDP session for the connected SAP user/,
     );
   });
@@ -124,15 +138,14 @@ describe('the debugger descriptions', () => {
     for (const name of START_TOOLS) {
       const tool = coreDebugTools().find((t) => t.name === name)!;
       const schema = listedJson(tool.inputSchema);
-      expect({
+      assert.ok(
+        declaredRequired(tool.inputSchema).some((e) =>
+          isDeepStrictEqual(e, 'breakpoints'),
+        ),
         name,
-        required: declaredRequired(tool.inputSchema),
-      }).toEqual({
-        name,
-        required: expect.arrayContaining(['breakpoints']),
-      });
-      expect(jsonAt(schema, 'breakpoints').minItems).toBe(1);
-      expect(tool.description).toMatch(/at least one breakpoint/);
+      );
+      assert.equal(jsonAt(schema, 'breakpoints').minItems, 1);
+      assert.match(tool.description, /at least one breakpoint/);
     }
   });
 });

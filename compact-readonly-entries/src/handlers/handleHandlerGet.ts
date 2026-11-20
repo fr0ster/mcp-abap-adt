@@ -7,6 +7,7 @@ import {
   compactGetDescription,
   compactGetSchemaWithNamesFor,
   HANDLER_GET_DRAFT_TYPES,
+  subResourceRefusal,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { ToolArgs, ToolResultLike } from '@mcp-abap-adt/lib/handlers';
@@ -221,6 +222,8 @@ export async function handleHandlerGet(
         ),
       );
     }
+    const legacy = subResourceRefusal(context, member);
+    if (legacy !== undefined) return return_error(new Error(legacy));
     args = { ...given, object_type: member };
   } else {
     args = { ...given, object_type: undefined };

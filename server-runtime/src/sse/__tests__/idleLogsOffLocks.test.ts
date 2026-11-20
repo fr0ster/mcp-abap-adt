@@ -5,10 +5,14 @@
  * it the lock outlived its handle: no unlock could reach it until the
  * stream closed. The instance lives on, and its next call logs on afresh.
  *
- * The bound's timer is the idle mechanism's own `setTimeout`: a timeout of a
- * minute or more is the bound's (nothing else on this path waits that long)
- * and is run here by `expire()`; every other timer is the real one.
+ * The bound's timer is the idle mechanism's own `setTimeout`: a timeout of
+ * the bound's 30 minutes is the bound's (the session keep-alive's ticks are
+ * another interval) and is run here by `expire()`; every other timer is the
+ * real one.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
 import {
   defineTool,
@@ -20,8 +24,6 @@ import * as z from 'zod';
 import { isLogoff } from '../../../../src/__tests__/helpers/adtStandIn';
 import { own } from '../../../../src/lib/ownedConnections';
 import { type SseStand, sseStand, turns, until } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const MINUTE = 60_000;
 
@@ -64,13 +66,19 @@ const realSetTimeout = global.setTimeout;
 const realClearTimeout = global.clearTimeout;
 
 beforeEach(async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
   bound = [];
   packageLogoffs = 0;
-  jest
-    .spyOn(global, 'setTimeout')
-    .mockImplementation((callback, ms, ...rest) => {
-      if (typeof ms === 'number' && ms >= MINUTE) {
+  mock.method(
+    global,
+    'setTimeout',
+    (
+      callback: (...args: unknown[]) => void,
+      ms?: number,
+      ...rest: unknown[]
+    ) => {
+      // The bound's 30 minutes; the session keep-alive's ticks run as ever.
+      if (typeof ms === 'number' && ms === 30 * MINUTE) {
         // The bound's own timer stays armed, never firing on its own.
         const timer = realSetTimeout(() => {}, ms);
         timer.unref();
@@ -78,8 +86,9 @@ beforeEach(async () => {
         return timer;
       }
       return realSetTimeout(callback, ms, ...rest);
-    });
-  jest.spyOn(global, 'clearTimeout').mockImplementation((timer) => {
+    },
+  );
+  mock.method(global, 'clearTimeout', (timer?: NodeJS.Timeout) => {
     bound = bound.filter((each) => each.timer !== timer);
     realClearTimeout(timer);
   });
@@ -93,7 +102,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   await s.close();
 });
 
@@ -115,9 +124,9 @@ it('the idle bound of an SSE instance holding a lock logs its session off; the n
     1,
   );
   const locked = await connection.answer(1);
-  expect(locked.isError).toBe(false);
+  assert.equal(locked.isError, false);
   await turns(20);
-  expect(logoffs()).toBe(0);
+  assert.equal(logoffs(), 0);
 
   expire();
   await until(() => logoffs() === 1);
@@ -135,20 +144,21 @@ it('the idle bound of an SSE instance holding a lock logs its session off; the n
     2,
   );
   const unlocked = await connection.answer(2);
-  expect(unlocked.isError).toBe(true);
-  expect(s.standIn.requests.slice(before)).toEqual([]);
+  assert.equal(unlocked.isError, true);
+  assert.deepStrictEqual(s.standIn.requests.slice(before), []);
 
   await connection.call(
     'HandlerLock',
     { object_type: 'CLASS', object_name: 'ZCL_IDLE' },
     3,
   );
-  expect((await connection.answer(3)).isError).toBe(false);
-  expect(
+  assert.equal((await connection.answer(3)).isError, false);
+  assert.equal(
     s.standIn.requests
       .slice(before)
       .some((r) => r.url.includes('_action=LOCK')),
-  ).toBe(true);
+    true,
+  );
 });
 
 it('the idle bound of an SSE instance holding nothing it lets go of keeps the session', async () => {
@@ -158,7 +168,7 @@ it('the idle bound of an SSE instance holding nothing it lets go of keeps the se
     { object_type: 'CLASS', object_name: 'ZCL_IDLE' },
     1,
   );
-  expect((await connection.answer(1)).isError).toBe(false);
+  assert.equal((await connection.answer(1)).isError, false);
   await connection.call(
     'HandlerUnlock',
     {
@@ -168,23 +178,23 @@ it('the idle bound of an SSE instance holding nothing it lets go of keeps the se
     },
     2,
   );
-  expect((await connection.answer(2)).isError).toBe(false);
+  assert.equal((await connection.answer(2)).isError, false);
   await turns(20);
   // Nothing held: no bound is armed, and the session stays.
-  expect(bound).toEqual([]);
-  expect(logoffs()).toBe(0);
+  assert.deepStrictEqual(bound, []);
+  assert.equal(logoffs(), 0);
 });
 
 it("the idle bound of an SSE instance holding a package lock logs that lock's own session off, and keeps the main one", async () => {
   const connection = await s.open();
   await connection.call('HoldPackageLock', {}, 1);
-  expect((await connection.answer(1)).isError).toBe(false);
+  assert.equal((await connection.answer(1)).isError, false);
   await turns(20);
-  expect(packageLogoffs).toBe(0);
+  assert.equal(packageLogoffs, 0);
 
   expire();
   await until(() => packageLogoffs === 1);
   await turns(20);
   // No lock of the main session was let go: its session stays.
-  expect(logoffs()).toBe(0);
+  assert.equal(logoffs(), 0);
 });

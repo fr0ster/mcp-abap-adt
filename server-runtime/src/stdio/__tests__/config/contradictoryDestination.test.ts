@@ -5,6 +5,9 @@
  * Each is refused before anything is read, naming both forms as used.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { ParameterRefusal } from '@mcp-abap-adt/lib/config';
 import { readCoreConfig } from '../../config/coreParameters';
 
@@ -22,45 +25,50 @@ const refusalOf = (run: () => unknown): string | undefined => {
 
 describe('--env with --env-path', () => {
   it('both on the command line are refused, naming both', () => {
-    expect(
+    assert.equal(
       refusalOf(() =>
         readCoreConfig([KIND, '--env=TRIAL', '--env-path=/tmp/x.env'], {}),
       ),
-    ).toBe('--env and --env-path both name the env file: give one of them');
+      '--env and --env-path both name the env file: give one of them',
+    );
   });
 
   it('MCP_ENV_PATH beside --env is refused, naming the variable', () => {
-    expect(
+    assert.equal(
       refusalOf(() =>
         readCoreConfig([KIND, '--env=TRIAL'], { MCP_ENV_PATH: '/tmp/x.env' }),
       ),
-    ).toBe('--env and MCP_ENV_PATH both name the env file: give one of them');
+      '--env and MCP_ENV_PATH both name the env file: give one of them',
+    );
   });
 
   it('either alone is read', () => {
-    expect(readCoreConfig([KIND, '--env-path=/tmp/x.env'], {}).envPath).toBe(
+    assert.equal(
+      readCoreConfig([KIND, '--env-path=/tmp/x.env'], {}).envPath,
       '/tmp/x.env',
     );
   });
 });
 
 describe('--mcp with an env file', () => {
-  it.each([
+  for (const [argv, env, form] of [
     [['--env-path=/tmp/x.env'], {}, '--env-path'],
     [['--env=TRIAL'], {}, '--env'],
     [[], { MCP_ENV_PATH: '/tmp/x.env' }, 'MCP_ENV_PATH'],
-  ] as const)('--mcp with %j %j is refused', (argv, env, form) => {
-    expect(
-      refusalOf(() =>
-        readCoreConfig([KIND, '--mcp=TRIAL', ...argv], { ...env }),
-      ),
-    ).toBe(
-      `--mcp and ${form} both name the destination: give --mcp (a stored destination) or the env file, not both`,
-    );
-  });
+  ] as const) {
+    it(format('--mcp with %j %j is refused', argv, env), () => {
+      assert.equal(
+        refusalOf(() =>
+          readCoreConfig([KIND, '--mcp=TRIAL', ...argv], { ...env }),
+        ),
+        `--mcp and ${form} both name the destination: give --mcp (a stored destination) or the env file, not both`,
+      );
+    });
+  }
 
   it('--mcp alone is read', () => {
-    expect(readCoreConfig([KIND, '--mcp=TRIAL'], {}).mcpDestination).toBe(
+    assert.equal(
+      readCoreConfig([KIND, '--mcp=TRIAL'], {}).mcpDestination,
       'TRIAL',
     );
   });

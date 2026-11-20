@@ -6,6 +6,8 @@
  * factory hands over after the close is never connected.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -123,17 +125,17 @@ describe('a background run being born', () => {
 
       await closeInstance(stand.server);
       // The logoff was asked while the connect still waits.
-      expect(events).toEqual(['connect', 'disconnect']);
+      assert.deepStrictEqual(events, ['connect', 'disconnect']);
 
       connect.resolve();
       await call;
       await until(() => events.includes('connected'));
       await new Promise((resolve) => setImmediate(resolve));
       // One logoff, no second; the run never kept, nothing owned.
-      expect(events).toEqual(['connect', 'disconnect', 'connected']);
-      expect(ownedConnections(stand.strategy)).toEqual([]);
-      expect(ownedConnections().includes(fresh)).toBe(false);
-      expect(stand.kept()).toEqual([]);
+      assert.deepStrictEqual(events, ['connect', 'disconnect', 'connected']);
+      assert.deepStrictEqual(ownedConnections(stand.strategy), []);
+      assert.equal(ownedConnections().includes(fresh), false);
+      assert.deepStrictEqual(stand.kept(), []);
     } finally {
       connect.resolve();
       await stand.close();
@@ -162,10 +164,10 @@ describe('a background run being born', () => {
       await until(() => events.includes('disconnect'));
       await new Promise((resolve) => setImmediate(resolve));
       // Nothing was sent on it: no connect, only its end.
-      expect(events).toEqual(['disconnect']);
-      expect(stand.kept()).toEqual([]);
-      expect(ownedConnections(stand.strategy)).toEqual([]);
-      expect(ownedConnections().includes(fresh)).toBe(false);
+      assert.deepStrictEqual(events, ['disconnect']);
+      assert.deepStrictEqual(stand.kept(), []);
+      assert.deepStrictEqual(ownedConnections(stand.strategy), []);
+      assert.equal(ownedConnections().includes(fresh), false);
     } finally {
       connect.resolve();
       await stand.close();

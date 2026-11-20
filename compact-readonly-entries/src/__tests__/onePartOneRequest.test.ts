@@ -20,9 +20,17 @@
  *
  * Real adt-clients code runs over the batch proof's counting connection.
  */
+
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import { handleGetServiceBindingPreviewUrl } from '@mcp-abap-adt/lib/handlers/read';
 import { corpusBody } from '../../../src/__tests__/helpers/adtCorpus';
+import {
+  assertMatchObject,
+  assertNoProperty,
+} from '../../../src/__tests__/helpers/assertions';
 import {
   type Answer,
   countingConnection,
@@ -114,100 +122,122 @@ const SOURCELESS: Array<[string, Record<string, unknown>, string]> = [
 const MODES: Mode[] = ['pending', 'document', 'not-found'];
 
 describe('compact HandlerGet: one part, one request', () => {
-  describe.each([...BOTH, ...SOURCE_ONLY])('%s', (object_type, names) => {
-    it.each([
-      ['source', { part: 'source' }],
-      ['absent', {}],
-    ])(
-      'part %s: exactly one request, held, answered and 404 alike',
-      async (_label, part) => {
-        const args = { object_type, ...names, ...part };
+  for (const [object_type, names] of [...BOTH, ...SOURCE_ONLY]) {
+    describe(format('%s', object_type), () => {
+      for (const [_label, part] of [
+        ['source', { part: 'source' }],
+        ['absent', {}],
+      ] satisfies [string, Record<string, unknown>][]) {
+        it(
+          format(
+            'part %s: exactly one request, held, answered and 404 alike',
+            _label,
+          ),
+          async () => {
+            const args = { object_type, ...names, ...part };
+            const [held, documented, refused] = await Promise.all(
+              MODES.map((mode) => run(mode, args)),
+            );
+            assert.equal(held.sent.length, 1);
+            assert.deepStrictEqual(documented.sent, held.sent);
+            assert.deepStrictEqual(refused.sent, held.sent);
+          },
+        );
+      }
+
+      it('source answers the source only', async () => {
+        const { answer } = await run('document', {
+          object_type,
+          ...names,
+          part: 'source',
+        });
+        assert.notEqual(answer?.isError, true);
+        const body = jsonOf(answer);
+        assert.equal(body.part, 'source');
+        assert.ok('source' in Object(body));
+        assertNoProperty(body, 'metadata');
+      });
+    });
+  }
+
+  for (const [object_type, names] of [
+    ...BOTH,
+    ...SOURCELESS.map(([t, n]) => [t, n] as [string, Record<string, unknown>]),
+  ]) {
+    describe(format('%s', object_type), () => {
+      it('part metadata: exactly one request, held, answered and 404 alike', async () => {
+        const args = { object_type, ...names, part: 'metadata' };
         const [held, documented, refused] = await Promise.all(
           MODES.map((mode) => run(mode, args)),
         );
-        expect(held.sent).toHaveLength(1);
-        expect(documented.sent).toEqual(held.sent);
-        expect(refused.sent).toEqual(held.sent);
-      },
-    );
-
-    it('source answers the source only', async () => {
-      const { answer } = await run('document', {
-        object_type,
-        ...names,
-        part: 'source',
+        assert.equal(held.sent.length, 1);
+        assert.deepStrictEqual(documented.sent, held.sent);
+        assert.deepStrictEqual(refused.sent, held.sent);
       });
-      expect(answer?.isError).not.toBe(true);
-      const body = jsonOf(answer);
-      expect(body.part).toBe('source');
-      expect(body).toHaveProperty('source');
-      expect(body).not.toHaveProperty('metadata');
-    });
-  });
 
-  describe.each([
-    ...BOTH,
-    ...SOURCELESS.map(([t, n]) => [t, n] as [string, Record<string, unknown>]),
-  ])('%s', (object_type, names) => {
-    it('part metadata: exactly one request, held, answered and 404 alike', async () => {
-      const args = { object_type, ...names, part: 'metadata' };
-      const [held, documented, refused] = await Promise.all(
-        MODES.map((mode) => run(mode, args)),
-      );
-      expect(held.sent).toHaveLength(1);
-      expect(documented.sent).toEqual(held.sent);
-      expect(refused.sent).toEqual(held.sent);
-    });
-
-    it('metadata answers the metadata only', async () => {
-      const { answer } = await run('document', {
-        object_type,
-        ...names,
-        part: 'metadata',
+      it('metadata answers the metadata only', async () => {
+        const { answer } = await run('document', {
+          object_type,
+          ...names,
+          part: 'metadata',
+        });
+        assert.notEqual(answer?.isError, true);
+        const body = jsonOf(answer);
+        assert.equal(body.part, 'metadata');
+        assert.ok('metadata' in Object(body));
+        assertNoProperty(body, 'source');
       });
-      expect(answer?.isError).not.toBe(true);
-      const body = jsonOf(answer);
-      expect(body.part).toBe('metadata');
-      expect(body).toHaveProperty('metadata');
-      expect(body).not.toHaveProperty('source');
     });
-  });
+  }
 
   // A service binding has one document: its source and its metadata are the
   // same read (adt-clients' `readMetadata` fetches the resource `read` does).
-  it.each(BOTH.filter(([t]) => t !== 'SERVICE_BINDING'))(
-    '%s: source and metadata are two different requests',
-    async (object_type, names) => {
-      const source = await run('pending', { object_type, ...names });
-      const metadata = await run('pending', {
-        object_type,
-        ...names,
-        part: 'metadata',
-      });
-      expect(source.sent[0]).not.toEqual(metadata.sent[0]);
-    },
-  );
-
-  describe.each(SOURCELESS)('%s has no source', (object_type, names, parts) => {
-    it.each([
-      ['source', { part: 'source' }],
-      ['absent', {}],
-    ])(
-      'part %s is refused before any request, naming its parts',
-      async (_label, part) => {
-        const { sent, answer } = await run('document', {
+  for (const [object_type, names] of BOTH.filter(
+    ([t]) => t !== 'SERVICE_BINDING',
+  )) {
+    it(
+      format('%s: source and metadata are two different requests', object_type),
+      async () => {
+        const source = await run('pending', { object_type, ...names });
+        const metadata = await run('pending', {
           object_type,
           ...names,
-          ...part,
+          part: 'metadata',
         });
-        expect(sent).toEqual([]);
-        expect(answer?.isError).toBe(true);
-        expect(textOf(answer)).toContain(
-          `part=source is not available for object_type=${object_type}. It offers: ${parts}.`,
-        );
+        assert.notDeepStrictEqual(source.sent[0], metadata.sent[0]);
       },
     );
-  });
+  }
+
+  for (const [object_type, names, parts] of SOURCELESS) {
+    describe(format('%s has no source', object_type), () => {
+      for (const [_label, part] of [
+        ['source', { part: 'source' }],
+        ['absent', {}],
+      ] satisfies [string, Record<string, unknown>][]) {
+        it(
+          format(
+            'part %s is refused before any request, naming its parts',
+            _label,
+          ),
+          async () => {
+            const { sent, answer } = await run('document', {
+              object_type,
+              ...names,
+              ...part,
+            });
+            assert.deepStrictEqual(sent, []);
+            assert.equal(answer?.isError, true);
+            assert.ok(
+              textOf(answer).includes(
+                `part=source is not available for object_type=${object_type}. It offers: ${parts}.`,
+              ),
+            );
+          },
+        );
+      }
+    });
+  }
 
   describe('FUNCTION_MODULE: the group in the arguments', () => {
     // The corpus module, at the group its metadata states.
@@ -216,7 +246,7 @@ describe('compact HandlerGet: one part, one request', () => {
     const MODULE_SOURCE =
       'GET /sap/bc/adt/functions/groups/zmcp_shr_fgrp/fmodules/z_mcp_shr_fm/source/main?version=active';
 
-    it.each([
+    for (const [_label, names] of [
       ['GROUP|MODULE', { function_module_name: 'ZMCP_SHR_FGRP|Z_MCP_SHR_FM' }],
       [
         'function_group_name',
@@ -232,19 +262,27 @@ describe('compact HandlerGet: one part, one request', () => {
           function_group_name: 'ZMCP_SHR_FGRP',
         },
       ],
-    ])(
-      'source by %s: the metadata read at that group, then the source there when the group holds the module',
-      async (_label, names) => {
-        const args = { object_type: 'FUNCTION_MODULE', ...names };
-        const [held, documented, refused] = await Promise.all(
-          MODES.map((mode) => run(mode, args)),
-        );
-        expect(held.sent).toEqual([MODULE_METADATA]);
-        expect(documented.sent).toEqual([MODULE_METADATA, MODULE_SOURCE]);
-        expect(refused.sent).toEqual([MODULE_METADATA]);
-        expect(refused.answer?.isError).toBe(true);
-      },
-    );
+    ] satisfies [string, Record<string, unknown>][]) {
+      it(
+        format(
+          'source by %s: the metadata read at that group, then the source there when the group holds the module',
+          _label,
+        ),
+        async () => {
+          const args = { object_type: 'FUNCTION_MODULE', ...names };
+          const [held, documented, refused] = await Promise.all(
+            MODES.map((mode) => run(mode, args)),
+          );
+          assert.deepStrictEqual(held.sent, [MODULE_METADATA]);
+          assert.deepStrictEqual(documented.sent, [
+            MODULE_METADATA,
+            MODULE_SOURCE,
+          ]);
+          assert.deepStrictEqual(refused.sent, [MODULE_METADATA]);
+          assert.equal(refused.answer?.isError, true);
+        },
+      );
+    }
 
     it('part metadata: exactly one request, the metadata, held, answered and 404 alike', async () => {
       const args = {
@@ -255,14 +293,14 @@ describe('compact HandlerGet: one part, one request', () => {
       const [held, documented, refused] = await Promise.all(
         MODES.map((mode) => run(mode, args)),
       );
-      expect(held.sent).toEqual([MODULE_METADATA]);
-      expect(documented.sent).toEqual(held.sent);
-      expect(refused.sent).toEqual(held.sent);
-      expect(documented.answer?.isError).not.toBe(true);
+      assert.deepStrictEqual(held.sent, [MODULE_METADATA]);
+      assert.deepStrictEqual(documented.sent, held.sent);
+      assert.deepStrictEqual(refused.sent, held.sent);
+      assert.notEqual(documented.answer?.isError, true);
       const body = jsonOf(documented.answer);
-      expect(body.part).toBe('metadata');
-      expect(body).toHaveProperty('metadata');
-      expect(body).not.toHaveProperty('source');
+      assert.equal(body.part, 'metadata');
+      assert.ok('metadata' in Object(body));
+      assertNoProperty(body, 'source');
     });
 
     it("a caller's own isError argument is sent on as an argument, the read answered", async () => {
@@ -271,9 +309,9 @@ describe('compact HandlerGet: one part, one request', () => {
         function_module_name: 'ZMCP_SHR_FGRP|Z_MCP_SHR_FM',
         isError: true,
       });
-      expect(sent).toEqual([MODULE_METADATA, MODULE_SOURCE]);
-      expect(answer?.isError).not.toBe(true);
-      expect(jsonOf(answer)).toMatchObject({ part: 'source' });
+      assert.deepStrictEqual(sent, [MODULE_METADATA, MODULE_SOURCE]);
+      assert.notEqual(answer?.isError, true);
+      assertMatchObject(jsonOf(answer), { part: 'source' });
     });
 
     it('answers the module and its group', async () => {
@@ -281,15 +319,15 @@ describe('compact HandlerGet: one part, one request', () => {
         object_type: 'FUNCTION_MODULE',
         function_module_name: 'ZMCP_SHR_FGRP|Z_MCP_SHR_FM',
       });
-      expect(answer?.isError).not.toBe(true);
-      expect(jsonOf(answer)).toMatchObject({
+      assert.notEqual(answer?.isError, true);
+      assertMatchObject(jsonOf(answer), {
         function_module_name: 'Z_MCP_SHR_FM',
         function_group_name: 'ZMCP_SHR_FGRP',
         part: 'source',
       });
     });
 
-    it.each([
+    for (const [_label, names, words] of [
       [
         'no group',
         { function_module_name: 'FM_A' },
@@ -310,21 +348,23 @@ describe('compact HandlerGet: one part, one request', () => {
         { function_module_name: 'FUGR_A|FM_A|EXTRA' },
         'FUNCTION_MODULE is named GROUP|MODULE, or with function_group_name',
       ],
-    ])('%s: refused before any request', async (_label, names, words) => {
-      const { sent, answer } = await run('document', {
-        object_type: 'FUNCTION_MODULE',
-        ...names,
+    ] satisfies [string, Record<string, unknown>, string][]) {
+      it(format('%s: refused before any request', _label), async () => {
+        const { sent, answer } = await run('document', {
+          object_type: 'FUNCTION_MODULE',
+          ...names,
+        });
+        assert.deepStrictEqual(sent, []);
+        assert.equal(answer?.isError, true);
+        assert.ok(textOf(answer).includes(words));
       });
-      expect(sent).toEqual([]);
-      expect(answer?.isError).toBe(true);
-      expect(textOf(answer)).toContain(words);
-    });
+    }
   });
 
   describe('INCLUDE: the source and the metadata document, one request each', () => {
     const SOURCE = "REPORT zincl.\n  WRITE 'x'.\n";
 
-    it.each([
+    for (const [_label, part, request] of [
       [
         'absent',
         {},
@@ -355,16 +395,18 @@ describe('compact HandlerGet: one part, one request', () => {
         { part: 'metadata', version: 'workingArea' },
         'GET /sap/bc/adt/programs/includes/incl_a?version=workingArea',
       ],
-    ])('part %s: exactly that request', async (_label, part, request) => {
-      for (const mode of MODES) {
-        const { sent } = await run(mode, {
-          object_type: 'INCLUDE',
-          include_name: 'INCL_A',
-          ...part,
-        });
-        expect(sent).toEqual([request]);
-      }
-    });
+    ] satisfies [string, Record<string, unknown>, string][]) {
+      it(format('part %s: exactly that request', _label), async () => {
+        for (const mode of MODES) {
+          const { sent } = await run(mode, {
+            object_type: 'INCLUDE',
+            include_name: 'INCL_A',
+            ...part,
+          });
+          assert.deepStrictEqual(sent, [request]);
+        }
+      });
+    }
 
     it('source answers { part: "source", source } beside the name', async () => {
       const { answer } = await run(
@@ -372,8 +414,8 @@ describe('compact HandlerGet: one part, one request', () => {
         { object_type: 'INCLUDE', include_name: 'incl_a' },
         SOURCE,
       );
-      expect(answer?.isError).not.toBe(true);
-      expect(jsonOf(answer)).toEqual({
+      assert.notEqual(answer?.isError, true);
+      assert.deepStrictEqual(jsonOf(answer), {
         success: true,
         include_name: 'INCL_A',
         part: 'source',
@@ -391,7 +433,7 @@ describe('compact HandlerGet: one part, one request', () => {
         },
         SOURCE,
       );
-      expect(jsonOf(answer)).toEqual({
+      assert.deepStrictEqual(jsonOf(answer), {
         success: true,
         include_name: 'INCL_A',
         version: 'inactive',
@@ -407,7 +449,7 @@ describe('compact HandlerGet: one part, one request', () => {
         { object_type: 'INCLUDE', include_name: 'INCL_A', part: 'metadata' },
         DOCUMENT,
       );
-      expect(jsonOf(answer)).toEqual({
+      assert.deepStrictEqual(jsonOf(answer), {
         success: true,
         include_name: 'INCL_A',
         part: 'metadata',
@@ -415,51 +457,60 @@ describe('compact HandlerGet: one part, one request', () => {
       });
     });
 
-    it.each(['source', 'metadata'])(
-      'part %s with another version: refused by GetInclude’s schema before any request, naming the three',
-      async (part) => {
-        const { sent, answer } = await run('document', {
-          object_type: 'INCLUDE',
-          include_name: 'INCL_A',
+    for (const part of ['source', 'metadata']) {
+      it(
+        format(
+          'part %s with another version: refused by GetInclude’s schema before any request, naming the three',
           part,
-          version: 'latest',
-        });
-        expect(sent).toEqual([]);
-        expect(answer?.isError).toBe(true);
-        expect(textOf(answer)).toContain(
-          'Invalid arguments for tool GetInclude: Invalid option: expected one of "active"|"inactive"|"workingArea" at version',
-        );
-      },
-    );
+        ),
+        async () => {
+          const { sent, answer } = await run('document', {
+            object_type: 'INCLUDE',
+            include_name: 'INCL_A',
+            part,
+            version: 'latest',
+          });
+          assert.deepStrictEqual(sent, []);
+          assert.equal(answer?.isError, true);
+          assert.ok(
+            textOf(answer).includes(
+              'Invalid arguments for tool GetInclude: Invalid option: expected one of "active"|"inactive"|"workingArea" at version',
+            ),
+          );
+        },
+      );
+    }
 
     describe('on ABAP cloud', () => {
-      beforeAll(() => {
+      before(() => {
         process.env.SAP_SYSTEM_TYPE = 'cloud';
       });
-      afterAll(() => {
+      after(() => {
         process.env.SAP_SYSTEM_TYPE = 'onprem';
       });
 
-      it.each([
+      for (const [part, request] of [
         [
           'source',
           'GET /sap/bc/adt/programs/includes/incl_a/source/main?version=active',
         ],
         ['metadata', 'GET /sap/bc/adt/programs/includes/incl_a?version=active'],
-      ])('part %s: exactly that request', async (part, request) => {
-        for (const mode of MODES) {
-          const { sent, answer } = await run(mode, {
-            object_type: 'INCLUDE',
-            include_name: 'INCL_A',
-            part,
-          });
-          expect(sent).toEqual([request]);
-          if (mode === 'document') {
-            expect(answer?.isError).not.toBe(true);
-            expect(jsonOf(answer).part).toBe(part);
+      ]) {
+        it(format('part %s: exactly that request', part), async () => {
+          for (const mode of MODES) {
+            const { sent, answer } = await run(mode, {
+              object_type: 'INCLUDE',
+              include_name: 'INCL_A',
+              part,
+            });
+            assert.deepStrictEqual(sent, [request]);
+            if (mode === 'document') {
+              assert.notEqual(answer?.isError, true);
+              assert.equal(jsonOf(answer).part, part);
+            }
           }
-        }
-      });
+        });
+      }
     });
   });
 
@@ -474,18 +525,19 @@ describe('compact HandlerGet: one part, one request', () => {
       const [held, documented, refused] = await Promise.all(
         MODES.map((mode) => run(mode, args, '')),
       );
-      expect(held.sent).toHaveLength(1);
-      expect(held.sent[0]).toMatch(
+      assert.equal(held.sent.length, 1);
+      assert.match(
+        held.sent[0],
         /^POST \/sap\/bc\/adt\/repository\/nodestructure/,
       );
-      expect(documented.sent).toEqual(held.sent);
-      expect(refused.sent).toEqual(held.sent);
+      assert.deepStrictEqual(documented.sent, held.sent);
+      assert.deepStrictEqual(refused.sent, held.sent);
     });
 
     it('a blank body answers an empty listing with both readings stated', async () => {
       const { answer } = await run('document', args, '');
-      expect(answer?.isError).not.toBe(true);
-      expect(jsonOf(answer)).toEqual({
+      assert.notEqual(answer?.isError, true);
+      assert.deepStrictEqual(jsonOf(answer), {
         objects: [],
         childNodes: [],
         blank:
@@ -498,13 +550,14 @@ describe('compact HandlerGet: one part, one request', () => {
         'read-package-contents-structure--01-nodestructure',
       );
       const { sent, answer } = await run('document', args, listing);
-      expect(sent).toHaveLength(1);
+      assert.equal(sent.length, 1);
       const body = jsonOf(answer);
-      expect(body).not.toHaveProperty('blank');
-      expect(
+      assertNoProperty(body, 'blank');
+      assert.ok(
         (body.objects as unknown[]).length +
-          (body.childNodes as unknown[]).length,
-      ).toBeGreaterThan(0);
+          (body.childNodes as unknown[]).length >
+          0,
+      );
     });
   });
 
@@ -515,18 +568,20 @@ describe('compact HandlerGet: one part, one request', () => {
       service_binding_name: 'SRVB_A',
     };
 
-    it.each(MODES.filter((m) => m !== 'pending'))(
-      'answers as GetServiceBindingPreviewUrl does (%s)',
-      async (mode) => {
-        const compact = await run(mode, args);
-        const full = await runWith(
-          handleGetServiceBindingPreviewUrl as never,
-          mode,
-          args,
-        );
-        expect(compact.sent).toEqual(full.sent);
-        expect(textOf(compact.answer)).toEqual(textOf(full.answer));
-      },
-    );
+    for (const mode of MODES.filter((m) => m !== 'pending')) {
+      it(
+        format('answers as GetServiceBindingPreviewUrl does (%s)', mode),
+        async () => {
+          const compact = await run(mode, args);
+          const full = await runWith(
+            handleGetServiceBindingPreviewUrl as never,
+            mode,
+            args,
+          );
+          assert.deepStrictEqual(compact.sent, full.sent);
+          assert.deepStrictEqual(textOf(compact.answer), textOf(full.answer));
+        },
+      );
+    }
   });
 });

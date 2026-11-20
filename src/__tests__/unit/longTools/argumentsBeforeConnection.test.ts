@@ -8,6 +8,9 @@
  * (`HandlerSystem`'s actions: `../handlerSystem/argumentsBeforeConnection`.)
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -28,17 +31,16 @@ import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import * as packageSessions from '../../../lib/packageSessions';
 import { adtStandIn } from '../../helpers/adtStandIn';
+import { assertRejects } from '../../helpers/assertions';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { type CallAnswer, longStand } from './harness';
 
-jest.setTimeout(120_000);
-
 beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(console, 'error', () => {});
+  mock.method(process.stderr, 'write', () => true);
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 /** A tool, arguments its call refuses, and the words it refuses them in. */
 type Case = readonly [string, Record<string, unknown>, string];
@@ -173,29 +175,36 @@ const SETUPS = [
   ['no factory, background false', 'bare', false],
 ] as const;
 
-describe.each(SETUPS)('on the server, %s', (_n, injected, bg) => {
-  it.each(CASES)(
-    '%s %j: refused in its words before any connection',
-    async (tool, args, words) => {
-      const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
-      const stand = await longStand(tool, {
-        injected,
-        backgroundRuns: new InMemoryBackgroundRuns(),
-      });
-      try {
-        const answer = await stand.call(tool, { ...args, background: bg });
-        expect(answer.isError).toBe(true);
-        expect(textOf(answer)).toContain(words);
-        expect(textOf(answer)).not.toContain('run_handle');
-        expect(fresh).not.toHaveBeenCalled();
-        expect(stand.standIn.requests.filter(stand.isToolRequest)).toEqual([]);
-        expect(stand.standIn.loggedOff()).toEqual([]);
-      } finally {
-        await stand.close();
-      }
-    },
-  );
-});
+for (const [_n, injected, bg] of SETUPS) {
+  describe(format('on the server, %s', _n), () => {
+    for (const [tool, args, words] of CASES) {
+      it(
+        format('%s %j: refused in its words before any connection', tool, args),
+        async (t) => {
+          const fresh = t.mock.method(packageSessions, 'openFreshConnection');
+          const stand = await longStand(tool, {
+            injected,
+            backgroundRuns: new InMemoryBackgroundRuns(),
+          });
+          try {
+            const answer = await stand.call(tool, { ...args, background: bg });
+            assert.equal(answer.isError, true);
+            assert.ok(textOf(answer).includes(words));
+            assert.ok(!textOf(answer).includes('run_handle'));
+            assert.equal(fresh.mock.callCount(), 0);
+            assert.deepStrictEqual(
+              stand.standIn.requests.filter(stand.isToolRequest),
+              [],
+            );
+            assert.deepStrictEqual(stand.standIn.loggedOff(), []);
+          } finally {
+            await stand.close();
+          }
+        },
+      );
+    }
+  });
+}
 
 /** The group of the shipped binaries that serves `tool`. */
 function groupOf(tool: string, context: HandlerContext): BaseHandlerGroup {
@@ -215,90 +224,103 @@ function groupOf(tool: string, context: HandlerContext): BaseHandlerGroup {
 }
 
 describe('registered on a plain McpServer', () => {
-  it.each(CASES)(
-    '%s %j: refused in its words before the call’s context',
-    async (tool, args, words) => {
-      const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
-      const standIn = await adtStandIn();
-      stateSystemKind();
-      const connection = createAbapConnection(
-        { url: standIn.url, client: '100', authType: 'basic' },
-        new BasicAuthProvider('LONG_USER', 'long-password'),
-      );
-      const asked: string[] = [];
-      const context: HandlerContext = {
-        connection,
-        logger: undefined,
-        systemType: 'onprem',
-      };
-      const group = groupOf(tool, context);
-      const entry = group
-        .getHandlers()
-        .find((e) => e.toolDefinition.name === tool);
-      if (entry === undefined) throw new Error(`no ${tool}`);
-      const server = new McpServer({ name: 'plain', version: '1.0.0' });
-      group.registerOneTool(server, entry, async () => {
-        asked.push('context');
-        return context;
-      });
-      const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
-      const client = new Client({ name: 'plain', version: '1.0.0' });
-      try {
-        await Promise.all([
-          server.connect(serverSide),
-          client.connect(clientSide),
-        ]);
-        const before = standIn.requests.length;
-        const answer = (await client.callTool({
-          name: tool,
-          arguments: args,
-        })) as CallAnswer;
-        expect(answer.isError).toBe(true);
-        expect(textOf(answer)).toContain(words);
-        expect(asked).toEqual([]);
-        expect(fresh).not.toHaveBeenCalled();
-        expect(standIn.requests.length).toBe(before);
-      } finally {
-        await client.close().catch(() => undefined);
-        await standIn.close();
-      }
-    },
-  );
+  for (const [tool, args, words] of CASES) {
+    it(
+      format(
+        '%s %j: refused in its words before the call’s context',
+        tool,
+        args,
+      ),
+      async (t) => {
+        const fresh = t.mock.method(packageSessions, 'openFreshConnection');
+        const standIn = await adtStandIn();
+        stateSystemKind();
+        const connection = createAbapConnection(
+          { url: standIn.url, client: '100', authType: 'basic' },
+          new BasicAuthProvider('LONG_USER', 'long-password'),
+        );
+        const asked: string[] = [];
+        const context: HandlerContext = {
+          connection,
+          logger: undefined,
+          systemType: 'onprem',
+        };
+        const group = groupOf(tool, context);
+        const entry = group
+          .getHandlers()
+          .find((e) => e.toolDefinition.name === tool);
+        if (entry === undefined) throw new Error(`no ${tool}`);
+        const server = new McpServer({ name: 'plain', version: '1.0.0' });
+        group.registerOneTool(server, entry, async () => {
+          asked.push('context');
+          return context;
+        });
+        const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+        const client = new Client({ name: 'plain', version: '1.0.0' });
+        try {
+          await Promise.all([
+            server.connect(serverSide),
+            client.connect(clientSide),
+          ]);
+          const before = standIn.requests.length;
+          const answer = (await client.callTool({
+            name: tool,
+            arguments: args,
+          })) as CallAnswer;
+          assert.equal(answer.isError, true);
+          assert.ok(textOf(answer).includes(words));
+          assert.deepStrictEqual(asked, []);
+          assert.equal(fresh.mock.callCount(), 0);
+          assert.equal(standIn.requests.length, before);
+        } finally {
+          await client.close().catch(() => undefined);
+          await standIn.close();
+        }
+      },
+    );
+  }
 });
 
 /** The full tools of CASES, as `HandlerExporter` hands them out. */
 const EXPORTED = CASES.filter(([tool]) => !tool.startsWith('Handler'));
 
 describe('handed out by HandlerExporter', () => {
-  it.each(EXPORTED)(
-    '%s %j: refused in its words before any scope, resolver or send',
-    async (tool, args, words) => {
-      const requests: string[] = [];
-      const connection = {
-        getBaseUrl: async () => 'https://system.example.invalid',
-        makeAdtRequest: async (options: { url: string }) => {
-          requests.push(options.url);
-          return { status: 200, data: '' };
-        },
-      };
-      const resolved: string[] = [];
-      const exporter = new HandlerExporter({
-        systemType: 'onprem',
-        includeData: true,
-        systemContextResolver: async () => {
-          resolved.push('asked');
-          return null;
-        },
-      });
-      const entry = exporter
-        .getHandlerEntries()
-        .find((e) => e.toolDefinition.name === tool);
-      if (entry === undefined) throw new Error(`no ${tool}`);
-      await expect(
-        entry.call({ connection, logger: undefined } as never, args),
-      ).rejects.toThrow(words);
-      expect(resolved).toEqual([]);
-      expect(requests).toEqual([]);
-    },
-  );
+  for (const [tool, args, words] of EXPORTED) {
+    it(
+      format(
+        '%s %j: refused in its words before any scope, resolver or send',
+        tool,
+        args,
+      ),
+      async () => {
+        const requests: string[] = [];
+        const connection = {
+          getBaseUrl: async () => 'https://system.example.invalid',
+          makeAdtRequest: async (options: { url: string }) => {
+            requests.push(options.url);
+            return { status: 200, data: '' };
+          },
+        };
+        const resolved: string[] = [];
+        const exporter = new HandlerExporter({
+          systemType: 'onprem',
+          includeData: true,
+          systemContextResolver: async () => {
+            resolved.push('asked');
+            return null;
+          },
+        });
+        const entry = exporter
+          .getHandlerEntries()
+          .find((e) => e.toolDefinition.name === tool);
+        if (entry === undefined) throw new Error(`no ${tool}`);
+        await assertRejects(
+          entry.call({ connection, logger: undefined } as never, args),
+          words,
+        );
+        assert.deepStrictEqual(resolved, []);
+        assert.deepStrictEqual(requests, []);
+      },
+    );
+  }
 });

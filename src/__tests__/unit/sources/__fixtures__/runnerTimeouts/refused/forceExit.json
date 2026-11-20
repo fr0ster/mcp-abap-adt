@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test:integration": "jest --testPathPatterns=integration --runInBand --forceExit",
-    "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests --forceExit"
+    "test:integration": "node tools/run-tests.mjs --concurrency 1 --root src/__tests__/integration --forceExit",
+    "shared:setup": "node tools/run-tests.mjs --concurrency 1 src/__tests__/admin/shared-deps/setup.test.ts --forceExit"
   }
 }

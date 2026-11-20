@@ -7,7 +7,7 @@
  * Each negative check stands beside the positive one it differs from, so a
  * check cannot pass because the whole line is broken.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 import type {
@@ -180,6 +180,13 @@ export const dsfdInTable: TableMains['DSFD'] = 'DSFD/SCF';
 export const msagInTable: TableMains['MSAG'] = 'MSAG/N';
 /** …it is ambiguous there, with both. */
 export const msagSharedInTable: TableShared['MSAG'] = ['MSAG/N', 'MSAG/NN'];
+
+/** A sub-resource code is no main type's: `CLAS` stays the class… */
+export const clasInTable: TableMains['CLAS'] = 'CLAS/OC';
+/** …`TABL` stays the table and the structure… */
+export const tablSharedInTable: TableShared['TABL'] = ['TABL/DT', 'TABL/DS'];
+// @ts-expect-error …never the settings.
+export const settingsInTabl: TableShared['TABL'] = ['TABL/DTT'];
 
 /** An enhancement spot is one code on cloud's group activation… */
 export const enhsOnCloud: MainTypeOfOne<ActivationCode<'cloud'>> = 'ENHS';

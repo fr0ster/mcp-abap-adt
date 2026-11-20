@@ -11,6 +11,9 @@
  * the variant — real adt-clients code, no SAP.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleActivateObjects } from '../../../handlers/common/high/handleActivateObjects';
 import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
@@ -117,63 +120,85 @@ describe('dbview is the dictionary view, VIEW/DV', () => {
     SERVED.map(([tool, send]) => [tool, variant, send] as const),
   );
 
-  it.each(served)(
-    '%s on %s: dbview sends exactly what VIEW/DV sends, under /ddic/views',
-    async (_tool, variant, send) => {
-      const byCode = await run(send, variant, 'VIEW/DV');
-      const byName = await run(send, variant, 'dbview');
-      const byUpper = await run(send, variant, 'DBVIEW');
-      expect(byCode.requests.length).toBeGreaterThan(0);
-      expect(decodeURIComponent(byCode.requests.join('\n'))).toContain(
-        '/sap/bc/adt/ddic/views/',
-      );
-      expect(byName.requests).toEqual(byCode.requests);
-      expect(byUpper.requests).toEqual(byCode.requests);
-    },
-  );
+  for (const [_tool, variant, send] of served) {
+    it(
+      format(
+        '%s on %s: dbview sends exactly what VIEW/DV sends, under /ddic/views',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const byCode = await run(send, variant, 'VIEW/DV');
+        const byName = await run(send, variant, 'dbview');
+        const byUpper = await run(send, variant, 'DBVIEW');
+        assert.ok(byCode.requests.length > 0);
+        assert.ok(
+          decodeURIComponent(byCode.requests.join('\n')).includes(
+            '/sap/bc/adt/ddic/views/',
+          ),
+        );
+        assert.deepStrictEqual(byName.requests, byCode.requests);
+        assert.deepStrictEqual(byUpper.requests, byCode.requests);
+      },
+    );
+  }
 
-  it.each(served)(
-    '%s on %s: view stays the CDS view, DDLS/DF',
-    async (_tool, variant, send) => {
-      const byView = await run(send, variant, 'view');
-      const byDdl = await run(send, variant, 'DDLS/DF');
-      expect(byView.requests.length).toBeGreaterThan(0);
-      expect(byView.requests).toEqual(byDdl.requests);
-    },
-  );
+  for (const [_tool, variant, send] of served) {
+    it(
+      format('%s on %s: view stays the CDS view, DDLS/DF', _tool, variant),
+      async () => {
+        const byView = await run(send, variant, 'view');
+        const byDdl = await run(send, variant, 'DDLS/DF');
+        assert.ok(byView.requests.length > 0);
+        assert.deepStrictEqual(byView.requests, byDdl.requests);
+      },
+    );
+  }
 
   const notServed = VARIANTS.flatMap((variant) =>
     NOT_SERVED.map(([tool, send]) => [tool, variant, send] as const),
   );
 
-  it.each(notServed)(
-    '%s on %s: dbview is refused naming the list, nothing sent',
-    async (_tool, variant, send) => {
-      const { requests, answered } = await run(send, variant, 'dbview');
-      expect(requests).toEqual([]);
-      expect(answered).toContain('"dbview" is not one of: CLAS/OC');
-    },
-  );
+  for (const [_tool, variant, send] of notServed) {
+    it(
+      format(
+        '%s on %s: dbview is refused naming the list, nothing sent',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const { requests, answered } = await run(send, variant, 'dbview');
+        assert.deepStrictEqual(requests, []);
+        assert.ok(answered.includes('"dbview" is not one of: CLAS/OC'));
+      },
+    );
+  }
 
-  it.each(VARIANTS)(
-    'SearchObject on %s: dbview is sent as the search name VIEW, view as DDLS',
-    async (variant) => {
-      const objectTypeOf = async (value: string) => {
-        const connection = recordingConnection();
-        declareSystemKind(connection, variant);
-        await handleSearchObject(
-          { connection },
-          { object_name: 'Z*', object_type: value },
-        );
-        expect(connection.requests).toHaveLength(1);
-        const [request] = connection.requests;
-        if (request === undefined) throw new Error('no request was sent');
-        return new URL(request.url, 'https://system.invalid').searchParams.get(
-          'objectType',
-        );
-      };
-      expect(await objectTypeOf('dbview')).toBe('VIEW');
-      expect(await objectTypeOf('view')).toBe('DDLS');
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'SearchObject on %s: dbview is sent as the search name VIEW, view as DDLS',
+        variant,
+      ),
+      async () => {
+        const objectTypeOf = async (value: string) => {
+          const connection = recordingConnection();
+          declareSystemKind(connection, variant);
+          await handleSearchObject(
+            { connection },
+            { object_name: 'Z*', object_type: value },
+          );
+          assert.equal(connection.requests.length, 1);
+          const [request] = connection.requests;
+          if (request === undefined) throw new Error('no request was sent');
+          return new URL(
+            request.url,
+            'https://system.invalid',
+          ).searchParams.get('objectType');
+        };
+        assert.equal(await objectTypeOf('dbview'), 'VIEW');
+        assert.equal(await objectTypeOf('view'), 'DDLS');
+      },
+    );
+  }
 });

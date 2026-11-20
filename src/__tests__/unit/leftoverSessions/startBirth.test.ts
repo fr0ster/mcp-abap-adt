@@ -1,4 +1,7 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import * as z from 'zod';
+import { assertMatchObject, rejectionOf } from '../../helpers/assertions';
 /**
  * A stdio instance's connection is born at its start, before any tool call
  * (`bornAtStart`): the one leftover session of its destination — a dead
@@ -30,22 +33,20 @@ import {
   until,
 } from './harness';
 
-jest.setTimeout(30_000);
-
 let stand: LeftoverStand;
 let previousType: string | undefined;
 
 beforeEach(() => {
   previousType = process.env.SAP_SYSTEM_TYPE;
   process.env.SAP_SYSTEM_TYPE = 'onprem';
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 
 afterEach(async () => {
   await stand?.close();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
-  jest.restoreAllMocks();
+  mock.restoreAll();
   resetProcessLatchForTests();
 });
 
@@ -91,37 +92,46 @@ describe('one leftover session of the destination', () => {
     const { handle, session } = await stand.leftover();
     const from = stand.standIn.requests.length;
 
-    expect(await stand.start()).toEqual({ session: 'picked_up', handle });
+    assert.deepStrictEqual(await stand.start(), {
+      session: 'picked_up',
+      handle,
+    });
     const born = stand.standIn.requests.slice(from);
-    expect(born.length).toBeGreaterThan(0);
+    assert.ok(born.length > 0);
     // All in the old session — no logon; the takeover's request without
     // the credential. (The system lookup that follows goes on that session
     // as every request of a basic connection does.)
-    for (const r of born) expect(r.session).toBe(session);
-    expect(born[0]?.authorization).toBeUndefined();
+    for (const r of born) assert.equal(r.session, session);
+    assert.equal(born[0]?.authorization, undefined);
     // The file is this process's, under the same handle.
-    expect(stand.files()).toEqual([handle]);
-    expect(stand.file(handle)).toMatchObject({
-      pid: OUR_PID,
-      role: 'built',
-      cookies: expect.stringContaining(`=${session}`),
-    });
+    assert.deepStrictEqual(stand.files(), [handle]);
+    {
+      const written = stand.file(handle);
+      assertMatchObject(written, { pid: OUR_PID, role: 'built' });
+      const cookies = written?.cookies;
+      assert.ok(typeof cookies === 'string' && cookies.includes(`=${session}`));
+    }
 
     const before = stand.standIn.requests.length;
-    expect((await stand.call('ProbeAdt', { id: 'after' })).isError).toBe(false);
-    expect(sessionOf('after')).toBe(session);
+    assert.equal(
+      (await stand.call('ProbeAdt', { id: 'after' })).isError,
+      false,
+    );
+    assert.equal(sessionOf('after'), session);
     // No further logon: no session but the picked-up one.
-    expect(sessionsSince(before)).toEqual(new Set([session]));
-    expect(stand.standIn.logoffs()).toBe(0);
+    assert.deepStrictEqual(sessionsSince(before), new Set([session]));
+    assert.equal(stand.standIn.logoffs(), 0);
   });
 
   it('the process is shutting down at the start: the claimed file is given back as a leftover, the start refused', async () => {
     stand = await leftoverStand();
     const { handle } = await stand.leftover();
     latch();
-    await expect(stand.start()).rejects.toBeInstanceOf(ClosedInstanceRefusal);
-    expect(stand.files()).toEqual([handle]);
-    expect(stand.file(handle)).toMatchObject({ pid: 111 });
+    assert.ok(
+      (await rejectionOf(stand.start())) instanceof ClosedInstanceRefusal,
+    );
+    assert.deepStrictEqual(stand.files(), [handle]);
+    assertMatchObject(stand.file(handle), { pid: 111 });
   });
 
   it('SAP answers 401 for it: a new session with the normal logon, the file rewritten under the same handle', async () => {
@@ -130,23 +140,23 @@ describe('one leftover session of the destination', () => {
     stand.standIn.answer((r) => r.session === session, 401);
     const from = stand.standIn.requests.length;
 
-    expect(await stand.start()).toEqual({ session: 'new', handle });
+    assert.deepStrictEqual(await stand.start(), { session: 'new', handle });
     const sent = stand.standIn.requests.slice(from);
     // The takeover's request in the old session, without the credential;
     // then one logon, with it, in one new session.
-    expect(sent[0]?.session).toBe(session);
-    expect(sent[0]?.authorization).toBeUndefined();
+    assert.equal(sent[0]?.session, session);
+    assert.equal(sent[0]?.authorization, undefined);
     const fresh = [...logons(from)];
-    expect(fresh).toHaveLength(1);
-    expect(fresh[0]).not.toBe(session);
-    expect(stand.files()).toEqual([handle]);
+    assert.equal(fresh.length, 1);
+    assert.notEqual(fresh[0], session);
+    assert.deepStrictEqual(stand.files(), [handle]);
     const pairs = String(stand.file(handle).cookies).split('; ');
-    expect(pairs).toContain(`SAP_SESSIONID_X01_100=${fresh[0]}`);
+    assert.ok(pairs.includes(`SAP_SESSIONID_X01_100=${fresh[0]}`));
 
     const before = stand.standIn.requests.length;
     await stand.call('ProbeAdt', { id: 'next' });
-    expect(sessionOf('next')).toBe(fresh[0]);
-    expect(sessionsSince(before)).toEqual(new Set([fresh[0]]));
+    assert.equal(sessionOf('next'), fresh[0]);
+    assert.deepStrictEqual(sessionsSince(before), new Set([fresh[0]]));
   });
 
   it('a 2xx naming another session than the old one: a new session with the normal logon', async () => {
@@ -155,8 +165,8 @@ describe('one leftover session of the destination', () => {
     stand.standIn.body((r) => r.session === session, '', {
       'set-cookie': 'SAP_SESSIONID_X01_100=another-session; path=/',
     });
-    expect(await stand.start()).toEqual({ session: 'new', handle });
-    expect(stand.files()).toEqual([handle]);
+    assert.deepStrictEqual(await stand.start(), { session: 'new', handle });
+    assert.deepStrictEqual(stand.files(), [handle]);
   });
 
   it('a redirect is not "gone": the start fails as SAP answered, no logon is tried, and the file is a leftover again', async () => {
@@ -164,48 +174,49 @@ describe('one leftover session of the destination', () => {
     const { handle, session } = await stand.leftover();
     stand.standIn.answer((r) => r.session === session, 302);
     const from = stand.standIn.requests.length;
-    await expect(stand.start()).rejects.toBeDefined();
-    expect(logons(from).size).toBe(0);
-    expect(stand.files()).toEqual([handle]);
-    expect(stand.file(handle)).toMatchObject({ pid: 111 });
+    assert.notEqual(await rejectionOf(stand.start()), undefined);
+    assert.equal(logons(from).size, 0);
+    assert.deepStrictEqual(stand.files(), [handle]);
+    assertMatchObject(stand.file(handle), { pid: 111 });
   });
 
   it('a 500: the start fails, and the file is a leftover again', async () => {
     stand = await leftoverStand();
     const { handle, session } = await stand.leftover();
     stand.standIn.answer((r) => r.session === session, 500);
-    await expect(stand.start()).rejects.toBeDefined();
-    expect(stand.files()).toEqual([handle]);
+    assert.notEqual(await rejectionOf(stand.start()), undefined);
+    assert.deepStrictEqual(stand.files(), [handle]);
   });
 
   it('a gone session whose new logon SAP refuses: the start fails, the file given back under its handle', async () => {
     stand = await leftoverStand();
     const { handle } = await stand.leftover();
     stand.standIn.refuse(true);
-    await expect(stand.start()).rejects.toBeDefined();
-    expect(stand.files()).toEqual([handle]);
-    expect(stand.file(handle)).toMatchObject({ pid: 111 });
+    assert.notEqual(await rejectionOf(stand.start()), undefined);
+    assert.deepStrictEqual(stand.files(), [handle]);
+    assertMatchObject(stand.file(handle), { pid: 111 });
   });
 
   it('a debugger’s session is not taken up: a normal logon, and the file is left for the list and the logoff', async () => {
     stand = await leftoverStand();
     const { handle, session } = await stand.leftover({ role: 'debugger' });
     const from = stand.standIn.requests.length;
-    expect(await stand.start()).toEqual({ session: 'logged_on' });
-    expect(logons(from).size).toBe(1);
-    expect(
+    assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
+    assert.equal(logons(from).size, 1);
+    assert.equal(
       stand.standIn.requests.slice(from).some((r) => r.session === session),
-    ).toBe(false);
-    expect(stand.files()).toContain(handle);
-    expect(stand.file(handle)).toMatchObject({ pid: 111, role: 'debugger' });
+      false,
+    );
+    assert.ok(stand.files().includes(handle));
+    assertMatchObject(stand.file(handle), { pid: 111, role: 'debugger' });
   });
 
   it('another destination’s session is not this start’s: a normal logon', async () => {
     stand = await leftoverStand();
     const { handle } = await stand.leftover({ destination: 'OTHER_DEST' });
-    expect(await stand.start()).toEqual({ session: 'logged_on' });
-    expect(stand.files()).toContain(handle);
-    expect(stand.file(handle)).toMatchObject({ pid: 111 });
+    assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
+    assert.ok(stand.files().includes(handle));
+    assertMatchObject(stand.file(handle), { pid: 111 });
   });
 });
 
@@ -213,16 +224,16 @@ describe('one leftover session of the destination', () => {
 describe('no leftover session, or several', () => {
   it('none: a normal logon at the start, and a tool afterwards runs on it with no further logon', async () => {
     stand = await leftoverStand();
-    expect(await stand.start()).toEqual({ session: 'logged_on' });
+    assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
     const born = [...logons()];
-    expect(born).toHaveLength(1);
+    assert.equal(born.length, 1);
     // Its own runtime file, as any logon's.
-    expect(stand.files()).toHaveLength(1);
+    assert.equal(stand.files().length, 1);
 
     const before = stand.standIn.requests.length;
     await stand.call('ProbeAdt', { id: 'after' });
-    expect(sessionOf('after')).toBe(born[0]);
-    expect(sessionsSince(before)).toEqual(new Set([born[0]]));
+    assert.equal(sessionOf('after'), born[0]);
+    assert.deepStrictEqual(sessionsSince(before), new Set([born[0]]));
   });
 
   it('two: a normal logon, neither is picked, and both files stay untouched', async () => {
@@ -234,17 +245,24 @@ describe('no leftover session, or several', () => {
       [second.handle]: stand.file(second.handle),
     };
     const from = stand.standIn.requests.length;
-    expect(await stand.start()).toEqual({ session: 'logged_on' });
+    assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
     const sent = stand.standIn.requests.slice(from);
-    expect(sent.some((r) => r.session === first.session)).toBe(false);
-    expect(sent.some((r) => r.session === second.session)).toBe(false);
-    expect(logons(from).size).toBe(1);
-    expect(stand.file(first.handle)).toEqual(files[first.handle]);
-    expect(stand.file(second.handle)).toEqual(files[second.handle]);
+    assert.equal(
+      sent.some((r) => r.session === first.session),
+      false,
+    );
+    assert.equal(
+      sent.some((r) => r.session === second.session),
+      false,
+    );
+    assert.equal(logons(from).size, 1);
+    assert.deepStrictEqual(stand.file(first.handle), files[first.handle]);
+    assert.deepStrictEqual(stand.file(second.handle), files[second.handle]);
     // Still listed for the user.
     const listed = json((await stand.call('ListLeftoverSessions')).text)
       .sessions as Array<{ handle: string }>;
-    expect(listed.map((s) => s.handle).sort()).toEqual(
+    assert.deepStrictEqual(
+      listed.map((s) => s.handle).sort(),
       [first.handle, second.handle].sort(),
     );
   });
@@ -252,7 +270,7 @@ describe('no leftover session, or several', () => {
   it('a logon SAP refuses: the start fails, and nothing is kept', async () => {
     stand = await leftoverStand();
     stand.standIn.refuse(true);
-    await expect(stand.start()).rejects.toBeDefined();
-    expect(stand.files()).toEqual([]);
+    assert.notEqual(await rejectionOf(stand.start()), undefined);
+    assert.deepStrictEqual(stand.files(), []);
   });
 });

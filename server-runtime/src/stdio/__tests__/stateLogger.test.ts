@@ -3,6 +3,16 @@
  * cleanup, a failing observer) are always on and go to stderr — never to the
  * transport logger, which the launcher silences unless DEBUG_AUTH_LOG.
  */
+
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
 import { stateLoggerForTransport } from '../launcher.js';
@@ -31,40 +41,38 @@ const provokeObserverFailure = (state: {
 describe('the state logger', () => {
   const saved = process.env.DEBUG_AUTH_LOG;
   let written: string[];
-  let spy: jest.SpyInstance;
+  let spy: Mock<typeof process.stderr.write>;
   beforeEach(() => {
     delete process.env.DEBUG_AUTH_LOG;
     written = [];
-    spy = jest
-      .spyOn(process.stderr, 'write')
-      .mockImplementation((chunk: unknown) => {
-        written.push(String(chunk));
-        return true;
-      });
+    spy = mock.method(process.stderr, 'write', (chunk: unknown) => {
+      written.push(String(chunk));
+      return true;
+    });
   });
   afterEach(() => {
-    spy.mockRestore();
+    spy.mock.restore();
     if (saved === undefined) delete process.env.DEBUG_AUTH_LOG;
     else process.env.DEBUG_AUTH_LOG = saved;
   });
 
-  it("the launcher's state logger is not silent: info and error reach stderr, never stdout", () => {
-    const out = jest.spyOn(process.stdout, 'write');
+  it("the launcher's state logger is not silent: info and error reach stderr, never stdout", (t) => {
+    const out = t.mock.method(process.stdout, 'write');
     try {
       stateLoggerForTransport.info?.('held state ended');
       stateLoggerForTransport.error('cleanup failed');
-      expect(written.join('')).toContain('held state ended');
-      expect(written.join('')).toContain('cleanup failed');
-      expect(out).not.toHaveBeenCalled();
+      assert.ok(written.join('').includes('held state ended'));
+      assert.ok(written.join('').includes('cleanup failed'));
+      assert.equal(out.mock.callCount(), 0);
     } finally {
-      out.mockRestore();
+      out.mock.restore();
     }
   });
 
   it('a stdio server with a silent transport logger still reports its state on stderr', () => {
     const server = new StdioServer(registry(), destinations);
     provokeObserverFailure(server.state as never);
-    expect(written.join('')).toContain('observer broke');
+    assert.ok(written.join('').includes('observer broke'));
   });
 
   it('a stdio server reports its state to the state logger it is given', () => {
@@ -73,7 +81,7 @@ describe('the state logger', () => {
       stateLogger: { info: () => {}, error: (m) => lines.push(m) },
     });
     provokeObserverFailure(server.state as never);
-    expect(lines.join('')).toContain('observer broke');
+    assert.ok(lines.join('').includes('observer broke'));
   });
 
   it('a stdio server given only a logger reports its state to that logger, not to a defaulted silent one', () => {
@@ -86,6 +94,6 @@ describe('the state logger', () => {
     };
     const server = new StdioServer(registry(), destinations, { logger });
     provokeObserverFailure(server.state as never);
-    expect(lines.join('')).toContain('observer broke');
+    assert.ok(lines.join('').includes('observer broke'));
   });
 });

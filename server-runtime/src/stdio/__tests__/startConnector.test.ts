@@ -13,10 +13,13 @@
  * (`default`), its runtime files under `--auth-broker-path`.
  */
 
+import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { runtimeDirectory } from '@mcp-abap-adt/lib/embeddable';
 import {
   fullReadOnlyToolSet,
@@ -31,6 +34,7 @@ import {
   isLogoff,
   type StandInRequest,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import { rejectionOf } from '../../../../src/__tests__/helpers/assertions';
 import {
   killedProcessSession,
   runtimeFiles,
@@ -53,8 +57,6 @@ import {
   startSystemUserUnknownWords,
 } from '../launcher.js';
 import { SHUTDOWN_BEFORE_START_LINE } from '../shutdown.js';
-
-jest.setTimeout(30_000);
 
 const USER = 'START_USER';
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
@@ -96,7 +98,7 @@ afterEach(async () => {
   await standIn.close();
   fs.rmSync(root, { recursive: true, force: true });
   process.env = { ...savedEnv };
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 /** A session a killed process left for this destination, on `kind`. */
@@ -171,7 +173,7 @@ async function start(
   const processLike = Object.assign(new EventEmitter(), {
     stdin: new EventEmitter(),
   });
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
   const launched = launch(
     config,
     {
@@ -239,31 +241,32 @@ it('one leftover session: picked up before the transport opens, with no tool cal
   const from = standIn.requests.length;
   const s = await start();
   try {
-    expect(s.exits).toEqual([]);
-    expect(s.opened()).toBe(1);
+    assert.deepStrictEqual(s.exits, []);
+    assert.equal(s.opened(), 1);
     // Everything up to the transport's opening was the resume and the
     // system lookup, in the old session — no logon; the takeover's request
     // without the credential.
     const born = standIn.requests.slice(from, s.seenAtOpen());
-    expect(born.length).toBeGreaterThan(0);
-    for (const r of born) expect(r.session).toBe(session);
-    expect(born[0]?.authorization).toBeUndefined();
-    expect(runtimeFiles(runtime)).toEqual([handle]);
+    assert.ok(born.length > 0);
+    for (const r of born) assert.equal(r.session, session);
+    assert.equal(born[0]?.authorization, undefined);
+    assert.deepStrictEqual(runtimeFiles(runtime), [handle]);
     const file = JSON.parse(
       fs.readFileSync(path.join(runtime, handle), 'utf8'),
     );
-    expect(file.pid).toBe(process.pid);
+    assert.equal(file.pid, process.pid);
 
     const before = standIn.requests.length;
-    expect((await s.call('ListLeftoverSessions')).text).toContain(
-      '"sessions": []',
+    assert.ok(
+      (await s.call('ListLeftoverSessions')).text.includes('"sessions": []'),
     );
-    expect(standIn.requests.length).toBe(before);
+    assert.equal(standIn.requests.length, before);
     const read = await s.call('GetClass', { class_name: 'ZCL_AFTER_START' });
-    expect(read.text).not.toContain('not found');
-    expect(
+    assert.ok(!read.text.includes('not found'));
+    assert.deepStrictEqual(
       new Set(standIn.requests.slice(before).map((r) => r.session)),
-    ).toEqual(new Set([session]));
+      new Set([session]),
+    );
   } finally {
     await s.stop();
   }
@@ -275,13 +278,13 @@ it('one leftover session SAP says has ended (401): a new session logged on at th
   const from = standIn.requests.length;
   const s = await start();
   try {
-    expect(s.exits).toEqual([]);
+    assert.deepStrictEqual(s.exits, []);
     const born = standIn.requests.slice(from, s.seenAtOpen());
     const fresh = new Set(
       born.filter((r) => r.session !== session).map((r) => r.session),
     );
-    expect(fresh.size).toBe(1);
-    expect(runtimeFiles(runtime)).toEqual([handle]);
+    assert.equal(fresh.size, 1);
+    assert.deepStrictEqual(runtimeFiles(runtime), [handle]);
   } finally {
     await s.stop();
   }
@@ -304,15 +307,16 @@ it('the shutdown lands while a leftover with its system information is resumed: 
   });
   await exited(s.exits);
   // The one exit is the shutdown's, and it is 1: the start failed.
-  expect(s.exits).toEqual([1]);
-  expect(s.stderr).toContain(SHUTDOWN_BEFORE_START_LINE);
-  expect(s.opened()).toBe(0);
-  expect(standIn.requests.filter(isLookup)).toEqual([]);
-  expect(runtimeFiles(runtime)).toEqual([handle]);
-  expect(
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.ok(s.stderr.includes(SHUTDOWN_BEFORE_START_LINE));
+  assert.equal(s.opened(), 0);
+  assert.deepStrictEqual(standIn.requests.filter(isLookup), []);
+  assert.deepStrictEqual(runtimeFiles(runtime), [handle]);
+  assert.equal(
     JSON.parse(fs.readFileSync(path.join(runtime, handle), 'utf8')).pid,
-  ).toBe(111);
-  expect(ownedConnections()).toEqual([]);
+    111,
+  );
+  assert.deepStrictEqual(ownedConnections(), []);
 });
 
 it('the latch lands while a leftover with its system information is resumed and SAP answers: the start fails, the transport never opens, the file is a leftover again, nothing owned', async () => {
@@ -331,105 +335,127 @@ it('the latch lands while a leftover with its system information is resumed and 
       held.release();
     },
   });
-  expect(s.exits).toEqual([1]);
-  expect(s.opened()).toBe(0);
-  expect(standIn.requests.filter(isLookup)).toEqual([]);
-  expect(runtimeFiles(runtime)).toEqual([handle]);
-  expect(
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.equal(s.opened(), 0);
+  assert.deepStrictEqual(standIn.requests.filter(isLookup), []);
+  assert.deepStrictEqual(runtimeFiles(runtime), [handle]);
+  assert.equal(
     JSON.parse(fs.readFileSync(path.join(runtime, handle), 'utf8')).pid,
-  ).toBe(111);
+    111,
+  );
   // The connection the resume built is ended: its logoff, nothing owned.
   const end = Date.now() + 10_000;
   while (standIn.logoffs() === 0 && Date.now() < end) {
     await new Promise((r) => setTimeout(r, 5));
   }
-  expect(standIn.loggedOff()).toEqual([session]);
-  expect(ownedConnections()).toEqual([]);
+  assert.deepStrictEqual(standIn.loggedOff(), [session]);
+  assert.deepStrictEqual(ownedConnections(), []);
 });
 
 it('none: a normal logon at the start, before the transport opens', async () => {
   const s = await start();
   try {
-    expect(s.exits).toEqual([]);
+    assert.deepStrictEqual(s.exits, []);
     const born = standIn.requests.slice(0, s.seenAtOpen());
-    expect(born.some((r) => r.authorization !== undefined)).toBe(true);
-    expect(new Set(born.map((r) => r.session)).size).toBe(1);
-    expect(runtimeFiles(runtime)).toHaveLength(1);
+    assert.equal(
+      born.some((r) => r.authorization !== undefined),
+      true,
+    );
+    assert.equal(new Set(born.map((r) => r.session)).size, 1);
+    assert.equal(runtimeFiles(runtime).length, 1);
   } finally {
     await s.stop();
   }
 });
 
-it.each<['the end of stdin' | 'a signal', 'onprem' | 'cloud']>([
+for (const [trigger, kind] of [
   ['the end of stdin', 'onprem'],
   ['a signal', 'onprem'],
   ['the end of stdin', 'cloud'],
-])(
-  'the shutdown (%s) while the start is still logging on (%s): the process exits 1 once, never 0, and the transport never opens',
-  async (trigger, kind) => {
-    process.env.SAP_SYSTEM_TYPE = kind;
-    // The logon's first request, held until the shutdown began.
-    const held = standIn.hold((r) => !isLogoff(r.url));
-    const s = await start({
+] satisfies ReadonlyArray<
+  ['the end of stdin' | 'a signal', 'onprem' | 'cloud']
+>) {
+  it(
+    format(
+      'the shutdown (%s) while the start is still logging on (%s): the process exits 1 once, never 0, and the transport never opens',
+      trigger,
       kind,
-      atBirth: async (shutdown, signal) => {
-        await held.arrived;
-        if (trigger === 'a signal') signal('SIGTERM');
-        else shutdown();
-        held.release();
-      },
-    });
-    await exited(s.exits);
-    expect(s.exits).toEqual([1]);
-    expect(s.stderr).toContain(SHUTDOWN_BEFORE_START_LINE);
-    expect(s.opened()).toBe(0);
-    expect(standIn.requests.filter(isLookup)).toEqual([]);
-    expect(ownedConnections()).toEqual([]);
-  },
-);
+    ),
+    async () => {
+      process.env.SAP_SYSTEM_TYPE = kind;
+      // The logon's first request, held until the shutdown began.
+      const held = standIn.hold((r) => !isLogoff(r.url));
+      const s = await start({
+        kind,
+        atBirth: async (shutdown, signal) => {
+          await held.arrived;
+          if (trigger === 'a signal') signal('SIGTERM');
+          else shutdown();
+          held.release();
+        },
+      });
+      await exited(s.exits);
+      assert.deepStrictEqual(s.exits, [1]);
+      assert.ok(s.stderr.includes(SHUTDOWN_BEFORE_START_LINE));
+      assert.equal(s.opened(), 0);
+      assert.deepStrictEqual(standIn.requests.filter(isLookup), []);
+      assert.deepStrictEqual(ownedConnections(), []);
+    },
+  );
+}
 
-it.each<['the end of stdin' | 'a signal']>([
+for (const [trigger] of [
   ['the end of stdin'],
   ['a signal'],
-])(
-  'the shutdown (%s) while the startup check is still reading: the process exits 1 once, no logon, and the transport never opens',
-  async (trigger) => {
-    // The check's first read, held: the start is still before its logon.
-    let release: () => void = () => {};
-    const gate = new Promise<void>((resolve) => {
-      release = resolve;
-    });
-    let reading: () => void = () => {};
-    const arrived = new Promise<void>((resolve) => {
-      reading = resolve;
-    });
-    const settingsFor = AuthBrokerFactory.prototype.settingsFor;
-    jest
-      .spyOn(AuthBrokerFactory.prototype, 'settingsFor')
-      .mockImplementation(async function (this: AuthBrokerFactory, ...args) {
-        reading();
-        await gate;
-        return settingsFor.apply(this, args);
+] satisfies ReadonlyArray<['the end of stdin' | 'a signal']>) {
+  it(
+    format(
+      'the shutdown (%s) while the startup check is still reading: the process exits 1 once, no logon, and the transport never opens',
+      trigger,
+    ),
+    async (t) => {
+      // The check's first read, held: the start is still before its logon.
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
       });
-    const requestsBefore = standIn.requests.length;
-    const s = await start({
-      atBirth: async (shutdown, signal) => {
-        await arrived;
-        if (trigger === 'a signal') signal('SIGTERM');
-        else shutdown();
-        // Let the shutdown run its first steps before the read answers.
-        await new Promise((r) => setTimeout(r, 20));
-        release();
-      },
-    });
-    await exited(s.exits);
-    expect(s.exits).toEqual([1]);
-    expect(s.stderr).toContain(SHUTDOWN_BEFORE_START_LINE);
-    expect(s.opened()).toBe(0);
-    expect(standIn.requests.length).toBe(requestsBefore);
-    expect(ownedConnections()).toEqual([]);
-  },
-);
+      let reading: () => void = () => {};
+      const arrived = new Promise<void>((resolve) => {
+        reading = resolve;
+      });
+      const settingsFor = AuthBrokerFactory.prototype.settingsFor;
+      t.mock.method(
+        AuthBrokerFactory.prototype,
+        'settingsFor',
+        async function (
+          this: AuthBrokerFactory,
+          ...args: Parameters<typeof settingsFor>
+        ) {
+          reading();
+          await gate;
+          return settingsFor.apply(this, args);
+        },
+      );
+      const requestsBefore = standIn.requests.length;
+      const s = await start({
+        atBirth: async (shutdown, signal) => {
+          await arrived;
+          if (trigger === 'a signal') signal('SIGTERM');
+          else shutdown();
+          // Let the shutdown run its first steps before the read answers.
+          await new Promise((r) => setTimeout(r, 20));
+          release();
+        },
+      });
+      await exited(s.exits);
+      assert.deepStrictEqual(s.exits, [1]);
+      assert.ok(s.stderr.includes(SHUTDOWN_BEFORE_START_LINE));
+      assert.equal(s.opened(), 0);
+      assert.equal(standIn.requests.length, requestsBefore);
+      assert.deepStrictEqual(ownedConnections(), []);
+    },
+  );
+}
 
 it('two: a normal logon, and both files are left untouched', async () => {
   const first = await leftover();
@@ -440,12 +466,18 @@ it('two: a normal logon, and both files are left untouched', async () => {
   const from = standIn.requests.length;
   const s = await start();
   try {
-    expect(s.exits).toEqual([]);
+    assert.deepStrictEqual(s.exits, []);
     const born = standIn.requests.slice(from, s.seenAtOpen());
-    expect(born.some((r) => r.session === first.session)).toBe(false);
-    expect(born.some((r) => r.session === second.session)).toBe(false);
-    expect(read(first.handle)).toBe(before.first);
-    expect(read(second.handle)).toBe(before.second);
+    assert.equal(
+      born.some((r) => r.session === first.session),
+      false,
+    );
+    assert.equal(
+      born.some((r) => r.session === second.session),
+      false,
+    );
+    assert.equal(read(first.handle), before.first);
+    assert.equal(read(second.handle), before.second);
   } finally {
     await s.stop();
   }
@@ -454,13 +486,14 @@ it('two: a normal logon, and both files are left untouched', async () => {
 it('a logon SAP refuses: exit 1 with the failure on stderr, and the transport never opens', async () => {
   standIn.refuse(true);
   const s = await start();
-  expect(s.exits).toEqual([1]);
-  expect(s.opened()).toBe(0);
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.equal(s.opened(), 0);
   // The chain failure's own words.
-  expect(s.stderr.at(-1)).toMatch(
+  assert.match(
+    s.stderr.at(-1) ?? '',
     /^\[MCP\] the user or password was refused\n/,
   );
-  expect(s.stderr.join('\n')).not.toContain('start-password');
+  assert.ok(!s.stderr.join('\n').includes('start-password'));
 });
 
 // On ABAP Cloud a `404` is a system without the endpoint every ABAP Cloud
@@ -468,38 +501,47 @@ it('a logon SAP refuses: exit 1 with the failure on stderr, and the transport ne
 it('ABAP Cloud, systeminformation answered 404: exit 1 naming an inconsistent configuration, the transport never opens, and the logon is logged off', async () => {
   standIn.answer(isLookup, 404);
   const s = await start({ kind: 'cloud' });
-  expect(s.exits).toEqual([1]);
-  expect(s.opened()).toBe(0);
-  expect(s.stderr).toContain(
-    '[MCP] Destination "default": the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration is inconsistent; the server did not start',
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.equal(s.opened(), 0);
+  assert.ok(
+    s.stderr.includes(
+      '[MCP] Destination "default": the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration is inconsistent; the server did not start',
+    ),
   );
-  expect(s.stderr).not.toContain(`[MCP] ${startLookupFailedWords('default')}`);
+  assert.ok(!s.stderr.includes(`[MCP] ${startLookupFailedWords('default')}`));
   const end = Date.now() + 10_000;
   while (standIn.logoffs() === 0 && Date.now() < end) {
     await new Promise((r) => setTimeout(r, 5));
   }
-  expect(standIn.logoffs()).toBe(1);
-  expect(runtimeFiles(runtime)).toEqual([]);
+  assert.equal(standIn.logoffs(), 1);
+  assert.deepStrictEqual(runtimeFiles(runtime), []);
 });
 
 // Any other status but a `2xx` (`405`, `501`, `500`) is the ABAP system's
 // problem with a valid configuration — never the login in its place.
-it.each([500, 405, 501])(
-  'ABAP Cloud, systeminformation answered %i: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
-  async (status) => {
-    standIn.answer(isLookup, status);
-    const s = await start({ kind: 'cloud' });
-    expect(s.exits).toEqual([1]);
-    expect(s.opened()).toBe(0);
-    expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
-    const end = Date.now() + 10_000;
-    while (standIn.logoffs() === 0 && Date.now() < end) {
-      await new Promise((r) => setTimeout(r, 5));
-    }
-    expect(standIn.logoffs()).toBe(1);
-    expect(runtimeFiles(runtime)).toEqual([]);
-  },
-);
+for (const status of [500, 405, 501]) {
+  it(
+    format(
+      'ABAP Cloud, systeminformation answered %i: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
+      status,
+    ),
+    async () => {
+      standIn.answer(isLookup, status);
+      const s = await start({ kind: 'cloud' });
+      assert.deepStrictEqual(s.exits, [1]);
+      assert.equal(s.opened(), 0);
+      assert.ok(
+        s.stderr.includes(`[MCP] ${startLookupFailedWords('default')}`),
+      );
+      const end = Date.now() + 10_000;
+      while (standIn.logoffs() === 0 && Date.now() < end) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      assert.equal(standIn.logoffs(), 1);
+      assert.deepStrictEqual(runtimeFiles(runtime), []);
+    },
+  );
+}
 
 // The logoff of a failed start is answered before the process ends: SAP
 // ends a security session only once it received the logoff whole, so an
@@ -518,11 +560,11 @@ it('a start that fails after the logon exits 1 only once SAP answered its logoff
       logoff.release();
     },
   });
-  expect(exitsWhileHeld).toEqual([]);
-  expect(s.exits).toEqual([1]);
-  expect(s.opened()).toBe(0);
-  expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
-  expect(standIn.logoffs()).toBe(1);
+  assert.deepStrictEqual(exitsWhileHeld, []);
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.equal(s.opened(), 0);
+  assert.ok(s.stderr.includes(`[MCP] ${startLookupFailedWords('default')}`));
+  assert.equal(standIn.logoffs(), 1);
 });
 
 // A launch that rejects once the connector is born (the transport cannot
@@ -533,27 +575,30 @@ it('a transport that cannot open: the launch rejects only once SAP answered the 
   let settledWhileHeld: boolean | undefined;
   let launchSettled = false;
   const failure = new Error('the transport cannot open');
-  await expect(
-    start({
-      openTransport: async () => {
-        // Seen from inside the launch: the logoff comes only after this
-        // rejection, so the check runs beside it.
-        void (async () => {
-          await logoff.arrived;
-          await new Promise((r) => setTimeout(r, 100));
-          settledWhileHeld = launchSettled;
-          logoff.release();
-        })();
-        throw failure;
-      },
-      atBirth: async () => undefined,
-    }).finally(() => {
-      launchSettled = true;
-    }),
-  ).rejects.toBe(failure);
-  expect(settledWhileHeld).toBe(false);
-  expect(standIn.logoffs()).toBe(1);
-  expect(ownedConnections()).toEqual([]);
+  assert.equal(
+    await rejectionOf(
+      start({
+        openTransport: async () => {
+          // Seen from inside the launch: the logoff comes only after this
+          // rejection, so the check runs beside it.
+          void (async () => {
+            await logoff.arrived;
+            await new Promise((r) => setTimeout(r, 100));
+            settledWhileHeld = launchSettled;
+            logoff.release();
+          })();
+          throw failure;
+        },
+        atBirth: async () => undefined,
+      }).finally(() => {
+        launchSettled = true;
+      }),
+    ),
+    failure,
+  );
+  assert.equal(settledWhileHeld, false);
+  assert.equal(standIn.logoffs(), 1);
+  assert.deepStrictEqual(ownedConnections(), []);
 });
 
 /** systeminformation answers that name no user: missing, empty, blank, not a string, not JSON, JSON that is no object. */
@@ -568,22 +613,29 @@ const WITHOUT_USER: Array<[string, string]> = [
   ['JSON null', 'null'],
 ];
 
-it.each(WITHOUT_USER)(
-  'ABAP Cloud, systeminformation with %s: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
-  async (_what, body) => {
-    standIn.body(isLookup, body);
-    const s = await start({ kind: 'cloud' });
-    expect(s.exits).toEqual([1]);
-    expect(s.opened()).toBe(0);
-    expect(s.stderr).toContain(`[MCP] ${startLookupFailedWords('default')}`);
-    const end = Date.now() + 10_000;
-    while (standIn.logoffs() === 0 && Date.now() < end) {
-      await new Promise((r) => setTimeout(r, 5));
-    }
-    expect(standIn.logoffs()).toBe(1);
-    expect(runtimeFiles(runtime)).toEqual([]);
-  },
-);
+for (const [_what, body] of WITHOUT_USER) {
+  it(
+    format(
+      'ABAP Cloud, systeminformation with %s: exit 1 naming the lookup, the transport never opens, and the logon is logged off',
+      _what,
+    ),
+    async () => {
+      standIn.body(isLookup, body);
+      const s = await start({ kind: 'cloud' });
+      assert.deepStrictEqual(s.exits, [1]);
+      assert.equal(s.opened(), 0);
+      assert.ok(
+        s.stderr.includes(`[MCP] ${startLookupFailedWords('default')}`),
+      );
+      const end = Date.now() + 10_000;
+      while (standIn.logoffs() === 0 && Date.now() < end) {
+        await new Promise((r) => setTimeout(r, 5));
+      }
+      assert.equal(standIn.logoffs(), 1);
+      assert.deepStrictEqual(runtimeFiles(runtime), []);
+    },
+  );
+}
 
 it('ABAP Cloud: the system information is asked at the start, and a tool asks no more', async () => {
   standIn.body(
@@ -592,15 +644,16 @@ it('ABAP Cloud: the system information is asked at the start, and a tool asks no
   );
   const s = await start({ kind: 'cloud' });
   try {
-    expect(s.exits).toEqual([]);
-    expect(
-      standIn.requests.slice(0, s.seenAtOpen()).filter(isLookup),
-    ).toHaveLength(1);
+    assert.deepStrictEqual(s.exits, []);
+    assert.equal(
+      standIn.requests.slice(0, s.seenAtOpen()).filter(isLookup).length,
+      1,
+    );
     const before = standIn.requests.length;
     const read = await s.call('GetClass', { class_name: 'ZCL_AFTER_START' });
-    expect(read.text).not.toContain('not found');
-    expect(standIn.requests.length).toBeGreaterThan(before);
-    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    assert.ok(!read.text.includes('not found'));
+    assert.ok(standIn.requests.length > before);
+    assert.equal(standIn.requests.filter(isLookup).length, 1);
   } finally {
     await s.stop();
   }
@@ -611,12 +664,12 @@ it('ABAP Cloud: the system information is asked at the start, and a tool asks no
 it('no system type stated anywhere: exit 1 naming the parameter, nothing sent, the transport never opens', async () => {
   delete process.env.SAP_SYSTEM_TYPE;
   const s = await start({ kind: null });
-  expect(s.exits).toEqual([1]);
-  expect(s.opened()).toBe(0);
-  expect(s.stderr).toContain(
-    `[MCP] ${startSystemTypeRequiredWords('default')}`,
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.equal(s.opened(), 0);
+  assert.ok(
+    s.stderr.includes(`[MCP] ${startSystemTypeRequiredWords('default')}`),
   );
-  expect(standIn.requests).toEqual([]);
+  assert.deepStrictEqual(standIn.requests, []);
 });
 
 it('the --env file states it (SAP_SYSTEM_TYPE): the start goes on', async () => {
@@ -624,8 +677,8 @@ it('the --env file states it (SAP_SYSTEM_TYPE): the start goes on', async () => 
   fs.appendFileSync(envFile, 'SAP_SYSTEM_TYPE=onprem\n');
   const s = await start({ kind: null });
   try {
-    expect(s.exits).toEqual([]);
-    expect(s.opened()).toBe(1);
+    assert.deepStrictEqual(s.exits, []);
+    assert.equal(s.opened(), 1);
   } finally {
     await s.stop();
   }
@@ -641,18 +694,19 @@ it('on-premise: the system information is asked at the start, and a tool asks no
   );
   const s = await start({ kind: 'onprem' });
   try {
-    expect(s.exits).toEqual([]);
-    expect(
-      standIn.requests.slice(0, s.seenAtOpen()).filter(isLookup),
-    ).toHaveLength(1);
+    assert.deepStrictEqual(s.exits, []);
+    assert.equal(
+      standIn.requests.slice(0, s.seenAtOpen()).filter(isLookup).length,
+      1,
+    );
     await s.call('GetClass', { class_name: 'ZCL_AFTER_START' });
-    expect(standIn.requests.filter(isLookup)).toHaveLength(1);
+    assert.equal(standIn.requests.filter(isLookup).length, 1);
   } finally {
     await s.stop();
   }
 });
 
-it.each<[string, () => void]>([
+for (const [_case, answer] of [
   ['answered 404', () => standIn.answer(isLookup, 404)],
   ['answered 500', () => standIn.answer(isLookup, 500)],
   ['answered 405', () => standIn.answer(isLookup, 405)],
@@ -660,40 +714,52 @@ it.each<[string, () => void]>([
     'without a user',
     () => standIn.body(isLookup, JSON.stringify({ systemID: 'OPS' })),
   ],
-])(
-  'on-premise, systeminformation %s: the start goes on with the start parameters',
-  async (_case, answer) => {
-    answer();
-    const s = await start({ kind: 'onprem' });
-    try {
-      expect(s.exits).toEqual([]);
-      expect(s.opened()).toBe(1);
-    } finally {
-      await s.stop();
-    }
-  },
-);
+] satisfies ReadonlyArray<[string, () => void]>) {
+  it(
+    format(
+      'on-premise, systeminformation %s: the start goes on with the start parameters',
+      _case,
+    ),
+    async () => {
+      answer();
+      const s = await start({ kind: 'onprem' });
+      try {
+        assert.deepStrictEqual(s.exits, []);
+        assert.equal(s.opened(), 1);
+      } finally {
+        await s.stop();
+      }
+    },
+  );
+}
 
-it.each<[string, ToolSet, number]>([
+for (const [_bin, toolSet, leftover] of [
   ['mcp-abap-adt', fullToolSet, 2],
   ['mcp-abap-adt-ro', fullReadOnlyToolSet, 1],
-])(
-  '%s lists no resume tool, and the list (the full set the logoff too)',
-  async (_bin, toolSet, leftover) => {
-    const s = await start({ toolSet });
-    try {
-      const names = (await s.client.listTools()).tools.map((t) => t.name);
-      expect(names.filter((n) => n.toLowerCase().includes('resume'))).toEqual(
-        [],
-      );
-      expect(names.filter((n) => n.includes('Leftover'))).toHaveLength(
-        leftover,
-      );
-    } finally {
-      await s.stop();
-    }
-  },
-);
+] satisfies ReadonlyArray<[string, ToolSet, number]>) {
+  it(
+    format(
+      '%s lists no resume tool, and the list (the full set the logoff too)',
+      _bin,
+    ),
+    async () => {
+      const s = await start({ toolSet });
+      try {
+        const names = (await s.client.listTools()).tools.map((t) => t.name);
+        assert.deepStrictEqual(
+          names.filter((n) => n.toLowerCase().includes('resume')),
+          [],
+        );
+        assert.equal(
+          names.filter((n) => n.includes('Leftover')).length,
+          leftover,
+        );
+      } finally {
+        await s.stop();
+      }
+    },
+  );
+}
 
 it('the start words of the lookup refusals', () => {
   const words = (
@@ -705,22 +771,27 @@ it('the start words of the lookup refusals', () => {
       { sentenceFor: () => undefined },
       'linux',
     );
-  expect(words('system_lookup_failed')).toBe(startLookupFailedWords('default'));
-  expect(words('cloud_without_systeminformation')).toBe(
+  assert.equal(
+    words('system_lookup_failed'),
+    startLookupFailedWords('default'),
+  );
+  assert.equal(
+    words('cloud_without_systeminformation'),
     startCloudWithoutSystemInformationWords('default'),
   );
 });
 
 it('the start words of a refusal for an unknown session user name what to set', () => {
-  expect(
+  assert.equal(
     startConnectionWords(
       new ServerRefusal('system_user_unknown'),
       'default',
       { sentenceFor: () => undefined },
       'linux',
     ),
-  ).toBe(startSystemUserUnknownWords('default'));
-  expect(startSystemUserUnknownWords('default')).toContain('SAP_USERNAME');
+    startSystemUserUnknownWords('default'),
+  );
+  assert.ok(startSystemUserUnknownWords('default').includes('SAP_USERNAME'));
 });
 
 /**
@@ -739,7 +810,7 @@ describe('the start line names the network cause', () => {
   const failure = (code: unknown) =>
     Object.assign(new Error('connect ECONNREFUSED sap.example:443'), { code });
 
-  it.each([
+  for (const code of [
     'ECONNREFUSED',
     'ECONNRESET',
     'ENOTFOUND',
@@ -749,18 +820,22 @@ describe('the start line names the network cause', () => {
     'ENETUNREACH',
     'CERT_HAS_EXPIRED',
     'SELF_SIGNED_CERT_IN_CHAIN',
-  ])('a listed code is named: %s', (code) => {
-    expect(words(failure(code))).toBe(
-      `Destination "default" could not be connected at start: Error (${code})`,
-    );
-  });
+  ]) {
+    it(format('a listed code is named: %s', code), () => {
+      assert.equal(
+        words(failure(code)),
+        `Destination "default" could not be connected at start: Error (${code})`,
+      );
+    });
+  }
 
   it('a code not on the list adds nothing, and the message never shows', () => {
     const line = words(failure('ERR_SOMETHING_ELSE'));
-    expect(line).toBe(
+    assert.equal(
+      line,
       'Destination "default" could not be connected at start: Error',
     );
-    expect(line).not.toContain('sap.example');
+    assert.ok(!line.includes('sap.example'));
   });
 
   it('a throwing code getter adds nothing and throws nothing', () => {
@@ -770,7 +845,8 @@ describe('the start line names the network cause', () => {
         throw new Error('the getter threw');
       },
     });
-    expect(words(thrown)).toBe(
+    assert.equal(
+      words(thrown),
       'Destination "default" could not be connected at start: Error',
     );
   });

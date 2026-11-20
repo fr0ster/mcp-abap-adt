@@ -11,6 +11,9 @@
  * the variant — real adt-clients code, no SAP.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   TOOL_DEFINITION as HandlerActivate,
   handleHandlerActivate,
@@ -95,12 +98,11 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { defineTool } from '../../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { assertThrows } from '../../helpers/assertions';
 import { moduleInGroup } from '../../helpers/functionModuleMetadata';
 import { holding } from '../../helpers/heldLocks';
 import { setSystemContext } from '../../helpers/processSystemContext';
 import { recordingConnection } from '../../helpers/recordingConnection';
-
-jest.setTimeout(60_000);
 
 /** What a case must show: a request sent, or the refusal's words and none. */
 type Expected = 'sent' | { readonly refused: string };
@@ -640,31 +642,37 @@ describe('every type argument is checked once, against its projection', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
-  it.each(
-    [...CASES, ...CLOUD_REFUSALS].map(
-      (each) => [each.family, each.variant, each.what, each] as const,
-    ),
-  )('%s on %s: %s', async (_family, variant, _what, each) => {
-    process.env.SAP_SYSTEM_TYPE = variant;
-    const connection = recordingConnection();
-    declareSystemKind(connection, variant);
-    const answered = await each
-      // The instance locked what the cases write under.
-      .send({ connection, heldLocks: holding('LOCKHANDLE') })
-      .catch((thrown: unknown) => ({ thrown: String(thrown) }));
-    if (each.expected === 'sent') {
-      expect({
-        sent: connection.requests.length > 0,
-        answered: connection.requests.length > 0 ? '' : textOf(answered),
-      }).toEqual({ sent: true, answered: '' });
-      return;
-    }
-    // The words as they stand inside the answer's JSON.
-    expect(textOf(answered)).toContain(
-      JSON.stringify(each.expected.refused).slice(1, -1),
-    );
-    expect(connection.requests).toEqual([]);
-  });
+  for (const [_family, variant, _what, each] of [
+    ...CASES,
+    ...CLOUD_REFUSALS,
+  ].map((each) => [each.family, each.variant, each.what, each] as const)) {
+    it(format('%s on %s: %s', _family, variant, _what), async () => {
+      process.env.SAP_SYSTEM_TYPE = variant;
+      const connection = recordingConnection();
+      declareSystemKind(connection, variant);
+      const answered = await each
+        // The instance locked what the cases write under.
+        .send({ connection, heldLocks: holding('LOCKHANDLE') })
+        .catch((thrown: unknown) => ({ thrown: String(thrown) }));
+      if (each.expected === 'sent') {
+        assert.deepStrictEqual(
+          {
+            sent: connection.requests.length > 0,
+            answered: connection.requests.length > 0 ? '' : textOf(answered),
+          },
+          { sent: true, answered: '' },
+        );
+        return;
+      }
+      // The words as they stand inside the answer's JSON.
+      assert.ok(
+        textOf(answered).includes(
+          JSON.stringify(each.expected.refused).slice(1, -1),
+        ),
+      );
+      assert.deepStrictEqual(connection.requests, []);
+    });
+  }
 });
 
 describe('HandlerActivate: a function module and a behaviour implementation', () => {
@@ -683,93 +691,127 @@ describe('HandlerActivate: a function module and a behaviour implementation', ()
     return connection;
   };
 
-  it.each(VARIANTS)(
-    'a function module is activated under its group, named GROUP|MODULE (%s)',
-    async (variant) => {
-      const connection = on(variant);
-      await handleHandlerActivate(
-        { connection },
-        { object_type: 'FUNCTION_MODULE', object_name: 'zfg_a|z_fm_a' },
-      );
-      const [metadata, request] = connection.requests;
-      expect(metadata?.url).toBe(
-        '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a?version=workingArea',
-      );
-      expect(request?.url).toContain('/activation/runs');
-      expect(String(request?.data)).toContain(
-        '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a',
-      );
-      expect(String(request?.data)).toContain('FUGR/FF');
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'a function module is activated under its group, named GROUP|MODULE (%s)',
+        variant,
+      ),
+      async () => {
+        const connection = on(variant);
+        await handleHandlerActivate(
+          { connection },
+          { object_type: 'FUNCTION_MODULE', object_name: 'zfg_a|z_fm_a' },
+        );
+        const [metadata, request] = connection.requests;
+        assert.equal(
+          metadata?.url,
+          '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a?version=workingArea',
+        );
+        assert.ok(request?.url.includes('/activation/runs'));
+        assert.ok(
+          String(request?.data).includes(
+            '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a',
+          ),
+        );
+        assert.ok(String(request?.data).includes('FUGR/FF'));
+      },
+    );
+  }
 
-  it.each(VARIANTS)(
-    'a function module is activated under its group, named by function_group_name (%s)',
-    async (variant) => {
-      const connection = on(variant);
-      await handleHandlerActivate(
-        { connection },
-        {
-          object_type: 'FUNCTION_MODULE',
-          object_name: 'Z_FM_A',
-          function_group_name: 'zfg_a',
-        },
-      );
-      expect(String(connection.requests[1]?.data)).toContain(
-        '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a',
-      );
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'a function module is activated under its group, named by function_group_name (%s)',
+        variant,
+      ),
+      async () => {
+        const connection = on(variant);
+        await handleHandlerActivate(
+          { connection },
+          {
+            object_type: 'FUNCTION_MODULE',
+            object_name: 'Z_FM_A',
+            function_group_name: 'zfg_a',
+          },
+        );
+        assert.ok(
+          String(connection.requests[1]?.data).includes(
+            '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a',
+          ),
+        );
+      },
+    );
+  }
 
-  it.each(VARIANTS)(
-    'a function module without its group is refused, nothing sent (%s)',
-    async (variant) => {
-      const connection = on(variant);
-      const answered = await handleHandlerActivate(
-        { connection },
-        { object_type: 'FUNCTION_MODULE', object_name: 'Z_FM_A' },
-      );
-      expect(textOf(answered)).toContain(
-        'FUNCTION_MODULE is named GROUP|MODULE in object_name, or with function_group_name',
-      );
-      expect(connection.requests).toEqual([]);
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'a function module without its group is refused, nothing sent (%s)',
+        variant,
+      ),
+      async () => {
+        const connection = on(variant);
+        const answered = await handleHandlerActivate(
+          { connection },
+          { object_type: 'FUNCTION_MODULE', object_name: 'Z_FM_A' },
+        );
+        assert.ok(
+          textOf(answered).includes(
+            'FUNCTION_MODULE is named GROUP|MODULE in object_name, or with function_group_name',
+          ),
+        );
+        assert.deepStrictEqual(connection.requests, []);
+      },
+    );
+  }
 
-  it.each(VARIANTS)(
-    'two groups named for one module are refused, nothing sent (%s)',
-    async (variant) => {
-      const connection = on(variant);
-      const answered = await handleHandlerActivate(
-        { connection },
-        {
-          object_type: 'FUNCTION_MODULE',
-          object_name: 'ZFG_A|Z_FM_A',
-          function_group_name: 'ZFG_B',
-        },
-      );
-      expect(textOf(answered)).toContain('give the group once');
-      expect(connection.requests).toEqual([]);
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'two groups named for one module are refused, nothing sent (%s)',
+        variant,
+      ),
+      async () => {
+        const connection = on(variant);
+        const answered = await handleHandlerActivate(
+          { connection },
+          {
+            object_type: 'FUNCTION_MODULE',
+            object_name: 'ZFG_A|Z_FM_A',
+            function_group_name: 'ZFG_B',
+          },
+        );
+        assert.ok(textOf(answered).includes('give the group once'));
+        assert.deepStrictEqual(connection.requests, []);
+      },
+    );
+  }
 
-  it.each(VARIANTS)(
-    'a behaviour implementation is activated as its class (%s)',
-    async (variant) => {
-      const connection = on(variant);
-      await handleHandlerActivate(
-        { connection },
-        { object_type: 'BEHAVIOR_IMPLEMENTATION', object_name: 'zbp_a' },
-      );
-      const [request] = connection.requests;
-      expect(request?.url).toContain('/sap/bc/adt/activation');
-      expect(String(request?.data)).toContain('/sap/bc/adt/oo/classes/zbp_a');
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'a behaviour implementation is activated as its class (%s)',
+        variant,
+      ),
+      async () => {
+        const connection = on(variant);
+        await handleHandlerActivate(
+          { connection },
+          { object_type: 'BEHAVIOR_IMPLEMENTATION', object_name: 'zbp_a' },
+        );
+        const [request] = connection.requests;
+        assert.ok(request?.url.includes('/sap/bc/adt/activation'));
+        assert.ok(
+          String(request?.data).includes('/sap/bc/adt/oo/classes/zbp_a'),
+        );
+      },
+    );
+  }
 });
 
 describe("the debugger's labels and their codes", () => {
-  it.each([
+  for (const [text, label] of [
     ['CLAS', 'CLAS'],
     ['clas/oc', 'CLAS'],
     ['PROG/P', 'PROG'],
@@ -777,27 +819,30 @@ describe("the debugger's labels and their codes", () => {
     ['PROG/I', 'INCL'],
     ['FUNC', 'FUNC'],
     ['fugr/ff', 'FUNC'],
-  ])('%s is the label %s', (text, label) => {
-    expect(breakpointLabelOf(text)).toBe(label);
-  });
+  ]) {
+    it(format('%s is the label %s', text, label), () => {
+      assert.equal(breakpointLabelOf(text), label);
+    });
+  }
 
-  it.each(['FUGR', 'FUGR/F', 'INTF/OI', 'doma/dm'])(
-    '%s is no breakpoint label',
-    (text) => {
-      expect(breakpointLabelOf(text)).toBeUndefined();
-      expect(() =>
-        sourceUriOf({ object_type: text, object_name: 'ZA' }),
-      ).toThrow('holds no breakpoint; one of CLAS, PROG, INCL, FUNC');
-    },
-  );
+  for (const text of ['FUGR', 'FUGR/F', 'INTF/OI', 'doma/dm']) {
+    it(format('%s is no breakpoint label', text), () => {
+      assert.equal(breakpointLabelOf(text), undefined);
+      assertThrows(
+        () => sourceUriOf({ object_type: text, object_name: 'ZA' }),
+        'holds no breakpoint; one of CLAS, PROG, INCL, FUNC',
+      );
+    });
+  }
 
   it('FUNC is a function module, addressed under its group', () => {
-    expect(
+    assert.equal(
       sourceUriOf({
         object_type: 'FUNC',
         object_name: 'Z_FM_A',
         parent_name: 'ZFG_A',
       }),
-    ).toBe('/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a/source/main');
+      '/sap/bc/adt/functions/groups/zfg_a/fmodules/z_fm_a/source/main',
+    );
   });
 });

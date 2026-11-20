@@ -13,6 +13,10 @@
  * handler's use of the fields is `sourcesAndFailures.test.ts`' (the D23b
  * routes block).
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import {
@@ -74,8 +78,8 @@ describe('EmbeddableMcpServer: the options reach the handler on every route', ()
     try {
       await stand.call('SearchSource', ARGS);
       const context = await rec.called;
-      expect(context.sapAnswerStrategy).toBe(sap);
-      expect(context.lineMatchStrategy).toBe(lines);
+      assert.equal(context.sapAnswerStrategy, sap);
+      assert.equal(context.lineMatchStrategy, lines);
     } finally {
       await stand.close();
     }
@@ -91,10 +95,10 @@ describe('EmbeddableMcpServer: the options reach the handler on every route', ()
     });
     try {
       const started = await stand.call('SearchSource', ARGS);
-      expect(started.isError).toBeFalsy();
+      assert.ok(!started.isError);
       const context = await rec.called;
-      expect(context.sapAnswerStrategy).toBe(sap);
-      expect(context.lineMatchStrategy).toBe(lines);
+      assert.equal(context.sapAnswerStrategy, sap);
+      assert.equal(context.lineMatchStrategy, lines);
     } finally {
       await stand.close();
     }
@@ -110,8 +114,8 @@ describe('EmbeddableMcpServer: the options reach the handler on every route', ()
       try {
         await stand.call('SearchSource', ARGS);
         const context = await rec.called;
-        expect('sapAnswerStrategy' in context).toBe(false);
-        expect('lineMatchStrategy' in context).toBe(false);
+        assert.equal('sapAnswerStrategy' in context, false);
+        assert.equal('lineMatchStrategy' in context, false);
       } finally {
         await stand.close();
       }
@@ -158,115 +162,132 @@ function searchEntry(exporter: HandlerExporter) {
   return entry;
 }
 
-describe.each([
+for (const [_path, absent] of [
   ['served', false],
   ['absent', true],
-] as const)('HandlerExporter (%s)', (_path, absent) => {
-  it("getHandlerEntries(): the exporter's option is asked and obeyed, whatever the embedder's context held", async () => {
-    const exporterSap = recordingSap('throw');
-    const embedderSap = recordingSap('skip');
-    const entry = searchEntry(
-      new HandlerExporter({
-        systemType: 'onprem',
-        sapAnswerStrategy: exporterSap.strategy,
-      }),
-    );
-    const context: HandlerContext = {
-      ...contextOn(standOn(ONE, REFUSED), absent ? 'absent' : 'served'),
-      sapAnswerStrategy: embedderSap.strategy,
-    };
-    const answer = await entry.call(context, SEARCH);
-    expect(exporterSap.asked).toEqual(['source']);
-    expect(embedderSap.asked).toEqual([]);
-    expect(isError(answer)).toBe(true);
-  });
+] as const) {
+  describe(format('HandlerExporter (%s)', _path), () => {
+    it("getHandlerEntries(): the exporter's option is asked and obeyed, whatever the embedder's context held", async () => {
+      const exporterSap = recordingSap('throw');
+      const embedderSap = recordingSap('skip');
+      const entry = searchEntry(
+        new HandlerExporter({
+          systemType: 'onprem',
+          sapAnswerStrategy: exporterSap.strategy,
+        }),
+      );
+      const context: HandlerContext = {
+        ...contextOn(standOn(ONE, REFUSED), absent ? 'absent' : 'served'),
+        sapAnswerStrategy: embedderSap.strategy,
+      };
+      const answer = await entry.call(context, SEARCH);
+      assert.deepStrictEqual(exporterSap.asked, ['source']);
+      assert.deepStrictEqual(embedderSap.asked, []);
+      assert.equal(isError(answer), true);
+    });
 
-  it('getHandlerEntries() without the option: the shipped strategy, whatever the embedder context held', async () => {
-    const embedderSap = recordingSap('throw');
-    const entry = searchEntry(new HandlerExporter({ systemType: 'onprem' }));
-    const context: HandlerContext = {
-      ...contextOn(standOn(ONE, REFUSED), absent ? 'absent' : 'served'),
-      sapAnswerStrategy: embedderSap.strategy,
-    };
-    const answer = await entry.call(context, SEARCH);
-    expect(embedderSap.asked).toEqual([]);
-    expect(isError(answer)).toBe(false);
-    expect(hitNames(answer)).toEqual(['ZOK/ZOK']);
-  });
+    it('getHandlerEntries() without the option: the shipped strategy, whatever the embedder context held', async () => {
+      const embedderSap = recordingSap('throw');
+      const entry = searchEntry(new HandlerExporter({ systemType: 'onprem' }));
+      const context: HandlerContext = {
+        ...contextOn(standOn(ONE, REFUSED), absent ? 'absent' : 'served'),
+        sapAnswerStrategy: embedderSap.strategy,
+      };
+      const answer = await entry.call(context, SEARCH);
+      assert.deepStrictEqual(embedderSap.asked, []);
+      assert.equal(isError(answer), false);
+      assert.deepStrictEqual(hitNames(answer), ['ZOK/ZOK']);
+    });
 
-  it("getHandlerEntries(): the exporter's line match is the one used", async () => {
-    const used: string[][] = [];
-    const lineMatch: LineMatchStrategy = {
-      match(sourceLines) {
-        used.push([...sourceLines]);
-        return { hits: [], capped: false };
-      },
-    };
-    const entry = searchEntry(
-      new HandlerExporter({
-        systemType: 'onprem',
-        lineMatchStrategy: lineMatch,
-      }),
-    );
-    const answer = await entry.call(
-      contextOn(standOn(ONE, REFUSED), absent ? 'absent' : 'served'),
-      SEARCH,
-    );
-    expect(used).toEqual([['marker ok']]);
-    expect(payloadOf(answer).results).toEqual([]);
-  });
+    it("getHandlerEntries(): the exporter's line match is the one used", async () => {
+      const used: string[][] = [];
+      const lineMatch: LineMatchStrategy = {
+        match(sourceLines) {
+          used.push([...sourceLines]);
+          return { hits: [], capped: false };
+        },
+      };
+      const entry = searchEntry(
+        new HandlerExporter({
+          systemType: 'onprem',
+          lineMatchStrategy: lineMatch,
+        }),
+      );
+      const answer = await entry.call(
+        contextOn(standOn(ONE, REFUSED), absent ? 'absent' : 'served'),
+        SEARCH,
+      );
+      assert.deepStrictEqual(used, [['marker ok']]);
+      assert.deepStrictEqual(payloadOf(answer).results, []);
+    });
 
-  it.each([
-    ['with the options', true],
-    ['without the options', false],
-  ] as const)(
-    "registerOnServer, %s: the context its calls run in carries the exporter's strategies",
-    async (_name, given) => {
-      const exporter = new HandlerExporter({
-        systemType: 'onprem',
-        ...(given ? { sapAnswerStrategy: sap, lineMatchStrategy: lines } : {}),
-      });
-      const fake = standOn(ONE, REFUSED);
-      const connection = contextOn(
-        fake,
-        absent ? 'absent' : 'served',
-      ).connection;
-      const contexts: CallContext[] = [];
-      const spy = jest
-        .spyOn(CompositeHandlersRegistry.prototype, 'registerAllToolsOnCall')
-        .mockImplementation((_server, callContext) => {
-          contexts.push(callContext);
-        });
-      try {
-        exporter.registerOnServer(
-          new McpServer({ name: 'routes', version: '1.0.0' }),
-          async () => connection,
-        );
-      } finally {
-        spy.mockRestore();
-      }
-      const [callContext] = contexts;
-      if (callContext === undefined) throw new Error('nothing registered');
-      const context = await callContext();
-      expect(context.connection).toBe(connection);
-      if (given) {
-        expect(context.sapAnswerStrategy).toBe(sap);
-        expect(context.lineMatchStrategy).toBe(lines);
-      } else {
-        expect('sapAnswerStrategy' in context).toBe(false);
-        expect('lineMatchStrategy' in context).toBe(false);
-      }
-    },
-  );
-});
+    for (const [_name, given] of [
+      ['with the options', true],
+      ['without the options', false],
+    ] as const) {
+      it(
+        format(
+          "registerOnServer, %s: the context its calls run in carries the exporter's strategies",
+          _name,
+        ),
+        async (t) => {
+          const exporter = new HandlerExporter({
+            systemType: 'onprem',
+            ...(given
+              ? { sapAnswerStrategy: sap, lineMatchStrategy: lines }
+              : {}),
+          });
+          const fake = standOn(ONE, REFUSED);
+          const connection = contextOn(
+            fake,
+            absent ? 'absent' : 'served',
+          ).connection;
+          const contexts: CallContext[] = [];
+          const spy = t.mock.method(
+            CompositeHandlersRegistry.prototype,
+            'registerAllToolsOnCall',
+            (
+              ...[_server, callContext]: Parameters<
+                CompositeHandlersRegistry['registerAllToolsOnCall']
+              >
+            ) => {
+              contexts.push(callContext);
+            },
+          );
+          try {
+            exporter.registerOnServer(
+              new McpServer({ name: 'routes', version: '1.0.0' }),
+              async () => connection,
+            );
+          } finally {
+            spy.mock.restore();
+          }
+          const [callContext] = contexts;
+          if (callContext === undefined) throw new Error('nothing registered');
+          const context = await callContext();
+          assert.equal(context.connection, connection);
+          if (given) {
+            assert.equal(context.sapAnswerStrategy, sap);
+            assert.equal(context.lineMatchStrategy, lines);
+          } else {
+            assert.equal('sapAnswerStrategy' in context, false);
+            assert.equal('lineMatchStrategy' in context, false);
+          }
+        },
+      );
+    }
+  });
+}
 
 describe('the shipped strategies', () => {
   it('the shipped strategies are the exported ones', () => {
-    expect(
+    assert.equal(
       skipSapAnswers.decide(new Error('x'), { kind: 'mask', mask: 'Z*' }),
-    ).toBe('skip');
-    expect(
+      'skip',
+    );
+    assert.deepStrictEqual(
       substringLineMatch.match(['a marker'], { query: 'marker' }).hits,
-    ).toEqual([{ line: 1, snippet: 'a marker' }]);
+      [{ line: 1, snippet: 'a marker' }],
+    );
   });
 });

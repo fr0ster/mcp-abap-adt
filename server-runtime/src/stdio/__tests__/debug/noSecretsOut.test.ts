@@ -6,155 +6,164 @@
  * token, `state=`, authorization URL or `code=`. stdout stays empty under
  * stdio. With `--auth-debug` the secret's prepared form (its first and last
  * four characters) is on stderr, and only there.
+ *
+ * Each case runs its login stand in a process of its own
+ * (`scenarios/noSecretsOut.scenario.ts`), and this file is the client that
+ * owns that process's stdout and stderr: nothing but the scenario's one
+ * report line may reach stdout, and no secret may reach stderr — the
+ * process's own, besides every surface the stand captured. A spy on this
+ * process's stdout would sit between node:test's runner and its report
+ * (Task 3.1, measured), so stdout is read from the outside instead.
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
-import { type Stand, stand } from '../helpers/loginStand';
+import assert from 'node:assert/strict';
+import { afterEach, describe, it } from 'node:test';
+import {
+  killScenarioChildren,
+  runScenarioOutput,
+  type ScenarioOutput,
+} from '../../../../../src/__tests__/helpers/scenarioOutput';
 
-jest.setTimeout(60_000);
-
+const SCENARIO =
+  'server-runtime/src/stdio/__tests__/debug/scenarios/noSecretsOut.scenario.ts';
 const MARKER = 'description-marker-5d2e8b17c9';
 const CLIENT_SECRET = 'cs-0123456789-abcdefghij-ZZ';
 /** `prepareSecret` under authDebug: the first four, an ellipsis, the last four. */
 const PREPARED = 'cs-0…j-ZZ';
 
-let s: Stand;
-let stdout: string[];
-let stdoutSpy: jest.SpyInstance;
-let loggerLines: string[];
+afterEach(() => killScenarioChildren());
 
-/** What `--auth-debug` makes the launcher's logger: every line to stderr. */
-const stderrLogger = (): ILogger => {
-  const write = (line: unknown, meta?: unknown) => {
-    const text = `${String(line)}${meta === undefined ? '' : ` ${JSON.stringify(meta)}`}`;
-    loggerLines.push(text);
-    process.stderr.write(`${text}\n`);
+/** The scenario's report, read as data from outside the type system. */
+interface Seen {
+  answer: unknown;
+  urls: string[];
+  issued: string[];
+  /** stderr as the stand captured it, its logger's lines among them. */
+  stderr: string;
+  logger: string;
+  http: string;
+}
+
+const strings = (value: unknown): string[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+const text = (value: unknown): string =>
+  typeof value === 'string' ? value : '';
+
+/**
+ * Runs one case as its client: the child ends with 0, its stdout holds its
+ * report line and nothing else, and the report is read.
+ */
+async function run(
+  which: string,
+): Promise<{ seen: Seen; out: ScenarioOutput }> {
+  const out = await runScenarioOutput(SCENARIO, [which]);
+  assert.equal(out.code, 0, out.stderr);
+  // stdout empty under stdio: its bytes are exactly the report line, so a
+  // stray byte or newline fails.
+  const end = out.stdout.indexOf('\n');
+  const parsed: unknown = JSON.parse(
+    end === -1 ? out.stdout : out.stdout.slice(0, end),
+  );
+  assert.equal(
+    out.stdout,
+    `${JSON.stringify(parsed)}\n`,
+    'stdout carried more than the report',
+  );
+  const field = (key: string): unknown =>
+    typeof parsed === 'object' && parsed !== null && key in parsed
+      ? Reflect.get(parsed, key)
+      : undefined;
+  // The child saw no unhandled rejection (the recorder's list).
+  assert.deepStrictEqual(field('unhandled'), []);
+  return {
+    seen: {
+      answer: field('answer'),
+      urls: strings(field('urls')),
+      issued: strings(field('issued')),
+      stderr: text(field('stderr')),
+      logger: text(field('logger')),
+      http: text(field('http')),
+    },
+    out,
   };
-  return { info: write, warn: write, error: write, debug: write };
-};
+}
 
-beforeEach(() => {
-  stdout = [];
-  loggerLines = [];
-  stdoutSpy = jest
-    .spyOn(process.stdout, 'write')
-    .mockImplementation((chunk: unknown) => {
-      stdout.push(String(chunk));
-      return true;
-    });
-});
-
-afterEach(async () => {
-  await s?.close();
-  stdoutSpy.mockRestore();
-});
-
-/** Every surface a secret could leave by, as text. */
-const surfaces = (results: string[]) => ({
-  stderr: s.stderr.join(''),
-  logger: loggerLines.join('\n'),
+/** Every surface a secret could leave by, as text: the child's own stderr too. */
+const surfaces = (seen: Seen, out: ScenarioOutput, results: string[]) => ({
+  stderr: seen.stderr,
+  logger: seen.logger,
   results: results.join('\n'),
-  http: s.browser.answers.join('\n'),
+  http: seen.http,
+  'process stderr': out.stderr,
 });
 
-const secretsOf = () => [
+const secretsOf = (seen: Seen) => [
   MARKER,
   CLIENT_SECRET,
   'the-code',
   'code=',
   'state=',
-  ...s.browser.urls,
-  ...s.tokens.issued,
+  ...seen.urls,
+  ...seen.issued,
 ];
 
-function expectNoSecret(where: string, text: string, secrets = secretsOf()) {
+function expectNoSecret(where: string, surface: string, secrets: string[]) {
   for (const secret of secrets) {
-    if (text.includes(secret)) {
+    if (surface.includes(secret)) {
       throw new Error(`${where} holds a secret: ${secret.slice(0, 6)}…`);
     }
   }
 }
 
+/** The answer's field, when the answer is a tool answer (not 'cancelled'). */
+const answerField = (answer: unknown, key: string): unknown =>
+  typeof answer === 'object' && answer !== null && key in answer
+    ? Reflect.get(answer, key)
+    : undefined;
+
 describe('a refused token request', () => {
   it('no marker, secret, state, code or URL on any surface; stdout empty', async () => {
-    s = await stand({
-      kind: 'cloud',
-      auth: 'jwt',
-      clientSecret: CLIENT_SECRET,
-    });
-    s.tokens.refuseCodes(MARKER);
-    const answer = await s.callTool('ProbeAdt', { id: 'REFUSED' });
-    expect(answer).not.toBe('cancelled');
-    expect(s.browser.urls).toHaveLength(1);
-    expect((answer as { isError: boolean }).isError).toBe(true);
-    const where = surfaces([(answer as { text: string }).text]);
-    for (const [name, text] of Object.entries(where)) {
-      expectNoSecret(name, text);
+    const { seen, out } = await run('refused');
+    assert.notEqual(seen.answer, 'cancelled');
+    assert.equal(seen.urls.length, 1);
+    assert.equal(answerField(seen.answer, 'isError'), true);
+    const where = surfaces(seen, out, [text(answerField(seen.answer, 'text'))]);
+    for (const [name, surface] of Object.entries(where)) {
+      expectNoSecret(name, surface, secretsOf(seen));
     }
-    expect(stdout.join('')).toBe('');
   });
 
   it('--auth-debug: the prepared form on stderr, nowhere else; never the secret or the marker', async () => {
-    s = await stand({
-      kind: 'cloud',
-      auth: 'jwt',
-      clientSecret: CLIENT_SECRET,
-      authDebug: true,
-      logger: stderrLogger(),
-    });
-    s.tokens.refuseCodes(MARKER);
-    const answer = await s.callTool('ProbeAdt', { id: 'REFUSED' });
-    const text = (answer as { text: string }).text;
-    const where = surfaces([text]);
-    expect(where.stderr).toContain(PREPARED);
-    expect(where.results).not.toContain(PREPARED);
-    expect(where.http).not.toContain(PREPARED);
+    const { seen, out } = await run('refused-debug');
+    const where = surfaces(seen, out, [text(answerField(seen.answer, 'text'))]);
+    assert.ok(where.stderr.includes(PREPARED));
+    assert.ok(!where.results.includes(PREPARED));
+    assert.ok(!where.http.includes(PREPARED));
     for (const [name, surface] of Object.entries(where)) {
-      expectNoSecret(name, surface);
+      expectNoSecret(name, surface, secretsOf(seen));
     }
-    expect(stdout.join('')).toBe('');
   });
 });
 
 describe('a successful login', () => {
   it('no token, secret, state, code or URL on any surface; stdout empty', async () => {
-    s = await stand({
-      kind: 'cloud',
-      auth: 'jwt',
-      clientSecret: CLIENT_SECRET,
-    });
-    const answer = await s.callTool('ProbeAdt', { id: 'OK' });
-    expect((answer as { isError: boolean }).isError).toBe(false);
-    expect(s.tokens.issued.length).toBeGreaterThan(0);
-    const where = surfaces([(answer as { text: string }).text]);
-    for (const [name, text] of Object.entries(where)) {
-      expectNoSecret(name, text);
+    const { seen, out } = await run('login');
+    assert.equal(answerField(seen.answer, 'isError'), false);
+    assert.ok(seen.issued.length > 0);
+    const where = surfaces(seen, out, [text(answerField(seen.answer, 'text'))]);
+    for (const [name, surface] of Object.entries(where)) {
+      expectNoSecret(name, surface, secretsOf(seen));
     }
-    expect(stdout.join('')).toBe('');
   });
 
   it('--auth-debug: still no token, code, state or URL; stdout empty', async () => {
-    s = await stand({
-      kind: 'cloud',
-      auth: 'jwt',
-      clientSecret: CLIENT_SECRET,
-      authDebug: true,
-      logger: stderrLogger(),
-    });
-    const answer = await s.callTool('ProbeAdt', { id: 'OK' });
-    expect((answer as { isError: boolean }).isError).toBe(false);
-    const where = surfaces([(answer as { text: string }).text]);
-    for (const [name, text] of Object.entries(where)) {
-      expectNoSecret(name, text, [
-        MARKER,
-        CLIENT_SECRET,
-        'the-code',
-        'code=',
-        'state=',
-        ...s.browser.urls,
-        ...s.tokens.issued,
-      ]);
+    const { seen, out } = await run('login-debug');
+    assert.equal(answerField(seen.answer, 'isError'), false);
+    const where = surfaces(seen, out, [text(answerField(seen.answer, 'text'))]);
+    for (const [name, surface] of Object.entries(where)) {
+      expectNoSecret(name, surface, secretsOf(seen));
     }
-    expect(stdout.join('')).toBe('');
   });
 });

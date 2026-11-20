@@ -11,6 +11,8 @@
  * until the case lets it go — the "long read".
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { pending, resetProcessLatchForTests } from '../../../lib/activeTools';
 import {
@@ -32,6 +34,7 @@ import { BACKGROUND_READ_CANCELLED_WORDS } from '../../../lib/backgroundRuns/run
 import * as longCall from '../../../lib/longCall';
 import * as packageSessions from '../../../lib/packageSessions';
 import type { StandInRequest } from '../../helpers/adtStandIn';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   type Answer,
   type BackgroundStand,
@@ -140,7 +143,7 @@ let stand: BackgroundStand;
 afterEach(async () => {
   await stand.close();
   resetProcessLatchForTests();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const handleOf = (answer: Answer): string => {
@@ -188,31 +191,31 @@ describe('a long read in the background', () => {
       ...SQL,
       background: false,
     });
-    expect(foreground.payload.run_handle).toBeUndefined();
+    assert.equal(foreground.payload.run_handle, undefined);
 
     const held = stand.standIn.hold(isSqlRead);
     const started = await stand.a.call('GetSqlQuery', SQL);
     await held.arrived;
-    expect(started.isError).toBe(false);
-    expect(started.payload).toMatchObject({
+    assert.equal(started.isError, false);
+    assertMatchObject(started.payload, {
       state: 'running',
       tool: 'GetSqlQuery',
     });
     const handle = handleOf(started);
     const instanceSession = stand.standIn.requests[0]?.session;
-    expect(readSession()).not.toBe(instanceSession);
-    expect(await listed(stand.a, handle)).toBe('running');
+    assert.notEqual(readSession(), instanceSession);
+    assert.equal(await listed(stand.a, handle), 'running');
 
     held.release();
     await until(async () => (await listed(stand.a, handle)) === 'finished');
     const read = await stand.a.call('GetBackgroundRun', { run_handle: handle });
-    expect(read.payload).toMatchObject({
+    assertMatchObject(read.payload, {
       run_handle: handle,
       state: 'finished',
       tool: 'GetSqlQuery',
     });
-    expect(read.isError).toBe(foreground.isError);
-    expect(read.content.slice(1)).toEqual(foreground.content);
+    assert.equal(read.isError, foreground.isError);
+    assert.deepStrictEqual(read.content.slice(1), foreground.content);
   });
 
   it('a second Get after a finished read answers not available', async () => {
@@ -222,47 +225,47 @@ describe('a long read in the background', () => {
     const first = await stand.a.call('GetBackgroundRun', {
       run_handle: handle,
     });
-    expect(first.payload.state).toBe('finished');
+    assert.equal(first.payload.state, 'finished');
     const second = await stand.a.call('GetBackgroundRun', {
       run_handle: handle,
     });
-    expect(second.isError).toBe(true);
-    expect(second.payload).toMatchObject({
+    assert.equal(second.isError, true);
+    assertMatchObject(second.payload, {
       error: 'background_run_not_available',
       message: BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
     });
-    expect(await listed(stand.a, handle)).toBeUndefined();
+    assert.equal(await listed(stand.a, handle), undefined);
   });
 
   it('seventeen sequential default-background reads, each read once, never hit the limit', async () => {
     for (let i = 0; i < 17; i += 1) {
       const started = await stand.a.call('GetSqlQuery', SQL);
-      expect(started.isError).toBe(false);
+      assert.equal(started.isError, false);
       const handle = handleOf(started);
-      expect(handle).not.toBe('');
+      assert.notEqual(handle, '');
       await until(async () => (await listed(stand.a, handle)) === 'finished');
       const read = await stand.a.call('GetBackgroundRun', {
         run_handle: handle,
       });
-      expect(read.payload.state).toBe('finished');
+      assert.equal(read.payload.state, 'finished');
     }
-    expect((await stand.a.call('ListBackgroundRuns')).payload).toEqual({
+    assert.deepStrictEqual((await stand.a.call('ListBackgroundRuns')).payload, {
       runs: [],
     });
   });
 
-  it('a background long run uses one connection: one fresh connection per run, no second from runLongCall', async () => {
-    const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
-    const inCall = jest.spyOn(longCall, 'runLongCall');
+  it('a background long run uses one connection: one fresh connection per run, no second from runLongCall', async (t) => {
+    const fresh = t.mock.method(packageSessions, 'openFreshConnection');
+    const inCall = t.mock.method(longCall, 'runLongCall');
     const started = await stand.a.call('GetSqlQuery', SQL);
     const handle = handleOf(started);
     await until(async () => (await listed(stand.a, handle)) === 'finished');
-    expect(fresh).toHaveBeenCalledTimes(1);
-    expect(inCall).not.toHaveBeenCalled();
+    assert.equal(fresh.mock.callCount(), 1);
+    assert.equal(inCall.mock.callCount(), 0);
     const sessions = new Set(
       stand.standIn.requests.filter(isSqlRead).map((r) => r.session),
     );
-    expect(sessions.size).toBe(1);
+    assert.equal(sessions.size, 1);
   });
 
   it('Discard of a running read run cancels it: its session logged off, listed and read cancelled, then consumed', async () => {
@@ -276,29 +279,29 @@ describe('a long read in the background', () => {
     const discarded = await stand.a.call('DiscardBackgroundRun', {
       run_handle: handle,
     });
-    expect(discarded.isError).toBe(false);
-    expect(discarded.payload).toEqual({
+    assert.equal(discarded.isError, false);
+    assert.deepStrictEqual(discarded.payload, {
       run_handle: handle,
       state: 'cancelled',
     });
     // The discard sent that session's logoff, the read still held.
     await until(() => logoffIndex(stand.standIn, session) >= before);
 
-    expect(await listed(stand.a, handle)).toBe('cancelled');
+    assert.equal(await listed(stand.a, handle), 'cancelled');
     const read = await stand.a.call('GetBackgroundRun', { run_handle: handle });
-    expect(read.isError).toBe(false);
-    expect(read.payload).toMatchObject({
+    assert.equal(read.isError, false);
+    assertMatchObject(read.payload, {
       run_handle: handle,
       state: 'cancelled',
       tool: 'GetSqlQuery',
     });
-    expect(read.content[1]?.text).toBe(BACKGROUND_READ_CANCELLED_WORDS);
+    assert.equal(read.content[1]?.text, BACKGROUND_READ_CANCELLED_WORDS);
     // Consumed: no longer listed, and a second Get answers not available.
-    expect(await listed(stand.a, handle)).toBeUndefined();
+    assert.equal(await listed(stand.a, handle), undefined);
     const again = await stand.a.call('GetBackgroundRun', {
       run_handle: handle,
     });
-    expect(again.payload).toMatchObject({
+    assertMatchObject(again.payload, {
       error: 'background_run_not_available',
     });
     held.release();
@@ -312,12 +315,12 @@ describe('a long read in the background', () => {
     const discarded = await stand.a.call('DiscardBackgroundRun', {
       run_handle: handle,
     });
-    expect(discarded.payload).toEqual({
+    assert.deepStrictEqual(discarded.payload, {
       run_handle: handle,
       state: 'discarded',
     });
     const gone = await stand.a.call('GetBackgroundRun', { run_handle: handle });
-    expect(gone.payload).toMatchObject({
+    assertMatchObject(gone.payload, {
       error: 'background_run_not_available',
     });
   });
@@ -336,22 +339,22 @@ describe('a long read in the background', () => {
     const refused = await stand.a.call('DiscardBackgroundRun', {
       run_handle: handle,
     });
-    expect(refused.isError).toBe(true);
-    expect(refused.payload).toMatchObject({
+    assert.equal(refused.isError, true);
+    assertMatchObject(refused.payload, {
       error: 'background_run_running',
       message: BACKGROUND_RUN_RUNNING_WORDS,
     });
-    expect(stand.standIn.requests).toHaveLength(before);
-    expect(logoffIndex(stand.standIn, session)).toBe(-1);
-    expect(await listed(stand.a, handle)).toBe('running');
+    assert.equal(stand.standIn.requests.length, before);
+    assert.equal(logoffIndex(stand.standIn, session), -1);
+    assert.equal(await listed(stand.a, handle), 'running');
     held.release();
     await until(async () => (await listed(stand.a, handle)) === 'finished');
   });
 
   it("a code run's background default is unchanged: without it RuntimeRunClass waits for the run", async () => {
     const answer = await stand.a.call('RuntimeRunClass', RUN);
-    expect(answer.payload.run_handle).toBeUndefined();
-    expect((await stand.a.call('ListBackgroundRuns')).payload).toEqual({
+    assert.equal(answer.payload.run_handle, undefined);
+    assert.deepStrictEqual((await stand.a.call('ListBackgroundRuns')).payload, {
       runs: [],
     });
   });
@@ -369,10 +372,10 @@ describe('a long read in the background', () => {
     const second = await stand.a.call('GetBackgroundRun', {
       run_handle: handle,
     });
-    expect(second).toEqual(first);
-    expect(await listed(stand.a, handle)).toBe('finished');
+    assert.deepStrictEqual(second, first);
+    assert.equal(await listed(stand.a, handle), 'finished');
     await stand.a.call('DiscardBackgroundRun', { run_handle: handle });
-    expect(await listed(stand.a, handle)).toBeUndefined();
+    assert.equal(await listed(stand.a, handle), undefined);
   });
 
   it('an unknown and a foreign handle answer alike: Get, List and Discard', async () => {
@@ -393,19 +396,19 @@ describe('a long read in the background', () => {
         await b.call('DiscardBackgroundRun', { run_handle: unknown }),
       ];
       for (const answer of answers) {
-        expect(answer.isError).toBe(true);
-        expect(answer.payload).toMatchObject({
+        assert.equal(answer.isError, true);
+        assertMatchObject(answer.payload, {
           error: 'background_run_not_available',
           message: BACKGROUND_RUN_NOT_AVAILABLE_WORDS,
         });
-        expect(answer.content).toEqual(answers[1]?.content);
+        assert.deepStrictEqual(answer.content, answers[1]?.content);
       }
-      expect((await b.call('ListBackgroundRuns')).payload).toEqual({
+      assert.deepStrictEqual((await b.call('ListBackgroundRuns')).payload, {
         runs: [],
       });
       // The foreign discard cancelled nothing: still running, not logged off.
-      expect(logoffIndex(stand.standIn, session)).toBe(-1);
-      expect(await listed(stand.a, handle)).toBe('running');
+      assert.equal(logoffIndex(stand.standIn, session), -1);
+      assert.equal(await listed(stand.a, handle), 'running');
       held.release();
       await until(async () => (await listed(stand.a, handle)) === 'finished');
     } finally {
@@ -477,12 +480,21 @@ describe('a strategy whose get answers late', () => {
     const first = await stand.a.call('DiscardBackgroundRun', {
       run_handle: handle,
     });
-    expect(first.payload).toEqual({ run_handle: handle, state: 'cancelled' });
+    assert.deepStrictEqual(first.payload, {
+      run_handle: handle,
+      state: 'cancelled',
+    });
     release();
     const second = await late;
-    expect(second.isError).toBe(false);
-    expect(second.payload).toEqual({ run_handle: handle, state: 'discarded' });
-    expect(runs.finished.map((f) => f.handle)).toEqual([handle]);
+    assert.equal(second.isError, false);
+    assert.deepStrictEqual(second.payload, {
+      run_handle: handle,
+      state: 'discarded',
+    });
+    assert.deepStrictEqual(
+      runs.finished.map((f) => f.handle),
+      [handle],
+    );
     held.release();
     await until(readsSettled);
   });
@@ -498,8 +510,11 @@ describe('a strategy whose get answers late', () => {
     await until(async () => (await listed(stand.a, handle)) === 'finished');
     release();
     const answer = await late;
-    expect(answer.isError).toBe(false);
-    expect(answer.payload).toEqual({ run_handle: handle, state: 'discarded' });
+    assert.equal(answer.isError, false);
+    assert.deepStrictEqual(answer.payload, {
+      run_handle: handle,
+      state: 'discarded',
+    });
   });
 });
 
@@ -532,18 +547,18 @@ describe('the owner of the running runs', () => {
       const refused = await alone.call('DiscardBackgroundRun', {
         run_handle: handle,
       });
-      expect(refused.payload).toMatchObject({
+      assertMatchObject(refused.payload, {
         error: 'background_run_running',
       });
-      expect(await listed(first, handle)).toBe('running');
+      assert.equal(await listed(first, handle), 'running');
       const cancelled = await shared.call('DiscardBackgroundRun', {
         run_handle: handle,
       });
-      expect(cancelled.payload).toEqual({
+      assert.deepStrictEqual(cancelled.payload, {
         run_handle: handle,
         state: 'cancelled',
       });
-      expect(await listed(first, handle)).toBe('cancelled');
+      assert.equal(await listed(first, handle), 'cancelled');
       held.release();
       await until(readsSettled);
     } finally {
@@ -571,9 +586,9 @@ describe('which end wins', () => {
     await stand.a.call('DiscardBackgroundRun', { run_handle: handle });
     held.release();
     await until(readsSettled);
-    expect(await listed(stand.a, handle)).toBe('cancelled');
-    expect(runs.finished).toHaveLength(1);
-    expect(runs.finished[0]?.answer.cancelled).toBe(true);
+    assert.equal(await listed(stand.a, handle), 'cancelled');
+    assert.equal(runs.finished.length, 1);
+    assert.equal(runs.finished[0]?.answer.cancelled, true);
   });
 
   it('an answer arriving after the cancel does not overwrite it', async () => {
@@ -584,9 +599,12 @@ describe('which end wins', () => {
     held.release();
     await until(readsSettled);
     const read = await stand.a.call('GetBackgroundRun', { run_handle: handle });
-    expect(read.payload.state).toBe('cancelled');
-    expect(read.content[1]?.text).toBe(BACKGROUND_READ_CANCELLED_WORDS);
-    expect(runs.finished.map((f) => f.handle)).toEqual([handle]);
+    assert.equal(read.payload.state, 'cancelled');
+    assert.equal(read.content[1]?.text, BACKGROUND_READ_CANCELLED_WORDS);
+    assert.deepStrictEqual(
+      runs.finished.map((f) => f.handle),
+      [handle],
+    );
   });
 
   it("Discard racing the run's completion ends in one state: completion first answers finished and the discard removes it", async () => {
@@ -595,12 +613,12 @@ describe('which end wins', () => {
     const discarded = await stand.a.call('DiscardBackgroundRun', {
       run_handle: handle,
     });
-    expect(discarded.payload).toEqual({
+    assert.deepStrictEqual(discarded.payload, {
       run_handle: handle,
       state: 'discarded',
     });
-    expect(runs.finished).toHaveLength(1);
-    expect(runs.finished[0]?.answer.cancelled).toBeUndefined();
+    assert.equal(runs.finished.length, 1);
+    assert.equal(runs.finished[0]?.answer.cancelled, undefined);
   });
 
   it("Discard racing the run's completion ends in one state: released and discarded at once, finish is called once", async () => {
@@ -612,15 +630,15 @@ describe('which end wins', () => {
       run_handle: handle,
     });
     await until(readsSettled);
-    expect(runs.finished).toHaveLength(1);
+    assert.equal(runs.finished.length, 1);
     const state = discarded.payload.state;
     if (state === 'cancelled') {
-      expect(runs.finished[0]?.answer.cancelled).toBe(true);
-      expect(await listed(stand.a, handle)).toBe('cancelled');
+      assert.equal(runs.finished[0]?.answer.cancelled, true);
+      assert.equal(await listed(stand.a, handle), 'cancelled');
     } else {
-      expect(state).toBe('discarded');
-      expect(runs.finished[0]?.answer.cancelled).toBeUndefined();
-      expect(await listed(stand.a, handle)).toBeUndefined();
+      assert.equal(state, 'discarded');
+      assert.equal(runs.finished[0]?.answer.cancelled, undefined);
+      assert.equal(await listed(stand.a, handle), undefined);
     }
   });
 
@@ -634,12 +652,12 @@ describe('which end wins', () => {
     const states = both.map((answer) =>
       answer.isError ? answer.payload.error : answer.payload.state,
     );
-    expect([...states].sort()).toEqual([
+    assert.deepStrictEqual([...states].sort(), [
       'background_run_not_available',
       'finished',
     ]);
     const refused = both.find((answer) => answer.isError);
-    expect(refused?.payload.message).toBe(BACKGROUND_RUN_NOT_AVAILABLE_WORDS);
+    assert.equal(refused?.payload.message, BACKGROUND_RUN_NOT_AVAILABLE_WORDS);
   });
 
   it('two overlapping Discards of one running read: both answer cancelled, the session is logged off once, finish is called once', async () => {
@@ -652,8 +670,8 @@ describe('which end wins', () => {
       stand.a.call('DiscardBackgroundRun', { run_handle: handle }),
     ]);
     for (const answer of both) {
-      expect(answer.isError).toBe(false);
-      expect(answer.payload).toEqual({
+      assert.equal(answer.isError, false);
+      assert.deepStrictEqual(answer.payload, {
         run_handle: handle,
         state: 'cancelled',
       });
@@ -661,13 +679,17 @@ describe('which end wins', () => {
     await until(() => logoffIndex(stand.standIn, session) > -1);
     held.release();
     await until(readsSettled);
-    expect(
+    assert.equal(
       stand.standIn.requests.filter(
         (r) => r.session === session && r.url.includes('logoff'),
-      ),
-    ).toHaveLength(1);
-    expect(runs.finished.map((f) => f.handle)).toEqual([handle]);
-    expect(runs.finished[0]?.answer.cancelled).toBe(true);
+      ).length,
+      1,
+    );
+    assert.deepStrictEqual(
+      runs.finished.map((f) => f.handle),
+      [handle],
+    );
+    assert.equal(runs.finished[0]?.answer.cancelled, true);
   });
 
   it('the contract: with a custom strategy the cancel arrives as finish with cancelled: true and its listing answers cancelled', async () => {
@@ -675,7 +697,7 @@ describe('which end wins', () => {
     const handle = handleOf(await stand.a.call('GetSqlQuery', SQL));
     await held.arrived;
     await stand.a.call('DiscardBackgroundRun', { run_handle: handle });
-    expect(runs.finished).toEqual([
+    assert.deepStrictEqual(runs.finished, [
       {
         handle,
         answer: {
@@ -684,7 +706,7 @@ describe('which end wins', () => {
         },
       },
     ]);
-    expect(await listed(stand.a, handle)).toBe('cancelled');
+    assert.equal(await listed(stand.a, handle), 'cancelled');
     held.release();
     await until(readsSettled);
   });
@@ -699,9 +721,9 @@ describe('compact', () => {
 
   it("the compact long tools' background default: HandlerGetData answers a run_handle read by HandlerBackgroundRunGet, once", async () => {
     const started = await stand.a.call('HandlerGetData', TABLE);
-    expect(started.isError).toBe(false);
-    expect(String(started.payload.message)).toContain(
-      'HandlerBackgroundRunGet',
+    assert.equal(started.isError, false);
+    assert.ok(
+      String(started.payload.message).includes('HandlerBackgroundRunGet'),
     );
     const handle = handleOf(started);
     await until(
@@ -712,11 +734,11 @@ describe('compact', () => {
     const first = await stand.a.call('HandlerBackgroundRunGet', {
       run_handle: handle,
     });
-    expect(first.payload.state).toBe('finished');
+    assert.equal(first.payload.state, 'finished');
     const second = await stand.a.call('HandlerBackgroundRunGet', {
       run_handle: handle,
     });
-    expect(second.payload).toMatchObject({
+    assertMatchObject(second.payload, {
       error: 'background_run_not_available',
     });
   });
@@ -729,22 +751,23 @@ describe('compact', () => {
     const discarded = await stand.a.call('HandlerBackgroundRunDiscard', {
       run_handle: handle,
     });
-    expect(discarded.payload).toEqual({
+    assert.deepStrictEqual(discarded.payload, {
       run_handle: handle,
       state: 'cancelled',
     });
     await until(() => logoffIndex(stand.standIn, session) > -1);
-    expect(await listed(stand.a, handle, 'HandlerBackgroundRunList')).toBe(
+    assert.equal(
+      await listed(stand.a, handle, 'HandlerBackgroundRunList'),
       'cancelled',
     );
     const read = await stand.a.call('HandlerBackgroundRunGet', {
       run_handle: handle,
     });
-    expect(read.payload.state).toBe('cancelled');
+    assert.equal(read.payload.state, 'cancelled');
     const again = await stand.a.call('HandlerBackgroundRunGet', {
       run_handle: handle,
     });
-    expect(again.payload).toMatchObject({
+    assertMatchObject(again.payload, {
       error: 'background_run_not_available',
     });
     held.release();
@@ -765,9 +788,9 @@ describe('with no strategy', () => {
     });
     try {
       const answer = await bare.call('GetSqlQuery', SQL);
-      expect(answer.payload.run_handle).toBeUndefined();
+      assert.equal(answer.payload.run_handle, undefined);
       const session = stand.standIn.requests.find(isSqlRead)?.session ?? '';
-      expect(session).not.toBe('');
+      assert.notEqual(session, '');
       await until(() => logoffIndex(stand.standIn, session) > -1);
     } finally {
       await bare.close();

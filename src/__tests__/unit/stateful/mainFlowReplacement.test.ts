@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import * as z from 'zod';
 /**
  * A session lost while calls wait in the main flow: a queued
@@ -22,8 +24,6 @@ import {
   probeGroup,
 } from '../../helpers/adtStandIn';
 import { clientOf, StandServer, silent } from '../backgroundRuns/harness';
-
-jest.setTimeout(30_000);
 
 async function until(done: () => boolean, limitMs = 10_000): Promise<void> {
   const end = Date.now() + limitMs;
@@ -129,7 +129,7 @@ it('a running call loses its session while reads are queued: the reads run on th
     await client.call('ProbeAdt', { id: 'warm' });
     const first = standIn.requests.find((r) => r.url === `${PROBE_PATH}warm`);
     const firstSession = first?.session ?? '';
-    expect(firstSession).not.toBe('');
+    assert.notEqual(firstSession, '');
 
     const held = standIn.hold((r) => r.url === `${LOSE_PATH}a`);
     const losing = client.call('LoseSession', { id: 'a' });
@@ -140,39 +140,41 @@ it('a running call loses its session while reads are queued: the reads run on th
     await new Promise((resolve) => setTimeout(resolve, 100));
     held.release();
 
-    expect((await losing).isError).toBe(true);
+    assert.equal((await losing).isError, true);
     const answers = await Promise.all(reads);
-    for (const answer of answers) expect(answer.isError).toBe(false);
+    for (const answer of answers) assert.equal(answer.isError, false);
 
     const readSessions = ['q1', 'q2', 'q3'].map(
       (id) =>
         standIn.requests.find((r) => r.url === `${PROBE_PATH}${id}`)?.session,
     );
     // On the replacement: one new session, not the lost one.
-    expect(new Set(readSessions).size).toBe(1);
-    expect(readSessions[0]).toBeDefined();
-    expect(readSessions[0]).not.toBe(firstSession);
+    assert.equal(new Set(readSessions).size, 1);
+    assert.notEqual(readSessions[0], undefined);
+    assert.notEqual(readSessions[0], firstSession);
     // The spent connection is given back by every call that held it, each
     // once: it ends with its logoff only when the last lets go — q3, which
     // still held it while q2 ran — and it is logged off exactly once.
     await until(() => standIn.loggedOff().includes(firstSession));
-    expect(
-      standIn.loggedOff().filter((session) => session === firstSession),
-    ).toHaveLength(1);
+    assert.equal(
+      standIn.loggedOff().filter((session) => session === firstSession).length,
+      1,
+    );
     const logoff = standIn.requests.findIndex(
       (r) => isLogoff(r.url) && r.session === firstSession,
     );
     const q2 = standIn.requests.findIndex((r) => r.url === `${PROBE_PATH}q2`);
-    expect(q2).toBeGreaterThanOrEqual(0);
-    expect(logoff).toBeGreaterThan(q2);
+    assert.ok(q2 >= 0);
+    assert.ok(logoff > q2);
     // Not ended while a queued call still held it: q1 and q2 ran while q3
     // held the spent reference (a reference given back twice ends it early).
-    expect(endedWhenRun.get('q1')).toBe(false);
-    expect(endedWhenRun.get('q2')).toBe(false);
+    assert.equal(endedWhenRun.get('q1'), false);
+    assert.equal(endedWhenRun.get('q2'), false);
     // The call that lost the session ran once.
-    expect(
-      standIn.requests.filter((r) => r.url === `${LOSE_PATH}a`),
-    ).toHaveLength(1);
+    assert.equal(
+      standIn.requests.filter((r) => r.url === `${LOSE_PATH}a`).length,
+      1,
+    );
   } finally {
     await client.close();
     await server.terminalClose();

@@ -6,6 +6,9 @@
  * Compact `HandlerUpdate` keeps its write under a held lock.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
 import { declareSystemKind } from '../../lib/systemKind';
@@ -33,32 +36,36 @@ const CASES: ReadonlyArray<[string, string, string]> = [
   ['UpdateMetadataExtension', 'ZC_A', '/sap/bc/adt/ddic/ddlx/sources/zc_a'],
 ];
 
-describe.each(CASES)('%s on the full set', (tool, name, uri) => {
-  it.each(['stdio', 'http'] as const)(
-    'declares no lock_handle (%s)',
-    (transport) => {
-      const shape = Object.keys(
-        fullEntry(tool, transport).toolDefinition.inputSchema.shape,
-      );
-      expect(shape).toContain('source_code');
-      expect(shape).not.toContain('lock_handle');
-    },
-  );
+for (const [tool, name, uri] of CASES) {
+  describe(format('%s on the full set', tool), () => {
+    for (const transport of ['stdio', 'http'] as const) {
+      it(format('declares no lock_handle (%s)', transport), () => {
+        const shape = Object.keys(
+          fullEntry(tool, transport).toolDefinition.inputSchema.shape,
+        );
+        assert.ok(shape.includes('source_code'));
+        assert.ok(!shape.includes('lock_handle'));
+      });
+    }
 
-  it('locks, writes and unlocks itself, then waits for the write', async () => {
-    process.env.SAP_SYSTEM_TYPE = 'onprem';
-    const connection = recordingConnection();
-    declareSystemKind(connection, 'onprem');
-    const answered = await fullEntry(tool, 'stdio').call(
-      { connection },
-      { name, source_code: 'placeholder source', activate: false },
-    );
-    expect(JSON.stringify(answered)).not.toContain('"isError":true');
-    expect(connection.requests.map((r) => `${r.method} ${r.url}`)).toEqual([
-      `POST ${uri}?_action=LOCK&accessMode=MODIFY`,
-      `PUT ${uri}/source/main?lockHandle=${HANDLE}`,
-      `POST ${uri}?_action=UNLOCK&lockHandle=${HANDLE}`,
-      `GET ${uri}/source/main?version=inactive&withLongPolling=true`,
-    ]);
+    it('locks, writes and unlocks itself, then waits for the write', async () => {
+      process.env.SAP_SYSTEM_TYPE = 'onprem';
+      const connection = recordingConnection();
+      declareSystemKind(connection, 'onprem');
+      const answered = await fullEntry(tool, 'stdio').call(
+        { connection },
+        { name, source_code: 'placeholder source', activate: false },
+      );
+      assert.ok(!JSON.stringify(answered).includes('"isError":true'));
+      assert.deepStrictEqual(
+        connection.requests.map((r) => `${r.method} ${r.url}`),
+        [
+          `POST ${uri}?_action=LOCK&accessMode=MODIFY`,
+          `PUT ${uri}/source/main?lockHandle=${HANDLE}`,
+          `POST ${uri}?_action=UNLOCK&lockHandle=${HANDLE}`,
+          `GET ${uri}/source/main?version=inactive&withLongPolling=true`,
+        ],
+      );
+    });
   });
-});
+}

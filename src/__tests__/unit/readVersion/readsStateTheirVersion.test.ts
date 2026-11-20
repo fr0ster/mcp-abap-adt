@@ -20,6 +20,9 @@
  * calls, given each of the three values, sends reads that carry exactly it.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { COMPACT_READ_TAKES } from '../../../lib/compact/compactSchemas';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type {
@@ -73,6 +76,7 @@ const OBJECT_ROOTS = [
   '/sap/bc/adt/packages/',
   '/sap/bc/adt/enhancements/',
   '/sap/bc/adt/acm/dcl/sources/',
+  '/sap/bc/adt/textelements/',
 ];
 
 /**
@@ -335,6 +339,7 @@ const NO_OBJECT_READ: Readonly<Record<string, string>> = {
   UpdateServiceBinding: 'publishes or unpublishes the binding',
   UpdateStructure: 'writes the source it is given under a lock',
   UpdateTable: 'writes the source it is given under a lock',
+  UpdateTextElements: 'writes each part given whole, reading none',
   UpdateUnitTest: 'writes the source it is given under a lock',
   ValidateServiceBinding: 'validates a binding name',
 };
@@ -352,6 +357,10 @@ interface Sample {
 
 /** Sample calls for tools whose required arguments alone end before a read. */
 const SAMPLES: Readonly<Record<string, Sample>> = {
+  // A setting to write: the patch reads the working area first.
+  UpdateTableSettings: {
+    args: { table_name: 'TABL_A', data_class: 'APPL0', activate: false },
+  },
   CreateDomain: { args: { domain_name: 'DOM_A', package_name: 'PKG_A' } },
   DescribeByList: { args: { objects: [{ name: 'CLAS_A', type: 'CLAS/OC' }] } },
   GetIncludesList: { args: { object_name: 'PROG_A', object_type: 'PROG/P' } },
@@ -566,30 +575,38 @@ describe('every read a served tool sends states its version', () => {
 
   const tools = served();
 
-  it.each([...tools.keys()].sort())(
-    '%s: every object read it sends names active, inactive or workingArea',
-    async (tool) => {
-      const entry = tools.get(tool);
-      if (entry === undefined) throw new Error(`no served tool ${tool}`);
-      const unstated: string[] = [];
-      let reads = 0;
-      for (const sample of callsOf(tool, entry)) {
-        for (const { read, versions } of await readsOf(tool, sample)) {
-          reads += 1;
-          const named =
-            versions.length === 1 &&
-            VERSIONS.some((version) => version === versions[0]);
-          if (!named) unstated.push(`${read} ${JSON.stringify(versions)}`);
-        }
-      }
-      // A tool reads an object in its samples, or says why it reads none.
-      expect({ tool, reads: reads > 0 }).toEqual({
+  for (const tool of [...tools.keys()].sort()) {
+    it(
+      format(
+        '%s: every object read it sends names active, inactive or workingArea',
         tool,
-        reads: NO_OBJECT_READ[tool] === undefined,
-      });
-      expect(unstated).toEqual([]);
-    },
-  );
+      ),
+      async () => {
+        const entry = tools.get(tool);
+        if (entry === undefined) throw new Error(`no served tool ${tool}`);
+        const unstated: string[] = [];
+        let reads = 0;
+        for (const sample of callsOf(tool, entry)) {
+          for (const { read, versions } of await readsOf(tool, sample)) {
+            reads += 1;
+            const named =
+              versions.length === 1 &&
+              VERSIONS.some((version) => version === versions[0]);
+            if (!named) unstated.push(`${read} ${JSON.stringify(versions)}`);
+          }
+        }
+        // A tool reads an object in its samples, or says why it reads none.
+        assert.deepStrictEqual(
+          { tool, reads: reads > 0 },
+          {
+            tool,
+            reads: NO_OBJECT_READ[tool] === undefined,
+          },
+        );
+        assert.deepStrictEqual(unstated, []);
+      },
+    );
+  }
 
   const versioned = [...tools.entries()]
     .flatMap(([tool, entry]) =>
@@ -609,17 +626,24 @@ describe('every read a served tool sends states its version', () => {
       .map(([tool]) => tool)
       .sort();
     const sampled = [...new Set(versioned.map(([, tool]) => tool))].sort();
-    expect(sampled).toEqual(declaring);
+    assert.deepStrictEqual(sampled, declaring);
   });
 
-  describe.each(versioned)('%s', (_name, tool, sample) => {
-    it.each(VERSIONS)('given %s, every read it sends states it', async (v) => {
-      const reads = await readsOf(tool, {
-        ...sample,
-        args: { ...sample.args, version: v },
-      });
-      expect(reads.length).toBeGreaterThan(0);
-      expect(reads.filter(({ versions }) => versions.join() !== v)).toEqual([]);
+  for (const [_name, tool, sample] of versioned) {
+    describe(format('%s', _name), () => {
+      for (const v of VERSIONS) {
+        it(format('given %s, every read it sends states it', v), async () => {
+          const reads = await readsOf(tool, {
+            ...sample,
+            args: { ...sample.args, version: v },
+          });
+          assert.ok(reads.length > 0);
+          assert.deepStrictEqual(
+            reads.filter(({ versions }) => versions.join() !== v),
+            [],
+          );
+        });
+      }
     });
-  });
+  }
 });

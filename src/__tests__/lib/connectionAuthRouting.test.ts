@@ -9,11 +9,14 @@
  * is refused by the credential source, before any connector is built.
  */
 
+import assert from 'node:assert/strict';
+import { beforeEach, describe, test } from 'node:test';
 import { CertificateAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { AdtOnPremConnector } from '@mcp-abap-adt/connection';
 import { createAbapConnection } from '../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../lib/credentialSources';
+import { assertThrows } from '../helpers/assertions';
 import { stateSystemKind } from '../helpers/systemKind';
 
 // The system kind is required: the stand-in's is stated for every case.
@@ -32,12 +35,12 @@ describe('connection factory routing', () => {
       certKeyPath: '/path/to/cert.key',
     };
     const credential = credentialFromSapConfig(config);
-    expect(credential).toBeInstanceOf(CertificateAuthProvider);
+    assert.ok(credential instanceof CertificateAuthProvider);
 
     const conn = createAbapConnection(config, credential);
-    expect(conn).toBeInstanceOf(AdtOnPremConnector);
+    assert.ok(conn instanceof AdtOnPremConnector);
     // The credential is a constructor argument, not part of IAbapConnection.
-    expect((conn as any).credential).toBe(credential);
+    assert.equal((conn as any).credential, credential);
   });
 
   test('kerberos config → refused by the credential source, not routed', () => {
@@ -46,7 +49,8 @@ describe('connection factory routing', () => {
       authType: 'kerberos',
       kerberosSpn: 'HTTP@system.example.invalid',
     };
-    expect(() => credentialFromSapConfig(config)).toThrow(
+    assertThrows(
+      () => credentialFromSapConfig(config),
       /Kerberos authentication is not available/,
     );
   });

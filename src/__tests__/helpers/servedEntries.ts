@@ -3,10 +3,9 @@
  * tool sets over both transports, each tool once, kept when it is listed for
  * the kind's stated environment.
  *
- * Shared by the Jest pin harness (`pinCases.ts`, which re-exports it for the
+ * Shared by the pin harness (`pinCases.ts`, which re-exports it for the
  * pin suites) and the live files (`integration/helpers/live.ts`), so it
- * imports no test runner (D27): a node:test file reaches it through the
- * node:test build, whose `types` is `node` alone.
+ * imports no test runner (D27) and reaches no global beyond node's types.
  */
 import { compactToolSet } from '../../../compact/src/launcher';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';

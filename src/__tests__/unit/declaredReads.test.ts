@@ -4,6 +4,10 @@
  * schema's parse, so the handler never saw it. Each is declared now, and
  * reaches the handler.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { TOOL_DEFINITION as GetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { TOOL_DEFINITION as GetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult';
 import {
@@ -11,24 +15,26 @@ import {
   compactCreateSchema,
   compactUnitTestResultSchema,
 } from '../../lib/compact/compactSchemas';
+import { assertMatchObject } from '../helpers/assertions';
 
 describe('the arguments a handler reads are declared by its schema', () => {
   it('GetUnitTestResult takes with_navigation_uris and format', () => {
-    expect(
+    assertMatchObject(
       GetUnitTestResult.inputSchema.parse({
         run_id: 'R1',
         with_navigation_uris: true,
         format: 'junit',
       }),
-    ).toMatchObject({
-      run_id: 'R1',
-      with_navigation_uris: true,
-      format: 'junit',
-    });
+      {
+        run_id: 'R1',
+        with_navigation_uris: true,
+        format: 'junit',
+      },
+    );
   });
 
   it('GetEnhancements takes program, include_nested, detailed and max_includes', () => {
-    expect(
+    assertMatchObject(
       GetEnhancements.inputSchema.parse({
         object_name: 'ZINC',
         object_type: 'include',
@@ -37,26 +43,30 @@ describe('the arguments a handler reads are declared by its schema', () => {
         detailed: true,
         max_includes: 3,
       }),
-    ).toMatchObject({
-      program: 'ZPROG',
-      include_nested: true,
-      detailed: true,
-      max_includes: 3,
-    });
+      {
+        program: 'ZPROG',
+        include_nested: true,
+        detailed: true,
+        max_includes: 3,
+      },
+    );
   });
 
-  it.each([
+  for (const [_tool, schema] of [
     ['HandlerUnitTestResult', compactUnitTestResultSchema],
     ['HandlerCdsUnitTestResult', compactCdsUnitTestResultSchema],
-  ])('%s takes detail', (_tool, schema) => {
-    expect(schema.parse({ run_id: 'R1', detail: 'full' })).toMatchObject({
-      detail: 'full',
+  ] as const) {
+    it(format('%s takes detail', _tool), () => {
+      assertMatchObject(schema.parse({ run_id: 'R1', detail: 'full' }), {
+        detail: 'full',
+      });
     });
-  });
+  }
 
   it('HandlerCreate takes detail', () => {
-    expect(
+    assertMatchObject(
       compactCreateSchema.parse({ object_type: 'PACKAGE', detail: 'raw' }),
-    ).toMatchObject({ detail: 'raw' });
+      { detail: 'raw' },
+    );
   });
 });

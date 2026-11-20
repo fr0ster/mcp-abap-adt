@@ -13,7 +13,8 @@ import {
   resolvePackageName,
   resolveTransportRequest,
 } from '../helpers/configHelpers';
-import type { LiveAnswer } from '../helpers/live';
+import { HeldLiveLocks, type HeldLock } from '../helpers/heldLiveLocks';
+import { type LiveAnswer, livePrepare } from '../helpers/live';
 import { CREATION_PACKAGES } from '../helpers/packageGuard';
 
 /** Whether the configured system is the on-premise one. */
@@ -67,4 +68,29 @@ export function member(value: unknown, key: string): unknown {
 /** An answer's JSON payload. */
 export function payloadOf(answer: LiveAnswer): unknown {
   return JSON.parse(answer.text);
+}
+
+/** The compact locks the suites' cases hold until SAP answers their unlock. */
+const heldLocks = new HeldLiveLocks();
+
+/** Records a lock handle the case now holds. */
+export function holdLock(lock: HeldLock): void {
+  heldLocks.hold(lock);
+}
+
+/** SAP answered the case's unlock of `handle` with a success. */
+export function lockReleased(handle: string): void {
+  heldLocks.released(handle);
+}
+
+/**
+ * The unlock of every lock a case still holds, each attempted whatever the
+ * others answered; a lock SAP still holds is named in the suite's output,
+ * and the suite goes on to its deletions.
+ */
+export async function releaseHeldLocks(): Promise<void> {
+  await heldLocks.releaseAll(
+    (lock) => livePrepare('HandlerUnlock', { ...lock }),
+    (line) => console.log(`[held locks] ${line}`),
+  );
 }

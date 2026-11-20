@@ -9,6 +9,9 @@
  * tool once.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
+import { format } from 'node:util';
 import { TokenAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -22,8 +25,6 @@ import {
 } from '../../helpers/adtStandIn';
 import { StandServer, silent, until } from '../backgroundRuns/harness';
 import { oneToolGroup } from './harness';
-
-jest.setTimeout(30_000);
 
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
 const of = (name: string) => (r: StandInRequest) =>
@@ -74,32 +75,40 @@ async function stand(transportCloseEndsSession: boolean | undefined) {
 
 const live = () => activeTools().filter((tool) => tool.name === 'GetClass');
 
-it.each([
+for (const [_label, option] of [
   ['by default', undefined],
   ['stated true', true],
-])(
-  '%s the transport’s close ends the session: the instance’s close — its connection logged off, the waiting call’s signal aborts and its tool never runs',
-  async (_label, option) => {
-    // Nothing here closes the instance but the transport.
-    const s = await stand(option);
-    const held = standIn.hold(isLookup);
-    await held.arrived;
-    expect(ownedConnections(s.server)).toHaveLength(1);
-    await s.client.close();
-    expect(isLatched(s.server)).toBe(true);
-    expect(ownedConnections(s.server)).toEqual([]);
-    expect(await s.call).toBe('the transport closed');
-    await until(() => standIn.logoffs() === 1);
-    await settleWhile();
-    expect(live()).toHaveLength(1);
-    expect(live().every((tool) => tool.signal.aborted)).toBe(true);
-    held.release();
-    await until(() => live().length === 0);
-    await settleWhile();
-    expect(standIn.requests.some(of('ZCL_WAITS'))).toBe(false);
-    expect(standIn.logoffs()).toBe(1);
-  },
-);
+] satisfies [string, boolean | undefined][]) {
+  it(
+    format(
+      '%s the transport’s close ends the session: the instance’s close — its connection logged off, the waiting call’s signal aborts and its tool never runs',
+      _label,
+    ),
+    async () => {
+      // Nothing here closes the instance but the transport.
+      const s = await stand(option);
+      const held = standIn.hold(isLookup);
+      await held.arrived;
+      assert.equal(ownedConnections(s.server).length, 1);
+      await s.client.close();
+      assert.equal(isLatched(s.server), true);
+      assert.deepStrictEqual(ownedConnections(s.server), []);
+      assert.equal(await s.call, 'the transport closed');
+      await until(() => standIn.logoffs() === 1);
+      await settleWhile();
+      assert.equal(live().length, 1);
+      assert.equal(
+        live().every((tool) => tool.signal.aborted),
+        true,
+      );
+      held.release();
+      await until(() => live().length === 0);
+      await settleWhile();
+      assert.equal(standIn.requests.some(of('ZCL_WAITS')), false);
+      assert.equal(standIn.logoffs(), 1);
+    },
+  );
+}
 
 it('stated false (a transport per request): the transport’s close ends no call — the waiting call runs its tool once', async () => {
   const s = await stand(false);
@@ -108,24 +117,29 @@ it('stated false (a transport per request): the transport’s close ends no call
     await held.arrived;
     await s.client.close();
     // Nothing closed: the instance is open, its connection still its own.
-    expect(isLatched(s.server)).toBe(false);
-    expect(ownedConnections(s.server)).toHaveLength(1);
-    expect(await s.call).toBe('the transport closed');
+    assert.equal(isLatched(s.server), false);
+    assert.equal(ownedConnections(s.server).length, 1);
+    assert.equal(await s.call, 'the transport closed');
     await settleWhile();
-    expect(live()).toHaveLength(1);
-    expect(live().every((tool) => !tool.signal.aborted)).toBe(true);
+    assert.equal(live().length, 1);
+    assert.equal(
+      live().every((tool) => !tool.signal.aborted),
+      true,
+    );
     held.release();
     await until(() => live().length === 0);
     // The tool ran once: its source read reached the system once.
-    expect(
+    assert.equal(
       standIn.requests.filter((r) =>
         r.url.toLowerCase().includes('zcl_waits/source/main'),
-      ),
-    ).toHaveLength(1);
-    expect(standIn.requests.findIndex(of('ZCL_WAITS'))).toBeGreaterThan(
-      standIn.requests.findIndex(isLookup),
+      ).length,
+      1,
     );
-    expect(standIn.logoffs()).toBe(0);
+    assert.ok(
+      standIn.requests.findIndex(of('ZCL_WAITS')) >
+        standIn.requests.findIndex(isLookup),
+    );
+    assert.equal(standIn.logoffs(), 0);
   } finally {
     // Cleanup only: this case's subject is a close that ends nothing.
     await s.server.terminalClose();

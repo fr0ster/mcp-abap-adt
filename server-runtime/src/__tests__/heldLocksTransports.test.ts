@@ -14,6 +14,9 @@
  * handle works only in the instance that issued it.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { CompactModifyHandlersGroup } from '@mcp-abap-adt/compact-modify';
 import { noConnectionContext } from '@mcp-abap-adt/lib/handlers';
 import { HeldLocks } from '@mcp-abap-adt/lib/state';
@@ -24,8 +27,6 @@ import type {
 import { httpStand, until } from '../http/__tests__/shutdown/harness';
 import { sseStand } from '../sse/__tests__/shutdown/harness';
 import { stand as stdioStand } from '../stdio/__tests__/helpers/loginStand';
-
-jest.setTimeout(60_000);
 
 // The words a write or an unlock under a handle the instance does not hold
 // answers, copied here, never imported: the test is the copy. Streamable
@@ -217,7 +218,7 @@ async function lock(
   target: { object_type: string; object_name: string },
 ): Promise<string> {
   const locked = await session.call('HandlerLock', target);
-  expect(locked.isError).toBe(false);
+  assert.equal(locked.isError, false);
   const read: unknown = JSON.parse(locked.text);
   if (
     typeof read !== 'object' ||
@@ -230,116 +231,135 @@ async function lock(
   return read.lock_handle;
 }
 
-describe.each(TRANSPORTS)('%s', (_transport, standOf) => {
-  let s: TransportStand;
-  let owners: HeldLocks[];
+for (const [_transport, standOf] of TRANSPORTS) {
+  describe(format('%s', _transport), () => {
+    let s: TransportStand;
+    let owners: HeldLocks[];
 
-  beforeEach(async () => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
-    owners = [];
-    const hold = HeldLocks.prototype.hold;
-    jest.spyOn(HeldLocks.prototype, 'hold').mockImplementation(function (
-      this: HeldLocks,
-      ...args
-    ) {
-      if (!owners.includes(this)) owners.push(this);
-      return hold.apply(this, args);
+    beforeEach(async () => {
+      mock.method(console, 'error', () => {});
+      owners = [];
+      const hold = HeldLocks.prototype.hold;
+      mock.method(
+        HeldLocks.prototype,
+        'hold',
+        function (this: HeldLocks, ...args: Parameters<HeldLocks['hold']>) {
+          if (!owners.includes(this)) owners.push(this);
+          return hold.apply(this, args);
+        },
+      );
+      s = await standOf();
     });
-    s = await standOf();
-  });
 
-  afterEach(async () => {
-    await s.close();
-    jest.restoreAllMocks();
-  });
-
-  it('HandlerLock registers its handle', async () => {
-    const session = await s.session();
-    const handle = await lock(session, {
-      object_type: 'CLASS',
-      object_name: 'ZCL_HELD',
+    afterEach(async () => {
+      await s.close();
+      mock.restoreAll();
     });
-    expect(handle).toBe(ISSUED);
-    expect(owners).toHaveLength(1);
-    expect(owners[0]?.holds(ISSUED)).toBe(true);
-  });
 
-  it.each(UNDER_LOCK)(
-    '%s under a handle this instance did not issue is refused with zero requests, no logon either',
-    async (tool, underLock) => {
+    it('HandlerLock registers its handle', async () => {
       const session = await s.session();
-      // The instance holds a lock of its own, so it is connected and kept.
-      await lock(session, underLock.lock);
-      const before = s.adt.requests.length;
-      const answered = await session.call(tool, underLock.args(FOREIGN));
-      expect(answered.isError).toBe(true);
-      expect(answered.text).toContain(s.notHeld);
-      expect(sent(s.adt.requests.slice(before))).toEqual([]);
-    },
-  );
-
-  it.each(UNDER_LOCK)(
-    '%s under a handle on an instance that has not logged on sends nothing, no logon either',
-    async (tool, underLock) => {
-      const before = s.adt.requests.length;
-      const session = await s.session();
-      const answered = await session.call(tool, underLock.args(FOREIGN));
-      expect(answered.isError).toBe(true);
-      expect(answered.text).toContain(s.notHeld);
-      expect(sent(s.adt.requests.slice(before))).toEqual([]);
-    },
-  );
-
-  it.each(UNDER_LOCK)(
-    '%s under the handle HandlerLock gave is sent',
-    async (tool, underLock) => {
-      const session = await s.session();
-      const handle = await lock(session, underLock.lock);
-      const before = s.adt.requests.length;
-      const answered = await session.call(tool, underLock.args(handle));
-      expect(answered.isError).toBe(false);
-      expect(sent(s.adt.requests.slice(before))).toEqual(underLock.requests);
-    },
-  );
-
-  it('HandlerUnlock releases the handle, and a second unlock with it is refused', async () => {
-    const session = await s.session();
-    const handle = await lock(session, {
-      object_type: 'CLASS',
-      object_name: 'ZCL_HELD',
+      const handle = await lock(session, {
+        object_type: 'CLASS',
+        object_name: 'ZCL_HELD',
+      });
+      assert.equal(handle, ISSUED);
+      assert.equal(owners.length, 1);
+      assert.equal(owners[0]?.holds(ISSUED), true);
     });
-    const unlock = {
-      object_type: 'CLASS',
-      object_name: 'ZCL_HELD',
-      lock_handle: handle,
-    };
-    const first = await session.call('HandlerUnlock', unlock);
-    expect(first.isError).toBe(false);
-    expect(owners[0]?.holds(handle)).toBe(false);
-    await s.released();
-    const before = s.adt.requests.length;
-    const second = await session.call('HandlerUnlock', unlock);
-    expect(second.isError).toBe(true);
-    expect(sent(s.adt.requests.slice(before))).toEqual([]);
+
+    for (const [tool, underLock] of UNDER_LOCK) {
+      it(
+        format(
+          '%s under a handle this instance did not issue is refused with zero requests, no logon either',
+          tool,
+        ),
+        async () => {
+          const session = await s.session();
+          // The instance holds a lock of its own, so it is connected and kept.
+          await lock(session, underLock.lock);
+          const before = s.adt.requests.length;
+          const answered = await session.call(tool, underLock.args(FOREIGN));
+          assert.equal(answered.isError, true);
+          assert.ok(answered.text.includes(s.notHeld));
+          assert.deepStrictEqual(sent(s.adt.requests.slice(before)), []);
+        },
+      );
+    }
+
+    for (const [tool, underLock] of UNDER_LOCK) {
+      it(
+        format(
+          '%s under a handle on an instance that has not logged on sends nothing, no logon either',
+          tool,
+        ),
+        async () => {
+          const before = s.adt.requests.length;
+          const session = await s.session();
+          const answered = await session.call(tool, underLock.args(FOREIGN));
+          assert.equal(answered.isError, true);
+          assert.ok(answered.text.includes(s.notHeld));
+          assert.deepStrictEqual(sent(s.adt.requests.slice(before)), []);
+        },
+      );
+    }
+
+    for (const [tool, underLock] of UNDER_LOCK) {
+      it(
+        format('%s under the handle HandlerLock gave is sent', tool),
+        async () => {
+          const session = await s.session();
+          const handle = await lock(session, underLock.lock);
+          const before = s.adt.requests.length;
+          const answered = await session.call(tool, underLock.args(handle));
+          assert.equal(answered.isError, false);
+          assert.deepStrictEqual(
+            sent(s.adt.requests.slice(before)),
+            underLock.requests,
+          );
+        },
+      );
+    }
+
+    it('HandlerUnlock releases the handle, and a second unlock with it is refused', async () => {
+      const session = await s.session();
+      const handle = await lock(session, {
+        object_type: 'CLASS',
+        object_name: 'ZCL_HELD',
+      });
+      const unlock = {
+        object_type: 'CLASS',
+        object_name: 'ZCL_HELD',
+        lock_handle: handle,
+      };
+      const first = await session.call('HandlerUnlock', unlock);
+      assert.equal(first.isError, false);
+      assert.equal(owners[0]?.holds(handle), false);
+      await s.released();
+      const before = s.adt.requests.length;
+      const second = await session.call('HandlerUnlock', unlock);
+      assert.equal(second.isError, true);
+      assert.deepStrictEqual(sent(s.adt.requests.slice(before)), []);
+    });
   });
-});
+}
 
 describe("every transport's instance has its own held-lock owner", () => {
   let owners: HeldLocks[];
 
   beforeEach(() => {
-    jest.spyOn(console, 'error').mockImplementation(() => {});
+    mock.method(console, 'error', () => {});
     owners = [];
     const hold = HeldLocks.prototype.hold;
-    jest.spyOn(HeldLocks.prototype, 'hold').mockImplementation(function (
-      this: HeldLocks,
-      ...args
-    ) {
-      if (!owners.includes(this)) owners.push(this);
-      return hold.apply(this, args);
-    });
+    mock.method(
+      HeldLocks.prototype,
+      'hold',
+      function (this: HeldLocks, ...args: Parameters<HeldLocks['hold']>) {
+        if (!owners.includes(this)) owners.push(this);
+        return hold.apply(this, args);
+      },
+    );
   });
-  afterEach(() => jest.restoreAllMocks());
+  afterEach(() => mock.restoreAll());
 
   const LOCKED = { object_type: 'CLASS', object_name: 'ZCL_HELD' };
   const UPDATE = (lock_handle: string) => ({
@@ -353,43 +373,48 @@ describe("every transport's instance has its own held-lock owner", () => {
     const s = await onStdio();
     try {
       const handle = await lock(await s.session(), LOCKED);
-      expect(owners).toHaveLength(1);
-      expect(owners[0]?.holds(handle)).toBe(true);
+      assert.equal(owners.length, 1);
+      assert.equal(owners[0]?.holds(handle), true);
     } finally {
       await s.close();
     }
   });
 
-  it.each([
+  for (const [_transport, standOf] of [
     ['Streamable HTTP', onHttp],
     ['SSE', onSse],
-  ])(
-    "%s: another instance refuses the first one's handle, and locks into an owner of its own",
-    async (_transport, standOf) => {
-      const s = await standOf();
-      try {
-        const first = await s.session();
-        const handle = await lock(first, LOCKED);
-        expect(owners).toHaveLength(1);
+  ] satisfies [string, () => Promise<TransportStand>][]) {
+    it(
+      format(
+        "%s: another instance refuses the first one's handle, and locks into an owner of its own",
+        _transport,
+      ),
+      async () => {
+        const s = await standOf();
+        try {
+          const first = await s.session();
+          const handle = await lock(first, LOCKED);
+          assert.equal(owners.length, 1);
 
-        const second = await s.session();
-        const before = s.adt.requests.length;
-        const refused = await second.call('HandlerUpdate', UPDATE(handle));
-        expect(refused.isError).toBe(true);
-        expect(refused.text).toContain(s.notHeld);
-        // An unknown handle gets the same answer as another instance's.
-        const unknown = await second.call('HandlerUpdate', UPDATE(FOREIGN));
-        expect(unknown).toEqual(refused);
-        // Refused before a connection is taken: nothing sent, no logon of
-        // the second instance either.
-        expect(sent(s.adt.requests.slice(before))).toEqual([]);
+          const second = await s.session();
+          const before = s.adt.requests.length;
+          const refused = await second.call('HandlerUpdate', UPDATE(handle));
+          assert.equal(refused.isError, true);
+          assert.ok(refused.text.includes(s.notHeld));
+          // An unknown handle gets the same answer as another instance's.
+          const unknown = await second.call('HandlerUpdate', UPDATE(FOREIGN));
+          assert.deepStrictEqual(unknown, refused);
+          // Refused before a connection is taken: nothing sent, no logon of
+          // the second instance either.
+          assert.deepStrictEqual(sent(s.adt.requests.slice(before)), []);
 
-        await lock(second, LOCKED);
-        expect(owners).toHaveLength(2);
-        expect(owners[0]).not.toBe(owners[1]);
-      } finally {
-        await s.close();
-      }
-    },
-  );
+          await lock(second, LOCKED);
+          assert.equal(owners.length, 2);
+          assert.notEqual(owners[0], owners[1]);
+        } finally {
+          await s.close();
+        }
+      },
+    );
+  }
 });

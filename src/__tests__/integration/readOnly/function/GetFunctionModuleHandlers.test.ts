@@ -6,7 +6,7 @@ import { stated } from '../../helpers/testConfigSchema';
  * Reads a shared function module from shared_dependencies config.
  * Requires shared:setup to have been run first.
  *
- * Run: npm test -- --testPathPatterns=readOnly/function/GetFunctionModule
+ * Run: npm run test:integration -- src/__tests__/integration/readOnly/function/GetFunctionModuleHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

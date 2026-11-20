@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import * as z from 'zod';
 /**
  * The idle bound ends a long session (spec §2, "Idle bound"): an open long
@@ -17,8 +19,6 @@ import type { StatePart } from '@mcp-abap-adt/lib/state';
 import { CompactLongSessionHandlersGroup } from '../../../../src/lib/compact/longSession/group';
 import { LongSessionHandlersGroup } from '../../../../src/lib/handlers/groups/LongSessionHandlersGroup';
 import { type HttpStand, httpStand, turns } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const MINUTE = 60_000;
 const placeholder = { connection: undefined } as unknown as HandlerContext;
@@ -117,7 +117,7 @@ function advance(ms: number): void {
 beforeEach(async () => {
   held = [];
   now = 0;
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
   s = await httpStand({
     stateIdleMinutes: 30,
     groups: [
@@ -145,34 +145,38 @@ afterEach(async () => {
   global.setTimeout = realSetTimeout;
   global.clearTimeout = realClearTimeout;
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 it('no call for the bound ends the long session: SAP session logged off, instance out of the pool, handle unknown, nothing created', async () => {
   const opened = await s.call('SessionOpen', {});
-  expect(opened.isError).toBe(false);
+  assert.equal(opened.isError, false);
   const handle = handleOf(opened.text);
   const probed = await s.call('ProbeAdt', { id: 'one', state_handle: handle });
-  expect(probed.isError).toBe(false);
-  expect(poolSize()).toBe(1);
-  expect(s.standIn.logoffs()).toBe(0);
+  assert.equal(probed.isError, false);
+  assert.equal(poolSize(), 1);
+  assert.equal(s.standIn.logoffs(), 0);
 
   advance(30 * MINUTE - 1);
   await settle();
-  expect(poolSize()).toBe(1);
-  expect(s.standIn.logoffs()).toBe(0);
+  assert.equal(poolSize(), 1);
+  assert.equal(s.standIn.logoffs(), 0);
 
   advance(1);
   await settle();
-  expect(s.standIn.logoffs()).toBe(1);
-  expect(poolSize()).toBe(0);
+  assert.equal(s.standIn.logoffs(), 1);
+  assert.equal(poolSize(), 0);
 
   const sent = s.standIn.requests.length;
   const after = await s.call('ProbeAdt', { id: 'two', state_handle: handle });
-  expect(after).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(after, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
   await settle();
-  expect(s.standIn.requests).toHaveLength(sent);
-  expect(poolSize()).toBe(0);
+  assert.equal(s.standIn.requests.length, sent);
+  assert.equal(poolSize(), 0);
 });
 
 it('a call within the bound restarts it: the session outlives the original deadline and ends one bound after its last call', async () => {
@@ -181,44 +185,56 @@ it('a call within the bound restarts it: the session outlives the original deadl
 
   advance(20 * MINUTE);
   const again = await s.call('ProbeAdt', { id: 'two', state_handle: handle });
-  expect(again.isError).toBe(false);
+  assert.equal(again.isError, false);
 
   advance(20 * MINUTE); // 40 minutes after open
   await settle();
-  expect(poolSize()).toBe(1);
-  expect(s.standIn.logoffs()).toBe(0);
+  assert.equal(poolSize(), 1);
+  assert.equal(s.standIn.logoffs(), 0);
 
   advance(10 * MINUTE); // 30 after the last call
   await settle();
-  expect(s.standIn.logoffs()).toBe(1);
-  expect(poolSize()).toBe(0);
+  assert.equal(s.standIn.logoffs(), 1);
+  assert.equal(poolSize(), 0);
   const gone = await s.call('ProbeAdt', { id: 'three', state_handle: handle });
-  expect(gone.text).toBe(NOT_AVAILABLE);
+  assert.equal(gone.text, NOT_AVAILABLE);
 });
 
 it('an ending session is never reopened: open with its handle while the expiry cleanup runs is refused; the handle then ends', async () => {
   const handle = handleOf((await s.call('SessionOpen', {})).text);
   const heldPart = await s.call('HoldSlowPart', { state_handle: handle });
-  expect(heldPart.isError).toBe(false);
+  assert.equal(heldPart.isError, false);
 
   advance(30 * MINUTE); // the bound fires; the cleanup waits
   await settle();
-  expect(poolSize()).toBe(1);
+  assert.equal(poolSize(), 1);
 
   const reopened = await s.call('SessionOpen', { state_handle: handle });
-  expect(reopened).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(reopened, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
   const compact = await s.call('HandlerSession', {
     action: 'open',
     state_handle: handle,
   });
-  expect(compact).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(compact, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
 
   letCleanupFinish();
   await settle();
-  expect(poolSize()).toBe(0);
+  assert.equal(poolSize(), 0);
   const after = await s.call('SessionOpen', { state_handle: handle });
-  expect(after).toEqual({ status: 200, text: NOT_AVAILABLE, isError: true });
+  assert.deepStrictEqual(after, {
+    status: 200,
+    text: NOT_AVAILABLE,
+    isError: true,
+  });
   // A new session gets a new handle.
   const fresh = await s.call('SessionOpen', {});
-  expect(handleOf(fresh.text)).not.toBe(handle);
+  assert.notEqual(handleOf(fresh.text), handle);
 });

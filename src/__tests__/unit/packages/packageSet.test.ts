@@ -11,11 +11,15 @@
  * are the owner's names.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { RELEASE_DIRS } from '../../helpers/installedRelease';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const ROOT = path.join(__dirname, '..', '..', '..', '..');
+const ROOT = repositoryRoot(__dirname);
 
 /** Each package's directory, its name and its bin (none for a library). */
 const PACKAGES: ReadonlyArray<readonly [string, string, string | null]> = [
@@ -154,11 +158,11 @@ describe('the package set', () => {
       .readFileSync(path.join(ROOT, 'scripts', 'publish-all.sh'), 'utf8')
       .split(/\r?\n/);
     const start = script.findIndex((line) => line.trim() === 'PACKAGES=(');
-    expect(start).toBeGreaterThanOrEqual(0);
+    assert.ok(start >= 0);
     const end = script.findIndex(
       (line, index) => index > start && line.trim() === ')',
     );
-    expect(end).toBeGreaterThan(start);
+    assert.ok(end > start);
     const published = script
       .slice(start + 1, end)
       .map((line) => line.trim().replace(/^"|"$/g, ''))
@@ -167,85 +171,101 @@ describe('the package set', () => {
     const listed = PACKAGES.map(([dir]) => dir);
     const sorted = (dirs: readonly string[]) => [...dirs].sort();
     for (const dirs of [published, RELEASE_DIRS, listed]) {
-      expect(dirs).toHaveLength(18);
-      expect(new Set(dirs).size).toBe(18);
+      assert.equal(dirs.length, 18);
+      assert.equal(new Set(dirs).size, 18);
     }
     // The order is publish-all's own concern (dependency order).
-    expect(sorted(published)).toEqual(sorted(listed));
-    expect(sorted(RELEASE_DIRS)).toEqual(sorted(listed));
+    assert.deepStrictEqual(sorted(published), sorted(listed));
+    assert.deepStrictEqual(sorted(RELEASE_DIRS), sorted(listed));
   });
 
   it('is eighteen packages, every manifest kept by .gitignore’s exceptions', () => {
     const ignore = fs.readFileSync(path.join(ROOT, '.gitignore'), 'utf8');
-    expect(PACKAGES).toHaveLength(18);
+    assert.equal(PACKAGES.length, 18);
     for (const [dir, name] of PACKAGES) {
-      expect(manifestOf(dir).name).toBe(name);
-      expect(manifestOf(dir).workspaces).toBeUndefined();
+      assert.equal(manifestOf(dir).name, name);
+      assert.equal(manifestOf(dir).workspaces, undefined);
       const exception =
         dir === '.' ? '!/package.json' : `!/${dir}/package.json`;
-      expect({ dir, kept: ignore.split('\n').includes(exception) }).toEqual({
-        dir,
-        kept: true,
-      });
-    }
-  });
-
-  it.each(PACKAGES)('%s: its bin, declared and shipped', (dir, _name, bin) => {
-    const manifest = manifestOf(dir);
-    if (bin === null) {
-      expect(manifest.bin).toBeUndefined();
-      return;
-    }
-    expect(manifest.bin).toEqual({ [bin]: `./bin/${bin}.js` });
-    expect(manifest.files).toEqual(expect.arrayContaining(['dist/', 'bin/']));
-    const file = path.join(ROOT, dir, 'bin', `${bin}.js`);
-    expect(
-      fs.readFileSync(file, 'utf8').startsWith('#!/usr/bin/env node\n'),
-    ).toBe(true);
-  });
-
-  it.each(PACKAGES)('%s: every dependency range is a registry range', (dir) => {
-    const manifest = manifestOf(dir);
-    const refused: string[] = [];
-    for (const field of [
-      'dependencies',
-      'devDependencies',
-      'optionalDependencies',
-      'peerDependencies',
-    ] as const) {
-      for (const [dep, range] of Object.entries(manifest[field] ?? {})) {
-        if (!isRegistryRange(range)) refused.push(`${field} ${dep} ${range}`);
-      }
-    }
-    expect(refused).toEqual([]);
-  });
-
-  // A sibling's range must accept the version the sibling's manifest
-  // carries: a range ahead of it builds here (the mappers read the sources)
-  // and fails the packed install, where npm asks the registry for it.
-  it.each(PACKAGES)(
-    '%s: every sibling range accepts the sibling’s own version',
-    (dir) => {
-      const versions = new Map(
-        PACKAGES.map(([d, name]) => [name, manifestOf(d).version] as const),
+      assert.deepStrictEqual(
+        { dir, kept: ignore.split('\n').includes(exception) },
+        {
+          dir,
+          kept: true,
+        },
       );
+    }
+  });
+
+  for (const [dir, _name, bin] of PACKAGES) {
+    it(format('%s: its bin, declared and shipped', dir), () => {
+      const manifest = manifestOf(dir);
+      if (bin === null) {
+        assert.equal(manifest.bin, undefined);
+        return;
+      }
+      assert.deepStrictEqual(manifest.bin, { [bin]: `./bin/${bin}.js` });
+      {
+        const actual = manifest.files;
+        assert.ok(Array.isArray(actual));
+        for (const expected of ['dist/', 'bin/']) {
+          assert.ok(actual.some((e) => isDeepStrictEqual(e, expected)));
+        }
+      }
+      const file = path.join(ROOT, dir, 'bin', `${bin}.js`);
+      assert.equal(
+        fs.readFileSync(file, 'utf8').startsWith('#!/usr/bin/env node\n'),
+        true,
+      );
+    });
+  }
+
+  for (const [dir] of PACKAGES) {
+    it(format('%s: every dependency range is a registry range', dir), () => {
       const manifest = manifestOf(dir);
       const refused: string[] = [];
       for (const field of [
         'dependencies',
+        'devDependencies',
         'optionalDependencies',
         'peerDependencies',
       ] as const) {
         for (const [dep, range] of Object.entries(manifest[field] ?? {})) {
-          const version = versions.get(dep);
-          if (version !== undefined && !accepts(range, version)) {
-            refused.push(`${dep} ${range} refuses ${version}`);
-          }
+          if (!isRegistryRange(range)) refused.push(`${field} ${dep} ${range}`);
         }
       }
-      expect(refused).toEqual([]);
-    },
-  );
+      assert.deepStrictEqual(refused, []);
+    });
+  }
+
+  // A sibling's range must accept the version the sibling's manifest
+  // carries: a range ahead of it builds here (the mappers read the sources)
+  // and fails the packed install, where npm asks the registry for it.
+  for (const [dir] of PACKAGES) {
+    it(
+      format('%s: every sibling range accepts the sibling’s own version', dir),
+      () => {
+        const versions = new Map(
+          PACKAGES.map(([d, name]) => [name, manifestOf(d).version] as const),
+        );
+        const manifest = manifestOf(dir);
+        const refused: string[] = [];
+        for (const field of [
+          'dependencies',
+          'optionalDependencies',
+          'peerDependencies',
+        ] as const) {
+          for (const [dep, range] of Object.entries(manifest[field] ?? {})) {
+            const version = versions.get(dep);
+            if (version !== undefined && !accepts(range, version)) {
+              refused.push(`${dep} ${range} refuses ${version}`);
+            }
+          }
+        }
+        assert.deepStrictEqual(refused, []);
+      },
+    );
+  }
 
   it('the range reading is npm’s for the ranges written here', () => {
     const cases: Array<[string, string, boolean]> = [
@@ -263,11 +283,14 @@ describe('the package set', () => {
       ['18.1.0', '18.1.1', false],
     ];
     for (const [range, version, ok] of cases) {
-      expect({ range, version, ok: accepts(range, version) }).toEqual({
-        range,
-        version,
-        ok,
-      });
+      assert.deepStrictEqual(
+        { range, version, ok: accepts(range, version) },
+        {
+          range,
+          version,
+          ok,
+        },
+      );
     }
   });
 
@@ -282,16 +305,22 @@ describe('the package set', () => {
       '../server',
       'npm:@x/y@1.0.0',
     ]) {
-      expect({ range, ok: isRegistryRange(range) }).toEqual({
-        range,
-        ok: false,
-      });
+      assert.deepStrictEqual(
+        { range, ok: isRegistryRange(range) },
+        {
+          range,
+          ok: false,
+        },
+      );
     }
     for (const range of ['^18.1.0', '~1.2.3', '1.0.0-alpha.6', '*']) {
-      expect({ range, ok: isRegistryRange(range) }).toEqual({
-        range,
-        ok: true,
-      });
+      assert.deepStrictEqual(
+        { range, ok: isRegistryRange(range) },
+        {
+          range,
+          ok: true,
+        },
+      );
     }
   });
 
@@ -314,7 +343,7 @@ describe('the package set', () => {
   ];
 
   it('twelve binary packages, none depending on another', () => {
-    expect(BINARIES).toHaveLength(12);
+    assert.equal(BINARIES.length, 12);
     for (const [dir, name] of BINARIES) {
       const manifest = manifestOf(dir);
       const edges = (
@@ -324,48 +353,63 @@ describe('the package set', () => {
           .filter((dep) => dep !== name && BINARY_NAMES.includes(dep))
           .map((dep) => `${field} ${dep}`),
       );
-      expect({ dir, edges }).toEqual({ dir, edges: [] });
+      assert.deepStrictEqual({ dir, edges }, { dir, edges: [] });
     }
   });
 
-  it.each(BINARIES)(
-    '%s: lists the runtime, lib and the two state packages in dependencies',
-    (dir) => {
-      const dependencies = manifestOf(dir).dependencies ?? {};
-      const missing = [
-        '@mcp-abap-adt/server-runtime',
-        '@mcp-abap-adt/lib',
-        ...STATE,
-      ].filter((dep) => dependencies[dep] === undefined);
-      expect(missing).toEqual([]);
-    },
-  );
+  for (const [dir] of BINARIES) {
+    it(
+      format(
+        '%s: lists the runtime, lib and the two state packages in dependencies',
+        dir,
+      ),
+      () => {
+        const dependencies = manifestOf(dir).dependencies ?? {};
+        const missing = [
+          '@mcp-abap-adt/server-runtime',
+          '@mcp-abap-adt/lib',
+          ...STATE,
+        ].filter((dep) => dependencies[dep] === undefined);
+        assert.deepStrictEqual(missing, []);
+      },
+    );
+  }
 
-  it.each(BELOW)(
-    '%s: takes %j as peerDependencies (and devDependencies), not dependencies',
-    (dir, peers) => {
-      const manifest = manifestOf(dir);
-      for (const name of peers) {
-        expect({
-          dir,
-          name,
-          peer: manifest.peerDependencies?.[name],
-          dev: manifest.devDependencies?.[name],
-          dependency: manifest.dependencies?.[name],
-        }).toEqual({
-          dir,
-          name,
-          // The ranges themselves are releaseMetadata's: each against the release.
-          peer: expect.any(String),
-          dev: expect.any(String),
-          dependency: undefined,
-        });
-      }
-    },
-  );
+  for (const [dir, peers] of BELOW) {
+    it(
+      format(
+        '%s: takes %j as peerDependencies (and devDependencies), not dependencies',
+        dir,
+        peers,
+      ),
+      () => {
+        const manifest = manifestOf(dir);
+        for (const name of peers) {
+          // The ranges themselves are releaseMetadata's: each against the
+          // release. Here: a string each, and no dependency.
+          assert.deepStrictEqual(
+            {
+              dir,
+              name,
+              peer: typeof manifest.peerDependencies?.[name],
+              dev: typeof manifest.devDependencies?.[name],
+              dependency: manifest.dependencies?.[name],
+            },
+            {
+              dir,
+              name,
+              peer: 'string',
+              dev: 'string',
+              dependency: undefined,
+            },
+          );
+        }
+      },
+    );
+  }
 
   it('server-runtime has no bin', () => {
-    expect(manifestOf('server-runtime').bin).toBeUndefined();
+    assert.equal(manifestOf('server-runtime').bin, undefined);
   });
 
   it('the lockfile installs nothing by link', () => {
@@ -375,7 +419,7 @@ describe('the package set', () => {
     const links = Object.entries(lock.packages)
       .filter(([, entry]) => entry.link === true)
       .map(([at]) => at);
-    expect(links).toEqual([]);
+    assert.deepStrictEqual(links, []);
   });
 
   // Built by `npm run build`, as the dependency rule's dist graph is: under
@@ -397,15 +441,18 @@ describe('the package set', () => {
 
   it('every package declares what it exports', () => {
     for (const [dir] of PACKAGES) {
-      expect({
-        dir,
-        targets: declaredTargets(manifestOf(dir)).length > 0,
-      }).toEqual({ dir, targets: true });
+      assert.deepStrictEqual(
+        {
+          dir,
+          targets: declaredTargets(manifestOf(dir)).length > 0,
+        },
+        { dir, targets: true },
+      );
     }
   });
 
   it('every package builds: each exported file is there after npm run build', () => {
     if (unbuilt.length > 0 && !onCi) return;
-    expect(unbuilt).toEqual([]);
+    assert.deepStrictEqual(unbuilt, []);
   });
 });

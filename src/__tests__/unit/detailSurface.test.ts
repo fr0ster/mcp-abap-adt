@@ -60,27 +60,30 @@
  *     `terse` actually answer different bytes for a real handler, which
  *     `detailWiring` (a wiring check, not a behavioural one) cannot see.
  */
+
+import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import ts from 'typescript';
 import {
   detailWiring,
   toolNameOf,
 } from '../../../scripts/lib/analyseOmissions';
 import { handleCheckClass } from '../../handlers/class/low/handleCheckClass';
+import * as clients from '../../lib/clients';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 import { globSync, tsxCommand } from '../helpers/platform';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 const handlers = globSync('src/handlers/**/handle*.ts');
 
-// Hoisted above the imports above by babel-plugin-jest-hoist, matching every
-// other file in this directory that swaps the real client for a fake one
-// (`lowTierStrategies.test.ts`, `staticSequences.test.ts`) — written inside a
-// `describe` block this registers too late: `handleCheckClass`'s own static
-// import of `createAdtClient` above has already linked the real module by
-// the time a nested `jest.mock` call would run.
+// The real client swapped for a fake one on the module that defines
+// `createAdtClient` (`mock.method`): the handlers read it at call time, so
+// the swap reaches `handleCheckClass` though it was imported above.
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 /**
  * Every tool whose `inputSchema` declares `detail` — the list this migration
@@ -102,7 +105,7 @@ jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
  *    second row (a `structured` slot, a real parse), always answering the
  *    whole parse regardless of any `detail`.
  *  - `GetUnitTest`/`GetUnitTestResult`/`GetCdsUnitTest`/
- *    `GetCdsUnitTestResult` — each answers through `readRunOnce`'s
+ *    `GetCdsUnitTestResult` — each answers through `readGivenRun`'s
  *    `RunOutcome`, whose `status` and (once finished) `result` are BOTH
  *    `structured` `AdtReading`s in their own right; "no single reading
  *    behind a composite" does not excuse these the way it does the two
@@ -270,7 +273,9 @@ const JSON_ANSWERING: readonly string[] = [
   'UpdateServiceDefinition',
   'UpdateStructure',
   'UpdateTable',
+  'UpdateTableSettings',
   'UpdateTableType',
+  'UpdateTextElements',
   'UpdateUnitTest',
   'ValidateServiceBinding',
 ];
@@ -305,7 +310,10 @@ const toolsDeclaring = (param: string): string[] => [
 ];
 
 it('declares detail on every JSON-answering tool and on no other', () => {
-  expect(toolsDeclaring('detail').sort()).toEqual([...JSON_ANSWERING].sort());
+  assert.deepStrictEqual(
+    toolsDeclaring('detail').sort(),
+    [...JSON_ANSWERING].sort(),
+  );
 });
 
 /**
@@ -371,10 +379,10 @@ it('resolves the tool name past a decoy name property above TOOL_DEFINITION', ()
   // "First quoted name: in the file" would answer 'NotTheToolName' — the
   // decoy object's own property, textually first. The real tool name,
   // `TOOL_DEFINITION`'s, comes second in the file.
-  expect(toolNameOf(source)).toBe('DecoyFixtureTool');
+  assert.equal(toolNameOf(source), 'DecoyFixtureTool');
 });
 
-it.each([
+for (const [fixture, declaring] of [
   // The absence hides six ways: no `detail` property at all, a context
   // assembled in a variable this walk cannot see into, the shorthand
   // `{ detail }` bound to something other than `detailOf(args)` (the exact
@@ -397,22 +405,26 @@ it.each([
   ['declares-no-answer-call', ['FixtureDeclaresNoAnswerCall']],
   ['declares-debug-fixed-level', ['FixtureDebugFixedLevel']],
   ['undeclared-debug-reads-args', []],
-] as const)('reports %s rather than skipping it', (fixture, declaring) => {
-  expect(
-    detailWiring(
-      [`src/__tests__/fixtures/detail/${fixture}.ts`],
-      new Set(declaring),
-    ),
-  ).toHaveLength(1);
-});
+] as const) {
+  it(format('reports %s rather than skipping it', fixture), () => {
+    assert.equal(
+      detailWiring(
+        [`src/__tests__/fixtures/detail/${fixture}.ts`],
+        new Set(declaring),
+      ).length,
+      1,
+    );
+  });
+}
 
 it('accepts a debug tool that hands its arguments to the adapters', () => {
-  expect(
+  assert.deepStrictEqual(
     detailWiring(
       ['src/__tests__/fixtures/detail/declares-debug-wired.ts'],
       new Set(['FixtureDebugWired']),
     ),
-  ).toEqual([]);
+    [],
+  );
 });
 
 /**
@@ -477,7 +489,7 @@ it('wires detail the way each tool schema claims', () => {
   // `handlerInvariants.test.ts` holds `ANALYSE_EXCEPTIONS` to.
   const excused = DETAIL_WIRING_EXCEPTIONS.map((exc) => {
     const match = excusedBy(exc);
-    expect(match).toBeDefined();
+    assert.notEqual(match, undefined);
     return match as string;
   });
 
@@ -487,9 +499,9 @@ it('wires detail the way each tool schema claims', () => {
   // precisely the matched lines and nothing else is what proves this
   // ledger cannot swallow a neighbour.
   const excusedSet = new Set(excused);
-  expect(excusedSet.size).toBe(DETAIL_WIRING_EXCEPTIONS.length);
+  assert.equal(excusedSet.size, DETAIL_WIRING_EXCEPTIONS.length);
   const remaining = offenders.filter((o) => !excusedSet.has(o));
-  expect(remaining).toEqual([]);
+  assert.deepStrictEqual(remaining, []);
 });
 
 // One worked example beside the invariant, since `detailWiring` proves the
@@ -528,7 +540,7 @@ describe('a JSON-answering tool actually varies with detail', () => {
       class_name: 'ZCL_X',
       detail: 'raw',
     });
-    expect(raw.content[0].text).toContain('<?xml');
-    expect(terse.content[0].text).not.toContain('<?xml');
+    assert.ok(raw.content[0].text.includes('<?xml'));
+    assert.ok(!terse.content[0].text.includes('<?xml'));
   });
 });

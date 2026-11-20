@@ -1684,5 +1684,29 @@
     "name": "MemorySnapshotDelta",
     "inputs": "from_id*, to_id*, view, key, max_objects, detail",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetTableSettings",
+    "inputs": "table_name*, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "GetTextElements",
+    "inputs": "object_kind*, object_name*, parts, version",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "UpdateTableSettings",
+    "inputs": "table_name*, data_class, size_category, buffering, storage_type, sharing_type, load_unit, translation, logging_enabled, transport_request, activate*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "UpdateTextElements",
+    "inputs": "object_kind*, object_name*, symbols, selections, headings, transport_request, activate*, detail",
+    "available_in": "cloud, onprem"
   }
 ]

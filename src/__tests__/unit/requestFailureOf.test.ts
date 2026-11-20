@@ -4,6 +4,10 @@
  * `status` and object `headers` make it a wire answer (`statusText` may be
  * absent); any other shape is no answer, and the error carries none.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { requestFailureOf } from '../../lib/answer';
 import { wireResponseOf } from '../../lib/wireResponse';
 
@@ -26,12 +30,14 @@ describe('requestFailureOf: the answer a throw carries', () => {
       }),
       SENT,
     );
-    expect(error?.message).toBe('Request failed with status code 404');
-    expect(error?.request).toEqual(SENT);
-    expect(error?.response?.status).toBe(404);
-    expect(error?.response?.statusText).toBe('Not Found');
-    expect(error?.response?.headers).toEqual({ 'content-type': 'text/plain' });
-    expect(error?.response?.data).toBe('not found');
+    assert.equal(error?.message, 'Request failed with status code 404');
+    assert.deepStrictEqual(error?.request, SENT);
+    assert.equal(error?.response?.status, 404);
+    assert.equal(error?.response?.statusText, 'Not Found');
+    assert.deepStrictEqual(error?.response?.headers, {
+      'content-type': 'text/plain',
+    });
+    assert.equal(error?.response?.data, 'not found');
   });
 
   it('reads a response without statusText, which is then empty', () => {
@@ -39,11 +45,11 @@ describe('requestFailureOf: the answer a throw carries', () => {
       thrownWith({ data: '', status: 500, headers: {} }),
       SENT,
     );
-    expect(error?.response?.status).toBe(500);
-    expect(error?.response?.statusText).toBe('');
+    assert.equal(error?.response?.status, 500);
+    assert.equal(error?.response?.statusText, '');
   });
 
-  it.each([
+  for (const [_shape, response] of [
     ['a status that is a string', { status: '404', headers: {} }],
     ['a status that is not an integer', { status: 404.5, headers: {} }],
     ['no status', { headers: {} }],
@@ -52,19 +58,21 @@ describe('requestFailureOf: the answer a throw carries', () => {
     ['headers that are a list', { status: 404, headers: ['a'] }],
     ['headers that are a string', { status: 404, headers: 'a: b' }],
     ['a response that is not an object', 'HTTP 404'],
-  ])('carries no response for %s', (_shape, response) => {
-    const error = requestFailureOf(thrownWith(response), SENT);
-    expect(error?.origin).toBe('connection');
-    expect(error?.message).toBe('Request failed with status code 404');
-    expect(error?.response).toBeUndefined();
-    expect(error?.request).toEqual(SENT);
-  });
+  ]) {
+    it(format('carries no response for %s', _shape), () => {
+      const error = requestFailureOf(thrownWith(response), SENT);
+      assert.equal(error?.origin, 'connection');
+      assert.equal(error?.message, 'Request failed with status code 404');
+      assert.equal(error?.response, undefined);
+      assert.deepStrictEqual(error?.request, SENT);
+    });
+  }
 
   it('answers a thrown string as its message, with no response', () => {
     const error = requestFailureOf('socket hang up', undefined);
-    expect(error?.message).toBe('socket hang up');
-    expect(error?.response).toBeUndefined();
-    expect(error?.request).toBeUndefined();
+    assert.equal(error?.message, 'socket hang up');
+    assert.equal(error?.response, undefined);
+    assert.equal(error?.request, undefined);
   });
 });
 
@@ -84,7 +92,7 @@ describe('wireResponseOf', () => {
       config: { url: '/u' },
       request: { path: '/u' },
     });
-    expect(read).toEqual({
+    assert.deepStrictEqual(read, {
       data: 1,
       status: 200,
       statusText: '',

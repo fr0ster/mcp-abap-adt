@@ -8,16 +8,17 @@
  * A page generated from the group, or left stale after the set changed, goes
  * red here.
  */
+
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import { LONG_TOOLS } from '../../lib/longTools';
 import { fullReadOnlyToolSet } from '../../lib/toolSet';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 const PAGE = path.join(
-  __dirname,
-  '..',
-  '..',
-  '..',
+  repositoryRoot(__dirname),
   'docs',
   'user-guide',
   'AVAILABLE_TOOLS_READONLY.md',
@@ -51,10 +52,11 @@ const served = fullReadOnlyToolSet
 describe('the read-only tool page lists exactly what mcp-abap-adt-ro serves', () => {
   it('the same tools, no more and no fewer', () => {
     const names = [...documented().keys()].sort();
-    expect(names).toEqual(
+    assert.deepStrictEqual(
+      names,
       served.map((entry) => entry.toolDefinition.name).sort(),
     );
-    expect(page).toContain(`- Total tools: ${served.length}\n`);
+    assert.ok(page.includes(`- Total tools: ${served.length}\n`));
   });
 
   it('the background-run tools of the long reads, and no resume', () => {
@@ -64,12 +66,15 @@ describe('the read-only tool page lists exactly what mcp-abap-adt-ro serves', ()
       'ListBackgroundRuns',
       'DiscardBackgroundRun',
     ]) {
-      expect({ name, listed: names.includes(name) }).toEqual({
-        name,
-        listed: true,
-      });
+      assert.deepStrictEqual(
+        { name, listed: names.includes(name) },
+        {
+          name,
+          listed: true,
+        },
+      );
     }
-    expect(names.includes('ResumeLeftoverSession')).toBe(false);
+    assert.equal(names.includes('ResumeLeftoverSession'), false);
   });
 
   it('no run tool, no trace schedule, no logoff; only the long reads take background', () => {
@@ -80,19 +85,23 @@ describe('the read-only tool page lists exactly what mcp-abap-adt-ro serves', ()
       'RuntimeCreateProfilerTraceParameters',
       'LogoffLeftoverSession',
     ]) {
-      expect({ name, listed: tools.has(name) }).toEqual({
-        name,
-        listed: false,
-      });
+      assert.deepStrictEqual(
+        { name, listed: tools.has(name) },
+        {
+          name,
+          listed: false,
+        },
+      );
     }
     const withBackground = [...tools.entries()]
       .filter(([, params]) =>
         params.some((p) => p.startsWith('- `background`')),
       )
       .map(([name]) => name);
-    expect(withBackground.filter((name) => !LONG_TOOLS.includes(name))).toEqual(
+    assert.deepStrictEqual(
+      withBackground.filter((name) => !LONG_TOOLS.includes(name)),
       [],
     );
-    expect(withBackground.length).toBeGreaterThan(10);
+    assert.ok(withBackground.length > 10);
   });
 });

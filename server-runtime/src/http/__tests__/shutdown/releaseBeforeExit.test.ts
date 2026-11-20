@@ -8,6 +8,8 @@
  * off at once. (The full and the compact tool set: the parity suite.)
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import {
   isUnlockOf,
   isUpdateOf,
@@ -15,19 +17,17 @@ import {
 import { activeTools } from '../../../../../src/lib/activeTools';
 import { type HttpStand, httpStand, turns, until } from './harness';
 
-jest.setTimeout(30_000);
-
 let s: HttpStand;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 beforeEach(async () => {
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
   s = await httpStand();
 });
 
 afterEach(async () => {
   await s.close();
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
 it('the logoff is written under the held update, exit 0 without waiting for the tool; no UNLOCK', async () => {
@@ -36,16 +36,19 @@ it('the logoff is written under the held update, exit 0 without waiting for the 
   await hold.arrived;
 
   s.processLike.emit('SIGTERM');
-  expect(await s.exited).toBe(0);
+  assert.equal(await s.exited, 0);
   // The tool still runs: its update is held.
-  expect(activeTools().map((t) => t.name)).toEqual(['LockedUpdate']);
+  assert.deepStrictEqual(
+    activeTools().map((t) => t.name),
+    ['LockedUpdate'],
+  );
   await until(() => s.standIn.logoffs() === 1);
-  expect(s.stderr).toEqual([]);
+  assert.deepStrictEqual(s.stderr, []);
 
   hold.release();
   await until(() => activeTools().length === 0);
   await turns(20);
-  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
+  assert.equal(s.indexOf(isUnlockOf('A')), -1);
 });
 
 it('two concurrent tools on two per-request instances: both sessions logged off at once, neither awaited', async () => {
@@ -56,14 +59,14 @@ it('two concurrent tools on two per-request instances: both sessions logged off 
   await Promise.all([holdA.arrived, holdB.arrived]);
 
   s.processLike.emit('SIGTERM');
-  expect(await s.exited).toBe(0);
+  assert.equal(await s.exited, 0);
   await until(() => s.standIn.logoffs() === 2);
-  expect(activeTools()).toHaveLength(2);
+  assert.equal(activeTools().length, 2);
 
   holdA.release();
   holdB.release();
   await until(() => activeTools().length === 0);
   await turns(20);
-  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
-  expect(s.indexOf(isUnlockOf('B'))).toBe(-1);
+  assert.equal(s.indexOf(isUnlockOf('A')), -1);
+  assert.equal(s.indexOf(isUnlockOf('B')), -1);
 });

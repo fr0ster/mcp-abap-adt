@@ -1,4 +1,7 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { XMLBuilder } from 'fast-xml-parser';
 import {
@@ -49,38 +52,43 @@ function wire(name: string): IAdtWireResponse {
 }
 
 describe('the read that feeds a write gives the document back untouched', () => {
-  it.each(ALL_METADATA)('%s survives verbatim, byte for byte', (name) => {
-    expect(verbatim(wire(name)).raw).toBe(corpusBody(name));
-    expect(verbatim(wire(name)).value).toBe(corpusBody(name));
-  });
+  for (const name of ALL_METADATA) {
+    it(format('%s survives verbatim, byte for byte', name), () => {
+      assert.equal(verbatim(wire(name)).raw, corpusBody(name));
+      assert.equal(verbatim(wire(name)).value, corpusBody(name));
+    });
+  }
 
-  it.each(XML_BODIED)(
-    '%s is a family whose update replaces the whole document',
-    (name) => {
-      // Nothing clever here: the point is that the bytes a handler would send
-      // back are the bytes it read, with its own edit and nothing else.
-      const read = verbatim(wire(name)).value as string;
-      const edited = read.replace(
-        /adtcore:description="[^"]*"/,
-        'adtcore:description="edited"',
-      );
-      expect(edited).not.toBe(read);
-      expect(edited.length).toBeCloseTo(read.length, -2);
-      // everything outside the edit is identical
-      expect(edited.replace('adtcore:description="edited"', '')).toBe(
-        read.replace(/adtcore:description="[^"]*"/, ''),
-      );
-    },
-  );
+  for (const name of XML_BODIED) {
+    it(
+      format('%s is a family whose update replaces the whole document', name),
+      () => {
+        // Nothing clever here: the point is that the bytes a handler would send
+        // back are the bytes it read, with its own edit and nothing else.
+        const read = verbatim(wire(name)).value as string;
+        const edited = read.replace(
+          /adtcore:description="[^"]*"/,
+          'adtcore:description="edited"',
+        );
+        assert.notEqual(edited, read);
+        assert.ok(Math.abs(edited.length - read.length) < 10 ** -(-2) / 2);
+        // everything outside the edit is identical
+        assert.equal(
+          edited.replace('adtcore:description="edited"', ''),
+          read.replace(/adtcore:description="[^"]*"/, ''),
+        );
+      },
+    );
+  }
 });
 
 describe('why a parsed reading cannot feed a write', () => {
   it('a parse is not a document, and re-serialising it is not the same bytes', () => {
     const name = 'read-metadata-package--01-packages-zmcpshrpkg';
     const parsed = structured(wire(name)).value;
-    expect(typeof parsed).toBe('object');
+    assert.equal(typeof parsed, 'object');
     // The parse is faithful enough to read from and not a document to write.
-    expect(JSON.stringify(parsed)).not.toBe(corpusBody(name));
+    assert.notEqual(JSON.stringify(parsed), corpusBody(name));
   });
 
   it('re-serialising the parse does not reproduce the bytes', () => {
@@ -90,7 +98,7 @@ describe('why a parsed reading cannot feed a write', () => {
 
     // The parse is faithful — it even keeps the prolog, which I had assumed it
     // dropped until the test said otherwise.
-    expect(Object.keys(parsed)).toContain('?xml');
+    assert.ok(Object.keys(parsed).includes('?xml'));
 
     // And it still is not the document. Building it back changes the bytes:
     // attribute order, self-closing forms and whitespace are the parser's
@@ -102,6 +110,6 @@ describe('why a parsed reading cannot feed a write', () => {
       attributesGroupName: '@',
       suppressEmptyNode: true,
     }).build(parsed) as string;
-    expect(rebuilt).not.toBe(body);
+    assert.notEqual(rebuilt, body);
   });
 });

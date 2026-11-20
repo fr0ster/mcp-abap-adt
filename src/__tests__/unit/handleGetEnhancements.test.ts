@@ -1,5 +1,11 @@
-import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import {
+  handleGetEnhancements,
+  parseEnhancementsFromXml,
+} from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { createBatchAvailability } from '../../lib/batch/availability';
+import { assertMatchObject } from '../helpers/assertions';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -71,11 +77,12 @@ describe('GetEnhancements', () => {
       object_type: 'program',
     });
 
-    expect(result.isError).toBe(false);
-    expect(connection.calls.map((c) => c.url)).toEqual([
-      '/sap/bc/adt/functions/groups/zfg/source/main/enhancements/elements',
-    ]);
-    expect(connection.calls[0]?.headers?.Accept).toBe(ELEMENTS_ACCEPT);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(
+      connection.calls.map((c) => c.url),
+      ['/sap/bc/adt/functions/groups/zfg/source/main/enhancements/elements'],
+    );
+    assert.equal(connection.calls[0]?.headers?.Accept, ELEMENTS_ACCEPT);
   });
 
   it('goes straight to a class when told it is one', async () => {
@@ -88,11 +95,12 @@ describe('GetEnhancements', () => {
       object_type: 'class',
     });
 
-    expect(result.isError).toBe(false);
-    expect(connection.calls.map((c) => c.url)).toEqual([
-      '/sap/bc/adt/oo/classes/zcl_x/source/main/enhancements/elements',
-    ]);
-    expect(connection.calls[0]?.headers?.Accept).toBe(ELEMENTS_ACCEPT);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(
+      connection.calls.map((c) => c.url),
+      ['/sap/bc/adt/oo/classes/zcl_x/source/main/enhancements/elements'],
+    );
+    assert.equal(connection.calls[0]?.headers?.Accept, ELEMENTS_ACCEPT);
   });
 
   it("when it must probe, reads each kind's active metadata through adt-clients, Accept as a header", async () => {
@@ -109,21 +117,26 @@ describe('GetEnhancements', () => {
       object_type: 'unknown-kind',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     for (const call of connection.calls) {
-      expect(call.data).toBeUndefined();
+      assert.equal(call.data, undefined);
     }
-    expect(connection.calls.map((c) => c.url)).toEqual([
-      '/sap/bc/adt/oo/classes/zprog?version=active',
-      '/sap/bc/adt/programs/programs/zprog?version=active',
-      '/sap/bc/adt/programs/programs/zprog/source/main/enhancements/elements',
-    ]);
-    expect(
-      connection.calls.find(
-        (c) => c.url === '/sap/bc/adt/programs/programs/zprog?version=active',
-      )?.headers?.Accept,
-    ).toContain('application/vnd.sap.adt.programs.programs');
-    expect(JSON.parse(result.content[0].text).unreadable).toBeUndefined();
+    assert.deepStrictEqual(
+      connection.calls.map((c) => c.url),
+      [
+        '/sap/bc/adt/oo/classes/zprog?version=active',
+        '/sap/bc/adt/programs/programs/zprog?version=active',
+        '/sap/bc/adt/programs/programs/zprog/source/main/enhancements/elements',
+      ],
+    );
+    assert.ok(
+      connection.calls
+        .find(
+          (c) => c.url === '/sap/bc/adt/programs/programs/zprog?version=active',
+        )
+        ?.headers?.Accept.includes('application/vnd.sap.adt.programs.programs'),
+    );
+    assert.equal(JSON.parse(result.content[0].text).unreadable, undefined);
   });
 
   it('a refused probe is the method error as it is, with its step, beside the enhancements', async () => {
@@ -160,13 +173,13 @@ describe('GetEnhancements', () => {
       object_type: 'unknown-kind',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const [refused, ...rest] = JSON.parse(result.content[0].text).unreadable;
-    expect(rest).toEqual([]);
-    expect(refused.step).toBe('read class metadata');
-    expect(refused.status).toBe(403);
-    expect(refused.raw_body).toBe(DOCUMENT);
-    expect(refused.message).toBe('Request failed with status code 403');
+    assert.deepStrictEqual(rest, []);
+    assert.equal(refused.step, 'read class metadata');
+    assert.equal(refused.status, 403);
+    assert.equal(refused.raw_body, DOCUMENT);
+    assert.equal(refused.message, 'Request failed with status code 403');
   });
 });
 
@@ -203,12 +216,15 @@ describe('GetEnhancements: the elements read on the wire, through adt-clients', 
       object_name: 'LSVIMTOP',
       object_type: 'include',
     });
-    expect(result.isError).toBe(false);
-    expect(connection.calls.map((c) => c.url)).toEqual([
-      '/sap/bc/adt/programs/includes/lsvimtop?version=active',
-      `/sap/bc/adt/programs/includes/lsvimtop/source/main/enhancements/elements?context=${encodeURIComponent('/sap/bc/adt/programs/programs/saplsvim')}`,
-    ]);
-    expect(connection.calls[1]?.headers?.Accept).toBe(ELEMENTS_ACCEPT);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(
+      connection.calls.map((c) => c.url),
+      [
+        '/sap/bc/adt/programs/includes/lsvimtop?version=active',
+        `/sap/bc/adt/programs/includes/lsvimtop/source/main/enhancements/elements?context=${encodeURIComponent('/sap/bc/adt/programs/programs/saplsvim')}`,
+      ],
+    );
+    assert.equal(connection.calls[1]?.headers?.Accept, ELEMENTS_ACCEPT);
   });
 
   it('a 403 SAP answered is the method error as it is, with step read enhancements', async () => {
@@ -221,11 +237,11 @@ describe('GetEnhancements: the elements read on the wire, through adt-clients', 
       object_name: 'ZCL_X',
       object_type: 'class',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     // The method's error as adt-clients and the strategy made it: the
     // transport's sentence, SAP's document read into `messages`, the document
     // itself as `raw_body` — the handler adds only the step.
-    expect(payloadOf(result)).toMatchObject({
+    assertMatchObject(payloadOf(result), {
       message: 'Request failed with status code 403',
       messages: [{ type: 'E', text: 'No authorization' }],
       step: 'read enhancements',
@@ -240,8 +256,8 @@ describe('GetEnhancements: the elements read on the wire, through adt-clients', 
       object_name: 'ZCL_X',
       object_type: 'class',
     });
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), {
       origin: 'refusal',
       step: 'read enhancements',
       message: 'No authorization',
@@ -256,9 +272,9 @@ describe('GetEnhancements: the elements read on the wire, through adt-clients', 
       object_name: 'ZCL_X',
       object_type: 'class',
     });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('socket hang up');
-    expect(result.content[0].text).not.toContain('"status"');
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('socket hang up'));
+    assert.ok(!result.content[0].text.includes('"status"'));
   });
 });
 
@@ -283,9 +299,6 @@ describe('parseEnhancementsFromXml', () => {
     `</enh:enhancementImplementations>`;
 
   it('names each source by its own implementation', () => {
-    const { parseEnhancementsFromXml } = jest.requireActual(
-      '../../handlers/enhancement/readonly/handleGetEnhancements',
-    );
     const xml =
       '<enh:enhancements xmlns:enh="http://www.sap.com/adt/abapsource/enhancements">' +
       impl('Z_FIRST', 'ENHANCEMENT 1 z_first.\nENDENHANCEMENT.') +
@@ -297,19 +310,17 @@ describe('parseEnhancementsFromXml', () => {
 
     const parsed = parseEnhancementsFromXml(xml);
 
-    expect(parsed.map((e: { name: string }) => e.name)).toEqual([
-      'Z_FIRST',
-      'FSH_DET_PROCESS',
-    ]);
-    expect(parsed.map((e: { type: string }) => e.type)).toEqual([
-      'ENHO/XHH',
-      'ENHO/XHH',
-    ]);
+    assert.deepStrictEqual(
+      parsed.map((e: { name: string }) => e.name),
+      ['Z_FIRST', 'FSH_DET_PROCESS'],
+    );
+    assert.deepStrictEqual(
+      parsed.map((e: { type: string }) => e.type),
+      ['ENHO/XHH', 'ENHO/XHH'],
+    );
   });
 
-  const { parseEnhancementsFromXml: parse } = jest.requireActual(
-    '../../handlers/enhancement/readonly/handleGetEnhancements',
-  );
+  const parse = parseEnhancementsFromXml;
   const FIRST = 'ENHANCEMENT 1 z_first.\nENDENHANCEMENT.';
   const root = (body: string) =>
     '<enh:enhancements xmlns:enh="http://www.sap.com/adt/abapsource/enhancements" xmlns:adtcore="http://www.sap.com/adt/core">' +
@@ -317,19 +328,20 @@ describe('parseEnhancementsFromXml', () => {
     '</enh:enhancements>';
 
   it('reads each source: its implementation, its type, its decoded source', () => {
-    expect(parse(root(impl('Z_FIRST', FIRST)))).toEqual([
+    assert.deepStrictEqual(parse(root(impl('Z_FIRST', FIRST))), [
       { name: 'Z_FIRST', type: 'ENHO/XHH', sourceCode: FIRST },
     ]);
   });
 
   it('names a source outside any implementation by the element it sits in', () => {
-    expect(
+    assert.deepStrictEqual(
       parse(
         root(
           `<enh:sourceCodePlugin adtcore:name="Z_PLUGIN" adtcore:type="ENHO/XHH"><enh:source>${b64(FIRST)}</enh:source></enh:sourceCodePlugin>`,
         ),
       ),
-    ).toEqual([{ name: 'Z_PLUGIN', type: 'ENHO/XHH', sourceCode: FIRST }]);
+      [{ name: 'Z_PLUGIN', type: 'ENHO/XHH', sourceCode: FIRST }],
+    );
   });
 
   // Read through the XML parser: an implementation named in apostrophes is
@@ -338,7 +350,7 @@ describe('parseEnhancementsFromXml', () => {
     const quoted = impl('Z_FIRST', FIRST)
       .replace('adtcore:name="Z_FIRST"', "adtcore:name='Z_FIRST'")
       .replace('adtcore:type="ENHO/XHH"', "adtcore:type='ENHO/XHH'");
-    expect(parse(root(quoted))).toEqual([
+    assert.deepStrictEqual(parse(root(quoted)), [
       { name: 'Z_FIRST', type: 'ENHO/XHH', sourceCode: FIRST },
     ]);
   });
@@ -348,13 +360,13 @@ describe('parseEnhancementsFromXml', () => {
       `<enh:source>${b64(FIRST)}</enh:source>`,
       `<enh:source><![CDATA[${b64(FIRST)}]]></enh:source>`,
     );
-    expect(parse(root(cdata))).toEqual([
+    assert.deepStrictEqual(parse(root(cdata)), [
       { name: 'Z_FIRST', type: 'ENHO/XHH', sourceCode: FIRST },
     ]);
   });
 
   it('reads no source of a document without one', () => {
-    expect(parse(root(''))).toEqual([]);
-    expect(parse('')).toEqual([]);
+    assert.deepStrictEqual(parse(root('')), []);
+    assert.deepStrictEqual(parse(''), []);
   });
 });

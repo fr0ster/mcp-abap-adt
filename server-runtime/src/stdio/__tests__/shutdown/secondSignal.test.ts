@@ -5,6 +5,12 @@
  * codes, and one stderr line per fact.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, it, mock } from 'node:test';
+import {
+  useFakeTimers,
+  useRealTimers,
+} from '../../../../../src/__tests__/helpers/fakeTime';
 import {
   CLOSE_FAILED_WORDS,
   own,
@@ -12,7 +18,7 @@ import {
 import { deferred, runningTool, setup, turns } from './harness';
 
 afterEach(() => {
-  jest.useRealTimers();
+  useRealTimers();
 });
 
 it('a SIGTERM after the start exits 1 at once, naming the tool still running and the step', async () => {
@@ -21,20 +27,20 @@ it('a SIGTERM after the start exits 1 at once, naming the tool still running and
   const tool = runningTool('UpdateClass');
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(s.exits).toEqual([]);
+  assert.deepStrictEqual(s.exits, []);
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(s.exits).toEqual([1]);
+  assert.deepStrictEqual(s.exits, [1]);
   // The tool was interrupted at the start, and has not settled yet.
-  expect(s.stderr).toEqual([
+  assert.deepStrictEqual(s.stderr, [
     '[MCP] Still running at the forced close: UpdateClass',
     '[MCP] Not finished at the forced close: the session writes',
   ]);
-  expect(s.order).toEqual(['begin', 'mcp close', 'settle', 'exit(1)']);
+  assert.deepStrictEqual(s.order, ['begin', 'mcp close', 'settle', 'exit(1)']);
   tool.end();
   write.resolve({ notStored: [] });
   await turns();
-  expect(s.exits).toEqual([1]);
+  assert.deepStrictEqual(s.exits, [1]);
 });
 
 it('a SIGINT after the start does the same', async () => {
@@ -45,31 +51,29 @@ it('a SIGINT after the start does the same', async () => {
   await turns();
   s.processLike.emit('SIGINT');
   await turns();
-  expect(s.exits).toEqual([1]);
+  assert.deepStrictEqual(s.exits, [1]);
   tool.end();
   write.resolve({ notStored: [] });
 });
 
 it('--shutdown-timeout=1 ends a held flush: exit 1 naming the session writes; the flush got the aborted signal', async () => {
-  jest.useFakeTimers({
-    doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'],
-  });
+  useFakeTimers({ apis: ['setTimeout', 'setInterval', 'Date'] });
   const write = deferred<{ notStored: string[] }>();
   const s = setup({ settle: () => write.promise, shutdownTimeoutMs: 1_000 });
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(s.order).toContain('settle');
-  expect(s.exits).toEqual([]);
-  jest.advanceTimersByTime(1_000);
+  assert.ok(s.order.includes('settle'));
+  assert.deepStrictEqual(s.exits, []);
+  mock.timers.tick(1_000);
   await turns();
-  expect(s.exits).toEqual([1]);
-  expect(s.stderr).toEqual([
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.deepStrictEqual(s.stderr, [
     '[MCP] Not finished at the forced close: the session writes',
   ]);
-  expect(s.settleSignal()?.aborted).toBe(true);
+  assert.equal(s.settleSignal()?.aborted, true);
   write.resolve({ notStored: [] });
   await turns();
-  expect(s.exits).toEqual([1]);
+  assert.deepStrictEqual(s.exits, [1]);
 });
 
 it('the logoffs and the forced close write the logoff of every owned connection only once each', async () => {
@@ -85,14 +89,14 @@ it('the logoffs and the forced close write the logoff of every owned connection 
   own(connection, { role: 'built', owner: {} });
   s.processLike.emit('SIGTERM');
   // Asked for in the trigger's tick: the logoffs at once.
-  expect(disconnects).toBe(1);
+  assert.equal(disconnects, 1);
   await turns();
   s.processLike.emit('SIGTERM');
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(disconnects).toBe(1);
-  expect(s.exits).toEqual([1]);
-  expect(s.stderr).not.toContain(CLOSE_FAILED_WORDS);
+  assert.equal(disconnects, 1);
+  assert.deepStrictEqual(s.exits, [1]);
+  assert.ok(!s.stderr.includes(CLOSE_FAILED_WORDS));
   tool.end();
   write.resolve({ notStored: [] });
 });

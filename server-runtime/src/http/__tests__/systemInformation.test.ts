@@ -11,10 +11,12 @@
  * `system_user_unknown`. A refused call's tool never runs.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { StandInRequest } from '../../../../src/__tests__/helpers/adtStandIn';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 import { type HttpStand, httpStand, turns } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
 const isProbe = (r: StandInRequest) => r.url.includes('/probe/');
@@ -40,56 +42,66 @@ const WITHOUT_USER: Array<[string, string]> = [
   ['JSON null', 'null'],
 ];
 
-it.each(WITHOUT_USER)(
-  'ABAP Cloud, systeminformation with %s: system_lookup_failed, the tool not run',
-  async (_what, body) => {
-    s.standIn.body(isLookup, body);
-    const answer = await s.call('ProbeAdt', { id: 'NO_USER' });
-    expect(answer.isError).toBe(true);
-    expect(JSON.parse(answer.text)).toMatchObject({
-      error: 'system_lookup_failed',
-    });
-    expect(answer.text).not.toContain('SHUTDOWN_USER');
-    expect(s.standIn.requests.filter(isLookup)).toHaveLength(1);
-    expect(s.standIn.requests.some(isProbe)).toBe(false);
-  },
-);
+for (const [_what, body] of WITHOUT_USER) {
+  it(
+    format(
+      'ABAP Cloud, systeminformation with %s: system_lookup_failed, the tool not run',
+      _what,
+    ),
+    async () => {
+      s.standIn.body(isLookup, body);
+      const answer = await s.call('ProbeAdt', { id: 'NO_USER' });
+      assert.equal(answer.isError, true);
+      assertMatchObject(JSON.parse(answer.text), {
+        error: 'system_lookup_failed',
+      });
+      assert.ok(!answer.text.includes('SHUTDOWN_USER'));
+      assert.equal(s.standIn.requests.filter(isLookup).length, 1);
+      assert.equal(s.standIn.requests.some(isProbe), false);
+    },
+  );
+}
 
 it('ABAP Cloud, systeminformation answered 404: cloud_without_systeminformation, no header stands in, the tool not run', async () => {
   s.standIn.answer(isLookup, 404);
   const answer = await s.call('ProbeAdt', { id: 'NO_LOOKUP' });
-  expect(answer.isError).toBe(true);
-  expect(JSON.parse(answer.text)).toEqual({
+  assert.equal(answer.isError, true);
+  assert.deepStrictEqual(JSON.parse(answer.text), {
     error: 'cloud_without_systeminformation',
     message:
       'the destination is stated as ABAP Cloud, but its system has no systeminformation endpoint, which every ABAP Cloud system has: the configuration or the headers are inconsistent; the tool did not run',
   });
-  expect(answer.text).not.toContain('SHUTDOWN_USER');
-  expect(s.standIn.requests.some(isProbe)).toBe(false);
+  assert.ok(!answer.text.includes('SHUTDOWN_USER'));
+  assert.equal(s.standIn.requests.some(isProbe), false);
 });
 
-it.each([405, 501, 500])(
-  'ABAP Cloud, systeminformation answered %i: system_lookup_failed, no login stands in, the tool not run',
-  async (status) => {
-    s.standIn.answer(isLookup, status);
-    const answer = await s.call('ProbeAdt', { id: 'NO_LOOKUP' });
-    expect(answer.isError).toBe(true);
-    expect(JSON.parse(answer.text)).toMatchObject({
-      error: 'system_lookup_failed',
-    });
-    expect(answer.text).not.toContain('SHUTDOWN_USER');
-    expect(s.standIn.requests.some(isProbe)).toBe(false);
-  },
-);
+for (const status of [405, 501, 500]) {
+  it(
+    format(
+      'ABAP Cloud, systeminformation answered %i: system_lookup_failed, no login stands in, the tool not run',
+      status,
+    ),
+    async () => {
+      s.standIn.answer(isLookup, status);
+      const answer = await s.call('ProbeAdt', { id: 'NO_LOOKUP' });
+      assert.equal(answer.isError, true);
+      assertMatchObject(JSON.parse(answer.text), {
+        error: 'system_lookup_failed',
+      });
+      assert.ok(!answer.text.includes('SHUTDOWN_USER'));
+      assert.equal(s.standIn.requests.some(isProbe), false);
+    },
+  );
+}
 
 it('each request is its own destination (its own credential): each asks its own lookup', async () => {
   s.standIn.body(
     isLookup,
     JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
   );
-  expect((await s.call('ProbeAdt', { id: 'FIRST' })).isError).toBe(false);
-  expect((await s.call('ProbeAdt', { id: 'SECOND' })).isError).toBe(false);
-  expect(s.standIn.requests.filter(isLookup)).toHaveLength(2);
+  assert.equal((await s.call('ProbeAdt', { id: 'FIRST' })).isError, false);
+  assert.equal((await s.call('ProbeAdt', { id: 'SECOND' })).isError, false);
+  assert.equal(s.standIn.requests.filter(isLookup).length, 2);
 });
 
 it('systeminformation naming its user: the tool runs', async () => {
@@ -98,8 +110,8 @@ it('systeminformation naming its user: the tool runs', async () => {
     JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
   );
   const answer = await s.call('ProbeAdt', { id: 'WITH_USER' });
-  expect(answer.isError).toBe(false);
-  expect(s.standIn.requests.some(isProbe)).toBe(true);
+  assert.equal(answer.isError, false);
+  assert.equal(s.standIn.requests.some(isProbe), true);
 });
 
 describe('on-premise: asked the same way; the headers when it gives no information', () => {
@@ -115,10 +127,11 @@ describe('on-premise: asked the same way; the headers when it gives no informati
       JSON.stringify({ userName: 'OP_USER', systemID: 'OPS' }),
     );
     const answer = await s.call('ProbeAdt', { id: 'ONPREM_USER' });
-    expect(answer.isError).toBe(false);
-    expect(s.standIn.requests.filter(isLookup)).toHaveLength(1);
-    expect(s.standIn.requests.findIndex(isProbe)).toBeGreaterThan(
-      s.standIn.requests.findIndex(isLookup),
+    assert.equal(answer.isError, false);
+    assert.equal(s.standIn.requests.filter(isLookup).length, 1);
+    assert.ok(
+      s.standIn.requests.findIndex(isProbe) >
+        s.standIn.requests.findIndex(isLookup),
     );
   });
 
@@ -132,36 +145,46 @@ describe('on-premise: asked the same way; the headers when it gives no informati
     ],
   ];
 
-  it.each(NO_INFORMATION)(
-    'systeminformation %s, a token connection stating no user: system_user_unknown, the tool not run, the next call asks again',
-    async (_case, answer) => {
-      answer();
-      const token = {
-        'x-sap-url': s.standIn.url,
-        'x-sap-client': '100',
-        'x-sap-jwt-token': 'token-placeholder',
-      };
-      for (const id of ['NO_USER_ONE', 'NO_USER_TWO']) {
-        const result = await s.call('ProbeAdt', { id }, token);
-        expect(result.isError).toBe(true);
-        expect(JSON.parse(result.text)).toEqual({
-          error: 'system_user_unknown',
-          message:
-            'the system gave no session user (systeminformation) and the call states no user: set SAP_RESPONSIBLE or SAP_USERNAME (the destination or the environment), or send x-sap-responsible, or x-sap-login with x-sap-url, so the session user is known; the tool did not run',
-        });
-      }
-      expect(s.standIn.requests.filter(isLookup)).toHaveLength(2);
-      expect(s.standIn.requests.some(isProbe)).toBe(false);
-    },
-  );
+  for (const [_case, answer] of NO_INFORMATION) {
+    it(
+      format(
+        'systeminformation %s, a token connection stating no user: system_user_unknown, the tool not run, the next call asks again',
+        _case,
+      ),
+      async () => {
+        answer();
+        const token = {
+          'x-sap-url': s.standIn.url,
+          'x-sap-client': '100',
+          'x-sap-jwt-token': 'token-placeholder',
+        };
+        for (const id of ['NO_USER_ONE', 'NO_USER_TWO']) {
+          const result = await s.call('ProbeAdt', { id }, token);
+          assert.equal(result.isError, true);
+          assert.deepStrictEqual(JSON.parse(result.text), {
+            error: 'system_user_unknown',
+            message:
+              'the system gave no session user (systeminformation) and the call states no user: set SAP_RESPONSIBLE or SAP_USERNAME (the destination or the environment), or send x-sap-responsible, or x-sap-login with x-sap-url, so the session user is known; the tool did not run',
+          });
+        }
+        assert.equal(s.standIn.requests.filter(isLookup).length, 2);
+        assert.equal(s.standIn.requests.some(isProbe), false);
+      },
+    );
+  }
 
-  it.each(NO_INFORMATION)(
-    'systeminformation %s, x-sap-login states the user: the tool runs with the headers',
-    async (_case, answer) => {
-      answer();
-      const result = await s.call('ProbeAdt', { id: 'ONPREM_ABSENT' });
-      expect(result.isError).toBe(false);
-      expect(s.standIn.requests.some(isProbe)).toBe(true);
-    },
-  );
+  for (const [_case, answer] of NO_INFORMATION) {
+    it(
+      format(
+        'systeminformation %s, x-sap-login states the user: the tool runs with the headers',
+        _case,
+      ),
+      async () => {
+        answer();
+        const result = await s.call('ProbeAdt', { id: 'ONPREM_ABSENT' });
+        assert.equal(result.isError, false);
+        assert.equal(s.standIn.requests.some(isProbe), true);
+      },
+    );
+  }
 });

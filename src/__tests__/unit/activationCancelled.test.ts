@@ -15,6 +15,9 @@
  * results.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import { handleHandlerActivate } from '../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
@@ -146,18 +149,20 @@ const FULL_FORMS: readonly (readonly [string, Activate, readonly string[]])[] =
   ];
 
 /**
- * A message about the view `name`, as answered: the sent object's uri beside
- * its name where the form sent it (`activationMessagesOf` resolves the
- * message's `objName` to it), the name alone where it did not.
+ * A message about the view `name`, as answered: its `objDescr` as `object`,
+ * and the sent object's uri beside its name where the form sent it
+ * (`activationMessagesOf` resolves the message's `objName` to it), the name
+ * alone where it did not.
  */
 function aboutView(
   message: { type: string; text: string },
   name: string,
   sent: readonly string[],
 ) {
+  const described = { ...message, object: `View ${name}` };
   return sent.includes(name)
-    ? { ...message, uri: buildObjectUri(name, 'VIEW/DV'), objectName: name }
-    : { ...message, objectName: name };
+    ? { ...described, uri: buildObjectUri(name, 'VIEW/DV'), objectName: name }
+    : { ...described, objectName: name };
 }
 
 describe('activation answers follow SAP’s verdict', () => {
@@ -185,87 +190,123 @@ describe('activation answers follow SAP’s verdict', () => {
     const connection = finishedRun(results);
     declareSystemKind(connection, 'onprem');
     const answered = await activate({ connection });
-    expect(answered.isError).toBe(isError);
+    assert.equal(answered.isError, isError);
     const urls = connection.requests.map((request) => request.url);
-    expect(urls.some((url) => url.includes('/activation/runs'))).toBe(true);
-    expect(urls).toContain(`/sap/bc/adt/activation/results/${RUN_ID}`);
+    assert.equal(
+      urls.some((url) => url.includes('/activation/runs')),
+      true,
+    );
+    assert.ok(urls.includes(`/sap/bc/adt/activation/results/${RUN_ID}`));
     // The inactive list follows only results that say no activation ran
     // and give no message.
-    expect(urls.at(-1)).toContain(
-      results === NOTHING
-        ? '/sap/bc/adt/activation/inactiveobjects'
-        : `/activation/results/${RUN_ID}`,
+    assert.ok(
+      urls
+        .at(-1)
+        ?.includes(
+          results === NOTHING
+            ? '/sap/bc/adt/activation/inactiveobjects'
+            : `/activation/results/${RUN_ID}`,
+        ),
     );
     return payloadOf(answered);
   }
 
-  it.each(FULL_FORMS)(
-    '%s: a run SAP cancelled is not activated, and its messages are returned',
-    async (_form, activate, sent) => {
-      const payload = await full(activate, CANCELLED);
-      expect(payload.run_status).toBe('finished');
-      expect(payload.activated).toBe(false);
-      expect(payload.messages).toEqual([
-        aboutView(
-          { type: 'W', text: 'Activation was cancelled.' },
-          'ZMCPV',
-          sent,
-        ),
-      ]);
-      expect(payload.nothing_to_activate).toBeUndefined();
-      expect(payload.message).toContain('activationExecuted="false"');
-      expect(payload.message).toContain('Activation was cancelled.');
-    },
-  );
+  for (const [_form, activate, sent] of FULL_FORMS) {
+    it(
+      format(
+        '%s: a run SAP cancelled is not activated, and its messages are returned',
+        _form,
+      ),
+      async () => {
+        const payload = await full(activate, CANCELLED);
+        assert.equal(payload.run_status, 'finished');
+        assert.equal(payload.activated, false);
+        assert.deepStrictEqual(payload.messages, [
+          aboutView(
+            { type: 'W', text: 'Activation was cancelled.' },
+            'ZMCPV',
+            sent,
+          ),
+        ]);
+        assert.equal(payload.nothing_to_activate, undefined);
+        assert.ok(
+          typeof payload.message === 'string' &&
+            payload.message.includes('activationExecuted="false"'),
+        );
+        assert.ok(
+          typeof payload.message === 'string' &&
+            payload.message.includes('Activation was cancelled.'),
+        );
+      },
+    );
+  }
 
-  it.each(FULL_FORMS)(
-    '%s: a run with an error-severity message is an error, naming the refusal, its messages returned',
-    async (_form, activate, sent) => {
-      const payload = await full(activate, REFUSED, true);
-      expect(payload.origin).toBe('refusal');
-      expect(payload.message).toContain(
-        `Activation run ${RUN_ID} finished and refused 1 of `,
-      );
-      expect(payload.message).toContain(
-        'ZMCPW: View ZMCPW refers to a field that does not exist.',
-      );
-      expect(payload.messages).toEqual([
-        aboutView(
-          {
-            type: 'E',
-            text: 'View ZMCPW refers to a field that does not exist.',
-          },
-          'ZMCPW',
-          sent,
-        ),
-        aboutView(
-          { type: 'W', text: 'Activation was cancelled.' },
-          'ZMCPV',
-          sent,
-        ),
-      ]);
-      expect(payload.activated).toBeUndefined();
-    },
-  );
+  for (const [_form, activate, sent] of FULL_FORMS) {
+    it(
+      format(
+        '%s: a run with an error-severity message is an error, naming the refusal, its messages returned',
+        _form,
+      ),
+      async () => {
+        const payload = await full(activate, REFUSED, true);
+        assert.equal(payload.origin, 'refusal');
+        assert.ok(
+          typeof payload.message === 'string' &&
+            payload.message.includes(
+              `Activation run ${RUN_ID} finished and refused 1 of `,
+            ),
+        );
+        assert.ok(
+          typeof payload.message === 'string' &&
+            payload.message.includes(
+              'ZMCPW: View ZMCPW refers to a field that does not exist.',
+            ),
+        );
+        assert.deepStrictEqual(payload.messages, [
+          aboutView(
+            {
+              type: 'E',
+              text: 'View ZMCPW refers to a field that does not exist.',
+            },
+            'ZMCPW',
+            sent,
+          ),
+          aboutView(
+            { type: 'W', text: 'Activation was cancelled.' },
+            'ZMCPV',
+            sent,
+          ),
+        ]);
+        assert.equal(payload.activated, undefined);
+      },
+    );
+  }
 
-  it.each(FULL_FORMS)(
-    '%s: nothing to activate is not activated, and says so',
-    async (_form, activate) => {
-      const payload = await full(activate, NOTHING);
-      expect(payload.activated).toBe(false);
-      expect(payload.nothing_to_activate).toBe(true);
-      expect(payload.messages).toEqual([]);
-    },
-  );
+  for (const [_form, activate] of FULL_FORMS) {
+    it(
+      format('%s: nothing to activate is not activated, and says so', _form),
+      async () => {
+        const payload = await full(activate, NOTHING);
+        assert.equal(payload.activated, false);
+        assert.equal(payload.nothing_to_activate, true);
+        assert.deepStrictEqual(payload.messages, []);
+      },
+    );
+  }
 
-  it.each(FULL_FORMS)(
-    '%s: activationExecuted="true" with a warning is activated',
-    async (_form, activate) => {
-      const payload = await full(activate, ACTIVATED);
-      expect(payload.activated).toBe(true);
-      expect(payload.nothing_to_activate).toBeUndefined();
-    },
-  );
+  for (const [_form, activate] of FULL_FORMS) {
+    it(
+      format(
+        '%s: activationExecuted="true" with a warning is activated',
+        _form,
+      ),
+      async () => {
+        const payload = await full(activate, ACTIVATED);
+        assert.equal(payload.activated, true);
+        assert.equal(payload.nothing_to_activate, undefined);
+      },
+    );
+  }
 
   it('HandlerActivate (compact, group form) starts the run and answers its id alone', async () => {
     const connection = finishedRun(CANCELLED);
@@ -273,11 +314,11 @@ describe('activation answers follow SAP’s verdict', () => {
     const payload = payloadOf(
       await handleHandlerActivate({ connection }, { objects: OBJECTS }),
     );
-    expect(payload).toEqual({ run_id: RUN_ID });
-    expect(connection.requests).toHaveLength(1);
+    assert.deepStrictEqual(payload, { run_id: RUN_ID });
+    assert.equal(connection.requests.length, 1);
   });
 
-  it.each([
+  for (const [_case, results, activated, nothing, messages] of [
     ['a run SAP cancelled', CANCELLED, false, undefined, 1],
     ['nothing to activate', NOTHING, false, true, 0],
     ['an activation with a warning', ACTIVATED, true, undefined, 1],
@@ -288,53 +329,77 @@ describe('activation answers follow SAP’s verdict', () => {
       undefined,
       0,
     ],
-  ] as const)(
-    'HandlerGet part=activation_results (compact, run form), %s: activated is %s',
-    async (_case, results, activated, nothing, messages) => {
-      const connection = resultsOnly(results);
-      declareSystemKind(connection, 'onprem');
-      const payload = payloadOf(
-        await handleGetActivationResults({ connection }, { run_id: RUN_ID }),
-      );
-      expect(payload.activated).toBe(activated);
-      expect(payload.nothing_to_activate).toBe(nothing);
-      expect(payload.messages).toHaveLength(messages);
-      expect(payload.document).toBe(results);
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        'HandlerGet part=activation_results (compact, run form), %s: activated is %s',
+        _case,
+        results,
+      ),
+      async () => {
+        const connection = resultsOnly(results);
+        declareSystemKind(connection, 'onprem');
+        const payload = payloadOf(
+          await handleGetActivationResults({ connection }, { run_id: RUN_ID }),
+        );
+        assert.equal(payload.activated, activated);
+        assert.equal(payload.nothing_to_activate, nothing);
+        assert.ok(Array.isArray(payload.messages));
+        assert.equal(payload.messages.length, messages);
+        assert.equal(payload.document, results);
+      },
+    );
+  }
 
-  it.each([
+  for (const [document, executed] of [
     [CANCELLED, false],
     [NOTHING, false],
     [ACTIVATED, true],
     [`<chkl:messages ${CHECKLIST}/>`, undefined],
     ['', undefined],
-  ] as const)(
-    'a results document kept as text states its verdict: %s → %s',
-    (document, executed) => {
-      expect(activationExecutedOf(kept(document))).toBe(executed);
-      expect(
-        activationExecutedOf({ value: undefined, raw: document, status: 200 }),
-      ).toBe(executed);
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        'a results document kept as text states its verdict: %s → %s',
+        document,
+        executed,
+      ),
+      () => {
+        assert.equal(activationExecutedOf(kept(document)), executed);
+        assert.equal(
+          activationExecutedOf({
+            value: undefined,
+            raw: document,
+            status: 200,
+          }),
+          executed,
+        );
+      },
+    );
+  }
 
-  it.each([
+  for (const [stated, executed] of [
     ['false', false],
     ['true', true],
-  ] as const)(
-    'a parsed results document states its verdict: activationExecuted="%s"',
-    (stated, executed) => {
-      const parsed = {
-        'chkl:messages': {
-          'chkl:properties': { '@': { activationExecuted: stated } },
-        },
-      };
-      expect(
-        activationExecutedOf({ value: parsed, raw: '', status: 200 }),
-      ).toBe(executed);
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        'a parsed results document states its verdict: activationExecuted="%s"',
+        stated,
+      ),
+      () => {
+        const parsed = {
+          'chkl:messages': {
+            'chkl:properties': { '@': { activationExecuted: stated } },
+          },
+        };
+        assert.equal(
+          activationExecutedOf({ value: parsed, raw: '', status: 200 }),
+          executed,
+        );
+      },
+    );
+  }
 });
 
 /**
@@ -347,54 +412,64 @@ describe('a run document kept as text, read through the XML parser', () => {
   const FAILED = corpusBody('refusal-activation-fails--01-activation');
 
   it('the recorded refusal: its message, type and words — tests/fixtures/adt/refusal-activation-fails--01-activation.body.xml', () => {
-    expect(activationMessagesOf(kept(FAILED), [])).toEqual([
-      { type: 'E', text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.' },
+    assert.deepStrictEqual(activationMessagesOf(kept(FAILED), []), [
+      {
+        type: 'E',
+        text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
+        object: 'Class ZMCP_BLD_ANSCH01, Method SAY_HELLO',
+        source_uri: '/sap/bc/adt/oo/classes/zmcp_bld_ansch01/source/main',
+        position: { line: 15, column: 24, end: { line: 15, column: 50 } },
+        code: 'MESSAGE(GTH)',
+      },
     ]);
-    expect(activationExecutedOf(kept(FAILED))).toBe(false);
+    assert.equal(activationExecutedOf(kept(FAILED)), false);
   });
 
   it('the recorded success: no messages, activation executed — tests/fixtures/adt/activation-success-verdict--01-activation.body.xml', () => {
     const success = corpusBody('activation-success-verdict--01-activation');
-    expect(activationMessagesOf(kept(success), [])).toEqual([]);
-    expect(activationExecutedOf(kept(success))).toBe(true);
+    assert.deepStrictEqual(activationMessagesOf(kept(success), []), []);
+    assert.equal(activationExecutedOf(kept(success)), true);
   });
 
   it('a run status as the run answers it', () => {
-    expect(
+    assert.equal(
       runStatusOf(
         kept(
           '<?xml version="1.0" encoding="utf-8"?><runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status="finished"/>',
         ),
       ),
-    ).toBe('finished');
+      'finished',
+    );
   });
 
   it('a run status quoted with apostrophes', () => {
-    expect(
+    assert.equal(
       runStatusOf(
         kept(
           '<runs:run xmlns:runs="http://www.sap.com/adt/activation/runs" runs:status=\'finished\'/>',
         ),
       ),
-    ).toBe('finished');
+      'finished',
+    );
   });
 
   it("a message's words with an entity and its object quoted with apostrophes", () => {
     const document =
       `<chkl:messages ${CHECKLIST}><msg type='E' objName='ZMCP_X'>` +
       '<shortText><txt>A &lt; B</txt></shortText></msg></chkl:messages>';
-    expect(activationMessagesOf(kept(document), [])).toEqual([
+    assert.deepStrictEqual(activationMessagesOf(kept(document), []), [
       { type: 'E', text: 'A < B', objectName: 'ZMCP_X' },
     ]);
   });
 
   it('activationExecuted quoted with apostrophes', () => {
-    expect(
+    assert.equal(
       activationExecutedOf(
         kept(
           `<chkl:messages ${CHECKLIST}><chkl:properties activationExecuted='false'/></chkl:messages>`,
         ),
       ),
-    ).toBe(false);
+      false,
+    );
   });
 });

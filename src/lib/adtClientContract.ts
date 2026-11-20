@@ -49,14 +49,15 @@ import type {
   IAdtObjectProperties,
   IAdtOperationOptions,
   IAdtRepositoryStructure,
-  IAdtRequest,
   IAdtResponse,
   IAdtSearchObjectsParamsOf,
   IAdtServiceBindingTypes,
   IAdtServiceGroupReadable,
+  IAdtTableSettingsPatchable,
+  IAdtTextElementsReadable,
+  IAdtTextElementsUpdatable,
   IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
-  IAdtTransportSearchConfigurations,
   IAdtTransportSortAndCompress,
   IAdtTypeCatalogue,
   IAdtTypedGroupLifecycle,
@@ -118,8 +119,12 @@ import type {
   IStructureResults,
   ITableConfig,
   ITableResults,
+  ITableSettingsConfig,
+  ITableSettingsResults,
   ITableTypeConfig,
   ITableTypeResults,
+  ITextElementsConfig,
+  ITextElementsResults,
   ITransformationConfig,
   ITransformationResults,
   ITransportConfig,
@@ -555,6 +560,36 @@ export type TableApi<
     ReturnType<R['versions']>,
     ReturnType<R['versionSource']>
   >;
+
+/**
+ * What the server calls on `getTableSettings()`'s answer: the settings read
+ * at a stated version, the settings' own lock, and the patch that writes the
+ * named settings over the rest as read (adt-clients 46.1.0). The patch is
+ * typed by the variant: a cloud change may name `isWritableByAMDP`, an
+ * on-premise one may not (interfaces-adt 30.1.0).
+ */
+export type TableSettingsApi<
+  R extends ITableSettingsResults,
+  V extends AdtVariant,
+> = StatedMetadataReadable<ITableSettingsConfig, ReturnType<R['metadata']>> &
+  IAdtTableSettingsPatchable<
+    ReturnType<R['metadataUpdated']>,
+    Extract<V, AdtModernVariant>
+  > &
+  IAdtLockable<ITableSettingsConfig>;
+
+/**
+ * What the server calls on `getTextElements()`'s answer: one part read at a
+ * stated version or the working area, one whole part written under the
+ * text elements' own lock (`TEXT`), and that lock. Reached through
+ * `textElementsClientOf` (`clients.ts`), not `IServerAdtClient`: one more
+ * member there makes some of its callers' inferred types too complex for
+ * the compiler (TS2590).
+ */
+export type TextElementsApi<R extends ITextElementsResults> =
+  IAdtTextElementsReadable<ReturnType<R['source']>> &
+    IAdtTextElementsUpdatable<ReturnType<R['updated']>> &
+    IAdtLockable<ITextElementsConfig, 'objectKind' | 'objectName'>;
 
 /** What the server calls on `getTableType()`'s answer. */
 export type DdicTableTypeApi<
@@ -1047,6 +1082,40 @@ export type EnhancementApi<
 > = StatedReadable<IEnhancementConfig, ReturnType<R['source']>> &
   StatedMetadataReadable<IEnhancementConfig, ReturnType<R['metadata']>>;
 
+/** A request status the listing selects: `D` modifiable, `R` released. */
+export type TransportListStatus = 'D' | 'R';
+
+/** A request type the listing selects: `K` workbench, `W` customizing, `T` transport of copies. */
+export type TransportListType = 'K' | 'W' | 'T';
+
+/**
+ * The transport listing by user, with no saved search configuration: the
+ * query SAP's handler reads — `user` (it matches the request owner or a
+ * task owner), `requestStatus`, `requestType`, and `releasedFromDate` /
+ * `releasedToDate` (`YYYYMMDD`, released requests only; SAP's default is
+ * the last 14 days). Each is sent only when given. adt-clients 45.5.3
+ * serves it (`IListTransportsQuery`); interfaces-adt 27.4's `IAdtRequest`
+ * names the saved search alone, so the server states the form it calls.
+ */
+export type TransportListQuery = {
+  readonly user: string;
+  readonly requestStatus: readonly [
+    TransportListStatus,
+    ...TransportListStatus[],
+  ];
+  readonly requestType?: readonly [TransportListType, ...TransportListType[]];
+  readonly releasedFromDate?: string;
+  readonly releasedToDate?: string;
+};
+
+/** The listing the server calls: one request, the query by user. */
+export interface TransportListing<TList> {
+  list<E extends IAdtError>(
+    options: TransportListQuery &
+      IAdtAnalyseOptions<E> & { analyse: IAnalyse<E> },
+  ): Promise<IAdtResponse<TList, E>>;
+}
+
 /** What the server calls on `getRequest()`'s answer. */
 export type RequestApi<
   R extends ITransportResults,
@@ -1070,7 +1139,7 @@ export type RequestApi<
       'delete'
     >
   > &
-  IAdtRequest<ReturnType<R['list']>> &
+  TransportListing<ReturnType<R['list']>> &
   PerformedOn<
     V,
     'request',
@@ -1181,15 +1250,6 @@ export type RequestApi<
     'request',
     'moveObjects',
     Pick<IAdtTransportMoveObjects<ReturnType<R['movedObjects']>>, 'moveObjects'>
-  > &
-  PerformedOn<
-    V,
-    'request',
-    'searchConfigurations',
-    Pick<
-      IAdtTransportSearchConfigurations<ReturnType<R['searchConfigurations']>>,
-      'searchConfigurations'
-    >
   >;
 
 /** What the server calls on `getLocalTestClass()`'s answer. */
@@ -1391,6 +1451,15 @@ export type IServerAdtClient<V extends AdtVariant = AdtModernVariant> =
       'table',
       {
         getTable<R extends ITableResults>(results: R): TableApi<R, V>;
+      }
+    > &
+    ServedOn<
+      V,
+      'tableSettings',
+      {
+        getTableSettings<R extends ITableSettingsResults>(
+          results: R,
+        ): TableSettingsApi<R, V>;
       }
     > &
     ServedOn<

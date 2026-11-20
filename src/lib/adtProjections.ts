@@ -188,7 +188,11 @@ export const NAME_CASE_SENTENCE =
  * settings (`TABL/DTT`). Each is named as its code; its main type stands for
  * the object itself, so a main type never resolves to one of these.
  */
-export const SUB_RESOURCE_CODES = ['PROG/PX', 'CLAS/OCX', 'TABL/DTT'] as const;
+export const SUB_RESOURCE_CODES = [
+  'PROG/PX',
+  'CLAS/OCX',
+  'TABL/DTT',
+] as const satisfies readonly AdtTypeCode[];
 
 /** A code of {@link SUB_RESOURCE_CODES}. */
 export type SubResourceCode = (typeof SUB_RESOURCE_CODES)[number];
@@ -331,8 +335,14 @@ export type TypeNameFor<P> = ServedCodeName<typeof TYPE_NAMES, P>;
  */
 export type WhereUsedCode<V extends ProjectionVariant> = Exclude<
   AdtWhereUsedCode<V>,
-  'TABL/DTT' | 'PROG/PX'
+  (typeof NOT_WHERE_USED)[number]
 >;
+
+/** The where-used codes GetWhereUsed leaves out ({@link WhereUsedCode}). */
+const NOT_WHERE_USED = [
+  'TABL/DTT',
+  'PROG/PX',
+] as const satisfies readonly AdtTypeCode[];
 
 /** GetWhereUsed's `object_type` codes. */
 export const WHERE_USED_CODES = projected<
@@ -482,8 +492,14 @@ export function whereUsedTypeDescription(variant: ProjectionVariant): string {
  */
 export type ActivationCode<V extends ProjectionVariant> = Exclude<
   AdtActivationCode<V>,
-  'PROG/PX' | 'CLAS/OCX'
+  (typeof NOT_ACTIVATED)[number]
 >;
+
+/** The activation codes ActivateObjects leaves out ({@link ActivationCode}). */
+const NOT_ACTIVATED = [
+  'PROG/PX',
+  'CLAS/OCX',
+] as const satisfies readonly AdtTypeCode[];
 
 /** ActivateObjects' `objects[].type` codes: what a group activation takes. */
 export const ACTIVATION_CODES = projected<

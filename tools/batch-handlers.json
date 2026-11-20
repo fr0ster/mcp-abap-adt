@@ -28,7 +28,8 @@
           "INTERFACE",
           "BEHAVIOR_DEFINITION",
           "BEHAVIOR_IMPLEMENTATION",
-          "METADATA_EXTENSION"
+          "METADATA_EXTENSION",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]
@@ -311,7 +312,11 @@
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "INCLUDE",
-          "TABLE_TYPE"
+          "TABLE_TYPE",
+          "TABLE_SETTINGS",
+          "PROGRAM_TEXT_ELEMENTS",
+          "FUNCTION_GROUP_TEXT_ELEMENTS",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]
@@ -353,7 +358,11 @@
           "SERVICE_DEFINITION",
           "SERVICE_BINDING",
           "INCLUDE",
-          "TABLE_TYPE"
+          "TABLE_TYPE",
+          "TABLE_SETTINGS",
+          "PROGRAM_TEXT_ELEMENTS",
+          "FUNCTION_GROUP_TEXT_ELEMENTS",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]
@@ -405,7 +414,8 @@
           "BEHAVIOR_IMPLEMENTATION",
           "METADATA_EXTENSION",
           "INCLUDE",
-          "TABLE_TYPE"
+          "TABLE_TYPE",
+          "CLASS_TEXT_ELEMENTS"
         ]
       }
     ]

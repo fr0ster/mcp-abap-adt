@@ -183,12 +183,10 @@ export const msagSharedInTable: TableShared['MSAG'] = ['MSAG/N', 'MSAG/NN'];
 
 /** A sub-resource code is no main type's: `CLAS` stays the class… */
 export const clasInTable: TableMains['CLAS'] = 'CLAS/OC';
-// @ts-expect-error …and `TABL` stays the table and the structure, never the settings.
-export const tablSharedInTable: TableShared['TABL'] = [
-  'TABL/DT',
-  'TABL/DS',
-  'TABL/DTT',
-];
+/** …`TABL` stays the table and the structure… */
+export const tablSharedInTable: TableShared['TABL'] = ['TABL/DT', 'TABL/DS'];
+// @ts-expect-error …never the settings.
+export const settingsInTabl: TableShared['TABL'] = ['TABL/DTT'];
 
 /** An enhancement spot is one code on cloud's group activation… */
 export const enhsOnCloud: MainTypeOfOne<ActivationCode<'cloud'>> = 'ENHS';

@@ -118,6 +118,47 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
     assert.equal(member(member(settings, 'buffering'), 'allowed'), 'N');
   });
 
+  it('compact: HandlerLock, HandlerUpdate and HandlerUnlock write the settings, HandlerActivate the table, HandlerGet reads them', async () => {
+    const locked = await liveCall('HandlerLock', {
+      object_type: 'TABLE_SETTINGS',
+      object_name: TABLE,
+    });
+    const handle = member(
+      payloadOf(succeeded('HandlerLock TABLE_SETTINGS', locked)),
+      'lock_handle',
+    );
+    assert.equal(typeof handle, 'string', locked.text);
+    const written = await liveCall('HandlerUpdate', {
+      object_type: 'TABLE_SETTINGS',
+      table_name: TABLE,
+      data_class: 'APPL2',
+      lock_handle: handle,
+      transport_request: request(),
+    });
+    const unlocked = await liveCall('HandlerUnlock', {
+      object_type: 'TABLE_SETTINGS',
+      object_name: TABLE,
+      lock_handle: handle,
+    });
+    succeeded('HandlerUpdate TABLE_SETTINGS', written);
+    succeeded('HandlerUnlock TABLE_SETTINGS', unlocked);
+    succeeded(
+      'HandlerActivate TABLE',
+      await livePrepare('HandlerActivate', {
+        object_type: 'TABLE',
+        object_name: TABLE,
+      }),
+    );
+    const read = await liveCall('HandlerGet', {
+      object_type: 'TABLE_SETTINGS',
+      part: 'source',
+      table_name: TABLE,
+      version: 'active',
+    });
+    const settings = payloadOf(succeeded('HandlerGet TABLE_SETTINGS', read));
+    assert.equal(member(settings, 'data_class'), 'APPL2');
+  });
+
   it("answers the activation of a data class SAP does not know as SAP's error", async () => {
     const answer = await liveCall('UpdateTableSettings', {
       table_name: TABLE,

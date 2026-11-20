@@ -330,6 +330,143 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
     );
   });
 
+  it("compact: a program's text elements locked, written, unlocked, activated and read", async () => {
+    if (!onPremise()) {
+      skipRunningTest('the cloud has no program of the customer to write');
+      return;
+    }
+    const locked = await liveCall('HandlerLock', {
+      object_type: 'PROGRAM_TEXT_ELEMENTS',
+      object_name: N.program,
+    });
+    const handle = member(
+      payloadOf(succeeded('HandlerLock PROGRAM_TEXT_ELEMENTS', locked)),
+      'lock_handle',
+    );
+    assert.equal(typeof handle, 'string', locked.text);
+    const written = await liveCall('HandlerUpdate', {
+      object_type: 'PROGRAM_TEXT_ELEMENTS',
+      program_name: N.program,
+      symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
+      lock_handle: handle,
+      transport_request: request(),
+    });
+    const unlocked = await liveCall('HandlerUnlock', {
+      object_type: 'PROGRAM_TEXT_ELEMENTS',
+      object_name: N.program,
+      lock_handle: handle,
+    });
+    succeeded('HandlerUpdate PROGRAM_TEXT_ELEMENTS', written);
+    succeeded('HandlerUnlock PROGRAM_TEXT_ELEMENTS', unlocked);
+    succeeded(
+      'HandlerActivate PROGRAM_TEXT_ELEMENTS',
+      await livePrepare('HandlerActivate', {
+        object_type: 'PROGRAM_TEXT_ELEMENTS',
+        object_name: N.program,
+      }),
+    );
+    const read = await liveCall('HandlerGet', {
+      object_type: 'PROGRAM_TEXT_ELEMENTS',
+      part: 'source',
+      program_name: N.program,
+      version: 'active',
+    });
+    assert.deepEqual(
+      symbolKeys(
+        payloadOf(succeeded('HandlerGet PROGRAM_TEXT_ELEMENTS', read)),
+      ),
+      ['003'],
+    );
+  });
+
+  it("compact: a function group's text elements locked, written, unlocked, activated and read", async () => {
+    const locked = await liveCall('HandlerLock', {
+      object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+      object_name: N.group,
+    });
+    const handle = member(
+      payloadOf(succeeded('HandlerLock FUNCTION_GROUP_TEXT_ELEMENTS', locked)),
+      'lock_handle',
+    );
+    assert.equal(typeof handle, 'string', locked.text);
+    const written = await liveCall('HandlerUpdate', {
+      object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+      function_group_name: N.group,
+      symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
+      lock_handle: handle,
+      transport_request: request(),
+    });
+    const unlocked = await liveCall('HandlerUnlock', {
+      object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+      object_name: N.group,
+      lock_handle: handle,
+    });
+    succeeded('HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS', written);
+    succeeded('HandlerUnlock FUNCTION_GROUP_TEXT_ELEMENTS', unlocked);
+    succeeded(
+      'HandlerActivate FUNCTION_GROUP_TEXT_ELEMENTS',
+      await livePrepare('HandlerActivate', {
+        object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+        object_name: N.group,
+      }),
+    );
+    const read = await liveCall('HandlerGet', {
+      object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+      part: 'source',
+      function_group_name: N.group,
+      version: 'active',
+    });
+    assert.deepEqual(
+      symbolKeys(
+        payloadOf(succeeded('HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS', read)),
+      ),
+      ['003'],
+    );
+  });
+
+  it("compact: a class's text elements locked, written, unlocked, activated and read", async () => {
+    const locked = await liveCall('HandlerLock', {
+      object_type: 'CLASS_TEXT_ELEMENTS',
+      object_name: N.class,
+    });
+    const handle = member(
+      payloadOf(succeeded('HandlerLock CLASS_TEXT_ELEMENTS', locked)),
+      'lock_handle',
+    );
+    assert.equal(typeof handle, 'string', locked.text);
+    const written = await liveCall('HandlerUpdate', {
+      object_type: 'CLASS_TEXT_ELEMENTS',
+      class_name: N.class,
+      symbols: [{ key: '003', text: 'Compact symbol', max_length: 20 }],
+      lock_handle: handle,
+      transport_request: request(),
+    });
+    const unlocked = await liveCall('HandlerUnlock', {
+      object_type: 'CLASS_TEXT_ELEMENTS',
+      object_name: N.class,
+      lock_handle: handle,
+    });
+    succeeded('HandlerUpdate CLASS_TEXT_ELEMENTS', written);
+    succeeded('HandlerUnlock CLASS_TEXT_ELEMENTS', unlocked);
+    succeeded(
+      'HandlerActivate CLASS_TEXT_ELEMENTS',
+      await livePrepare('HandlerActivate', {
+        object_type: 'CLASS_TEXT_ELEMENTS',
+        object_name: N.class,
+      }),
+    );
+    const read = await liveCall('HandlerGet', {
+      object_type: 'CLASS_TEXT_ELEMENTS',
+      part: 'source',
+      class_name: N.class,
+      version: 'active',
+    });
+    assert.deepEqual(
+      symbolKeys(payloadOf(succeeded('HandlerGet CLASS_TEXT_ELEMENTS', read))),
+      ['003'],
+    );
+  });
+
   it('the text elements of a delivered program, read on the cloud', async () => {
     if (onPremise()) {
       skipRunningTest('the delivered-program read is the cloud case');
@@ -352,5 +489,12 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
     });
     const texts = payloadOf(succeeded('GetTextElements delivered', read));
     assert.equal(member(texts, 'object_name'), name.toUpperCase());
+    const compact = await liveCall('HandlerGet', {
+      object_type: 'PROGRAM_TEXT_ELEMENTS',
+      part: 'source',
+      program_name: name,
+      version: 'active',
+    });
+    succeeded('HandlerGet PROGRAM_TEXT_ELEMENTS delivered', compact);
   });
 });

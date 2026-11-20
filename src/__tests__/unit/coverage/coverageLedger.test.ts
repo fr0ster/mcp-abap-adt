@@ -205,10 +205,22 @@ describe('the coverage ledger guard', () => {
           "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is left inactive to activate",
       },
       {
+        key: 'HandlerLock#PROGRAM_TEXT_ELEMENTS',
+        kind: 'cloud',
+        reason:
+          "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is locked",
+      },
+      {
         key: 'HandlerTransportMoveObjects',
         kind: 'cloud',
         reason:
           "the cloud trial has only ZLOCAL packages; SAP records no local object on a request (TRINT_APPEND_TO_COMM_ARRAYS: 'Local object is edited without a request')",
+      },
+      {
+        key: 'HandlerUnlock#PROGRAM_TEXT_ELEMENTS',
+        kind: 'cloud',
+        reason:
+          "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is locked",
       },
     ]);
   });

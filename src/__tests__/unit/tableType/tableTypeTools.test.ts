@@ -788,17 +788,17 @@ describe('the definition SAP stored, read at a stated version', () => {
       undefined,
       undefined,
       { data: STORED_HASHED },
-      REFUSED,
     ]);
+    // SAP's refusal rejects, as the shipped connection rejects a non-2xx answer.
     const result = await handleCreateTableType(
-      { connection, logger: undefined },
+      { connection: throwingAt(connection, CHECK_URL), logger: undefined },
       { table_type_name: 'ZTT_X', package_name: 'ZP', access_type: 'hashed' },
     );
     expect(result.isError).toBe(true);
     expect(connection.requests).toHaveLength(8);
     expect(answerOf(result)).toMatchObject({
-      message: 'refused',
       status: 403,
+      raw_body: REFUSED.data,
       step: 'check',
       stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
@@ -858,19 +858,19 @@ describe('the definition SAP stored, read at a stated version', () => {
   });
 
   it('a write refused before the wait answers no stored definition', async () => {
-    const connection = sessionRecording([
-      undefined,
-      { data: STRING_TABLE },
-      REFUSED,
-    ]);
+    const connection = sessionRecording([undefined, { data: STRING_TABLE }]);
+    // SAP's refusal rejects, as the shipped connection rejects a non-2xx answer.
     const result = await handleUpdateTableType(
-      { connection, logger: undefined },
+      {
+        connection: throwingAt(connection, `${TTYP}/ztt_x?lockHandle=${HANDLE}`),
+        logger: undefined,
+      },
       { table_type_name: 'ZTT_X', access_type: 'hashed' },
     );
     expect(result.isError).toBe(true);
     expect(connection.requests).toHaveLength(4);
     const answered = answerOf(result);
-    expect(answered.message).toBe('refused');
+    expect(answered).toMatchObject({ status: 403, raw_body: REFUSED.data });
     expect(answered).not.toHaveProperty('stored_definition');
     expect(answered).not.toHaveProperty('stored_definition_not_read');
     expect(answered).not.toHaveProperty('stored_version');

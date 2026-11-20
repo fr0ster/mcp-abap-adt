@@ -30,7 +30,7 @@
  * function groups), GetStructuresList (two structures), GetEnhancements (two
  * classes), DescribeByList (a class, a table and a structure), GetWhereUsed (two tables), RuntimeListFeeds (dumps and system messages of a fixed past day).
  *
- * Run (HTTP): npm test -- --testPathPatterns='batchedReadsTiming' --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
+ * Run (HTTP): npm run test:integration -- src/__tests__/integration/batch/batchedReadsTiming.test.ts
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
  *             the RFC SDK's libraries on LD_LIBRARY_PATH.
  */

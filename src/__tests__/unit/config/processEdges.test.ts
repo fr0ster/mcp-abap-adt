@@ -4,6 +4,9 @@
  * `stdout` — never `process` itself (D27: production code uses `process`
  * only for a named member).
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { processEdges } from '../../../lib/config/startup';
 
 describe('processEdges', () => {
@@ -14,21 +17,21 @@ describe('processEdges', () => {
     processLike.on('warning', listener);
     try {
       const after = process.listeners('warning');
-      expect(after).toHaveLength(before + 1);
-      expect(after).toContain(listener);
+      assert.equal(after.length, before + 1);
+      assert.ok(after.includes(listener));
     } finally {
       process.removeListener('warning', listener);
     }
-    expect(process.listeners('warning')).toHaveLength(before);
+    assert.equal(process.listeners('warning').length, before);
   });
 
   it("processLike's streams are the process's own", () => {
     const { processLike } = processEdges();
-    expect(processLike.stdin).toBe(process.stdin);
-    expect(processLike.stdout).toBe(process.stdout);
+    assert.equal(processLike.stdin, process.stdin);
+    assert.equal(processLike.stdout, process.stdout);
   });
 
   it('processLike is not process itself', () => {
-    expect(processEdges().processLike).not.toBe(process);
+    assert.notEqual(processEdges().processLike, process);
   });
 });

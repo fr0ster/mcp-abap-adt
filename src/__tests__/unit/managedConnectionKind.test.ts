@@ -9,6 +9,8 @@
  * a connection connects nothing.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { resetProcessLatchForTests } from '../../lib/activeTools';
 import { systemKindOf } from '../../lib/connectionFactory';
@@ -17,6 +19,7 @@ import {
   invalidateConnectionCache,
   setConfigOverride,
 } from '../../lib/utils';
+import { assertThrows } from '../helpers/assertions';
 
 const SETTINGS: SapConfig = {
   url: 'https://sap.example.invalid',
@@ -37,25 +40,26 @@ afterEach(() => {
 it('setConfigOverride with a stated kind builds that kind, SAP_SYSTEM_TYPE unset', () => {
   delete process.env.SAP_SYSTEM_TYPE;
   setConfigOverride(SETTINGS, 'onprem');
-  expect(systemKindOf(getManagedConnection())).toBe('onprem');
+  assert.equal(systemKindOf(getManagedConnection()), 'onprem');
 });
 
 it('the stated kind beats SAP_SYSTEM_TYPE', () => {
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   setConfigOverride(SETTINGS, 'cloud');
-  expect(systemKindOf(getManagedConnection())).toBe('cloud');
+  assert.equal(systemKindOf(getManagedConnection()), 'cloud');
 });
 
 it('getManagedConnection states its kind; the same kind is the same connection', () => {
   delete process.env.SAP_SYSTEM_TYPE;
   setConfigOverride(SETTINGS, 'onprem');
   const first = getManagedConnection('onprem');
-  expect(getManagedConnection('onprem')).toBe(first);
+  assert.equal(getManagedConnection('onprem'), first);
 });
 
 it('a request for another kind than the override was configured for is refused', () => {
   setConfigOverride(SETTINGS, 'onprem');
-  expect(() => getManagedConnection('cloud')).toThrow(
+  assertThrows(
+    () => getManagedConnection('cloud'),
     'The configured connection is built for onprem; cloud was asked for',
   );
 });
@@ -67,12 +71,12 @@ it('after invalidation the rebuilt connection keeps the configured kind', () => 
   invalidateConnectionCache();
   process.env.SAP_SYSTEM_TYPE = 'onprem';
   const after = getManagedConnection();
-  expect(after).not.toBe(before);
-  expect(systemKindOf(after)).toBe('cloud');
+  assert.notEqual(after, before);
+  assert.equal(systemKindOf(after), 'cloud');
 });
 
 it('without a kind, SAP_SYSTEM_TYPE answers', () => {
   process.env.SAP_SYSTEM_TYPE = 'cloud';
   setConfigOverride(SETTINGS);
-  expect(systemKindOf(getManagedConnection())).toBe('cloud');
+  assert.equal(systemKindOf(getManagedConnection()), 'cloud');
 });

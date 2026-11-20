@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   analyseActivation,
   analyseCheck,
@@ -10,6 +13,7 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 
 /**
  * The error axis, injected, against real documents.
@@ -31,38 +35,39 @@ function wire(name: string): IAdtWireResponse {
 }
 
 describe('a refusal inside an HTTP 200 — what the design exists for', () => {
-  it.each([
+  for (const [name, analyse] of [
     ['refusal-activation-fails--01-activation', analyseActivation],
     ['refusal-delete-refused--01-deletion-delete', analyseDeletion],
     ['refusal-syntax-check--01-checkrun', analyseCheck],
     ['refusal-check-nonexistent-object--01-checkrun', analyseCheck],
     ['refusal-validation-name-taken-ddl--01-ddl-validation', analyseValidation],
-  ] as const)(
-    '%s is a failure though the library saw none',
-    (name, analyse) => {
-      expect(corpusSidecar(name).response.status).toBe(200);
+  ] as const) {
+    it(format('%s is a failure though the library saw none', name), () => {
+      assert.equal(corpusSidecar(name).response.status, 200);
 
       const verdict = analyse(ADT_NO_FAILURE, wire(name));
-      expect(verdict).not.toBe(ADT_NO_FAILURE);
+      assert.notEqual(verdict, ADT_NO_FAILURE);
       const failure = verdict as IAdtError & { messages: unknown[] };
-      expect(failure.origin).toBe('refusal');
-      expect(failure.message.length).toBeGreaterThan(0);
-      expect(failure.messages.length).toBeGreaterThan(0);
-    },
-  );
+      assert.equal(failure.origin, 'refusal');
+      assert.ok(failure.message.length > 0);
+      assert.ok(failure.messages.length > 0);
+    });
+  }
 });
 
 describe('a success stays a success', () => {
-  it.each([
+  for (const [name, analyse] of [
     ['activation-success-verdict--01-activation', analyseActivation],
     ['delete-success--01-deletion-delete', analyseDeletion],
     ['deletion-check-allows--01-deletion-check', analyseDeletion],
     ['check-success-verdict--01-checkrun', analyseCheck],
     ['validation-name-free-class--01-validation-objectname', analyseValidation],
     ['validation-name-free-ddl--01-ddl-validation', analyseValidation],
-  ] as const)('%s answers ADT_NO_FAILURE', (name, analyse) => {
-    expect(analyse(ADT_NO_FAILURE, wire(name))).toBe(ADT_NO_FAILURE);
-  });
+  ] as const) {
+    it(format('%s answers ADT_NO_FAILURE', name), () => {
+      assert.equal(analyse(ADT_NO_FAILURE, wire(name)), ADT_NO_FAILURE);
+    });
+  }
 
   /**
    * The activation this repository once read for itself, now the package's.
@@ -90,24 +95,26 @@ describe('a success stays a success', () => {
    */
   it('nothing to activate is not a failure, judged by the empty inactive list read after it', () => {
     const name = 'activation-nothing-to-activate--01-activation';
-    expect(corpusSidecar(name).response.status).toBe(200);
-    expect(corpusBody(name)).not.toMatch(/<msg/);
+    assert.equal(corpusSidecar(name).response.status, 200);
+    assert.doesNotMatch(corpusBody(name), /<msg/);
     // adt-strategies 0.22.0 (fr0ster/mcp-abap-adt#351): the same document
     // answered an activation that left objects inactive, so the member reads
     // the inactive list after it and hands it as the third parameter.
     const emptyList = wire(
       'activation-reactivate-active-s4-2025--04-inactiveobjects',
     );
-    expect(
+    assert.equal(
       analyseActivation(ADT_NO_FAILURE, wire(name), {
         activation: {
           named: ['/sap/bc/adt/oo/classes/zmcp_bld_ansch01'],
           inactiveObjects: emptyList,
         },
       }),
-    ).toBe(ADT_NO_FAILURE);
+      ADT_NO_FAILURE,
+    );
     // Without the list the outcome is not decided, and that is a failure.
-    expect(analyseActivation(ADT_NO_FAILURE, wire(name))).not.toBe(
+    assert.notEqual(
+      analyseActivation(ADT_NO_FAILURE, wire(name)),
       ADT_NO_FAILURE,
     );
   });
@@ -115,8 +122,8 @@ describe('a success stays a success', () => {
   it('an activation SAP refused with an E is still a failure', () => {
     const name = 'refusal-activation-fails--01-activation';
     const verdict = analyseActivation(ADT_NO_FAILURE, wire(name));
-    expect(verdict).not.toBe(ADT_NO_FAILURE);
-    expect((verdict as IAdtError).origin).toBe('refusal');
+    assert.notEqual(verdict, ADT_NO_FAILURE);
+    assert.equal((verdict as IAdtError).origin, 'refusal');
   });
 
   it('a verdict the library already reached is never reversed', () => {
@@ -125,22 +132,23 @@ describe('a success stays a success', () => {
       origin: 'connection',
     } as IAdtError;
     const name = 'activation-nothing-to-activate--01-activation';
-    expect(analyseActivation(library, wire(name))).not.toBe(ADT_NO_FAILURE);
+    assert.notEqual(analyseActivation(library, wire(name)), ADT_NO_FAILURE);
   });
 
   it('a passing unit test run is not a failure', () => {
     const passing = corpusSidecar(
       'unittest-run-passing--03-results-fa53c505dd7b1fd1abb8599833a05d44',
     );
-    expect(passing.response.status).toBe(200);
-    expect(
+    assert.equal(passing.response.status, 200);
+    assert.equal(
       analyseUnitTest(
         ADT_NO_FAILURE,
         wire(
           'unittest-run-passing--03-results-fa53c505dd7b1fd1abb8599833a05d44',
         ),
       ),
-    ).toBe(ADT_NO_FAILURE);
+      ADT_NO_FAILURE,
+    );
   });
 
   it('a failing one is', () => {
@@ -150,8 +158,8 @@ describe('a success stays a success', () => {
         'refusal-unittest-run-failing--03-results-fa53c505dd7b1fd1abb859f1193d5d44',
       ),
     );
-    expect(verdict).not.toBe(ADT_NO_FAILURE);
-    expect((verdict as IAdtError).message).toContain('deliberate failure');
+    assert.notEqual(verdict, ADT_NO_FAILURE);
+    assert.ok((verdict as IAdtError).message.includes('deliberate failure'));
   });
 });
 
@@ -166,7 +174,7 @@ describe("the library's own verdict is enriched, never discarded", () => {
     const out = analyseException(libraryVerdict, wire(name)) as IAdtError & {
       messages: ReadonlyArray<{ t100?: { id: string; no: string } }>;
     };
-    expect(out.message).toBe('Request failed with status code 423');
+    assert.equal(out.message, 'Request failed with status code 423');
   });
 
   it('adds the identity the document carried and the library did not', () => {
@@ -176,9 +184,9 @@ describe("the library's own verdict is enriched, never discarded", () => {
     ) as IAdtError & {
       messages: ReadonlyArray<{ t100?: { id: string; no: string } }>;
     };
-    expect(out.adtType).toBe('ExceptionResourceInvalidLockHandle');
-    expect(out.namespace).toBe('com.sap.adt');
-    expect(out.messages[0].t100).toMatchObject({
+    assert.equal(out.adtType, 'ExceptionResourceInvalidLockHandle');
+    assert.equal(out.namespace, 'com.sap.adt');
+    assertMatchObject(out.messages[0].t100, {
       id: 'SADT_RESOURCE',
       no: '026',
     });
@@ -189,8 +197,8 @@ describe("the library's own verdict is enriched, never discarded", () => {
       { origin: 'connection', message: 'JWT token has expired' },
       undefined,
     ) as IAdtError & { messages: Array<{ type: string; text: string }> };
-    expect(out.origin).toBe('connection');
-    expect(out.messages).toEqual([
+    assert.equal(out.origin, 'connection');
+    assert.deepStrictEqual(out.messages, [
       { type: 'E', text: 'JWT token has expired' },
     ]);
   });
@@ -202,7 +210,7 @@ describe('what a strategy never does', () => {
       ADT_NO_FAILURE,
       wire('refusal-activation-fails--01-activation'),
     ) as IAdtError;
-    expect(verdict.origin).toBe('refusal');
+    assert.equal(verdict.origin, 'refusal');
   });
 
   it('copies method and url by name, never the transport config', () => {
@@ -215,7 +223,7 @@ describe('what a strategy never does', () => {
         headers: { authorization: 'Bearer MUST-NOT-APPEAR' },
       },
     } as unknown as IAdtWireResponse) as IAdtError;
-    expect(verdict.request).toEqual({
+    assert.deepStrictEqual(verdict.request, {
       method: 'POST',
       url: '/sap/bc/adt/deletion/delete',
     });
@@ -228,7 +236,7 @@ describe('what a strategy never does', () => {
       ADT_NO_FAILURE,
       wire('check-success-verdict--01-checkrun'),
     );
-    expect(verdict).toBe(ADT_NO_FAILURE);
-    expect(verdict).not.toBeUndefined();
+    assert.equal(verdict, ADT_NO_FAILURE);
+    assert.notEqual(verdict, undefined);
   });
 });

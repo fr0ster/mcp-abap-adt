@@ -11,7 +11,8 @@
  * `legacy` stays distinct here (an older on-premise system), unlike
  * production's `statedSystemKind`, which maps it to `onprem`.
  *
- * Light on purpose: Jest's `globalSetup` and `globalTeardown` import it.
+ * Light on purpose: the live run's setup and teardown (`globalSetup.ts`,
+ * `globalTeardown.ts`, run by the runner in its own process) import it.
  */
 
 import * as fs from 'node:fs';

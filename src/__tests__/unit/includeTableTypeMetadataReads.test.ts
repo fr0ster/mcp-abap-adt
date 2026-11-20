@@ -4,6 +4,9 @@
  * and answers the document as SAP sent it. The real client over a connection
  * double.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -65,12 +68,13 @@ describe('the shared include and table-type metadata reads', () => {
       'active',
     );
 
-    expect(sent).toHaveLength(1);
-    expect(sent[0]?.method).toBe('GET');
-    expect(sent[0]?.url).toBe(
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0]?.method, 'GET');
+    assert.equal(
+      sent[0]?.url,
       '/sap/bc/adt/programs/includes/zincl_x?version=active',
     );
-    expect(rawOf(response)).toBe(document);
+    assert.equal(rawOf(response), document);
   });
 
   it('readTableTypeMetadata sends one GET to the table type, at the version given, and answers its document as sent', async () => {
@@ -85,16 +89,17 @@ describe('the shared include and table-type metadata reads', () => {
       'active',
     );
 
-    expect(sent).toHaveLength(1);
-    expect(sent[0]?.method).toBe('GET');
-    expect(sent[0]?.url).toBe(
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0]?.method, 'GET');
+    assert.equal(
+      sent[0]?.url,
       '/sap/bc/adt/ddic/tabletypes/zttyp_x?version=active',
     );
-    expect(rawOf(response)).toBe(document);
+    assert.equal(rawOf(response), document);
   });
 
   it("neither read joins the package walk's reads", () => {
-    expect(METADATA_READ_TYPES).not.toContain('PROG/I');
-    expect(METADATA_READ_TYPES).not.toContain('TTYP/DA');
+    assert.ok(!METADATA_READ_TYPES.includes('PROG/I'));
+    assert.ok(!METADATA_READ_TYPES.includes('TTYP/DA'));
   });
 });

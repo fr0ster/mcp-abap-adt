@@ -7,34 +7,36 @@
  * destination is who its leftover sessions belong to.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 
-jest.mock('../../../lib/connectionFactory', () => {
-  const actual = jest.requireActual('../../../lib/connectionFactory');
-  return {
-    ...actual,
-    createAbapConnection: () => ({
-      connect: async () => {},
-      disconnect: async () => {},
-      isConnected: () => true,
-      makeAdtRequest: async () => ({ status: 200, data: '' }),
-      sessionCookies: () => 'SAP_SESSIONID_X01_100=placeholder-session',
-    }),
-  };
-});
-
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { LeftoverSessions } from '../../../lib/leftoverSessions/LeftoverSessions';
 import { probeGroup } from '../../helpers/adtStandIn';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { fakeProbe, OUR_PID } from './harness';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time); the names not replaced stay real.
+// The real exports, read before any is replaced.
+const actual = { ...connectionFactory };
+
+mock.method(connectionFactory, 'createAbapConnection', () => ({
+  connect: async () => {},
+  disconnect: async () => {},
+  isConnected: () => true,
+  makeAdtRequest: async () => ({ status: 200, data: '' }),
+  sessionCookies: () => 'SAP_SESSIONID_X01_100=placeholder-session',
+}));
 
 // The system kind is required: the stand-in's is stated for every case.
 beforeEach(() => {
@@ -108,13 +110,13 @@ async function filesAfterACall(
 }
 
 it('an HTTP connection holding a session writes its file (the control)', async () => {
-  expect(await filesAfterACall('http')).toHaveLength(1);
+  assert.equal((await filesAfterACall('http')).length, 1);
 });
 
 it('an RFC connection writes none', async () => {
-  expect(await filesAfterACall('rfc')).toEqual([]);
+  assert.deepStrictEqual(await filesAfterACall('rfc'), []);
 });
 
 it('an instance that serves no destination writes none', async () => {
-  expect(await filesAfterACall('http', null)).toEqual([]);
+  assert.deepStrictEqual(await filesAfterACall('http', null), []);
 });

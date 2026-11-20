@@ -5,10 +5,14 @@
  * same quickSearch the handler used to build itself — and the answer is read
  * off the search document as before.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { enhancementTypeOf } from '../../handlers/enhancement/readonly/enhancementAvailability';
+import { rejectionOf } from '../helpers/assertions';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -25,7 +29,7 @@ type Sent = { url?: string; method?: string; headers?: Record<string, string> };
 function connectionAnswering(answer: () => Promise<unknown>) {
   const sent: Sent[] = [];
   const connection = {
-    makeAdtRequest: jest.fn(async (request: Sent) => {
+    makeAdtRequest: mock.fn(async (request: Sent) => {
       sent.push(request);
       return answer();
     }),
@@ -44,23 +48,26 @@ describe('enhancementTypeOf', () => {
   it('sends the quickSearch through the client and reads the named hit', async () => {
     const { connection, sent } = connectionAnswering(ok(HITS));
 
-    await expect(
-      enhancementTypeOf(connection, 'zenh_impl', 'ENHO/XHH'),
-    ).resolves.toBe('ENHO/XHB');
+    assert.equal(
+      await enhancementTypeOf(connection, 'zenh_impl', 'ENHO/XHH'),
+      'ENHO/XHB',
+    );
 
-    expect(sent).toHaveLength(1);
-    expect(sent[0].method).toBe('GET');
-    expect(sent[0].url).toBe(
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].method, 'GET');
+    assert.equal(
+      sent[0].url,
       '/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=zenh_impl&maxResults=20&objectType=ENHO',
     );
-    expect(sent[0].headers?.Accept).toBe('application/xml');
+    assert.equal(sent[0].headers?.Accept, 'application/xml');
   });
 
   it('answers undefined when no hit carries the name', async () => {
     const { connection } = connectionAnswering(ok(HITS));
-    await expect(
-      enhancementTypeOf(connection, 'ZNOT_THERE', 'ENHO/XHH'),
-    ).resolves.toBeUndefined();
+    assert.equal(
+      await enhancementTypeOf(connection, 'ZNOT_THERE', 'ENHO/XHH'),
+      undefined,
+    );
   });
 
   // The search answer is read with adt-strategies' `readSearchHits`, through
@@ -71,9 +78,10 @@ describe('enhancementTypeOf', () => {
         "<adtcore:objectReferences xmlns:adtcore='http://www.sap.com/adt/core'><adtcore:objectReference adtcore:type='ENHS/XSB' adtcore:uri='/sap/bc/adt/enhancements/enhsxsb/zspot' adtcore:name='ZSPOT'/></adtcore:objectReferences>",
       ),
     );
-    await expect(
-      enhancementTypeOf(connection, 'zspot', 'ENHS/XSB'),
-    ).resolves.toBe('ENHS/XSB');
+    assert.equal(
+      await enhancementTypeOf(connection, 'zspot', 'ENHS/XSB'),
+      'ENHS/XSB',
+    );
   });
 
   it('answers undefined when SAP refuses the search', async () => {
@@ -83,9 +91,10 @@ describe('enhancementTypeOf', () => {
         response: { status: 500, statusText: 'Error', headers: {}, data: '' },
       });
     });
-    await expect(
-      enhancementTypeOf(connection, 'ZENH_IMPL', 'ENHS/XSB'),
-    ).resolves.toBeUndefined();
+    assert.equal(
+      await enhancementTypeOf(connection, 'ZENH_IMPL', 'ENHS/XSB'),
+      undefined,
+    );
   });
 
   it("rethrows the connection's credential refusal as it came", async () => {
@@ -97,8 +106,9 @@ describe('enhancementTypeOf', () => {
     const { connection } = connectionAnswering(async () => {
       throw refused;
     });
-    await expect(
-      enhancementTypeOf(connection, 'ZENH_IMPL', 'ENHO/XHH'),
-    ).rejects.toBe(refused);
+    assert.equal(
+      await rejectionOf(enhancementTypeOf(connection, 'ZENH_IMPL', 'ENHO/XHH')),
+      refused,
+    );
   });
 });

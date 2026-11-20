@@ -2,6 +2,10 @@
  * What AbapDebugger's members answer through their default strategies, on the
  * recorded endpoint answers: the fakes in fakes.ts return exactly this.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { AbapDebugger } from '@mcp-abap-adt/adt-clients';
 import {
   analyseDebuggeeEnd,
@@ -99,28 +103,31 @@ const DOCUMENT_MEMBERS: Array<
 ];
 
 describe('what AbapDebugger members answer through their default strategies', () => {
-  it.each(DOCUMENT_MEMBERS)(
-    '%s answers the recorded document as it came',
-    async (_member, name, call) => {
-      expect(bodyOf(await call(AbapDebugger.create(replaying(name))))).toBe(
-        corpusBody(name),
-      );
-    },
-  );
+  for (const [_member, name, call] of DOCUMENT_MEMBERS) {
+    it(
+      format('%s answers the recorded document as it came', _member),
+      async () => {
+        assert.equal(
+          bodyOf(await call(AbapDebugger.create(replaying(name)))),
+          corpusBody(name),
+        );
+      },
+    );
+  }
 
   it('a listen the server held to its end answers an empty string', async () => {
     const answer = await AbapDebugger.create(
       replaying('debugger-conversation--03-listen-timeout-no-trigger'),
     ).listen(IDENTITY, { holdSeconds: 60 });
-    expect(bodyOf(answer)).toBe('');
+    assert.equal(bodyOf(answer), '');
   });
 
   it('terminateDebuggee: its 500 is a success under analyseDebuggeeEnd, and answers nothing (the `done` strategy)', async () => {
     const answer = await AbapDebugger.create(
       replaying('debugger-terminate--01-terminate-debuggee'),
     ).terminateDebuggee({ analyse: analyseDebuggeeEnd });
-    expect(answer.ok).toBe(true);
-    expect(bodyOf(answer)).toBeUndefined();
+    assert.equal(answer.ok, true);
+    assert.equal(bodyOf(answer), undefined);
   });
 
   it('a step whose debuggee ended: the 500 is a success under analyseDebuggeeEnd, and the document is kept, so the end can be read', async () => {
@@ -131,8 +138,8 @@ describe('what AbapDebugger members answer through their default strategies', ()
     const answer = await AbapDebugger.create(
       replaying('debugger-terminate--01-terminate-debuggee', ended),
     ).step('stepContinue', { analyse: analyseDebuggeeEnd });
-    expect(answer.ok).toBe(true);
-    expect(readDebuggeeEnd(bodyOf(answer) as string)).toBe('debuggeeEnded');
+    assert.equal(answer.ok, true);
+    assert.equal(readDebuggeeEnd(bodyOf(answer) as string), 'debuggeeEnded');
   });
 });
 
@@ -173,18 +180,20 @@ describe('terminateDebugger under analyseDebuggerFreed (errata: the debugger fre
       analyse: analyseDebuggerFreed,
     });
 
-  it.each([
+  for (const [_, headers, data] of [
     [
       'a plain 500 served as text/plain',
       { 'content-type': 'text/plain' },
       'Internal Server Error',
     ],
     ['a plain 500 with an empty body', {}, ''],
-  ])('%s is no failure', async (_, headers, data) => {
-    expect((await free(500, headers, data)).ok).toBe(true);
-  });
+  ] satisfies [string, Record<string, string>, string][]) {
+    it(format('%s is no failure', _), async () => {
+      assert.equal((await free(500, headers, data)).ok, true);
+    });
+  }
 
-  it.each([
+  for (const [_, status, headers, data] of [
     [
       'a 500 carrying an ADT exception document',
       500,
@@ -203,7 +212,9 @@ describe('terminateDebugger under analyseDebuggerFreed (errata: the debugger fre
       { 'content-type': 'text/plain' },
       'Session no longer exists',
     ],
-  ])('%s stays a failure', async (_, status, headers, data) => {
-    expect((await free(status, headers, data)).ok).toBe(false);
-  });
+  ] satisfies [string, number, Record<string, string>, string][]) {
+    it(format('%s stays a failure', _), async () => {
+      assert.equal((await free(status, headers, data)).ok, false);
+    });
+  }
 });

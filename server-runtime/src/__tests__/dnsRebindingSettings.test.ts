@@ -5,8 +5,15 @@
  * flag without a list checked nothing either. Both together are accepted.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { checkDnsRebinding } from '@mcp-abap-adt/lib/http-transport';
+import {
+  assertMatchObject,
+  assertThrows,
+} from '../../../src/__tests__/helpers/assertions';
 import { readHttpConfig } from '../http/config/httpParameters';
 import { StreamableHttpServer } from '../http/StreamableHttpServer';
 import { readSseConfig } from '../sse/config/sseParameters';
@@ -14,47 +21,54 @@ import { SseServer } from '../sse/SseServer';
 
 const KIND = '--system-type=onprem';
 
-describe.each([
+for (const [prefix, read] of [
   ['http', readHttpConfig],
   ['sse', readSseConfig],
-] as const)('the %s launcher', (prefix, read) => {
-  const enable = `--${prefix}-enable-dns-protection`;
-  const hosts = `--${prefix}-allowed-hosts`;
-  const origins = `--${prefix}-allowed-origins`;
+] as const) {
+  describe(format('the %s launcher', prefix), () => {
+    const enable = `--${prefix}-enable-dns-protection`;
+    const hosts = `--${prefix}-allowed-hosts`;
+    const origins = `--${prefix}-allowed-origins`;
 
-  it('allowed hosts without the enable flag are refused, naming both', () => {
-    expect(() => read([KIND, `${hosts}=localhost:3000`], {})).toThrow(
-      `${hosts} without ${enable}: DNS-rebinding protection checks the hosts and origins only when it is enabled — add ${enable}, or drop them`,
-    );
+    it('allowed hosts without the enable flag are refused, naming both', () => {
+      assertThrows(
+        () => read([KIND, `${hosts}=localhost:3000`], {}),
+        `${hosts} without ${enable}: DNS-rebinding protection checks the hosts and origins only when it is enabled — add ${enable}, or drop them`,
+      );
+    });
+
+    it('allowed origins with the enable flag stated false are refused', () => {
+      assertThrows(
+        () =>
+          read([KIND, `${origins}=https://a.example`, `${enable}=false`], {}),
+        `${origins} without ${enable}`,
+      );
+    });
+
+    it('the enable flag without a list is refused, naming the lists', () => {
+      assertThrows(
+        () => read([KIND, enable], {}),
+        `${enable} without ${hosts} or ${origins}: DNS-rebinding protection has nothing to check against — state the hosts or origins to accept`,
+      );
+    });
+
+    it('the form used is named: an environment variable by its name', () => {
+      const variable = `MCP_${prefix.toUpperCase()}_ENABLE_DNS_PROTECTION`;
+      assertThrows(
+        () => read([KIND], { [variable]: 'true' }),
+        `${variable} without ${hosts} or ${origins}`,
+      );
+    });
+
+    it('both together are read as stated', () => {
+      const config = read([KIND, enable, `${hosts}=localhost:3000`], {});
+      assert.equal(config.enableDnsRebindingProtection, true);
+      assert.deepStrictEqual(config.allowedHosts, ['localhost:3000']);
+    });
   });
+}
 
-  it('allowed origins with the enable flag stated false are refused', () => {
-    expect(() =>
-      read([KIND, `${origins}=https://a.example`, `${enable}=false`], {}),
-    ).toThrow(`${origins} without ${enable}`);
-  });
-
-  it('the enable flag without a list is refused, naming the lists', () => {
-    expect(() => read([KIND, enable], {})).toThrow(
-      `${enable} without ${hosts} or ${origins}: DNS-rebinding protection has nothing to check against — state the hosts or origins to accept`,
-    );
-  });
-
-  it('the form used is named: an environment variable by its name', () => {
-    const variable = `MCP_${prefix.toUpperCase()}_ENABLE_DNS_PROTECTION`;
-    expect(() => read([KIND], { [variable]: 'true' })).toThrow(
-      `${variable} without ${hosts} or ${origins}`,
-    );
-  });
-
-  it('both together are read as stated', () => {
-    const config = read([KIND, enable, `${hosts}=localhost:3000`], {});
-    expect(config.enableDnsRebindingProtection).toBe(true);
-    expect(config.allowedHosts).toEqual(['localhost:3000']);
-  });
-});
-
-describe.each([
+for (const [_name, construct] of [
   [
     'StreamableHttpServer',
     (opts: ConstructorParameters<typeof StreamableHttpServer>[1]) =>
@@ -65,46 +79,51 @@ describe.each([
     (opts: ConstructorParameters<typeof SseServer>[1]) =>
       new SseServer(new CompositeHandlersRegistry([]), opts),
   ],
-] as const)('%s', (_name, construct) => {
-  it('allowedHosts without enableDnsRebindingProtection throws, naming the fields', () => {
-    expect(() => construct({ allowedHosts: ['localhost:3000'] })).toThrow(
-      'allowedHosts without enableDnsRebindingProtection',
-    );
-  });
+] as const) {
+  describe(format('%s', _name), () => {
+    it('allowedHosts without enableDnsRebindingProtection throws, naming the fields', () => {
+      assertThrows(
+        () => construct({ allowedHosts: ['localhost:3000'] }),
+        'allowedHosts without enableDnsRebindingProtection',
+      );
+    });
 
-  it('allowedOrigins with enableDnsRebindingProtection false throws', () => {
-    expect(() =>
-      construct({
-        allowedOrigins: ['https://a.example'],
-        enableDnsRebindingProtection: false,
-      }),
-    ).toThrow('allowedOrigins without enableDnsRebindingProtection');
-  });
+    it('allowedOrigins with enableDnsRebindingProtection false throws', () => {
+      assertThrows(
+        () =>
+          construct({
+            allowedOrigins: ['https://a.example'],
+            enableDnsRebindingProtection: false,
+          }),
+        'allowedOrigins without enableDnsRebindingProtection',
+      );
+    });
 
-  it('enableDnsRebindingProtection without a list throws, naming the lists', () => {
-    expect(() => construct({ enableDnsRebindingProtection: true })).toThrow(
-      'enableDnsRebindingProtection without allowedHosts or allowedOrigins',
-    );
-    expect(() =>
-      construct({ enableDnsRebindingProtection: true, allowedHosts: [] }),
-    ).toThrow(
-      'enableDnsRebindingProtection without allowedHosts or allowedOrigins',
-    );
-  });
+    it('enableDnsRebindingProtection without a list throws, naming the lists', () => {
+      assertThrows(
+        () => construct({ enableDnsRebindingProtection: true }),
+        'enableDnsRebindingProtection without allowedHosts or allowedOrigins',
+      );
+      assertThrows(
+        () =>
+          construct({ enableDnsRebindingProtection: true, allowedHosts: [] }),
+        'enableDnsRebindingProtection without allowedHosts or allowedOrigins',
+      );
+    });
 
-  it('both together, and neither, construct', () => {
-    expect(() =>
+    it('both together, and neither, construct', () => {
       construct({
         enableDnsRebindingProtection: true,
         allowedHosts: ['localhost:3000'],
-      }),
-    ).not.toThrow();
-    expect(() => construct({})).not.toThrow();
+      });
+      construct({});
+    });
   });
-});
+}
 
 it('checkDnsRebinding fails closed when enabled with no list', () => {
-  expect(
+  assertMatchObject(
     checkDnsRebinding({ host: 'evil.example' }, { enable: true }),
-  ).toMatchObject({ status: 403 });
+    { status: 403 },
+  );
 });

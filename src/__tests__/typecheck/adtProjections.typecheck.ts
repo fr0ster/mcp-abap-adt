@@ -8,7 +8,7 @@
  * Each negative check stands beside the positive one it differs from, so a
  * check cannot pass because the whole line is broken.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 import {

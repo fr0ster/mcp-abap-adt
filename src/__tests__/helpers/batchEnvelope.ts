@@ -7,6 +7,7 @@
  * (`parseBatchResponse`).
  */
 import type {
+  IAbapConnection,
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -131,11 +132,29 @@ export const partByPart =
     envelopeResponse(parts.map(part));
 
 /**
+ * Every call of the fake connection's five recorded members, in order: a
+ * plain record (no runner's mock function), read by the tests on either
+ * runner.
+ */
+export interface EnvelopeCalls {
+  connect: number;
+  disconnect: number;
+  getBaseUrl: number;
+  setSessionType: Array<'stateful' | 'stateless'>;
+  makeAdtRequest: IAbapRequestOptions[];
+}
+
+type MakeAdtRequest = IAbapConnection['makeAdtRequest'];
+
+/**
  * A fake instance connection that answers envelopes with `answer`; every
  * other request (none is expected while a batch runs) goes to `direct`,
  * else `200` with an empty body. It records every envelope with the session
- * type in force when it was sent, every direct request, and its logoff
- * (`disconnect`).
+ * type in force when it was sent, every direct request, and every call of
+ * `connect`, `disconnect` (its logoff), `getBaseUrl`, `setSessionType` and
+ * `makeAdtRequest` (`calls`). `answerRequests(next)` replaces how
+ * `makeAdtRequest` answers: `next` gets each request and the answering in
+ * force before it, to fall back on.
  */
 export function envelopeConnection(
   answer: EnvelopeAnswer,
@@ -143,31 +162,59 @@ export function envelopeConnection(
 ) {
   const envelopes: SeenEnvelope[] = [];
   const directs: IAbapRequestOptions[] = [];
-  let session: 'stateful' | 'stateless' = 'stateless';
-  const connection = {
-    connect: jest.fn(async () => undefined),
-    disconnect: jest.fn(async () => undefined),
-    getBaseUrl: jest.fn(async () => 'https://system.invalid'),
-    getSessionId: () => null,
-    setSessionType: jest.fn((type: 'stateful' | 'stateless') => {
-      session = type;
-    }),
-    getSessionType: () => session,
-    makeAdtRequest: jest.fn(async (request: IAbapRequestOptions) => {
-      if (request.url.endsWith('/batch')) {
-        const seen: SeenEnvelope = {
-          url: request.url,
-          accept: headerOf(request.headers, 'accept'),
-          session,
-          parts: innerRequests(request),
-        };
-        envelopes.push(seen);
-        return answer(seen.parts, seen);
-      }
-      directs.push(request);
-      if (direct !== undefined) return direct(request);
-      return { status: 200, statusText: 'OK', headers: {}, data: '' };
-    }),
+  const calls: EnvelopeCalls = {
+    connect: 0,
+    disconnect: 0,
+    getBaseUrl: 0,
+    setSessionType: [],
+    makeAdtRequest: [],
   };
-  return { connection, envelopes, directs };
+  let session: 'stateful' | 'stateless' = 'stateless';
+  let answering: MakeAdtRequest = async (request) => {
+    if (request.url.endsWith('/batch')) {
+      const seen: SeenEnvelope = {
+        url: request.url,
+        accept: headerOf(request.headers, 'accept'),
+        session,
+        parts: innerRequests(request),
+      };
+      envelopes.push(seen);
+      return answer(seen.parts, seen);
+    }
+    directs.push(request);
+    if (direct !== undefined) return direct(request);
+    return { status: 200, statusText: 'OK', headers: {}, data: '' };
+  };
+  const connection = {
+    connect: async (): Promise<void> => {
+      calls.connect += 1;
+    },
+    disconnect: async (): Promise<void> => {
+      calls.disconnect += 1;
+    },
+    getBaseUrl: async (): Promise<string> => {
+      calls.getBaseUrl += 1;
+      return 'https://system.invalid';
+    },
+    getSessionId: () => null,
+    setSessionType: (type: 'stateful' | 'stateless') => {
+      calls.setSessionType.push(type);
+      session = type;
+    },
+    getSessionType: () => session,
+    makeAdtRequest: (request: IAbapRequestOptions) => {
+      calls.makeAdtRequest.push(request);
+      return answering(request);
+    },
+  };
+  const answerRequests = (
+    next: (
+      request: IAbapRequestOptions,
+      previous: MakeAdtRequest,
+    ) => Promise<IAdtWireResponse>,
+  ): void => {
+    const previous = answering;
+    answering = (request) => next(request, previous);
+  };
+  return { connection, envelopes, directs, calls, answerRequests };
 }

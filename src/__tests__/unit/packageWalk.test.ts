@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { HandlerContext } from '../../handlers/interfaces';
@@ -16,6 +19,7 @@ import {
 } from '../../lib/strategies/packageWalk';
 import { succeeded } from '../../lib/strategies/stepResponse';
 import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
+import { rejectionOf } from '../helpers/assertions';
 
 /**
  * The walk, offline, over the levels the corpus recorded.
@@ -65,28 +69,37 @@ describe('the walk is composed of single-answer steps', () => {
     const source = replaying();
     await walkPackage(source, 'ZMCP_SHR_PKG', { includeDescriptions: true });
     // one root call plus one per type — the eight the corpus recorded
-    expect(source.calls).toBe(8);
+    assert.equal(source.calls, 8);
   });
 
   it('finds every object the levels carried', async () => {
     const objects = await walkPackage(replaying(), 'ZMCP_SHR_PKG', {
       includeDescriptions: true,
     });
-    expect(objects.length).toBeGreaterThan(20);
-    expect(objects.every((o) => o.name && o.type)).toBe(true);
+    assert.ok(objects.length > 20);
+    assert.equal(
+      objects.every((o) => o.name && o.type),
+      true,
+    );
   });
 
   it('keeps the descriptions the shipped node reading drops', async () => {
     const objects = await walkPackage(replaying(), 'ZMCP_SHR_PKG', {
       includeDescriptions: true,
     });
-    expect(objects.some((o) => (o.description ?? '').length > 0)).toBe(true);
+    assert.equal(
+      objects.some((o) => (o.description ?? '').length > 0),
+      true,
+    );
   });
 
   it('answers no description when none is asked for, though the levels carry some', async () => {
     const objects = await walkPackage(replaying(), 'ZMCP_SHR_PKG');
-    expect(objects.length).toBeGreaterThan(0);
-    expect(objects.some((o) => 'description' in o)).toBe(false);
+    assert.ok(objects.length > 0);
+    assert.equal(
+      objects.some((o) => 'description' in o),
+      false,
+    );
   });
 });
 
@@ -94,27 +107,33 @@ describe('one walk, two assemblies', () => {
   it('a flat list names the package on every row', async () => {
     const objects = await walkPackage(replaying(), 'ZMCP_SHR_PKG', {});
     const list = assembleList('ZMCP_SHR_PKG', objects);
-    expect(list).toHaveLength(objects.length);
-    expect(list.every((i) => i.packageName === 'ZMCP_SHR_PKG')).toBe(true);
+    assert.equal(list.length, objects.length);
+    assert.equal(
+      list.every((i) => i.packageName === 'ZMCP_SHR_PKG'),
+      true,
+    );
   });
 
   it('a tree hangs the same objects under the package', async () => {
     const objects = await walkPackage(replaying(), 'ZMCP_SHR_PKG', {});
     const tree = assembleTree('ZMCP_SHR_PKG', objects);
-    expect(tree.name).toBe('ZMCP_SHR_PKG');
-    expect(tree.isPackage).toBe(true);
-    expect(tree.children).toHaveLength(objects.length);
+    assert.equal(tree.name, 'ZMCP_SHR_PKG');
+    assert.equal(tree.isPackage, true);
+    assert.equal(tree.children?.length, objects.length);
   });
 
   it('a leaf says what is below it with an empty array, not by omission', async () => {
     const objects = await walkPackage(replaying(), 'ZMCP_SHR_PKG', {});
     const tree = assembleTree('ZMCP_SHR_PKG', objects);
-    expect(tree.children?.every((c) => Array.isArray(c.children))).toBe(true);
+    assert.equal(
+      tree.children?.every((c) => Array.isArray(c.children)),
+      true,
+    );
   });
 });
 
 describe('the derived fields', () => {
-  it.each([
+  for (const [type, kind, written] of [
     ['CLAS/OC', 'class', 'source'],
     ['DDLS/DF', 'view', 'source'],
     ['TABL/DT', 'table', 'source'],
@@ -122,13 +141,15 @@ describe('the derived fields', () => {
     ['DOMA/DD', 'domain', 'xml'],
     ['FUGR/F', 'functionGroup', 'xml'],
     ['BDEF/BDO', 'behaviorDefinition', 'source'],
-  ])('%s is %s, written as %s', (type, kind, format) => {
-    expect(kindOf(type)).toBe(kind);
-    expect(codeFormatOf(type)).toBe(format);
-  });
+  ]) {
+    it(format('%s is %s, written as %s', type, kind, written), () => {
+      assert.equal(kindOf(type), kind);
+      assert.equal(codeFormatOf(type), written);
+    });
+  }
 
   it('an unknown type gets no kind rather than a wrong one', () => {
-    expect(kindOf('ZZZZ/QQ')).toBeUndefined();
+    assert.equal(kindOf('ZZZZ/QQ'), undefined);
   });
 });
 
@@ -138,21 +159,24 @@ describe('the node reading', () => {
       data: corpusBody('read-object-tree-structure--01-nodestructure'),
     });
     // the root level lists types, not objects
-    expect(level.objects).toHaveLength(0);
-    expect(level.childNodes.length).toBeGreaterThan(0);
-    expect(level.childNodes[0].nodeId).toBeTruthy();
+    assert.equal(level.objects.length, 0);
+    assert.ok(level.childNodes.length > 0);
+    assert.ok(level.childNodes[0].nodeId);
   });
 
   it('reads objects out of a type level', () => {
     const level = nodeLevel({
       data: corpusBody('read-object-tree-structure--04-nodestructure'),
     });
-    expect(level.objects.length).toBeGreaterThan(0);
-    expect(level.objects[0].name).toBeTruthy();
+    assert.ok(level.objects.length > 0);
+    assert.ok(level.objects[0].name);
   });
 
   it('answers an empty level for an empty body rather than throwing', () => {
-    expect(nodeLevel({ data: '' })).toEqual({ objects: [], childNodes: [] });
+    assert.deepStrictEqual(nodeLevel({ data: '' }), {
+      objects: [],
+      childNodes: [],
+    });
   });
 });
 
@@ -194,15 +218,15 @@ describe('subpackages keep their own objects', () => {
     const tree = assembleTree('P', walked);
     const names = (n: { children?: Array<{ name: string }> }) =>
       (n.children ?? []).map((c) => c.name).sort();
-    expect(names(tree)).toEqual(['SUB', 'T1']);
+    assert.deepStrictEqual(names(tree), ['SUB', 'T1']);
     const sub = (tree.children ?? []).find((c) => c.name === 'SUB') as any;
-    expect(names(sub)).toEqual(['T2']);
+    assert.deepStrictEqual(names(sub), ['T2']);
   });
 
   it('names the package each listed object is in', async () => {
     const walked = await walkPackage(source, 'P', { includeSubpackages: true });
     const t2 = assembleList('P', walked).find((i) => i.name === 'T2');
-    expect(t2?.packageName).toBe('SUB');
+    assert.equal(t2?.packageName, 'SUB');
   });
 });
 
@@ -219,7 +243,10 @@ describe('a node-load message is not an object', () => {
       '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>VIEW/DV</OBJECT_TYPE><OBJECT_NAME>ZV_REAL</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
       '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>The API state can be edited...</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
       '</TREE_CONTENT></DATA></asx:values></asx:abap>';
-    expect(nodeLevel({ data }).objects.map((o) => o.name)).toEqual(['ZV_REAL']);
+    assert.deepStrictEqual(
+      nodeLevel({ data }).objects.map((o) => o.name),
+      ['ZV_REAL'],
+    );
   });
 });
 
@@ -240,9 +267,12 @@ describe('concurrentReader', () => {
     });
     const items = Array.from({ length: 30 }, (_, i) => i);
     const out = await read(items);
-    expect(out).toEqual(items.map((n) => ({ ok: true, value: n * 10 })));
-    expect(most).toBe(NODE_READ_CONCURRENCY);
-    expect(read.ownAnswers).toBe(true);
+    assert.deepStrictEqual(
+      out,
+      items.map((n) => ({ ok: true, value: n * 10 })),
+    );
+    assert.equal(most, NODE_READ_CONCURRENCY);
+    assert.equal(read.ownAnswers, true);
   });
 
   it("an item's failure is its own", async () => {
@@ -251,7 +281,7 @@ describe('concurrentReader', () => {
       if (n === 1) throw boom;
       return n;
     });
-    expect(await read([0, 1, 2])).toEqual([
+    assert.deepStrictEqual(await read([0, 1, 2]), [
       { ok: true, value: 0 },
       { ok: false, error: boom },
       { ok: true, value: 2 },
@@ -279,13 +309,14 @@ describe('concurrentReader', () => {
     answer.catch(() => undefined);
     for (let i = 0; i < 5; i++) await tick();
     // The refused read's pump stopped; the other pumps hold their reads.
-    expect(started).toEqual(
+    assert.deepStrictEqual(
+      started,
       Array.from({ length: NODE_READ_CONCURRENCY }, (_, i) => i),
     );
-    expect(settled).toBe(false);
+    assert.equal(settled, false);
     for (const release of held.values()) release();
-    await expect(answer).rejects.toBe(refusal);
-    expect(started).toHaveLength(NODE_READ_CONCURRENCY);
+    assert.equal(await rejectionOf(answer), refusal);
+    assert.equal(started.length, NODE_READ_CONCURRENCY);
   });
 
   it('an answer stopsAt accepts starts no further read; the items read are answered', async () => {
@@ -304,13 +335,14 @@ describe('concurrentReader', () => {
     );
     const answer = read(Array.from({ length: 40 }, (_, i) => i));
     for (let i = 0; i < 5; i++) await tick();
-    expect(started).toEqual(
+    assert.deepStrictEqual(
+      started,
       Array.from({ length: NODE_READ_CONCURRENCY }, (_, i) => i),
     );
     for (const release of held.values()) release();
     const out = await answer;
-    expect(started).toHaveLength(NODE_READ_CONCURRENCY);
-    expect(out).toEqual([
+    assert.equal(started.length, NODE_READ_CONCURRENCY);
+    assert.deepStrictEqual(out, [
       { ok: true, value: 'refused' },
       ...Array.from({ length: NODE_READ_CONCURRENCY - 1 }, (_, i) => ({
         ok: true,

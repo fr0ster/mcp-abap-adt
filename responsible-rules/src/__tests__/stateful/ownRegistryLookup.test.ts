@@ -11,6 +11,9 @@
  * embedder's injected connection alike.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -19,6 +22,7 @@ import {
   adtStandIn,
   type StandInRequest,
 } from '../../../../src/__tests__/helpers/adtStandIn';
+import { assertMatchObject } from '../../../../src/__tests__/helpers/assertions';
 import {
   clientOf,
   silent,
@@ -27,8 +31,6 @@ import { createAbapConnection } from '../../../../src/lib/connectionFactory';
 import type { IHandlersRegistry } from '../../../../src/lib/handlers/interfaces';
 import { getStatedSystemContext } from '../../../../src/lib/systemContext';
 import { EmbeddableMcpServer, StandServer } from '../helpers/withRules';
-
-jest.setTimeout(30_000);
 
 const isLookup = (r: StandInRequest) => r.url.includes('systeminformation');
 const probe = (id: string) => `/sap/bc/adt/probe/own-${id}`;
@@ -138,10 +140,10 @@ let previousType: string | undefined;
 beforeEach(() => {
   previousType = process.env.SAP_SYSTEM_TYPE;
   process.env.SAP_SYSTEM_TYPE = 'cloud';
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
 });
@@ -172,51 +174,60 @@ const FAILED: Array<
   ],
 ];
 
-describe.each(INSTANCES)('%s', (_instance, open) => {
-  it.each(FAILED)(
-    'the lookup %s: the call answers %s, the callback not called; the next call asks again and runs once',
-    async (_how, code, fail) => {
-      const standIn = await adtStandIn();
-      let failing = true;
-      fail(standIn, () => failing);
-      standIn.body(
-        isLookup,
-        JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
+for (const [_instance, open] of INSTANCES) {
+  describe(format('%s', _instance), () => {
+    for (const [_how, code, fail] of FAILED) {
+      it(
+        format(
+          'the lookup %s: the call answers %s, the callback not called; the next call asks again and runs once',
+          _how,
+          code,
+        ),
+        async () => {
+          const standIn = await adtStandIn();
+          let failing = true;
+          fail(standIn, () => failing);
+          standIn.body(
+            isLookup,
+            JSON.stringify({ userName: 'CLOUD_USER', systemID: 'CLD' }),
+          );
+          const seen: Seen = [];
+          const s = await open(standIn, seen);
+          try {
+            const first = await s.call('OwnProbe', { id: 'one' });
+            assert.equal(first.isError, true);
+            assertMatchObject(first.payload, { error: code });
+            assert.equal(seen.length, 0);
+            assert.equal(sent(standIn, 'one'), 0);
+
+            const again = await s.call('OwnProbe', { id: 'again' });
+            assertMatchObject(again.payload, { error: code });
+            assert.equal(seen.length, 0);
+            assert.equal(standIn.requests.filter(isLookup).length, 2);
+
+            failing = false;
+            const second = await s.call('OwnProbe', { id: 'two' });
+            assert.equal(second.isError, false);
+            assert.equal(standIn.requests.filter(isLookup).length, 3);
+            // Called once, after the lookup, inside the known system context.
+            assert.deepStrictEqual(seen, ['CLOUD_USER']);
+            assert.equal(sent(standIn, 'two'), 1);
+            const lookup = standIn.requests.map(isLookup).lastIndexOf(true);
+            assert.ok(
+              standIn.requests.findIndex((r) => r.url === probe('two')) >
+                lookup,
+            );
+
+            // Known from now on: asked no more.
+            await s.call('OwnProbe', { id: 'three' });
+            assert.equal(standIn.requests.filter(isLookup).length, 3);
+            assert.equal(sent(standIn, 'three'), 1);
+          } finally {
+            await s.close();
+            await standIn.close();
+          }
+        },
       );
-      const seen: Seen = [];
-      const s = await open(standIn, seen);
-      try {
-        const first = await s.call('OwnProbe', { id: 'one' });
-        expect(first.isError).toBe(true);
-        expect(first.payload).toMatchObject({ error: code });
-        expect(seen).toHaveLength(0);
-        expect(sent(standIn, 'one')).toBe(0);
-
-        const again = await s.call('OwnProbe', { id: 'again' });
-        expect(again.payload).toMatchObject({ error: code });
-        expect(seen).toHaveLength(0);
-        expect(standIn.requests.filter(isLookup)).toHaveLength(2);
-
-        failing = false;
-        const second = await s.call('OwnProbe', { id: 'two' });
-        expect(second.isError).toBe(false);
-        expect(standIn.requests.filter(isLookup)).toHaveLength(3);
-        // Called once, after the lookup, inside the known system context.
-        expect(seen).toEqual(['CLOUD_USER']);
-        expect(sent(standIn, 'two')).toBe(1);
-        const lookup = standIn.requests.map(isLookup).lastIndexOf(true);
-        expect(
-          standIn.requests.findIndex((r) => r.url === probe('two')),
-        ).toBeGreaterThan(lookup);
-
-        // Known from now on: asked no more.
-        await s.call('OwnProbe', { id: 'three' });
-        expect(standIn.requests.filter(isLookup)).toHaveLength(3);
-        expect(sent(standIn, 'three')).toBe(1);
-      } finally {
-        await s.close();
-        await standIn.close();
-      }
-    },
-  );
-});
+    }
+  });
+}

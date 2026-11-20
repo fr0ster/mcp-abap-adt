@@ -8,6 +8,8 @@
  * compact: the parity suite.)
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import {
   isLockOf,
   isUnlockOf,
@@ -16,19 +18,17 @@ import {
 import { activeTools } from '../../../../../src/lib/activeTools';
 import { halfPost, type SseStand, sseStand, turns, until } from './harness';
 
-jest.setTimeout(30_000);
-
 let s: SseStand;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 beforeEach(async () => {
-  errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  errorSpy = mock.method(console, 'error', () => {});
   s = await sseStand();
 });
 
 afterEach(async () => {
   await s.close();
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
 it('POSTs whose bodies complete after SIGTERM reach no tool; the running tool is not awaited; exit 0', async () => {
@@ -61,14 +61,14 @@ it('POSTs whose bodies complete after SIGTERM reach no tool; the running tool is
   s.processLike.emit('SIGTERM');
   void late.finish().catch(() => undefined);
   void lateOnFresh.finish().catch(() => undefined);
-  expect(await s.exited).toBe(0);
+  assert.equal(await s.exited, 0);
   await until(() => s.standIn.logoffs() === connects);
 
   hold.release();
   await until(() => activeTools().length === 0);
   await turns(20);
-  expect(s.indexOf(isLockOf('LATE'))).toBe(-1);
-  expect(s.indexOf(isLockOf('FRESH'))).toBe(-1);
-  expect(s.connects()).toBe(connects);
-  expect(s.indexOf(isUnlockOf('A'))).toBe(-1);
+  assert.equal(s.indexOf(isLockOf('LATE')), -1);
+  assert.equal(s.indexOf(isLockOf('FRESH')), -1);
+  assert.equal(s.connects(), connects);
+  assert.equal(s.indexOf(isUnlockOf('A')), -1);
 });

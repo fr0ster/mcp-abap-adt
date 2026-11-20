@@ -16,10 +16,15 @@
  * name. That makes the guarantee stronger than the pre-package version: it is the
  * package's dependency surface that is checked, not one directory's.
  */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
 
-const REPO = resolve(__dirname, '../../..');
+import assert from 'node:assert/strict';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../../../src/__tests__/helpers/repoRoot';
+
+// From the repository root, so the compiled node:test file reads the sources.
+const REPO = repositoryRoot(__dirname);
 
 interface Graph {
   files: Set<string>;
@@ -72,35 +77,36 @@ describe('the compact capability split holds across the packages', () => {
 
   it('reads a graph at all — the walker is not silently empty', () => {
     // A resolver that finds nothing would make every assertion below pass.
-    expect(readOnly.files.size).toBeGreaterThan(10);
-    expect([...readOnly.bare]).toContain('@mcp-abap-adt/lib/handlers/read');
+    assert.ok(readOnly.files.size > 10);
+    assert.ok([...readOnly.bare].includes('@mcp-abap-adt/lib/handlers/read'));
   });
 
   it('the read-only package never names the write barrel', () => {
-    expect([...readOnly.bare]).not.toContain(
-      '@mcp-abap-adt/lib/handlers/write',
-    );
+    assert.ok(![...readOnly.bare].includes('@mcp-abap-adt/lib/handlers/write'));
   });
 
   it('the read-only package never names the modifying package', () => {
-    expect(
+    assert.deepStrictEqual(
       [...readOnly.bare].filter((name) => name.includes('compact-modify')),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('the read-only package links no write route file', () => {
-    expect(localFiles(readOnly, /compactWriteRoutes\.ts$/)).toEqual([]);
+    assert.deepStrictEqual(localFiles(readOnly, /compactWriteRoutes\.ts$/), []);
   });
 
   it('the modifying package does name the write barrel', () => {
     // The other direction, so a split that simply lost the routes fails too.
-    expect([...modify.bare]).toContain('@mcp-abap-adt/lib/handlers/write');
-    expect(localFiles(modify, /compactWriteRoutes\.ts$/)).toHaveLength(1);
+    assert.ok([...modify.bare].includes('@mcp-abap-adt/lib/handlers/write'));
+    assert.equal(localFiles(modify, /compactWriteRoutes\.ts$/).length, 1);
   });
 
   it('the command serves both halves', () => {
-    expect([...whole.bare]).toContain('@mcp-abap-adt/compact-readonly-entries');
-    expect([...whole.bare]).toContain('@mcp-abap-adt/compact-modify');
+    assert.ok(
+      [...whole.bare].includes('@mcp-abap-adt/compact-readonly-entries'),
+    );
+    assert.ok([...whole.bare].includes('@mcp-abap-adt/compact-modify'));
   });
 
   it('the read-only package declares no dependency on the modifying one', () => {
@@ -118,15 +124,18 @@ describe('the compact capability split holds across the packages', () => {
     };
     // Every field an install reads names lib alone — a peer, since the
     // binary package owns lib (one copy per install tree).
-    expect({
-      dependencies: Object.keys(manifest.dependencies ?? {}),
-      peerDependencies: Object.keys(manifest.peerDependencies ?? {}),
-      optionalDependencies: Object.keys(manifest.optionalDependencies ?? {}),
-    }).toEqual({
-      dependencies: [],
-      peerDependencies: ['@mcp-abap-adt/lib'],
-      optionalDependencies: [],
-    });
+    assert.deepStrictEqual(
+      {
+        dependencies: Object.keys(manifest.dependencies ?? {}),
+        peerDependencies: Object.keys(manifest.peerDependencies ?? {}),
+        optionalDependencies: Object.keys(manifest.optionalDependencies ?? {}),
+      },
+      {
+        dependencies: [],
+        peerDependencies: ['@mcp-abap-adt/lib'],
+        optionalDependencies: [],
+      },
+    );
   });
 
   it('every compact tool file belongs to exactly one half', () => {
@@ -136,8 +145,11 @@ describe('the compact capability split holds across the packages', () => {
       );
     const read = handlersOf('compact-readonly-entries');
     const write = handlersOf('compact-modify');
-    expect(read).toHaveLength(16);
-    expect(write).toHaveLength(12);
-    expect(read.filter((name) => write.includes(name))).toEqual([]);
+    assert.equal(read.length, 16);
+    assert.equal(write.length, 12);
+    assert.deepStrictEqual(
+      read.filter((name) => write.includes(name)),
+      [],
+    );
   });
 });

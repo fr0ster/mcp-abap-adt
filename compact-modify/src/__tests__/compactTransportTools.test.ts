@@ -7,6 +7,10 @@
  * Both run the real client over a recording connection, as the full tools'
  * own test does, and each pair is compared whole.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import {
   handleMoveTransportObjects,
   handleSortAndCompressTransportTask,
@@ -95,25 +99,27 @@ function withoutDetail(schema: JsonSchema): JsonSchema {
 describe('the compact transport sort and move tools', () => {
   it('are registered in compact-modify under their compact names', () => {
     const names = compactModifyEntries().map((e) => e.toolDefinition.name);
-    expect(names).toEqual(
-      expect.arrayContaining([
-        'HandlerTransportSortAndCompress',
-        'HandlerTransportMoveObjects',
-      ]),
-    );
-    expect(CompactSort.name).toBe('HandlerTransportSortAndCompress');
-    expect(CompactMove.name).toBe('HandlerTransportMoveObjects');
+    for (const name of [
+      'HandlerTransportSortAndCompress',
+      'HandlerTransportMoveObjects',
+    ]) {
+      assert.ok(names.some((e) => isDeepStrictEqual(e, name)));
+    }
+    assert.equal(CompactSort.name, 'HandlerTransportSortAndCompress');
+    assert.equal(CompactMove.name, 'HandlerTransportMoveObjects');
   });
 
   it("take the full tools' parameters, without detail, where the full tools run", () => {
-    expect(listedJson(CompactSort.inputSchema)).toEqual(
+    assert.deepStrictEqual(
+      listedJson(CompactSort.inputSchema),
       withoutDetail(listedJson(FullSort.inputSchema)),
     );
-    expect(listedJson(CompactMove.inputSchema)).toEqual(
+    assert.deepStrictEqual(
+      listedJson(CompactMove.inputSchema),
       withoutDetail(listedJson(FullMove.inputSchema)),
     );
-    expect(CompactSort.available_in).toEqual(FullSort.available_in);
-    expect(CompactMove.available_in).toEqual(FullMove.available_in);
+    assert.deepStrictEqual(CompactSort.available_in, FullSort.available_in);
+    assert.deepStrictEqual(CompactMove.available_in, FullMove.available_in);
   });
 
   it('sort and compress: the same request and the same answer as the full tool', async () => {
@@ -130,18 +136,21 @@ describe('the compact transport sort and move tools', () => {
       args,
     );
 
-    expect(compact.sent).toHaveLength(1);
-    expect(compact.sent[0]?.url).toBe(
+    assert.equal(compact.sent.length, 1);
+    assert.equal(
+      compact.sent[0]?.url,
       `/sap/bc/adt/cts/transportrequests/${SOURCE}/sortandcompress`,
     );
-    expect(compact.sent).toEqual(full.sent);
-    expect(JSON.stringify(fullAnswer)).toContain('ReadTransportObjects');
-    expect(JSON.stringify(compactAnswer)).not.toContain('ReadTransportObjects');
-    expect(JSON.stringify(compactAnswer)).toContain(
-      `HandlerGet with object_type TRANSPORT on ${SOURCE}`,
+    assert.deepStrictEqual(compact.sent, full.sent);
+    assert.ok(JSON.stringify(fullAnswer).includes('ReadTransportObjects'));
+    assert.ok(!JSON.stringify(compactAnswer).includes('ReadTransportObjects'));
+    assert.ok(
+      JSON.stringify(compactAnswer).includes(
+        `HandlerGet with object_type TRANSPORT on ${SOURCE}`,
+      ),
     );
-    expect(compactAnswer).toEqual(asCompact(fullAnswer));
-    expect(compactAnswer.isError).toBe(false);
+    assert.deepStrictEqual(compactAnswer, asCompact(fullAnswer));
+    assert.equal(compactAnswer.isError, false);
   });
 
   it('move objects: the same request and the same answer as the full tool', async () => {
@@ -159,23 +168,25 @@ describe('the compact transport sort and move tools', () => {
     );
     const fullAnswer = await handleMoveTransportObjects(full.context, args);
 
-    expect(compact.sent).toHaveLength(1);
-    expect(compact.sent[0]?.method).toBe('POST');
-    expect(String(compact.sent[0]?.data)).toContain(TARGET);
-    expect(compact.sent).toEqual(full.sent);
-    expect(JSON.stringify(compactAnswer)).not.toContain('ReadTransportObjects');
-    expect(JSON.stringify(compactAnswer)).toContain(
-      `HandlerGet with object_type TRANSPORT on ${SOURCE} and on ${TARGET}`,
+    assert.equal(compact.sent.length, 1);
+    assert.equal(compact.sent[0]?.method, 'POST');
+    assert.ok(String(compact.sent[0]?.data).includes(TARGET));
+    assert.deepStrictEqual(compact.sent, full.sent);
+    assert.ok(!JSON.stringify(compactAnswer).includes('ReadTransportObjects'));
+    assert.ok(
+      JSON.stringify(compactAnswer).includes(
+        `HandlerGet with object_type TRANSPORT on ${SOURCE} and on ${TARGET}`,
+      ),
     );
-    expect(compactAnswer).toEqual(asCompact(fullAnswer));
-    expect(compactAnswer.isError).toBe(false);
+    assert.deepStrictEqual(compactAnswer, asCompact(fullAnswer));
+    assert.equal(compactAnswer.isError, false);
   });
 
   it('name no other tool in their descriptions: the re-read is the task objects, object_type TRANSPORT', () => {
     for (const tool of [CompactSort, CompactMove]) {
-      expect(tool.description).not.toContain('ReadTransportObjects');
-      expect(tool.description).not.toContain('HandlerGet');
-      expect(tool.description).toContain('(object_type TRANSPORT)');
+      assert.ok(!tool.description.includes('ReadTransportObjects'));
+      assert.ok(!tool.description.includes('HandlerGet'));
+      assert.ok(tool.description.includes('(object_type TRANSPORT)'));
     }
   });
 
@@ -193,15 +204,17 @@ describe('the compact transport sort and move tools', () => {
       objects: [],
     });
 
-    expect(sortRefused.isError).toBe(true);
-    expect(JSON.stringify(sortRefused)).toContain(
-      'transport_number is required',
+    assert.equal(sortRefused.isError, true);
+    assert.ok(
+      JSON.stringify(sortRefused).includes('transport_number is required'),
     );
-    expect(moveRefused.isError).toBe(true);
-    expect(JSON.stringify(moveRefused)).toContain(
-      'objects must hold at least one entry',
+    assert.equal(moveRefused.isError, true);
+    assert.ok(
+      JSON.stringify(moveRefused).includes(
+        'objects must hold at least one entry',
+      ),
     );
-    expect(sort.sent).toEqual([]);
-    expect(move.sent).toEqual([]);
+    assert.deepStrictEqual(sort.sent, []);
+    assert.deepStrictEqual(move.sent, []);
   });
 });

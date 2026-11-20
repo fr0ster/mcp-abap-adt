@@ -8,6 +8,10 @@
  * level ends the package's walk as before. Both walkers: `walkPackage`
  * (sequential) and `walkPackages` (level by level).
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { PhaseResult } from '../../lib/batch/phases';
 import {
   failedRead,
@@ -23,6 +27,7 @@ import {
   walkPackages,
 } from '../../lib/strategies/packageWalk';
 import { failed, succeeded } from '../../lib/strategies/stepResponse';
+import { rejectionOf } from '../helpers/assertions';
 
 /** The walk's failures, classified as `SearchSource` classifies them (SAP answers skipped). */
 const classified = (failure: unknown, place: WalkFailurePlace) =>
@@ -100,7 +105,7 @@ function levelReader(refused: Readonly<Record<string, number>> = {}) {
 const names = (items: ReadonlyArray<{ name: string }>) =>
   items.map((i) => i.name).sort();
 
-describe.each([
+for (const [_case, refused, found, _walked] of [
   [
     'a refused type node',
     { 'P|2': 500 },
@@ -125,38 +130,45 @@ describe.each([
     ['PPROG', 'SA', 'SAPROG', 'SB'],
     ['P', 'SA'],
   ],
-] as const)(
-  'under the branch rule, %s excludes only its branch',
-  (_case, refused, found, _walked) => {
-    it('walkPackage', async () => {
-      const { utils, asked } = source(refused);
-      const options = {
-        includeSubpackages: true,
-        missingLevel: 'refused' as const,
-        branchRule: { onFailure: classified },
-      };
-      expect(names(await walkPackage(utils, 'P', options))).toEqual(found);
-      expect(asked.some((k) => k.startsWith('SB|') && k !== 'SB|root')).toBe(
-        !('SB|root' in refused),
-      );
-    });
+] as const) {
+  describe(
+    format('under the branch rule, %s excludes only its branch', _case),
+    () => {
+      it('walkPackage', async () => {
+        const { utils, asked } = source(refused);
+        const options = {
+          includeSubpackages: true,
+          missingLevel: 'refused' as const,
+          branchRule: { onFailure: classified },
+        };
+        assert.deepStrictEqual(
+          names(await walkPackage(utils, 'P', options)),
+          found,
+        );
+        assert.equal(
+          asked.some((k) => k.startsWith('SB|') && k !== 'SB|root'),
+          !('SB|root' in refused),
+        );
+      });
 
-    it('walkPackages', async () => {
-      const { read, asked } = levelReader(refused);
-      const options = {
-        includeSubpackages: true,
-        missingLevel: 'refused' as const,
-        branchRule: { onFailure: classified },
-      };
-      const [settled] = await walkPackages(read, ['P'], options);
-      expect(settled?.ok).toBe(true);
-      if (settled?.ok) expect(names(settled.value)).toEqual(found);
-      expect(asked.some((k) => k.startsWith('SB|') && k !== 'SB|root')).toBe(
-        !('SB|root' in refused),
-      );
-    });
-  },
-);
+      it('walkPackages', async () => {
+        const { read, asked } = levelReader(refused);
+        const options = {
+          includeSubpackages: true,
+          missingLevel: 'refused' as const,
+          branchRule: { onFailure: classified },
+        };
+        const [settled] = await walkPackages(read, ['P'], options);
+        assert.equal(settled?.ok, true);
+        if (settled?.ok) assert.deepStrictEqual(names(settled.value), found);
+        assert.equal(
+          asked.some((k) => k.startsWith('SB|') && k !== 'SB|root'),
+          !('SB|root' in refused),
+        );
+      });
+    },
+  );
+}
 
 describe('under the branch rule, the root is handed over at its place (DO22)', () => {
   it('walkPackage: a SAP-refused root is the package place; skipped, it yields nothing', async () => {
@@ -172,8 +184,8 @@ describe('under the branch rule, the root is handed over at its place (DO22)', (
         },
       },
     };
-    expect(await walkPackage(utils, 'P', options)).toEqual([]);
-    expect(places).toEqual([{ kind: 'package', package: 'P' }]);
+    assert.deepStrictEqual(await walkPackage(utils, 'P', options), []);
+    assert.deepStrictEqual(places, [{ kind: 'package', package: 'P' }]);
   });
 
   it('walkPackages: a SAP-refused root is the package place; skipped, it settles empty', async () => {
@@ -190,8 +202,8 @@ describe('under the branch rule, the root is handed over at its place (DO22)', (
       },
     };
     const [settled] = await walkPackages(read, ['P'], options);
-    expect(settled).toEqual({ ok: true, value: [] });
-    expect(places).toEqual([{ kind: 'package', package: 'P' }]);
+    assert.deepStrictEqual(settled, { ok: true, value: [] });
+    assert.deepStrictEqual(places, [{ kind: 'package', package: 'P' }]);
   });
 
   it('each level is handed over with its place: a subpackage and a type node', async () => {
@@ -207,7 +219,7 @@ describe('under the branch rule, the root is handed over at its place (DO22)', (
         },
       },
     });
-    expect(places).toEqual([
+    assert.deepStrictEqual(places, [
       {
         kind: 'level',
         package: 'SA',
@@ -219,48 +231,66 @@ describe('under the branch rule, the root is handed over at its place (DO22)', (
 });
 
 describe('under the branch rule, a credential refusal at any level ends the walk', () => {
-  it.each([['P|2'], ['SB|root']])('walkPackage, at %s', async (key) => {
-    const { utils } = source({ [key]: 401 });
-    const options = {
-      includeSubpackages: true,
-      missingLevel: 'refused' as const,
-      branchRule: { onFailure: classified },
-    };
-    await expect(walkPackage(utils, 'P', options)).rejects.toBeDefined();
-  });
+  for (const [key] of [['P|2'], ['SB|root']]) {
+    it(format('walkPackage, at %s', key), async () => {
+      const { utils } = source({ [key]: 401 });
+      const options = {
+        includeSubpackages: true,
+        missingLevel: 'refused' as const,
+        branchRule: { onFailure: classified },
+      };
+      assert.notEqual(
+        await rejectionOf(walkPackage(utils, 'P', options)),
+        undefined,
+      );
+    });
+  }
 
-  it.each([['P|2'], ['SB|root']])('walkPackages, at %s', async (key) => {
-    const { read } = levelReader({ [key]: 401 });
-    const options = {
-      includeSubpackages: true,
-      missingLevel: 'refused' as const,
-      branchRule: { onFailure: classified },
-    };
-    await expect(walkPackages(read, ['P'], options)).rejects.toBeDefined();
-  });
+  for (const [key] of [['P|2'], ['SB|root']]) {
+    it(format('walkPackages, at %s', key), async () => {
+      const { read } = levelReader({ [key]: 401 });
+      const options = {
+        includeSubpackages: true,
+        missingLevel: 'refused' as const,
+        branchRule: { onFailure: classified },
+      };
+      assert.notEqual(
+        await rejectionOf(walkPackages(read, ['P'], options)),
+        undefined,
+      );
+    });
+  }
 });
 
 describe('the other walking tools are unchanged: without the branch rule a refused level ends the package', () => {
-  it.each([['P|2'], ['SB|root']])('walkPackage, at %s', async (key) => {
-    const { utils } = source({ [key]: 500 });
-    await expect(
-      walkPackage(utils, 'P', { includeSubpackages: true }),
-    ).rejects.toBeDefined();
-  });
-
-  it.each([['P|2'], ['SB|root']])('walkPackages, at %s', async (key) => {
-    const { read } = levelReader({ [key]: 500 });
-    const [settled] = await walkPackages(read, ['P'], {
-      includeSubpackages: true,
+  for (const [key] of [['P|2'], ['SB|root']]) {
+    it(format('walkPackage, at %s', key), async () => {
+      const { utils } = source({ [key]: 500 });
+      assert.notEqual(
+        await rejectionOf(
+          walkPackage(utils, 'P', { includeSubpackages: true }),
+        ),
+        undefined,
+      );
     });
-    expect(settled?.ok).toBe(false);
-  });
+  }
+
+  for (const [key] of [['P|2'], ['SB|root']]) {
+    it(format('walkPackages, at %s', key), async () => {
+      const { read } = levelReader({ [key]: 500 });
+      const [settled] = await walkPackages(read, ['P'], {
+        includeSubpackages: true,
+      });
+      assert.equal(settled?.ok, false);
+    });
+  }
 
   it('a 404 level stays empty without missingLevel: refused', async () => {
     const { utils } = source({ 'P|2': 404 });
-    expect(
+    assert.deepStrictEqual(
       names(await walkPackage(utils, 'P', { includeSubpackages: true })),
-    ).toEqual(['SA', 'SAPROG', 'SB', 'SBPROG']);
+      ['SA', 'SAPROG', 'SB', 'SBPROG'],
+    );
   });
 });
 
@@ -286,7 +316,7 @@ describe('a level of any size', () => {
       },
     };
     const found = await walkPackage(utils, 'P', { includeSubpackages: true });
-    expect(found).toHaveLength(300_001);
+    assert.equal(found.length, 300_001);
   });
 
   it('walkPackages answers every object', async () => {
@@ -300,14 +330,14 @@ describe('a level of any size', () => {
     const [settled] = await walkPackages(read, ['P'], {
       includeSubpackages: true,
     });
-    expect(settled?.ok && settled.value).toHaveLength(300_001);
+    assert.ok(settled?.ok);
+    assert.equal(settled.value.length, 300_001);
   });
 });
 
 describe('under the branch rule, a raw 401 at the root or a level ends the walk, never a SAP answer (DO22)', () => {
-  it.each([['P|root'], ['P|2'], ['SB|root']])(
-    'walkPackage, at %s',
-    async (key) => {
+  for (const [key] of [['P|root'], ['P|2'], ['SB|root']]) {
+    it(format('walkPackage, at %s', key), async () => {
       const asked: string[] = [];
       const raw = { response: { status: 401 } };
       const utils: NodeStructureSource = {
@@ -317,26 +347,29 @@ describe('under the branch rule, a raw 401 at the root or a level ends the walk,
           return answerOf(at, {});
         },
       };
-      await expect(
-        walkPackage(utils, 'P', {
-          includeSubpackages: true,
-          missingLevel: 'refused',
-          branchRule: {
-            onFailure: (failure, place) =>
-              failedRead(
-                {
-                  decide(_f, p) {
-                    asked.push(p.kind);
-                    return 'skip';
+      assert.equal(
+        await rejectionOf(
+          walkPackage(utils, 'P', {
+            includeSubpackages: true,
+            missingLevel: 'refused',
+            branchRule: {
+              onFailure: (failure, place) =>
+                failedRead(
+                  {
+                    decide(_f, p) {
+                      asked.push(p.kind);
+                      return 'skip';
+                    },
                   },
-                },
-                failure,
-                place,
-              ),
-          },
-        }),
-      ).rejects.toBe(raw);
-      expect(asked).toEqual([]);
-    },
-  );
+                  failure,
+                  place,
+                ),
+            },
+          }),
+        ),
+        raw,
+      );
+      assert.deepStrictEqual(asked, []);
+    });
+  }
 });

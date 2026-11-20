@@ -1,7 +1,7 @@
 /**
- * The run report (spec §8, acceptance 3; plan C2): what the reporter wrote
- * from Jest's completed results, compared with the ledger by
- * `globalTeardown`.
+ * The run report (spec §8, acceptance 3; plan C2): what the reporter
+ * (`coverageReport/ledgerReporter.ts`) wrote from the run's completed
+ * results, compared with the ledger by `globalTeardown`.
  *
  * - A **full** run (`npm run test:integration`) requires every key the
  *   ledger requires on the configured system.

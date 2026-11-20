@@ -13,7 +13,7 @@
  *   DEBUG_ADT_LIBS=true      - Library logs
  *   DEBUG_CONNECTORS=true    - Connection logs
  *
- * Run: npm test -- --testPathPattern=integration/class
+ * Run: npm run test:integration -- src/__tests__/integration/high/class/ClassHighHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

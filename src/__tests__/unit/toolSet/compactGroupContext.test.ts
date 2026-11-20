@@ -12,6 +12,8 @@
  * and the halves are what a consumer imports directly.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import {
   CompactModifyHandlersGroup,
   compactModifyEntries,
@@ -51,7 +53,7 @@ describe('compact groups read the context of the current request', () => {
       // at all, which is the worse half of the original defect.
       const group = new Group(contextNamed('at-build-time'));
       const entries = group.getHandlers();
-      expect(entries.length).toBeGreaterThan(0);
+      assert.ok(entries.length > 0);
 
       // What BaseMcpServer does before each call.
       (group as unknown as { context: HandlerContext }).context =
@@ -90,7 +92,7 @@ describe('compact groups read the context of the current request', () => {
 
       // The handler logged through the context it was given, so it read the
       // current one rather than the one captured at build time.
-      expect(seen.length).toBeGreaterThan(0);
+      assert.ok(seen.length > 0);
     });
 
     it(`${name} answers the connection of the current context`, () => {
@@ -99,7 +101,8 @@ describe('compact groups read the context of the current request', () => {
       (group as unknown as { context: HandlerContext }).context =
         contextNamed('this-request');
       const current = (group as unknown as { context: HandlerContext }).context;
-      expect((current.connection as unknown as { marker: string }).marker).toBe(
+      assert.equal(
+        (current.connection as unknown as { marker: string }).marker,
         'this-request',
       );
     });

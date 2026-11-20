@@ -7,8 +7,10 @@
  * answer or check names them).
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import {
   CompactDataHandlersGroup,
@@ -27,8 +29,9 @@ import type {
   HandlerEntry,
 } from '../../../lib/handlers/interfaces';
 import { listedJson } from '../../helpers/listedJson';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 const NAMES = ['session_id', 'session_state'];
 const PACKAGES = [
   'src',
@@ -104,8 +107,10 @@ describe('no tool takes session_id or session_state', () => {
   const tools = groups.flatMap((g) => g.getHandlers());
 
   it('the shipped tools are seen, so the check is not vacuous', () => {
-    expect(tools.length).toBeGreaterThan(200);
-    expect(tools.map((t) => t.toolDefinition.name)).toContain('HandlerUnlock');
+    assert.ok(tools.length > 200);
+    assert.ok(
+      tools.map((t) => t.toolDefinition.name).includes('HandlerUnlock'),
+    );
   });
 
   it('no shipped tool declares either in its input schema, nor GetSession exists', () => {
@@ -114,8 +119,8 @@ describe('no tool takes session_id or session_state', () => {
         .filter((name) => NAMES.includes(name))
         .map((name) => `${t.toolDefinition.name}.${name}`),
     );
-    expect(offending).toEqual([]);
-    expect(tools.map((t) => t.toolDefinition.name)).not.toContain('GetSession');
+    assert.deepStrictEqual(offending, []);
+    assert.ok(!tools.map((t) => t.toolDefinition.name).includes('GetSession'));
   });
 
   it('no source of any package names either', () => {
@@ -130,6 +135,6 @@ describe('no tool takes session_id or session_state', () => {
         }
       }
     }
-    expect(offending).toEqual([]);
+    assert.deepStrictEqual(offending, []);
   });
 });

@@ -4,37 +4,46 @@
  * rejected, and the failures are reported together afterwards.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { assertRejects } from '../../helpers/assertions';
 import { closeEvery } from '../../integration/helpers/launchedServers';
 
 describe('closeEvery', () => {
   it('a rejected launch does not keep a resolved one from closing', async () => {
-    const close = jest.fn(async () => {});
+    const close = mock.fn(async () => {});
     const failure = new Error('the compact launch failed');
     const closing = closeEvery([
       Promise.reject(failure),
       Promise.resolve({ close }),
     ]);
-    await expect(closing).rejects.toThrow(
+    await assertRejects(
+      closing,
       '1 hard-mode server(s) failed to launch or stop',
     );
     await closing.catch((error: unknown) => {
-      expect(error).toBeInstanceOf(AggregateError);
-      expect(error instanceof AggregateError ? error.errors : []).toEqual([
-        failure,
-      ]);
+      assert.ok(error instanceof AggregateError);
+      assert.deepStrictEqual(
+        error instanceof AggregateError ? error.errors : [],
+        [failure],
+      );
     });
-    expect(close).toHaveBeenCalledTimes(1);
+    assert.equal(close.mock.callCount(), 1);
   });
 
   it('nothing failed: nothing thrown, every launch closed', async () => {
-    const first = jest.fn(async () => {});
-    const second = jest.fn(async () => {});
-    await expect(
-      closeEvery([
+    const first = mock.fn(async () => {});
+    const second = mock.fn(async () => {});
+    assert.equal(
+      await closeEvery([
         Promise.resolve({ close: first }),
         Promise.resolve({ close: second }),
       ]),
-    ).resolves.toBeUndefined();
-    expect([first.mock.calls.length, second.mock.calls.length]).toEqual([1, 1]);
+      undefined,
+    );
+    assert.deepStrictEqual(
+      [first.mock.calls.length, second.mock.calls.length],
+      [1, 1],
+    );
   });
 });

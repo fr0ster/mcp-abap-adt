@@ -8,6 +8,9 @@
  * another action (D25-Q3, option A).
  */
 
+import assert from 'node:assert/strict';
+import { after, before, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { TOOL_DEFINITION } from '../../../../compact-readonly-entries/src/handlers/handleHandlerSystem';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
@@ -23,8 +26,6 @@ import type { ServedTransport, ToolSetKind } from '../../../lib/toolSet';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { type JsonSchema, listedJson } from '../../helpers/listedJson';
 import { binaryClient } from '../../helpers/servedTools';
-
-jest.setTimeout(120_000);
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
@@ -43,83 +44,107 @@ function propertiesOf(
 }
 
 describe('the listed schema declares each action’s arguments once', () => {
-  it.each(
-    VARIANTS.flatMap((variant) =>
-      SYSTEM_ACTIONS.map((action) => [action, variant] as const),
-    ),
-  )(
-    "%s on %s: exactly its full tool's properties, typed as there",
-    (action, variant) => {
-      const full = READ_DEFINITIONS[SYSTEM_ACTION_TOOLS[action]];
-      const fullSchema =
-        'variants' in full
-          ? full.variants[variant].inputSchema
-          : full.inputSchema;
-      const fullProperties = propertiesOf(listedJson(fullSchema));
-      const listed = propertiesOf(
-        listedJson(TOOL_DEFINITION.variants[variant].inputSchema),
-      );
-      const taken: readonly string[] = COMPACT_SYSTEM_TAKES.members[action];
-      expect([...taken].sort()).toEqual(
-        Object.keys(fullProperties)
-          .filter((name) => name !== 'background')
-          .sort(),
-      );
-      for (const name of taken) {
-        expect({ name, type: typeOf(listed[name]) }).toEqual({
-          name,
-          type: typeOf(fullProperties[name]),
-        });
-      }
-    },
-  );
-
-  it.each(VARIANTS)(
-    'on %s: action is the one required property, an enum of the eight; every property is taken',
-    (variant) => {
-      const listed = listedJson(TOOL_DEFINITION.variants[variant].inputSchema);
-      expect(listed.required).toEqual(['action']);
-      expect(typeOf(propertiesOf(listed).action)).toEqual({
-        type: 'string',
-        enum: [...SYSTEM_ACTIONS],
-      });
-      const taken = new Set<string>([
-        ...COMPACT_SYSTEM_TAKES.every,
-        ...SYSTEM_ACTIONS.flatMap(
-          (action): readonly string[] => COMPACT_SYSTEM_TAKES.members[action],
-        ),
-      ]);
-      expect(Object.keys(propertiesOf(listed)).sort()).toEqual(
-        [...taken].sort(),
-      );
-    },
-  );
-
-  it.each(VARIANTS)(
-    "on %s: a shared property's words name each action that takes it",
-    (variant) => {
-      const listed = propertiesOf(
-        listedJson(TOOL_DEFINITION.variants[variant].inputSchema),
-      );
-      for (const action of SYSTEM_ACTIONS) {
-        for (const name of COMPACT_SYSTEM_TAKES.members[action]) {
-          const node = listed[name];
-          const words =
-            node === undefined || typeof node === 'boolean'
-              ? ''
-              : (node.description ?? '');
-          const named = [':', ',', ' '].some((after) =>
-            words.includes(`${action}${after}`),
+  for (const [action, variant] of VARIANTS.flatMap((variant) =>
+    SYSTEM_ACTIONS.map((action) => [action, variant] as const),
+  )) {
+    it(
+      format(
+        "%s on %s: exactly its full tool's properties, typed as there",
+        action,
+        variant,
+      ),
+      () => {
+        const full = READ_DEFINITIONS[SYSTEM_ACTION_TOOLS[action]];
+        const fullSchema =
+          'variants' in full
+            ? full.variants[variant].inputSchema
+            : full.inputSchema;
+        const fullProperties = propertiesOf(listedJson(fullSchema));
+        const listed = propertiesOf(
+          listedJson(TOOL_DEFINITION.variants[variant].inputSchema),
+        );
+        const taken: readonly string[] = COMPACT_SYSTEM_TAKES.members[action];
+        assert.deepStrictEqual(
+          [...taken].sort(),
+          Object.keys(fullProperties)
+            .filter((name) => name !== 'background')
+            .sort(),
+        );
+        for (const name of taken) {
+          assert.deepStrictEqual(
+            { name, type: typeOf(listed[name]) },
+            {
+              name,
+              type: typeOf(fullProperties[name]),
+            },
           );
-          expect({ name, action, named }).toEqual({
-            name,
-            action,
-            named: true,
-          });
         }
-      }
-    },
-  );
+      },
+    );
+  }
+
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'on %s: action is the one required property, an enum of the eight; every property is taken',
+        variant,
+      ),
+      () => {
+        const listed = listedJson(
+          TOOL_DEFINITION.variants[variant].inputSchema,
+        );
+        assert.deepStrictEqual(listed.required, ['action']);
+        assert.deepStrictEqual(typeOf(propertiesOf(listed).action), {
+          type: 'string',
+          enum: [...SYSTEM_ACTIONS],
+        });
+        const taken = new Set<string>([
+          ...COMPACT_SYSTEM_TAKES.every,
+          ...SYSTEM_ACTIONS.flatMap(
+            (action): readonly string[] => COMPACT_SYSTEM_TAKES.members[action],
+          ),
+        ]);
+        assert.deepStrictEqual(
+          Object.keys(propertiesOf(listed)).sort(),
+          [...taken].sort(),
+        );
+      },
+    );
+  }
+
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        "on %s: a shared property's words name each action that takes it",
+        variant,
+      ),
+      () => {
+        const listed = propertiesOf(
+          listedJson(TOOL_DEFINITION.variants[variant].inputSchema),
+        );
+        for (const action of SYSTEM_ACTIONS) {
+          for (const name of COMPACT_SYSTEM_TAKES.members[action]) {
+            const node = listed[name];
+            const words =
+              node === undefined || typeof node === 'boolean'
+                ? ''
+                : (node.description ?? '');
+            const named = [':', ',', ' '].some((after) =>
+              words.includes(`${action}${after}`),
+            );
+            assert.deepStrictEqual(
+              { name, action, named },
+              {
+                name,
+                action,
+                named: true,
+              },
+            );
+          }
+        }
+      },
+    );
+  }
 });
 
 describe('the description', () => {
@@ -136,20 +161,25 @@ describe('the description', () => {
   };
 
   it('starts with what it reads, marked read-only', () => {
-    expect(
+    assert.equal(
       TOOL_DEFINITION.description.startsWith(
         '[read-only] Reads across the ABAP system, one read per action: ',
       ),
-    ).toBe(true);
+      true,
+    );
   });
 
-  it.each(SYSTEM_ACTIONS)("names %s's required arguments", (action) => {
-    for (const variant of VARIANTS) {
-      expect(TOOL_DEFINITION.variants[variant].description).toContain(
-        REQUIRED[action],
-      );
-    }
-  });
+  for (const action of SYSTEM_ACTIONS) {
+    it(format("names %s's required arguments", action), () => {
+      for (const variant of VARIANTS) {
+        assert.ok(
+          TOOL_DEFINITION.variants[variant].description.includes(
+            REQUIRED[action],
+          ),
+        );
+      }
+    });
+  }
 });
 
 const BINARIES: ReadonlyArray<readonly [ServedTransport, ToolSetKind]> = [
@@ -213,74 +243,78 @@ describe('every compact binary serves HandlerSystem, refuses a malformed argumen
   let standIn: AdtStandIn;
   const saved = process.env.SAP_SYSTEM_TYPE;
 
-  beforeAll(async () => {
+  before(async () => {
     standIn = await adtStandIn();
   });
 
-  afterAll(async () => {
+  after(async () => {
     await standIn.close();
     if (saved === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = saved;
     resetProcessLatchForTests();
   });
 
-  it.each(
-    VARIANTS.flatMap((variant) =>
-      BINARIES.map(([transport, kind]) => [kind, transport, variant] as const),
-    ),
-  )('%s over %s on %s', async (kind, transport, variant) => {
-    process.env.SAP_SYSTEM_TYPE = variant;
-    resetProcessLatchForTests();
-    const before = standIn.requests.length;
-    const { client, close } = await binaryClient(transport, kind, standIn);
-    try {
-      const listed = (await client.listTools()).tools.map((t) => t.name);
-      expect(listed).toContain('HandlerSystem');
-      // HandlerSearch and HandlerWhereUsed are in no compact set, and a call
-      // to either answers as any unknown tool name does.
-      expect(listed).not.toContain('HandlerSearch');
-      expect(listed).not.toContain('HandlerWhereUsed');
-      const unknownAnswer = async (name: string) =>
-        JSON.stringify(
-          await client.callTool({ name, arguments: { query: 'Z*' } }),
-        )
-          .split(name)
-          .join('<tool>');
-      const madeUp = await unknownAnswer('HandlerMadeUpTool');
-      expect(madeUp).toContain('<tool>');
-      expect(await unknownAnswer('HandlerSearch')).toBe(madeUp);
-      expect(await unknownAnswer('HandlerWhereUsed')).toBe(madeUp);
-      for (const [name, args, argument] of REFUSED) {
-        const answer = await client.callTool({
-          name: 'HandlerSystem',
-          arguments: args,
-        });
-        const content = Array.isArray(answer.content) ? answer.content : [];
-        const first = content[0];
-        const text =
-          typeof first === 'object' &&
-          first !== null &&
-          'text' in first &&
-          typeof first.text === 'string'
-            ? first.text
-            : '';
-        expect({ name, isError: answer.isError, text }).toEqual({
-          name,
-          isError: true,
-          text: expect.stringContaining(
-            'Input validation error: Invalid arguments for tool HandlerSystem',
-          ),
-        });
-        expect(text).toContain(argument);
+  for (const [kind, transport, variant] of VARIANTS.flatMap((variant) =>
+    BINARIES.map(([transport, kind]) => [kind, transport, variant] as const),
+  )) {
+    it(format('%s over %s on %s', kind, transport, variant), async () => {
+      process.env.SAP_SYSTEM_TYPE = variant;
+      resetProcessLatchForTests();
+      const before = standIn.requests.length;
+      const { client, close } = await binaryClient(transport, kind, standIn);
+      try {
+        const listed = (await client.listTools()).tools.map((t) => t.name);
+        assert.ok(listed.includes('HandlerSystem'));
+        // HandlerSearch and HandlerWhereUsed are in no compact set, and a call
+        // to either answers as any unknown tool name does.
+        assert.ok(!listed.includes('HandlerSearch'));
+        assert.ok(!listed.includes('HandlerWhereUsed'));
+        const unknownAnswer = async (name: string) =>
+          JSON.stringify(
+            await client.callTool({ name, arguments: { query: 'Z*' } }),
+          )
+            .split(name)
+            .join('<tool>');
+        const madeUp = await unknownAnswer('HandlerMadeUpTool');
+        assert.ok(madeUp.includes('<tool>'));
+        assert.equal(await unknownAnswer('HandlerSearch'), madeUp);
+        assert.equal(await unknownAnswer('HandlerWhereUsed'), madeUp);
+        for (const [name, args, argument] of REFUSED) {
+          const answer = await client.callTool({
+            name: 'HandlerSystem',
+            arguments: args,
+          });
+          const content = Array.isArray(answer.content) ? answer.content : [];
+          const first = content[0];
+          const text =
+            typeof first === 'object' &&
+            first !== null &&
+            'text' in first &&
+            typeof first.text === 'string'
+              ? first.text
+              : '';
+          assert.deepStrictEqual(
+            { name, isError: answer.isError },
+            { name, isError: true },
+          );
+          assert.ok(
+            text.includes(
+              'Input validation error: Invalid arguments for tool HandlerSystem',
+            ),
+            name,
+          );
+          assert.ok(text.includes(argument));
+        }
+        // Nothing reached the stand-in for a refused call.
+        assert.deepStrictEqual(
+          standIn.requests
+            .slice(before)
+            .filter((r) => !r.url.includes('/discovery')),
+          [],
+        );
+      } finally {
+        await close();
       }
-      // Nothing reached the stand-in for a refused call.
-      expect(
-        standIn.requests
-          .slice(before)
-          .filter((r) => !r.url.includes('/discovery')),
-      ).toEqual([]);
-    } finally {
-      await close();
-    }
-  });
+    });
+  }
 });

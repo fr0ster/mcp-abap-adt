@@ -8,6 +8,8 @@
  * client and user never share a run in one store.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -127,10 +129,11 @@ describe('the background-run caller is { system, client, user }', () => {
     const server = await embedder(stand, strategy, stand.url);
     try {
       const started = await server.call('RuntimeRunClass', RUN);
-      expect(started.isError).toBe(false);
-      expect(
-        strategy.list(callerOf(JSON.stringify(['http', stand.url, '']))),
-      ).toHaveLength(1);
+      assert.equal(started.isError, false);
+      assert.equal(
+        strategy.list(callerOf(JSON.stringify(['http', stand.url, '']))).length,
+        1,
+      );
     } finally {
       await server.close();
       await stand.close();
@@ -145,8 +148,8 @@ describe('the background-run caller is { system, client, user }', () => {
     });
     try {
       const started = await server.call('RuntimeRunClass', RUN);
-      expect(started.isError).toBe(false);
-      expect(strategy.list(callerOf('SYSTEM_A'))).toHaveLength(1);
+      assert.equal(started.isError, false);
+      assert.equal(strategy.list(callerOf('SYSTEM_A')).length, 1);
     } finally {
       await server.close();
       await stand.close();
@@ -159,13 +162,15 @@ describe('the background-run caller is { system, client, user }', () => {
     const server = await embedder(stand, strategy, undefined);
     try {
       const started = await server.call('RuntimeRunClass', RUN);
-      expect(started.isError).toBe(true);
-      expect(started.payload.error).toBe('background_runs_unavailable');
-      expect(JSON.stringify(started.payload)).toContain(
-        BACKGROUND_RUNS_NO_SYSTEM_WORDS,
+      assert.equal(started.isError, true);
+      assert.equal(started.payload.error, 'background_runs_unavailable');
+      assert.ok(
+        JSON.stringify(started.payload).includes(
+          BACKGROUND_RUNS_NO_SYSTEM_WORDS,
+        ),
       );
-      expect(BACKGROUND_RUNS_NO_SYSTEM_WORDS).toContain('`system`');
-      expect(strategy.list(callerOf(''))).toEqual([]);
+      assert.ok(BACKGROUND_RUNS_NO_SYSTEM_WORDS.includes('`system`'));
+      assert.deepStrictEqual(strategy.list(callerOf('')), []);
     } finally {
       await server.close();
       await stand.close();
@@ -181,21 +186,22 @@ describe('the background-run caller is { system, client, user }', () => {
     });
     try {
       const started = await server.call('RuntimeRunClass', RUN);
-      expect(started.isError).toBe(false);
+      assert.equal(started.isError, false);
       const handle = started.payload.run_handle;
       await until(
         () => strategy.list(callerOf('SYSTEM_A'))[0]?.state === 'finished',
       );
-      expect(strategy.list(callerOf('SYSTEM_A'))).toHaveLength(1);
-      expect(
+      assert.equal(strategy.list(callerOf('SYSTEM_A')).length, 1);
+      assert.deepStrictEqual(
         strategy.list(
           callerOf(JSON.stringify(['http', 'https://fresh.example.test', ''])),
         ),
-      ).toEqual([]);
+        [],
+      );
       const read = await server.call('GetBackgroundRun', {
         run_handle: handle,
       });
-      expect(read.isError).toBe(false);
+      assert.equal(read.isError, false);
     } finally {
       await server.close();
       await stand.close();
@@ -213,14 +219,14 @@ describe('the background-run caller is { system, client, user }', () => {
     });
     try {
       const started = await a.call('RuntimeRunClass', RUN);
-      expect(started.isError).toBe(false);
-      expect(strategy.list(callerOf('SYSTEM_A'))).toHaveLength(1);
-      expect(strategy.list(callerOf('SYSTEM_B'))).toEqual([]);
+      assert.equal(started.isError, false);
+      assert.equal(strategy.list(callerOf('SYSTEM_A')).length, 1);
+      assert.deepStrictEqual(strategy.list(callerOf('SYSTEM_B')), []);
       const read = await b.call('GetBackgroundRun', {
         run_handle: started.payload.run_handle,
       });
-      expect(read.isError).toBe(true);
-      expect(read.payload.error).toBe('background_run_not_available');
+      assert.equal(read.isError, true);
+      assert.equal(read.payload.error, 'background_run_not_available');
     } finally {
       await a.close();
       await b.close();
@@ -236,15 +242,16 @@ describe('the background-run caller is { system, client, user }', () => {
     const caller = await callerOn(stand, strategy, { user: 'RUN_USER' });
     try {
       const started = await caller.call('RuntimeRunClass', RUN);
-      expect(started.isError).toBe(false);
+      assert.equal(started.isError, false);
       const system = adtSystemKey({
         url: stand.url,
         client: '100',
         authType: 'basic',
       });
-      expect(
-        strategy.list({ system, client: '100', user: 'RUN_USER' }),
-      ).toHaveLength(1);
+      assert.equal(
+        strategy.list({ system, client: '100', user: 'RUN_USER' }).length,
+        1,
+      );
     } finally {
       await caller.close();
       await stand.close();
@@ -259,14 +266,15 @@ describe('the background-run caller is { system, client, user }', () => {
     });
     try {
       const started = await server.call('RuntimeRunClass', RUN);
-      expect(started.isError).toBe(false);
+      assert.equal(started.isError, false);
       // The caller's user came from the system's own answer (ABAP Cloud).
-      expect(
+      assert.equal(
         stand.requests.some((r) =>
           r.url.startsWith('/sap/bc/adt/core/http/systeminformation'),
         ),
-      ).toBe(true);
-      expect(strategy.list(callerOf('SYSTEM_A'))).toHaveLength(1);
+        true,
+      );
+      assert.equal(strategy.list(callerOf('SYSTEM_A')).length, 1);
     } finally {
       await server.close();
       await stand.close();

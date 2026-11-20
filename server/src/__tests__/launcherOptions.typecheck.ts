@@ -5,7 +5,7 @@
  * The runtime's own path keeps `packageName` required: the
  * `@ts-expect-error` below fails the check the moment it is not.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 import type { ToolSet } from '@mcp-abap-adt/lib/tool-set';

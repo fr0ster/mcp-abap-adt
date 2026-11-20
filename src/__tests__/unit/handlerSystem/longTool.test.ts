@@ -16,12 +16,16 @@
  * - with no strategy it lists no `background` and answers in the call.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { runToolsOf } from '../../../lib/backgroundRuns/tools';
 import { SYSTEM_ACTIONS, type SystemAction } from '../../../lib/compact';
 import * as longCall from '../../../lib/longCall';
 import { isLongRead, isLongTool, LONG_TOOLS } from '../../../lib/longTools';
 import * as packageSessions from '../../../lib/packageSessions';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   type CallAnswer,
   type LongStand,
@@ -30,14 +34,12 @@ import {
   until,
 } from '../longTools/harness';
 
-jest.setTimeout(60_000);
-
 beforeEach(() => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(console, 'error', () => {});
+  mock.method(process.stderr, 'write', () => true);
 });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 const TOOL = 'HandlerSystem';
 
@@ -84,164 +86,168 @@ async function listedState(
 
 describe('HandlerSystem is a long tool', () => {
   it('is on the approved list, its runs read and discarded by compact’s tools', () => {
-    expect(isLongTool(TOOL)).toBe(true);
-    expect(LONG_TOOLS).toContain(TOOL);
-    expect(runToolsOf(TOOL)).toEqual({
+    assert.equal(isLongTool(TOOL), true);
+    assert.ok(LONG_TOOLS.includes(TOOL));
+    assert.deepStrictEqual(runToolsOf(TOOL), {
       get: 'HandlerBackgroundRunGet',
       discard: 'HandlerBackgroundRunDiscard',
     });
   });
 
-  it.each(SYSTEM_ACTIONS)(
-    'no HandlerSystem call is a run mode: %s',
-    (action) => {
-      expect(isLongRead(TOOL, argsOf(action))).toBe(true);
-      expect(isLongRead(TOOL, { ...argsOf(action), background: true })).toBe(
+  for (const action of SYSTEM_ACTIONS) {
+    it(format('no HandlerSystem call is a run mode: %s', action), () => {
+      assert.equal(isLongRead(TOOL, argsOf(action)), true);
+      assert.equal(
+        isLongRead(TOOL, { ...argsOf(action), background: true }),
         true,
       );
-    },
-  );
+    });
+  }
 });
 
-describe.each(SYSTEM_ACTIONS)('HandlerSystem %s', (action) => {
-  const args = argsOf(action);
+for (const action of SYSTEM_ACTIONS) {
+  describe(format('HandlerSystem %s', action), () => {
+    const args = argsOf(action);
 
-  it('a call without background answers a run_handle, the read on a session of its own, logged off after; HandlerBackgroundRunGet answers it once', async () => {
-    const stand = await longStand(TOOL, {
-      backgroundRuns: new InMemoryBackgroundRuns(),
+    it('a call without background answers a run_handle, the read on a session of its own, logged off after; HandlerBackgroundRunGet answers it once', async () => {
+      const stand = await longStand(TOOL, {
+        backgroundRuns: new InMemoryBackgroundRuns(),
+      });
+      try {
+        const hold = stand.standIn.hold(stand.isToolRequest);
+        const started = await stand.call(TOOL, args);
+        await hold.arrived;
+        assert.ok(!started.isError);
+        assertMatchObject(payloadOf(started), {
+          state: 'running',
+          tool: TOOL,
+        });
+        const handle = handleOf(started);
+        assert.notEqual(handle, '');
+        assert.deepStrictEqual(stand.standIn.loggedOff(), []);
+
+        hold.release();
+        await until(() => stand.standIn.loggedOff().length === 1);
+        const own = stand.standIn.requests.filter(stand.isToolRequest);
+        const sessions = [...new Set(own.map((r) => r.session))];
+        assert.equal(sessions.length, 1);
+        assert.notEqual(sessions[0], stand.instanceSession);
+        assert.deepStrictEqual(stand.standIn.loggedOff(), sessions);
+
+        await until(
+          async () => (await listedState(stand, handle)) === 'finished',
+        );
+        const read = await stand.call('HandlerBackgroundRunGet', {
+          run_handle: handle,
+        });
+        assertMatchObject(payloadOf(read), {
+          run_handle: handle,
+          state: 'finished',
+          tool: TOOL,
+        });
+        const again = await stand.call('HandlerBackgroundRunGet', {
+          run_handle: handle,
+        });
+        assert.equal(again.isError, true);
+        assert.equal(payloadOf(again).error, 'background_run_not_available');
+      } finally {
+        await stand.close();
+      }
     });
-    try {
-      const hold = stand.standIn.hold(stand.isToolRequest);
-      const started = await stand.call(TOOL, args);
-      await hold.arrived;
-      expect(started.isError).toBeFalsy();
-      expect(payloadOf(started)).toMatchObject({
-        state: 'running',
-        tool: TOOL,
-      });
-      const handle = handleOf(started);
-      expect(handle).not.toBe('');
-      expect(stand.standIn.loggedOff()).toEqual([]);
 
-      hold.release();
-      await until(() => stand.standIn.loggedOff().length === 1);
-      const own = stand.standIn.requests.filter(stand.isToolRequest);
-      const sessions = [...new Set(own.map((r) => r.session))];
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0]).not.toBe(stand.instanceSession);
-      expect(stand.standIn.loggedOff()).toEqual(sessions);
-
-      await until(
-        async () => (await listedState(stand, handle)) === 'finished',
-      );
-      const read = await stand.call('HandlerBackgroundRunGet', {
-        run_handle: handle,
+    it('background: false answers in the call, on a session of its own', async () => {
+      const stand = await longStand(TOOL, {
+        backgroundRuns: new InMemoryBackgroundRuns(),
       });
-      expect(payloadOf(read)).toMatchObject({
-        run_handle: handle,
-        state: 'finished',
-        tool: TOOL,
-      });
-      const again = await stand.call('HandlerBackgroundRunGet', {
-        run_handle: handle,
-      });
-      expect(again.isError).toBe(true);
-      expect(payloadOf(again).error).toBe('background_run_not_available');
-    } finally {
-      await stand.close();
-    }
-  });
-
-  it('background: false answers in the call, on a session of its own', async () => {
-    const stand = await longStand(TOOL, {
-      backgroundRuns: new InMemoryBackgroundRuns(),
+      try {
+        const answer = await stand.call(TOOL, { ...args, background: false });
+        assert.equal(payloadOf(answer).run_handle, undefined);
+        const own = stand.standIn.requests.filter(stand.isToolRequest);
+        assert.ok(own.length > 0);
+        const sessions = [...new Set(own.map((r) => r.session))];
+        assert.equal(sessions.length, 1);
+        assert.notEqual(sessions[0], stand.instanceSession);
+        await until(() => stand.standIn.loggedOff().length === 1);
+        assert.deepStrictEqual(stand.standIn.loggedOff(), sessions);
+      } finally {
+        await stand.close();
+      }
     });
-    try {
-      const answer = await stand.call(TOOL, { ...args, background: false });
-      expect(payloadOf(answer).run_handle).toBeUndefined();
-      const own = stand.standIn.requests.filter(stand.isToolRequest);
-      expect(own.length).toBeGreaterThan(0);
-      const sessions = [...new Set(own.map((r) => r.session))];
-      expect(sessions).toHaveLength(1);
-      expect(sessions[0]).not.toBe(stand.instanceSession);
-      await until(() => stand.standIn.loggedOff().length === 1);
-      expect(stand.standIn.loggedOff()).toEqual(sessions);
-    } finally {
-      await stand.close();
-    }
-  });
 
-  it('HandlerBackgroundRunDiscard cancels a running read: its session logged off, the run cancelled', async () => {
-    const stand = await longStand(TOOL, {
-      backgroundRuns: new InMemoryBackgroundRuns(),
-    });
-    try {
-      const hold = stand.standIn.hold(stand.isToolRequest);
-      const started = await stand.call(TOOL, args);
-      await hold.arrived;
-      const handle = handleOf(started);
-      const session = stand.standIn.requests
-        .filter(stand.isToolRequest)
-        .at(-1)?.session;
-      expect(session).toBeDefined();
-
-      const discarded = await stand.call('HandlerBackgroundRunDiscard', {
-        run_handle: handle,
+    it('HandlerBackgroundRunDiscard cancels a running read: its session logged off, the run cancelled', async () => {
+      const stand = await longStand(TOOL, {
+        backgroundRuns: new InMemoryBackgroundRuns(),
       });
-      expect(discarded.isError).toBeFalsy();
-      expect(payloadOf(discarded)).toEqual({
-        run_handle: handle,
-        state: 'cancelled',
-      });
-      await until(() => stand.standIn.loggedOff().includes(session ?? ''));
-      expect(await listedState(stand, handle)).toBe('cancelled');
-      hold.release();
-    } finally {
-      await stand.close();
-    }
-  });
-
-  it('one connection per background run: the call into the full entry opens no second one', async () => {
-    const fresh = jest.spyOn(packageSessions, 'openFreshConnection');
-    const inCall = jest.spyOn(longCall, 'runLongCall');
-    const stand = await longStand(TOOL, {
-      backgroundRuns: new InMemoryBackgroundRuns(),
-    });
-    try {
-      const started = await stand.call(TOOL, args);
-      const handle = handleOf(started);
-      await until(
-        async () => (await listedState(stand, handle)) === 'finished',
-      );
-      expect(fresh).toHaveBeenCalledTimes(1);
-      expect(inCall).not.toHaveBeenCalled();
-      const sessions = new Set(
-        stand.standIn.requests
+      try {
+        const hold = stand.standIn.hold(stand.isToolRequest);
+        const started = await stand.call(TOOL, args);
+        await hold.arrived;
+        const handle = handleOf(started);
+        const session = stand.standIn.requests
           .filter(stand.isToolRequest)
-          .map((r) => r.session),
-      );
-      expect(sessions.size).toBe(1);
-    } finally {
-      await stand.close();
-    }
-  });
+          .at(-1)?.session;
+        assert.notEqual(session, undefined);
 
-  it('without a strategy, HandlerSystem is listed without background and answers in the call', async () => {
-    const stand = await longStand(TOOL);
-    try {
-      expect(await stand.inputs(TOOL)).not.toContain('background');
-      const described = await stand.described(TOOL);
-      expect(described).toContain(
-        'Runs on an ABAP session of its own and answers its result in the call.',
-      );
-      expect(described).not.toContain('run_handle');
-      const answer = await stand.call(TOOL, args);
-      expect(payloadOf(answer).run_handle).toBeUndefined();
-      expect(
-        stand.standIn.requests.filter(stand.isToolRequest).length,
-      ).toBeGreaterThan(0);
-    } finally {
-      await stand.close();
-    }
+        const discarded = await stand.call('HandlerBackgroundRunDiscard', {
+          run_handle: handle,
+        });
+        assert.ok(!discarded.isError);
+        assert.deepStrictEqual(payloadOf(discarded), {
+          run_handle: handle,
+          state: 'cancelled',
+        });
+        await until(() => stand.standIn.loggedOff().includes(session ?? ''));
+        assert.equal(await listedState(stand, handle), 'cancelled');
+        hold.release();
+      } finally {
+        await stand.close();
+      }
+    });
+
+    it('one connection per background run: the call into the full entry opens no second one', async (t) => {
+      const fresh = t.mock.method(packageSessions, 'openFreshConnection');
+      const inCall = t.mock.method(longCall, 'runLongCall');
+      const stand = await longStand(TOOL, {
+        backgroundRuns: new InMemoryBackgroundRuns(),
+      });
+      try {
+        const started = await stand.call(TOOL, args);
+        const handle = handleOf(started);
+        await until(
+          async () => (await listedState(stand, handle)) === 'finished',
+        );
+        assert.equal(fresh.mock.callCount(), 1);
+        assert.equal(inCall.mock.callCount(), 0);
+        const sessions = new Set(
+          stand.standIn.requests
+            .filter(stand.isToolRequest)
+            .map((r) => r.session),
+        );
+        assert.equal(sessions.size, 1);
+      } finally {
+        await stand.close();
+      }
+    });
+
+    it('without a strategy, HandlerSystem is listed without background and answers in the call', async () => {
+      const stand = await longStand(TOOL);
+      try {
+        assert.ok(!(await stand.inputs(TOOL)).includes('background'));
+        const described = await stand.described(TOOL);
+        assert.ok(
+          described.includes(
+            'Runs on an ABAP session of its own and answers its result in the call.',
+          ),
+        );
+        assert.ok(!described.includes('run_handle'));
+        const answer = await stand.call(TOOL, args);
+        assert.equal(payloadOf(answer).run_handle, undefined);
+        assert.ok(
+          stand.standIn.requests.filter(stand.isToolRequest).length > 0,
+        );
+      } finally {
+        await stand.close();
+      }
+    });
   });
-});
+}

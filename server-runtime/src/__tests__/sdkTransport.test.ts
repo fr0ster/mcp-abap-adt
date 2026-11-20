@@ -14,8 +14,12 @@
  * `src/__tests__/unit/launchers/dataToolsAtStart.test.ts`, over the real
  * launchers.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
+import { assertMatchObject } from '../../../src/__tests__/helpers/assertions';
 import { type SdkServerTransport, SdkTransport } from '../sdkTransport';
 
 /** An SDK server transport that records what is sent, and fires events when told. */
@@ -74,17 +78,17 @@ describe('SdkTransport', () => {
     server.onclose = () => closes.push('server');
 
     await server.connect(new SdkTransport(fake));
-    expect(fake.started).toBe(1);
+    assert.equal(fake.started, 1);
 
     fake.deliver(INITIALIZE);
     await fake.firstSent;
     const [answer] = fake.sent;
-    expect(answer).toMatchObject({ jsonrpc: '2.0', id: 1 });
-    expect(answer !== undefined && 'result' in answer).toBe(true);
+    assertMatchObject(answer, { jsonrpc: '2.0', id: 1 });
+    assert.equal(answer !== undefined && 'result' in answer, true);
 
     await server.close();
-    expect(fake.closed).toBe(1);
-    expect(closes).toEqual(['server']);
+    assert.equal(fake.closed, 1);
+    assert.deepStrictEqual(closes, ['server']);
   });
 
   it("hands the SDK transport's close, error and message to the handler stored", () => {
@@ -100,7 +104,7 @@ describe('SdkTransport', () => {
     fake.onerror?.(new Error('broken'));
     fake.deliver({ jsonrpc: '2.0', method: 'notifications/initialized' });
 
-    expect(seen).toEqual([
+    assert.deepStrictEqual(seen, [
       'close',
       'error broken',
       'message notifications/initialized',
@@ -110,32 +114,30 @@ describe('SdkTransport', () => {
   it('answers a stable no-op for a handler never stored, and the event is dropped', () => {
     const fake = new FakeSdkTransport();
     const adapter = new SdkTransport(fake);
-    expect(adapter.onclose).toBe(adapter.onclose);
-    expect(() => fake.onclose?.()).not.toThrow();
-    expect(() => fake.onerror?.(new Error('x'))).not.toThrow();
-    expect(() =>
-      fake.deliver({ jsonrpc: '2.0', method: 'notifications/initialized' }),
-    ).not.toThrow();
+    assert.equal(adapter.onclose, adapter.onclose);
+    fake.onclose?.();
+    fake.onerror?.(new Error('x'));
+    fake.deliver({ jsonrpc: '2.0', method: 'notifications/initialized' });
   });
 
   it("copies the SDK transport's sessionId after start and before a message, and keeps it absent when there is none", async () => {
     const fake = new FakeSdkTransport();
     const adapter = new SdkTransport(fake);
-    expect('sessionId' in adapter).toBe(false);
+    assert.equal('sessionId' in adapter, false);
 
     fake.sessionId = 'session-1';
     await adapter.start();
-    expect(adapter.sessionId).toBe('session-1');
+    assert.equal(adapter.sessionId, 'session-1');
 
     const atMessage: Array<string | undefined> = [];
     adapter.onmessage = () => atMessage.push(adapter.sessionId);
     fake.sessionId = 'session-2';
     fake.deliver({ jsonrpc: '2.0', method: 'notifications/initialized' });
-    expect(atMessage).toEqual(['session-2']);
+    assert.deepStrictEqual(atMessage, ['session-2']);
 
     fake.sessionId = undefined;
     fake.deliver({ jsonrpc: '2.0', method: 'notifications/initialized' });
-    expect('sessionId' in adapter).toBe(false);
+    assert.equal('sessionId' in adapter, false);
   });
 
   it('forwards send and close to the SDK transport', async () => {
@@ -144,7 +146,7 @@ describe('SdkTransport', () => {
     const message: JSONRPCMessage = { jsonrpc: '2.0', id: 7, result: {} };
     await adapter.send(message);
     await adapter.close();
-    expect(fake.sent).toEqual([message]);
-    expect(fake.closed).toBe(1);
+    assert.deepStrictEqual(fake.sent, [message]);
+    assert.equal(fake.closed, 1);
   });
 });

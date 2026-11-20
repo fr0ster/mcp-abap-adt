@@ -17,6 +17,8 @@
  * row yet — their family tasks add the row with its live case.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -27,6 +29,7 @@ import { handleDeleteServiceBinding } from '../../../handlers/service_binding/hi
 import { handleDeleteServiceDefinition } from '../../../handlers/service_definition/high/handleDeleteServiceDefinition';
 import type { McpResult } from '../../../lib/answer';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
+import { assertMatchObject } from '../../helpers/assertions';
 import { type PinnedRequest, runPinCase } from '../../helpers/pinCases';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
@@ -305,104 +308,106 @@ function payloadOf(result: McpResult): unknown {
   return JSON.parse(part.text);
 }
 
-describe.each(CASES)('$tool', (c) => {
-  it(`an existing object whose check says "does not exist" (W) with isDeletable=true is deleted`, async () => {
-    await runPinCase({
-      tool: c.tool,
-      variant: 'onprem',
-      stand: 'recording',
-      args: c.args,
-      answers: [
+for (const c of CASES) {
+  describe(`${c.tool}`, () => {
+    it(`an existing object whose check says "does not exist" (W) with isDeletable=true is deleted`, async () => {
+      await runPinCase({
+        tool: c.tool,
+        variant: 'onprem',
+        stand: 'recording',
+        args: c.args,
+        answers: [
+          ...c.first.answers,
+          { data: permittedSaysAbsent(c.name) },
+          { data: deleted(c.name) },
+        ],
+        expected: [...c.first.requests, c.check, c.delete],
+      });
+      const connection = recordingConnection([
         ...c.first.answers,
         { data: permittedSaysAbsent(c.name) },
         { data: deleted(c.name) },
-      ],
-      expected: [...c.first.requests, c.check, c.delete],
+      ]);
+      const result = await c.run(connection);
+      assert.equal(result.isError, false);
+      assertMatchObject(payloadOf(result), { deleted: true, object: c.name });
     });
-    const connection = recordingConnection([
-      ...c.first.answers,
-      { data: permittedSaysAbsent(c.name) },
-      { data: deleted(c.name) },
-    ]);
-    const result = await c.run(connection);
-    expect(result.isError).toBe(false);
-    expect(payloadOf(result)).toMatchObject({ deleted: true, object: c.name });
-  });
 
-  it('a check with isDeletable=false is refused with its messages and T100 keys, nothing sent', async () => {
-    await runPinCase({
-      tool: c.tool,
-      variant: 'onprem',
-      stand: 'recording',
-      args: c.args,
-      answers: [...c.first.answers, { data: refusedWithKeys(c.name) }],
-      refusal: 'answer',
-      expected: [...c.first.requests, c.check],
+    it('a check with isDeletable=false is refused with its messages and T100 keys, nothing sent', async () => {
+      await runPinCase({
+        tool: c.tool,
+        variant: 'onprem',
+        stand: 'recording',
+        args: c.args,
+        answers: [...c.first.answers, { data: refusedWithKeys(c.name) }],
+        refusal: 'answer',
+        expected: [...c.first.requests, c.check],
+      });
+      const connection = recordingConnection([
+        ...c.first.answers,
+        { data: refusedWithKeys(c.name) },
+      ]);
+      const result = await c.run(connection);
+      assert.equal(result.isError, true);
+      assertMatchObject(payloadOf(result), {
+        origin: 'refusal',
+        messages: [
+          { type: 'W', text: `${c.name}: ${c.name} does not exist` },
+          {
+            type: 'E',
+            text: `${c.name}: Error while converting object references`,
+            t100: { id: 'RIS_MESSAGES', no: '014' },
+          },
+        ],
+      });
     });
-    const connection = recordingConnection([
-      ...c.first.answers,
-      { data: refusedWithKeys(c.name) },
-    ]);
-    const result = await c.run(connection);
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      origin: 'refusal',
-      messages: [
-        { type: 'W', text: `${c.name}: ${c.name} does not exist` },
-        {
-          type: 'E',
-          text: `${c.name}: Error while converting object references`,
-          t100: { id: 'RIS_MESSAGES', no: '014' },
-        },
-      ],
-    });
-  });
 
-  it('a permitted check with a typed E (the measured missing function module) is refused, only the check sent', async () => {
-    await runPinCase({
-      tool: c.tool,
-      variant: 'onprem',
-      stand: 'recording',
-      args: c.args,
-      answers: [...c.first.answers, { data: permittedWithError(c.name) }],
-      refusal: 'answer',
-      expected: [...c.first.requests, c.check],
+    it('a permitted check with a typed E (the measured missing function module) is refused, only the check sent', async () => {
+      await runPinCase({
+        tool: c.tool,
+        variant: 'onprem',
+        stand: 'recording',
+        args: c.args,
+        answers: [...c.first.answers, { data: permittedWithError(c.name) }],
+        refusal: 'answer',
+        expected: [...c.first.requests, c.check],
+      });
+      const connection = recordingConnection([
+        ...c.first.answers,
+        { data: permittedWithError(c.name) },
+      ]);
+      const result = await c.run(connection);
+      assert.equal(result.isError, true);
+      assertMatchObject(payloadOf(result), {
+        origin: 'refusal',
+        messages: [
+          { type: 'W', text: `${c.name}: ${c.name} does not exist` },
+          {
+            type: 'E',
+            text: `${c.name}: Error while converting object references`,
+            t100: { id: 'RIS_MESSAGES', no: '014' },
+          },
+        ],
+      });
     });
-    const connection = recordingConnection([
-      ...c.first.answers,
-      { data: permittedWithError(c.name) },
-    ]);
-    const result = await c.run(connection);
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      origin: 'refusal',
-      messages: [
-        { type: 'W', text: `${c.name}: ${c.name} does not exist` },
-        {
-          type: 'E',
-          text: `${c.name}: Error while converting object references`,
-          t100: { id: 'RIS_MESSAGES', no: '014' },
-        },
-      ],
-    });
-  });
 
-  it("a delete refused by SAP is named by its T100 key through the delete's analyse strategy", async () => {
-    const connection = recordingConnection([
-      ...c.first.answers,
-      { data: permittedSaysAbsent(c.name) },
-      { data: deleteRefused(c.name) },
-    ]);
-    const result = await c.run(connection);
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
-      origin: 'refusal',
-      messages: [
-        {
-          type: 'E',
-          t100: { id: 'SWB_TOOL', no: '029', values: [c.name] },
-        },
-      ],
+    it("a delete refused by SAP is named by its T100 key through the delete's analyse strategy", async () => {
+      const connection = recordingConnection([
+        ...c.first.answers,
+        { data: permittedSaysAbsent(c.name) },
+        { data: deleteRefused(c.name) },
+      ]);
+      const result = await c.run(connection);
+      assert.equal(result.isError, true);
+      assertMatchObject(payloadOf(result), {
+        origin: 'refusal',
+        messages: [
+          {
+            type: 'E',
+            t100: { id: 'SWB_TOOL', no: '029', values: [c.name] },
+          },
+        ],
+      });
     });
   });
-});
+}

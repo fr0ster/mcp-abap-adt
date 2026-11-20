@@ -8,6 +8,8 @@
  * and in a tool that reads several items no request follows it.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type {
@@ -25,28 +27,37 @@ import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/han
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
 import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
 import { createBatchAvailability } from '../../lib/batch/availability';
+import * as clients from '../../lib/clients';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { child, listOf } from '../../lib/thrownValue';
+import { assertMatchObject } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// The declared variant the boundary checks a type argument against.
+// The declared variant: the kind stated, read by the real variantOf.
+stateSystemKind('onprem');
+// The real client, kept before the swap: some cases run adt-clients' own
+// members over a connection double.
+const realCreateAdtClient = clients.createAdtClient;
+mock.method(clients, 'createAdtClient', () => fakeClient);
+// The declared variant's client, tagged with it (SearchObject's filter is
+// that variant's search names).
+mock.method(clients, 'adtClientOf', () => ({
+  variant: 'onprem',
+  client: fakeClient,
+}));
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 let fakeClient: any;
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => fakeClient,
-  // The declared variant's client, tagged with it (SearchObject's filter is
-  // that variant's search names).
-  adtClientOf: () => ({ variant: 'onprem', client: fakeClient }),
-}));
 
 const payloadOf = (result: any) => JSON.parse(result.content[0].text);
 
@@ -128,15 +139,15 @@ describe('GetInclude: through the adt-clients member, answered by answer()', () 
       { connection: {} as any, logger: undefined } as any,
       { include_name: 'ZINC' },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), {
       message: 'No authorization to display the object',
       origin: 'refusal',
       status: 403,
       adt_type: 'ExceptionResourceNoAccess',
       raw_body: DOCUMENT,
     });
-    expect(analyses).toEqual([analyseException]);
+    assert.deepStrictEqual(analyses, [analyseException]);
   });
 
   it('answers the source as it came', async () => {
@@ -147,7 +158,7 @@ describe('GetInclude: through the adt-clients member, answered by answer()', () 
       { connection: {} as any, logger: undefined } as any,
       { include_name: 'ZINC' },
     );
-    expect(result).toEqual({
+    assert.deepStrictEqual(result, {
       isError: false,
       content: [{ type: 'text', text: 'DATA a TYPE i.' }],
     });
@@ -165,8 +176,8 @@ describe('GetPackageContents: a throw', () => {
       { connection: {} as any, logger: undefined } as any,
       { package_name: 'ZPKG' },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
+    assert.equal(result.isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
   });
 
   it("a throw of our own is the method's own failure, client_threw", async () => {
@@ -179,8 +190,8 @@ describe('GetPackageContents: a throw', () => {
       { connection: {} as any, logger: undefined } as any,
       { package_name: 'ZPKG' },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), {
       error: 'client_threw',
       tool: 'GetPackageContents',
       message: 'boom',
@@ -191,10 +202,9 @@ describe('GetPackageContents: a throw', () => {
 describe('GetTypeInfo: a direct lookup SAP refused', () => {
   // adt-clients' own members (#235) over the connection double, so the
   // requests on the wire are the members'.
+  // A connection double: the members it serves are the ones these cases reach.
   const realClientOver = (connection: unknown) => {
-    fakeClient = jest
-      .requireActual('../../lib/clients')
-      .createAdtClient(connection);
+    fakeClient = realCreateAdtClient(connection as never);
   };
 
   it("is the lookup's error as SAP answered it, with the lookup as the step", async () => {
@@ -205,8 +215,8 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
       { connection, logger: undefined } as any,
       { type_name: 'ZT' },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toEqual({
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(payloadOf(result), {
       origin: 'connection',
       // The first lookup is the data element (`getDataElement().readMetadata`).
       ...sapRefusal(
@@ -215,7 +225,7 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
       ),
     });
     // The refusal is the answer: no further lookup is sent.
-    expect(sent).toHaveLength(1);
+    assert.equal(sent.length, 1);
   });
 
   it('a 404 stays absence: the next lookup is asked', async () => {
@@ -232,11 +242,11 @@ describe('GetTypeInfo: a direct lookup SAP refused', () => {
       { connection, logger: undefined } as any,
       { type_name: 'ZT' },
     );
-    expect(payloadOf(result)).toMatchObject({
+    assertMatchObject(payloadOf(result), {
       status: 403,
       step: 'read domain',
     });
-    expect(sent).toEqual([
+    assert.deepStrictEqual(sent, [
       '/sap/bc/adt/ddic/dataelements/zt?version=workingArea',
       '/sap/bc/adt/ddic/domains/zt?version=workingArea',
     ]);
@@ -248,15 +258,14 @@ describe('GetTransport: the request SAP refused', () => {
     // adt-clients' own `readObjects` (#235) over the refusing connection, so
     // the request on the wire is the member's.
     const connection = refusingWith(403);
-    fakeClient = jest
-      .requireActual('../../lib/clients')
-      .createAdtClient(connection);
+    fakeClient = realCreateAdtClient(connection);
     const result: any = await handleGetTransport(
       { connection, logger: undefined } as any,
       { transport_number: 'TRLK900001' } as any,
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject(
+    assert.equal(result.isError, true);
+    assertMatchObject(
+      payloadOf(result),
       sapRefusal(
         '/sap/bc/adt/cts/transportrequests/TRLK900001',
         'read transport request',
@@ -281,20 +290,22 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
       { connection: refusingWith(403), logger: undefined } as any,
       { object_type: 'PROG/P', object_name: 'ZPROG', tech_name: 'ZPROG' },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject(
+    assert.equal(result.isError, true);
+    assertMatchObject(
+      payloadOf(result),
       sapRefusal(
         '/sap/bc/adt/programs/programs/zprog?version=active',
         'read OBJECT_URI',
       ),
     );
     // Nothing of the failure was cached as the node's content.
-    expect(
+    assert.equal(
       child(
         listOf(child(objectsListCache.getCache(), 'objects'))[0],
         'object_uri_response',
       ),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 });
 
@@ -329,14 +340,14 @@ describe('GetEnhancements include_nested: the nested walk threw', () => {
       { object_name: 'ZPROG', object_type: 'program', include_nested: true },
     );
     const body = payloadOf(result);
-    expect(body.partial_result).toBe(true);
-    expect(body.error).toEqual({
+    assert.equal(body.partial_result, true);
+    assert.deepStrictEqual(body.error, {
       error: 'client_threw',
       message: 'logger down',
       step: 'list includes',
     });
     // A partial answer is not a failure, and says so as every answer does.
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
   });
 });
 
@@ -364,13 +375,13 @@ describe('GetIncludesList: SAP answered 401 to an include', () => {
       } as any,
       { object_name: 'ZPROG', object_type: 'PROG/P' },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), {
       status: 401,
       step: 'read source',
     });
-    expect(payloadOf(result).tree).toBeUndefined();
-    expect(read).toEqual(['ZONE']);
+    assert.equal(payloadOf(result).tree, undefined);
+    assert.deepStrictEqual(read, ['ZONE']);
   });
 });
 
@@ -387,9 +398,9 @@ describe('DescribeByList: a credential failure on the typed search', () => {
       { connection: {} as any, logger: undefined } as any,
       { objects: [{ name: 'ZCL_X', type: 'CLAS/OC' }] },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(searched).toEqual(['ZCL_X']);
+    assert.equal(result.isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.deepStrictEqual(searched, ['ZCL_X']);
   });
 
   it('a 401 SAP answered: the call ends with it, no untyped search follows', async () => {
@@ -404,9 +415,9 @@ describe('DescribeByList: a credential failure on the typed search', () => {
       { connection: {} as any, logger: undefined } as any,
       { objects: [{ name: 'ZCL_X', type: 'CLAS/OC' }] },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({ status: 401 });
-    expect(searches).toBe(1);
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), { status: 401 });
+    assert.equal(searches, 1);
   });
 });
 
@@ -429,9 +440,9 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
       { connection: {} as any, logger: undefined } as any,
       { parent_type: 'PROG/P', parent_name: 'ZPROG', maxDepth: 1 },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(calls).toEqual(['tree', 'search']);
+    assert.equal(result.isError, true);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.deepStrictEqual(calls, ['tree', 'search']);
   });
 
   it('a 401 SAP answered to the search ends the call the same way', async () => {
@@ -450,9 +461,9 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
       { connection: {} as any, logger: undefined } as any,
       { parent_type: 'PROG/P', parent_name: 'ZPROG', maxDepth: 1 },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({ status: 401 });
-    expect(calls).toEqual(['tree', 'search']);
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), { status: 401 });
+    assert.deepStrictEqual(calls, ['tree', 'search']);
   });
 
   it('any other search refusal stays best effort: the tree answers', async () => {
@@ -465,7 +476,7 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
       { connection: {} as any, logger: undefined } as any,
       { parent_type: 'PROG/P', parent_name: 'ZPROG', maxDepth: 1 },
     );
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
   });
 });
 
@@ -487,13 +498,14 @@ describe('GetTransport / GetIncludesList: a missing argument', () => {
     );
     // A read's own refusal of a missing argument: one text, isError.
     const reference = { isError: true, types: ['text'] };
-    expect(shape(transport)).toEqual(reference);
-    expect(shape(includes)).toEqual(reference);
-    expect(transport.content[0].text).toBe('Transport number is required');
-    expect(includes.content[0].text).toBe(
+    assert.deepStrictEqual(shape(transport), reference);
+    assert.deepStrictEqual(shape(includes), reference);
+    assert.equal(transport.content[0].text, 'Transport number is required');
+    assert.equal(
+      includes.content[0].text,
       'Parameter "object_name" (string) is required and cannot be empty.',
     );
-    expect(sent).toEqual([]);
+    assert.deepStrictEqual(sent, []);
   });
 });
 
@@ -508,8 +520,8 @@ describe('GetIncludesList: a throw that carries nothing', () => {
       { connection: {} as any, logger: undefined } as any,
       { object_name: 'ZPROG', object_type: 'PROG/P' },
     );
-    expect(result.isError).toBe(true);
-    expect(payloadOf(result)).toMatchObject({
+    assert.equal(result.isError, true);
+    assertMatchObject(payloadOf(result), {
       error: 'client_threw',
       tool: 'GetIncludesList',
       message: 'boom',

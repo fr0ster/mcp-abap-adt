@@ -9,6 +9,16 @@
  * state), and the exit is `0` before any timer could force it.
  */
 
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format } from 'node:util';
 import {
   isUpdateOf,
   stopUrl,
@@ -17,61 +27,62 @@ import { activeTools } from '../../../../../src/lib/activeTools';
 import { ownedConnections } from '../../../../../src/lib/ownedConnections';
 import { type HttpStand, httpStand, until } from './harness';
 
-jest.setTimeout(30_000);
-
 let s: HttpStand;
-let errorSpy: jest.SpyInstance;
+let errorSpy: Mock<typeof console.error>;
 
 afterEach(async () => {
   await s.close();
-  errorSpy.mockRestore();
+  errorSpy.mock.restore();
 });
 
 /** Connections opened at the stand-in: each connect reads the discovery once. */
 const connects = () =>
   s.standIn.requests.filter((r) => r.url.includes('discovery')).length;
 
-describe.each([
+for (const [_name, shutdownTimeoutMs] of [
   ['no --shutdown-timeout', undefined],
   ['--shutdown-timeout=1', 1_000],
-])('%s', (_name, shutdownTimeoutMs) => {
-  beforeEach(async () => {
-    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    s = await httpStand(
-      shutdownTimeoutMs === undefined ? {} : { shutdownTimeoutMs },
-    );
-  });
+] satisfies [string, number | undefined][]) {
+  describe(format('%s', _name), () => {
+    beforeEach(async () => {
+      errorSpy = mock.method(console, 'error', () => {});
+      s = await httpStand(
+        shutdownTimeoutMs === undefined ? {} : { shutdownTimeoutMs },
+      );
+    });
 
-  it('tools that never settle: every owned connection logged off at once, no undo, exit 0', async () => {
-    const held = await s.call('HoldState', { id: 'P' });
-    expect(held.isError).toBe(false);
-    const holds = [
-      s.standIn.hold((r) => isUpdateOf('P1')(r.url)),
-      s.standIn.hold((r) => isUpdateOf('B1')(r.url)),
-    ];
-    void s
-      .call('LockedUpdate', { id: 'P1', state_handle: held.text })
-      .catch(() => undefined);
-    void s.call('LockedUpdate', { id: 'B1' }).catch(() => undefined);
-    await until(
-      () =>
-        s.standIn.requests.some((r) => isUpdateOf('P1')(r.url)) &&
-        s.standIn.requests.some((r) => isUpdateOf('B1')(r.url)),
-    );
+    it('tools that never settle: every owned connection logged off at once, no undo, exit 0', async () => {
+      const held = await s.call('HoldState', { id: 'P' });
+      assert.equal(held.isError, false);
+      const holds = [
+        s.standIn.hold((r) => isUpdateOf('P1')(r.url)),
+        s.standIn.hold((r) => isUpdateOf('B1')(r.url)),
+      ];
+      void s
+        .call('LockedUpdate', { id: 'P1', state_handle: held.text })
+        .catch(() => undefined);
+      void s.call('LockedUpdate', { id: 'B1' }).catch(() => undefined);
+      await until(
+        () =>
+          s.standIn.requests.some((r) => isUpdateOf('P1')(r.url)) &&
+          s.standIn.requests.some((r) => isUpdateOf('B1')(r.url)),
+      );
 
-    s.processLike.emit('SIGTERM');
-    expect(await s.exited).toBe(0);
-    expect(s.stderr).toEqual([]);
-    expect(activeTools()).toHaveLength(2);
-    expect(ownedConnections()).toEqual([]);
-    // Every connection opened — the pooled instance's (one per request
-    // credential), its state's own, the per-request one's — got its logoff.
-    await until(() => s.standIn.logoffs() === connects());
-    expect(s.standIn.logoffs()).toBeGreaterThanOrEqual(3);
-    expect(s.standIn.requests.some((r) => r.url.startsWith(stopUrl('P')))).toBe(
-      false,
-    );
-    for (const hold of holds) hold.release();
-    await until(() => activeTools().length === 0);
+      s.processLike.emit('SIGTERM');
+      assert.equal(await s.exited, 0);
+      assert.deepStrictEqual(s.stderr, []);
+      assert.equal(activeTools().length, 2);
+      assert.deepStrictEqual(ownedConnections(), []);
+      // Every connection opened — the pooled instance's (one per request
+      // credential), its state's own, the per-request one's — got its logoff.
+      await until(() => s.standIn.logoffs() === connects());
+      assert.ok(s.standIn.logoffs() >= 3);
+      assert.equal(
+        s.standIn.requests.some((r) => r.url.startsWith(stopUrl('P'))),
+        false,
+      );
+      for (const hold of holds) hold.release();
+      await until(() => activeTools().length === 0);
+    });
   });
-});
+}

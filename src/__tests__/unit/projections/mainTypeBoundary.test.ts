@@ -12,6 +12,9 @@
  * names, of which every table main type is one (`searchObjectTypes.test.ts`).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import type { AdtUtilityCode } from '@mcp-abap-adt/interfaces-adt';
 import { handleHandlerActivate } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
 import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handlers/handleHandlerGet';
@@ -46,8 +49,6 @@ import {
   type RecordedRequest,
   recordingConnection,
 } from '../../helpers/recordingConnection';
-
-jest.setTimeout(60_000);
 
 const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
@@ -266,32 +267,46 @@ describe('a main type is read where it names one code, refused where it names se
     ARGUMENTS.map((argument) => [argument.tool, variant, argument] as const),
   );
 
-  it.each(cases)(
-    '%s on %s: the main type sends exactly what its code sends, in either case',
-    async (_tool, variant, argument) => {
-      const [main, code] = argument.one;
-      const byCode = await run(argument, variant, code);
-      const byMain = await run(argument, variant, main);
-      const byLower = await run(argument, variant, main.toLowerCase());
-      expect(byCode.requests.length).toBeGreaterThan(0);
-      expect(byMain.requests).toEqual(byCode.requests);
-      expect(byLower.requests).toEqual(byCode.requests);
-    },
-  );
+  for (const [_tool, variant, argument] of cases) {
+    it(
+      format(
+        '%s on %s: the main type sends exactly what its code sends, in either case',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const [main, code] = argument.one;
+        const byCode = await run(argument, variant, code);
+        const byMain = await run(argument, variant, main);
+        const byLower = await run(argument, variant, main.toLowerCase());
+        assert.ok(byCode.requests.length > 0);
+        assert.deepStrictEqual(byMain.requests, byCode.requests);
+        assert.deepStrictEqual(byLower.requests, byCode.requests);
+      },
+    );
+  }
 
-  it.each(cases)(
-    '%s on %s: a main type codes share is refused naming them, nothing sent',
-    async (_tool, variant, argument) => {
-      const [main, codes] = argument.shared;
-      for (const value of [main, main.toLowerCase()]) {
-        const { requests, answered } = await run(argument, variant, value);
-        expect(unescaped(answered)).toContain(
-          `"${value}" is the main type of ${codes}: name one of these codes; nothing was sent`,
-        );
-        expect(requests).toEqual([]);
-      }
-    },
-  );
+  for (const [_tool, variant, argument] of cases) {
+    it(
+      format(
+        '%s on %s: a main type codes share is refused naming them, nothing sent',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const [main, codes] = argument.shared;
+        for (const value of [main, main.toLowerCase()]) {
+          const { requests, answered } = await run(argument, variant, value);
+          assert.ok(
+            unescaped(answered).includes(
+              `"${value}" is the main type of ${codes}: name one of these codes; nothing was sent`,
+            ),
+          );
+          assert.deepStrictEqual(requests, []);
+        }
+      },
+    );
+  }
 
   /**
    * The arguments that take friendly names (`TYPE_NAMES`): a main type is no
@@ -308,76 +323,114 @@ describe('a main type is read where it names one code, refused where it names se
     argument.tool.startsWith('ActivateObjects') ||
     argument.tool.startsWith('HandlerActivate');
 
-  it.each(namedCases)(
-    '%s on %s: TABL names a table and a structure, so it is refused naming both, nothing sent',
-    async (_tool, variant, argument) => {
-      for (const value of ['TABL', 'tabl']) {
-        const { requests, answered } = await run(argument, variant, value);
-        expect(unescaped(answered)).toContain(
-          `"${value}" is the main type of TABL/DT, TABL/DS: name one of these codes; nothing was sent`,
+  for (const [_tool, variant, argument] of namedCases) {
+    it(
+      format(
+        '%s on %s: TABL names a table and a structure, so it is refused naming both, nothing sent',
+        _tool,
+        variant,
+      ),
+      async () => {
+        for (const value of ['TABL', 'tabl']) {
+          const { requests, answered } = await run(argument, variant, value);
+          assert.ok(
+            unescaped(answered).includes(
+              `"${value}" is the main type of TABL/DT, TABL/DS: name one of these codes; nothing was sent`,
+            ),
+          );
+          assert.deepStrictEqual(requests, []);
+        }
+      },
+    );
+  }
+
+  for (const [_tool, variant, argument] of namedCases) {
+    it(
+      format(
+        '%s on %s: PROG is refused naming PROG/P and PROG/I where both are served, nothing sent',
+        _tool,
+        variant,
+      ),
+      async () => {
+        for (const value of ['PROG', 'prog']) {
+          const { requests, answered } = await run(argument, variant, value);
+          assert.ok(
+            unescaped(answered).includes(
+              activation(argument) && variant === 'cloud'
+                ? `"${value}" is not one of: CLAS/OC`
+                : `"${value}" is the main type of PROG/P, PROG/I: name one of these codes; nothing was sent`,
+            ),
+          );
+          assert.deepStrictEqual(requests, []);
+        }
+      },
+    );
+  }
+
+  for (const [_tool, variant, argument] of namedCases) {
+    it(
+      format(
+        '%s on %s: FUGR is refused naming the function codes served, nothing sent',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const codes = argument.tool.startsWith('GetWhereUsed')
+          ? 'FUGR/F, FUGR/FF'
+          : 'FUGR/F, FUGR/FF, FUGR/I';
+        const { requests, answered } = await run(argument, variant, 'FUGR');
+        assert.ok(
+          unescaped(answered).includes(
+            `"FUGR" is the main type of ${codes}: name one of these codes; nothing was sent`,
+          ),
         );
-        expect(requests).toEqual([]);
-      }
-    },
-  );
+        assert.deepStrictEqual(requests, []);
+      },
+    );
+  }
 
-  it.each(namedCases)(
-    '%s on %s: PROG is refused naming PROG/P and PROG/I where both are served, nothing sent',
-    async (_tool, variant, argument) => {
-      for (const value of ['PROG', 'prog']) {
-        const { requests, answered } = await run(argument, variant, value);
-        expect(unescaped(answered)).toContain(
-          activation(argument) && variant === 'cloud'
-            ? `"${value}" is not one of: CLAS/OC`
-            : `"${value}" is the main type of PROG/P, PROG/I: name one of these codes; nothing was sent`,
+  for (const [_tool, variant, argument] of namedCases) {
+    it(
+      format(
+        '%s on %s: CLAS is the one class code, and sends exactly what CLAS/OC sends',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const byCode = await run(argument, variant, 'CLAS/OC');
+        const byMain = await run(argument, variant, 'CLAS');
+        const byLower = await run(argument, variant, 'clas');
+        assert.ok(byCode.requests.length > 0);
+        assert.deepStrictEqual(byMain.requests, byCode.requests);
+        assert.deepStrictEqual(byLower.requests, byCode.requests);
+      },
+    );
+  }
+
+  for (const [_tool, variant, argument] of namedCases) {
+    it(
+      format(
+        '%s on %s: stru/ds is no code and no name, refused, nothing sent; stru is the structure',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const refused = await run(argument, variant, 'stru/ds');
+        assert.ok(
+          unescaped(refused.answered).includes(
+            '"stru/ds" is not one of: CLAS/OC',
+          ),
         );
-        expect(requests).toEqual([]);
-      }
-    },
-  );
-
-  it.each(namedCases)(
-    '%s on %s: FUGR is refused naming the function codes served, nothing sent',
-    async (_tool, variant, argument) => {
-      const codes = argument.tool.startsWith('GetWhereUsed')
-        ? 'FUGR/F, FUGR/FF'
-        : 'FUGR/F, FUGR/FF, FUGR/I';
-      const { requests, answered } = await run(argument, variant, 'FUGR');
-      expect(unescaped(answered)).toContain(
-        `"FUGR" is the main type of ${codes}: name one of these codes; nothing was sent`,
-      );
-      expect(requests).toEqual([]);
-    },
-  );
-
-  it.each(namedCases)(
-    '%s on %s: CLAS is the one class code, and sends exactly what CLAS/OC sends',
-    async (_tool, variant, argument) => {
-      const byCode = await run(argument, variant, 'CLAS/OC');
-      const byMain = await run(argument, variant, 'CLAS');
-      const byLower = await run(argument, variant, 'clas');
-      expect(byCode.requests.length).toBeGreaterThan(0);
-      expect(byMain.requests).toEqual(byCode.requests);
-      expect(byLower.requests).toEqual(byCode.requests);
-    },
-  );
-
-  it.each(namedCases)(
-    '%s on %s: stru/ds is no code and no name, refused, nothing sent; stru is the structure',
-    async (_tool, variant, argument) => {
-      const refused = await run(argument, variant, 'stru/ds');
-      expect(unescaped(refused.answered)).toContain(
-        '"stru/ds" is not one of: CLAS/OC',
-      );
-      expect(refused.requests).toEqual([]);
-      // One object of `stru` is activated as one object of TABL/DS, through
-      // the structure family (S6), like every other argument here.
-      const byCode = await run(argument, variant, 'TABL/DS');
-      const byName = await run(argument, variant, 'stru');
-      expect(byCode.requests.length).toBeGreaterThan(0);
-      expect(byName.requests).toEqual(byCode.requests);
-    },
-  );
+        assert.deepStrictEqual(refused.requests, []);
+        // One object of `stru` is activated as one object of TABL/DS, through
+        // the structure family (S6), like every other argument here.
+        const byCode = await run(argument, variant, 'TABL/DS');
+        const byName = await run(argument, variant, 'stru');
+        assert.ok(byCode.requests.length > 0);
+        assert.deepStrictEqual(byName.requests, byCode.requests);
+      },
+    );
+  }
 
   /** The arguments `func` is sent through, each with a function module's name. */
   const FUNCTION_MODULE: readonly Argument[] = [
@@ -411,33 +464,45 @@ describe('a main type is read where it names one code, refused where it names se
     ),
   );
 
-  it.each(functionModuleCases)(
-    '%s on %s: func is the function module, FUGR/FF, not the group',
-    async (_tool, variant, argument) => {
-      const byModule = await run(argument, variant, 'FUGR/FF');
-      const byGroup = await run(argument, variant, 'FUGR/F');
-      const byName = await run(argument, variant, 'func');
-      const byUpper = await run(argument, variant, 'FUNC');
-      expect(byModule.requests.length).toBeGreaterThan(0);
-      expect(byName.requests).toEqual(byModule.requests);
-      expect(byUpper.requests).toEqual(byModule.requests);
-      expect(byName.requests).not.toEqual(byGroup.requests);
-    },
-  );
+  for (const [_tool, variant, argument] of functionModuleCases) {
+    it(
+      format(
+        '%s on %s: func is the function module, FUGR/FF, not the group',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const byModule = await run(argument, variant, 'FUGR/FF');
+        const byGroup = await run(argument, variant, 'FUGR/F');
+        const byName = await run(argument, variant, 'func');
+        const byUpper = await run(argument, variant, 'FUNC');
+        assert.ok(byModule.requests.length > 0);
+        assert.deepStrictEqual(byName.requests, byModule.requests);
+        assert.deepStrictEqual(byUpper.requests, byModule.requests);
+        assert.notDeepStrictEqual(byName.requests, byGroup.requests);
+      },
+    );
+  }
 
-  it.each(functionModuleCases)(
-    '%s on %s: function is the function module, FUGR/FF, not the group',
-    async (_tool, variant, argument) => {
-      const byModule = await run(argument, variant, 'FUGR/FF');
-      const byGroup = await run(argument, variant, 'FUGR/F');
-      const byName = await run(argument, variant, 'function');
-      const byUpper = await run(argument, variant, 'FUNCTION');
-      expect(byModule.requests.length).toBeGreaterThan(0);
-      expect(byName.requests).toEqual(byModule.requests);
-      expect(byUpper.requests).toEqual(byModule.requests);
-      expect(byName.requests).not.toEqual(byGroup.requests);
-    },
-  );
+  for (const [_tool, variant, argument] of functionModuleCases) {
+    it(
+      format(
+        '%s on %s: function is the function module, FUGR/FF, not the group',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const byModule = await run(argument, variant, 'FUGR/FF');
+        const byGroup = await run(argument, variant, 'FUGR/F');
+        const byName = await run(argument, variant, 'function');
+        const byUpper = await run(argument, variant, 'FUNCTION');
+        assert.ok(byModule.requests.length > 0);
+        assert.deepStrictEqual(byName.requests, byModule.requests);
+        assert.deepStrictEqual(byUpper.requests, byModule.requests);
+        assert.notDeepStrictEqual(byName.requests, byGroup.requests);
+      },
+    );
+  }
 
   /** The arguments `functiongroup` is sent through, each with a group's name. */
   const FUNCTION_GROUP: readonly Argument[] = [
@@ -468,34 +533,47 @@ describe('a main type is read where it names one code, refused where it names se
     ),
   );
 
-  it.each(functionGroupCases)(
-    '%s on %s: functiongroup is the function group, FUGR/F, not the module',
-    async (_tool, variant, argument) => {
-      const byGroup = await run(argument, variant, 'FUGR/F');
-      const byModule = await run(argument, variant, 'FUGR/FF');
-      const byName = await run(argument, variant, 'functiongroup');
-      const byUpper = await run(argument, variant, 'FUNCTIONGROUP');
-      expect(byGroup.requests.length).toBeGreaterThan(0);
-      expect(byName.requests).toEqual(byGroup.requests);
-      expect(byUpper.requests).toEqual(byGroup.requests);
-      expect(byName.requests).not.toEqual(byModule.requests);
-    },
-  );
+  for (const [_tool, variant, argument] of functionGroupCases) {
+    it(
+      format(
+        '%s on %s: functiongroup is the function group, FUGR/F, not the module',
+        _tool,
+        variant,
+      ),
+      async () => {
+        const byGroup = await run(argument, variant, 'FUGR/F');
+        const byModule = await run(argument, variant, 'FUGR/FF');
+        const byName = await run(argument, variant, 'functiongroup');
+        const byUpper = await run(argument, variant, 'FUNCTIONGROUP');
+        assert.ok(byGroup.requests.length > 0);
+        assert.deepStrictEqual(byName.requests, byGroup.requests);
+        assert.deepStrictEqual(byUpper.requests, byGroup.requests);
+        assert.notDeepStrictEqual(byName.requests, byModule.requests);
+      },
+    );
+  }
 
-  it.each(VARIANTS)(
-    'a main type no code of the projection has is refused as any unknown value (%s)',
-    async (variant) => {
-      const argument = ARGUMENTS.find(
-        (each) => each.tool === 'GetWhereUsed.object_type',
-      );
-      if (argument === undefined) throw new Error('no such argument');
-      const { requests, answered } = await run(argument, variant, 'BIMP');
-      expect(unescaped(answered)).toContain(
-        'object_type "BIMP" is not one of: CLAS/OC',
-      );
-      expect(requests).toEqual([]);
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'a main type no code of the projection has is refused as any unknown value (%s)',
+        variant,
+      ),
+      async () => {
+        const argument = ARGUMENTS.find(
+          (each) => each.tool === 'GetWhereUsed.object_type',
+        );
+        if (argument === undefined) throw new Error('no such argument');
+        const { requests, answered } = await run(argument, variant, 'BIMP');
+        assert.ok(
+          unescaped(answered).includes(
+            'object_type "BIMP" is not one of: CLAS/OC',
+          ),
+        );
+        assert.deepStrictEqual(requests, []);
+      },
+    );
+  }
 });
 
 /**
@@ -540,45 +618,63 @@ const ONE_IN_EVERY = [
 ];
 
 describe("each projection's main types", () => {
-  it.each(VARIANTS)(
-    'the table: the structure tools and the search filter (%s)',
-    (variant) => {
-      expect(mainTypesOf(TABLE_CODES[variant])).toEqual({
-        one: [...ONE_IN_EVERY, 'FTG2', 'ENHS'],
-        shared: ['PROG', 'FUGR', 'TABL', 'MSAG', 'ENHO'],
-      });
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'the table: the structure tools and the search filter (%s)',
+        variant,
+      ),
+      () => {
+        assert.deepStrictEqual(mainTypesOf(TABLE_CODES[variant]), {
+          one: [...ONE_IN_EVERY, 'FTG2', 'ENHS'],
+          shared: ['PROG', 'FUGR', 'TABL', 'MSAG', 'ENHO'],
+        });
+      },
+    );
+  }
 
-  it.each(VARIANTS)('where-used (%s)', (variant) => {
-    expect(mainTypesOf(WHERE_USED_CODES[variant])).toEqual({
-      one: [...ONE_IN_EVERY, 'MSAG', 'FTG2', 'ENHS'],
-      shared: ['PROG', 'FUGR', 'TABL', 'ENHO'],
+  for (const variant of VARIANTS) {
+    it(format('where-used (%s)', variant), () => {
+      assert.deepStrictEqual(mainTypesOf(WHERE_USED_CODES[variant]), {
+        one: [...ONE_IN_EVERY, 'MSAG', 'FTG2', 'ENHS'],
+        shared: ['PROG', 'FUGR', 'TABL', 'ENHO'],
+      });
     });
-  });
+  }
 
   it('group activation on premise', () => {
-    expect(mainTypesOf(ACTIVATION_CODES.onprem)).toEqual({
+    assert.deepStrictEqual(mainTypesOf(ACTIVATION_CODES.onprem), {
       one: [...ONE_IN_EVERY, 'FTG2', 'ENHS'],
       shared: ['PROG', 'FUGR', 'TABL', 'ENHO'],
     });
   });
 
   it('group activation on ABAP cloud', () => {
-    expect(mainTypesOf(ACTIVATION_CODES.cloud)).toEqual({
+    assert.deepStrictEqual(mainTypesOf(ACTIVATION_CODES.cloud), {
       one: [...ONE_IN_EVERY, 'ENHS'],
       shared: ['FUGR', 'TABL', 'ENHO'],
     });
   });
 
-  it.each(VARIANTS)(
-    "GetIncludesList's parents, and the main types its enum lists (%s)",
-    (variant) => {
-      const read = mainTypesOf(INCLUDES_PARENTS[variant]);
-      expect(read).toEqual({ one: ['FUGR', 'CLAS'], shared: ['PROG'] });
-      expect([...INCLUDES_PARENT_MAIN_TYPES[variant]]).toEqual(read.one);
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        "GetIncludesList's parents, and the main types its enum lists (%s)",
+        variant,
+      ),
+      () => {
+        const read = mainTypesOf(INCLUDES_PARENTS[variant]);
+        assert.deepStrictEqual(read, {
+          one: ['FUGR', 'CLAS'],
+          shared: ['PROG'],
+        });
+        assert.deepStrictEqual(
+          [...INCLUDES_PARENT_MAIN_TYPES[variant]],
+          read.one,
+        );
+      },
+    );
+  }
 });
 
 /**
@@ -616,28 +712,40 @@ describe('GetIncludesList: a main type at its schema', () => {
     SENDS.map(([where, args, one]) => [where, variant, args, one] as const),
   );
 
-  it.each(cases)(
-    '%s on %s: the main type sends exactly what its code sends',
-    async (where, variant, args, [main, code]) => {
-      const sent = argument(`GetIncludesList.${where}`, args);
-      const byCode = await run(sent, variant, code);
-      const byMain = await run(sent, variant, main);
-      expect(byCode.requests.length).toBeGreaterThan(0);
-      expect(byMain.requests).toEqual(byCode.requests);
-    },
-  );
+  for (const [where, variant, args, [main, code]] of cases) {
+    it(
+      format(
+        '%s on %s: the main type sends exactly what its code sends',
+        where,
+        variant,
+      ),
+      async () => {
+        const sent = argument(`GetIncludesList.${where}`, args);
+        const byCode = await run(sent, variant, code);
+        const byMain = await run(sent, variant, main);
+        assert.ok(byCode.requests.length > 0);
+        assert.deepStrictEqual(byMain.requests, byCode.requests);
+      },
+    );
+  }
 
-  it.each(cases)(
-    '%s on %s: lower case and a shared main type are refused at the schema, nothing sent',
-    async (where, variant, args, [main]) => {
-      const sent = argument(`GetIncludesList.${where}`, args);
-      for (const value of [main.toLowerCase(), 'PROG', 'prog']) {
-        const { requests, answered } = await run(sent, variant, value);
-        expect(answered).toContain(
-          'Invalid arguments for tool GetIncludesList: ',
-        );
-        expect(requests).toEqual([]);
-      }
-    },
-  );
+  for (const [where, variant, args, [main]] of cases) {
+    it(
+      format(
+        '%s on %s: lower case and a shared main type are refused at the schema, nothing sent',
+        where,
+        variant,
+      ),
+      async () => {
+        const sent = argument(`GetIncludesList.${where}`, args);
+        for (const value of [main.toLowerCase(), 'PROG', 'prog']) {
+          const { requests, answered } = await run(sent, variant, value);
+          assert.ok(
+            answered.includes('Invalid arguments for tool GetIncludesList: '),
+          );
+          assert.deepStrictEqual(requests, []);
+        }
+      },
+    );
+  }
 });

@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
@@ -7,7 +10,14 @@ import { runWithRequestSignal } from '../../../lib/requestSignal';
 import { payloadCarriedBy } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import { corpusBody } from '../../helpers/adtCorpus';
+import { assertMatchObject, assertRejects } from '../../helpers/assertions';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
+import {
+  advanceTimersByTimeAsync,
+  track,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
 import {
   AMDP_BREAK_LINE,
   AMDP_MAIN_ID,
@@ -100,8 +110,13 @@ function idleAbap() {
 }
 
 describe('AmdpSession', () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   async function started(w = world(), withRun = false) {
     const s = w.session.start({
@@ -124,9 +139,9 @@ describe('AmdpSession', () => {
       run: { kind: 'class', name: 'ZCL_A' },
     });
     await until(() => w.reads.length === 1);
-    expect(w.calls).not.toContain('run');
+    assert.ok(!w.calls.includes('run'));
     w.reads[0].resolve(okResponse(SYNCED('Q1')));
-    await expect(s).resolves.toMatchObject({
+    assertMatchObject(await s, {
       mainId: AMDP_MAIN_ID,
       breakpoints: [
         { class_name: 'ZMCP_DBG_AMDP', line: 27, state: 'PENDING' },
@@ -159,7 +174,7 @@ describe('AmdpSession', () => {
           ),
       ),
     );
-    await expect(s).resolves.toMatchObject({
+    assertMatchObject(await s, {
       breakpoints: [
         {
           class_name: 'ZMCP_DBG_AMDP',
@@ -176,15 +191,13 @@ describe('AmdpSession', () => {
     const w = await started();
     const waiting = w.session.wait(30);
     w.reads[1].resolve(okResponse(BREAK));
-    await expect(waiting).resolves.toMatchObject({
+    assertMatchObject(await waiting, {
       state: 'event',
       events: [{ kind: 'ON_BREAK', line: AMDP_BREAK_LINE }],
     });
     await w.session.step('continue');
-    expect(w.calls).toContain('step:D1:continue');
-    await expect(w.session.step('over')).rejects.toThrow(
-      /no AMDP debuggee is stopped/,
-    );
+    assert.ok(w.calls.includes('step:D1:continue'));
+    await assertRejects(w.session.step('over'), /no AMDP debuggee is stopped/);
   });
 
   it('ON_EXECUTION_END clears the debuggee', async () => {
@@ -193,9 +206,7 @@ describe('AmdpSession', () => {
     await until(() => w.reads.length === 3);
     w.reads[2].resolve(okResponse(END));
     await until(() => w.reads.length === 4);
-    await expect(w.session.getTable('LT_ROWS')).rejects.toThrow(
-      /no AMDP debuggee/,
-    );
+    await assertRejects(w.session.getTable('LT_ROWS'), /no AMDP debuggee/);
   });
 
   it('stop cancels a suspended debuggee and sends the stop only once the debuggee ended — its end event and the run returned — then logs off', async () => {
@@ -208,21 +219,21 @@ describe('AmdpSession', () => {
       done = true;
     });
     await until(() => w.calls.includes('delete:D1'));
-    await jest.advanceTimersByTimeAsync(1000);
-    expect(w.calls).not.toContain('stop'); // the debuggee has not ended yet
+    await advanceTimersByTimeAsync(1000);
+    assert.ok(!w.calls.includes('stop')); // the debuggee has not ended yet
     w.reads[2].resolve(okResponse(END)); // ON_EXECUTION_END of D1
     await until(() => w.reads.length === 4);
-    await jest.advanceTimersByTimeAsync(1000);
-    expect(w.calls).not.toContain('stop'); // the run has not returned yet
+    await advanceTimersByTimeAsync(1000);
+    assert.ok(!w.calls.includes('stop')); // the run has not returned yet
     w.run.resolve({ ok: false, message: 'cancelled' });
     await until(() => w.calls.includes('stop'));
     await stopping;
-    expect(done).toBe(true);
+    assert.equal(done, true);
     const order = ['delete:D1', 'stop'].map((c) => w.calls.indexOf(c));
-    expect(order[0]).toBeLessThan(order[1] as number);
-    expect(w.calls.filter((c) => c === 'delete:D1')).toHaveLength(1);
-    expect(w.closed).toHaveLength(3); // events, commands and the run, after the stop
-    expect(w.session.holdsState()).toBe(false);
+    assert.ok(order[0] < (order[1] as number));
+    assert.equal(w.calls.filter((c) => c === 'delete:D1').length, 1);
+    assert.equal(w.closed.length, 3); // events, commands and the run, after the stop
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('a stop whose debuggee never ends holds no other call: a dispose ends the wait, and every connection is logged off', async () => {
@@ -231,7 +242,8 @@ describe('AmdpSession', () => {
     w.reads[1].resolve(okResponse(BREAK));
     await until(() => w.reads.length === 3);
     const first = w.session.stop();
-    const firstFailed = expect(first).rejects.toThrow(
+    const firstFailed = assertRejects(
+      first,
       /the debuggee D1 had not ended when the stop was sent/,
     );
     await until(() => w.calls.includes('delete:D1'));
@@ -244,7 +256,7 @@ describe('AmdpSession', () => {
     await firstFailed;
     await disposed.catch(() => undefined);
     await until(() => w.closed.length === 3); // events, commands, the run
-    expect(w.calls.filter((c) => c === 'stop')).toHaveLength(1);
+    assert.equal(w.calls.filter((c) => c === 'stop').length, 1);
   });
 
   it('a dispose at a break whose debuggee never ends: it cancels, waits for nothing, stops, and logs off every connection', async () => {
@@ -259,8 +271,8 @@ describe('AmdpSession', () => {
       .dispose()
       .catch((e: unknown) => e);
     await until(() => w.calls.includes('stop'));
-    expect(w.calls.indexOf('delete:D1')).toBeLessThan(w.calls.indexOf('stop'));
-    expect(String(await disposed)).toMatch(/the debuggee D1 had not ended/);
+    assert.ok(w.calls.indexOf('delete:D1') < w.calls.indexOf('stop'));
+    assert.match(String(await disposed), /the debuggee D1 had not ended/);
     await until(() => w.closed.length === 3);
   });
 
@@ -276,7 +288,7 @@ describe('AmdpSession', () => {
     await first;
     await second;
     await until(() => w.closed.length >= 2);
-    expect(w.calls.filter((c) => c === 'delete:D1')).toHaveLength(1);
+    assert.equal(w.calls.filter((c) => c === 'delete:D1').length, 1);
   });
 
   it('a refused cancel sends no stop: the stop fails naming the refusal, the session stays, and the next stop cancels, waits for the end, then stops', async () => {
@@ -289,21 +301,21 @@ describe('AmdpSession', () => {
       w.calls.push(`refused-delete:${d}`);
       return refusedResponse('busy');
     };
-    await expect(w.session.stop()).rejects.toThrow(/release debuggee D1: busy/);
-    expect(w.calls).not.toContain('stop');
-    expect(w.closed).toHaveLength(0);
-    expect(w.session.holdsState()).toBe(true);
+    await assertRejects(w.session.stop(), /release debuggee D1: busy/);
+    assert.ok(!w.calls.includes('stop'));
+    assert.equal(w.closed.length, 0);
+    assert.equal(w.session.holdsState(), true);
     w.dbg.deleteDebuggee = realDelete;
     const again = w.session.stop();
     await until(() => w.calls.includes('delete:D1'));
-    await jest.advanceTimersByTimeAsync(1000);
-    expect(w.calls).not.toContain('stop'); // waits for the end
+    await advanceTimersByTimeAsync(1000);
+    assert.ok(!w.calls.includes('stop')); // waits for the end
     w.reads[2].resolve(okResponse(END));
     await until(() => w.reads.length === 4);
     w.run.resolve({ ok: false, message: 'cancelled' });
     await until(() => w.calls.includes('stop'));
     await again;
-    expect(w.closed).toHaveLength(3);
+    assert.equal(w.closed.length, 3);
   });
 
   it('a stop with no session, then a start queued right behind it: the new session survives the stop', async () => {
@@ -317,11 +329,11 @@ describe('AmdpSession', () => {
     w.reads[0].resolve(okResponse(SYNCED('Q1')));
     await starting;
     await stopping;
-    await jest.advanceTimersByTimeAsync(10);
-    expect(w.calls).not.toContain('stop');
-    expect(w.closed).toHaveLength(0);
-    expect(w.session.holdsState()).toBe(true);
-    await expect(w.session.wait(0)).resolves.toMatchObject({
+    await advanceTimersByTimeAsync(10);
+    assert.ok(!w.calls.includes('stop'));
+    assert.equal(w.closed.length, 0);
+    assert.equal(w.session.holdsState(), true);
+    assertMatchObject(await w.session.wait(0), {
       state: 'waiting',
     });
   });
@@ -333,11 +345,12 @@ describe('AmdpSession', () => {
     await until(() => w.reads.length === 3);
     const call = new AbortController();
     const stopping = runWithRequestSignal(call.signal, () => w.session.stop());
-    const failed = expect(stopping).rejects.toThrow(
+    const failed = assertRejects(
+      stopping,
       /the debuggee D1 had not ended when the stop was sent/,
     );
     await until(() => w.calls.includes('delete:D1'));
-    expect(w.calls).not.toContain('stop');
+    assert.ok(!w.calls.includes('stop'));
     call.abort();
     await until(() => w.calls.includes('stop'));
     await failed;
@@ -355,15 +368,15 @@ describe('AmdpSession', () => {
     await until(() => w.calls.includes('delete:D1'));
     w.reads[2].resolve(okResponse(END)); // the cancelled debuggee ended
     await until(() => w.calls.includes('stop'));
-    await jest.advanceTimersByTimeAsync(1000);
-    expect(done).toBe(false); // the system has not answered the read yet
-    expect(w.calls.indexOf('delete:D1')).toBeLessThan(w.calls.indexOf('stop'));
+    await advanceTimersByTimeAsync(1000);
+    assert.equal(done, false); // the system has not answered the read yet
+    assert.ok(w.calls.indexOf('delete:D1') < w.calls.indexOf('stop'));
     await until(() => w.reads.length === 4);
     w.reads[3].resolve(okResponse(amdpBreak('D2'))); // a break in the last batch
     await stopping;
-    expect(w.calls).toContain('delete:D2');
-    expect(w.closed).toHaveLength(2);
-    expect(w.session.holdsState()).toBe(false);
+    assert.ok(w.calls.includes('delete:D2'));
+    assert.equal(w.closed.length, 2);
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('a stop the system refused does not wait for the read: it fails at once and is kept for the next stop', async () => {
@@ -373,38 +386,43 @@ describe('AmdpSession', () => {
       w.calls.push('stop');
       return refusedResponse('stop refused');
     };
-    await expect(w.session.stop()).rejects.toThrow(/stop: .*stop refused/);
-    expect(w.session.holdsState()).toBe(true);
+    await assertRejects(w.session.stop(), /stop: .*stop refused/);
+    assert.equal(w.session.holdsState(), true);
     w.dbg.stop = realStop;
     await w.session.stop();
-    expect(w.closed).toHaveLength(2);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(w.closed.length, 2);
+    assert.equal(w.session.holdsState(), false);
   });
 
   // The commands connection spent (the owner's decision), read from the typed
   // verdict alone: the AMDP debug session is gone with its SAP session, and
   // SAP's logoff freed it. Nothing more is sent on it; both connections are
   // dropped without a request, and the stop completes.
-  it.each([
+  for (const [_name, extra] of [
     ['sessionError ADT_NOT_CONNECTED', { sessionError: 'ADT_NOT_CONNECTED' }],
     ['sessionLost', { sessionLost: 'ADT_SESSION_REPLACED' }],
-  ] as const)(
-    'a stop answered %s: the session is dropped, nothing more is sent, the stop completes',
-    async (_name, extra) => {
-      const w = await started();
-      w.dbg.stop = async () => {
-        w.calls.push('stop');
-        return refusedResponse('words that are never read', {
-          origin: 'connection',
-          ...extra,
-        });
-      };
-      await expect(w.session.stop()).resolves.toBeUndefined();
-      expect(w.dropped).toHaveLength(2);
-      expect(w.closed).toHaveLength(0);
-      expect(w.session.holdsState()).toBe(false);
-    },
-  );
+  ] as const) {
+    it(
+      format(
+        'a stop answered %s: the session is dropped, nothing more is sent, the stop completes',
+        _name,
+      ),
+      async () => {
+        const w = await started();
+        w.dbg.stop = async () => {
+          w.calls.push('stop');
+          return refusedResponse('words that are never read', {
+            origin: 'connection',
+            ...extra,
+          });
+        };
+        assert.equal(await w.session.stop(), undefined);
+        assert.equal(w.dropped.length, 2);
+        assert.equal(w.closed.length, 0);
+        assert.equal(w.session.holdsState(), false);
+      },
+    );
+  }
 
   it('a cancel answered with a spent connection: no wait, nothing more is sent, the session is dropped', async () => {
     const w = await started(world(), true);
@@ -421,14 +439,14 @@ describe('AmdpSession', () => {
     const before = w.calls.length;
     const stopped = w.session.stop();
     w.run.resolve({ ok: false, message: 'ended with its session' });
-    await expect(stopped).resolves.toBeUndefined();
+    assert.equal(await stopped, undefined);
     // The spent cancel is the last call on the commands connection: no
     // breakpoint clear, no second cancel, no stop.
     const after = w.calls.slice(before);
-    expect(after).toHaveLength(1);
-    expect(after[0]).toMatch(/^spent-delete:/);
-    expect(w.dropped).toHaveLength(2);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(after.length, 1);
+    assert.match(after[0], /^spent-delete:/);
+    assert.equal(w.dropped.length, 2);
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('a cancel answered with a spent connection while the session is ending: nothing more is sent', async () => {
@@ -447,12 +465,12 @@ describe('AmdpSession', () => {
     const before = w.calls.length;
     const stopped = w.session.stop();
     w.run.resolve({ ok: false, message: 'ended with its session' });
-    await expect(stopped).resolves.toBeUndefined();
+    assert.equal(await stopped, undefined);
     const after = w.calls.slice(before);
-    expect(after).toHaveLength(1);
-    expect(after[0]).toMatch(/^spent-delete:/);
-    expect(w.dropped).toHaveLength(2);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(after.length, 1);
+    assert.match(after[0], /^spent-delete:/);
+    assert.equal(w.dropped.length, 2);
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('a stop refused with ADT_RELEASE_PENDING is no spent connection: it fails and is kept', async () => {
@@ -464,9 +482,9 @@ describe('AmdpSession', () => {
         sessionError: 'ADT_RELEASE_PENDING',
       });
     };
-    await expect(w.session.stop()).rejects.toThrow(/stop: .*pending/);
-    expect(w.dropped).toHaveLength(0);
-    expect(w.session.holdsState()).toBe(true);
+    await assertRejects(w.session.stop(), /stop: .*pending/);
+    assert.equal(w.dropped.length, 0);
+    assert.equal(w.session.holdsState(), true);
   });
 
   it('a read the system never answers holds the stopping call only: a second stop, a dispose and a wait go on', async () => {
@@ -477,24 +495,24 @@ describe('AmdpSession', () => {
       first = true;
     });
     await until(() => w.calls.includes('stop'));
-    await expect(w.session.stop()).resolves.toBeUndefined(); // a retried stop / a dispose
-    expect((await w.session.wait(0)).state).toBe('idle');
-    expect(w.calls.filter((c) => c === 'stop')).toHaveLength(1); // nothing sent twice
-    await jest.advanceTimersByTimeAsync(60_000);
-    expect(first).toBe(false);
-    expect(w.session.pending()).toBe(true);
+    assert.equal(await w.session.stop(), undefined); // a retried stop / a dispose
+    assert.equal((await w.session.wait(0)).state, 'idle');
+    assert.equal(w.calls.filter((c) => c === 'stop').length, 1); // nothing sent twice
+    await advanceTimersByTimeAsync(60_000);
+    assert.equal(first, false);
+    assert.equal(w.session.pending(), true);
     w.reads[1].resolve(okResponse(AMDP_STOPPED));
     await stopping;
-    expect(w.closed).toHaveLength(2);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(w.closed.length, 2);
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('an accepted stop ends with the STOP event the system answers the read with', async () => {
     const w = await started();
     await w.session.stop();
-    expect(w.closed).toHaveLength(2);
-    expect(w.session.holdsState()).toBe(false);
-    expect(w.session.pending()).toBe(false);
+    assert.equal(w.closed.length, 2);
+    assert.equal(w.session.holdsState(), false);
+    assert.equal(w.session.pending(), false);
   });
 
   it('a break that arrives while a step is answered is not lost', async () => {
@@ -508,8 +526,8 @@ describe('AmdpSession', () => {
       return real(...(a as [any, any, any]));
     };
     await w.session.step('continue');
-    await expect(w.session.getTable('LT_ROWS')).resolves.toBeDefined();
-    expect(w.calls).toContain('preview:LT_ROWS:D3'); // D3 is the stopped debuggee
+    assert.notEqual(await w.session.getTable('LT_ROWS'), undefined);
+    assert.ok(w.calls.includes('preview:LT_ROWS:D3')); // D3 is the stopped debuggee
   });
 
   it('a wait does not take the sync confirmation away from the start', async () => {
@@ -519,21 +537,23 @@ describe('AmdpSession', () => {
       breakpoints: [{ class_name: 'ZCL_A', line: 14 }],
     });
     await until(() => w.reads.length === 1);
-    const waiting = w.session.wait(30);
+    // Settled by the wait's 30 s, a fake timer: tracked, not awaited.
+    const waiting = track(w.session.wait(30));
     w.reads[0].resolve(okResponse(SYNCED('Q1')));
-    await expect(s).resolves.toMatchObject({
+    assertMatchObject(await s, {
       breakpoints: [{ state: 'PENDING' }, { state: 'PENDING' }],
     });
-    await jest.advanceTimersByTimeAsync(30_000);
-    expect((await waiting).state).toBe('waiting');
+    await advanceTimersByTimeAsync(30_000);
+    assert.ok(waiting.settled);
+    assert.equal(waiting.value.state, 'waiting');
   });
 
   it('a failed event read fails the next wait once, closes the session, and allows a new start', async () => {
     const w = await started();
     w.reads[1].resolve(refusedResponse('session gone'));
     await until(() => w.closed.length === 2);
-    await expect(w.session.wait(0)).rejects.toThrow(/session gone/);
-    expect((await w.session.wait(0)).state).toBe('idle');
+    await assertRejects(w.session.wait(0), /session gone/);
+    assert.equal((await w.session.wait(0)).state, 'idle');
     const before = w.reads.length;
     const expected = w.nextSync(); // ask the fake, never count by hand
     const s = w.session.start({
@@ -542,7 +562,7 @@ describe('AmdpSession', () => {
     });
     await until(() => w.reads.length === before + 1);
     w.reads[before].resolve(okResponse(SYNCED(expected)));
-    await expect(s).resolves.toMatchObject({
+    assertMatchObject(await s, {
       mainId: AMDP_MAIN_ID,
     });
   });
@@ -556,16 +576,20 @@ describe('AmdpSession', () => {
       refusedClears++;
       return refusedResponse('clear refused');
     };
-    await expect(w.session.stop()).rejects.toThrow(/clear refused/);
-    expect(w.calls).toContain('stop');
+    await assertRejects(w.session.stop(), /clear refused/);
+    assert.ok(w.calls.includes('stop'));
     // The stop was accepted: the last batch closes both, the clear not sent again.
     await until(() => w.closed.length === 2);
     await until(() => !w.session.pending());
-    expect(refusedClears).toBe(1);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(refusedClears, 1);
+    // The clear's failure is let go a turn after the close: with nextTick and
+    // queueMicrotask real (node:test cannot fake them, spec §3.7) it is
+    // still held when the close is seen.
+    // What is proven: the session comes to hold nothing, within until's bound.
+    await until(() => !w.session.holdsState());
     await w.session.stop();
-    expect(refusedClears).toBe(1);
-    expect(w.closed).toHaveLength(2);
+    assert.equal(refusedClears, 1);
+    assert.equal(w.closed.length, 2);
   });
 
   it('a breakpoint clear that fails before a refused stop keeps both connections, and the next stop retries both', async () => {
@@ -575,14 +599,14 @@ describe('AmdpSession', () => {
     w.dbg.syncBreakpoints = async (m: string, b: any[]) =>
       b.length ? realSync(m, b) : refusedResponse('clear refused');
     w.dbg.stop = async () => refusedResponse('not stopped');
-    await expect(w.session.stop()).rejects.toThrow(/clear refused/);
-    expect(w.closed).toHaveLength(0);
-    expect(w.session.holdsState()).toBe(true);
+    await assertRejects(w.session.stop(), /clear refused/);
+    assert.equal(w.closed.length, 0);
+    assert.equal(w.session.holdsState(), true);
     w.dbg.syncBreakpoints = realSync;
     w.dbg.stop = realStop;
     await w.session.stop();
-    expect(w.session.holdsState()).toBe(false);
-    expect(w.closed).toHaveLength(2);
+    assert.equal(w.session.holdsState(), false);
+    assert.equal(w.closed.length, 2);
   });
 
   it('a release that fails in the last batch is retried by the next stop', async () => {
@@ -597,18 +621,18 @@ describe('AmdpSession', () => {
       return refusedResponse('busy');
     };
     w.reads[1].resolve(okResponse(BREAK)); // the last batch carries a break
-    await expect(stopping).rejects.toThrow(/release debuggee D1: busy/);
-    expect(refusedDeletes).toBe(1);
-    expect(w.session.pending()).toBe(false);
-    expect(w.session.failures()).toEqual([
+    await assertRejects(stopping, /release debuggee D1: busy/);
+    assert.equal(refusedDeletes, 1);
+    assert.equal(w.session.pending(), false);
+    assert.deepStrictEqual(w.session.failures(), [
       { message: 'busy', origin: 'refusal', step: 'release debuggee D1' },
     ]);
-    expect(w.closed).toHaveLength(0);
+    assert.equal(w.closed.length, 0);
     w.dbg.deleteDebuggee = realDelete;
     await w.session.stop();
-    expect(w.calls).toContain('delete:D1');
-    expect(w.session.holdsState()).toBe(false);
-    expect(w.closed).toHaveLength(2);
+    assert.ok(w.calls.includes('delete:D1'));
+    assert.equal(w.session.holdsState(), false);
+    assert.equal(w.closed.length, 2);
   });
 
   it('a stop returns only after the last batch released its break and recorded the outcome, whatever else wakes it meanwhile', async () => {
@@ -629,21 +653,19 @@ describe('AmdpSession', () => {
     w.reads[1].resolve(okResponse(BREAK)); // the last batch carries a break
     await until(() => w.calls.includes('delete:D1'));
     w.run.resolve({ ok: true, output: 'late' }); // a run ending now wakes the waiters
-    await jest.advanceTimersByTimeAsync(0);
-    await jest.advanceTimersByTimeAsync(0);
-    expect(settled).toBe(false); // the release is still unanswered
+    await advanceTimersByTimeAsync(0);
+    await advanceTimersByTimeAsync(0);
+    assert.equal(settled, false); // the release is still unanswered
     release.resolve(refusedResponse('release failed'));
-    await expect(stopping).rejects.toThrow(
-      /release debuggee D1: release failed/,
-    );
-    expect(w.session.failures()).toEqual([
+    await assertRejects(stopping, /release debuggee D1: release failed/);
+    assert.deepStrictEqual(w.session.failures(), [
       {
         message: 'release failed',
         origin: 'refusal',
         step: 'release debuggee D1',
       },
     ]);
-    expect(w.session.holdsState()).toBe(true);
+    assert.equal(w.session.holdsState(), true);
   });
 
   it('a second stop while the first waits does not erase what the last batch could not undo', async () => {
@@ -652,14 +674,14 @@ describe('AmdpSession', () => {
     const first = w.session.stop();
     first.catch(() => undefined);
     await until(() => w.calls.includes('stop'));
-    await expect(w.session.stop()).resolves.toBeUndefined(); // nothing failed yet
+    assert.equal(await w.session.stop(), undefined); // nothing failed yet
     w.dbg.deleteDebuggee = async () => refusedResponse('busy');
     w.reads[1].resolve(okResponse(BREAK));
-    await expect(first).rejects.toThrow(/release debuggee D1: busy/);
-    expect(w.session.failures()).toEqual([
+    await assertRejects(first, /release debuggee D1: busy/);
+    assert.deepStrictEqual(w.session.failures(), [
       { message: 'busy', origin: 'refusal', step: 'release debuggee D1' },
     ]);
-    expect(w.session.holdsState()).toBe(true);
+    assert.equal(w.session.holdsState(), true);
   });
 
   it('a start that fails before the session is recorded closes what it opened', async () => {
@@ -677,22 +699,22 @@ describe('AmdpSession', () => {
         w.dbg.start = async () => {
           throw new Error('socket hang up');
         };
-      await expect(
+      await assertRejects(
         w.session.start({
           stopExisting: true,
           breakpoints: [{ class_name: 'ZCL_A', line: 14 }],
         }),
-      ).rejects.toThrow();
-      expect(w.closed).toHaveLength(failure === 'second open' ? 1 : 2);
-      expect(w.session.holdsState()).toBe(false);
+      );
+      assert.equal(w.closed.length, failure === 'second open' ? 1 : 2);
+      assert.equal(w.session.holdsState(), false);
     }
   });
 
   it('a cleanup that fails is reported', async () => {
     const w = await started();
     w.dbg.stop = async () => refusedResponse('not stopped');
-    await expect(w.session.stop()).rejects.toThrow(DebugCleanupError);
-    expect(w.session.holdsState()).toBe(true); // kept for a retry
+    await assertRejects(w.session.stop(), DebugCleanupError);
+    assert.equal(w.session.holdsState(), true); // kept for a retry
   });
 
   // --- beyond the brief: the lessons of the ABAP sibling ----------------------
@@ -709,16 +731,15 @@ describe('AmdpSession', () => {
       if (refuse && (c as any).n === 0) throw new Error('logoff failed');
       return realClose(c);
     };
-    await expect(
+    await assertRejects(
       w.session.start({ stopExisting: true, breakpoints: [] }),
-    ).rejects.toThrow(
       /socket hang up; not undone: close the events' connection: logoff failed/,
     );
-    expect(w.session.holdsState()).toBe(true);
+    assert.equal(w.session.holdsState(), true);
     refuse = false;
     await w.session.stop();
-    expect(w.session.holdsState()).toBe(false);
-    expect(w.closed).toHaveLength(2);
+    assert.equal(w.session.holdsState(), false);
+    assert.equal(w.closed.length, 2);
   });
 
   it('a start whose sync is refused after the session is recorded rolls the session back', async () => {
@@ -727,18 +748,19 @@ describe('AmdpSession', () => {
       b.length
         ? refusedResponse('bad uri')
         : okResponse({ headers: { location: 'C' } });
-    await expect(
+    await assertRejects(
       w.session.start({
         stopExisting: true,
         breakpoints: [{ class_name: 'ZCL_A', line: 14 }],
         run: { kind: 'class', name: 'ZCL_A' },
       }),
-    ).rejects.toThrow(/bad uri/);
-    expect(w.calls).toContain('stop');
-    expect(w.calls).not.toContain('run');
+      /bad uri/,
+    );
+    assert.ok(w.calls.includes('stop'));
+    assert.ok(!w.calls.includes('run'));
     // The accepted stop ended the open read (STOP), and that last batch closed both sessions.
     await until(() => w.closed.length === 2);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('a sync never confirmed fails within WAIT_MAX_SECONDS and runs nothing', async () => {
@@ -748,11 +770,13 @@ describe('AmdpSession', () => {
       breakpoints: [{ class_name: 'ZCL_A', line: 14 }],
       run: { kind: 'class', name: 'ZCL_A' },
     });
-    const failed = expect(s).rejects.toThrow(/did not confirm them/);
+    // Refused by the confirmation's 30 s bound, a fake timer: tracked.
+    const failed = track(assertRejects(s, /did not confirm them/));
     await until(() => w.reads.length === 1);
-    await jest.advanceTimersByTimeAsync(30_000);
-    await failed;
-    expect(w.calls).not.toContain('run');
+    await advanceTimersByTimeAsync(30_000);
+    assert.ok(failed.settled);
+    assert.ok(failed.value instanceof Error);
+    assert.ok(!w.calls.includes('run'));
   });
 
   it('a failed event read while a sync waits fails the start at once, and is not reported twice', async () => {
@@ -761,13 +785,13 @@ describe('AmdpSession', () => {
       stopExisting: true,
       breakpoints: [{ class_name: 'ZCL_A', line: 14 }],
     });
-    const failed = expect(s).rejects.toThrow(/session gone/);
+    const failed = assertRejects(s, /session gone/);
     await until(() => w.reads.length === 1);
     w.reads[0].resolve(refusedResponse('session gone'));
     await failed;
     await until(() => w.closed.length === 2);
-    expect((await w.session.wait(0)).state).toBe('idle');
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal((await w.session.wait(0)).state, 'idle');
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('a close that throws in the last batch is no unhandled rejection: it is owed to the next stop', async () => {
@@ -779,9 +803,9 @@ describe('AmdpSession', () => {
       if (refuse) throw new Error('logoff failed');
       return realClose(c);
     };
-    await expect(w.session.stop()).rejects.toThrow(/logoff failed/);
-    expect(w.session.pending()).toBe(false);
-    expect(w.session.failures()).toEqual([
+    await assertRejects(w.session.stop(), /logoff failed/);
+    assert.equal(w.session.pending(), false);
+    assert.deepStrictEqual(w.session.failures(), [
       {
         error: 'client_threw',
         message: 'logoff failed',
@@ -793,11 +817,11 @@ describe('AmdpSession', () => {
         step: "close the commands' connection",
       },
     ]);
-    expect(w.session.holdsState()).toBe(true);
+    assert.equal(w.session.holdsState(), true);
     refuse = false;
     await w.session.stop();
-    expect(w.closed).toHaveLength(2);
-    expect(w.session.holdsState()).toBe(false);
+    assert.equal(w.closed.length, 2);
+    assert.equal(w.session.holdsState(), false);
   });
 
   it("a run's outcome arrives through wait; after a stop it changes nothing", async () => {
@@ -805,7 +829,7 @@ describe('AmdpSession', () => {
     await until(() => w.calls.includes('run'));
     w.run.resolve({ ok: true, output: 'done' });
     await until(() => w.closed.length === 1);
-    await expect(w.session.wait(0)).resolves.toEqual({
+    assert.deepStrictEqual(await w.session.wait(0), {
       state: 'ended',
       reason: 'run_finished',
       run: { ok: true, output: 'done' },
@@ -818,8 +842,8 @@ describe('AmdpSession', () => {
     await until(() => !v.session.pending());
     v.run.resolve({ ok: true, output: 'late' });
     await until(() => v.closed.length === 3);
-    expect(v.session.holdsState()).toBe(false);
-    expect((await v.session.wait(0)).state).toBe('idle');
+    assert.equal(v.session.holdsState(), false);
+    assert.equal((await v.session.wait(0)).state, 'idle');
   });
 
   it('an event read that throws outside its answer ends the session like a failed read', async () => {
@@ -829,10 +853,10 @@ describe('AmdpSession', () => {
     };
     w.reads[1].resolve(okResponse('')); // the loop asks again, and the ask throws
     await until(() => w.closed.length === 2);
-    expect(w.calls).toContain('stop');
-    await expect(w.session.wait(0)).rejects.toThrow(/socket closed/);
-    expect((await w.session.wait(0)).state).toBe('idle');
-    expect(w.session.holdsState()).toBe(false);
+    assert.ok(w.calls.includes('stop'));
+    await assertRejects(w.session.wait(0), /socket closed/);
+    assert.equal((await w.session.wait(0)).state, 'idle');
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('an event read that throws outside its answer carries the throw as an entry with the step read events', async () => {
@@ -846,7 +870,7 @@ describe('AmdpSession', () => {
       () => undefined,
       (e: unknown) => e,
     );
-    expect(payloadCarriedBy(thrown)).toEqual({
+    assert.deepStrictEqual(payloadCarriedBy(thrown), {
       error: 'client_threw',
       message: 'socket closed',
       step: 'read events',
@@ -861,7 +885,7 @@ describe('AmdpSession', () => {
       () => undefined,
       (e: unknown) => e,
     );
-    expect(payloadCarriedBy(thrown)).toEqual({
+    assert.deepStrictEqual(payloadCarriedBy(thrown), {
       error: 'client_threw',
       message: 'socket reset',
       step: 'read events',
@@ -884,13 +908,13 @@ describe('AmdpSession', () => {
     await until(() => n === 2);
     runs[0].resolve({ ok: true, output: 'first' });
     await until(() => w.closed.length === 1);
-    await expect(w.session.wait(0)).resolves.toMatchObject({
+    assertMatchObject(await w.session.wait(0), {
       state: 'ended',
       run: { output: 'first' },
     });
     runs[1].resolve({ ok: true, output: 'second' });
     await until(() => w.closed.length === 2);
-    await expect(w.session.wait(0)).resolves.toMatchObject({
+    assertMatchObject(await w.session.wait(0), {
       state: 'ended',
       run: { output: 'second' },
     });
@@ -901,7 +925,7 @@ describe('AmdpSession', () => {
     runs[2].resolve({ ok: true, output: 'third' }); // the fourth run stays in flight
     await until(() => w.closed.length === 3);
     await w.session.stop();
-    expect(w.closed).toContainEqual({ n: 5 }); // the fourth run's connection, still tracked
+    assert.ok(w.closed.some((e) => isDeepStrictEqual(e, { n: 5 }))); // the fourth run's connection, still tracked
   });
 
   it('a read failure whose cleanup fails names what it could not undo', async () => {
@@ -909,11 +933,12 @@ describe('AmdpSession', () => {
     w.dbg.stop = async () => refusedResponse('not stopped');
     w.reads[1].resolve(refusedResponse('session gone'));
     await until(() => w.session.failures().length > 0); // retired, the stop still owed
-    expect(w.session.pending()).toBe(false);
-    await expect(w.session.wait(0)).rejects.toThrow(
+    assert.equal(w.session.pending(), false);
+    await assertRejects(
+      w.session.wait(0),
       /session gone; not undone: stop: not stopped/,
     );
-    expect(w.session.failures()).toEqual([
+    assert.deepStrictEqual(w.session.failures(), [
       { message: 'not stopped', origin: 'refusal', step: 'stop' },
     ]);
   });
@@ -930,28 +955,28 @@ describe('AmdpSession', () => {
     w.dbg.deleteDebuggee = async () => refusedResponse('busy');
     w.reads[2].resolve(refusedResponse('session gone')); // retired with D1 at its break
     await until(() => w.session.failures().length > 0);
-    await expect(w.session.wait(0)).rejects.toThrow(/session gone/);
-    await expect(w.session.stop()).rejects.toThrow(/release debuggee D1: busy/);
-    expect(w.closed).not.toContainEqual(runConnection);
-    expect(w.session.holdsState()).toBe(true);
+    await assertRejects(w.session.wait(0), /session gone/);
+    await assertRejects(w.session.stop(), /release debuggee D1: busy/);
+    assert.ok(!w.closed.some((e) => isDeepStrictEqual(e, runConnection)));
+    assert.equal(w.session.holdsState(), true);
     w.dbg.deleteDebuggee = async (m: string, d: string) => {
       const answer = await realDelete(m, d);
-      expect(w.closed).not.toContainEqual(runConnection); // released first
+      assert.ok(!w.closed.some((e) => isDeepStrictEqual(e, runConnection))); // released first
       return answer;
     };
     await w.session.stop();
-    expect(w.calls).toContain('delete:D1');
-    expect(w.closed).toContainEqual(runConnection);
-    expect(w.session.holdsState()).toBe(false);
+    assert.ok(w.calls.includes('delete:D1'));
+    assert.ok(w.closed.some((e) => isDeepStrictEqual(e, runConnection)));
+    assert.equal(w.session.holdsState(), false);
   });
 
   it('observers hear of changes the read loop makes', async () => {
     const w = await started();
-    const heard = jest.fn();
+    const heard = mock.fn();
     w.session.observe(heard);
     w.reads[1].resolve(okResponse(BREAK));
     await until(() => heard.mock.calls.length > 0);
-    expect(await w.session.wait(0)).toMatchObject({ state: 'event' });
+    assertMatchObject(await w.session.wait(0), { state: 'event' });
   });
 
   it('a breakpoint clear the credential refused (AuthRefusedError): the stop is not sent, the refusal is the answer with its step, the stop named not attempted', async () => {
@@ -972,14 +997,14 @@ describe('AmdpSession', () => {
       () => undefined,
       (e: unknown) => e,
     );
-    expect(error).toBeInstanceOf(DebugCleanupError);
-    expect(w.calls).not.toContain('stop');
+    assert.ok(error instanceof DebugCleanupError);
+    assert.ok(!w.calls.includes('stop'));
     const payload = JSON.parse((return_error(error) as any).content[0].text);
-    expect(payload).toMatchObject({
+    assertMatchObject(payload, {
       error: 'authentication_failed',
       step: 'clear breakpoints',
       not_attempted: { steps: ['stop'] },
     });
-    expect(w.session.holdsState()).toBe(true);
+    assert.equal(w.session.holdsState(), true);
   });
 });

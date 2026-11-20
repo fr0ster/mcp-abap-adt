@@ -4,9 +4,12 @@
  * with the step `unlock`, in `cleanup` — after a successful and a failed write.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { handleUpdatePackage } from '../../handlers/package/high/handleUpdatePackage';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
 import { silentLogger } from '../helpers/lowToCompact';
 import { recordingConnection } from '../helpers/recordingConnection';
 
@@ -30,13 +33,13 @@ describe('UpdatePackage over the wire, its unlock refused with a 403', () => {
   const forbidden = { status: 403, statusText: 'Forbidden', data: DOCUMENT };
 
   const expectUnlockEntry = (payload: any) => {
-    expect(payload.cleanup.failures).toHaveLength(1);
-    expect(payload.cleanup.failures[0]).toMatchObject({
+    assert.equal(payload.cleanup.failures.length, 1);
+    assertMatchObject(payload.cleanup.failures[0], {
       step: 'unlock',
       status: 403,
       raw_body: DOCUMENT,
     });
-    expect(payload.cleanup.failures[0].adt_type).toEqual(expect.any(String));
+    assert.equal(typeof payload.cleanup.failures[0].adt_type, 'string');
   };
 
   it('after a successful write', async () => {
@@ -50,7 +53,7 @@ describe('UpdatePackage over the wire, its unlock refused with a 403', () => {
       package_name: 'pkg_a',
       description: 'New text',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     expectUnlockEntry(payloadOf(result));
   });
 
@@ -65,9 +68,9 @@ describe('UpdatePackage over the wire, its unlock refused with a 403', () => {
       package_name: 'pkg_a',
       description: 'New text',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = payloadOf(result);
-    expect(payload.step).toBe('update metadata');
+    assert.equal(payload.step, 'update metadata');
     expectUnlockEntry(payload);
   });
 });

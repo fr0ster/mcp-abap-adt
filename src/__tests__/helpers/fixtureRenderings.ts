@@ -5,7 +5,7 @@
  * and `stdio-sse-surface.json` (`transportSurface.test.ts`). Those tests
  * and the byte test (`unit/toolSet/fixtureBytes.test.ts`) read them from
  * here, so the bytes a fixture is compared with are the bytes its writer
- * writes. Reaches no Jest global: the node:test build compiles it.
+ * writes.
  */
 
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';

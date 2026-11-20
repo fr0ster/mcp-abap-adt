@@ -76,7 +76,5 @@ Thumbs.db
 sk.json
 smithery.yaml
 # .npmrc stays: legacy-peer-deps and install-strategy shape the install
-jest.config.js
-jest.setup.js
 # tsconfig.json is needed for build, so don't ignore it
 # src/ is needed for build, so don't ignore it (tests are excluded via __tests__/)

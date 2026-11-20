@@ -1,5 +1,12 @@
-import { parseSqlPreview } from '../../lib/strategies/sqlPreview';
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import { handleGetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery';
+import { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents';
+import * as clients from '../../lib/clients';
+import { parseSqlPreview, sqlPreview } from '../../lib/strategies/sqlPreview';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject } from '../helpers/assertions';
+import { okResponse } from '../helpers/fakeClient';
 
 /**
  * The reading behind `GetSqlQuery` and `GetTableContents`, against the
@@ -25,10 +32,10 @@ describe('a data preview, read from the captured document', () => {
   const preview = parseSqlPreview(PREVIEW);
 
   it('reads every column and every row', () => {
-    expect(preview.columns).toHaveLength(13);
-    expect(preview.rows).toHaveLength(5);
-    expect(preview.total_rows).toBe(249);
-    expect(preview.columns[0]).toEqual({
+    assert.equal(preview.columns.length, 13);
+    assert.equal(preview.rows.length, 5);
+    assert.equal(preview.total_rows, 249);
+    assert.deepStrictEqual(preview.columns[0], {
       name: 'COUNTRY',
       type: 'C',
       description: 'COUNTRY',
@@ -42,23 +49,20 @@ describe('a data preview, read from the captured document', () => {
    * values of `AF`.
    */
   it('keeps each value on its own row, across a blank cell', () => {
-    expect(preview.rows[0]).toMatchObject({
+    assertMatchObject(preview.rows[0], {
       COUNTRY: 'AD',
       COUNTRYTHREELETTERISOCODE: 'AND',
       COUNTRYTHREEDIGITISOCODE: '020',
       COUNTRYISOCODE: 'AD',
       ISEUROPEANUNIONMEMBER: null,
     });
-    expect(preview.rows.map((row) => row.COUNTRY)).toEqual([
-      'AD',
-      'AE',
-      'AF',
-      'AG',
-      'AI',
-    ]);
+    assert.deepStrictEqual(
+      preview.rows.map((row) => row.COUNTRY),
+      ['AD', 'AE', 'AF', 'AG', 'AI'],
+    );
     // Every row carries every column, blank or not: 5 × 13 with none missing.
     for (const row of preview.rows) {
-      expect(Object.keys(row)).toHaveLength(13);
+      assert.equal(Object.keys(row).length, 13);
     }
   });
 
@@ -70,14 +74,19 @@ describe('a data preview, read from the captured document', () => {
    * `isHanaAnalyticalView` and still dropped the column attributes.
    */
   it('carries the whole document, not a chosen few of its fields', () => {
-    expect(preview.execution_time).toBeCloseTo(0.316, 3);
+    assert.ok(
+      preview.execution_time !== undefined &&
+        Math.abs(preview.execution_time - 0.316) < 10 ** -3 / 2,
+    );
 
     const document = preview.document as any;
     const table = document['dataPreview:tableData'];
-    expect(table['dataPreview:executedQueryString']).toContain(
-      'SELECT * FROM I_COUNTRY',
+    assert.ok(
+      table['dataPreview:executedQueryString'].includes(
+        'SELECT * FROM I_COUNTRY',
+      ),
     );
-    expect(table['dataPreview:isHanaAnalyticalView']).toBe('false');
+    assert.equal(table['dataPreview:isHanaAnalyticalView'], 'false');
 
     // The column attributes the shaped reading has no use for, and which a
     // hand-picked `full` left behind.
@@ -87,7 +96,7 @@ describe('a data preview, read from the captured document', () => {
       'dataPreview:colType',
       'dataPreview:isKeyFigure',
     ]) {
-      expect(metadata).toContain(attribute);
+      assert.ok(metadata.includes(attribute));
     }
   });
 
@@ -95,12 +104,13 @@ describe('a data preview, read from the captured document', () => {
     const blanks = preview.rows.flatMap((row) =>
       Object.values(row).filter((value) => value === null),
     );
-    expect(blanks).toHaveLength(14);
-    expect(
+    assert.equal(blanks.length, 14);
+    assert.deepStrictEqual(
       preview.rows.flatMap((row) =>
         Object.values(row).filter((value) => value === ''),
       ),
-    ).toEqual([]);
+      [],
+    );
   });
 });
 
@@ -117,7 +127,7 @@ describe('what the regular expression got wrong, one case each', () => {
         '<dataPreview:columns><dataPreview:metadata dataPreview:name="C1" dataPreview:type="C" dataPreview:description="C1"/><dataPreview:dataSet><dataPreview:data>one</dataPreview:data><dataPreview:data>two</dataPreview:data></dataPreview:dataSet></dataPreview:columns>',
       ),
     );
-    expect(preview.rows).toEqual([{ C1: 'one' }, { C1: 'two' }]);
+    assert.deepStrictEqual(preview.rows, [{ C1: 'one' }, { C1: 'two' }]);
   });
 
   it('decodes what the document escaped', () => {
@@ -128,7 +138,7 @@ describe('what the regular expression got wrong, one case each', () => {
         '<dataPreview:columns><dataPreview:metadata dataPreview:name="C1" dataPreview:type="C" dataPreview:description="C1"/><dataPreview:dataSet><dataPreview:data>A &amp; B</dataPreview:data><dataPreview:data>&lt;tag&gt;</dataPreview:data></dataPreview:dataSet></dataPreview:columns>',
       ),
     );
-    expect(preview.rows).toEqual([{ C1: 'A & B' }, { C1: '<tag>' }]);
+    assert.deepStrictEqual(preview.rows, [{ C1: 'A & B' }, { C1: '<tag>' }]);
   });
 
   it('pads a short column instead of shortening the rows after it', () => {
@@ -140,7 +150,7 @@ describe('what the regular expression got wrong, one case each', () => {
           '<dataPreview:columns><dataPreview:metadata dataPreview:name="C2" dataPreview:type="C" dataPreview:description="C2"/><dataPreview:dataSet><dataPreview:data>x</dataPreview:data></dataPreview:dataSet></dataPreview:columns>',
       ),
     );
-    expect(preview.rows).toEqual([
+    assert.deepStrictEqual(preview.rows, [
       { C1: 'a', C2: 'x' },
       { C1: 'b', C2: null },
     ]);
@@ -151,9 +161,9 @@ describe('what the regular expression got wrong, one case each', () => {
     // promises the parse of whatever came back, including the answer that
     // explains why there are no rows in it.
     const nothing = parseSqlPreview('<other:thing/>');
-    expect(nothing.columns).toEqual([]);
-    expect(nothing.rows).toEqual([]);
-    expect(nothing.document).toEqual({ 'other:thing': '' });
+    assert.deepStrictEqual(nothing.columns, []);
+    assert.deepStrictEqual(nothing.rows, []);
+    assert.deepStrictEqual(nothing.document, { 'other:thing': '' });
   });
 });
 
@@ -163,20 +173,16 @@ describe('what the regular expression got wrong, one case each', () => {
  */
 describe('detail over a data preview', () => {
   let fakeClient: any;
-  jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
-
-  const {
-    handleGetSqlQuery,
-  } = require('../../handlers/system/readonly/handleGetSqlQuery');
-  const { okResponse } = require('../helpers/fakeClient');
-  const { sqlPreview } = require('../../lib/strategies/sqlPreview');
+  // The client swapped on the module that defines createAdtClient: the
+  // handler reads it at call time.
+  mock.method(clients, 'createAdtClient', () => fakeClient);
 
   const context = { connection: {} as any, logger: undefined };
-  const answerOf = async (detail?: string) => {
+  const answerOf = async (detail?: 'terse' | 'full' | 'raw') => {
     fakeClient = {
       getUtils: () => ({
         getSqlQuery: async () =>
-          okResponse(sqlPreview({ data: PREVIEW, status: 200 })),
+          okResponse(sqlPreview({ data: PREVIEW, status: 200 } as any)),
       }),
     };
     const result: any = await handleGetSqlQuery(context as any, {
@@ -196,49 +202,54 @@ describe('detail over a data preview', () => {
 
   it('answers the acting fields on terse', async () => {
     const terse = await answerOf();
-    expect(terse.rows).toHaveLength(5);
-    expect(terse.document).toBeUndefined();
+    assert.equal(terse.rows.length, 5);
+    assert.equal(terse.document, undefined);
   });
 
   it('answers the whole parse on full', async () => {
     const full = await answerOf('full');
-    expect(full.rows).toHaveLength(5);
+    assert.equal(full.rows.length, 5);
     const table = full.document['dataPreview:tableData'];
-    expect(table['dataPreview:executedQueryString']).toContain(
-      'SELECT * FROM I_COUNTRY',
+    assert.ok(
+      table['dataPreview:executedQueryString'].includes(
+        'SELECT * FROM I_COUNTRY',
+      ),
     );
-    expect(JSON.stringify(table['dataPreview:columns'])).toContain(
-      'dataPreview:isKeyFigure',
+    assert.ok(
+      JSON.stringify(table['dataPreview:columns']).includes(
+        'dataPreview:isKeyFigure',
+      ),
     );
   });
 
   it('answers the document on raw', async () => {
-    expect(String(await answerOf('raw'))).toContain('<dataPreview:tableData');
+    assert.ok(String(await answerOf('raw')).includes('<dataPreview:tableData'));
   });
 
   // `GetTableContents` reads the same freestyle document: the rows it asked
   // for and the table's own count, not `/datapreview/ddic`'s N+1 rows and 0.
   it('GetTableContents answers the freestyle preview: its rows and its total', async () => {
-    const {
-      handleGetTableContents,
-    } = require('../../handlers/table/readonly/handleGetTableContents');
     fakeClient = {
       getUtils: () => ({
         getSqlQuery: async () =>
-          okResponse(sqlPreview({ data: PREVIEW, status: 200 })),
+          okResponse(sqlPreview({ data: PREVIEW, status: 200 } as any)),
       }),
     };
-    const result: any = await handleGetTableContents(context as any, {
-      table_name: 'I_Country',
-      max_rows: 5,
-    });
+    // The raw arguments, untyped.
+    const result: any = await handleGetTableContents(
+      context as any,
+      {
+        table_name: 'I_Country',
+        max_rows: 5,
+      } as never,
+    );
     const terse = JSON.parse(String(result.content[0].text));
-    expect(terse).toMatchObject({
+    assertMatchObject(terse, {
       sql_query: 'SELECT * FROM I_Country',
       row_number: 5,
       total_rows: 249,
     });
-    expect(terse.rows).toHaveLength(5);
-    expect(terse.columns).toHaveLength(13);
+    assert.equal(terse.rows.length, 5);
+    assert.equal(terse.columns.length, 13);
   });
 });

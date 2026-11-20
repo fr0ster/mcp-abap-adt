@@ -8,8 +8,12 @@
  * refusal leaves the composed URL. `serviceBindingPreviewUrl.test.ts` covers
  * the composition with a client double.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
+import { assertMatchObject } from '../helpers/assertions';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -72,7 +76,7 @@ function systemAnswering(serviceGroup: () => Promise<string>) {
   const connection = {
     getBaseUrl: async () => 'https://system.example.test:44300/',
     getSessionId: () => null,
-    makeAdtRequest: jest.fn(async (request: Sent) => {
+    makeAdtRequest: mock.fn(async (request: Sent) => {
       sent.push(request);
       const ok = (data: string) => ({
         status: 200,
@@ -109,18 +113,20 @@ describe('GetServiceBindingPreviewUrl: the service-URL lookup on the wire', () =
     const answered = await run(connection);
 
     const lookups = lookupOf(sent);
-    expect(lookups).toHaveLength(1);
-    expect(lookups[0].method).toBe('GET');
-    expect(lookups[0].url).toBe(SERVICE_GROUP);
-    expect(lookups[0].params).toBeUndefined();
-    expect(lookups[0].headers?.Accept).toBe(
+    assert.equal(lookups.length, 1);
+    assert.equal(lookups[0].method, 'GET');
+    assert.equal(lookups[0].url, SERVICE_GROUP);
+    assert.equal(lookups[0].params, undefined);
+    assert.equal(
+      lookups[0].headers?.Accept,
       'application/vnd.sap.adt.businessservices.odatav2.v1+xml, application/vnd.sap.adt.businessservices.odatav2.v2+xml',
     );
 
-    expect(answered.isError).toBe(false);
+    assert.equal(answered.isError, false);
     const payload = JSON.parse(answered.content[0].text);
-    expect(payload.service_url_source).toBe('system');
-    expect(payload.service_url).toBe(
+    assert.equal(payload.service_url_source, 'system');
+    assert.equal(
+      payload.service_url,
       'https://system.example.test:44300/sap/opu/odata/sap/ELSEWHERE/',
     );
   });
@@ -128,7 +134,7 @@ describe('GetServiceBindingPreviewUrl: the service-URL lookup on the wire', () =
   it('an empty service list leaves the composed URL', async () => {
     const { connection } = systemAnswering(async () => '');
     const payload = JSON.parse((await run(connection)).content[0].text);
-    expect(payload.service_url_source).toBe('composed');
+    assert.equal(payload.service_url_source, 'composed');
   });
 
   it("a 401 SAP answered ends the call with the lookup's error and step", async () => {
@@ -138,8 +144,8 @@ describe('GetServiceBindingPreviewUrl: the service-URL lookup on the wire', () =
 
     const answered = await run(connection);
 
-    expect(answered.isError).toBe(true);
-    expect(JSON.parse(answered.content[0].text)).toMatchObject({
+    assert.equal(answered.isError, true);
+    assertMatchObject(JSON.parse(answered.content[0].text), {
       status: 401,
       step: 'read service URL',
       request: { method: 'GET', url: SERVICE_GROUP },
@@ -153,8 +159,9 @@ describe('GetServiceBindingPreviewUrl: the service-URL lookup on the wire', () =
 
     const answered = await run(connection);
 
-    expect(answered.isError).toBe(false);
-    expect(JSON.parse(answered.content[0].text).service_url_source).toBe(
+    assert.equal(answered.isError, false);
+    assert.equal(
+      JSON.parse(answered.content[0].text).service_url_source,
       'composed',
     );
   });

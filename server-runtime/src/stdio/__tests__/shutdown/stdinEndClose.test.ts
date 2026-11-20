@@ -5,6 +5,8 @@
  * forces.
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import { deferred, setup, turns } from './harness';
 
 it('end then close is one start: the held write lands, exit 0', async () => {
@@ -13,12 +15,12 @@ it('end then close is one start: the held write lands, exit 0', async () => {
   s.processLike.stdin.emit('end');
   s.processLike.stdin.emit('close');
   await turns();
-  expect(s.order.filter((o) => o === 'begin')).toHaveLength(1);
-  expect(s.exits).toEqual([]);
+  assert.equal(s.order.filter((o) => o === 'begin').length, 1);
+  assert.deepStrictEqual(s.exits, []);
   write.resolve({ notStored: [] });
   await turns();
-  expect(s.exits).toEqual([0]);
-  expect(s.stderr).toEqual([]);
+  assert.deepStrictEqual(s.exits, [0]);
+  assert.deepStrictEqual(s.stderr, []);
 });
 
 it('a SIGTERM after stdin ended is the second trigger: the forced close', async () => {
@@ -28,6 +30,6 @@ it('a SIGTERM after stdin ended is the second trigger: the forced close', async 
   await turns();
   s.processLike.emit('SIGTERM');
   await turns();
-  expect(s.exits).toEqual([1]);
+  assert.deepStrictEqual(s.exits, [1]);
   write.resolve({ notStored: [] });
 });

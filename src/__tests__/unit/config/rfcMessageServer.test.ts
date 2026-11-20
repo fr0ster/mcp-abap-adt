@@ -8,15 +8,9 @@
  * `destinationKeys.test.ts`'s.
  */
 
-jest.mock('@mcp-abap-adt/connection', () => {
-  const actual = jest.requireActual('@mcp-abap-adt/connection');
-  return {
-    ...actual,
-    createConnection: jest.fn((spec: unknown) => actual.createConnection(spec)),
-  };
-});
-
-import { createConnection } from '@mcp-abap-adt/connection';
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type { DestinationKeyValues } from '../../../lib/config/messageServer';
 import {
   checkDestinationStatement,
@@ -24,12 +18,18 @@ import {
 } from '../../../lib/config/rfcDestination';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
+import { connectionCreate as createConnectionModule } from '../../helpers/packageFiles';
+
+// connection's createConnection watched on the module that defines it (the
+// package index re-exports it by getter, read at call time): every call
+// still reaches the real one.
+const create = mock.method(createConnectionModule, 'createConnection');
 
 const saved = process.env.SAP_SYSTEM_TYPE;
 
 beforeEach(() => {
   process.env.SAP_SYSTEM_TYPE = 'onprem';
-  jest.mocked(createConnection).mockClear();
+  create.mock.resetCalls();
 });
 
 afterEach(() => {
@@ -55,11 +55,11 @@ function handedToCreateConnection(keys: DestinationKeyValues) {
     checked.rfc,
   );
   createAbapConnection(config, credentialFromSapConfig(config));
-  const calls = jest.mocked(createConnection).mock.calls;
-  expect(calls).toHaveLength(1);
-  const [spec] = calls[0] ?? [];
+  const calls = create.mock.calls;
+  assert.equal(calls.length, 1);
+  const [spec] = calls[0]?.arguments ?? [];
   if (spec === undefined) throw new Error('no spec');
-  expect(spec.transport).toBe('rfc');
+  assert.equal(spec.transport, 'rfc');
   return spec.config;
 }
 
@@ -75,7 +75,7 @@ describe('a message-server destination reaches createConnection as stated', () =
       group: 'SPACE',
       saprouter: '/H/router.example.test/S/3299/H/',
     });
-    expect(config).toEqual({
+    assert.deepStrictEqual(config, {
       authType: 'basic',
       username: 'placeholder-user',
       password: 'placeholder-password',
@@ -90,21 +90,23 @@ describe('a message-server destination reaches createConnection as stated', () =
     });
   });
 
-  it.each([
+  for (const [_name, service] of [
     ['msserv alone', { msserv: 'sapmsXYZ' }],
     ['sysid alone', { sysid: 'XYZ' }],
-  ])('%s names the service; the other key is absent', (_name, service) => {
-    const config = handedToCreateConnection({
-      ...LOGON,
-      mshost: 'ms.example.test',
-      group: 'SPACE',
-      ...service,
+  ] satisfies [string, Record<string, string>][]) {
+    it(format('%s names the service; the other key is absent', _name), () => {
+      const config = handedToCreateConnection({
+        ...LOGON,
+        mshost: 'ms.example.test',
+        group: 'SPACE',
+        ...service,
+      });
+      for (const key of ['msserv', 'sysid'] as const) {
+        assert.equal(Object.hasOwn(config, key), key in service);
+      }
+      assert.equal(Object.hasOwn(config, 'saprouter'), false);
     });
-    for (const key of ['msserv', 'sysid'] as const) {
-      expect(Object.hasOwn(config, key)).toBe(key in service);
-    }
-    expect(Object.hasOwn(config, 'saprouter')).toBe(false);
-  });
+  }
 
   it('no application-server key and no URL: the address is the message server alone', () => {
     const config = handedToCreateConnection({
@@ -114,7 +116,7 @@ describe('a message-server destination reaches createConnection as stated', () =
       sysid: 'XYZ',
     });
     for (const key of ['url', 'ashost', 'sysnr']) {
-      expect(Object.hasOwn(config, key)).toBe(false);
+      assert.equal(Object.hasOwn(config, key), false);
     }
   });
 });

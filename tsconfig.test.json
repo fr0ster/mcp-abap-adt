@@ -1,14 +1,14 @@
 {
   "extends": ["./tsconfig.json", "./tsconfig.paths.json"],
   "compilerOptions": {
-    "types": ["node", "jest"],
+    "types": ["node"],
     // The emitting tsconfig.json pins `rootDir` to `./src`, which is correct
     // for `dist/` but refuses any file under `scripts/` the moment this
     // config's `include` reaches there (TS6059). This config never emits —
-    // ts-jest transpiles per-file and `tsc --noEmit -p` here is a checker
-    // run, not a build — so widening `rootDir` to the repo root costs
-    // nothing and lets the audit tooling under `scripts/` type-check with
-    // the tests.
+    // `tsc --noEmit -p` here is a checker run, not a build (the tests are
+    // built by `tsconfig.node-test.json`) — so widening `rootDir` to the repo
+    // root costs nothing and lets the audit tooling under `scripts/`
+    // type-check with the tests.
     //
     // Every TypeScript file under `scripts/` is checked here (#234): a script
     // that no longer compiles is a script nobody can run.
@@ -17,8 +17,7 @@
     // exercise it import them by package name. `paths` come from the one
     // package-name table, `tsconfig.paths.json`, through `extends` (D27):
     // this file defines none of its own, so the checker takes the table as it
-    // is, and Jest's `moduleNameMapper` (`jest.config.js`) is built from the
-    // same file.
+    // is, as the test build and its resolve hook do.
   },
   "include": [
     "src/**/*",

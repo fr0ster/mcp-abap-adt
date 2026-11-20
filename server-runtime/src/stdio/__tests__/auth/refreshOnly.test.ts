@@ -6,6 +6,8 @@
  * strategy is a recording stand-in that must never be asked.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import type { IRequestTarget } from '@mcp-abap-adt/interfaces-auth';
 import { AuthBrokerFactory } from '../../auth/brokerFactory';
@@ -42,7 +44,8 @@ function target(): IRequestTarget & { written: string[] } {
 }
 
 it('the sentence, verbatim', () => {
-  expect(REFRESH_ONLY_SENTENCE).toBe(
+  assert.equal(
+    REFRESH_ONLY_SENTENCE,
     'Logins are off (`--renewal=refresh-only`): log in with `mcp-auth`, or start without it.',
   );
 });
@@ -60,12 +63,12 @@ describe('--renewal=refresh-only, a destination with no session', () => {
     const sent = target();
     const outcome = await provider.authorize(sent);
 
-    expect(outcome.ok).toBe(false);
+    assert.equal(outcome.ok, false);
     if (outcome.ok) return;
-    expect(outcome.refusal.kind).toBe('renewal-declined');
-    expect(f.sentenceFor(outcome.refusal)).toBe(REFRESH_ONLY_SENTENCE);
-    expect(logins.requests).toHaveLength(0);
-    expect(sent.written).toEqual([]);
+    assert.equal(outcome.refusal.kind, 'renewal-declined');
+    assert.equal(f.sentenceFor(outcome.refusal), REFRESH_ONLY_SENTENCE);
+    assert.equal(logins.requests.length, 0);
+    assert.deepStrictEqual(sent.written, []);
   });
 });
 
@@ -74,16 +77,17 @@ describe('the sentence is keyed on the server’s renewal, not on words', () => 
 
   it('under refresh-then-login a renewal-declined gets no server sentence', () => {
     const f = new AuthBrokerFactory(factoryConfig(base, logins));
-    expect(f.sentenceFor(declined)).toBeUndefined();
+    assert.equal(f.sentenceFor(declined), undefined);
   });
 
   it('under refresh-only another kind gets no server sentence', () => {
     const f = new AuthBrokerFactory(
       factoryConfig(base, logins, { renewal: 'refresh-only' }),
     );
-    expect(
+    assert.equal(
       f.sentenceFor(authError['credential-refused']({ credential: 'token' })),
-    ).toBeUndefined();
-    expect(f.sentenceFor(declined)).toBe(REFRESH_ONLY_SENTENCE);
+      undefined,
+    );
+    assert.equal(f.sentenceFor(declined), REFRESH_ONLY_SENTENCE);
   });
 });

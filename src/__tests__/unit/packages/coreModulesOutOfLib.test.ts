@@ -6,10 +6,20 @@
  * built, in `dist`.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const ROOT = path.resolve(__dirname, '../../../..');
+const ROOT = repositoryRoot(__dirname);
+// Where the running code lives: .test-build/tree. A source module is
+// required from there, by its path without the extension (node resolves the
+// compiled .js).
+const CODE_ROOT = path.resolve(__dirname, '../../../..');
+const runningModule = (source: string): string =>
+  path.join(CODE_ROOT, path.relative(ROOT, source)).replace(/\.ts$/, '');
 
 const GONE_FROM_LIB = [
   'src/lib/config/envFileContext.ts',
@@ -49,31 +59,40 @@ function libEntries(): { entry: string; dist: string; src: string }[] {
 }
 
 describe("core's config modules stay out of lib", () => {
-  it.each(GONE_FROM_LIB)('%s does not exist', (file) => {
-    expect(fs.existsSync(path.join(ROOT, file))).toBe(false);
-  });
+  for (const file of GONE_FROM_LIB) {
+    it(format('%s does not exist', file), () => {
+      assert.equal(fs.existsSync(path.join(ROOT, file)), false);
+    });
+  }
 
   const entries = libEntries();
 
   it('lib has exports entries to check', () => {
-    expect(entries.length).toBeGreaterThan(5);
-    for (const { src } of entries) expect(fs.existsSync(src)).toBe(true);
+    assert.ok(entries.length > 5);
+    for (const { src } of entries) assert.equal(fs.existsSync(src), true);
   });
 
-  it.each(entries.map((e) => [e.entry, e] as const))(
-    '%s (src) exports none of core names',
-    (_entry, { src }) => {
-      const exported = Object.keys(require(src) as object);
-      expect(exported.filter((name) => CORE_NAMES.includes(name))).toEqual([]);
-    },
-  );
+  for (const [_entry, { src }] of entries.map((e) => [e.entry, e] as const)) {
+    it(format('%s (src) exports none of core names', _entry), () => {
+      const exported = Object.keys(require(runningModule(src)) as object);
+      assert.deepStrictEqual(
+        exported.filter((name) => CORE_NAMES.includes(name)),
+        [],
+      );
+    });
+  }
 
-  it.each(entries.map((e) => [e.entry, e] as const))(
-    '%s (dist, when built) exports none of core names',
-    (_entry, { dist }) => {
-      if (!fs.existsSync(dist)) return;
-      const exported = Object.keys(require(dist) as object);
-      expect(exported.filter((name) => CORE_NAMES.includes(name))).toEqual([]);
-    },
-  );
+  for (const [_entry, { dist }] of entries.map((e) => [e.entry, e] as const)) {
+    it(
+      format('%s (dist, when built) exports none of core names', _entry),
+      () => {
+        if (!fs.existsSync(dist)) return;
+        const exported = Object.keys(require(dist) as object);
+        assert.deepStrictEqual(
+          exported.filter((name) => CORE_NAMES.includes(name)),
+          [],
+        );
+      },
+    );
+  }
 });

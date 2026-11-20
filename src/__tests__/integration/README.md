@@ -66,7 +66,7 @@ npm run test:coverage-family -- src/__tests__/integration/high/class/ClassHighHa
 npm run test:integration -- --env DEBUG_TESTS=true src/__tests__/integration/high/class/ClassHighHandlers.test.ts
 ```
 
-A file is named by its source path; Jest's `--testPathPatterns` is not read. A suite is a
+A file is named by its source path; no path pattern is read. A suite is a
 `liveSuite` (`helpers/live.ts`): it states where it runs and skips with the reason elsewhere (a
 skipped `describe`, the reason its skip message); its cases call the system through `liveCall`,
 which records each call for the coverage ledger under the running case's name path (`t.fullName`)

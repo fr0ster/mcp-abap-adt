@@ -4,6 +4,8 @@
  * embedder's; without one, the embedder's context logger stays.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import * as z from 'zod';
 import { ReadOnlyHandlersGroup } from '../../lib/handlers/groups/ReadOnlyHandlersGroup';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
@@ -29,11 +31,11 @@ const probe = {
 
 beforeEach(() => {
   seen = undefined;
-  jest
-    .spyOn(ReadOnlyHandlersGroup.prototype, 'getHandlers')
-    .mockReturnValue([probe]);
+  // One list, made when the spy is told it.
+  const handlers = [probe];
+  mock.method(ReadOnlyHandlersGroup.prototype, 'getHandlers', () => handlers);
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 async function callProbe(exporter: HandlerExporter, logger: object) {
   const entry = exporter
@@ -49,11 +51,11 @@ async function callProbe(exporter: HandlerExporter, logger: object) {
 it("an exporter's logger reaches the handler, over the embedder's", async () => {
   const own = silent();
   await callProbe(new HandlerExporter({ logger: own }), silent());
-  expect(seen).toBe(own);
+  assert.equal(seen, own);
 });
 
 it("without one, the embedder's context logger stays", async () => {
   const embedder = silent();
   await callProbe(new HandlerExporter(), embedder);
-  expect(seen).toBe(embedder);
+  assert.equal(seen, embedder);
 });

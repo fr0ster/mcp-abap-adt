@@ -11,6 +11,9 @@
  *   cloud: refused `system_type_conflict`, nothing sent.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -24,18 +27,16 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { declareSystemKind } from '../../../lib/systemKind';
 
-jest.setTimeout(60_000);
-
 const saved = process.env.SAP_SYSTEM_TYPE;
 beforeEach(() => {
   delete process.env.SAP_SYSTEM_TYPE;
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(console, 'error', () => {});
+  mock.method(process.stderr, 'write', () => true);
 });
 afterEach(() => {
   if (saved === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = saved;
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 const placeholder = {
@@ -76,52 +77,62 @@ async function callOn(
   }
 }
 
-it.each(CALLS)(
-  'a connection declared cloud after an onprem start is refused system_type_conflict: %s',
-  async (tool, args) => {
-    process.env.SAP_SYSTEM_TYPE = 'onprem';
-    const requests: string[] = [];
-    const connection = {
-      getBaseUrl: async () => 'https://system.example.invalid',
-      makeAdtRequest: async (options: { url: string }) => {
-        requests.push(options.url);
-        return { status: 200, data: '' };
-      },
-    };
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      handlersRegistry: registry(),
-    });
-    declareSystemKind(connection, 'cloud');
-    const text = await callOn(server, tool, args);
-    expect(text).toContain('system_type_conflict');
-    expect(requests).toEqual([]);
-  },
-);
+for (const [tool, args] of CALLS) {
+  it(
+    format(
+      'a connection declared cloud after an onprem start is refused system_type_conflict: %s',
+      tool,
+    ),
+    async () => {
+      process.env.SAP_SYSTEM_TYPE = 'onprem';
+      const requests: string[] = [];
+      const connection = {
+        getBaseUrl: async () => 'https://system.example.invalid',
+        makeAdtRequest: async (options: { url: string }) => {
+          requests.push(options.url);
+          return { status: 200, data: '' };
+        },
+      };
+      const server = new EmbeddableMcpServer({
+        connection: connection as never,
+        handlersRegistry: registry(),
+      });
+      declareSystemKind(connection, 'cloud');
+      const text = await callOn(server, tool, args);
+      assert.ok(text.includes('system_type_conflict'));
+      assert.deepStrictEqual(requests, []);
+    },
+  );
+}
 
-it.each(CALLS)(
-  'a server stating onprem given a connection built for cloud is refused system_type_conflict: %s',
-  async (tool, args) => {
-    const connection = createAbapConnection(
-      {
-        url: 'https://system.example.invalid',
-        client: '100',
-        authType: 'basic',
-      },
-      new BasicAuthProvider('KIND_USER', 'kind-password'),
-      null,
-      undefined,
-      undefined,
-      'cloud',
-    );
-    const sent = jest.spyOn(connection, 'makeAdtRequest');
-    const server = new EmbeddableMcpServer({
-      connection,
-      systemType: 'onprem',
-      handlersRegistry: registry(),
-    });
-    const text = await callOn(server, tool, args);
-    expect(text).toContain('system_type_conflict');
-    expect(sent).not.toHaveBeenCalled();
-  },
-);
+for (const [tool, args] of CALLS) {
+  it(
+    format(
+      'a server stating onprem given a connection built for cloud is refused system_type_conflict: %s',
+      tool,
+    ),
+    async (t) => {
+      const connection = createAbapConnection(
+        {
+          url: 'https://system.example.invalid',
+          client: '100',
+          authType: 'basic',
+        },
+        new BasicAuthProvider('KIND_USER', 'kind-password'),
+        null,
+        undefined,
+        undefined,
+        'cloud',
+      );
+      const sent = t.mock.method(connection, 'makeAdtRequest');
+      const server = new EmbeddableMcpServer({
+        connection,
+        systemType: 'onprem',
+        handlersRegistry: registry(),
+      });
+      const text = await callOn(server, tool, args);
+      assert.ok(text.includes('system_type_conflict'));
+      assert.equal(sent.mock.callCount(), 0);
+    },
+  );
+}

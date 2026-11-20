@@ -9,6 +9,10 @@
  * connection is a fake, answering from a small model — the same model for
  * an envelope's parts and for the sequential version's requests.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -21,6 +25,7 @@ import {
   handleDescribeByList,
 } from '../../../handlers/system/readonly/handleDescribeByList';
 import { createBatchAvailability } from '../../../lib/batch/availability';
+import { assertMatchObject } from '../../helpers/assertions';
 import {
   envelopeConnection,
   envelopeResponse,
@@ -301,11 +306,12 @@ function expectEnvelopeFailure(
     JSON.stringify(request) === JSON.stringify(ENVELOPE_REQUEST);
   const own = requestsOf(sequential);
   const named = requestsOf(result);
-  expect(own.filter(isEnvelope)).toHaveLength(0);
-  expect(named).toHaveLength(own.length);
-  expect(named.filter(isEnvelope)).toHaveLength(failures);
+  assert.equal(own.filter(isEnvelope).length, 0);
+  assert.equal(named.length, own.length);
+  assert.equal(named.filter(isEnvelope).length, failures);
   let at = 0;
-  expect(wholeOf(result)).toEqual(
+  assert.deepStrictEqual(
+    wholeOf(result),
     wholeOf(sequential, (key, value) => {
       if (key !== 'request') return value;
       return isEnvelope(named[at++]) ? ENVELOPE_REQUEST : value;
@@ -372,20 +378,22 @@ const OBJECTS = [
 ];
 
 describe('DescribeByList', () => {
-  it.each([
+  for (const [args] of [
     [{ objects: OBJECTS }],
     [{ objects: [{ name: 'ZCL_A', type: 'CLAS/OC' }] }],
     [{ objects: [{ name: 'ZMISSING', type: 'CLAS/OC' }, { name: 'ZT*' }] }],
-  ])('same answer as the sequential version: %j', async (args) => {
-    const { a, b, batched, sequential } = await bothWays(
-      handleDescribeByList,
-      args,
-    );
-    expect(contentOf(a)).toBe(contentOf(b));
-    expect(batched.directs).toHaveLength(0);
-    expect(batched.envelopes.length).toBeGreaterThan(0);
-    expect(sequential.envelopes).toHaveLength(0);
-  });
+  ]) {
+    it(format('same answer as the sequential version: %j', args), async () => {
+      const { a, b, batched, sequential } = await bothWays(
+        handleDescribeByList,
+        args,
+      );
+      assert.equal(contentOf(a), contentOf(b));
+      assert.equal(batched.directs.length, 0);
+      assert.ok(batched.envelopes.length > 0);
+      assert.equal(sequential.envelopes.length, 0);
+    });
+  }
 
   it('phases: every quickSearch, then the typeless ones for the answers that failed or were empty', async () => {
     const fake = system();
@@ -393,14 +401,14 @@ describe('DescribeByList', () => {
       handleDescribeByList(contextOn(fake), { objects: OBJECTS }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['qs:ZCL_A:CLAS', 'qs:ZPROG_B:INCL', 'qs:ZT*:', 'qs:ZNONE:'],
       ['qs:ZPROG_B:'],
     ]);
     const names = (result as { content: Array<{ text: string }> }).content.map(
       (c) => JSON.parse(c.text).name,
     );
-    expect(names).toEqual(['ZCL_A', 'ZPROG_B', 'ZT*', 'ZNONE']);
+    assert.deepStrictEqual(names, ['ZCL_A', 'ZPROG_B', 'ZT*', 'ZNONE']);
   });
 
   it('nothing to search again: one envelope', async () => {
@@ -411,7 +419,7 @@ describe('DescribeByList', () => {
       }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([['qs:ZCL_A:CLAS', 'qs:ZT*:']]);
+    assert.deepStrictEqual(phasesOf(fake), [['qs:ZCL_A:CLAS', 'qs:ZT*:']]);
   });
 
   it("a part's failure is that object's: the typeless search refused too is its error entry", async () => {
@@ -421,20 +429,18 @@ describe('DescribeByList', () => {
       { objects: OBJECTS },
       model,
     );
-    expect(contentOf(a)).toBe(contentOf(b));
+    assert.equal(contentOf(a), contentOf(b));
     const entries = (a as { content: Array<{ text: string }> }).content.map(
       (c) => JSON.parse(c.text),
     );
-    expect(entries[1]).toMatchObject({
+    assertMatchObject(entries[1], {
       name: 'ZPROG_B',
       error: { status: 403, step: 'search' },
     });
-    expect(entries.map((e) => e.name)).toEqual([
-      'ZCL_A',
-      'ZPROG_B',
-      'ZT*',
-      'ZNONE',
-    ]);
+    assert.deepStrictEqual(
+      entries.map((e) => e.name),
+      ['ZCL_A', 'ZPROG_B', 'ZT*', 'ZNONE'],
+    );
   });
 
   it('a 401 SAP answered to a first search ends the call as it came; no second phase', async () => {
@@ -444,9 +450,9 @@ describe('DescribeByList', () => {
       { objects: OBJECTS },
       model,
     );
-    expect(contentOf(a)).toBe(contentOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
-    expect(batched.envelopes).toHaveLength(1);
+    assert.equal(contentOf(a), contentOf(b));
+    assertMatchObject(payloadOf(a), { status: 401 });
+    assert.equal(batched.envelopes.length, 1);
   });
 
   it('a 401 SAP answered to a typeless search ends the call as it came', async () => {
@@ -456,8 +462,8 @@ describe('DescribeByList', () => {
       { objects: OBJECTS },
       model,
     );
-    expect(contentOf(a)).toBe(contentOf(b));
-    expect(payloadOf(a)).toMatchObject({ status: 401 });
+    assert.equal(contentOf(a), contentOf(b));
+    assertMatchObject(payloadOf(a), { status: 401 });
   });
 
   it("the connection's credential refusal ends the call as it came", async () => {
@@ -468,8 +474,8 @@ describe('DescribeByList', () => {
       handleDescribeByList(contextOn(fake), { objects: OBJECTS }),
       TURNS,
     );
-    expect(payloadOf(result).error).toBe('authentication_failed');
-    expect(fake.envelopes).toHaveLength(1);
+    assert.equal(payloadOf(result).error, 'authentication_failed');
+    assert.equal(fake.envelopes.length, 1);
   });
 
   it("an envelope that fails is every search's failure, as the sequential version answers each", async () => {
@@ -484,8 +490,8 @@ describe('DescribeByList', () => {
       phasesOf(fake)[1] as string[],
     );
     expectEnvelopeFailure(result, expected, 1);
-    expect(fake.envelopes).toHaveLength(2);
-    expect(fake.directs).toHaveLength(0);
+    assert.equal(fake.envelopes.length, 2);
+    assert.equal(fake.directs.length, 0);
   });
 
   it('an outer 404: the destination has no communication batch; the sequential reads answer', async () => {
@@ -493,10 +499,10 @@ describe('DescribeByList', () => {
       handleDescribeByList,
       { objects: OBJECTS },
     );
-    expect(contentOf(result)).toBe(contentOf(expected));
-    expect(fake.envelopes).toHaveLength(1);
-    expect(fake.directs.length).toBeGreaterThan(0);
-    expect(context.batchAvailability?.available()).toBe(false);
+    assert.equal(contentOf(result), contentOf(expected));
+    assert.equal(fake.envelopes.length, 1);
+    assert.ok(fake.directs.length > 0);
+    assert.equal(context.batchAvailability?.available(), false);
   });
 
   it('a typed search answered 406 is that object’s error; no typeless search', async () => {
@@ -509,27 +515,27 @@ describe('DescribeByList', () => {
       handleDescribeByList(contextOn(fake), { objects: OBJECTS }),
       TURNS,
     );
-    expect(phasesOf(fake)).toEqual([
+    assert.deepStrictEqual(phasesOf(fake), [
       ['qs:ZCL_A:CLAS', 'qs:ZPROG_B:INCL', 'qs:ZT*:', 'qs:ZNONE:'],
     ]);
     const entries = (
       result as { content: Array<{ text: string }> }
     ).content.map((c) => JSON.parse(c.text));
-    expect(entries[1]).toMatchObject({
+    assertMatchObject(entries[1], {
       name: 'ZPROG_B',
       error: { status: 406, step: 'search' },
     });
-    expect(entries.map((e) => e.name)).toEqual([
-      'ZCL_A',
-      'ZPROG_B',
-      'ZT*',
-      'ZNONE',
-    ]);
+    assert.deepStrictEqual(
+      entries.map((e) => e.name),
+      ['ZCL_A', 'ZPROG_B', 'ZT*', 'ZNONE'],
+    );
   });
 
   it('no objects: the parameter error, by the schema', () => {
-    expect(schemaWords(DESCRIBE_BY_LIST, { objects: [] })).toContain(
-      'objects (array) is required',
+    assert.ok(
+      schemaWords(DESCRIBE_BY_LIST, { objects: [] }).includes(
+        'objects (array) is required',
+      ),
     );
   });
 });

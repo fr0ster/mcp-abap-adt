@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
 
@@ -30,9 +32,10 @@ describe('adding a channel to a logger keeps the logger', () => {
       csrfToken: logger.debug,
     };
 
-    expect(
+    assert.deepStrictEqual(
       channels.filter((name) => typeof spread[name] === 'function'),
-    ).toEqual([]);
+      [],
+    );
   });
 
   it('keeps every method when the channel is assigned to it', () => {
@@ -44,10 +47,11 @@ describe('adding a channel to a logger keeps the logger', () => {
       csrfToken: logger.debug.bind(logger),
     }) as unknown as Record<string, unknown>;
 
-    expect(
+    assert.deepStrictEqual(
       channels.filter((name) => typeof assigned[name] === 'function'),
-    ).toEqual([...channels]);
-    expect(typeof assigned.csrfToken).toBe('function');
+      [...channels],
+    );
+    assert.equal(typeof assigned.csrfToken, 'function');
   });
 
   it('gives the channel a receiver, so a bare reference still works', () => {
@@ -66,6 +70,6 @@ describe('adding a channel to a logger keeps the logger', () => {
     const channel = withChannel.csrfToken;
     channel('token refreshed');
 
-    expect(said).toEqual(['token refreshed']);
+    assert.deepStrictEqual(said, ['token refreshed']);
   });
 });

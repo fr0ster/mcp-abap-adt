@@ -13,18 +13,25 @@
  * answers sse's version when it is constructed without one, whatever version
  * the runtime has.
  */
-jest.mock('../../../server-runtime/src/runtimeVersion', () => ({
-  RUNTIME_VERSION: '0.0.0-runtime',
-}));
-
+import assert from 'node:assert/strict';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import * as path from 'node:path';
+import { describe, it, mock } from 'node:test';
+import { format } from 'node:util';
+import * as runtimeVersion from '../../../server-runtime/src/runtimeVersion';
+
+// server-runtime's RUNTIME_VERSION replaced on its module before the servers
+// load (they read it when constructed): the entry's
+// own version must win over it.
+mock.property(runtimeVersion, 'RUNTIME_VERSION', '0.0.0-runtime');
+
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
 import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import * as runtime from '@mcp-abap-adt/server-runtime/sse/server';
 import express from 'express';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../../../src/__tests__/helpers/repoRoot';
 import * as sse from '../index';
 import * as launcher from '../launcher';
 import { SSE_VERSION } from '../sseVersion';
@@ -47,7 +54,7 @@ const LAUNCHER_19_1_0 = {
   types: ['SseLauncherDeps', 'SseLauncherOptions'],
 };
 
-const SRC = path.resolve(__dirname, '..');
+const SRC = path.resolve(repositoryRoot(__dirname), 'sse', 'src');
 const ENTRIES = [
   ['@mcp-abap-adt/sse', 'index.ts', sse, SSE_19_1_0],
   ['@mcp-abap-adt/sse/launcher', 'launcher.ts', launcher, LAUNCHER_19_1_0],
@@ -83,25 +90,32 @@ function checkedExports(): Map<string, string[]> {
 }
 
 describe('@mcp-abap-adt/sse keeps every name 19.1.0 exported', () => {
-  describe.each(ENTRIES)('%s', (_name, _file, loaded, before) => {
-    it.each(before.values)('exports the value %s', (name) => {
-      expect(loaded).toHaveProperty(name);
-      expect((loaded as Record<string, unknown>)[name]).toBeDefined();
+  for (const [_name, _file, loaded, before] of ENTRIES) {
+    describe(format('%s', _name), () => {
+      for (const name of before.values) {
+        it(format('exports the value %s', name), () => {
+          assert.ok(
+            typeof loaded === 'object' && loaded !== null && name in loaded,
+          );
+          assert.notEqual((loaded as Record<string, unknown>)[name], undefined);
+        });
+      }
     });
-  });
+  }
 
   // One program for both entries: the checker follows each re-export into
   // server-runtime's sources through tsconfig.test.json's paths.
   const checked = checkedExports();
-  describe.each(ENTRIES)(
-    '%s, as the checker reads it',
-    (_name, file, _l, before) => {
+  for (const [_name, file, _l, before] of ENTRIES) {
+    describe(format('%s, as the checker reads it', _name), () => {
       const exported = checked.get(path.join(SRC, file)) ?? [];
-      it.each([...before.values, ...before.types])('exports %s', (name) => {
-        expect(exported).toContain(name);
-      });
-    },
-  );
+      for (const name of [...before.values, ...before.types]) {
+        it(format('exports %s', name), () => {
+          assert.ok(exported.includes(name));
+        });
+      }
+    });
+  }
 });
 
 /** The version the server's `/health` answers. */
@@ -126,24 +140,24 @@ async function versionAnswered(server: {
 describe("sse's SseServer answers sse's version", () => {
   it('the runtime version module is mocked to another value', async () => {
     const server = new runtime.SseServer(new CompositeHandlersRegistry([]));
-    expect(await versionAnswered(server)).toBe('0.0.0-runtime');
-    expect(SSE_VERSION).not.toBe('0.0.0-runtime');
+    assert.equal(await versionAnswered(server), '0.0.0-runtime');
+    assert.notEqual(SSE_VERSION, '0.0.0-runtime');
   });
 
   it('without a version: SSE_VERSION', async () => {
     const server = new sse.SseServer(new CompositeHandlersRegistry([]));
-    expect(await versionAnswered(server)).toBe(SSE_VERSION);
+    assert.equal(await versionAnswered(server), SSE_VERSION);
   });
 
   it('with a version: that version', async () => {
     const server = new sse.SseServer(new CompositeHandlersRegistry([]), {
       version: '9.9.9-given',
     });
-    expect(await versionAnswered(server)).toBe('9.9.9-given');
+    assert.equal(await versionAnswered(server), '9.9.9-given');
   });
 
   it('is the runtime SseServer underneath', () => {
     const server = new sse.SseServer(new CompositeHandlersRegistry([]));
-    expect(server).toBeInstanceOf(runtime.SseServer);
+    assert.ok(server instanceof runtime.SseServer);
   });
 });

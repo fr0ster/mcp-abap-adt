@@ -3,7 +3,7 @@
  * RunCdsUnitTest, UpdateCdsUnitTest, and DeleteCdsUnitTest as cleanup. The view
  * must exist; the test class is the suite's own.
  *
- * Run: npm test -- --testPathPatterns=integration/high/unitTest/CdsUnitTestHighHandlers
+ * Run: npm run test:integration -- src/__tests__/integration/high/unitTest/CdsUnitTestHighHandlers.test.ts
  */
 
 import { after, afterEach, before, beforeEach, it } from 'node:test';

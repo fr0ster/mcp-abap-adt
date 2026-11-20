@@ -7,6 +7,8 @@
  * into one item's failure or an empty list, and a held lock is still released.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { handleUpdateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
@@ -18,11 +20,13 @@ import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/han
 import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
 import { handleCreateTransportTask } from '../../handlers/transport/high/handleCreateTransportTask';
 import { createBatchAvailability } from '../../lib/batch/availability';
+import * as clients from '../../lib/clients';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
 import { runSearchSource } from '../../lib/search-source/orchestrator';
 import { skipSapAnswers } from '../../lib/search-source/readFailure';
 import { createSourceReaderDeps } from '../../lib/search-source/sourceReader';
+import { assertMatchObject, rejectionOf } from '../helpers/assertions';
 import {
   fakeClientOf,
   okResponse,
@@ -31,8 +35,9 @@ import {
 } from '../helpers/fakeClient';
 import { listing } from '../helpers/sourceReaderFake';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 /** The refusal as the connection raises it: SAP was never asked. */
 const refused = () =>
@@ -49,12 +54,12 @@ const payloadOf = (result: any) => JSON.parse(result.content[0].text);
 
 /** The answer of a credential failure: the chain's, the call ended. */
 const expectCredentialAnswer = (result: any) => {
-  expect(result.isError).toBe(true);
+  assert.equal(result.isError, true);
   const payload = payloadOf(result);
-  expect(payload.error).toBe('authentication_failed');
-  expect(payload.includes_unread).toBeUndefined();
-  expect(payload.partial_result).toBeUndefined();
-  expect(payload.cleanup).toBeUndefined();
+  assert.equal(payload.error, 'authentication_failed');
+  assert.equal(payload.includes_unread, undefined);
+  assert.equal(payload.partial_result, undefined);
+  assert.equal(payload.cleanup, undefined);
   return payload;
 };
 
@@ -98,7 +103,7 @@ describe('GetEnhancements include_nested: an include whose elements read rejects
       },
     });
     expectCredentialAnswer(await run());
-    expect(read).toEqual(['ZPROG', 'ZINC1', 'ZINC2']);
+    assert.deepStrictEqual(read, ['ZPROG', 'ZINC1', 'ZINC2']);
   });
 
   it('the includes walk rejecting ends the call too, not an empty list of includes', async () => {
@@ -117,7 +122,7 @@ describe('GetEnhancements include_nested: an include whose elements read rejects
       },
     });
     expectCredentialAnswer(await run());
-    expect(read).toEqual(['ZPROG']);
+    assert.deepStrictEqual(read, ['ZPROG']);
   });
 });
 
@@ -155,8 +160,8 @@ describe('SearchSource: a source read through adt-clients rejects with AuthRefus
         concurrency: 1,
       },
     );
-    await expect(run).rejects.toBe(failure);
-    expect(read).toEqual(['ZA', 'ZB']);
+    assert.equal(await rejectionOf(run), failure);
+    assert.deepStrictEqual(read, ['ZA', 'ZB']);
   });
 });
 
@@ -182,7 +187,7 @@ describe('withLock: AuthRefusedError inside a locked write', () => {
       activate: async () => (calls.push('activate'), okResponse(undefined)),
     });
     expectCredentialAnswer(await update({ activate: true }));
-    expect(calls).toEqual(['lock', 'update', 'unlock']);
+    assert.deepStrictEqual(calls, ['lock', 'update', 'unlock']);
   });
 
   it('the write refused: the unlock is still attempted, and the credential failure is the answer', async () => {
@@ -196,7 +201,7 @@ describe('withLock: AuthRefusedError inside a locked write', () => {
       unlock: async () => (calls.push('unlock'), okResponse(undefined)),
     });
     expectCredentialAnswer(await update());
-    expect(calls).toEqual(['lock', 'update', 'unlock']);
+    assert.deepStrictEqual(calls, ['lock', 'update', 'unlock']);
   });
 
   it('the write refused and the unlock refused by SAP: the credential failure, not the held-lock wrapper', async () => {
@@ -215,7 +220,7 @@ describe('withLock: AuthRefusedError inside a locked write', () => {
       ),
     });
     expectCredentialAnswer(await update());
-    expect(calls).toEqual(['lock', 'update', 'unlock']);
+    assert.deepStrictEqual(calls, ['lock', 'update', 'unlock']);
   });
 
   it('the activation refused after an unlock SAP refused: the credential failure, not the held-lock wrapper', async () => {
@@ -253,7 +258,7 @@ describe('a best-effort wait after a write rejects with AuthRefusedError', () =>
       source_code: 'x',
     });
     expectCredentialAnswer(result);
-    expect(calls).toEqual(['read']);
+    assert.deepStrictEqual(calls, ['read']);
   });
 });
 
@@ -274,7 +279,7 @@ describe('GetServiceBindingPreviewUrl: the system lookup rejects with AuthRefuse
       { service_binding_name: 'ZSB' },
     );
     expectCredentialAnswer(result);
-    expect(calls).toEqual([]);
+    assert.deepStrictEqual(calls, []);
   });
 });
 
@@ -355,11 +360,11 @@ describe("a 401 SAP answered to a cleanup step is the call's credential failure"
       source_code: 'x',
       activate: true,
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = payloadOf(result);
-    expect(payload).toMatchObject({ status: 401, step: 'unlock' });
-    expect(payload.cleanup).toBeUndefined();
-    expect(calls).toEqual(['unlock']);
+    assertMatchObject(payload, { status: 401, step: 'unlock' });
+    assert.equal(payload.cleanup, undefined);
+    assert.deepStrictEqual(calls, ['unlock']);
   });
 
   it('CreateTransportTask: the task type change answered 401: its error with its step, not a cleanup note', async () => {
@@ -372,9 +377,9 @@ describe("a 401 SAP answered to a cleanup step is the call's credential failure"
       transport_number: 'SIDK907072',
       target_user: 'DEVELOPER',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = payloadOf(result);
-    expect(payload).toMatchObject({ status: 401, step: 'change task type' });
-    expect(payload.cleanup).toBeUndefined();
+    assertMatchObject(payload, { status: 401, step: 'change task type' });
+    assert.equal(payload.cleanup, undefined);
   });
 });

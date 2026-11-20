@@ -1,7 +1,16 @@
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
+import { assertMatchObject } from '../helpers/assertions';
+import { repositoryRoot } from '../helpers/repoRoot';
 
-const GENERATOR = path.join(__dirname, '../../../tools/generate-tools-docs.js');
+const GENERATOR = path.join(
+  repositoryRoot(__dirname),
+  'tools',
+  'generate-tools-docs.js',
+);
 
 /**
  * The generator reads what the server builds — the handler groups' built
@@ -13,14 +22,14 @@ describe('the tool-docs generator reads no source text', () => {
   const text = fs.readFileSync(GENERATOR, 'utf8');
 
   it('opens no file to read it', () => {
-    expect(text).not.toContain('readFileSync');
-    expect(text).not.toContain('readFile(');
+    assert.ok(!text.includes('readFileSync'));
+    assert.ok(!text.includes('readFile('));
   });
 
   it('exports no source parser', () => {
     const exported = Object.keys(require(GENERATOR));
-    expect(exported).not.toContain('parseTopLevelProperties');
-    expect(exported).not.toContain('extractToolDefinition');
+    assert.ok(!exported.includes('parseTopLevelProperties'));
+    assert.ok(!exported.includes('extractToolDefinition'));
   });
 });
 
@@ -31,10 +40,9 @@ describe('the tool-docs generator reads no source text', () => {
  * text reader cannot follow, is listed with its type, enum and words.
  */
 describe('the tool-docs generator lists the built schema', () => {
-  const {
-    loadToolsFromHandlers,
-    renderParams,
-  } = require('../../../tools/generate-tools-docs.js');
+  const { loadToolsFromHandlers, renderParams } = require(
+    path.join(repositoryRoot(__dirname), 'tools', 'generate-tools-docs.js'),
+  );
   const tools: ReadonlyArray<{
     name: string;
     level: string;
@@ -50,18 +58,24 @@ describe('the tool-docs generator lists the built schema', () => {
 
   it('lists a spread-in property of CreateTableType with its enum', () => {
     const tool = named('CreateTableType');
-    expect(tool.inputSchema.properties.row_type_kind?.enum).toContain(
-      'dictionaryType',
+    assert.ok(
+      tool.inputSchema.properties.row_type_kind?.enum?.includes(
+        'dictionaryType',
+      ),
     );
     const text: string = renderParams(tool);
-    expect(text).toContain(
-      '- `row_type_kind` (string, optional, one of: `predefinedAbapType`, `dictionaryType`,',
+    assert.ok(
+      text.includes(
+        '- `row_type_kind` (string, optional, one of: `predefinedAbapType`, `dictionaryType`,',
+      ),
     );
-    expect(text).toContain('- `key_kind` (string, optional, one of:');
+    assert.ok(text.includes('- `key_kind` (string, optional, one of:'));
   });
 
   it('lists every tool the full stdio binary serves, and no other', () => {
-    const { fullToolSet } = require('../../../dist/lib/toolSet.js');
+    const { fullToolSet } = require(
+      path.join(repositoryRoot(__dirname), 'dist', 'lib', 'toolSet.js'),
+    );
     const served: string[] = fullToolSet
       // The pages document every set with the data tools served.
       .groups({ connection: null }, 'stdio', { dataTools: true })
@@ -70,19 +84,21 @@ describe('the tool-docs generator lists the built schema', () => {
           group.getHandlers().map((entry) => entry.toolDefinition.name),
       );
     const listed = new Set(tools.map((tool) => tool.name));
-    expect([...listed].sort()).toEqual([...new Set(served)].sort());
+    assert.deepStrictEqual([...listed].sort(), [...new Set(served)].sort());
   });
 
   it('files a tool under the object and source of the module that holds it', () => {
-    expect(named('ActivateClass')).toMatchObject({
+    assertMatchObject(named('ActivateClass'), {
       objectFolder: 'class',
       filePath: 'src/handlers/class/low/handleActivateClass.ts',
     });
   });
 
   it('lists the spread-in detail property', () => {
-    expect(renderParams(named('CreateTableType'))).toContain(
-      '- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`)',
+    assert.ok(
+      renderParams(named('CreateTableType')).includes(
+        '- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`)',
+      ),
     );
   });
 });
@@ -94,10 +110,9 @@ describe('the tool-docs generator lists the built schema', () => {
  */
 describe('every handler group the docs read has a page level', () => {
   const { GROUP_LEVELS, servedEntries } = require(GENERATOR);
-  const {
-    fullToolSet,
-    fullReadOnlyToolSet,
-  } = require('../../../dist/lib/toolSet.js');
+  const { fullToolSet, fullReadOnlyToolSet } = require(
+    path.join(repositoryRoot(__dirname), 'dist', 'lib', 'toolSet.js'),
+  );
   const groups: string[] = [
     ...new Set<string>(
       [fullToolSet, fullReadOnlyToolSet]
@@ -107,10 +122,12 @@ describe('every handler group the docs read has a page level', () => {
   ];
 
   it('reads at least one group', () => {
-    expect(groups.length).toBeGreaterThan(0);
+    assert.ok(groups.length > 0);
   });
 
-  it.each(groups)('%s has a level', (group) => {
-    expect(typeof GROUP_LEVELS[group]).toBe('string');
-  });
+  for (const group of groups) {
+    it(format('%s has a level', group), () => {
+      assert.equal(typeof GROUP_LEVELS[group], 'string');
+    });
+  }
 });

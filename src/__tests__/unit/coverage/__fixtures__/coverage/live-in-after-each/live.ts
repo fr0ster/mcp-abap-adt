@@ -1,3 +1,4 @@
+import { afterEach, it } from 'node:test';
 import {
   expectAbsent,
   expectCleared,

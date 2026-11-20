@@ -20,6 +20,7 @@
  * that variant.
  */
 
+import { after, before, describe } from 'node:test';
 import { corpusBody } from '../../helpers/adtCorpus';
 import type { StandInRequest } from '../../helpers/adtStandIn';
 import type { MatchedAnswer, MatchedRequest } from '../../helpers/pinCases';
@@ -220,11 +221,11 @@ const WAIT = { tool: 'AmdpDebugWait', args: { hold_seconds: 1 } };
  */
 function statedAs(variant: 'onprem' | 'cloud'): void {
   let previous: string | undefined;
-  beforeAll(() => {
+  before(() => {
     previous = process.env.SAP_SYSTEM_TYPE;
     process.env.SAP_SYSTEM_TYPE = variant;
   });
-  afterAll(() => {
+  after(() => {
     if (previous === undefined) delete process.env.SAP_SYSTEM_TYPE;
     else process.env.SAP_SYSTEM_TYPE = previous;
   });

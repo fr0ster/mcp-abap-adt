@@ -63,7 +63,7 @@
  * Each measured answer is one `refusal-follow-ups-live` line on stderr; no
  * cookie, password or state handle reaches it.
  *
- * Run (HTTP): npm test -- src/__tests__/integration/batch/refusalFollowUps.test.ts --testPathIgnorePatterns='__tests__/admin/' --runInBand --forceExit
+ * Run (HTTP): npm run test:integration -- src/__tests__/integration/batch/refusalFollowUps.test.ts
  * Run (RFC):  MCP_TEST_CONFIG=tests/test-config.rfc.yaml with the same command,
  *             the RFC SDK's libraries on LD_LIBRARY_PATH and SAPNWRFC_HOME set.
  */

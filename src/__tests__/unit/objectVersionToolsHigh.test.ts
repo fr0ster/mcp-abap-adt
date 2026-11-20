@@ -12,26 +12,28 @@
  * SAP-free via a mocked AdtClient.
  */
 
-const mockClassGetVersions = jest.fn();
-const mockTableGetVersions = jest.fn();
-const mockTableGetVersionSource = jest.fn();
-const mockFmGetVersions = jest.fn();
-const mockGetClass = jest.fn();
-const mockGetTable = jest.fn();
-const mockGetFunctionModule = jest.fn();
-
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => ({
-    getClass: mockGetClass,
-    getTable: mockGetTable,
-    getFunctionModule: mockGetFunctionModule,
-  }),
-}));
-
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
 import { buildObjectVersionTools } from '../../handlers/common/high/objectVersionTools';
+import * as clients from '../../lib/clients';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
 import { okResponse } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
+
+const mockClassGetVersions = mock.fn<(...args: any[]) => any>();
+const mockTableGetVersions = mock.fn<(...args: any[]) => any>();
+const mockTableGetVersionSource = mock.fn<(...args: any[]) => any>();
+const mockFmGetVersions = mock.fn<(...args: any[]) => any>();
+const mockGetClass = mock.fn<(...args: any[]) => any>();
+const mockGetTable = mock.fn<(...args: any[]) => any>();
+const mockGetFunctionModule = mock.fn<(...args: any[]) => any>();
+
+mock.method(clients, 'createAdtClient', () => ({
+  getClass: mockGetClass,
+  getTable: mockGetTable,
+  getFunctionModule: mockGetFunctionModule,
+}));
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -50,64 +52,83 @@ function tool(name: string) {
 }
 
 beforeEach(() => {
-  mockClassGetVersions.mockReset();
-  mockTableGetVersions.mockReset();
-  mockTableGetVersionSource.mockReset();
-  mockFmGetVersions.mockReset();
-  mockGetClass.mockReset();
-  mockGetTable.mockReset();
-  mockGetFunctionModule.mockReset();
-  mockGetClass.mockReturnValue({ getVersions: mockClassGetVersions });
-  mockGetTable.mockReturnValue({
+  mockClassGetVersions.mock.resetCalls();
+  mockClassGetVersions.mock.mockImplementation(() => undefined);
+  mockTableGetVersions.mock.resetCalls();
+  mockTableGetVersions.mock.mockImplementation(() => undefined);
+  mockTableGetVersionSource.mock.resetCalls();
+  mockTableGetVersionSource.mock.mockImplementation(() => undefined);
+  mockFmGetVersions.mock.resetCalls();
+  mockFmGetVersions.mock.mockImplementation(() => undefined);
+  mockGetClass.mock.resetCalls();
+  mockGetClass.mock.mockImplementation(() => undefined);
+  mockGetTable.mock.resetCalls();
+  mockGetTable.mock.mockImplementation(() => undefined);
+  mockGetFunctionModule.mock.resetCalls();
+  mockGetFunctionModule.mock.mockImplementation(() => undefined);
+  mockGetClass.mock.mockImplementation(() => ({
+    getVersions: mockClassGetVersions,
+  }));
+  mockGetTable.mock.mockImplementation(() => ({
     getVersions: mockTableGetVersions,
     getVersionSource: mockTableGetVersionSource,
-  });
+  }));
   // A function module's metadata names the group the cases give (#2).
-  mockGetFunctionModule.mockReturnValue({
+  mockGetFunctionModule.mock.mockImplementation(() => ({
     getVersions: mockFmGetVersions,
     readMetadata: readsModuleIn('Z_MY_GRP', 'Z_MY_FM'),
-  });
+  }));
 });
 
 describe('per-object high-level version tools (#30)', () => {
   it('GetClassVersions dispatches to getClass().getVersions({ className })', async () => {
     const versions = [{ versionId: '00001', contentUri: '/x;version=00001' }];
-    mockClassGetVersions.mockResolvedValue(okResponse(versions));
+    mockClassGetVersions.mock.mockImplementation(async () =>
+      okResponse(versions),
+    );
 
     const result = await tool('GetClassVersions').handler(ctx, {
       class_name: 'zcl_my_class',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockGetClass).toHaveBeenCalled();
-    expect(mockClassGetVersions).toHaveBeenCalledWith(
-      {
-        className: 'ZCL_MY_CLASS',
-      },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(mockGetClass.mock.callCount() > 0);
+    assert.ok(
+      mockClassGetVersions.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            className: 'ZCL_MY_CLASS',
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
     const data = payload(result);
-    expect(data.success).toBe(true);
-    expect(data.object_type).toBe('class');
-    expect(data.object_name).toBe('ZCL_MY_CLASS');
-    expect(data.versions).toEqual(versions);
+    assert.equal(data.success, true);
+    assert.equal(data.object_type, 'class');
+    assert.equal(data.object_name, 'ZCL_MY_CLASS');
+    assert.deepStrictEqual(data.versions, versions);
   });
 
   it('GetFunctionModuleVersions threads function_group_name through', async () => {
-    mockFmGetVersions.mockResolvedValue(okResponse([]));
+    mockFmGetVersions.mock.mockImplementation(async () => okResponse([]));
 
     const result = await tool('GetFunctionModuleVersions').handler(ctx, {
       function_module_name: 'z_my_fm',
       function_group_name: 'z_my_grp',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockFmGetVersions).toHaveBeenCalledWith(
-      {
-        functionGroupName: 'Z_MY_GRP',
-        functionModuleName: 'Z_MY_FM',
-      },
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockFmGetVersions.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(a[0], {
+            functionGroupName: 'Z_MY_GRP',
+            functionModuleName: 'Z_MY_FM',
+          }) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
   });
 
@@ -115,12 +136,12 @@ describe('per-object high-level version tools (#30)', () => {
     const result = await tool('GetFunctionModuleVersions').handler(ctx, {
       function_module_name: 'z_my_fm',
     });
-    expect(result.isError).toBe(true);
-    expect(mockFmGetVersions).not.toHaveBeenCalled();
+    assert.equal(result.isError, true);
+    assert.equal(mockFmGetVersions.mock.callCount(), 0);
   });
 
   it('GetTableVersionSource forwards content_uri to getVersionSource', async () => {
-    mockTableGetVersionSource.mockResolvedValue(
+    mockTableGetVersionSource.mock.mockImplementation(async () =>
       okResponse('DEFINE TABLE zmy_table.'),
     );
 
@@ -129,14 +150,21 @@ describe('per-object high-level version tools (#30)', () => {
         '/sap/bc/adt/ddic/tables/zmy_table/source/main?version=00001',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockTableGetVersionSource).toHaveBeenCalledWith(
-      '/sap/bc/adt/ddic/tables/zmy_table/source/main?version=00001',
-      expect.objectContaining({ analyse: expect.any(Function) }),
+    assert.equal(result.isError, false);
+    assert.ok(
+      mockTableGetVersionSource.mock.calls.some(
+        ({ arguments: a }: { arguments: any[] }) =>
+          a.length === 2 &&
+          isDeepStrictEqual(
+            a[0],
+            '/sap/bc/adt/ddic/tables/zmy_table/source/main?version=00001',
+          ) &&
+          typeof a[1]?.analyse === 'function',
+      ),
     );
     const data = payload(result);
-    expect(data.success).toBe(true);
-    expect(data.source).toBe('DEFINE TABLE zmy_table.');
+    assert.equal(data.success, true);
+    assert.equal(data.source, 'DEFINE TABLE zmy_table.');
   });
 
   it('registers all 28 expected tool names', () => {
@@ -160,8 +188,8 @@ describe('per-object high-level version tools (#30)', () => {
       ]),
       'GetTableTypeVersions',
     ];
-    expect(names.sort()).toEqual(expected.sort());
-    expect(new Set(names).size).toBe(28);
+    assert.deepStrictEqual(names.sort(), expected.sort());
+    assert.equal(new Set(names).size, 28);
   });
 
   it('does not register version tools for non-versioned types', () => {
@@ -169,9 +197,9 @@ describe('per-object high-level version tools (#30)', () => {
       buildObjectVersionTools().map((e) => e.toolDefinition.name),
     );
     for (const d of ['FunctionGroup', 'Domain', 'DataElement', 'Package']) {
-      expect(names.has(`Get${d}Versions`)).toBe(false);
-      expect(names.has(`Get${d}VersionSource`)).toBe(false);
-      expect(names.has(`Get${d}VersionDiff`)).toBe(false);
+      assert.equal(names.has(`Get${d}Versions`), false);
+      assert.equal(names.has(`Get${d}VersionSource`), false);
+      assert.equal(names.has(`Get${d}VersionDiff`), false);
     }
   });
 
@@ -185,33 +213,36 @@ describe('per-object high-level version tools (#30)', () => {
       (e) => e.toolDefinition.name,
     );
     for (const name of expected) {
-      expect(registered).toContain(name);
+      assert.ok(registered.includes(name));
     }
     // no duplicate tool names in the whole HighLevel group
-    expect(new Set(registered).size).toBe(registered.length);
+    assert.equal(new Set(registered).size, registered.length);
     // program version tools are on premise and cloud in the registered set
     const prog = group
       .getHandlers()
       .find((e) => e.toolDefinition.name === 'GetProgramVersions');
-    expect(prog?.toolDefinition.available_in).toEqual(['onprem', 'cloud']);
+    assert.deepStrictEqual(prog?.toolDefinition.available_in, [
+      'onprem',
+      'cloud',
+    ]);
   });
 
   it('program version tools are on premise and cloud (mirrors GetProgram)', () => {
     for (const name of ['GetProgramVersions', 'GetProgramVersionSource']) {
-      expect(tool(name).toolDefinition.available_in).toEqual([
+      assert.deepStrictEqual(tool(name).toolDefinition.available_in, [
         'onprem',
         'cloud',
       ]);
     }
     // class is both modern environments (mirrors GetClass)
-    expect(tool('GetClassVersions').toolDefinition.available_in).toEqual([
-      'onprem',
-      'cloud',
-    ]);
+    assert.deepStrictEqual(
+      tool('GetClassVersions').toolDefinition.available_in,
+      ['onprem', 'cloud'],
+    );
     // table omits legacy (mirrors GetTable)
-    expect(tool('GetTableVersions').toolDefinition.available_in).toEqual([
-      'onprem',
-      'cloud',
-    ]);
+    assert.deepStrictEqual(
+      tool('GetTableVersions').toolDefinition.available_in,
+      ['onprem', 'cloud'],
+    );
   });
 });

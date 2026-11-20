@@ -24,8 +24,8 @@ import * as ts from 'typescript';
 import { repositoryRoot } from '../../../helpers/repoRoot';
 
 /**
- * The repository root, found from here under Jest and from the node:test
- * build (`.test-build/tree/`) alike: never a count of `..` from `__dirname`.
+ * The repository root, found from here in the test build
+ * (`.test-build/tree/`): never a count of `..` from `__dirname`.
  */
 export const REPO = repositoryRoot(__dirname);
 

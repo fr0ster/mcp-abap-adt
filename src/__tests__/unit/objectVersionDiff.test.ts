@@ -9,26 +9,33 @@
  * SAP-free via a mocked AdtClient.
  */
 
-const mockClassGetVersionSource = jest.fn();
-const mockGetClass = jest.fn();
-
-jest.mock('../../lib/clients', () => ({
-  // The declared variant the boundary checks a type argument against.
-  variantOf: () => 'onprem',
-  createAdtClient: () => ({
-    getClass: mockGetClass,
-  }),
-}));
-
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it, mock } from 'node:test';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { buildObjectVersionTools } from '../../handlers/common/high/objectVersionTools';
 import {
   TOOL_DEFINITION as GET_OBJECT_VERSION_DIFF,
   handleGetObjectVersionDiff,
 } from '../../handlers/common/readonly/handleGetObjectVersionDiff';
+import * as clients from '../../lib/clients';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
 import { defineTool } from '../../lib/handlers/interfaces';
+import { assertRejects } from '../helpers/assertions';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+import { stateSystemKind } from '../helpers/systemKind';
+
+// Made afresh before each case: no one-off answer a case
+// left unconsumed reaches the next one.
+let mockClassGetVersionSource = mock.fn<(...args: any[]) => any>();
+let mockGetClass = mock.fn<(...args: any[]) => any>();
+
+// The declared variant the boundary checks a type argument against.
+// The declared variant: the kind stated, read by the real variantOf.
+stateSystemKind('onprem');
+mock.method(clients, 'createAdtClient', () => ({
+  // This case's mock, read when the client is asked.
+  getClass: (...args: any[]) => mockGetClass(...args),
+}));
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -47,16 +54,24 @@ function tool(name: string) {
 }
 
 beforeEach(() => {
-  mockClassGetVersionSource.mockReset();
-  mockGetClass.mockReset();
-  mockGetClass.mockReturnValue({ getVersionSource: mockClassGetVersionSource });
+  mockClassGetVersionSource = mock.fn<(...args: any[]) => any>();
+  mockGetClass = mock.fn<(...args: any[]) => any>(() => ({
+    getVersionSource: mockClassGetVersionSource,
+  }));
 });
 
 describe('version diff tools (#30)', () => {
   it('generic GetObjectVersionDiff fetches both uris and reports differences', async () => {
-    mockClassGetVersionSource
-      .mockResolvedValueOnce(okResponse('line one\nold middle\nline three\n'))
-      .mockResolvedValueOnce(okResponse('line one\nnew middle\nline three\n'));
+    // Two calls, each answered once, by the call index they are for.
+    const first = mockClassGetVersionSource.mock.callCount();
+    mockClassGetVersionSource.mock.mockImplementationOnce(
+      async () => okResponse('line one\nold middle\nline three\n'),
+      first,
+    );
+    mockClassGetVersionSource.mock.mockImplementationOnce(
+      async () => okResponse('line one\nnew middle\nline three\n'),
+      first + 1,
+    );
 
     const result = await handleGetObjectVersionDiff(ctx, {
       object_type: 'class',
@@ -65,29 +80,41 @@ describe('version diff tools (#30)', () => {
       content_uri_to: '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockClassGetVersionSource).toHaveBeenCalledTimes(2);
-    expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
-      1,
-      '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
-      expect.objectContaining({ analyse: expect.any(Function) }),
-    );
-    expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
-      2,
-      '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
-      expect.objectContaining({ analyse: expect.any(Function) }),
-    );
+    assert.equal(result.isError, false);
+    assert.equal(mockClassGetVersionSource.mock.callCount(), 2);
+    {
+      const called: any[] =
+        mockClassGetVersionSource.mock.calls[0]?.arguments ?? [];
+      assert.equal(called.length, 2);
+      assert.deepStrictEqual(
+        called[0],
+        '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      );
+      assert.ok(typeof called[1]?.analyse === 'function');
+    }
+    {
+      const called: any[] =
+        mockClassGetVersionSource.mock.calls[1]?.arguments ?? [];
+      assert.equal(called.length, 2);
+      assert.deepStrictEqual(
+        called[0],
+        '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
+      );
+      assert.ok(typeof called[1]?.analyse === 'function');
+    }
 
     const data = payload(result);
-    expect(data.success).toBe(true);
-    expect(data.object_type).toBe('class');
-    expect(data.identical).toBe(false);
-    expect(data.diff).toContain('-old middle');
-    expect(data.diff).toContain('+new middle');
+    assert.equal(data.success, true);
+    assert.equal(data.object_type, 'class');
+    assert.equal(data.identical, false);
+    assert.ok(data.diff.includes('-old middle'));
+    assert.ok(data.diff.includes('+new middle'));
   });
 
   it('generic GetObjectVersionDiff reports identical:true for equal sources', async () => {
-    mockClassGetVersionSource.mockResolvedValue(okResponse('same\nsource\n'));
+    mockClassGetVersionSource.mock.mockImplementation(async () =>
+      okResponse('same\nsource\n'),
+    );
 
     const result = await handleGetObjectVersionDiff(ctx, {
       object_type: 'class',
@@ -95,13 +122,13 @@ describe('version diff tools (#30)', () => {
       content_uri_to: '/x?version=00002',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const data = payload(result);
-    expect(data.identical).toBe(true);
+    assert.equal(data.identical, true);
   });
 
   it('refuses an unknown object_type at the schema', async () => {
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(GET_OBJECT_VERSION_DIFF, handleGetObjectVersionDiff).call(
         ctx,
         {
@@ -110,43 +137,55 @@ describe('version diff tools (#30)', () => {
           content_uri_to: '/x?version=00002',
         },
       ),
-    ).rejects.toThrow('Invalid arguments for tool GetObjectVersionDiff: ');
+      'Invalid arguments for tool GetObjectVersionDiff: ',
+    );
     await refused;
-    expect(mockClassGetVersionSource).not.toHaveBeenCalled();
+    assert.equal(mockClassGetVersionSource.mock.callCount(), 0);
   });
 
   it('per-object GetClassVersionDiff forwards both content_uris', async () => {
-    mockClassGetVersionSource
-      .mockResolvedValueOnce(okResponse('a\n'))
-      .mockResolvedValueOnce(okResponse('b\n'));
+    // Two calls, each answered once, by the call index they are for.
+    const first = mockClassGetVersionSource.mock.callCount();
+    mockClassGetVersionSource.mock.mockImplementationOnce(
+      async () => okResponse('a\n'),
+      first,
+    );
+    mockClassGetVersionSource.mock.mockImplementationOnce(
+      async () => okResponse('b\n'),
+      first + 1,
+    );
 
     const result = await tool('GetClassVersionDiff').handler(ctx, {
       content_uri_from: '/cls?version=00001',
       content_uri_to: '/cls?version=00002',
     });
 
-    expect(result.isError).toBe(false);
-    expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
-      1,
-      '/cls?version=00001',
-      expect.objectContaining({ analyse: expect.any(Function) }),
-    );
-    expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
-      2,
-      '/cls?version=00002',
-      expect.objectContaining({ analyse: expect.any(Function) }),
-    );
+    assert.equal(result.isError, false);
+    {
+      const called: any[] =
+        mockClassGetVersionSource.mock.calls[0]?.arguments ?? [];
+      assert.equal(called.length, 2);
+      assert.deepStrictEqual(called[0], '/cls?version=00001');
+      assert.ok(typeof called[1]?.analyse === 'function');
+    }
+    {
+      const called: any[] =
+        mockClassGetVersionSource.mock.calls[1]?.arguments ?? [];
+      assert.equal(called.length, 2);
+      assert.deepStrictEqual(called[0], '/cls?version=00002');
+      assert.ok(typeof called[1]?.analyse === 'function');
+    }
     const data = payload(result);
-    expect(data.identical).toBe(false);
-    expect(data.object_type).toBe('class');
+    assert.equal(data.identical, false);
+    assert.equal(data.object_type, 'class');
   });
 
   it('GetClassVersionDiff errors without both content_uris', async () => {
     const result = await tool('GetClassVersionDiff').handler(ctx, {
       content_uri_from: '/cls?version=00001',
     });
-    expect(result.isError).toBe(true);
-    expect(mockClassGetVersionSource).not.toHaveBeenCalled();
+    assert.equal(result.isError, true);
+    assert.equal(mockClassGetVersionSource.mock.callCount(), 0);
   });
 
   // adt-clients 19: "no version resource for this type" is a failure IN THE
@@ -160,7 +199,7 @@ describe('version diff tools (#30)', () => {
   // produce (see `handleGetObjectVersionDiff.ts`'s own comment on why
   // `unwrapVersionSource`/`buildVersionDiff` are no longer used here).
   it('generic GetObjectVersionDiff surfaces UNSUPPORTED_OPERATION as a refusal, code included', async () => {
-    mockClassGetVersionSource.mockResolvedValue(
+    mockClassGetVersionSource.mock.mockImplementation(async () =>
       refusedResponse('version diff not available', {
         code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       }),
@@ -173,21 +212,21 @@ describe('version diff tools (#30)', () => {
       content_uri_to: '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
     });
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const errText =
       (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
-    expect(errText).not.toContain('stack');
+    assert.ok(!errText.includes('stack'));
     const payload = JSON.parse(errText);
-    expect(payload.message).toBe('version diff not available');
-    expect(payload.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
-    expect(payload.origin).toBe('refusal');
+    assert.equal(payload.message, 'version diff not available');
+    assert.equal(payload.code, AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    assert.equal(payload.origin, 'refusal');
   });
 
   it('per-object GetClassVersionDiff answers the error of the read as it is, with its step', async () => {
     // `objectVersionTools.ts` (untouched by this task) still catches
     // `buildVersionDiff`'s throw and reads `.code` off it directly — a plain
     // reject here exercises exactly that path, same as before this migration.
-    mockClassGetVersionSource.mockResolvedValue(
+    mockClassGetVersionSource.mock.mockImplementation(async () =>
       refusedResponse('version diff not available', {
         code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
       }),
@@ -198,22 +237,22 @@ describe('version diff tools (#30)', () => {
       content_uri_to: '/cls?version=00002',
     });
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const errText =
       (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
-    expect(errText).not.toContain('stack');
+    assert.ok(!errText.includes('stack'));
     const payload = JSON.parse(errText);
-    expect(payload.message).toBe('version diff not available');
-    expect(payload.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
-    expect(payload.origin).toBe('refusal');
-    expect(payload.step).toBe('read version source (from)');
+    assert.equal(payload.message, 'version diff not available');
+    assert.equal(payload.code, AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    assert.equal(payload.origin, 'refusal');
+    assert.equal(payload.step, 'read version source (from)');
   });
 
   it('the factory builds 9 VersionDiff tools (28 total) and they register in High', () => {
     const names = buildObjectVersionTools().map((e) => e.toolDefinition.name);
     const diffNames = names.filter((n) => n.endsWith('VersionDiff'));
-    expect(diffNames.length).toBe(9);
-    expect(names.length).toBe(28);
+    assert.equal(diffNames.length, 9);
+    assert.equal(names.length, 28);
 
     const group = new HighLevelHandlersGroup({
       connection: {},
@@ -221,17 +260,17 @@ describe('version diff tools (#30)', () => {
     } as any);
     const registered = group.getHandlers().map((e) => e.toolDefinition.name);
     for (const n of diffNames) {
-      expect(registered).toContain(n);
+      assert.ok(registered.includes(n));
     }
     // class diff mirrors GetClass available_in
-    expect(tool('GetClassVersionDiff').toolDefinition.available_in).toEqual([
-      'onprem',
-      'cloud',
-    ]);
+    assert.deepStrictEqual(
+      tool('GetClassVersionDiff').toolDefinition.available_in,
+      ['onprem', 'cloud'],
+    );
     // program diff mirrors GetProgram: on premise and cloud
-    expect(tool('GetProgramVersionDiff').toolDefinition.available_in).toEqual([
-      'onprem',
-      'cloud',
-    ]);
+    assert.deepStrictEqual(
+      tool('GetProgramVersionDiff').toolDefinition.available_in,
+      ['onprem', 'cloud'],
+    );
   });
 });

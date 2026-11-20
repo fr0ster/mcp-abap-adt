@@ -4,10 +4,9 @@
  * (`@mcp-abap-adt/lib/auth`, `@mcp-abap-adt/core/auth`, …) and its source
  * entry, relative to the root (`./src/lib/auth/index.ts`).
  *
- * The one copy of that list: the type checker reads it through `extends`
- * (`tsconfig.test.json`), Jest's `moduleNameMapper` is built from it
- * (`jest.config.js`), and the node:test resolve hook answers its names
- * (`resolveHook.ts`). This reads it for the TypeScript side; the file is data
+ * The one copy of that list: the type checker and the test build read it
+ * through `extends` (`tsconfig.test.json`, `tsconfig.node-test.json`), and
+ * the test resolve hook answers its names (`resolveHook.ts`). This reads it for the TypeScript side; the file is data
  * from outside the type system, so its shape is checked here.
  */
 import { readFileSync } from 'node:fs';

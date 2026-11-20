@@ -4,15 +4,28 @@
  * `node-gyp-build` aliased to the embedded-addon loader, the version modules
  * fixed in the stage.
  */
+
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { after, describe, it } from 'node:test';
 import { build } from 'esbuild';
+import { assertThrows } from '../../helpers/assertions';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const readings = require('../../../../scripts/portable/readings.cjs');
-const bundling = require('../../../../scripts/portable/bundling.cjs');
-const args = require('../../../../scripts/portable/args.cjs');
-const tools = require('../../../../scripts/portable/tools.cjs');
+const readings = require(
+  path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'readings.cjs'),
+);
+const bundling = require(
+  path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'bundling.cjs'),
+);
+const args = require(
+  path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'args.cjs'),
+);
+const tools = require(
+  path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'tools.cjs'),
+);
 
 const made: string[] = [];
 const tmp = () => {
@@ -20,26 +33,28 @@ const tmp = () => {
   made.push(dir);
   return dir;
 };
-afterAll(() => {
+after(() => {
   for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
 });
 
 describe('versions and environment keys', () => {
   it('takes a semver with a pre-release or a dist-tag, nothing else', () => {
     for (const ok of ['1.2.3', '24.0.0-alpha.6', 'latest', 'next-1']) {
-      expect(readings.isVersionSpec(ok)).toBe(true);
+      assert.equal(readings.isVersionSpec(ok), true);
     }
     for (const bad of ['1.2', '1.2.3-', 'Latest', '1.2.3 ', '', '1..3']) {
-      expect(readings.isVersionSpec(bad)).toBe(false);
+      assert.equal(readings.isVersionSpec(bad), false);
     }
-    expect(() => args.parseArgs(['--version=1.2'], 'linux-x64')).toThrow(
+    assertThrows(
+      () => args.parseArgs(['--version=1.2'], 'linux-x64'),
       'not a version',
     );
   });
   it('drops npm settings in any case, keeps the rest', () => {
-    expect(
+    assert.deepStrictEqual(
       readings.withoutNpmSettings({ npm_a: '1', NPM_B: '2', PATH: 'p' }),
-    ).toEqual({ PATH: 'p' });
+      { PATH: 'p' },
+    );
   });
   it('drops the keys that state a system, in any case', () => {
     const env = tools.smokeEnv(
@@ -53,40 +68,44 @@ describe('versions and environment keys', () => {
       'lib.so',
       () => false,
     );
-    expect(env).toEqual({ HOME: 'h' });
+    assert.deepStrictEqual(env, { HOME: 'h' });
     // A long s upper-cases to S: no Unicode case mapping, the key stays.
-    expect(
+    assert.deepStrictEqual(
       tools.smokeEnv({ '\u017FAP_URL': 'x' }, 'lib.so', () => false),
-    ).toEqual({ '\u017FAP_URL': 'x' });
+      { '\u017FAP_URL': 'x' },
+    );
   });
   it('starts npm through a .js or .cjs npm_execpath', () => {
     const exists = () => true;
     for (const file of ['/n/npm-cli.js', '/n/npm-cli.cjs']) {
-      expect(
+      assert.deepStrictEqual(
         tools.npmCommand({
           env: { npm_execpath: file },
           execPath: '/node',
           exists,
         }).args,
-      ).toEqual([file]);
+        [file],
+      );
     }
-    expect(
+    assert.equal(
       tools.npmCommand({
         env: { npm_execpath: '/n/npm-cli.mjs' },
         execPath: '/node',
         platform: 'linux',
         exists,
       }).cmd,
-    ).toBe('npm');
+      'npm',
+    );
   });
 });
 
 describe('tool output', () => {
   it("drops otool's offset after an LC_RPATH path", () => {
-    expect(readings.withoutOffset('@loader_path (offset 12)')).toBe(
+    assert.equal(
+      readings.withoutOffset('@loader_path (offset 12)'),
       '@loader_path',
     );
-    expect(readings.withoutOffset('/a (offset x)')).toBe('/a (offset x)');
+    assert.equal(readings.withoutOffset('/a (offset x)'), '/a (offset x)');
   });
   it('reads the dynamic entries of readelf -d and what the patch must leave', () => {
     const output = [
@@ -98,29 +117,33 @@ describe('tool output', () => {
       ' 0x000000000000000c (INIT)               0x1000',
     ].join('\n');
     const entries = readings.dynamicEntries(output);
-    expect(entries).toEqual([
+    assert.deepStrictEqual(entries, [
       '(NEEDED)             Shared library: [libsapnwrfc.so]',
       '(SONAME)             Library soname: [x.node]',
       '(RUNPATH)            Library runpath: [/opt/sdk]',
     ]);
-    expect(readings.expectedDynamicEntries(entries)).toEqual([
+    assert.deepStrictEqual(readings.expectedDynamicEntries(entries), [
       '(NEEDED) Shared library: [libsapnwrfc.so]',
       '(SONAME) Library soname: [x.node]',
       '(RUNPATH) Library runpath: [$ORIGIN]',
     ]);
-    expect(readings.expectedDynamicEntries(entries.slice(0, 2))).toEqual([
-      '(NEEDED) Shared library: [libsapnwrfc.so]',
-      '(RUNPATH) Library runpath: [$ORIGIN]',
-    ]);
+    assert.deepStrictEqual(
+      readings.expectedDynamicEntries(entries.slice(0, 2)),
+      [
+        '(NEEDED) Shared library: [libsapnwrfc.so]',
+        '(RUNPATH) Library runpath: [$ORIGIN]',
+      ],
+    );
   });
   it("reads the server's own stderr for the SDK and an RFC key", () => {
-    expect(readings.sdkMissing('x needs the SAP NW RFC SDK y')).toBe(true);
-    expect(readings.sdkMissing('all fine')).toBe(false);
-    expect(
+    assert.equal(readings.sdkMissing('x needs the SAP NW RFC SDK y'), true);
+    assert.equal(readings.sdkMissing('all fine'), false);
+    assert.equal(
       readings.namesRfcKey('[MCP] failed (RFC_COMMUNICATION_FAILURE)'),
-    ).toBe(true);
-    expect(readings.namesRfcKey('[MCP] failed (RFC_)')).toBe(false);
-    expect(readings.namesRfcKey('[MCP] failed (rfc_x)')).toBe(false);
+      true,
+    );
+    assert.equal(readings.namesRfcKey('[MCP] failed (RFC_)'), false);
+    assert.equal(readings.namesRfcKey('[MCP] failed (rfc_x)'), false);
   });
 });
 
@@ -149,20 +172,21 @@ describe('bundling', () => {
       'dist/runtimeVersion.js',
     );
 
-    expect([...bundling.fixVersionModules(stage)].sort()).toEqual(
+    assert.deepStrictEqual(
+      [...bundling.fixVersionModules(stage)].sort(),
       [
         path.join(core, 'dist/coreVersion.js'),
         path.join(nested, 'dist/runtimeVersion.js'),
       ].sort(),
     );
-    expect(
+    assert.equal(
       fs.readFileSync(path.join(core, 'dist/coreVersion.js'), 'utf8'),
-    ).toBe(
       'exports.CORE_VERSION = "9.1.0";\nexports.CORE_PACKAGE = "@mcp-abap-adt/core";',
     );
-    expect(
+    assert.equal(
       fs.readFileSync(path.join(nested, 'dist/runtimeVersion.js'), 'utf8'),
-    ).toBe('exports.RUNTIME_VERSION = "2.0.0";');
+      'exports.RUNTIME_VERSION = "2.0.0";',
+    );
   });
 
   it('bundles node-gyp-build as the loader, wherever it is required', async () => {
@@ -177,7 +201,7 @@ describe('bundling', () => {
       bundling.bundleOptions({ entry, outfile, loader }),
     );
 
-    expect(result.errors).toEqual([]);
-    expect(fs.readFileSync(outfile, 'utf8')).toContain('THE-EMBEDDED-LOADER');
+    assert.deepStrictEqual(result.errors, []);
+    assert.ok(fs.readFileSync(outfile, 'utf8').includes('THE-EMBEDDED-LOADER'));
   });
 });

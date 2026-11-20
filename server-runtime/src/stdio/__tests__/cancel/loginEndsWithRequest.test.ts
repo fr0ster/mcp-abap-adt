@@ -7,9 +7,9 @@
  * afterwards.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import { bindsFree, type Stand, stand, until } from '../helpers/loginStand';
-
-jest.setTimeout(30_000);
 
 let s: Stand;
 
@@ -26,18 +26,18 @@ it('a cancel during the login aborts nothing; the session’s end ends it aborte
   const r1 = s.call('r1');
   await s.browser.opened(1);
   r1.cancel();
-  expect(await r1.done).toBe('cancelled');
+  assert.equal(await r1.done, 'cancelled');
 
   // The login goes on: no outcome, the call live.
   await new Promise((resolve) => setTimeout(resolve, 300));
-  expect(s.logins).toEqual([]);
-  expect(s.active()).toBe(1);
+  assert.deepStrictEqual(s.logins, []);
+  assert.equal(s.active(), 1);
 
   await s.client.close();
   await until(() => s.logins.length === 1);
-  expect(s.logins).toEqual(['aborted']);
+  assert.deepStrictEqual(s.logins, ['aborted']);
   await until(() => s.active() === 0);
   await bindsFree(s.browser.ports[0]);
-  expect(s.tokens.grants).toEqual([]);
-  expect(s.reached('r1')).toBe(false);
+  assert.deepStrictEqual(s.tokens.grants, []);
+  assert.equal(s.reached('r1'), false);
 });

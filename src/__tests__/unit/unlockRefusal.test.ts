@@ -5,9 +5,13 @@
  * A credential failure on the unlock ends the call: it is the answer, as it
  * came (adt-clients 33 rejects with it; nothing after it is sent).
  */
+
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
+import * as clients from '../../lib/clients';
 import {
   fakeClientOf,
   okResponse,
@@ -15,8 +19,9 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
 const DOCUMENT =
   '<?xml version="1.0" encoding="utf-8"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework">' +
@@ -64,10 +69,10 @@ describe('an atomic write whose unlock is refused (a client double)', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const payload = payloadOf(result);
-    expect(payload.cleanup.message).toBe('Unlock refused');
-    expect(payload.cleanup.failures).toEqual([
+    assert.equal(payload.cleanup.message, 'Unlock refused');
+    assert.deepStrictEqual(payload.cleanup.failures, [
       { message: 'Unlock refused', ...UNLOCK_ENTRY },
     ]);
   });
@@ -82,10 +87,10 @@ describe('an atomic write whose unlock is refused (a client double)', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = payloadOf(result);
-    expect(payload.message).toBe('Update refused');
-    expect(payload.cleanup.failures).toEqual([
+    assert.equal(payload.message, 'Update refused');
+    assert.deepStrictEqual(payload.cleanup.failures, [
       { message: 'Unlock refused', ...UNLOCK_ENTRY },
     ]);
   });
@@ -104,9 +109,9 @@ describe('an atomic write whose unlock is refused (a client double)', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const payload = payloadOf(result);
-    expect(payload.error).toBe('authentication_failed');
-    expect(payload.cleanup).toBeUndefined();
+    assert.equal(payload.error, 'authentication_failed');
+    assert.equal(payload.cleanup, undefined);
   });
 });

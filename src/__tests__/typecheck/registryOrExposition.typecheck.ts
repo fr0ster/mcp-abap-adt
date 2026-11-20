@@ -4,7 +4,7 @@
  * registry replaces, so beside one they did nothing. Each line marked
  * `@ts-expect-error` fails `npm run test:check` the moment it compiles.
  *
- * Nothing runs here: it is not a test file, and Jest never loads it.
+ * Nothing runs here: it is not a test file, and the runner never loads it.
  */
 
 import type { EmbeddableMcpServerOptions } from '../../embeddable/EmbeddableMcpServer';

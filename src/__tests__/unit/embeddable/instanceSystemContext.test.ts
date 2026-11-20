@@ -7,6 +7,8 @@
  * On a connection the host injected it names a background run's caller too.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -90,18 +92,18 @@ it('two instances each create under their own responsible', async () => {
     handlersRegistry: contextProbe,
     systemContext: { responsible: 'SECOND_USER' },
   });
-  expect(await probe(first)).toEqual({
+  assert.deepStrictEqual(await probe(first), {
     responsible: 'FIRST_USER',
     masterSystem: 'ONE',
   });
-  expect(await probe(second)).toEqual({ responsible: 'SECOND_USER' });
+  assert.deepStrictEqual(await probe(second), { responsible: 'SECOND_USER' });
   // The process context is not the option's.
-  expect(getSystemContext()).toEqual({});
+  assert.deepStrictEqual(getSystemContext(), {});
 });
 
 it("names a background run's caller on an injected connection", async () => {
   const strategy = new InMemoryBackgroundRuns();
-  const listed = jest.spyOn(strategy, 'list');
+  const listed = mock.method(strategy, 'list');
   const server = new EmbeddableMcpServer({
     connection: {
       getBaseUrl: async () => 'https://system.example.invalid',
@@ -124,7 +126,7 @@ it("names a background run's caller on an injected connection", async () => {
     }
   )._registeredTools;
   const result = await tools.ListBackgroundRuns.handler({});
-  expect(result.content[0]?.text).not.toContain('system_user_unknown');
-  expect(result.isError).toBeFalsy();
-  expect(listed.mock.calls.at(-1)?.[0].user).toBe('OWNER_USER');
+  assert.ok(!result.content[0]?.text.includes('system_user_unknown'));
+  assert.ok(!result.isError);
+  assert.equal(listed.mock.calls.at(-1)?.arguments[0].user, 'OWNER_USER');
 });

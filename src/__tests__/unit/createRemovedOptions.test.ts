@@ -8,6 +8,9 @@
  * request, naming it.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { listedTool, statedEnvironment } from '../../lib/listedTool';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { listedJson } from '../helpers/listedJson';
@@ -32,17 +35,19 @@ function listedProperties(tool: string, variant: SystemKind): string[] {
 }
 
 describe('no listed schema names abstract or program_type', () => {
-  it.each([
+  for (const [tool, variant, removed] of [
     ['CreateClass', 'onprem', 'abstract'],
     ['CreateClass', 'cloud', 'abstract'],
     ['CreateProgram', 'onprem', 'program_type'],
     ['HandlerCreate', 'onprem', 'program_type'],
     ['HandlerCreate', 'cloud', 'program_type'],
-  ] as const)('%s (%s) lists no %s', (tool, variant, removed) => {
-    const properties = listedProperties(tool, variant);
-    expect(properties.length).toBeGreaterThan(0);
-    expect(properties).not.toContain(removed);
-  });
+  ] as const) {
+    it(format('%s (%s) lists no %s', tool, variant, removed), () => {
+      const properties = listedProperties(tool, variant);
+      assert.ok(properties.length > 0);
+      assert.ok(!properties.includes(removed));
+    });
+  }
 });
 
 /** A create given a removed option: the tool, its arguments, the option. */
@@ -82,10 +87,16 @@ const GIVEN = [
   },
 ] as const;
 
+/** `args` as its title shows it: keys sorted, `"key": value`. */
+const shownArgs = (args: Readonly<Record<string, string | boolean>>) =>
+  `{${Object.keys(args)
+    .sort()
+    .map((key) => `"${key}": ${JSON.stringify(args[key])}`)
+    .join(', ')}}`;
+
 describe('a call that still gives abstract or program_type: refused before any request, naming it', () => {
-  it.each(GIVEN)(
-    '$tool ($variant) $args',
-    async ({ tool, variant, args, option }) => {
+  for (const { tool, variant, args, option } of GIVEN) {
+    it(`${tool} (${variant}) ${shownArgs(args)}`, async () => {
       const recording = await recordCase({
         tool,
         variant,
@@ -93,10 +104,10 @@ describe('a call that still gives abstract or program_type: refused before any r
         args,
         expected: 'none',
       });
-      expect(recording.requests).toEqual([]);
+      assert.deepStrictEqual(recording.requests, []);
       const message =
         recording.thrown instanceof Error ? recording.thrown.message : '';
-      expect(message).toContain(`${option} is not an argument of ${tool}`);
-    },
-  );
+      assert.ok(message.includes(`${option} is not an argument of ${tool}`));
+    });
+  }
 });

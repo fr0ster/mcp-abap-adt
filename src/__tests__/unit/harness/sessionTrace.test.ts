@@ -5,6 +5,9 @@
  * problems: more than one context on one connection, a context on a
  * stateless one, a session never logged off.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { readSessionTrace } from '../../integration/helpers/sessionTrace';
 
 const req = (
@@ -48,8 +51,8 @@ describe('readSessionTrace', () => {
       req(4, 'GET /sap/public/bc/icf/logoff', 0, 'aaa', '-', 200),
       res(4, 200, '-', '-', 260),
     ]);
-    expect(trace.problems).toEqual([]);
-    expect(trace.sessions).toEqual([
+    assert.deepStrictEqual(trace.problems, []);
+    assert.deepStrictEqual(trace.sessions, [
       {
         sec: 'aaa',
         stateful: true,
@@ -73,12 +76,12 @@ describe('readSessionTrace', () => {
       req(3, 'GET /y', 0, 'ccc', '-', 5),
       req(4, 'GET /sap/public/bc/icf/logoff', 0, 'ccc', '-', 6),
     ]);
-    expect(trace.problems).toEqual([
+    assert.deepStrictEqual(trace.problems, [
       'security session #1: 2 ABAP contexts on one connection',
       'security session #1: never logged off',
       'security session #2: its logoff was answered no answer, not 200',
     ]);
-    expect(trace.sessions[1]?.logoff).toEqual({ status: 'no answer' });
+    assert.deepStrictEqual(trace.sessions[1]?.logoff, { status: 'no answer' });
   });
 
   it('a logoff answered other than 200 is a problem: SAP did not say the session ended', () => {
@@ -87,9 +90,9 @@ describe('readSessionTrace', () => {
       req(2, 'GET /sap/public/bc/icf/logoff', 0, 'ddd', '-', 2),
       res(2, 500, '-', '-', 3),
     ]);
-    expect(trace.problems).toEqual([
+    assert.deepStrictEqual(trace.problems, [
       'security session #1: its logoff was answered 500, not 200',
     ]);
-    expect(trace.sessions[0]?.logoff).toEqual({ status: '500', ms: 1 });
+    assert.deepStrictEqual(trace.sessions[0]?.logoff, { status: '500', ms: 1 });
   });
 });

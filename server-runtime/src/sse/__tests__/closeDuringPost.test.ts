@@ -7,6 +7,8 @@
  * registry.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import {
   isLockOf,
@@ -21,22 +23,20 @@ import {
   until,
 } from './shutdown/harness';
 
-jest.setTimeout(30_000);
-
 let s: SseStand;
 
 beforeEach(async () => {
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(console, 'error', () => {});
   s = await sseStand();
 });
 
 afterEach(async () => {
   await s.close();
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
-it('the POST body completes after the close: refused, nothing sent, one instance close, no registry entry left', async () => {
-  const letGo = jest.spyOn(BaseMcpServer.prototype, 'letGoOfState');
+it('the POST body completes after the close: refused, nothing sent, one instance close, no registry entry left', async (t) => {
+  const letGo = t.mock.method(BaseMcpServer.prototype, 'letGoOfState');
   const connection = await s.open();
   const late = halfPost(
     s.port,
@@ -50,11 +50,11 @@ it('the POST body completes after the close: refused, nothing sent, one instance
   connection.close();
   await until(() => letGo.mock.calls.length === 1);
   const answered = await late.finish();
-  expect(answered.status).toBe(400);
+  assert.equal(answered.status, 400);
   await turns(20);
-  expect(s.indexOf(isLockOf('LATE'))).toBe(-1);
-  expect(letGo).toHaveBeenCalledTimes(1);
-  expect(activeTools()).toEqual([]);
+  assert.equal(s.indexOf(isLockOf('LATE')), -1);
+  assert.equal(letGo.mock.callCount(), 1);
+  assert.deepStrictEqual(activeTools(), []);
 });
 
 it('a message parsed before the close and dispatched after it: refused by the instance latch, before any connection', async () => {
@@ -69,7 +69,7 @@ it('a message parsed before the close and dispatched after it: refused by the in
       >;
     }
   ).sessions.get(connection.sessionId);
-  expect(entry).toBeDefined();
+  assert.notEqual(entry, undefined);
   // A tool runs, so the instance close waits for it: the stream is still open.
   const hold = s.standIn.hold((r) => isUpdateOf('A')(r.url));
   await connection.call('LockedUpdate', { id: 'A' }, 1);
@@ -87,8 +87,8 @@ it('a message parsed before the close and dispatched after it: refused by the in
     params: { name: 'LockedUpdate', arguments: { id: 'LATE' } },
   });
   await turns(20);
-  expect(s.indexOf(isLockOf('LATE'))).toBe(-1);
+  assert.equal(s.indexOf(isLockOf('LATE')), -1);
   hold.release();
   await until(() => activeTools().length === 0);
-  expect(s.indexOf(isLockOf('LATE'))).toBe(-1);
+  assert.equal(s.indexOf(isLockOf('LATE')), -1);
 });

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../lib/answer';
 
@@ -20,8 +22,8 @@ describe('answer — the boundary covers the whole pipeline', () => {
       async () => success('source'),
       (v) => v,
     );
-    expect(result.isError).toBe(false);
-    expect(result.content[0].text).toBe('source');
+    assert.equal(result.isError, false);
+    assert.equal(result.content[0].text, 'source');
   });
 
   it('names a throw from the client member client_threw', async () => {
@@ -33,10 +35,10 @@ describe('answer — the boundary covers the whole pipeline', () => {
       (v) => v,
     );
     const payload = JSON.parse(result.content[0].text);
-    expect(result.isError).toBe(true);
-    expect(payload.error).toBe('client_threw');
-    expect(payload.message).toBe('unsupported operation');
-    expect(payload.origin).toBeUndefined();
+    assert.equal(result.isError, true);
+    assert.equal(payload.error, 'client_threw');
+    assert.equal(payload.message, 'unsupported operation');
+    assert.equal(payload.origin, undefined);
   });
 
   it('names a throw from anything after the call adapter_threw', async () => {
@@ -48,9 +50,9 @@ describe('answer — the boundary covers the whole pipeline', () => {
       },
     );
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.error).toBe('adapter_threw');
-    expect(payload.message).toBe('unexpected shape');
-    expect(payload.origin).toBeUndefined();
+    assert.equal(payload.error, 'adapter_threw');
+    assert.equal(payload.message, 'unexpected shape');
+    assert.equal(payload.origin, undefined);
   });
 
   it('names a throw from reading the failure adapter_threw too', async () => {
@@ -70,8 +72,8 @@ describe('answer — the boundary covers the whole pipeline', () => {
       (v) => v,
     );
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.error).toBe('adapter_threw');
-    expect(payload.message).toBe('the strategy could not build its error');
+    assert.equal(payload.error, 'adapter_threw');
+    assert.equal(payload.message, 'the strategy could not build its error');
   });
 
   it('names the tool and the detail, so a local failure says where it happened', async () => {
@@ -83,8 +85,8 @@ describe('answer — the boundary covers the whole pipeline', () => {
       (v) => v,
     );
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.tool).toBe('DeleteInterface');
-    expect(payload.detail).toBe('raw');
+    assert.equal(payload.tool, 'DeleteInterface');
+    assert.equal(payload.detail, 'raw');
   });
 
   it('survives a thrown value that is not an Error', async () => {
@@ -95,7 +97,7 @@ describe('answer — the boundary covers the whole pipeline', () => {
       },
       (v) => v,
     );
-    expect(JSON.parse(result.content[0].text).message).toBe('a bare string');
+    assert.equal(JSON.parse(result.content[0].text).message, 'a bare string');
   });
 
   it('still answers a server refusal as a refusal, not as a local failure', async () => {
@@ -116,7 +118,7 @@ describe('answer — the boundary covers the whole pipeline', () => {
         )
       ).content[0].text,
     );
-    expect(payload.origin).toBe('refusal');
-    expect(payload.error).toBeUndefined();
+    assert.equal(payload.origin, 'refusal');
+    assert.equal(payload.error, undefined);
   });
 });

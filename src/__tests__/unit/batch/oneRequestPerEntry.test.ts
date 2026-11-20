@@ -22,6 +22,9 @@
  * holds one kind, and every batch end sends one envelope.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { eligible } from '../../../lib/batch/eligibility';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../../lib/systemContext';
@@ -53,37 +56,49 @@ describe('no request of a batch entry waits for another answer', () => {
     (c) => [`${c.tool} ${JSON.stringify(c.args)}`, c] as const,
   );
 
-  it.each(cases)('%s: the table admits it', (_name, c) => {
-    expect(eligible(c.tool, c.args, c.connection ?? 'http')).toEqual({
-      ok: true,
-    });
-  });
-
-  it.each(cases)(
-    '%s: every request goes out before any answer, all of one session kind, the same answered with a document or 404',
-    async (_name, c) => {
-      const held = await runCase(tools, context, c, 'pending');
-      const documented = await runCase(tools, context, c, 'document');
-      const refused = await runCase(tools, context, c, 'not-found');
-      expect({
-        oneKind: new Set(held.kinds).size,
-        held: held.sent.length >= 1,
-        document: documented.sent,
-        notFound: refused.sent,
-        threw:
-          documented.threw === undefined ? undefined : String(documented.threw),
-        isError:
-          documented.answer?.isError === true
-            ? documented.answer.content?.[0]?.text
-            : false,
-      }).toEqual({
-        oneKind: 1,
-        held: true,
-        document: held.sent,
-        notFound: held.sent,
-        threw: undefined,
-        isError: false,
+  for (const [_name, c] of cases) {
+    it(format('%s: the table admits it', _name), () => {
+      assert.deepStrictEqual(eligible(c.tool, c.args, c.connection ?? 'http'), {
+        ok: true,
       });
-    },
-  );
+    });
+  }
+
+  for (const [_name, c] of cases) {
+    it(
+      format(
+        '%s: every request goes out before any answer, all of one session kind, the same answered with a document or 404',
+        _name,
+      ),
+      async () => {
+        const held = await runCase(tools, context, c, 'pending');
+        const documented = await runCase(tools, context, c, 'document');
+        const refused = await runCase(tools, context, c, 'not-found');
+        assert.deepStrictEqual(
+          {
+            oneKind: new Set(held.kinds).size,
+            held: held.sent.length >= 1,
+            document: documented.sent,
+            notFound: refused.sent,
+            threw:
+              documented.threw === undefined
+                ? undefined
+                : String(documented.threw),
+            isError:
+              documented.answer?.isError === true
+                ? documented.answer.content?.[0]?.text
+                : false,
+          },
+          {
+            oneKind: 1,
+            held: true,
+            document: held.sent,
+            notFound: held.sent,
+            threw: undefined,
+            isError: false,
+          },
+        );
+      },
+    );
+  }
 });

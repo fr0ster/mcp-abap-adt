@@ -13,6 +13,8 @@
  *   callback: refused before the system lookup, the callback not run.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
@@ -28,18 +30,16 @@ import type {
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { defaultSystemContextResolver } from '../../../lib/requestSystemResolution';
 
-jest.setTimeout(60_000);
-
 const saved = process.env.SAP_SYSTEM_TYPE;
 beforeEach(() => {
   delete process.env.SAP_SYSTEM_TYPE;
-  jest.spyOn(console, 'error').mockImplementation(() => {});
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(console, 'error', () => {});
+  mock.method(process.stderr, 'write', () => true);
 });
 afterEach(() => {
   if (saved === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = saved;
-  jest.restoreAllMocks();
+  mock.restoreAll();
 });
 
 /** A connection the factory built for `kind`; nothing it is asked reaches a system. */
@@ -52,12 +52,14 @@ function builtFor(kind: 'onprem' | 'cloud') {
     undefined,
     kind,
   );
-  const connect = jest
-    .spyOn(connection, 'connect')
-    .mockRejectedValue(new Error('connect was called'));
-  const sent = jest
-    .spyOn(connection, 'makeAdtRequest')
-    .mockRejectedValue(new Error('a request was sent'));
+  const connectCalled = new Error('connect was called');
+  const connect = mock.method(connection, 'connect', async () => {
+    throw connectCalled;
+  });
+  const requestSent = new Error('a request was sent');
+  const sent = mock.method(connection, 'makeAdtRequest', async () => {
+    throw requestSent;
+  });
   return { connection, connect, sent };
 }
 
@@ -97,9 +99,9 @@ it("a fresh connection of another kind than the server's is refused before its c
     object_name: 'Z*',
     background: false,
   });
-  expect(text).toContain('system_type_conflict');
-  expect(fresh.connect).not.toHaveBeenCalled();
-  expect(fresh.sent).not.toHaveBeenCalled();
+  assert.ok(text.includes('system_type_conflict'));
+  assert.equal(fresh.connect.mock.callCount(), 0);
+  assert.equal(fresh.sent.mock.callCount(), 0);
 });
 
 it('a provided context of another kind than the listing is refused, nothing connected', async () => {
@@ -118,9 +120,9 @@ it('a provided context of another kind than the listing is refused, nothing conn
   const server = new McpServer({ name: 'plain', version: '1.0.0' });
   group.registerHandlersOnCall(server, async () => provided);
   const text = await call(server, 'SearchObject', { object_name: 'Z*' });
-  expect(text).toContain('system_type_conflict');
-  expect(cloud.connect).not.toHaveBeenCalled();
-  expect(cloud.sent).not.toHaveBeenCalled();
+  assert.ok(text.includes('system_type_conflict'));
+  assert.equal(cloud.connect.mock.callCount(), 0);
+  assert.equal(cloud.sent.mock.callCount(), 0);
 });
 
 it("a registry's own callback on a connection of another kind is refused before the lookup", async () => {
@@ -143,7 +145,7 @@ it("a registry's own callback on a connection of another kind is refused before 
     systemContextResolver: defaultSystemContextResolver,
   });
   const text = await call(server, 'OwnTool', {});
-  expect(text).toContain('system_type_conflict');
-  expect(ran).toEqual([]);
-  expect(cloud.sent).not.toHaveBeenCalled();
+  assert.ok(text.includes('system_type_conflict'));
+  assert.deepStrictEqual(ran, []);
+  assert.equal(cloud.sent.mock.callCount(), 0);
 });

@@ -1,5 +1,3 @@
-import * as z from 'zod';
-
 /**
  * The batch end (spec §5), `HandlerBatch` with `action: 'end'` (named
  * BatchEnd below, as the spec does): the open communication batch executed
@@ -12,22 +10,16 @@ import * as z from 'zod';
  * sets'); the dispatch is the real one. The calls recorded are the compact
  * tools' (`HandlerGet`, `HandlerLock`, `HandlerUnlock`) and the test's own.
  */
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(),
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A long read outside a batch opens a connection of its own: a sibling
-  // of the stand's, built by the mock above.
-  siblingRecordOf: jest.fn(() => ({
-    settings: {},
-    credential: {},
-    kind: 'onprem',
-  })),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-}));
 
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time); the names not replaced stay real.
+// Every case restores every mock after it: they are replaced before each.
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
+import * as z from 'zod';
 import { answerRead } from '../../../lib/auth/answerFailure';
 import { failureOf } from '../../../lib/auth/failures';
 import {
@@ -39,11 +31,13 @@ import {
 } from '../../../lib/auth/serverRefusal';
 import { endsCommunicationBatch } from '../../../lib/batch/batchTools';
 import type { BatchAnswer } from '../../../lib/batch/InstanceBatch';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import type {
   HandlerContext,
   IHandlerGroup,
 } from '../../../lib/handlers/interfaces';
 import { HeldLocks } from '../../../lib/state/heldLocks';
+import { assertMatchObject, assertNoProperty } from '../../helpers/assertions';
 import type { InnerRequest, PartAnswer } from '../../helpers/batchEnvelope';
 import { envelopeResponse, statusError } from '../../helpers/batchEnvelope';
 import {
@@ -55,6 +49,20 @@ import {
 } from '../../helpers/batchStand';
 import { holding } from '../../helpers/heldLocks';
 import { withinTurns } from '../../helpers/withinTurns';
+
+beforeEach(() => {
+  mock.method(connectionFactory, 'createAbapConnection', () => undefined);
+  mock.method(connectionFactory, 'systemKindOf', () => 'onprem');
+  // A long read outside a batch opens a connection of its own: a sibling
+  // of the stand's, built by the mock above.
+  mock.method(connectionFactory, 'siblingRecordOf', () => ({
+    settings: {},
+    credential: {},
+    kind: 'onprem',
+  }));
+  // A view over a connection keeps its kind: the kind is mocked above.
+  mock.method(connectionFactory, 'withSystemKindOf', (view: object) => view);
+});
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -105,7 +113,7 @@ const asAnswer = (entry: unknown) => {
 const refusal = () =>
   authError.connection({ problem: 'refused-after-renewal', at: 'request' });
 
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => mock.restoreAll());
 
 const READ = {
   url: '/sap/bc/adt/programs/programs/prog_a/source/main',
@@ -166,14 +174,15 @@ describe('BatchEnd', () => {
       },
     });
     s.begin();
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerGet', {
         object_type: 'PROGRAM',
         program_name: 'PROG_A',
       }),
-    ).toEqual({
-      content: [],
-    });
+      {
+        content: [],
+      },
+    );
     const [recording] = s.built;
     // SAP ended the session between recording and BatchEnd: BatchEnd
     // takes a new connection; the recording call's is replaced.
@@ -181,8 +190,8 @@ describe('BatchEnd', () => {
     const ending = s.end();
     await sent;
     const [, taken] = s.built;
-    expect(s.built).toHaveLength(2);
-    expect(recording?.connection.disconnect).toHaveBeenCalledTimes(1);
+    assert.equal(s.built.length, 2);
+    assert.equal(recording?.calls.disconnect, 1);
     // While the envelope runs, SAP ends BatchEnd's session too: the next
     // call replaces it, and BatchEnd holds its use, so no logoff comes
     // under it.
@@ -192,15 +201,15 @@ describe('BatchEnd', () => {
       program_name: 'PROG_B',
     });
     await new Promise((r) => setImmediate(r));
-    expect(s.built).toHaveLength(3);
-    expect(taken?.connection.disconnect).not.toHaveBeenCalled();
+    assert.equal(s.built.length, 3);
+    assert.equal(taken?.calls.disconnect, 0);
     release();
     const { summary } = await ending;
-    expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
+    assert.deepStrictEqual(summary, { recorded: 1, sent: 1, received: 1 });
     await later;
-    expect(recording?.envelopes).toEqual([]);
-    expect(taken?.envelopes).toHaveLength(1);
-    expect(taken?.connection.disconnect).toHaveBeenCalledTimes(1);
+    assert.deepStrictEqual(recording?.envelopes, []);
+    assert.equal(taken?.envelopes.length, 1);
+    assert.equal(taken?.calls.disconnect, 1);
     await s.close();
   });
 
@@ -224,27 +233,30 @@ describe('BatchEnd', () => {
       object_name: 'CLAS_B',
     });
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBe(true);
-    expect(summary).toMatchObject({
+    assert.equal(answer.isError, true);
+    assertMatchObject(summary, {
       origin: 'connection',
       message: 'socket hang up',
       step: 'execute',
     });
-    expect(s.owner.mode()).toBe('off');
+    assert.equal(s.owner.mode(), 'off');
     // No map: every number of the batch answers BatchEnd's error.
     for (const entry of await s.answers([1, 2])) {
-      expect(asAnswer(entry)).toEqual(answer);
+      assert.deepStrictEqual(asAnswer(entry), answer);
     }
     const again = await s.call('HandlerBatch', { action: 'end' });
-    expect(again.isError).toBe(true);
-    expect(payloadOf(again)).toEqual({
+    assert.equal(again.isError, true);
+    assert.deepStrictEqual(payloadOf(again), {
       error: 'batch_mode_off',
       message: BATCH_MODE_OFF_WORDS,
     });
     // The batch's one envelope failed; nothing twice.
     const [connection] = s.built;
-    expect(connection?.envelopes.map((e) => e.parts.length)).toEqual([2]);
-    expect(s.executes).toHaveBeenCalledTimes(1);
+    assert.deepStrictEqual(
+      connection?.envelopes.map((e) => e.parts.length),
+      [2],
+    );
+    assert.equal(s.executes.mock.callCount(), 1);
     await s.close();
   });
 
@@ -267,13 +279,14 @@ describe('BatchEnd', () => {
     ];
     // The LOCK phase and the read phase, each its own batch.
     s.begin();
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerLock', {
         object_type: 'CLASS',
         object_name: 'CLAS_A',
       }),
-    ).toEqual({ content: [] });
-    expect((await s.end()).summary).toEqual({
+      { content: [] },
+    );
+    assert.deepStrictEqual((await s.end()).summary, {
       recorded: 1,
       sent: 1,
       received: 1,
@@ -290,20 +303,26 @@ describe('BatchEnd', () => {
         program_name: 'MISSING',
       }),
     ]) {
-      expect(answer).toEqual({ content: [] });
+      assert.deepStrictEqual(answer, { content: [] });
     }
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
+    assert.deepStrictEqual(summary, { recorded: 2, sent: 2, received: 2 });
     const entries = [...locked, ...(await s.answers([1, 2]))];
-    expect(entries.map((e) => e.number)).toEqual([1, 1, 2]);
-    expect(entries.map(asAnswer)).toEqual(direct);
-    expect(payloadOf(entries[0] as Answer).lock_handle).toBe(
+    assert.deepStrictEqual(
+      entries.map((e) => e.number),
+      [1, 1, 2],
+    );
+    assert.deepStrictEqual(entries.map(asAnswer), direct);
+    assert.equal(
+      payloadOf(entries[0] as Answer).lock_handle,
       LOCK_HANDLE_OF_XML,
     );
-    expect(payloadOf(entries[1] as Answer).source).toContain(
-      'source of /sap/bc/adt/programs/programs/prog_a/source/main',
+    assert.ok(
+      payloadOf(entries[1] as Answer).source.includes(
+        'source of /sap/bc/adt/programs/programs/prog_a/source/main',
+      ),
     );
-    expect(payloadOf(entries[2] as Answer)).toMatchObject({
+    assertMatchObject(payloadOf(entries[2] as Answer), {
       origin: 'connection',
       status: 404,
       raw_body: 'not here',
@@ -321,13 +340,14 @@ describe('BatchEnd', () => {
       program_name: 'PROG_A',
     });
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 2, sent: 4, received: 4 });
+    assert.deepStrictEqual(summary, { recorded: 2, sent: 4, received: 4 });
     const [envelope] = s.built[0]?.envelopes ?? [];
-    expect(envelope?.parts).toHaveLength(4);
+    assert.equal(envelope?.parts.length, 4);
     const [first] = await s.answers([1]);
-    expect(asAnswer(first)).toEqual(direct);
+    assert.deepStrictEqual(asAnswer(first), direct);
     // The draft's three reads went together, ahead of the program read.
-    expect(envelope?.parts.slice(0, 3).map((part) => part.url)).toEqual(
+    assert.deepStrictEqual(
+      envelope?.parts.slice(0, 3).map((part) => part.url),
       ['active', 'inactive', 'workingArea'].map(
         (version) => `${DRAFT_SOURCE}?version=${version}`,
       ),
@@ -359,19 +379,20 @@ describe('BatchEnd', () => {
       interface_name: 'INTF_A',
     });
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBe(true);
-    expect(summary).toEqual({
+    assert.equal(answer.isError, true);
+    assert.ok(Array.isArray(summary.messages));
+    assert.deepStrictEqual(summary, {
       message: 'Request failed with status code 500',
       origin: 'connection',
       step: 'execute',
       status: 500,
-      messages: expect.any(Array),
+      messages: summary.messages,
       raw_body: '<html>dump placeholder</html>',
     });
     for (const entry of await s.answers([1, 2])) {
-      expect(asAnswer(entry)).toEqual(answer);
+      assert.deepStrictEqual(asAnswer(entry), answer);
     }
-    expect(s.owner.mode()).toBe('off');
+    assert.equal(s.owner.mode(), 'off');
     await s.close();
   });
 
@@ -391,48 +412,60 @@ describe('BatchEnd', () => {
       interface_name: 'MISSING_TOO',
     });
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBeFalsy();
-    expect(summary).toEqual({ recorded: 3, sent: 3, received: 3 });
+    assert.ok(!answer.isError);
+    assert.deepStrictEqual(summary, { recorded: 3, sent: 3, received: 3 });
     await s.close();
   });
 
   it('the served HandlerBatch begin opens the batch; its end and answers execute and read it', async () => {
     const s = await batchStand({ tools: TOOLS, part: sap });
     const begun = await s.call('HandlerBatch', { action: 'begin' });
-    expect(payloadOf(begun)).toEqual({
-      batch: 'on',
-      state_handle: expect.any(String),
-    });
-    expect(s.owner.mode()).toBe('communication');
-    expect(
+    {
+      const begunPayload = payloadOf(begun);
+      assert.equal(typeof begunPayload.state_handle, 'string');
+      assert.deepStrictEqual(begunPayload, {
+        batch: 'on',
+        state_handle: begunPayload.state_handle,
+      });
+    }
+    assert.equal(s.owner.mode(), 'communication');
+    assert.deepStrictEqual(
       await s.call('HandlerGet', {
         object_type: 'PROGRAM',
         program_name: 'MISSING',
       }),
-    ).toEqual({
-      content: [],
-    });
+      {
+        content: [],
+      },
+    );
     await s.call('HandlerGet', {
       object_type: 'PROGRAM',
       program_name: 'PROG_A',
     });
     // Nothing was sent while recording.
-    expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(0);
+    assert.equal(s.built.flatMap((b) => b.envelopes).length, 0);
     const ended = await s.call('HandlerBatch', { action: 'end' });
-    expect(ended.isError).toBeFalsy();
-    expect(payloadOf(ended)).toEqual({ recorded: 2, sent: 2, received: 2 });
-    expect(s.owner.mode()).toBe('off');
-    expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(1);
+    assert.ok(!ended.isError);
+    assert.deepStrictEqual(payloadOf(ended), {
+      recorded: 2,
+      sent: 2,
+      received: 2,
+    });
+    assert.equal(s.owner.mode(), 'off');
+    assert.equal(s.built.flatMap((b) => b.envelopes).length, 1);
     const read = await s.call('HandlerBatch', {
       action: 'answers',
       numbers: [2, 1],
     });
     const entries = payloadOf(read) as BatchAnswer[];
-    expect(entries.map((e) => [e.number, e.isError === true])).toEqual([
-      [2, false],
-      [1, true],
-    ]);
-    expect(await s.answers([2, 1])).toEqual(entries);
+    assert.deepStrictEqual(
+      entries.map((e) => [e.number, e.isError === true]),
+      [
+        [2, false],
+        [1, true],
+      ],
+    );
+    assert.deepStrictEqual(await s.answers([2, 1]), entries);
     await s.close();
   });
 
@@ -444,17 +477,17 @@ describe('BatchEnd', () => {
       program_name: 'PROG_A',
     });
     await s.end();
-    expect((await s.answers([1]))[0]).toMatchObject({ number: 1 });
-    expect((await s.answers([1]))[0]).not.toHaveProperty('error');
+    assertMatchObject((await s.answers([1]))[0], { number: 1 });
+    assertNoProperty((await s.answers([1]))[0], 'error');
     s.begin();
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 0, sent: 0, received: 0 });
-    expect(await s.answers([1])).toEqual([
+    assert.deepStrictEqual(summary, { recorded: 0, sent: 0, received: 0 });
+    assert.deepStrictEqual(await s.answers([1]), [
       { number: 1, error: 'no_answer', message: 'no answer with that number' },
     ]);
-    expect(s.built[0]?.envelopes).toHaveLength(1);
-    expect(s.owner.mode()).toBe('off');
-    expect(s.owner.holdsState()).toBe(false);
+    assert.equal(s.built[0]?.envelopes.length, 1);
+    assert.equal(s.owner.mode(), 'off');
+    assert.equal(s.owner.holdsState(), false);
     await s.close();
   });
 
@@ -479,22 +512,22 @@ describe('BatchEnd', () => {
     await s.call('HandlerGet', { object_type: 'CLASS', class_name: 'CLAS_A' });
     const { answer } = await s.end();
     const read = failureOf(refused);
-    expect(read?.error).toBe('authentication_failed');
+    assert.equal(read?.error, 'authentication_failed');
     const expected = answerRead(read as never);
-    expect(answer).toEqual({
+    assert.deepStrictEqual(answer, {
       content: expected.content,
       isError: true,
     });
-    expect(s.owner.mode()).toBe('off');
+    assert.equal(s.owner.mode(), 'off');
     const entries = await s.answers([1, 2, 3]);
     for (const entry of entries) {
-      expect(asAnswer(entry)).toEqual({
+      assert.deepStrictEqual(asAnswer(entry), {
         content: expected.content,
         isError: true,
       });
     }
     // The batch's one envelope went out; nothing after it.
-    expect(s.built[0]?.envelopes).toHaveLength(1);
+    assert.equal(s.built[0]?.envelopes.length, 1);
     await s.close();
   });
 
@@ -522,12 +555,15 @@ describe('BatchEnd', () => {
     });
     const { answer } = await s.end();
     const expected = answerRead(failureOf(refused) as never);
-    expect(answer).toEqual({ content: expected.content, isError: true });
-    expect(s.owner.mode()).toBe('off');
+    assert.deepStrictEqual(answer, {
+      content: expected.content,
+      isError: true,
+    });
+    assert.equal(s.owner.mode(), 'off');
     for (const entry of await s.answers([1, 2])) {
-      expect(asAnswer(entry)).toEqual(answer);
+      assert.deepStrictEqual(asAnswer(entry), answer);
     }
-    expect(s.built[0]?.envelopes).toHaveLength(1);
+    assert.equal(s.built[0]?.envelopes.length, 1);
     await s.close();
   });
 
@@ -541,21 +577,28 @@ describe('BatchEnd', () => {
     await s.call('HandlerGet', { object_type: 'CLASS', class_name: 'CLAS_A' });
     s.failResolve(new AuthRefusedError(refusal(), 'logon'));
     const { answer } = await s.end();
-    expect(answer.isError).toBe(true);
-    expect(payloadOf(answer).error).toBe('authentication_failed');
-    expect(s.owner.mode()).toBe('off');
+    assert.equal(answer.isError, true);
+    assert.equal(payloadOf(answer).error, 'authentication_failed');
+    assert.equal(s.owner.mode(), 'off');
     const entries = await s.answers([1, 2]);
     for (const entry of entries) {
-      expect(asAnswer(entry)).toEqual(answer);
+      assert.deepStrictEqual(asAnswer(entry), answer);
     }
-    expect(s.executes).not.toHaveBeenCalled();
-    expect(s.built.flatMap((b) => b.envelopes)).toEqual([]);
-    expect(s.built.flatMap((b) => b.directs)).toEqual([]);
+    assert.equal(s.executes.mock.callCount(), 0);
+    assert.deepStrictEqual(
+      s.built.flatMap((b) => b.envelopes),
+      [],
+    );
+    assert.deepStrictEqual(
+      s.built.flatMap((b) => b.directs),
+      [],
+    );
     // Ended: a second BatchEnd is refused, and nothing recorded is sent.
-    expect(
+    assert.equal(
       payloadOf(await s.call('HandlerBatch', { action: 'end' })).error,
-    ).toBe('batch_mode_off');
-    expect(s.executes).not.toHaveBeenCalled();
+      'batch_mode_off',
+    );
+    assert.equal(s.executes.mock.callCount(), 0);
     await s.close();
   });
 
@@ -564,7 +607,7 @@ describe('BatchEnd', () => {
     off.begin();
     await off.call('HandlerGet', DRAFT_ARGS);
     await off.end();
-    expect((await off.answers([1]))[0]).not.toHaveProperty('raw');
+    assertNoProperty((await off.answers([1]))[0], 'raw');
     await off.close();
 
     const on = await batchStand({
@@ -586,7 +629,8 @@ describe('BatchEnd', () => {
     });
     await on.end();
     const [unlock] = await on.answers([1]);
-    expect((read as BatchAnswer).raw).toEqual(
+    assert.deepStrictEqual(
+      (read as BatchAnswer).raw,
       ['active', 'inactive', 'workingArea'].map((version) => ({
         status: 200,
         status_text: 'OK',
@@ -594,7 +638,7 @@ describe('BatchEnd', () => {
         body: `source of ${DRAFT_SOURCE}?version=${version}`,
       })),
     );
-    expect((unlock as BatchAnswer).raw).toEqual([
+    assert.deepStrictEqual((unlock as BatchAnswer).raw, [
       { status: 200, status_text: 'OK', headers: {}, body: '' },
     ]);
     await on.close();
@@ -637,25 +681,26 @@ describe('BatchEnd', () => {
     ] as const) {
       s.begin();
       await s.call(name, args);
-      expect((await s.end()).summary).toEqual({
+      assert.deepStrictEqual((await s.end()).summary, {
         recorded: 1,
         sent: 1,
         received: 1,
       });
       entries.push(...(await s.answers([1])));
     }
-    expect(
+    assert.deepStrictEqual(
       s.built[0]?.envelopes.map((e) => ({
         session: e.session,
         parts: e.parts.map((p) => p.method),
       })),
-    ).toEqual([
-      { session: 'stateful', parts: ['POST'] },
-      { session: 'stateless', parts: ['GET'] },
-      { session: 'stateful', parts: ['POST'] },
-      { session: 'stateless', parts: ['GET'] },
-    ]);
-    expect(entries.map(asAnswer)).toEqual(direct);
+      [
+        { session: 'stateful', parts: ['POST'] },
+        { session: 'stateless', parts: ['GET'] },
+        { session: 'stateful', parts: ['POST'] },
+        { session: 'stateless', parts: ['GET'] },
+      ],
+    );
+    assert.deepStrictEqual(entries.map(asAnswer), direct);
     await s.close();
   });
 
@@ -683,9 +728,9 @@ describe('BatchEnd', () => {
       }
     });
     const { answer } = await s.end();
-    expect(answer.isError).toBe(true);
-    expect(s.owner.mode()).toBe('communication');
-    expect(s.owner.opened()).not.toBe(first);
+    assert.equal(answer.isError, true);
+    assert.equal(s.owner.mode(), 'communication');
+    assert.notEqual(s.owner.opened(), first);
     await s.close();
   });
 
@@ -718,36 +763,41 @@ describe('BatchEnd', () => {
       groups: [throwing],
     });
     s.begin();
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerProfileList', { program_name: 'PROG_A' }),
-    ).toEqual({
-      content: [],
-    });
-    expect(
+      {
+        content: [],
+      },
+    );
+    assert.deepStrictEqual(
       await s.call('HandlerServiceBindingListTypes', { class_name: 'CL_A' }),
-    ).toEqual({
-      content: [],
-    });
+      {
+        content: [],
+      },
+    );
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBeFalsy();
-    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
+    assert.ok(!answer.isError);
+    assert.deepStrictEqual(summary, { recorded: 2, sent: 2, received: 2 });
     const [first, second] = await s.answers([1, 2]);
-    expect(first).toMatchObject({ number: 1, isError: true });
-    expect(
-      JSON.stringify((first as BatchAnswer | undefined)?.content),
-    ).toContain('the handler failed after its part');
-    expect(second?.number).toBe(2);
-    expect((second as BatchAnswer | undefined)?.isError).toBeUndefined();
-    expect(s.executes).toHaveBeenCalledTimes(1);
+    assertMatchObject(first, { number: 1, isError: true });
+    assert.ok(
+      JSON.stringify((first as BatchAnswer | undefined)?.content).includes(
+        'the handler failed after its part',
+      ),
+    );
+    assert.equal(second?.number, 2);
+    assert.equal((second as BatchAnswer | undefined)?.isError, undefined);
+    assert.equal(s.executes.mock.callCount(), 1);
     await s.close();
   });
 
   it("the dispatch ends the batch on a failure of HandlerBatch with action 'end' alone", () => {
-    expect(endsCommunicationBatch('HandlerBatch', { action: 'end' })).toBe(
+    assert.equal(
+      endsCommunicationBatch('HandlerBatch', { action: 'end' }),
       true,
     );
     for (const action of ['begin', 'answers', undefined]) {
-      expect(endsCommunicationBatch('HandlerBatch', { action })).toBe(false);
+      assert.equal(endsCommunicationBatch('HandlerBatch', { action }), false);
     }
     // The full set's tools of that name are gone; none ends a batch.
     for (const tool of [
@@ -758,7 +808,7 @@ describe('BatchEnd', () => {
       'DebugBatchAnswers',
       'GetProgram',
     ]) {
-      expect(endsCommunicationBatch(tool, { action: 'end' })).toBe(false);
+      assert.equal(endsCommunicationBatch(tool, { action: 'end' }), false);
     }
   });
 });
@@ -778,18 +828,19 @@ describe('BatchEnd splits, the read answers', () => {
       ],
     });
     s.begin();
-    expect(
+    assert.deepStrictEqual(
       await s.call('HandlerProfileList', { program_name: 'PROG_A' }),
-    ).toEqual({
-      content: [],
-    });
+      {
+        content: [],
+      },
+    );
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBeFalsy();
-    expect(summary).toEqual({ recorded: 1, sent: 1, received: 1 });
-    expect(after).toBe(false);
+    assert.ok(!answer.isError);
+    assert.deepStrictEqual(summary, { recorded: 1, sent: 1, received: 1 });
+    assert.equal(after, false);
     const [entry] = await s.answers([1]);
-    expect(after).toBe(true);
-    expect(asAnswer(entry)).toEqual({
+    assert.equal(after, true);
+    assert.deepStrictEqual(asAnswer(entry), {
       content: [{ type: 'text', text: 'built when read' }],
     });
     await s.close();
@@ -824,7 +875,7 @@ describe('BatchEnd splits, the read answers', () => {
     await s.call('HandlerServiceBindingListTypes', { class_name: 'CLAS_B' });
     await s.end();
     const entries = await withinTurns(s.answers([1, 2]), 500);
-    expect(entries.map(asAnswer)).toEqual([
+    assert.deepStrictEqual(entries.map(asAnswer), [
       { content: [{ type: 'text', text: 'first' }] },
       { content: [{ type: 'text', text: 'second' }] },
     ]);
@@ -849,8 +900,9 @@ describe('BatchEnd splits, the read answers', () => {
     await s.end();
     const twice = await s.answers([1, 1]);
     const again = await s.answers([1]);
-    expect(runs).toBe(1);
-    expect([...twice, ...again].map(asAnswer)).toEqual(
+    assert.equal(runs, 1);
+    assert.deepStrictEqual(
+      [...twice, ...again].map(asAnswer),
       new Array(3).fill({ content: [{ type: 'text', text: 'run 1' }] }),
     );
     await s.close();
@@ -873,22 +925,26 @@ describe('BatchEnd splits, the read answers', () => {
     });
     s.begin();
     await s.call('HandlerProfileList', { program_name: 'PROG_A' });
-    expect((await s.end()).summary).toEqual({
+    assert.deepStrictEqual((await s.end()).summary, {
       recorded: 1,
       sent: 1,
       received: 1,
     });
     const [entry] = await s.answers([1]);
-    expect(asAnswer(entry)).toEqual({
-      content: expect.any(Array),
-      isError: true,
-    });
-    expect(payloadOf(entry as Answer)).toEqual({
+    {
+      const asked = asAnswer(entry);
+      assert.ok(Array.isArray(asked.content));
+      assert.deepStrictEqual(asked, { content: asked.content, isError: true });
+    }
+    assert.deepStrictEqual(payloadOf(entry as Answer), {
       error: 'batch_ended',
       message: BATCH_ENDED_WORDS,
     });
-    expect(s.built.flatMap((b) => b.envelopes)).toHaveLength(1);
-    expect(s.built.flatMap((b) => b.directs)).toEqual([]);
+    assert.equal(s.built.flatMap((b) => b.envelopes).length, 1);
+    assert.deepStrictEqual(
+      s.built.flatMap((b) => b.directs),
+      [],
+    );
     await s.close();
   });
 
@@ -914,15 +970,15 @@ describe('BatchEnd splits, the read answers', () => {
     for (let turn = 0; turn < 20; turn += 1) {
       await new Promise((r) => setImmediate(r));
     }
-    expect(finished).toBe(false);
+    assert.equal(finished, false);
     // The next batch's end replaces the map: number 1 is never read.
     s.begin();
     await s.end();
     for (let turn = 0; turn < 20 && !finished; turn += 1) {
       await new Promise((r) => setImmediate(r));
     }
-    expect(finished).toBe(true);
-    expect(await s.answers([1])).toEqual([
+    assert.equal(finished, true);
+    assert.deepStrictEqual(await s.answers([1]), [
       { number: 1, error: 'no_answer', message: 'no answer with that number' },
     ]);
     await s.close();
@@ -960,19 +1016,20 @@ describe("BatchEnd's error, no map", () => {
       envelopeResponse(parts.slice(0, 1).map(sap)),
     );
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBe(true);
-    expect(summary).toEqual({
+    assert.equal(answer.isError, true);
+    assert.deepStrictEqual(summary, {
       error: 'batch_parts_mismatch',
       message: batchPartsMismatchWords(1, 2),
     });
-    expect(batchPartsMismatchWords(1, 2)).toBe(
+    assert.equal(
+      batchPartsMismatchWords(1, 2),
       '1 of 2 parts came; the answers cannot be matched to the calls',
     );
     for (const entry of await s.answers([1, 2])) {
-      expect(asAnswer(entry)).toEqual(answer);
+      assert.deepStrictEqual(asAnswer(entry), answer);
     }
-    expect(ran).toEqual([]);
-    expect(s.owner.mode()).toBe('off');
+    assert.deepStrictEqual(ran, []);
+    assert.equal(s.owner.mode(), 'off');
     await s.close();
   });
 
@@ -984,18 +1041,19 @@ describe("BatchEnd's error, no map", () => {
       data: 'not a multipart answer',
     }));
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBe(true);
-    expect(summary).toEqual({
+    assert.equal(answer.isError, true);
+    assert.deepStrictEqual(summary, {
       error: 'batch_unsplit',
       message: BATCH_UNSPLIT_WORDS,
     });
-    expect(BATCH_UNSPLIT_WORDS).toBe(
+    assert.equal(
+      BATCH_UNSPLIT_WORDS,
       "the envelope's answer could not be split into the calls' parts",
     );
     for (const entry of await s.answers([1, 2])) {
-      expect(asAnswer(entry)).toEqual(answer);
+      assert.deepStrictEqual(asAnswer(entry), answer);
     }
-    expect(ran).toEqual([]);
+    assert.deepStrictEqual(ran, []);
     await s.close();
   });
 
@@ -1023,7 +1081,7 @@ describe("BatchEnd's error, no map", () => {
       program_name: 'PROG_B',
     });
     await s.end();
-    expect((await s.answers([2]))[0]).not.toHaveProperty('error');
+    assertNoProperty((await s.answers([2]))[0], 'error');
     fail = true;
     s.begin();
     await s.call('HandlerGet', {
@@ -1031,10 +1089,10 @@ describe("BatchEnd's error, no map", () => {
       program_name: 'PROG_C',
     });
     const { answer } = await s.end();
-    expect(answer.isError).toBe(true);
+    assert.equal(answer.isError, true);
     const [first, second] = await s.answers([1, 2]);
-    expect(asAnswer(first)).toEqual(answer);
-    expect(second).toEqual({
+    assert.deepStrictEqual(asAnswer(first), answer);
+    assert.deepStrictEqual(second, {
       number: 2,
       error: 'no_answer',
       message: 'no answer with that number',
@@ -1054,11 +1112,11 @@ describe('a lock read by number', () => {
     // SAP ended the recording call's session: BatchEnd sends on a new one.
     s.loseSession();
     await s.end();
-    expect(s.built).toHaveLength(2);
-    expect(heldLocks.holds(LOCK_HANDLE_OF_XML)).toBe(false); // not read yet
+    assert.equal(s.built.length, 2);
+    assert.equal(heldLocks.holds(LOCK_HANDLE_OF_XML), false); // not read yet
     const [entry] = await s.answers([1]);
-    expect(payloadOf(entry as Answer).lock_handle).toBe(LOCK_HANDLE_OF_XML);
-    expect(heldLocks.holds(LOCK_HANDLE_OF_XML)).toBe(true);
+    assert.equal(payloadOf(entry as Answer).lock_handle, LOCK_HANDLE_OF_XML);
+    assert.equal(heldLocks.holds(LOCK_HANDLE_OF_XML), true);
     await s.close();
   });
 
@@ -1076,13 +1134,13 @@ describe('a lock read by number', () => {
     // instance's own connection) replaces it.
     s.loseSession();
     await s.call('HandlerServiceBindingListTypes', {});
-    expect(s.built).toHaveLength(2);
+    assert.equal(s.built.length, 2);
     const [entry] = await s.answers([1]);
-    expect((entry as BatchAnswer).isError).toBeUndefined();
-    expect(payloadOf(entry as Answer).lock_handle).toBe(LOCK_HANDLE_OF_XML);
-    expect(heldLocks.holds(LOCK_HANDLE_OF_XML)).toBe(false);
+    assert.equal((entry as BatchAnswer).isError, undefined);
+    assert.equal(payloadOf(entry as Answer).lock_handle, LOCK_HANDLE_OF_XML);
+    assert.equal(heldLocks.holds(LOCK_HANDLE_OF_XML), false);
     // A write under it is refused here, sending nothing.
-    expect(heldLocks.holdsState()).toBe(false);
+    assert.equal(heldLocks.holdsState(), false);
     await s.close();
   });
 });
@@ -1104,45 +1162,48 @@ describe('BatchEnd: more parts than requests', () => {
     s.begin();
     await s.call('HandlerProfileList', { program_name: 'PROG_A' });
     const { answer, summary } = await s.end();
-    expect(answer.isError).toBe(true);
-    expect(summary).toEqual({
+    assert.equal(answer.isError, true);
+    assert.deepStrictEqual(summary, {
       error: 'batch_parts_mismatch',
       message: batchMorePartsWords(1),
     });
-    expect(batchMorePartsWords(1)).toBe(
+    assert.equal(
+      batchMorePartsWords(1),
       'more parts came than the 1 requests sent; the answers cannot be matched to the calls',
     );
     for (const entry of await s.answers([1])) {
-      expect(asAnswer(entry)).toEqual(answer);
+      assert.deepStrictEqual(asAnswer(entry), answer);
     }
     await s.close();
   });
 });
 
 describe('a resumed handler reaching the connection after its part', () => {
-  it.each(['getBaseUrl', 'connect'] as const)(
-    '%s is refused batch_ended, and that is its answer',
-    async (member) => {
-      const s = await batchStand({
-        tools: [],
-        part: sap,
-        groups: [
-          own('HandlerProfileList', async (context) => {
-            await context.connection.makeAdtRequest(READ);
-            await context.connection[member]();
-            return built('never');
-          }),
-        ],
-      });
-      s.begin();
-      await s.call('HandlerProfileList', { program_name: 'PROG_A' });
-      await s.end();
-      const [entry] = await s.answers([1]);
-      expect(payloadOf(entry as Answer)).toEqual({
-        error: 'batch_ended',
-        message: BATCH_ENDED_WORDS,
-      });
-      await s.close();
-    },
-  );
+  for (const member of ['getBaseUrl', 'connect'] as const) {
+    it(
+      format('%s is refused batch_ended, and that is its answer', member),
+      async () => {
+        const s = await batchStand({
+          tools: [],
+          part: sap,
+          groups: [
+            own('HandlerProfileList', async (context) => {
+              await context.connection.makeAdtRequest(READ);
+              await context.connection[member]();
+              return built('never');
+            }),
+          ],
+        });
+        s.begin();
+        await s.call('HandlerProfileList', { program_name: 'PROG_A' });
+        await s.end();
+        const [entry] = await s.answers([1]);
+        assert.deepStrictEqual(payloadOf(entry as Answer), {
+          error: 'batch_ended',
+          message: BATCH_ENDED_WORDS,
+        });
+        await s.close();
+      },
+    );
+  }
 });

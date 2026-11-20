@@ -41,7 +41,7 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json",
-    "test": "npm --prefix .. test -- --roots responsible-rules/src",
+    "test": "npm --prefix .. test -- --root responsible-rules/src",
     "test:check": "tsc --noEmit -p tsconfig.test.json",
     "lint:check": "biome check src",
     "prepublishOnly": "npm run build"
@@ -51,7 +51,6 @@
   },
   "devDependencies": {
     "@mcp-abap-adt/lib": "^24.0.1",
-    "@types/jest": "*",
     "@types/node": "*",
     "typescript": "*"
   }

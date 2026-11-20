@@ -16,6 +16,8 @@
  * `recordingConnection`, the tool called through its served entry.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type PinnedRequest,
@@ -696,8 +698,8 @@ describe('a function module addressed through a group (#2)', () => {
         expected: c.checks,
       });
       const text = answer?.content[0]?.text ?? '';
-      expect(text).toContain('FUNCTION_GROUP_MISMATCH');
-      expect(text).toContain('ZPIN_OTHER');
+      assert.ok(text.includes('FUNCTION_GROUP_MISMATCH'));
+      assert.ok(text.includes('ZPIN_OTHER'));
     });
     it(`${c.label} with the module's own group reads the metadata first, then sends its requests`, async () => {
       await runPinCase({
@@ -744,7 +746,8 @@ describe('a function module addressed through a group (#2)', () => {
       expected: [META('ZPIN_FM', 'active')],
     });
     const payload: unknown = JSON.parse(answer?.content[0]?.text ?? '');
-    expect(Reflect.get(Object(payload), 'metadata')).toBe(
+    assert.equal(
+      Reflect.get(Object(payload), 'metadata'),
       metadataDocument('ZPIN_FM', 'ZPIN_FG'),
     );
   });
@@ -789,15 +792,18 @@ describe('a function module addressed through a group (#2)', () => {
       ],
       expected: [META('ZPIN_FM', 'workingArea')],
     });
-    expect(requests).toEqual([META('ZPIN_FM', 'workingArea')]);
+    assert.deepStrictEqual(requests, [META('ZPIN_FM', 'workingArea')]);
     const payload: unknown = JSON.parse(answer?.content[0]?.text ?? '');
-    expect({
-      code: Reflect.get(Object(payload), 'code'),
-      step: Reflect.get(Object(payload), 'step'),
-    }).toEqual({
-      code: 'FUNCTION_GROUP_MISMATCH',
-      step: 'check function group',
-    });
+    assert.deepStrictEqual(
+      {
+        code: Reflect.get(Object(payload), 'code'),
+        step: Reflect.get(Object(payload), 'step'),
+      },
+      {
+        code: 'FUNCTION_GROUP_MISMATCH',
+        step: 'check function group',
+      },
+    );
   });
 
   it("a module that does not exist: SAP's 404 of the metadata read relayed with its key, nothing else sent", async () => {
@@ -813,22 +819,25 @@ describe('a function module addressed through a group (#2)', () => {
       answers: [{ status: 404, statusText: 'Not Found', data: notFound }],
       expected: [META('ZPIN_FM', 'workingArea')],
     });
-    expect(requests).toEqual([META('ZPIN_FM', 'workingArea')]);
-    expect(answer?.isError).toBe(true);
+    assert.deepStrictEqual(requests, [META('ZPIN_FM', 'workingArea')]);
+    assert.equal(answer?.isError, true);
     const payload: unknown = JSON.parse(answer?.content[0]?.text ?? '');
     const messages: unknown = Reflect.get(Object(payload), 'messages');
     const first: unknown = Array.isArray(messages) ? messages[0] : undefined;
-    expect({
-      step: Reflect.get(Object(payload), 'step'),
-      status: Reflect.get(Object(payload), 'status'),
-      code: Reflect.get(Object(payload), 'code'),
-      t100: Reflect.get(Object(first), 't100'),
-    }).toEqual({
-      step: 'check function group',
-      status: 404,
-      code: undefined,
-      t100: { id: 'FL', no: '110', values: ['ZPIN_FM'] },
-    });
+    assert.deepStrictEqual(
+      {
+        step: Reflect.get(Object(payload), 'step'),
+        status: Reflect.get(Object(payload), 'status'),
+        code: Reflect.get(Object(payload), 'code'),
+        t100: Reflect.get(Object(first), 't100'),
+      },
+      {
+        step: 'check function group',
+        status: 404,
+        code: undefined,
+        t100: { id: 'FL', no: '110', values: ['ZPIN_FM'] },
+      },
+    );
   });
 
   it('an async run without a group sends nothing extra', async () => {

@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import type { ScanInput } from '../../../lib/search-source/lineMatch';
 import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 
@@ -9,11 +11,11 @@ describe("the shipped line match (substringLineMatch) keeps today's match", () =
   it('matches a single query and returns 1-based line + snippet', () => {
     const lines = ['DATA lv_foo TYPE i.', 'WRITE lv_foo.', 'ENDFORM.'];
     const r = scanLines(lines, { query: 'lv_foo', max_hits: 10 });
-    expect(r.hits).toEqual([
+    assert.deepStrictEqual(r.hits, [
       { line: 1, snippet: 'DATA lv_foo TYPE i.' },
       { line: 2, snippet: 'WRITE lv_foo.' },
     ]);
-    expect(r.capped).toBe(false);
+    assert.equal(r.capped, false);
   });
 
   it('AND-matches query and query2 — both must appear on the same line', () => {
@@ -23,7 +25,10 @@ describe("the shipped line match (substringLineMatch) keeps today's match", () =
       query2: 'FUNCTION',
       max_hits: 10,
     });
-    expect(r.hits.map((h) => h.line)).toEqual([1, 3]);
+    assert.deepStrictEqual(
+      r.hits.map((h) => h.line),
+      [1, 3],
+    );
   });
 
   it('drops a candidate match when any exclude is contained in the line', () => {
@@ -37,7 +42,10 @@ describe("the shipped line match (substringLineMatch) keeps today's match", () =
       exclude: ['drop_this_marker'],
       max_hits: 10,
     });
-    expect(r.hits.map((h) => h.line)).toEqual([1, 2]);
+    assert.deepStrictEqual(
+      r.hits.map((h) => h.line),
+      [1, 2],
+    );
   });
 
   it('searches comments by default — matches inside col-1 `*` and full-line `"` are returned', () => {
@@ -47,7 +55,10 @@ describe("the shipped line match (substringLineMatch) keeps today's match", () =
       'WRITE marker_X.',
     ];
     const r = scanLines(lines, { query: 'marker_X', max_hits: 10 });
-    expect(r.hits.map((h) => h.line)).toEqual([1, 2, 3]);
+    assert.deepStrictEqual(
+      r.hits.map((h) => h.line),
+      [1, 2, 3],
+    );
   });
 
   it('exclude_comments=true skips col-1 `*` and full-line `"`, keeps ws-prefixed `*` and inline `" comment`', () => {
@@ -62,21 +73,30 @@ describe("the shipped line match (substringLineMatch) keeps today's match", () =
       exclude_comments: true,
       max_hits: 10,
     });
-    expect(r.hits.map((h) => h.line)).toEqual([3, 4]);
+    assert.deepStrictEqual(
+      r.hits.map((h) => h.line),
+      [3, 4],
+    );
   });
 
   it('max_hits caps the result and reports capped: true', () => {
     const lines = ['foo a', 'foo b', 'foo c'];
     const r = scanLines(lines, { query: 'foo', max_hits: 1 });
-    expect(r.hits.map((h) => h.line)).toEqual([1]);
-    expect(r.capped).toBe(true);
+    assert.deepStrictEqual(
+      r.hits.map((h) => h.line),
+      [1],
+    );
+    assert.equal(r.capped, true);
   });
 
   it('does not report capped when the hit count exactly equals max_hits with no omitted match', () => {
     const lines = ['foo a', 'bar b', 'baz c'];
     const r = scanLines(lines, { query: 'foo', max_hits: 1 });
-    expect(r.hits.map((h) => h.line)).toEqual([1]);
-    expect(r.capped).toBe(false);
+    assert.deepStrictEqual(
+      r.hits.map((h) => h.line),
+      [1],
+    );
+    assert.equal(r.capped, false);
   });
 
   it('matches are case-insensitive for query, query2, and exclude', () => {
@@ -87,14 +107,17 @@ describe("the shipped line match (substringLineMatch) keeps today's match", () =
       exclude: ['BAR'],
       max_hits: 10,
     });
-    expect(r.hits.map((h) => h.line)).toEqual([1]);
+    assert.deepStrictEqual(
+      r.hits.map((h) => h.line),
+      [1],
+    );
   });
 
   it('snippet is trimmed to 255 chars when the source line is longer', () => {
     const long = 'WRITE ' + 'X'.repeat(400);
     const r = scanLines([long], { query: 'write', max_hits: 10 });
-    expect(r.hits).toHaveLength(1);
-    expect(r.hits[0].snippet.length).toBe(255);
-    expect(r.hits[0].snippet.startsWith('WRITE ')).toBe(true);
+    assert.equal(r.hits.length, 1);
+    assert.equal(r.hits[0].snippet.length, 255);
+    assert.equal(r.hits[0].snippet.startsWith('WRITE '), true);
   });
 });

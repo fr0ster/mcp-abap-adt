@@ -7,17 +7,20 @@
  * through it, keyed by the system as the server keys it.
  */
 
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import {
   AdtHeaderPairs,
   adtSystemKey,
   DEFAULT_ADT_HEADERS,
   withAdtHeaders,
 } from '@mcp-abap-adt/lib/adt-headers';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const root = path.join(__dirname, '..', '..', '..', '..');
+const root = repositoryRoot(__dirname);
 const PUBLIC = [
   'AdtHeaderPairs',
   'DEFAULT_ADT_HEADERS',
@@ -35,7 +38,7 @@ describe('@mcp-abap-adt/lib/adt-headers through the package exports', () => {
   t(
     'resolves to the built module and its types, and exports only the public names',
     () => {
-      // A consumer's Node, outside Jest's resolver: the package's own
+      // A consumer's Node, outside the tests' resolve hook: the package's own
       // exports map, a self-reference from the package root.
       const script = [
         "const resolved = require.resolve('@mcp-abap-adt/lib/adt-headers');",
@@ -46,17 +49,19 @@ describe('@mcp-abap-adt/lib/adt-headers through the package exports', () => {
         cwd: root,
         encoding: 'utf8',
       });
-      expect(run.status).toBe(0);
+      assert.equal(run.status, 0);
       const { resolved, names } = JSON.parse(run.stdout);
-      expect(resolved).toBe(
+      assert.equal(
+        resolved,
         path.join(root, 'dist', 'lib', 'adtHeaders', 'index.js'),
       );
-      expect(
+      assert.equal(
         fs.existsSync(
           path.join(root, 'dist', 'lib', 'adtHeaders', 'index.d.ts'),
         ),
-      ).toBe(true);
-      expect(names).toEqual(PUBLIC);
+        true,
+      );
+      assert.deepStrictEqual(names, PUBLIC);
     },
   );
 });
@@ -91,8 +96,8 @@ describe('the one-shot correction through the subpath', () => {
         return { ok: true as const, getResult: () => ({ value: 'answered' }) };
       },
     );
-    expect(answer.getResult().value).toBe('answered');
-    expect(sent).toEqual([
+    assert.equal(answer.getResult().value, 'answered');
+    assert.deepStrictEqual(sent, [
       DEFAULT_ADT_HEADERS['utils.getWhereUsed'].accept,
       NEWER,
     ]);
@@ -104,6 +109,6 @@ describe('the one-shot correction through the subpath', () => {
         authType: 'basic',
       }),
     );
-    expect(again.pairFor('utils.getWhereUsed').accept).toBe(NEWER);
+    assert.equal(again.pairFor('utils.getWhereUsed').accept, NEWER);
   });
 });

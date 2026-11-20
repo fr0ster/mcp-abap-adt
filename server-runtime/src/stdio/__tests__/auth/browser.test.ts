@@ -3,6 +3,9 @@
  * browser is constructed and nothing is launched.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   linuxBrowser,
   linuxDefaultBrowser,
@@ -11,6 +14,7 @@ import {
   windowsBrowser,
   windowsDefaultBrowser,
 } from '@mcp-abap-adt/auth-providers';
+import { assertThrows } from '../../../../../src/__tests__/helpers/assertions';
 import { BrowserChoiceError, browserFor } from '../../auth/browser';
 
 const NONE = {};
@@ -42,75 +46,95 @@ describe('browserFor: the browser table', () => {
     ['headless', 'freebsd', NONE],
   ];
 
-  it.each(rows)('--browser=%s on %s', (browser, platform, expected) => {
-    expect(browserFor({ browser }, platform)).toStrictEqual(expected);
-  });
+  for (const [browser, platform, expected] of rows) {
+    it(format('--browser=%s on %s', browser, platform), () => {
+      assert.deepStrictEqual(browserFor({ browser }, platform), expected);
+    });
+  }
 
   it('no --browser is system', () => {
-    expect(browserFor({}, 'linux')).toStrictEqual({
+    assert.deepStrictEqual(browserFor({}, 'linux'), {
       factory: linuxDefaultBrowser,
     });
   });
 
   it('the word is read case-insensitively', () => {
-    expect(browserFor({ browser: 'Edge' }, 'win32')).toStrictEqual({
+    assert.deepStrictEqual(browserFor({ browser: 'Edge' }, 'win32'), {
       factory: windowsBrowser,
       argument: 'msedge',
     });
   });
 
-  it.each(['system', 'auto', 'chrome', 'edge', 'firefox'])(
-    '--browser=%s on another platform: unavailable, not thrown — the words say use --browser=none',
-    (browser) => {
-      const mapping = browserFor({ browser }, 'freebsd');
-      expect(mapping).toStrictEqual({ unavailable: expect.any(String) });
-      expect(mapping.unavailable).toContain('--browser=none');
-      expect(mapping.unavailable).toContain('freebsd');
-    },
-  );
+  for (const browser of ['system', 'auto', 'chrome', 'edge', 'firefox']) {
+    it(
+      format(
+        '--browser=%s on another platform: unavailable, not thrown — the words say use --browser=none',
+        browser,
+      ),
+      () => {
+        const mapping = browserFor({ browser }, 'freebsd');
+        assert.ok('unavailable' in mapping);
+        const { unavailable, ...rest } = mapping;
+        assert.ok(typeof unavailable === 'string');
+        assert.deepStrictEqual(rest, {});
+        assert.equal(Object.getPrototypeOf(mapping), Object.prototype);
+        assert.ok(unavailable.includes('--browser=none'));
+        assert.ok(unavailable.includes('freebsd'));
+      },
+    );
+  }
 
   it('no --browser on another platform: unavailable', () => {
-    expect(browserFor({}, 'aix').unavailable).toContain('--browser=none');
+    const { unavailable } = browserFor({}, 'aix');
+    assert.ok(typeof unavailable === 'string');
+    assert.ok(unavailable.includes('--browser=none'));
   });
 
-  it.each(['linux', 'freebsd'])(
-    'an unknown name on %s: refused, use --browser=none',
-    (platform) => {
-      expect(() => browserFor({ browser: 'opera' }, platform)).toThrow(
-        BrowserChoiceError,
-      );
-      expect(() => browserFor({ browser: 'opera' }, platform)).toThrow(
-        '--browser=none',
-      );
-    },
-  );
+  for (const platform of ['linux', 'freebsd']) {
+    it(
+      format('an unknown name on %s: refused, use --browser=none', platform),
+      () => {
+        assertThrows(
+          () => browserFor({ browser: 'opera' }, platform),
+          BrowserChoiceError,
+        );
+        assertThrows(
+          () => browserFor({ browser: 'opera' }, platform),
+          '--browser=none',
+        );
+      },
+    );
+  }
 });
 
 describe('browserFor: --browser-program', () => {
-  it.each([
+  for (const [platform, f] of [
     ['linux', linuxBrowser],
     ['darwin', macBrowser],
     ['win32', windowsBrowser],
-  ] as const)('on %s: the named factory with the program', (platform, f) => {
-    expect(browserFor({ program: 'my-browser' }, platform)).toStrictEqual({
-      factory: f,
-      argument: 'my-browser',
+  ] as const) {
+    it(format('on %s: the named factory with the program', platform), () => {
+      assert.deepStrictEqual(browserFor({ program: 'my-browser' }, platform), {
+        factory: f,
+        argument: 'my-browser',
+      });
     });
-  });
+  }
 
   it('on another platform: the linux launch, a plain spawn of the program', () => {
-    expect(browserFor({ program: 'my-browser' }, 'aix')).toStrictEqual({
+    assert.deepStrictEqual(browserFor({ program: 'my-browser' }, 'aix'), {
       factory: linuxBrowser,
       argument: 'my-browser',
     });
   });
 
-  it.each(['linux', 'freebsd'])(
-    'beside --browser on %s: refused',
-    (platform) => {
-      expect(() =>
-        browserFor({ browser: 'firefox', program: 'my-browser' }, platform),
-      ).toThrow('--browser-program excludes --browser');
-    },
-  );
+  for (const platform of ['linux', 'freebsd']) {
+    it(format('beside --browser on %s: refused', platform), () => {
+      assertThrows(
+        () =>
+          browserFor({ browser: 'firefox', program: 'my-browser' }, platform),
+        '--browser-program excludes --browser',
+      );
+    });
+  }
 });

@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { TOOL_DEFINITION as ActivateObjects } from '../../handlers/common/high/handleActivateObjects';
 import {
   handleActivateObject,
@@ -17,15 +20,18 @@ import { recordingConnection } from '../helpers/recordingConnection';
  * description says so.
  */
 describe("ActivateObject's preaudit, as described", () => {
-  it.each([
+  for (const [_tool, schema] of [
     ['ActivateObjectLow', TOOL_DEFINITION.inputSchema],
     ['ActivateObjects', ActivateObjects.inputSchema],
-  ])('%s says it is sent on both paths, default true', (_tool, schema) => {
-    const text = jsonAt(listedJson(schema), 'preaudit').description;
-    expect(text).toContain('Default: true');
-    expect(text).toContain('single-object activation and group activation');
-    expect(text).not.toContain('always sends preauditRequested=true');
-  });
+  ] as const) {
+    it(format('%s says it is sent on both paths, default true', _tool), () => {
+      const text = jsonAt(listedJson(schema), 'preaudit').description;
+      assert.ok(text !== undefined);
+      assert.ok(text.includes('Default: true'));
+      assert.ok(text.includes('single-object activation and group activation'));
+      assert.ok(!text.includes('always sends preauditRequested=true'));
+    });
+  }
 });
 
 /**
@@ -75,39 +81,55 @@ describe('ActivateObject: preaudit on the wire', () => {
     'CLAS',
   ];
 
-  it.each(SINGLE)(
-    'one object of %s sends preauditRequested=false with preaudit false',
-    async (type) => {
-      const urls = await activationUrls([{ name: 'ZA', type }], false);
-      expect(urls).toEqual([
-        '/sap/bc/adt/activation?method=activate&preauditRequested=false',
-      ]);
-    },
-  );
+  for (const type of SINGLE) {
+    it(
+      format(
+        'one object of %s sends preauditRequested=false with preaudit false',
+        type,
+      ),
+      async () => {
+        const urls = await activationUrls([{ name: 'ZA', type }], false);
+        assert.deepStrictEqual(urls, [
+          '/sap/bc/adt/activation?method=activate&preauditRequested=false',
+        ]);
+      },
+    );
+  }
 
-  it.each(SINGLE)(
-    'one object of %s sends preauditRequested=true without preaudit',
-    async (type) => {
-      const urls = await activationUrls([{ name: 'ZA', type }], undefined);
-      expect(urls).toEqual([
-        '/sap/bc/adt/activation?method=activate&preauditRequested=true',
-      ]);
-    },
-  );
+  for (const type of SINGLE) {
+    it(
+      format(
+        'one object of %s sends preauditRequested=true without preaudit',
+        type,
+      ),
+      async () => {
+        const urls = await activationUrls([{ name: 'ZA', type }], undefined);
+        assert.deepStrictEqual(urls, [
+          '/sap/bc/adt/activation?method=activate&preauditRequested=true',
+        ]);
+      },
+    );
+  }
 
-  it.each([true, false])(
-    'a group activation sends preauditRequested=%s as given',
-    async (preaudit) => {
-      const urls = await activationUrls(
-        [
-          { name: 'ZA', type: 'TABL/DS' },
-          { name: 'ZB', type: 'TABL/DS' },
-        ],
+  for (const preaudit of [true, false]) {
+    it(
+      format(
+        'a group activation sends preauditRequested=%s as given',
         preaudit,
-      );
-      expect(urls[0]).toBe(
-        `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preaudit}`,
-      );
-    },
-  );
+      ),
+      async () => {
+        const urls = await activationUrls(
+          [
+            { name: 'ZA', type: 'TABL/DS' },
+            { name: 'ZB', type: 'TABL/DS' },
+          ],
+          preaudit,
+        );
+        assert.equal(
+          urls[0],
+          `/sap/bc/adt/activation/runs?method=activate&preauditRequested=${preaudit}`,
+        );
+      },
+    );
+  }
 });

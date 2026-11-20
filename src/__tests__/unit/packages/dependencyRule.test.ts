@@ -42,12 +42,16 @@
  * The packages come from one table.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import { builtinModules } from 'node:module';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import * as ts from 'typescript';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const ROOT = path.join(__dirname, '..', '..', '..', '..');
+const ROOT = repositoryRoot(__dirname);
 
 const CHAIN_STATE = [
   '@mcp-abap-adt/auth-broker',
@@ -543,12 +547,12 @@ describe('the dist graph is checked when it can be', () => {
   });
 
   it('every package built: src and dist', () => {
-    expect(distDecision([], true)).toEqual({ modes: ['src', 'dist'] });
-    expect(distDecision([], false)).toEqual({ modes: ['src', 'dist'] });
+    assert.deepStrictEqual(distDecision([], true), { modes: ['src', 'dist'] });
+    assert.deepStrictEqual(distDecision([], false), { modes: ['src', 'dist'] });
   });
 
   it('a package not built under CI: refused, naming it', () => {
-    expect(distDecision(['@mcp-abap-adt/http'], true)).toEqual({
+    assert.deepStrictEqual(distDecision(['@mcp-abap-adt/http'], true), {
       modes: ['src'],
       refusal:
         'the dist graph cannot be checked: not built: @mcp-abap-adt/http — run npm run build first',
@@ -556,120 +560,133 @@ describe('the dist graph is checked when it can be', () => {
   });
 
   it('a package not built locally: skipped, with the reason printed', () => {
-    expect(distDecision(['@mcp-abap-adt/http'], false)).toEqual({
+    assert.deepStrictEqual(distDecision(['@mcp-abap-adt/http'], false), {
       modes: ['src'],
       skip: '[dependencyRule] dist graph skipped: not built: @mcp-abap-adt/http — run npm run build first',
     });
   });
 });
 
-describe.each(PACKAGES)('$name: published manifest', (row) => {
-  const manifest = manifestOf(row.dir);
+for (const row of PACKAGES) {
+  describe(`${row.name}: published manifest`, () => {
+    const manifest = manifestOf(row.dir);
 
-  it('its published dependency fields name nothing forbidden', () => {
-    const declared = Object.keys(published(manifest));
-    const refused = [...row.forbidden, ...(row.undeclared ?? [])];
-    expect(declared.filter((name) => refused.includes(name))).toEqual([]);
-  });
-
-  if (row.required) {
-    it('its published dependencies declare what it must reach', () => {
-      for (const name of row.required ?? []) {
-        expect(manifest.dependencies?.[name]).toBeDefined();
-      }
+    it('its published dependency fields name nothing forbidden', () => {
+      const declared = Object.keys(published(manifest));
+      const refused = [...row.forbidden, ...(row.undeclared ?? [])];
+      assert.deepStrictEqual(
+        declared.filter((name) => refused.includes(name)),
+        [],
+      );
     });
-  }
 
-  if (row.peers) {
-    it('takes its peers as peerDependencies (and devDependencies), not dependencies', () => {
-      for (const name of row.peers ?? []) {
-        expect({
-          name,
-          peer: manifest.peerDependencies?.[name] !== undefined,
-          dev: manifest.devDependencies?.[name] !== undefined,
-          dependency: manifest.dependencies?.[name] !== undefined,
-        }).toEqual({ name, peer: true, dev: true, dependency: false });
-      }
-    });
-  }
-});
-
-describe.each(
-  MODES.flatMap((mode) => PACKAGES.map((row) => ({ ...row, mode }))),
-)('$name: the import graph of $mode', (row) => {
-  const graph = walk(row, row.mode);
-  const manifest = manifestOf(row.dir);
-
-  it('walks its entries', () => {
-    expect(graph.files.size).toBeGreaterThan(0);
-  });
-
-  it('reaches nothing forbidden', () => {
-    expect([...graph.reached].filter((n) => row.forbidden.includes(n))).toEqual(
-      [],
-    );
-  });
-
-  if (row.required || row.peers || row.reaches) {
-    it('reaches what it must', () => {
-      for (const name of [
-        ...(row.required ?? []),
-        ...(row.peers ?? []),
-        ...(row.reaches ?? []),
-      ]) {
-        expect(graph.reached).toContain(name);
-      }
-    });
-  }
-
-  if (row.runtimePath !== undefined) {
-    const runtimePath = row.runtimePath;
-    it(`reaches ${runtimePath}, and no other transport's runtime path or directory`, () => {
-      expect(graph.reachedPaths).toContain(runtimePath);
-      expect(
-        [...graph.reachedPaths].filter((p) =>
-          otherRuntimePaths(runtimePath).includes(p),
-        ),
-      ).toEqual([]);
-      expect(
-        [...graph.files]
-          .filter((file) => inOtherRuntimeDir(runtimePath, file))
-          .map((file) => path.relative(ROOT, file)),
-      ).toEqual([]);
-    });
-  }
-
-  it('declares in its published dependencies every package its own files import', () => {
-    const declared = published(manifest);
-    const missing = [...graph.ownImports.entries()]
-      .filter(([name]) => name !== row.name && declared[name] === undefined)
-      .map(([name, files]) => `${name} (${[...files][0]})`);
-    expect(missing).toEqual([]);
-  });
-
-  if (row.dir !== '.') {
-    it('finds each of them in the root manifest, the install development and CI use', () => {
-      const root = manifestOf('.');
-      const own = manifest.dependencies ?? {};
-      const absent: string[] = [];
-      for (const name of graph.ownImports.keys()) {
-        if (SIBLINGS.has(name)) continue;
-        const inRoot =
-          root.dependencies?.[name] ??
-          root.optionalDependencies?.[name] ??
-          root.devDependencies?.[name];
-        if (inRoot === undefined) absent.push(name);
-        else if (
-          root.dependencies?.[name] === undefined &&
-          root.devDependencies?.[name] !== own[name]
-        ) {
-          absent.push(`${name} at ${own[name]} (root: ${inRoot})`);
+    if (row.required) {
+      it('its published dependencies declare what it must reach', () => {
+        for (const name of row.required ?? []) {
+          assert.notEqual(manifest.dependencies?.[name], undefined);
         }
-      }
-      expect(absent).toEqual([]);
+      });
+    }
+
+    if (row.peers) {
+      it('takes its peers as peerDependencies (and devDependencies), not dependencies', () => {
+        for (const name of row.peers ?? []) {
+          assert.deepStrictEqual(
+            {
+              name,
+              peer: manifest.peerDependencies?.[name] !== undefined,
+              dev: manifest.devDependencies?.[name] !== undefined,
+              dependency: manifest.dependencies?.[name] !== undefined,
+            },
+            { name, peer: true, dev: true, dependency: false },
+          );
+        }
+      });
+    }
+  });
+}
+
+for (const row of MODES.flatMap((mode) =>
+  PACKAGES.map((row) => ({ ...row, mode })),
+)) {
+  describe(`${row.name}: the import graph of ${row.mode}`, () => {
+    const graph = walk(row, row.mode);
+    const manifest = manifestOf(row.dir);
+
+    it('walks its entries', () => {
+      assert.ok(graph.files.size > 0);
     });
-  }
-});
+
+    it('reaches nothing forbidden', () => {
+      assert.deepStrictEqual(
+        [...graph.reached].filter((n) => row.forbidden.includes(n)),
+        [],
+      );
+    });
+
+    if (row.required || row.peers || row.reaches) {
+      it('reaches what it must', () => {
+        for (const name of [
+          ...(row.required ?? []),
+          ...(row.peers ?? []),
+          ...(row.reaches ?? []),
+        ]) {
+          assert.ok([...graph.reached].includes(name));
+        }
+      });
+    }
+
+    if (row.runtimePath !== undefined) {
+      const runtimePath = row.runtimePath;
+      it(`reaches ${runtimePath}, and no other transport's runtime path or directory`, () => {
+        assert.ok([...graph.reachedPaths].includes(runtimePath));
+        assert.deepStrictEqual(
+          [...graph.reachedPaths].filter((p) =>
+            otherRuntimePaths(runtimePath).includes(p),
+          ),
+          [],
+        );
+        assert.deepStrictEqual(
+          [...graph.files]
+            .filter((file) => inOtherRuntimeDir(runtimePath, file))
+            .map((file) => path.relative(ROOT, file)),
+          [],
+        );
+      });
+    }
+
+    it('declares in its published dependencies every package its own files import', () => {
+      const declared = published(manifest);
+      const missing = [...graph.ownImports.entries()]
+        .filter(([name]) => name !== row.name && declared[name] === undefined)
+        .map(([name, files]) => `${name} (${[...files][0]})`);
+      assert.deepStrictEqual(missing, []);
+    });
+
+    if (row.dir !== '.') {
+      it('finds each of them in the root manifest, the install development and CI use', () => {
+        const root = manifestOf('.');
+        const own = manifest.dependencies ?? {};
+        const absent: string[] = [];
+        for (const name of graph.ownImports.keys()) {
+          if (SIBLINGS.has(name)) continue;
+          const inRoot =
+            root.dependencies?.[name] ??
+            root.optionalDependencies?.[name] ??
+            root.devDependencies?.[name];
+          if (inRoot === undefined) absent.push(name);
+          else if (
+            root.dependencies?.[name] === undefined &&
+            root.devDependencies?.[name] !== own[name]
+          ) {
+            absent.push(`${name} at ${own[name]} (root: ${inRoot})`);
+          }
+        }
+        assert.deepStrictEqual(absent, []);
+      });
+    }
+  });
+}
 
 describe('the root manifest: development install, not lib’s runtime', () => {
   const root = manifestOf('.');
@@ -677,8 +694,8 @@ describe('the root manifest: development install, not lib’s runtime', () => {
 
   it('holds the broker and the stores only as devDependencies, at exactly server-runtime’s ranges', () => {
     for (const name of CHAIN_STATE) {
-      expect(published(root)[name]).toBeUndefined();
-      expect(root.devDependencies?.[name]).toBe(runtime.dependencies?.[name]);
+      assert.equal(published(root)[name], undefined);
+      assert.equal(root.devDependencies?.[name], runtime.dependencies?.[name]);
     }
   });
 });
@@ -690,7 +707,7 @@ describe('no transport reaches another by a relative path, tests included', () =
       .filter((rel) => rel.endsWith('.ts'))
       .map((rel) => path.join(ROOT, dir, rel));
 
-  it.each([
+  for (const [dir, others] of [
     [
       'server/src',
       ['http', 'server-runtime/src/http', 'sse', 'server-runtime/src/sse'],
@@ -820,24 +837,26 @@ describe('no transport reaches another by a relative path, tests included', () =
         'compact-sse',
       ],
     ],
-  ])('%s', (dir, others) => {
-    const crossings: string[] = [];
-    for (const file of sources(dir)) {
-      const { importedFiles } = ts.preProcessFile(
-        fs.readFileSync(file, 'utf8'),
-        true,
-        true,
-      );
-      for (const { fileName } of importedFiles) {
-        if (!fileName.startsWith('.')) continue;
-        const target = path.resolve(path.dirname(file), fileName);
-        for (const other of others) {
-          if (target.startsWith(path.join(ROOT, other) + path.sep)) {
-            crossings.push(`${path.relative(ROOT, file)} → ${fileName}`);
+  ] satisfies [string, string[]][]) {
+    it(format('%s', dir), () => {
+      const crossings: string[] = [];
+      for (const file of sources(dir)) {
+        const { importedFiles } = ts.preProcessFile(
+          fs.readFileSync(file, 'utf8'),
+          true,
+          true,
+        );
+        for (const { fileName } of importedFiles) {
+          if (!fileName.startsWith('.')) continue;
+          const target = path.resolve(path.dirname(file), fileName);
+          for (const other of others) {
+            if (target.startsWith(path.join(ROOT, other) + path.sep)) {
+              crossings.push(`${path.relative(ROOT, file)} → ${fileName}`);
+            }
           }
         }
       }
-    }
-    expect(crossings).toEqual([]);
-  });
+      assert.deepStrictEqual(crossings, []);
+    });
+  }
 });

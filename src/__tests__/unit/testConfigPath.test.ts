@@ -1,6 +1,10 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { assertThrows } from '../helpers/assertions';
+import { repositoryRoot } from '../helpers/repoRoot';
 import { testConfigPathFromEnv } from '../integration/helpers/testConfigPath';
 
 /**
@@ -10,32 +14,35 @@ import { testConfigPathFromEnv } from '../integration/helpers/testConfigPath';
  * file back and forth between systems is how a run ends up on the wrong one.
  */
 describe('the test config a run reads', () => {
-  const root = path.resolve(__dirname, '../../..');
+  const root = repositoryRoot(__dirname);
 
   it('is the default file when nothing names another', () => {
-    expect(testConfigPathFromEnv({})).toBeUndefined();
+    assert.equal(testConfigPathFromEnv({}), undefined);
   });
 
   it('refuses the variable set but naming no file', () => {
-    expect(() => testConfigPathFromEnv({ MCP_TEST_CONFIG: '' })).toThrow(
+    assertThrows(
+      () => testConfigPathFromEnv({ MCP_TEST_CONFIG: '' }),
       'MCP_TEST_CONFIG is set but names no file',
     );
-    expect(() => testConfigPathFromEnv({ MCP_TEST_CONFIG: '  ' })).toThrow(
+    assertThrows(
+      () => testConfigPathFromEnv({ MCP_TEST_CONFIG: '  ' }),
       'MCP_TEST_CONFIG is set but names no file',
     );
   });
 
   it('refuses a named file that is not there', () => {
-    expect(() =>
-      testConfigPathFromEnv({ MCP_TEST_CONFIG: 'tests/no-such-config.yaml' }),
-    ).toThrow(
+    assertThrows(
+      () =>
+        testConfigPathFromEnv({ MCP_TEST_CONFIG: 'tests/no-such-config.yaml' }),
       `MCP_TEST_CONFIG points to a missing file: ${path.join(root, 'tests', 'no-such-config.yaml')}`,
     );
   });
 
   it('resolves a relative name against the repository root', () => {
     // A file of this repository that is always there.
-    expect(testConfigPathFromEnv({ MCP_TEST_CONFIG: 'package.json' })).toBe(
+    assert.equal(
+      testConfigPathFromEnv({ MCP_TEST_CONFIG: 'package.json' }),
       path.join(root, 'package.json'),
     );
   });
@@ -45,7 +52,8 @@ describe('the test config a run reads', () => {
     const absolute = path.join(directory, 'config.yaml');
     fs.writeFileSync(absolute, '');
     try {
-      expect(testConfigPathFromEnv({ MCP_TEST_CONFIG: absolute })).toBe(
+      assert.equal(
+        testConfigPathFromEnv({ MCP_TEST_CONFIG: absolute }),
         absolute,
       );
     } finally {

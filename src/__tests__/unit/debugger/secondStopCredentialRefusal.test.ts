@@ -12,6 +12,8 @@
  * the credential is not asked again, and the session holds nothing.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { handleDebugStartListener } from '../../../handlers/debugger/debug/handleDebugStartListener';
@@ -20,7 +22,14 @@ import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugSession } from '../../../lib/debugger/DebugSession';
 import { InstanceState } from '../../../lib/state/InstanceState';
+import { assertMatchObject } from '../../helpers/assertions';
 import { okResponse } from '../../helpers/fakeClient';
+import {
+  runAllTimersAsync,
+  track,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
 import { fakeWorld, IDS, LISTEN_NOTHING, until } from './fakes';
 
 const json = (r: any) => JSON.parse(r.content[0].text);
@@ -82,8 +91,13 @@ function install() {
 }
 
 describe("the debugger stop's second stopListener refused by the credential", () => {
-  beforeEach(() => jest.useFakeTimers());
-  afterEach(() => jest.useRealTimers());
+  // setTimeout, setInterval, setImmediate and Date faked.
+  beforeEach(() =>
+    useFakeTimers({
+      apis: ['setTimeout', 'setInterval', 'setImmediate', 'Date'],
+    }),
+  );
+  afterEach(() => useRealTimers());
 
   it('DebugStop ends stopped, sends nothing more, asks the credential nothing more, holds nothing', async () => {
     const { world, credential, dbg, context } = install();
@@ -130,24 +144,27 @@ describe("the debugger stop's second stopListener refused by the credential", ()
       }
     };
 
-    const stopping = handleDebugStop(context as any, { state_handle: handle });
-    await jest.runAllTimersAsync();
-    const stopped: any = await stopping;
+    const stopping = track(
+      handleDebugStop(context as any, { state_handle: handle }),
+    );
+    await runAllTimersAsync();
+    assert.ok(stopping.settled);
+    const stopped: any = stopping.value;
 
-    expect(stopped.isError).toBeFalsy();
-    expect(json(stopped)).toMatchObject({ state: 'stopped' });
+    assert.ok(!stopped.isError);
+    assertMatchObject(json(stopped), { state: 'stopped' });
     // The second stopListener was attempted and refused by the credential.
-    expect(stops).toBe(1);
-    expect(askedAtRefusal).toBeGreaterThan(0);
-    expect(credential.asked[askedAtRefusal - 1]).toEqual({
+    assert.equal(stops, 1);
+    assert.ok(askedAtRefusal > 0);
+    assert.deepStrictEqual(credential.asked[askedAtRefusal - 1], {
       call: 'stopListener',
       refused: true,
     });
     // Nothing asked of the credential, and no request sent, after it.
-    expect(credential.asked.slice(askedAtRefusal)).toEqual([]);
-    expect(world.log.slice(loggedAtRefusal)).toEqual([]);
+    assert.deepStrictEqual(credential.asked.slice(askedAtRefusal), []);
+    assert.deepStrictEqual(world.log.slice(loggedAtRefusal), []);
     // The session holds nothing; every connection it opened is closed.
-    expect(dbg.holdsState()).toBe(false);
-    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    assert.equal(dbg.holdsState(), false);
+    assert.deepStrictEqual(new Set(world.closed), new Set(world.opened));
   });
 });

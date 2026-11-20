@@ -6,9 +6,12 @@
  * writes for it ({@link jsonValueOf}), as a thrown carrier's `Date` reads in
  * an answer (`answerValueOf`).
  */
+
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import {
   type Parameter,
   type ParameterTable,
@@ -47,7 +50,7 @@ describe('a YAML value is read as JSON writes it', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
     // The load validates the file against the table: the reader sees it once there.
-    expect(seen).toEqual(['2026-11-14T07:00:00Z']);
+    assert.deepStrictEqual(seen, ['2026-11-14T07:00:00Z']);
     seen.length = 0;
     const read = readParameters(table, [], {}, yaml);
     if (seen[0] !== '2026-11-14T07:00:00Z') {
@@ -55,13 +58,14 @@ describe('a YAML value is read as JSON writes it', () => {
         `the reader got ${JSON.stringify(seen)}, answered ${JSON.stringify(read)}\n`,
       );
     }
-    expect(seen).toEqual(['2026-11-14T07:00:00Z']);
-    expect(read).toEqual({ when: '2026-11-14T07:00:00Z' });
+    assert.deepStrictEqual(seen, ['2026-11-14T07:00:00Z']);
+    assert.deepStrictEqual(read, { when: '2026-11-14T07:00:00Z' });
   });
 
   it('a Date handed to the parse is its ISO text', () => {
-    expect(
+    assert.deepStrictEqual(
       jsonValueOf({ schedule: { when: new Date('2026-11-14T07:00:00Z') } }),
-    ).toEqual({ schedule: { when: '2026-11-14T07:00:00.000Z' } });
+      { schedule: { when: '2026-11-14T07:00:00.000Z' } },
+    );
   });
 });

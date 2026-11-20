@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { afterEach, it } from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
 /**
  * The tool filter (`available_in`) never guesses a kind: with a kind stated
@@ -52,29 +55,39 @@ class Server extends BaseMcpServer {
   }
 }
 
-it.each([
+for (const [_what, env] of [
   ['no SAP_SYSTEM_TYPE', undefined],
   ['an SAP_SYSTEM_TYPE of no kind', 'abap-cloud'],
-])('%s and no option: every tool is listed, none filtered', (_what, env) => {
-  if (env === undefined) delete process.env.SAP_SYSTEM_TYPE;
-  else process.env.SAP_SYSTEM_TYPE = env;
-  expect(new Server().names()).toEqual([
-    'CloudOnly',
-    'Everywhere',
-    'OnPremOnly',
-  ]);
-});
+]) {
+  it(
+    format('%s and no option: every tool is listed, none filtered', _what),
+    () => {
+      if (env === undefined) delete process.env.SAP_SYSTEM_TYPE;
+      else process.env.SAP_SYSTEM_TYPE = env;
+      assert.deepStrictEqual(new Server().names(), [
+        'CloudOnly',
+        'Everywhere',
+        'OnPremOnly',
+      ]);
+    },
+  );
+}
 
-it.each([
+for (const [env, listed] of [
   ['cloud', ['CloudOnly', 'Everywhere']],
   ['onprem', ['Everywhere', 'OnPremOnly']],
   ['legacy', ['Everywhere', 'OnPremOnly']],
-] as const)('SAP_SYSTEM_TYPE=%s: only its tools', (env, listed) => {
-  process.env.SAP_SYSTEM_TYPE = env;
-  expect(new Server().names()).toEqual(listed);
-});
+] as const) {
+  it(format('SAP_SYSTEM_TYPE=%s: only its tools', env), () => {
+    process.env.SAP_SYSTEM_TYPE = env;
+    assert.deepStrictEqual(new Server().names(), listed);
+  });
+}
 
 it('the option wins over SAP_SYSTEM_TYPE', () => {
   process.env.SAP_SYSTEM_TYPE = 'cloud';
-  expect(new Server('onprem').names()).toEqual(['Everywhere', 'OnPremOnly']);
+  assert.deepStrictEqual(new Server('onprem').names(), [
+    'Everywhere',
+    'OnPremOnly',
+  ]);
 });

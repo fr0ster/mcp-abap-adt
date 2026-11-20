@@ -22,6 +22,8 @@
  * (`lowTierStrategies.test.ts`) already asserts `factory` the same way.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import { handleCreateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
 import { handleUpdateBehaviorDefinition } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
@@ -40,6 +42,7 @@ import { handleUpdateServiceDefinition } from '../../handlers/service_definition
 import { handleCreateStructure } from '../../handlers/structure/high/handleCreateStructure';
 import { handleUpdateStructure } from '../../handlers/structure/high/handleUpdateStructure';
 import { handleUpdateTable } from '../../handlers/table/high/handleUpdateTable';
+import * as clients from '../../lib/clients';
 import { corpusBody } from '../helpers/adtCorpus';
 import {
   fakeClientOfWithFactory,
@@ -48,15 +51,14 @@ import {
 } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+mock.method(clients, 'createOnPremAdtClient', () => fakeClient);
+
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => fakeClient,
-  createOnPremAdtClient: () => fakeClient,
-}));
 
 const context = {
   connection: { getSessionId: () => null } as any,
@@ -464,13 +466,12 @@ const cases: WireCase[] = [
 ];
 
 describe('wire channel: every high-tier locked write lands where its shipped member reads it', () => {
-  it.each(cases)(
-    '$name reaches $expectFactory and lands in $channel.$field',
-    async (c) => {
+  for (const c of cases) {
+    it(`${c.name} reaches ${c.expectFactory} and lands in ${c.channel}${c.field}`, async () => {
       const result = await c.run();
-      expect(result.factory).toBe(c.expectFactory);
+      assert.equal(result.factory, c.expectFactory);
       const half = c.channel === 'options' ? result.options : result.config;
-      expect(String(half?.[c.field] ?? '')).toContain(c.marker);
-    },
-  );
+      assert.ok(String(half?.[c.field] ?? '').includes(c.marker));
+    });
+  }
 });

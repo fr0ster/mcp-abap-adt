@@ -8,6 +8,9 @@
  * started it, so one capture serves every Run* tool.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import type {
   IAbapConnection,
   IAbapRequestOptions,
@@ -49,6 +52,7 @@ import {
 } from '../../lib/handlers/interfaces';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { corpusBody } from '../helpers/adtCorpus';
+import { assertMatchObject, assertRejects } from '../helpers/assertions';
 import { moduleInGroup } from '../helpers/functionModuleMetadata';
 import { setSystemContext } from '../helpers/processSystemContext';
 import {
@@ -103,7 +107,7 @@ const firstLines = (args: Readonly<Record<string, unknown>>) =>
 const payload = (result: any) => JSON.parse(result.content[0].text);
 
 describe('Run* tools: start, wait, answer the result — one call', () => {
-  it.each([
+  for (const [_name, handler, args, type, name] of [
     [
       'RunUnitTest',
       handleRunUnitTest,
@@ -132,28 +136,36 @@ describe('Run* tools: start, wait, answer the result — one call', () => {
       'FUNC',
       'Z_FM_X',
     ],
-  ] as const)(
-    '%s names its object as %s, polls, and answers the finished result',
-    async (_name, handler, args, type, name) => {
-      const connection = recordingConnection([STARTED, FINISHED, RESULT]);
+  ] as const) {
+    it(
+      format(
+        '%s names its object as %s, polls, and answers the finished result',
+        _name,
+        handler,
+      ),
+      async () => {
+        const connection = recordingConnection([STARTED, FINISHED, RESULT]);
 
-      const result: any = await (handler as any)(ctx(connection), args);
+        const result: any = await (handler as any)(ctx(connection), args);
 
-      expect(result.isError).toBe(false);
-      expect(connection.requests.map(line)).toEqual([
-        'POST /sap/bc/adt/abapunit/runs',
-        `GET /sap/bc/adt/abapunit/runs/${RUN}`,
-        `GET /sap/bc/adt/abapunit/results/${RUN}`,
-      ]);
-      expect(String(connection.requests[0].data)).toContain(
-        `<osl:object name="${name}" type="${type}"/>`,
-      );
-      const answer = payload(result);
-      expect(answer.finished).toBe(true);
-      expect(answer.run_id).toBe(RUN);
-      expect(JSON.stringify(answer.run_result)).toContain('TEST_METHOD');
-    },
-  );
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(connection.requests.map(line), [
+          'POST /sap/bc/adt/abapunit/runs',
+          `GET /sap/bc/adt/abapunit/runs/${RUN}`,
+          `GET /sap/bc/adt/abapunit/results/${RUN}`,
+        ]);
+        assert.ok(
+          String(connection.requests[0].data).includes(
+            `<osl:object name="${name}" type="${type}"/>`,
+          ),
+        );
+        const answer = payload(result);
+        assert.equal(answer.finished, true);
+        assert.equal(answer.run_id, RUN);
+        assert.ok(JSON.stringify(answer.run_result).includes('TEST_METHOD'));
+      },
+    );
+  }
 
   it('answers the run id right after the start with wait false', async () => {
     const connection = recordingConnection([
@@ -169,11 +181,11 @@ describe('Run* tools: start, wait, answer the result — one call', () => {
       },
     );
 
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map(line)).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(connection.requests.map(line), [
       'POST /sap/bc/adt/abapunit/runs',
     ]);
-    expect(payload(result)).toEqual({ success: true, run_id: RUN });
+    assert.deepStrictEqual(payload(result), { success: true, run_id: RUN });
   });
 
   it('is an error, and asks nothing more, when no run was started', async () => {
@@ -183,8 +195,8 @@ describe('Run* tools: start, wait, answer the result — one call', () => {
       class_name: 'ZCL_X',
     });
 
-    expect(result.isError).toBe(true);
-    expect(connection.requests).toHaveLength(1);
+    assert.equal(result.isError, true);
+    assert.equal(connection.requests.length, 1);
   });
 });
 
@@ -196,7 +208,7 @@ const FAILING_RESULT = {
 };
 
 describe('Run* tools with runner sync: one request, the finished result', () => {
-  it.each([
+  for (const [_name, handler, args, uri] of [
     [
       'RunUnitTest',
       handleRunUnitTest,
@@ -221,31 +233,38 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
       { function_module_name: 'z_fm_x', function_group_name: 'zfg_x' },
       '/sap/bc/adt/functions/groups/zfg_x/fmodules/z_fm_x"',
     ],
-  ] as const)(
-    '%s posts the object to /abapunit/testruns once and answers the result',
-    async (_name, handler, args, uri) => {
-      const first = readFirst(args);
-      const connection = recordingConnection([...first, RESULT]);
+  ] as const) {
+    it(
+      format(
+        '%s posts the object to /abapunit/testruns once and answers the result',
+        _name,
+      ),
+      async () => {
+        const first = readFirst(args);
+        const connection = recordingConnection([...first, RESULT]);
 
-      const result: any = await (handler as any)(ctx(connection), {
-        ...args,
-        runner: 'sync',
-      });
+        const result: any = await (handler as any)(ctx(connection), {
+          ...args,
+          runner: 'sync',
+        });
 
-      expect(result.isError).toBe(false);
-      expect(connection.requests.map(line)).toEqual([
-        ...firstLines(args),
-        'POST /sap/bc/adt/abapunit/testruns',
-      ]);
-      expect(
-        String(connection.requests[first.length].data).toLowerCase(),
-      ).toContain(uri);
-      const answer = payload(result);
-      expect(answer).toMatchObject({ runner: 'sync', finished: true });
-      expect(answer.run_id).toBeUndefined();
-      expect(JSON.stringify(answer.run_result)).toContain('TEST_METHOD');
-    },
-  );
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(connection.requests.map(line), [
+          ...firstLines(args),
+          'POST /sap/bc/adt/abapunit/testruns',
+        ]);
+        assert.ok(
+          String(connection.requests[first.length].data)
+            .toLowerCase()
+            .includes(uri),
+        );
+        const answer = payload(result);
+        assertMatchObject(answer, { runner: 'sync', finished: true });
+        assert.equal(answer.run_id, undefined);
+        assert.ok(JSON.stringify(answer.run_result).includes('TEST_METHOD'));
+      },
+    );
+  }
 
   it('a failing test is in the result, not a refusal', async () => {
     const connection = recordingConnection([FAILING_RESULT]);
@@ -255,9 +274,11 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
       runner: 'sync',
     });
 
-    expect(result.isError).toBe(false);
-    expect(JSON.stringify(payload(result).run_result)).toContain(
-      'deliberate failure for the corpus',
+    assert.equal(result.isError, false);
+    assert.ok(
+      JSON.stringify(payload(result).run_result).includes(
+        'deliberate failure for the corpus',
+      ),
     );
   });
 
@@ -270,7 +291,7 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
       detail: 'raw',
     });
 
-    expect(payload(result).run_result).toBe(RESULT.data);
+    assert.equal(payload(result).run_result, RESULT.data);
   });
 
   it("SAP's refusal is an error, with the step", async () => {
@@ -293,9 +314,9 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
       runner: 'sync',
     });
 
-    expect(result.isError).toBe(true);
-    expect(payload(result)).toMatchObject({ step: 'run' });
-    expect(connection.requests).toHaveLength(1);
+    assert.equal(result.isError, true);
+    assertMatchObject(payload(result), { step: 'run' });
+    assert.equal(connection.requests.length, 1);
   });
 
   it('a function module with runner sync and no function group is refused before any request', async () => {
@@ -306,12 +327,14 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
       { function_module_name: 'Z_FM_X', runner: 'sync' },
     );
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('function_group_name is required');
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.ok(
+      result.content[0].text.includes('function_group_name is required'),
+    );
+    assert.equal(connection.requests.length, 0);
   });
 
-  it.each([
+  for (const [_name, call, args] of [
     [
       'RunUnitTest',
       (c: HandlerContext, args: ToolArgs) =>
@@ -342,18 +365,24 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
         ).call(c, args),
       { function_module_name: 'Z_FM_X' },
     ],
-  ] as const)(
-    "%s: the tool's schema refuses another runner before any request",
-    async (_name, call, args) => {
-      const connection = recordingConnection();
+  ] as const) {
+    it(
+      format(
+        "%s: the tool's schema refuses another runner before any request",
+        _name,
+      ),
+      async () => {
+        const connection = recordingConnection();
 
-      const refused = expect(
-        call(ctx(connection) as any, { ...args, runner: 'later' }),
-      ).rejects.toThrow('runner');
-      await refused;
-      expect(connection.requests).toHaveLength(0);
-    },
-  );
+        const refused = assertRejects(
+          call(ctx(connection) as any, { ...args, runner: 'later' }),
+          'runner',
+        );
+        await refused;
+        assert.equal(connection.requests.length, 0);
+      },
+    );
+  }
 
   it('runner async is the default flow: start, poll, result', async () => {
     const connection = recordingConnection([STARTED, FINISHED, RESULT]);
@@ -363,12 +392,12 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
       runner: 'async',
     });
 
-    expect(connection.requests.map(line)).toEqual([
+    assert.deepStrictEqual(connection.requests.map(line), [
       'POST /sap/bc/adt/abapunit/runs',
       `GET /sap/bc/adt/abapunit/runs/${RUN}`,
       `GET /sap/bc/adt/abapunit/results/${RUN}`,
     ]);
-    expect(payload(result)).toMatchObject({ run_id: RUN, finished: true });
+    assertMatchObject(payload(result), { run_id: RUN, finished: true });
   });
 });
 
@@ -393,65 +422,79 @@ describe('Run* tools: scope reaches the run, with either runner', () => {
     add_foreign_tests_as_preview: false,
   };
 
-  it.each(TOOLS)(
-    '%s async: the scope given is the run configuration',
-    async (_name, handler, args) => {
-      const first = readFirst(args);
-      const connection = recordingConnection([
-        ...first,
-        STARTED,
-        FINISHED,
-        RESULT,
-      ]);
+  for (const [_name, handler, args] of TOOLS) {
+    it(
+      format('%s async: the scope given is the run configuration', _name),
+      async () => {
+        const first = readFirst(args);
+        const connection = recordingConnection([
+          ...first,
+          STARTED,
+          FINISHED,
+          RESULT,
+        ]);
 
-      await (handler as any)(ctx(connection), { ...args, scope });
+        await (handler as any)(ctx(connection), { ...args, scope });
 
-      expect(String(connection.requests[first.length].data)).toContain(
-        '<aunit:scope ownTests="false" foreignTests="true" addForeignTestsAsPreview="false"/>',
-      );
-    },
-  );
+        assert.ok(
+          String(connection.requests[first.length].data).includes(
+            '<aunit:scope ownTests="false" foreignTests="true" addForeignTestsAsPreview="false"/>',
+          ),
+        );
+      },
+    );
+  }
 
-  it.each(TOOLS)(
-    '%s sync: the scope given is the run configuration',
-    async (_name, handler, args) => {
-      const first = readFirst(args);
-      const connection = recordingConnection([...first, RESULT]);
+  for (const [_name, handler, args] of TOOLS) {
+    it(
+      format('%s sync: the scope given is the run configuration', _name),
+      async () => {
+        const first = readFirst(args);
+        const connection = recordingConnection([...first, RESULT]);
 
-      await (handler as any)(ctx(connection), {
-        ...args,
-        runner: 'sync',
-        scope,
-      });
+        await (handler as any)(ctx(connection), {
+          ...args,
+          runner: 'sync',
+          scope,
+        });
 
-      expect(String(connection.requests[first.length].data)).toContain(
-        '<testDeterminationStrategy sameProgram="false" assignedTests="true" appendAssignedTestsPreview="false"/>',
-      );
-    },
-  );
+        assert.ok(
+          String(connection.requests[first.length].data).includes(
+            '<testDeterminationStrategy sameProgram="false" assignedTests="true" appendAssignedTestsPreview="false"/>',
+          ),
+        );
+      },
+    );
+  }
 
-  it.each(TOOLS)(
-    "%s without scope: adt-clients' defaults, both runners",
-    async (_name, handler, args) => {
-      const first = readFirst(args);
-      const asyncRun = recordingConnection([
-        ...first,
-        STARTED,
-        FINISHED,
-        RESULT,
-      ]);
-      await (handler as any)(ctx(asyncRun), args);
-      expect(String(asyncRun.requests[first.length].data)).toContain(
-        '<aunit:scope ownTests="true" foreignTests="false" addForeignTestsAsPreview="true"/>',
-      );
+  for (const [_name, handler, args] of TOOLS) {
+    it(
+      format("%s without scope: adt-clients' defaults, both runners", _name),
+      async () => {
+        const first = readFirst(args);
+        const asyncRun = recordingConnection([
+          ...first,
+          STARTED,
+          FINISHED,
+          RESULT,
+        ]);
+        await (handler as any)(ctx(asyncRun), args);
+        assert.ok(
+          String(asyncRun.requests[first.length].data).includes(
+            '<aunit:scope ownTests="true" foreignTests="false" addForeignTestsAsPreview="true"/>',
+          ),
+        );
 
-      const syncRun = recordingConnection([...first, RESULT]);
-      await (handler as any)(ctx(syncRun), { ...args, runner: 'sync' });
-      expect(String(syncRun.requests[first.length].data)).toContain(
-        '<testDeterminationStrategy sameProgram="true" assignedTests="false" appendAssignedTestsPreview="true"/>',
-      );
-    },
-  );
+        const syncRun = recordingConnection([...first, RESULT]);
+        await (handler as any)(ctx(syncRun), { ...args, runner: 'sync' });
+        assert.ok(
+          String(syncRun.requests[first.length].data).includes(
+            '<testDeterminationStrategy sameProgram="true" assignedTests="false" appendAssignedTestsPreview="true"/>',
+          ),
+        );
+      },
+    );
+  }
 });
 
 describe('HandlerUnitTestRun: the runner the caller names, async by default', () => {
@@ -461,27 +504,29 @@ describe('HandlerUnitTestRun: the runner the caller names, async by default', ()
     { container_class: 'zcl_b', test_class: 'ltc_c' },
   ];
 
-  it.each([
+  for (const [_name, extra] of [
     ['without runner', {}],
     ['runner async', { runner: 'async' }],
-  ])(
-    '%s: starts the run and answers its id, without waiting',
-    async (_name, extra) => {
-      const connection = recordingConnection([STARTED]);
+  ] satisfies [string, Record<string, string>][]) {
+    it(
+      format('%s: starts the run and answers its id, without waiting', _name),
+      async () => {
+        const connection = recordingConnection([STARTED]);
 
-      const result: any = await handleHandlerUnitTestRun(
-        ctx(connection) as any,
-        { tests, title: 'T', ...extra } as any,
-      );
+        const result: any = await handleHandlerUnitTestRun(
+          ctx(connection) as any,
+          { tests, title: 'T', ...extra } as any,
+        );
 
-      expect(result.isError).toBe(false);
-      expect(connection.requests.map(line)).toEqual([
-        'POST /sap/bc/adt/abapunit/runs',
-      ]);
-      expect(String(connection.requests[0].data)).toContain('LTC_B');
-      expect(payload(result)).toEqual({ success: true, run_id: RUN });
-    },
-  );
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(connection.requests.map(line), [
+          'POST /sap/bc/adt/abapunit/runs',
+        ]);
+        assert.ok(String(connection.requests[0].data).includes('LTC_B'));
+        assert.deepStrictEqual(payload(result), { success: true, run_id: RUN });
+      },
+    );
+  }
 
   it('runner sync: one POST /abapunit/testruns, each container once, the finished result', async () => {
     const connection = recordingConnection([FAILING_RESULT]);
@@ -492,32 +537,35 @@ describe('HandlerUnitTestRun: the runner the caller names, async by default', ()
       risk_level: { dangerous: true },
     });
 
-    expect(result.isError).toBe(false);
-    expect(connection.requests.map(line)).toEqual([
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(connection.requests.map(line), [
       'POST /sap/bc/adt/abapunit/testruns',
     ]);
     const body = String(connection.requests[0].data);
-    expect(body.split('/sap/bc/adt/oo/classes/zcl_a"').length - 1).toBe(1);
-    expect(body).toContain('/sap/bc/adt/oo/classes/zcl_b"');
+    assert.equal(body.split('/sap/bc/adt/oo/classes/zcl_a"').length - 1, 1);
+    assert.ok(body.includes('/sap/bc/adt/oo/classes/zcl_b"'));
     const answer = payload(result);
-    expect(answer).toMatchObject({ runner: 'sync', finished: true });
-    expect(answer.run_id).toBeUndefined();
-    expect(JSON.stringify(answer.run_result)).toContain(
-      'deliberate failure for the corpus',
+    assertMatchObject(answer, { runner: 'sync', finished: true });
+    assert.equal(answer.run_id, undefined);
+    assert.ok(
+      JSON.stringify(answer.run_result).includes(
+        'deliberate failure for the corpus',
+      ),
     );
   });
 
   it("the tool's schema refuses another runner before any request", async () => {
     const connection = recordingConnection();
 
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(HandlerUnitTestRun, handleHandlerUnitTestRun).call(
         ctx(connection) as any,
         { tests, runner: 'later' },
       ),
-    ).rejects.toThrow('runner');
+      'runner',
+    );
     await refused;
-    expect(connection.requests).toHaveLength(0);
+    assert.equal(connection.requests.length, 0);
   });
 });
 
@@ -530,18 +578,20 @@ describe('CreateUnitTest: the class test include, under the class lock', () => {
       test_class_source: 'CLASS ltc DEFINITION FOR TESTING. ENDCLASS.',
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const writes = connection.requests.filter((r) => r.method === 'PUT');
-    expect(writes).toHaveLength(1);
-    expect(writes[0].url).toContain('/oo/classes/zcl_x/includes/testclasses');
-    expect(String(writes[0].data)).toContain('FOR TESTING');
-    expect(
+    assert.equal(writes.length, 1);
+    assert.ok(writes[0].url.includes('/oo/classes/zcl_x/includes/testclasses'));
+    assert.ok(String(writes[0].data).includes('FOR TESTING'));
+    assert.equal(
       connection.requests.some((r) => r.url.includes('_action=LOCK')),
-    ).toBe(true);
-    expect(
+      true,
+    );
+    assert.equal(
       connection.requests.some((r) => r.url.includes('_action=UNLOCK')),
-    ).toBe(true);
-    expect(connection.requests.at(-1)?.url).toContain('/activation');
+      true,
+    );
+    assert.ok(connection.requests.at(-1)?.url.includes('/activation'));
   });
 });
 
@@ -574,27 +624,30 @@ describe('CreateProgramUnitTest: a test include, pulled into the report', () => 
       },
     );
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const include = programTestInclude('zr_x').toLowerCase();
     const created = connection.requests.find(
       (r) =>
         r.method === 'POST' &&
         r.url.split('?')[0].endsWith('/programs/includes'),
     );
-    expect(String(created?.data)).toContain('adtcore:name="ZPKG"');
+    assert.ok(String(created?.data).includes('adtcore:name="ZPKG"'));
     const puts = connection.requests.filter((r) => r.method === 'PUT');
-    expect(puts.map((r) => r.url.split('?')[0])).toEqual([
-      `/sap/bc/adt/programs/includes/${include}/source/main`,
-      '/sap/bc/adt/programs/programs/zr_x/source/main',
-    ]);
-    expect(String(puts[1].data)).toContain(`INCLUDE ${include}.`);
+    assert.deepStrictEqual(
+      puts.map((r) => r.url.split('?')[0]),
+      [
+        `/sap/bc/adt/programs/includes/${include}/source/main`,
+        '/sap/bc/adt/programs/programs/zr_x/source/main',
+      ],
+    );
+    assert.ok(String(puts[1].data).includes(`INCLUDE ${include}.`));
     // The report is read under its lock and written under the same one, so
     // nothing saved in between can be overwritten.
     const reportRequests = connection.requests
       .map((r) => line(r).toLowerCase())
       .filter((l) => l.includes('/programs/programs/zr_x'));
     // metadata, then lock → read → write → unlock
-    expect(reportRequests).toEqual([
+    assert.deepStrictEqual(reportRequests, [
       'get /sap/bc/adt/programs/programs/zr_x',
       'post /sap/bc/adt/programs/programs/zr_x',
       'get /sap/bc/adt/programs/programs/zr_x/source/main',
@@ -609,12 +662,12 @@ describe('CreateProgramUnitTest: a test include, pulled into the report', () => 
         r.method === 'GET' &&
         r.url.toLowerCase().includes('/programs/programs/zr_x/source'),
     );
-    expect(reportLock).toBeGreaterThan(-1);
-    expect(reportRead).toBeGreaterThan(reportLock);
+    assert.ok(reportLock > -1);
+    assert.ok(reportRead > reportLock);
     const activations = connection.requests.filter((r) =>
       r.url.includes('/activation'),
     );
-    expect(activations).toHaveLength(2);
+    assert.equal(activations.length, 2);
   });
 
   it('leaves the report alone when it already pulls the include in', async () => {
@@ -635,8 +688,8 @@ describe('CreateProgramUnitTest: a test include, pulled into the report', () => 
     });
 
     const puts = connection.requests.filter((r) => r.method === 'PUT');
-    expect(puts).toHaveLength(1);
-    expect(puts[0].url).toContain(`/programs/includes/${include}/`);
+    assert.equal(puts.length, 1);
+    assert.ok(puts[0].url.includes(`/programs/includes/${include}/`));
   });
 
   it('UpdateProgramUnitTest rewrites the include only — no create, no report write', async () => {
@@ -647,31 +700,34 @@ describe('CreateProgramUnitTest: a test include, pulled into the report', () => 
       { program_name: 'zr_x', test_class_source: 'x' },
     );
 
-    expect(result.isError).toBe(false);
-    expect(
+    assert.equal(result.isError, false);
+    assert.equal(
       connection.requests.some(
         (r) =>
           r.method === 'POST' &&
           r.url.split('?')[0].endsWith('/programs/includes'),
       ),
-    ).toBe(false);
+      false,
+    );
     const puts = connection.requests.filter((r) => r.method === 'PUT');
-    expect(puts).toHaveLength(1);
-    expect(puts[0].url).toContain(
-      `/programs/includes/${programTestInclude('zr_x').toLowerCase()}/`,
+    assert.equal(puts.length, 1);
+    assert.ok(
+      puts[0].url.includes(
+        `/programs/includes/${programTestInclude('zr_x').toLowerCase()}/`,
+      ),
     );
   });
 });
 
 describe('test include names', () => {
   it("a report's is the report's name with _T99", () => {
-    expect(programTestInclude('zr_x')).toBe('ZR_X_T99');
-    expect(programTestInclude('/ns/zr_x')).toBe('/NS/ZR_X_T99');
+    assert.equal(programTestInclude('zr_x'), 'ZR_X_T99');
+    assert.equal(programTestInclude('/ns/zr_x'), '/NS/ZR_X_T99');
   });
 
   it("a function group's follows its main program: L<group>, namespace in front", () => {
-    expect(functionGroupTestInclude('zfg_x')).toBe('LZFG_XT99');
-    expect(functionGroupTestInclude('/ns/group')).toBe('/NS/LGROUPT99');
+    assert.equal(functionGroupTestInclude('zfg_x'), 'LZFG_XT99');
+    assert.equal(functionGroupTestInclude('/ns/group'), '/NS/LGROUPT99');
   });
 });
 
@@ -701,36 +757,38 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
       { function_group_name: 'zfg_x', test_class_source: 'x' },
     );
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const include = functionGroupTestInclude('zfg_x').toLowerCase();
-    expect(
+    assert.equal(
       connection.requests.some(
         (r) =>
           r.method === 'POST' &&
           r.url.includes('/functions/groups/zfg_x/includes'),
       ),
-    ).toBe(true);
+      true,
+    );
     const puts = connection.requests.filter((r) => r.method === 'PUT');
-    expect(puts).toHaveLength(1);
-    expect(puts[0].url.toLowerCase()).toContain(
-      `/includes/${include}/source/main`,
+    assert.equal(puts.length, 1);
+    assert.ok(
+      puts[0].url.toLowerCase().includes(`/includes/${include}/source/main`),
     );
     // One run, without the pre-audit: activating the group alone with it is
     // answered by the inactive list, and the main program stays inactive.
     const runs = connection.requests.filter(
       (r) => r.method === 'POST' && r.url.includes('/activation'),
     );
-    expect(runs).toHaveLength(1);
-    expect(runs[0].url).toContain('/activation/runs');
-    expect(runs[0].url).toContain('preauditRequested=false');
+    assert.equal(runs.length, 1);
+    assert.ok(runs[0].url.includes('/activation/runs'));
+    assert.ok(runs[0].url.includes('preauditRequested=false'));
     const body = String(runs[0].data);
-    expect(body).toContain(`adtcore:name="${include.toUpperCase()}"`);
-    expect(body).toContain('adtcore:type="FUGR/F" adtcore:name="ZFG_X"');
-    expect(body).toContain('adtcore:name="SAPLZFG_X"');
+    assert.ok(body.includes(`adtcore:name="${include.toUpperCase()}"`));
+    assert.ok(body.includes('adtcore:type="FUGR/F" adtcore:name="ZFG_X"'));
+    assert.ok(body.includes('adtcore:name="SAPLZFG_X"'));
     // Then the run's status and its results: accepted is not done.
-    expect(
+    assert.equal(
       connection.requests.some((r) => r.url.includes('/activation/runs/RUN-1')),
-    ).toBe(true);
+      true,
+    );
   });
 
   it('an activation the run refused is a failure, not a success', async () => {
@@ -756,10 +814,10 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
       { function_group_name: 'zfg_x', test_class_source: 'x' },
     );
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Syntax error');
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('Syntax error'));
     // SAP reported it: SAP's refusal, with the step.
-    expect(payload(result)).toMatchObject({
+    assertMatchObject(payload(result), {
       origin: 'refusal',
       step: 'activate',
     });
@@ -786,11 +844,11 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
       { function_group_name: 'zfg_x', test_class_source: 'x' },
     );
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
   });
 
-  it('waits on the run with long polls and no timer of its own, past six reads', async () => {
-    const timer = jest.spyOn(global, 'setTimeout');
+  it('waits on the run with long polls and no timer of its own, past six reads', async (t) => {
+    const timer = t.mock.method(global, 'setTimeout');
     try {
       // A run still going for seven reads, then finished: long polls back
       // to back, no attempt limit, then the results.
@@ -824,23 +882,27 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
         { function_group_name: 'zfg_x', test_class_source: 'x' },
       );
 
-      expect(result.isError).toBe(false);
+      assert.equal(result.isError, false);
       const polls = connection.requests.filter((r) =>
         r.url.includes('/activation/runs/RUN-4?'),
       );
-      expect(polls).toHaveLength(8);
-      expect(polls.every((r) => r.url.includes('withLongPolling=true'))).toBe(
+      assert.equal(polls.length, 8);
+      assert.equal(
+        polls.every((r) => r.url.includes('withLongPolling=true')),
         true,
       );
-      expect(
+      assert.equal(
         connection.requests.some((r) =>
           r.url.includes('/activation/results/RUN-4'),
         ),
-      ).toBe(true);
-      const ours = timer.mock.calls.filter(([, ms]) => ms === 1000);
-      expect(ours).toHaveLength(0);
+        true,
+      );
+      const ours = timer.mock.calls.filter(
+        (call) => call.arguments[1] === 1000,
+      );
+      assert.equal(ours.length, 0);
     } finally {
-      timer.mockRestore();
+      timer.mock.restore();
     }
   });
 
@@ -880,20 +942,23 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
       { function_group_name: 'zfg_x', test_class_source: 'x' },
     );
 
-    expect(reads.overRead).toBe(false);
-    expect(reads.count).toBe(1);
-    expect(result.isError).toBe(true);
+    assert.equal(reads.overRead, false);
+    assert.equal(reads.count, 1);
+    assert.equal(result.isError, true);
     const answered = payload(result);
-    expect(answered.error).toBe('client_threw');
-    expect(answered.origin).toBeUndefined();
-    expect(answered.status).toBeUndefined();
-    expect(answered.step).toBe('activate');
-    expect(answered.message).toContain(
-      'The activation run RUN-5 answered the status "paused"',
+    assert.equal(answered.error, 'client_threw');
+    assert.equal(answered.origin, undefined);
+    assert.equal(answered.status, undefined);
+    assert.equal(answered.step, 'activate');
+    assert.ok(
+      answered.message.includes(
+        'The activation run RUN-5 answered the status "paused"',
+      ),
     );
-    expect(
+    assert.equal(
       connection.requests.some((r) => r.url.includes('/activation/results/')),
-    ).toBe(false);
+      false,
+    );
   });
 
   it('a run start with no run id ends the write as a failure on our side', async () => {
@@ -910,24 +975,26 @@ describe('CreateFunctionGroupUnitTest: the group test include', () => {
       { function_group_name: 'zfg_x', test_class_source: 'x' },
     );
 
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const answered = payload(result);
-    expect(answered.error).toBe('client_threw');
-    expect(answered.origin).toBeUndefined();
-    expect(answered.status).toBeUndefined();
-    expect(answered.step).toBe('activate');
-    expect(answered.message).toContain('The activation run answered no id');
-    expect(
+    assert.equal(answered.error, 'client_threw');
+    assert.equal(answered.origin, undefined);
+    assert.equal(answered.status, undefined);
+    assert.equal(answered.step, 'activate');
+    assert.ok(answered.message.includes('The activation run answered no id'));
+    assert.equal(
       connection.requests.some((r) => r.url.includes('/activation/runs/')),
-    ).toBe(false);
-    expect(
+      false,
+    );
+    assert.equal(
       connection.requests.some((r) => r.url.includes('/activation/results/')),
-    ).toBe(false);
+      false,
+    );
   });
 
   it("a function group's main program: SAPL<group>, namespace in front", () => {
-    expect(functionGroupMainProgram('zfg_x')).toBe('SAPLZFG_X');
-    expect(functionGroupMainProgram('/ns/group')).toBe('/NS/SAPLGROUP');
+    assert.equal(functionGroupMainProgram('zfg_x'), 'SAPLZFG_X');
+    assert.equal(functionGroupMainProgram('/ns/group'), '/NS/SAPLGROUP');
   });
 });
 
@@ -991,40 +1058,48 @@ describe('CreateFunctionGroupUnitTest: the activation endpoint by discovery', ()
       test_class_source: 'x',
     });
 
-  it.each([
+  for (const [_what, name] of [
     ['SAP_BASIS 7.40', 'system-description-basis-740--03-discovery'],
     ['751 (partial)', 'system-description-751-partial--01-discovery'],
-  ])(
-    '%s lists no /activation/runs: the discovery, then one POST /activation',
-    async (_what, name) => {
-      const { connection, lines } = system(
-        corpusBody(name),
-        corpusBody('activation-sync-activated-751--01-activation'),
-      );
-      const result: any = await create(connection);
-      expect(result.isError).toBe(false);
-      const activation = lines.slice(
-        lines.indexOf('GET /sap/bc/adt/discovery'),
-      );
-      expect(activation).toEqual([
-        'GET /sap/bc/adt/discovery',
-        'POST /sap/bc/adt/activation',
-      ]);
-    },
-  );
+  ]) {
+    it(
+      format(
+        '%s lists no /activation/runs: the discovery, then one POST /activation',
+        _what,
+      ),
+      async () => {
+        const { connection, lines } = system(
+          corpusBody(name),
+          corpusBody('activation-sync-activated-751--01-activation'),
+        );
+        const result: any = await create(connection);
+        assert.equal(result.isError, false);
+        const activation = lines.slice(
+          lines.indexOf('GET /sap/bc/adt/discovery'),
+        );
+        assert.deepStrictEqual(activation, [
+          'GET /sap/bc/adt/discovery',
+          'POST /sap/bc/adt/activation',
+        ]);
+      },
+    );
+  }
 
   it('S/4HANA 2025 lists /activation/runs: the discovery, then the run', async () => {
     const { connection, lines } = system(
       corpusBody('system-description-s4-2025--03-discovery'),
     );
     const result: any = await create(connection);
-    expect(result.isError).toBe(false);
-    expect(lines.slice(lines.indexOf('GET /sap/bc/adt/discovery'))).toEqual([
-      'GET /sap/bc/adt/discovery',
-      'POST /sap/bc/adt/activation/runs',
-      'GET /sap/bc/adt/activation/runs/RUN-9',
-      'GET /sap/bc/adt/activation/results/RUN-9',
-    ]);
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(
+      lines.slice(lines.indexOf('GET /sap/bc/adt/discovery')),
+      [
+        'GET /sap/bc/adt/discovery',
+        'POST /sap/bc/adt/activation/runs',
+        'GET /sap/bc/adt/activation/runs/RUN-9',
+        'GET /sap/bc/adt/activation/results/RUN-9',
+      ],
+    );
   });
 
   it('751: the objects still inactive after the POST are an error naming them', async () => {
@@ -1033,8 +1108,8 @@ describe('CreateFunctionGroupUnitTest: the activation endpoint by discovery', ()
       corpusBody('activation-preaudit-still-inactive-751--01-activation'),
     );
     const result: any = await create(connection);
-    expect(result.isError).toBe(true);
-    expect(payload(result).step).toBe('activate');
-    expect(payload(result).still_inactive?.length).toBeGreaterThan(0);
+    assert.equal(result.isError, true);
+    assert.equal(payload(result).step, 'activate');
+    assert.ok(payload(result).still_inactive?.length > 0);
   });
 });

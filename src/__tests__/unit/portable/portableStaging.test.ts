@@ -6,11 +6,19 @@
  * prefers it) — and which staged copies of sap-rfc-lite are too old to
  * load inside an executable.
  */
+
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { after, describe, it } from 'node:test';
+import { isDeepStrictEqual } from 'node:util';
+import { assertThrows } from '../../helpers/assertions';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const staging = require('../../../../scripts/portable/staging.cjs');
+const staging = require(
+  path.join(repositoryRoot(__dirname), 'scripts', 'portable', 'staging.cjs'),
+);
 
 const made: string[] = [];
 const tmp = () => {
@@ -18,7 +26,7 @@ const tmp = () => {
   made.push(dir);
   return dir;
 };
-afterAll(() => {
+after(() => {
   for (const dir of made) fs.rmSync(dir, { recursive: true, force: true });
 });
 const pkgOf = (dir: string) =>
@@ -61,17 +69,19 @@ const withAddon = (dir: string) => write(prebuildOf(stagePackage(dir)));
 
 describe('portable staging', () => {
   it('requires SAPNWRFC_HOME', () => {
-    expect(() => staging.sdkHome({})).toThrow(/set SAPNWRFC_HOME/);
+    assertThrows(() => staging.sdkHome({}), /set SAPNWRFC_HOME/);
   });
 
   it('refuses a relative SAPNWRFC_HOME', () => {
-    expect(() => staging.sdkHome({ SAPNWRFC_HOME: 'nwrfcsdk' })).toThrow(
+    assertThrows(
+      () => staging.sdkHome({ SAPNWRFC_HOME: 'nwrfcsdk' }),
       /absolute path/,
     );
   });
 
   it('keeps SAPNWRFC_HOME as given, trailing slash included', () => {
-    expect(staging.sdkHome({ SAPNWRFC_HOME: ' /opt/nwrfcsdk/ ' })).toBe(
+    assert.equal(
+      staging.sdkHome({ SAPNWRFC_HOME: ' /opt/nwrfcsdk/ ' }),
       '/opt/nwrfcsdk/',
     );
   });
@@ -79,7 +89,7 @@ describe('portable staging', () => {
   it('takes the prebuilt binding sap-rfc-lite carries (no build/Release)', () => {
     const dir = tmp();
     const prebuilt = withAddon(dir);
-    expect(staging.stagedAddon(dir)).toBe(prebuilt);
+    assert.equal(staging.stagedAddon(dir), prebuilt);
   });
 
   it('takes a build/Release over the prebuild, as the package loader does', () => {
@@ -88,24 +98,26 @@ describe('portable staging', () => {
     const compiled = write(
       path.join(pkgOf(dir), 'build/Release/sapnwrfc.node'),
     );
-    expect(staging.stagedAddon(dir)).toBe(compiled);
+    assert.equal(staging.stagedAddon(dir), compiled);
   });
 
   it('finds no binding when there is neither, or no package', () => {
     const empty = tmp();
-    expect(staging.stagedAddon(empty)).toBeUndefined();
+    assert.equal(staging.stagedAddon(empty), undefined);
     const dir = tmp();
     stagePackage(dir);
-    expect(staging.stagedAddon(dir)).toBeUndefined();
+    assert.equal(staging.stagedAddon(dir), undefined);
   });
 
   it('is not staged until the RFC binding exists — no marker for a failed install', () => {
     const dir = tmp();
     stagePackage(dir);
-    expect(() =>
-      staging.markStaged({ dir, version: '1.0.0', sdk: '/opt/sdk' }),
-    ).toThrow(/RFC binding is not in the staged/);
-    expect(staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/sdk' })).toBe(
+    assertThrows(
+      () => staging.markStaged({ dir, version: '1.0.0', sdk: '/opt/sdk' }),
+      /RFC binding is not in the staged/,
+    );
+    assert.equal(
+      staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/sdk' }),
       false,
     );
   });
@@ -114,7 +126,8 @@ describe('portable staging', () => {
     const dir = tmp();
     withAddon(dir);
     staging.markStaged({ dir, version: '1.0.0', sdk: '/opt/sdk' });
-    expect(staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/sdk' })).toBe(
+    assert.equal(
+      staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/sdk' }),
       true,
     );
   });
@@ -123,16 +136,18 @@ describe('portable staging', () => {
     const dir = tmp();
     withAddon(dir);
     staging.markStaged({ dir, version: '1.0.0', sdk: '/opt/sdk' });
-    expect(
+    assert.equal(
       staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/other-sdk' }),
-    ).toBe(false);
+      false,
+    );
   });
 
   it('is rebuilt for another version', () => {
     const dir = tmp();
     withAddon(dir);
     staging.markStaged({ dir, version: '1.0.0', sdk: '/opt/sdk' });
-    expect(staging.isStaged(dir, { version: '1.0.1', sdk: '/opt/sdk' })).toBe(
+    assert.equal(
+      staging.isStaged(dir, { version: '1.0.1', sdk: '/opt/sdk' }),
       false,
     );
   });
@@ -142,7 +157,8 @@ describe('portable staging', () => {
     const addon = withAddon(dir);
     staging.markStaged({ dir, version: '1.0.0', sdk: '/opt/sdk' });
     fs.rmSync(addon);
-    expect(staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/sdk' })).toBe(
+    assert.equal(
+      staging.isStaged(dir, { version: '1.0.0', sdk: '/opt/sdk' }),
       false,
     );
   });
@@ -166,7 +182,7 @@ describe('staged sap-rfc-lite copies older than 0.3.0', () => {
       path.join(dir, 'node_modules/@mcp-abap-adt/connection/node_modules'),
       '1.0.0',
     );
-    expect(staging.rfcLiteTooOld(dir)).toEqual([]);
+    assert.deepStrictEqual(staging.rfcLiteTooOld(dir), []);
   });
 
   it('finds an older copy nested under the package that pinned it', () => {
@@ -176,7 +192,7 @@ describe('staged sap-rfc-lite copies older than 0.3.0', () => {
       path.join(dir, 'node_modules/@mcp-abap-adt/connection/node_modules'),
       '0.2.4',
     );
-    expect(staging.rfcLiteTooOld(dir)).toEqual([
+    assert.deepStrictEqual(staging.rfcLiteTooOld(dir), [
       { dir: nested, version: '0.2.4' },
     ]);
   });
@@ -189,15 +205,18 @@ describe('staged sap-rfc-lite copies older than 0.3.0', () => {
       'node_modules/other/node_modules/@mcp-abap-adt/sap-rfc-lite',
     );
     fs.mkdirSync(broken, { recursive: true });
-    expect(staging.rfcLiteTooOld(dir)).toEqual(
-      expect.arrayContaining([
+    {
+      const actual = staging.rfcLiteTooOld(dir);
+      for (const expected of [
         { dir: hoisted, version: '0.2.3' },
         { dir: broken, version: 'undefined' },
-      ]),
-    );
+      ]) {
+        assert.ok(actual.some((e: unknown) => isDeepStrictEqual(e, expected)));
+      }
+    }
   });
 
   it('finds nothing in a stage with no node_modules', () => {
-    expect(staging.rfcLiteTooOld(tmp())).toEqual([]);
+    assert.deepStrictEqual(staging.rfcLiteTooOld(tmp()), []);
   });
 });

@@ -42,6 +42,9 @@
  * assertions.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleCreateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
@@ -68,6 +71,7 @@ import { handleCreateTable } from '../../handlers/table/high/handleCreateTable';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
+import * as clients from '../../lib/clients';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import {
@@ -78,15 +82,14 @@ import {
 } from '../helpers/fakeClient';
 import { setSystemContext } from '../helpers/processSystemContext';
 
+mock.method(clients, 'createAdtClient', () => fakeClient);
+mock.method(clients, 'createOnPremAdtClient', () => fakeClient);
+
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 let fakeClient: unknown;
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => fakeClient,
-  createOnPremAdtClient: () => fakeClient,
-}));
 
 const context = {
   connection: { getSessionId: () => null } as any,
@@ -99,7 +102,7 @@ describe('high-tier creates: no lock, single POST', () => {
   beforeEach(() => setSystemContext({ responsible: 'USER_PLACEHOLDER' }));
   afterEach(() => resetSystemContextCache());
 
-  it.each([
+  for (const [_n, handler, args] of [
     [
       'CreateBehaviorImplementation',
       handleCreateBehaviorImplementation,
@@ -185,18 +188,21 @@ describe('high-tier creates: no lock, single POST', () => {
         test_class_source: 'x',
       },
     ],
-  ])('%s reports a refused create as an error', async (_n, handler, args) => {
-    fakeClient = fakeClientOf({
-      // CreateCdsUnitTest asks the view first; the create under test follows.
-      checkCdsTestDoubles: async () => okResponse(reading('OK', 'OK', 200)),
-      create: async () => refusedResponse('Name already taken'),
+  ]) {
+    it(format('%s reports a refused create as an error', _n), async () => {
+      fakeClient = fakeClientOf({
+        // CreateCdsUnitTest asks the view first; the create under test follows.
+        checkCdsTestDoubles: async () => okResponse(reading('OK', 'OK', 200)),
+        create: async () => refusedResponse('Name already taken'),
+      });
+      const result: any = await (handler as any)(context as any, args);
+      assert.equal(result.isError, true);
+      assert.equal(
+        JSON.parse(result.content[0].text).message,
+        'Name already taken',
+      );
     });
-    const result: any = await (handler as any)(context as any, args);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
-      'Name already taken',
-    );
-  });
+  }
 
   it('answers SUCCESS and nothing else when a create works', async () => {
     // A class create answers 200 with zero bytes; the status is the whole verdict.
@@ -207,12 +213,12 @@ describe('high-tier creates: no lock, single POST', () => {
       class_name: 'ZCL_X',
       package_name: 'ZP',
     });
-    expect(result.isError).toBe(false);
-    expect(result.content[0].text).toContain('SUCCESS');
+    assert.equal(result.isError, false);
+    assert.ok(result.content[0].text.includes('SUCCESS'));
   });
 
   it('never acquires a lock', async () => {
-    const lock = jest.fn();
+    const lock = mock.fn<(...args: any[]) => any>();
     fakeClient = fakeClientOf({
       create: async () => okResponse(reading(undefined, '', 200)),
       lock,
@@ -221,7 +227,7 @@ describe('high-tier creates: no lock, single POST', () => {
       class_name: 'ZCL_X',
       package_name: 'ZP',
     });
-    expect(lock).not.toHaveBeenCalled();
+    assert.equal(lock.mock.callCount(), 0);
   });
 });
 
@@ -299,66 +305,89 @@ describe('high-tier updates that still have a lock to take: they take it themsel
   const readMetadata = async () =>
     okResponse(reading(classDocument, classDocument, 200));
 
-  it.each(lockingCases)(
-    '%s reports a refused write as an error, and releases the lock it took',
-    async (_n, handler, args) => {
-      const unlock = jest.fn(async () => okResponse(undefined));
-      const update = async () =>
-        refusedResponse('Object is locked by another user');
-      fakeClient = fakeClientOf({
-        readMetadata,
-        lock: async () => okResponse('handle-1'),
-        update,
-        updateMetadata: update,
-        unlock,
-      });
-      const result: any = await (handler as any)(context as any, args);
-      expect(unlock).toHaveBeenCalledTimes(1);
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text).message).toBe(
-        'Object is locked by another user',
-      );
-    },
-  );
+  for (const [_n, handler, args] of lockingCases) {
+    it(
+      format(
+        '%s reports a refused write as an error, and releases the lock it took',
+        _n,
+      ),
+      async () => {
+        const unlock = mock.fn(async () => okResponse(undefined));
+        const update = async () =>
+          refusedResponse('Object is locked by another user');
+        fakeClient = fakeClientOf({
+          readMetadata,
+          lock: async () => okResponse('handle-1'),
+          update,
+          updateMetadata: update,
+          unlock,
+        });
+        const result: any = await (handler as any)(context as any, args);
+        assert.equal(unlock.mock.callCount(), 1);
+        assert.equal(result.isError, true);
+        assert.equal(
+          JSON.parse(result.content[0].text).message,
+          'Object is locked by another user',
+        );
+      },
+    );
+  }
 
-  it.each(lockingCases)(
-    '%s locks, writes under that handle, and unlocks — the caller supplies none of it',
-    async (_n, handler, args, lockConfig) => {
-      const lock = jest.fn(async () => okResponse('handle-1'));
-      const unlock = jest.fn(async () => okResponse(undefined));
-      const update = jest.fn(async () =>
-        okResponse(reading(undefined, '', 200)),
-      );
-      fakeClient = fakeClientOf({
-        readMetadata,
-        lock,
-        update,
-        updateMetadata: update,
-        unlock,
-        // UpdateCdsUnitTest activates the test class after the write.
-        activate: async () => okResponse(reading(undefined, '', 200)),
-      });
+  for (const [_n, handler, args, lockConfig] of lockingCases) {
+    it(
+      format(
+        '%s locks, writes under that handle, and unlocks — the caller supplies none of it',
+        _n,
+      ),
+      async () => {
+        const lock = mock.fn(async () => okResponse('handle-1'));
+        const unlock = mock.fn(async () => okResponse(undefined));
+        const update = mock.fn(async () =>
+          okResponse(reading(undefined, '', 200)),
+        );
+        fakeClient = fakeClientOf({
+          readMetadata,
+          lock,
+          update,
+          updateMetadata: update,
+          unlock,
+          // UpdateCdsUnitTest activates the test class after the write.
+          activate: async () => okResponse(reading(undefined, '', 200)),
+        });
 
-      const result: any = await (handler as any)(context as any, args);
+        const result: any = await (handler as any)(context as any, args);
 
-      expect(result.isError).toBe(false);
-      expect(lock).toHaveBeenCalledWith(
-        lockConfig,
-        expect.objectContaining({ analyse: analyseLock }),
-      );
-      const withAnalyse = expect.objectContaining({
-        analyse: analyseException,
-      });
-      expect(update).toHaveBeenCalledWith(
-        expect.anything(),
-        expect.objectContaining({
-          lockHandle: 'handle-1',
-          analyse: analyseException,
-        }),
-      );
-      expect(unlock).toHaveBeenCalledWith(lockConfig, 'handle-1', withAnalyse);
-    },
-  );
+        assert.equal(result.isError, false);
+        assert.ok(
+          lock.mock.calls.some(
+            ({ arguments: a }: { arguments: any[] }) =>
+              a.length === 2 &&
+              isDeepStrictEqual(a[0], lockConfig) &&
+              isDeepStrictEqual(a[1]?.analyse, analyseLock),
+          ),
+        );
+        assert.ok(
+          update.mock.calls.some(
+            ({ arguments: a }: { arguments: any[] }) =>
+              a.length === 2 &&
+              a[0] !== undefined &&
+              a[0] !== null &&
+              isDeepStrictEqual(a[1]?.lockHandle, 'handle-1') &&
+              isDeepStrictEqual(a[1]?.analyse, analyseException),
+          ),
+        );
+        assert.ok(
+          unlock.mock.calls.some(
+            ({ arguments: a }: { arguments: any[] }) =>
+              a.length === 3 &&
+              isDeepStrictEqual(a[0], lockConfig) &&
+              a[1] === 'handle-1' &&
+              isDeepStrictEqual(a[2]?.analyse, analyseException),
+          ),
+        );
+      },
+    );
+  }
 });
 
 describe('UpdateMessageClassMessage: no lock to take, and none is asked for', () => {
@@ -371,15 +400,16 @@ describe('UpdateMessageClassMessage: no lock to take, and none is asked for', ()
       msgno: '001',
       msgtext: 'x',
     });
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
+    assert.equal(result.isError, true);
+    assert.equal(
+      JSON.parse(result.content[0].text).message,
       'Object is locked by another user',
     );
   });
 
   it('never calls lock or unlock — AdtMessageClassMessage is not IAdtLockable', async () => {
-    const lock = jest.fn();
-    const unlock = jest.fn();
+    const lock = mock.fn<(...args: any[]) => any>();
+    const unlock = mock.fn<(...args: any[]) => any>();
     fakeClient = fakeClientOf({
       update: async () => okResponse(reading(undefined, '', 200)),
       lock,
@@ -390,8 +420,8 @@ describe('UpdateMessageClassMessage: no lock to take, and none is asked for', ()
       msgno: '001',
       msgtext: 'x',
     });
-    expect(result.isError).toBe(false);
-    expect(lock).not.toHaveBeenCalled();
-    expect(unlock).not.toHaveBeenCalled();
+    assert.equal(result.isError, false);
+    assert.equal(lock.mock.callCount(), 0);
+    assert.equal(unlock.mock.callCount(), 0);
   });
 });

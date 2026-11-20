@@ -9,6 +9,9 @@
  * variant — real adt-clients code, no SAP.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { z } from 'zod';
 import {
   TOOL_DEFINITION as HANDLER_ACTIVATE,
@@ -191,12 +194,14 @@ describe('activation codes that need a parent are servable through the schema', 
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
-  it.each(VARIANTS)('%s offers codes that need a parent', (variant) => {
-    expect(parentedCodesOf(ACTIVATION_CODES[variant])).toEqual([
-      'FUGR/FF',
-      'FUGR/I',
-    ]);
-  });
+  for (const variant of VARIANTS) {
+    it(format('%s offers codes that need a parent', variant), () => {
+      assert.deepStrictEqual(parentedCodesOf(ACTIVATION_CODES[variant]), [
+        'FUGR/FF',
+        'FUGR/I',
+      ]);
+    });
+  }
 
   const schemas = VARIANTS.flatMap((variant) =>
     OFFERINGS.map(
@@ -204,19 +209,27 @@ describe('activation codes that need a parent are servable through the schema', 
     ),
   );
 
-  it.each(schemas)(
-    '%s on %s declares parentName, required for every code and name needing it',
-    (_argument, variant, offering) => {
-      const parent = offering.parentOf(
-        listedJson(offering.inputSchema(variant)),
-      );
-      expect(parent).toBeDefined();
-      for (const value of parentedOn(variant)) {
-        expect(parent?.description).toContain(value);
-      }
-      expect(parent?.description).toContain('Required for');
-    },
-  );
+  for (const [_argument, variant, offering] of schemas) {
+    it(
+      format(
+        '%s on %s declares parentName, required for every code and name needing it',
+        _argument,
+        variant,
+      ),
+      () => {
+        const parent = offering.parentOf(
+          listedJson(offering.inputSchema(variant)),
+        );
+        assert.notEqual(parent, undefined);
+        const description = parent?.description;
+        assert.ok(typeof description === 'string');
+        for (const value of parentedOn(variant)) {
+          assert.ok(description.includes(value));
+        }
+        assert.ok(description.includes('Required for'));
+      },
+    );
+  }
 
   const cases = VARIANTS.flatMap((variant) =>
     OFFERINGS.flatMap((offering) =>
@@ -231,26 +244,40 @@ describe('activation codes that need a parent are servable through the schema', 
     ),
   );
 
-  it.each(cases)(
-    '%s on %s, %s with parentName: sent under the group',
-    async (_argument, variant, value, offering) => {
-      const { urls } = await call(offering, variant, value, 'ZMCP_GRP');
-      expect(urls.length).toBeGreaterThan(0);
-      expect(urls.join('\n')).toContain('/functions/groups/zmcp_grp/');
-    },
-  );
-
-  it.each(cases)(
-    '%s on %s, %s without parentName: refused naming it, nothing sent',
-    async (_argument, variant, value, offering) => {
-      const { urls, answered } = await call(
-        offering,
+  for (const [_argument, variant, value, offering] of cases) {
+    it(
+      format(
+        '%s on %s, %s with parentName: sent under the group',
+        _argument,
         variant,
         value,
-        undefined,
-      );
-      expect(urls).toEqual([]);
-      expect(answered).toContain('objects[].parentName is required for');
-    },
-  );
+      ),
+      async () => {
+        const { urls } = await call(offering, variant, value, 'ZMCP_GRP');
+        assert.ok(urls.length > 0);
+        assert.ok(urls.join('\n').includes('/functions/groups/zmcp_grp/'));
+      },
+    );
+  }
+
+  for (const [_argument, variant, value, offering] of cases) {
+    it(
+      format(
+        '%s on %s, %s without parentName: refused naming it, nothing sent',
+        _argument,
+        variant,
+        value,
+      ),
+      async () => {
+        const { urls, answered } = await call(
+          offering,
+          variant,
+          value,
+          undefined,
+        );
+        assert.deepStrictEqual(urls, []);
+        assert.ok(answered.includes('objects[].parentName is required for'));
+      },
+    );
+  }
 });

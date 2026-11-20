@@ -6,7 +6,7 @@ import { includeDocuments } from '@mcp-abap-adt/adt-clients';
  * RunProgramUnitTest, UpdateProgramUnitTest. The suite builds its own report and
  * deletes it with its test include.
  *
- * Run: npm test -- --testPathPatterns=integration/high/unitTest/ProgramUnitTestHighHandlers
+ * Run: npm run test:integration -- src/__tests__/integration/high/unitTest/ProgramUnitTestHighHandlers.test.ts
  */
 
 import * as z from 'zod';

@@ -15,11 +15,14 @@
  * `(` (or `?.(`).
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 const PACKAGES = [
   'src',
   'compact/src',
@@ -185,20 +188,23 @@ function rowsOf(whose: Row['whose']): string[] {
 
 describe('every stateful site is listed with its window', () => {
   it("the server's sites equal tools/stateful-sites.json's", () => {
-    expect(scan(REPO, PACKAGES, '.ts')).toEqual(rowsOf('server'));
+    assert.deepStrictEqual(scan(REPO, PACKAGES, '.ts'), rowsOf('server'));
   });
 
   it("adt-clients' sites, in its installed dist, equal tools/stateful-sites.json's", () => {
-    expect(scan(REPO, [ADT_CLIENTS], '.js')).toEqual(rowsOf('adt-clients'));
+    assert.deepStrictEqual(
+      scan(REPO, [ADT_CLIENTS], '.js'),
+      rowsOf('adt-clients'),
+    );
   });
 
   it('every row names its function, its window, where it returns to stateless, and whose it is', () => {
     for (const row of listed()) {
-      expect(row.function.trim()).not.toBe('');
-      expect(row.window.trim()).not.toBe('');
-      expect(row.stateless.trim()).not.toBe('');
-      expect(['server', 'adt-clients']).toContain(row.whose);
-      expect(row.count).toBeGreaterThan(0);
+      assert.notEqual(row.function.trim(), '');
+      assert.notEqual(row.window.trim(), '');
+      assert.notEqual(row.stateless.trim(), '');
+      assert.ok(['server', 'adt-clients'].includes(row.whose));
+      assert.ok(row.count > 0);
     }
   });
 
@@ -217,10 +223,13 @@ describe('every stateful site is listed with its window', () => {
     );
     // The session keep-alive's ping goes into the held connection's
     // stateful session, in its own main-flow turn, the mode put back after.
-    expect(stateful.map((r) => `${r.file} ${r.function}`)).toEqual([
-      'src/embeddable/BaseMcpServer.ts BaseMcpServer.pingInTurn',
-      'src/lib/debugger/ports.ts openStateful',
-    ]);
+    assert.deepStrictEqual(
+      stateful.map((r) => `${r.file} ${r.function}`),
+      [
+        'src/embeddable/BaseMcpServer.ts BaseMcpServer.pingInTurn',
+        'src/lib/debugger/ports.ts openStateful',
+      ],
+    );
   });
 
   it('the scan finds a new site, and skips comments and declarations (load-bearing)', () => {
@@ -240,7 +249,7 @@ describe('every stateful site is listed with its window', () => {
           '',
         ].join('\n'),
       );
-      expect(scan(root, ['src'], '.ts')).toEqual([
+      assert.deepStrictEqual(scan(root, ['src'], '.ts'), [
         'src/lib/probe.ts restoreSessionInConnection',
         "src/lib/probe.ts setSessionType('stateful')",
         "src/lib/probe.ts setSessionType('stateless')",

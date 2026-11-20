@@ -1,3 +1,6 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
 /**
  * An embedder gets no rule unless it passes one: lib keeps the mechanism
@@ -120,23 +123,26 @@ async function callTool(
 }
 
 describe('no kind is required at construction', () => {
-  it.each([
+  for (const [_what, env] of [
     ['nothing stated', undefined],
     ['a blank SAP_SYSTEM_TYPE', ' '],
     ['an SAP_SYSTEM_TYPE of no kind', 'abap-cloud'],
-  ])(
-    '%s: EmbeddableMcpServer and HandlerExporter construct, nothing sent',
-    (_what, env) => {
-      if (env !== undefined) process.env.SAP_SYSTEM_TYPE = env;
-      const { connection, requests } = recorded(NO_ENDPOINT);
-      expect(
-        () => new EmbeddableMcpServer({ connection: connection as never }),
-      ).not.toThrow();
-      expect(() => new HandlerExporter()).not.toThrow();
-      expect(() => createDefaultHandlerExporter()).not.toThrow();
-      expect(requests).toEqual([]);
-    },
-  );
+  ]) {
+    it(
+      format(
+        '%s: EmbeddableMcpServer and HandlerExporter construct, nothing sent',
+        _what,
+      ),
+      () => {
+        if (env !== undefined) process.env.SAP_SYSTEM_TYPE = env;
+        const { connection, requests } = recorded(NO_ENDPOINT);
+        new EmbeddableMcpServer({ connection: connection as never });
+        new HandlerExporter();
+        createDefaultHandlerExporter();
+        assert.deepStrictEqual(requests, []);
+      },
+    );
+  }
 });
 
 describe('nothing is looked up without a resolver', () => {
@@ -151,8 +157,10 @@ describe('nothing is looked up without a resolver', () => {
       ]),
     });
     const result = await callTool(server, 'Report');
-    expect(JSON.parse(result.content[0].text)).toEqual({ responsible: null });
-    expect(lookups()).toBe(0);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
+      responsible: null,
+    });
+    assert.equal(lookups(), 0);
   });
 
   it('an exporter: its handlers are handed out unwrapped', () => {
@@ -165,8 +173,11 @@ describe('nothing is looked up without a resolver', () => {
       g.getHandlers().map((e) => e.toolDefinition.name),
     );
     const wrapped = exporter.getHandlerEntries();
-    expect(wrapped.map((e) => e.toolDefinition.name)).toEqual(raw);
-    expect(wrapped.length).toBeGreaterThan(0);
+    assert.deepStrictEqual(
+      wrapped.map((e) => e.toolDefinition.name),
+      raw,
+    );
+    assert.ok(wrapped.length > 0);
   });
 
   it('a handler group registered on its own: no lookup unless its context carries a resolver', async () => {
@@ -186,7 +197,7 @@ describe('nothing is looked up without a resolver', () => {
         },
       } as unknown as McpServer);
       await callback?.({});
-      expect(lookups()).toBe(expected);
+      assert.equal(lookups(), expected);
     }
   });
 });
@@ -204,42 +215,47 @@ describe('a resolver and no rules: the information applied, nothing refused', ()
       systemContextResolver: defaultSystemContextResolver,
     });
     const result = await callTool(server, 'Report');
-    expect(JSON.parse(result.content[0].text)).toEqual({
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
       responsible: 'system_user',
     });
     await callTool(server, 'Report');
-    expect(lookups()).toBe(1);
+    assert.equal(lookups(), 1);
   });
 
-  it.each(['cloud', 'onprem'] as const)(
-    'on %s no information and nothing stated: the tool runs as configured, no refusal',
-    async (systemType) => {
-      const { connection } = recorded(NO_ENDPOINT);
-      const server = new EmbeddableMcpServer({
-        connection: connection as never,
-        handlersRegistry: new CompositeHandlersRegistry([
-          new ReportingGroup({ connection: null as never }),
-        ]),
+  for (const systemType of ['cloud', 'onprem'] as const) {
+    it(
+      format(
+        'on %s no information and nothing stated: the tool runs as configured, no refusal',
         systemType,
-        systemContextResolver: defaultSystemContextResolver,
-      });
-      const result = (await callTool(server, 'Report')) as {
-        isError?: boolean;
-        content: { text: string }[];
-      };
-      expect(result.isError).toBeFalsy();
-      expect(JSON.parse(result.content[0].text)).toEqual({
-        responsible: null,
-      });
-    },
-  );
+      ),
+      async () => {
+        const { connection } = recorded(NO_ENDPOINT);
+        const server = new EmbeddableMcpServer({
+          connection: connection as never,
+          handlersRegistry: new CompositeHandlersRegistry([
+            new ReportingGroup({ connection: null as never }),
+          ]),
+          systemType,
+          systemContextResolver: defaultSystemContextResolver,
+        });
+        const result = (await callTool(server, 'Report')) as {
+          isError?: boolean;
+          content: { text: string }[];
+        };
+        assert.ok(!result.isError);
+        assert.deepStrictEqual(JSON.parse(result.content[0].text), {
+          responsible: null,
+        });
+      },
+    );
+  }
 });
 
 describe('a background run’s caller: the stated value', () => {
   const list = async (scope: { login?: string; responsible?: string }) => {
     const { connection, lookups } = recorded(NAMED);
     const strategy = new InMemoryBackgroundRuns();
-    const listed = jest.spyOn(strategy, 'list');
+    const listed = mock.method(strategy, 'list');
     const server = new EmbeddableMcpServer({
       connection: connection as never,
       handlersRegistry: shippedGroups(),
@@ -251,22 +267,24 @@ describe('a background run’s caller: the stated value', () => {
       isError?: boolean;
       content: { text: string }[];
     };
-    expect(lookups()).toBe(0);
-    return { result, user: listed.mock.calls.at(-1)?.[0].user };
+    assert.equal(lookups(), 0);
+    return { result, user: listed.mock.calls.at(-1)?.arguments[0].user };
   };
 
-  it.each([
+  for (const [_case, scope, expected] of [
     ['responsible only', { responsible: 'resp_user' }, 'RESP_USER'],
     ['login only', { login: 'login_user' }, 'LOGIN_USER'],
     ['both', { responsible: 'resp_user', login: 'login_user' }, 'RESP_USER'],
-  ])('%s: nothing looked up', async (_case, scope, expected) => {
-    expect((await list(scope)).user).toBe(expected);
-  });
+  ] satisfies [string, { login?: string; responsible?: string }, string][]) {
+    it(format('%s: nothing looked up', _case), async () => {
+      assert.equal((await list(scope)).user, expected);
+    });
+  }
 
   it('neither stated: system_user_unknown — the process SAP_USERNAME does not stand in', async () => {
     process.env.SAP_USERNAME = 'process_login';
     const none = await list({});
-    expect(none.result.isError).toBe(true);
-    expect(none.result.content[0].text).toContain('system_user_unknown');
+    assert.equal(none.result.isError, true);
+    assert.ok(none.result.content[0].text.includes('system_user_unknown'));
   });
 });

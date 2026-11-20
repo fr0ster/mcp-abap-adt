@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { utilDocuments } from '@mcp-abap-adt/adt-clients';
 /**
  * The corrected header pairs are the system's, not the credentials'
@@ -159,26 +161,26 @@ const acceptsSent = () =>
 
 describe('header pairs by system', () => {
   it('a 406 is corrected once; the next call of the destination sends the corrected Accept', async () => {
-    expect(await call()).toBe('ok');
-    expect(acceptsSent()).toEqual([DEFAULT.accept, NEWER]);
-    expect(await call()).toBe('ok');
-    expect(acceptsSent()).toEqual([DEFAULT.accept, NEWER, NEWER]);
+    assert.equal(await call(), 'ok');
+    assert.deepStrictEqual(acceptsSent(), [DEFAULT.accept, NEWER]);
+    assert.equal(await call(), 'ok');
+    assert.deepStrictEqual(acceptsSent(), [DEFAULT.accept, NEWER, NEWER]);
   });
 
   it('another destination to the same system — another user and credential — sends the corrected pair directly', async () => {
-    expect(await call()).toBe('ok');
+    assert.equal(await call(), 'ok');
     await server.endInstanceConnection();
     server.answer(destination(standIn, 'PAIRS_USER_B', '100'));
-    expect(await call()).toBe('ok');
-    expect(acceptsSent()).toEqual([DEFAULT.accept, NEWER, NEWER]);
+    assert.equal(await call(), 'ok');
+    assert.deepStrictEqual(acceptsSent(), [DEFAULT.accept, NEWER, NEWER]);
   });
 
   it('a destination to another system has pairs of its own', async () => {
-    expect(await call()).toBe('ok');
+    assert.equal(await call(), 'ok');
     await server.endInstanceConnection();
     server.answer(destination(standIn, 'PAIRS_USER_A', '200'));
-    expect(await call()).toBe('ok');
-    expect(acceptsSent()).toEqual([
+    assert.equal(await call(), 'ok');
+    assert.deepStrictEqual(acceptsSent(), [
       DEFAULT.accept,
       NEWER,
       DEFAULT.accept,

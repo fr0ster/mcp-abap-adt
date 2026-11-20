@@ -1,5 +1,8 @@
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
+import { repositoryRoot } from '../helpers/repoRoot';
 
 /**
  * A held lock has to survive every call made after it.
@@ -17,7 +20,7 @@ import { join } from 'node:path';
  * whose answer it returns must carry the note across. Not a substitute for
  * the behavioural tests; a net under the next handler someone writes.
  */
-const HANDLERS = join(__dirname, '../../handlers');
+const HANDLERS = join(repositoryRoot(__dirname), 'src', 'handlers');
 
 /**
  * The activation after the write: the one call these handlers make *after* the
@@ -48,7 +51,7 @@ const sources = readdirSync(HANDLERS, {
 
 describe('a lock nobody released is carried to the caller', () => {
   it('has handlers to check', () => {
-    expect(sources.length).toBeGreaterThan(100);
+    assert.ok(sources.length > 100);
   });
 
   it('is never dropped by a call made after the lock was held', () => {
@@ -58,14 +61,14 @@ describe('a lock nobody released is carried to the caller', () => {
     const offenders = holding
       .filter(({ text }) => RETURNS_AN_ACTIVATION.test(text))
       .map(({ name }) => name);
-    expect(offenders).toEqual([]);
+    assert.deepStrictEqual(offenders, []);
   });
 
   it('never awaits the call it is supposed to be carrying across', () => {
     const offenders = sources
       .filter(({ text }) => AWAITS_BEFORE_CARRYING.test(text))
       .map(({ name }) => name);
-    expect(offenders).toEqual([]);
+    assert.deepStrictEqual(offenders, []);
   });
 
   /**
@@ -74,15 +77,23 @@ describe('a lock nobody released is carried to the caller', () => {
    */
   it('is carried between the steps of a sequence', () => {
     const sequenceSource = readFileSync(
-      join(__dirname, '../../lib/strategies/sequence.ts'),
+      join(
+        repositoryRoot(__dirname),
+        'src',
+        'lib',
+        'strategies',
+        'sequence.ts',
+      ),
       'utf-8',
     );
     // The call is handed over, not awaited first: an awaited call that throws
     // unwinds past the carrying, which is the shape the fourth review round
     // found.
-    expect(sequenceSource).toContain(
-      'await carryCleanup(answer, () => step(previous))',
+    assert.ok(
+      sequenceSource.includes(
+        'await carryCleanup(answer, () => step(previous))',
+      ),
     );
-    expect(sequenceSource).toContain('attachCleanup(a, attachCleanup(b,');
+    assert.ok(sequenceSource.includes('attachCleanup(a, attachCleanup(b,'));
   });
 });

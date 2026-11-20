@@ -9,8 +9,10 @@
  * tool is a read, on an ABAP session of its own.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
 import * as z from 'zod';
 import { CompactModifyHandlersGroup } from '../../../../compact-modify/src/group';
 import {
@@ -34,8 +36,9 @@ import type {
 } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { LONG_TOOL_ADVICE, LONG_TOOLS } from '../../../lib/longTools';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
-const REPO = path.resolve(__dirname, '../../../..');
+const REPO = repositoryRoot(__dirname);
 
 interface Listed {
   tool: string;
@@ -136,13 +139,13 @@ describe('the approved list of long tools', () => {
 
   it('sees every shipped tool, so the checks below are not vacuous', () => {
     // 19.0.0: the low set's 112 tools left the surface.
-    expect(definitions.length).toBeGreaterThan(250);
+    assert.ok(definitions.length > 250);
   });
 
   it("the server's list is the JSON's, each tool once", () => {
     const tools = listed().map((l) => l.tool);
-    expect(new Set(tools).size).toBe(tools.length);
-    expect([...tools].sort()).toEqual([...LONG_TOOLS].sort());
+    assert.equal(new Set(tools).size, tools.length);
+    assert.deepStrictEqual([...tools].sort(), [...LONG_TOOLS].sort());
   });
 
   it('the tools that start a run or run code are off the list, take no timeout and carry no long-tool words', () => {
@@ -163,21 +166,30 @@ describe('the approved list of long tools', () => {
       'HandlerProfileRun',
     ];
     for (const tool of notReads) {
-      expect({ tool, listed: names.has(tool) }).toEqual({
-        tool,
-        listed: false,
-      });
-      const found = definitions.filter((d) => d.name === tool);
-      expect({ tool, shipped: found.length > 0 }).toEqual({
-        tool,
-        shipped: true,
-      });
-      for (const definition of found) {
-        expect({
+      assert.deepStrictEqual(
+        { tool, listed: names.has(tool) },
+        {
           tool,
-          timeout: declaresTimeout(definition),
-          advice: carriesAdvice(definition),
-        }).toEqual({ tool, timeout: false, advice: false });
+          listed: false,
+        },
+      );
+      const found = definitions.filter((d) => d.name === tool);
+      assert.deepStrictEqual(
+        { tool, shipped: found.length > 0 },
+        {
+          tool,
+          shipped: true,
+        },
+      );
+      for (const definition of found) {
+        assert.deepStrictEqual(
+          {
+            tool,
+            timeout: declaresTimeout(definition),
+            advice: carriesAdvice(definition),
+          },
+          { tool, timeout: false, advice: false },
+        );
       }
     }
   });
@@ -187,53 +199,68 @@ describe('the approved list of long tools', () => {
       .filter((d) => names.has(d.name))
       .filter(declaresTimeout)
       .map((d) => d.name);
-    expect(offending).toEqual([]);
+    assert.deepStrictEqual(offending, []);
   });
 
   it('SearchSource is listed and still declares neither time_budget_ms nor timeout', () => {
-    expect(names.has('SearchSource')).toBe(true);
+    assert.equal(names.has('SearchSource'), true);
     const found = groupDefinitions().filter((d) => d.name === 'SearchSource');
-    expect(found.length).toBeGreaterThan(0);
+    assert.ok(found.length > 0);
     for (const definition of found) {
       const shape = definition.inputSchema.shape;
-      expect({
-        time_budget_ms: Object.hasOwn(shape, 'time_budget_ms'),
-        timeout: Object.hasOwn(shape, 'timeout'),
-        background: Object.hasOwn(shape, 'background'),
-      }).toEqual({ time_budget_ms: false, timeout: false, background: true });
+      assert.deepStrictEqual(
+        {
+          time_budget_ms: Object.hasOwn(shape, 'time_budget_ms'),
+          timeout: Object.hasOwn(shape, 'timeout'),
+          background: Object.hasOwn(shape, 'background'),
+        },
+        { time_budget_ms: false, timeout: false, background: true },
+      );
     }
   });
 
   it('every listed entry names its set, a handler that exists and what it sends', () => {
     for (const entry of listed()) {
-      expect(['full', 'compact']).toContain(entry.set);
-      expect(entry.sends.trim()).not.toBe('');
+      assert.ok(['full', 'compact'].includes(entry.set));
+      assert.notEqual(entry.sends.trim(), '');
       const [file, fn] = entry.handler.split('#');
       const source = fs.readFileSync(path.join(REPO, file ?? ''), 'utf8');
-      expect({
-        tool: entry.tool,
-        exported: source.includes(`function ${fn}(`),
-      }).toEqual({ tool: entry.tool, exported: true });
-      expect({
-        tool: entry.tool,
-        defined: source.includes(`name: '${entry.tool}'`),
-      }).toEqual({ tool: entry.tool, defined: true });
+      assert.deepStrictEqual(
+        {
+          tool: entry.tool,
+          exported: source.includes(`function ${fn}(`),
+        },
+        { tool: entry.tool, exported: true },
+      );
+      assert.deepStrictEqual(
+        {
+          tool: entry.tool,
+          defined: source.includes(`name: '${entry.tool}'`),
+        },
+        { tool: entry.tool, defined: true },
+      );
     }
   });
 
   it('every listed tool is shipped, declares background and carries the long-tool words', () => {
     for (const tool of names) {
       const found = groupDefinitions().filter((d) => d.name === tool);
-      expect({ tool, shipped: found.length > 0 }).toEqual({
-        tool,
-        shipped: true,
-      });
-      for (const definition of found) {
-        expect({
+      assert.deepStrictEqual(
+        { tool, shipped: found.length > 0 },
+        {
           tool,
-          background: declaresBackground(definition),
-          advice: carriesAdvice(definition),
-        }).toEqual({ tool, background: true, advice: true });
+          shipped: true,
+        },
+      );
+      for (const definition of found) {
+        assert.deepStrictEqual(
+          {
+            tool,
+            background: declaresBackground(definition),
+            advice: carriesAdvice(definition),
+          },
+          { tool, background: true, advice: true },
+        );
       }
     }
   });
@@ -247,23 +274,25 @@ describe('the approved list of long tools', () => {
           carriesAdvice(d),
       )
       .map((d) => d.name);
-    expect(offending).toEqual([]);
+    assert.deepStrictEqual(offending, []);
   });
 
   it('the check sees a declared timeout (load-bearing)', () => {
-    expect(
+    assert.equal(
       declaresTimeout({
         name: 'X',
         description: '',
         inputSchema: z.object({ timeout: z.any().optional() }),
       }),
-    ).toBe(true);
-    expect(
+      true,
+    );
+    assert.equal(
       declaresTimeout({
         name: 'X',
         description: '',
         inputSchema: z.object({ other: z.any().optional() }),
       }),
-    ).toBe(false);
+      false,
+    );
   });
 });

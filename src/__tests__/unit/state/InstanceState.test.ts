@@ -1,7 +1,10 @@
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
 import {
   InstanceState,
   StateUnavailableError,
 } from '../../../lib/state/InstanceState';
+import { assertRejects, assertThrows } from '../../helpers/assertions';
 
 const part = () => {
   let held = false;
@@ -30,21 +33,21 @@ describe('InstanceState', () => {
     const s = new InstanceState();
     const a = part();
     s.attach(a.p);
-    expect(s.handle).toMatch(/^[0-9A-F]{32}$/);
-    expect(s.holdsState()).toBe(false);
+    assert.match(s.handle, /^[0-9A-F]{32}$/);
+    assert.equal(s.holdsState(), false);
     a.set(true);
-    expect(s.holdsState()).toBe(true);
+    assert.equal(s.holdsState(), true);
   });
   it('check: this handle and something held; otherwise not available — the same answer', () => {
     const s = new InstanceState();
     const a = part();
     s.attach(a.p);
     a.set(true);
-    expect(() => s.check(s.handle)).not.toThrow();
+    s.check(s.handle);
     for (const h of [undefined, 'F'.repeat(32)])
-      expect(() => s.check(h)).toThrow(StateUnavailableError);
+      assertThrows(() => s.check(h), StateUnavailableError);
     a.set(false);
-    expect(() => s.check(s.handle)).toThrow('state is not available');
+    assertThrows(() => s.check(s.handle), 'state is not available');
   });
   it('endWhenEmpty invalidates the old handle at once when nothing is held', () => {
     const s = new InstanceState();
@@ -52,9 +55,9 @@ describe('InstanceState', () => {
     s.attach(a.p);
     const old = s.handle;
     s.endWhenEmpty();
-    expect(s.handle).not.toBe(old);
+    assert.notEqual(s.handle, old);
     a.set(true);
-    expect(() => s.check(old)).toThrow(StateUnavailableError);
+    assertThrows(() => s.check(old), StateUnavailableError);
   });
   it('endWhenEmpty while a part still finishes: the old handle serves until it empties, then never again', () => {
     const s = new InstanceState();
@@ -63,21 +66,21 @@ describe('InstanceState', () => {
     a.set(true);
     const old = s.handle;
     s.endWhenEmpty();
-    expect(() => s.check(old)).not.toThrow(); // a retry of the stop may still use it
+    s.check(old); // a retry of the stop may still use it
     a.set(false); // the asynchronous part finished
-    expect(s.handle).not.toBe(old);
+    assert.notEqual(s.handle, old);
     a.set(true);
-    expect(() => s.check(old)).toThrow(StateUnavailableError);
+    assertThrows(() => s.check(old), StateUnavailableError);
   });
   it('attach samples a part already holding; dispose that empties it fires onEmpty', async () => {
     const s = new InstanceState();
     const a = part();
     a.set(true);
     s.attach(a.p);
-    const seen = jest.fn();
+    const seen = mock.fn();
     s.onEmpty(seen);
     await s.dispose();
-    expect(seen).toHaveBeenCalledTimes(1);
+    assert.equal(seen.mock.callCount(), 1);
   });
   it('shutdown waits for a part still finishing after its disposal threw, retries once, answers what is left', async () => {
     const s = new InstanceState();
@@ -106,25 +109,25 @@ describe('InstanceState', () => {
       answer = a;
     });
     await new Promise((r) => setImmediate(r));
-    expect(answer).toBeUndefined(); // waiting for the part to settle
+    assert.equal(answer, undefined); // waiting for the part to settle
     finishing = false;
     failures = ['release debuggee D1: busy'];
     tell();
     await shutting;
-    expect(disposals).toBe(2);
-    expect(answer).toEqual(['release debuggee D1: busy']);
+    assert.equal(disposals, 2);
+    assert.deepStrictEqual(answer, ['release debuggee D1: busy']);
   });
 
   it('onEmpty fires when the last part stops holding', () => {
     const s = new InstanceState();
     const a = part();
     s.attach(a.p);
-    const seen = jest.fn();
+    const seen = mock.fn();
     s.onEmpty(seen);
     a.set(true);
-    expect(seen).not.toHaveBeenCalled();
+    assert.equal(seen.mock.callCount(), 0);
     a.set(false);
-    expect(seen).toHaveBeenCalledTimes(1);
+    assert.equal(seen.mock.callCount(), 1);
   });
 });
 
@@ -147,16 +150,16 @@ describe('InstanceState — what failed is named', () => {
       observe: () => {},
       dispose: async () => {},
     });
-    await expect(s.dispose()).rejects.toThrow('close: refused');
-    expect(s.holdsState()).toBe(true);
-    expect(s.failures()).toEqual(['close: refused']);
+    await assertRejects(s.dispose(), 'close: refused');
+    assert.equal(s.holdsState(), true);
+    assert.deepStrictEqual(s.failures(), ['close: refused']);
   });
   it('shutdown with nothing left answers nothing; with no failure recorded it answers the disposal error', async () => {
     const empty = new InstanceState();
     const a = part();
     a.set(true);
     empty.attach(a.p);
-    await expect(empty.shutdown()).resolves.toEqual([]);
+    assert.deepStrictEqual(await empty.shutdown(), []);
     const stuck = new InstanceState();
     stuck.attach({
       holdsState: () => true,
@@ -167,18 +170,18 @@ describe('InstanceState — what failed is named', () => {
         throw new Error('refused');
       },
     });
-    await expect(stuck.shutdown()).resolves.toEqual(['refused']);
+    assert.deepStrictEqual(await stuck.shutdown(), ['refused']);
   });
   it('onChange answers its unsubscribe', () => {
     const s = new InstanceState();
     const a = part();
     s.attach(a.p);
-    const seen = jest.fn();
+    const seen = mock.fn();
     const off = s.onChange(seen);
     a.set(true);
     off();
     a.set(false);
-    expect(seen).toHaveBeenCalledTimes(1);
+    assert.equal(seen.mock.callCount(), 1);
   });
 });
 
@@ -190,7 +193,7 @@ describe('InstanceState — isolation', () => {
     });
     const a = part();
     s.attach(a.p);
-    const after = jest.fn();
+    const after = mock.fn();
     s.onChange(() => {
       throw new Error('observer broke');
     });
@@ -198,15 +201,21 @@ describe('InstanceState — isolation', () => {
       throw new Error('empty observer broke');
     });
     s.onChange(after);
-    expect(() => a.set(true)).not.toThrow();
-    expect(() => a.set(false)).not.toThrow();
-    expect(after).toHaveBeenCalledTimes(2);
-    expect(errors.some((e) => e.includes('observer broke'))).toBe(true);
-    expect(errors.some((e) => e.includes('empty observer broke'))).toBe(true);
+    a.set(true);
+    a.set(false);
+    assert.equal(after.mock.callCount(), 2);
+    assert.equal(
+      errors.some((e) => e.includes('observer broke')),
+      true,
+    );
+    assert.equal(
+      errors.some((e) => e.includes('empty observer broke')),
+      true,
+    );
   });
   it('a part whose dispose throws synchronously does not skip the others, and is named', async () => {
     const s = new InstanceState();
-    const second = jest.fn(async () => {});
+    const second = mock.fn(async () => {});
     s.attach({
       holdsState: () => false,
       pending: () => false,
@@ -223,8 +232,8 @@ describe('InstanceState — isolation', () => {
       observe: () => {},
       dispose: second,
     });
-    await expect(s.dispose()).rejects.toThrow('sync refusal');
-    expect(second).toHaveBeenCalledTimes(1);
+    await assertRejects(s.dispose(), 'sync refusal');
+    assert.equal(second.mock.callCount(), 1);
   });
   it('two concurrent shutdowns share one run: the state is disposed once', async () => {
     const s = new InstanceState();
@@ -248,11 +257,11 @@ describe('InstanceState — isolation', () => {
     const first = s.shutdown();
     const second = s.shutdown();
     release();
-    await expect(first).resolves.toEqual([]);
-    await expect(second).resolves.toEqual([]);
-    expect(disposals).toBe(1);
+    assert.deepStrictEqual(await first, []);
+    assert.deepStrictEqual(await second, []);
+    assert.equal(disposals, 1);
     // settled: a later call runs afresh (nothing held, nothing to dispose)
-    await expect(s.shutdown()).resolves.toEqual([]);
+    assert.deepStrictEqual(await s.shutdown(), []);
   });
 
   describe('unique handles', () => {
@@ -270,7 +279,7 @@ describe('InstanceState — isolation', () => {
         isTaken: (h) => taken.has(h),
         randomSource: source(1, 2, 3),
       });
-      expect(s.handle).toBe(hex(3));
+      assert.equal(s.handle, hex(3));
     });
     it('a handle the host holds is drawn again at rotation', () => {
       const taken = new Set<string>();
@@ -280,15 +289,15 @@ describe('InstanceState — isolation', () => {
       });
       const a = part();
       s.attach(a.p);
-      expect(s.handle).toBe(hex(1));
+      assert.equal(s.handle, hex(1));
       taken.add(hex(2));
       taken.add(hex(3));
       s.endWhenEmpty();
-      expect(s.handle).toBe(hex(4));
+      assert.equal(s.handle, hex(4));
     });
     it('without isTaken every draw stands', () => {
       const s = new InstanceState({ randomSource: source(7) });
-      expect(s.handle).toBe(hex(7));
+      assert.equal(s.handle, hex(7));
     });
     it('two instances created in a row never share a handle', () => {
       const held = new Set<string>();
@@ -305,8 +314,8 @@ describe('InstanceState — isolation', () => {
         isTaken: (h) => held.has(h),
         randomSource: source(5, 6),
       });
-      expect(a.handle).toBe(hex(5));
-      expect(b.handle).toBe(hex(6));
+      assert.equal(a.handle, hex(5));
+      assert.equal(b.handle, hex(6));
     });
   });
 });

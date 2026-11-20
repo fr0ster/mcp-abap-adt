@@ -8,11 +8,20 @@
  * The imports are read with TypeScript's own pre-processor, so an
  * `export … from`, a dynamic `import()` and a `require` count too.
  */
+
+import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { describe, it } from 'node:test';
 import ts from 'typescript';
+import { repositoryRoot } from '../helpers/repoRoot';
 
-const CONTRACT = join(__dirname, '..', '..', 'lib', 'adtClientContract.ts');
+const CONTRACT = join(
+  repositoryRoot(__dirname),
+  'src',
+  'lib',
+  'adtClientContract.ts',
+);
 
 function importsOf(file: string): string[] {
   const info = ts.preProcessFile(readFileSync(file, 'utf8'), true, true);
@@ -22,9 +31,10 @@ function importsOf(file: string): string[] {
 describe('the server client contract', () => {
   it('imports from @mcp-abap-adt/interfaces-adt only', () => {
     const imports = importsOf(CONTRACT);
-    expect(imports.length).toBeGreaterThan(0);
-    expect(
+    assert.ok(imports.length > 0);
+    assert.deepStrictEqual(
       imports.filter((name) => name !== '@mcp-abap-adt/interfaces-adt'),
-    ).toEqual([]);
+      [],
+    );
   });
 });

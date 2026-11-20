@@ -12,6 +12,10 @@
  * `200` echoing the entries it was sent. Neither answer is evidence of the
  * change — a re-read of the task is — so neither tool says `success`.
  */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type {
   IAbapConnection,
   IAdtWireResponse,
@@ -67,13 +71,14 @@ describe('SortAndCompressTransportTask', () => {
       { transport_number: SOURCE },
     );
 
-    expect(result.isError).toBe(false);
-    expect(sent).toHaveLength(1);
-    expect(sent[0].method).toBe('POST');
-    expect(sent[0].url).toBe(
+    assert.equal(result.isError, false);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].method, 'POST');
+    assert.equal(
+      sent[0].url,
       `/sap/bc/adt/cts/transportrequests/${SOURCE}/sortandcompress`,
     );
-    expect(sent[0].data ?? '').toBe('');
+    assert.equal(sent[0].data ?? '', '');
   });
 
   it('claims acceptance, not a sorted list, and names the re-read', async () => {
@@ -86,12 +91,12 @@ describe('SortAndCompressTransportTask', () => {
       ),
     );
 
-    expect(answered.accepted).toBe(true);
-    expect(answered.transport_number).toBe(SOURCE);
-    expect(answered.confirm_with).toContain('ReadTransportObjects');
-    expect(answered.confirm_with).toContain(SOURCE);
+    assert.equal(answered.accepted, true);
+    assert.equal(answered.transport_number, SOURCE);
+    assert.ok(answered.confirm_with.includes('ReadTransportObjects'));
+    assert.ok(answered.confirm_with.includes(SOURCE));
     // An empty `200` says nothing about the list, so no `success`.
-    expect('success' in answered).toBe(false);
+    assert.equal('success' in answered, false);
   });
 
   it('sends nothing without a task, and names the field', async () => {
@@ -102,9 +107,9 @@ describe('SortAndCompressTransportTask', () => {
       {} as never,
     );
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('transport_number is required');
-    expect(sent).toHaveLength(0);
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('transport_number is required'));
+    assert.equal(sent.length, 0);
   });
 });
 
@@ -131,22 +136,27 @@ describe('MoveTransportObjects', () => {
       },
     );
 
-    expect(result.isError).toBe(false);
-    expect(sent).toHaveLength(1);
-    expect(sent[0].method).toBe('POST');
-    expect(sent[0].url).toBe(
+    assert.equal(result.isError, false);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].method, 'POST');
+    assert.equal(
+      sent[0].url,
       `/sap/bc/adt/cts/transportrequests/${SOURCE}/moveobjects`,
     );
     const document = String(sent[0].data);
-    expect(document).toContain(`tm:number="${TARGET}"`);
-    expect(document).toContain('tm:useraction="moveobjects"');
-    expect(document).toContain(
-      'tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_X" tm:position="000026"',
+    assert.ok(document.includes(`tm:number="${TARGET}"`));
+    assert.ok(document.includes('tm:useraction="moveobjects"'));
+    assert.ok(
+      document.includes(
+        'tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_X" tm:position="000026"',
+      ),
     );
-    expect(document).toContain(
-      'tm:pgmid="R3TR" tm:type="PROG" tm:name="ZMCP_PROG" tm:position="000031"',
+    assert.ok(
+      document.includes(
+        'tm:pgmid="R3TR" tm:type="PROG" tm:name="ZMCP_PROG" tm:position="000031"',
+      ),
     );
-    expect(document).not.toContain(`tm:number="${SOURCE}"`);
+    assert.ok(!document.includes(`tm:number="${SOURCE}"`));
   });
 
   it('claims acceptance, not a move, and names the re-read of both tasks', async () => {
@@ -163,35 +173,37 @@ describe('MoveTransportObjects', () => {
       ),
     );
 
-    expect(answered.accepted).toBe(true);
-    expect(answered.transport_number).toBe(SOURCE);
-    expect(answered.target_number).toBe(TARGET);
-    expect(answered.objects).toEqual([
+    assert.equal(answered.accepted, true);
+    assert.equal(answered.transport_number, SOURCE);
+    assert.equal(answered.target_number, TARGET);
+    assert.deepStrictEqual(answered.objects, [
       { object: 'R3TR CLAS ZCL_X', position: '000026' },
       { object: 'R3TR PROG ZMCP_PROG', position: '000031' },
     ]);
-    expect(answered.confirm_with).toContain('ReadTransportObjects');
-    expect(answered.confirm_with).toContain(SOURCE);
-    expect(answered.confirm_with).toContain(TARGET);
-    expect('success' in answered).toBe(false);
+    assert.ok(answered.confirm_with.includes('ReadTransportObjects'));
+    assert.ok(answered.confirm_with.includes(SOURCE));
+    assert.ok(answered.confirm_with.includes(TARGET));
+    assert.equal('success' in answered, false);
   });
 
-  it.each([
+  for (const [field, args] of [
     ['transport_number', { target_number: TARGET, objects: twoEntries }],
     ['target_number', { transport_number: SOURCE, objects: twoEntries }],
     ['objects', { transport_number: SOURCE, target_number: TARGET }],
-  ])('sends nothing without %s, and names it', async (field, args) => {
-    const { connection, sent } = recording('<tm:root/>');
+  ]) {
+    it(format('sends nothing without %s, and names it', field), async () => {
+      const { connection, sent } = recording('<tm:root/>');
 
-    const result = await handleMoveTransportObjects(
-      { connection, logger: undefined } as any,
-      args as never,
-    );
+      const result = await handleMoveTransportObjects(
+        { connection, logger: undefined } as any,
+        args as never,
+      );
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(`${field} is required`);
-    expect(sent).toHaveLength(0);
-  });
+      assert.equal(result.isError, true);
+      assert.ok(result.content[0].text.includes(`${field} is required`));
+      assert.equal(sent.length, 0);
+    });
+  }
 
   it('sends nothing for an empty objects list', async () => {
     const { connection, sent } = recording('<tm:root/>');
@@ -201,11 +213,11 @@ describe('MoveTransportObjects', () => {
       { transport_number: SOURCE, target_number: TARGET, objects: [] },
     );
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain(
-      'objects must hold at least one entry',
+    assert.equal(result.isError, true);
+    assert.ok(
+      result.content[0].text.includes('objects must hold at least one entry'),
     );
-    expect(sent).toHaveLength(0);
+    assert.equal(sent.length, 0);
   });
 
   /**
@@ -214,29 +226,34 @@ describe('MoveTransportObjects', () => {
    * identifies an entry the same way. So the whole call is refused before
    * anything is sent, not just the entry dropped.
    */
-  it.each(['object_name', 'object_type', 'position'])(
-    'sends nothing when an entry lacks %s, and names the entry and field',
-    async (field) => {
-      const { connection, sent } = recording('<tm:root/>');
-      const second: Record<string, string | undefined> = {
-        ...twoEntries[1],
-      };
-      delete second[field];
+  for (const field of ['object_name', 'object_type', 'position']) {
+    it(
+      format(
+        'sends nothing when an entry lacks %s, and names the entry and field',
+        field,
+      ),
+      async () => {
+        const { connection, sent } = recording('<tm:root/>');
+        const second: Record<string, string | undefined> = {
+          ...twoEntries[1],
+        };
+        delete second[field];
 
-      const result = await handleMoveTransportObjects(
-        { connection, logger: undefined } as any,
-        {
-          transport_number: SOURCE,
-          target_number: TARGET,
-          objects: [twoEntries[0], second] as never,
-        },
-      );
+        const result = await handleMoveTransportObjects(
+          { connection, logger: undefined } as any,
+          {
+            transport_number: SOURCE,
+            target_number: TARGET,
+            objects: [twoEntries[0], second] as never,
+          },
+        );
 
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(
-        `objects[1].${field} is required`,
-      );
-      expect(sent).toHaveLength(0);
-    },
-  );
+        assert.equal(result.isError, true);
+        assert.ok(
+          result.content[0].text.includes(`objects[1].${field} is required`),
+        );
+        assert.equal(sent.length, 0);
+      },
+    );
+  }
 });

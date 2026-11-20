@@ -22,7 +22,7 @@
  * Config-driven: skips cleanly when no SAP connection / test case disabled /
  * wrong system type.
  *
- * Run: npm test -- --testPathPatterns=high/function/FunctionIncludeHigh
+ * Run: npm run test:integration -- src/__tests__/integration/high/function/FunctionIncludeHighHandlers.test.ts
  */
 
 import assert from 'node:assert/strict';

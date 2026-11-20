@@ -11,11 +11,12 @@
  *   when its type may carry a `timeout` property, an object held in a
  *   variable included;
  * - `--test-force-exit` in an npm script (node:test's force exit);
- * - `--forceExit` in an npm script (Jest's): none is allowed since the live
+ * - `--forceExit` in an npm script: none is allowed since the live
  *   scripts moved to node:test (`ALLOWED_FORCE_EXIT` is empty, D27 step 11).
  *
- * The node:test files are those of the list (`tools/node-test-files.json`),
- * this one among them; the npm scripts are every package manifest's: the
+ * The test files are every one the runner selects (`tools/run-tests.mjs
+ * --list --root <repository>`, a child process, and the runs of their own,
+ * `tools/separate-runs.json`), this one among them; the npm scripts are every package manifest's: the
  * root's and that of each package directory at the root, found on disk.
  * Each fixture under `__fixtures__/runnerTimeouts/refused` is refused by its
  * own check alone; the two under `clean` by none. No regular expression: a
@@ -27,6 +28,7 @@ import * as path from 'node:path';
 import { describe, it } from 'node:test';
 import * as ts from 'typescript';
 import { repositoryRoot } from '../../helpers/repoRoot';
+import { runTool } from '../runner/toolRuns';
 
 const REPO = repositoryRoot(__dirname);
 const THIS_FILE = 'src/__tests__/unit/sources/noRunnerTimeout.test.ts';
@@ -375,16 +377,25 @@ function sourceFindings(program: ts.Program, file: string): Finding[] {
   return found;
 }
 
-/** The node:test list's source paths; data from outside the type system. */
+/**
+ * Every test file the runner selects, as source paths: the repository as one
+ * root (the live suites included) and the runs of their own; data from
+ * outside the type system.
+ */
 function listedFiles(): string[] {
-  const listed = readJson(path.join(REPO, 'tools', 'node-test-files.json'));
-  if (
-    !Array.isArray(listed) ||
-    !listed.every((item): item is string => typeof item === 'string')
-  ) {
-    throw new Error('tools/node-test-files.json: not a list of strings');
+  const run = runTool('run-tests.mjs', ['--list', '--root', REPO]);
+  if (run.status !== 0) {
+    throw new Error(`run-tests.mjs --list exited ${run.status}: ${run.stderr}`);
   }
-  return listed;
+  const runs = readJson(path.join(REPO, 'tools', 'separate-runs.json'));
+  if (typeof runs !== 'object' || runs === null) {
+    throw new Error('tools/separate-runs.json: not an object');
+  }
+  const separate = Object.values(runs).flat();
+  if (!separate.every((item): item is string => typeof item === 'string')) {
+    throw new Error('tools/separate-runs.json: not lists of strings');
+  }
+  return [...run.stdout.split('\n').filter((line) => line !== ''), ...separate];
 }
 
 // ---------------------------------------------------------------- the tests
@@ -394,7 +405,7 @@ describe('the repository', () => {
   const manifestFiles = manifests();
   const rootManifest = path.join(REPO, 'package.json');
 
-  it('scans every listed node:test file, this one among them, and every package manifest', () => {
+  it('scans every selected test file, this one among them, and every package manifest', () => {
     assert.ok(listed.includes(THIS_FILE));
     for (const source of listed) {
       assert.ok(fs.existsSync(path.join(REPO, ...source.split('/'))), source);
@@ -410,7 +421,7 @@ describe('the repository', () => {
     }
   });
 
-  it('no node:test file passes { timeout } to a test, a suite or a hook', () => {
+  it('no test file passes { timeout } to a test, a suite or a hook', () => {
     const files = listed.map((source) => path.join(REPO, ...source.split('/')));
     const program = scanProgram(files);
     const found = files.flatMap((file) => sourceFindings(program, file));

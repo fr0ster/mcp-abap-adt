@@ -8,8 +8,12 @@
  *   a type with no `Get<Type>` handler is named with the request its part
  *   sends.
  */
+
+import assert from 'node:assert/strict';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import type {
   IAbapRequestOptions,
   IAdtWireResponse,
@@ -43,6 +47,7 @@ import {
   envelopeConnection,
   envelopeResponse,
 } from '../../helpers/batchEnvelope';
+import { repositoryRoot } from '../../helpers/repoRoot';
 import { withinTurns } from '../../helpers/withinTurns';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -239,7 +244,8 @@ function atVersion(url: string, version: string): string {
   return `${path}?${query.toString()}`;
 }
 
-const HANDLERS_DIR = join(__dirname, '../../../handlers');
+// From the repository root, so the compiled node:test file reads the sources.
+const HANDLERS_DIR = join(repositoryRoot(__dirname), 'src', 'handlers');
 
 /** A call of one of the shared reads (`read<Type>Metadata(`). */
 const SHARED_CALL = /\bread[A-Z]\w*Metadata\(/;
@@ -310,7 +316,7 @@ async function handlerRequest(type: string) {
       logger: undefined,
     } as unknown as HandlerContext),
   );
-  expect(fake.directs).toHaveLength(1);
+  assert.equal(fake.directs.length, 1);
   const request = fake.directs[0] as IAbapRequestOptions;
   return {
     method: request.method,
@@ -329,7 +335,8 @@ describe('one metadata read per type, shared by handler and batch', () => {
       })
       .map((path) => relative(HANDLERS_DIR, path).split(sep).join('/'))
       .sort();
-    expect(reading).toEqual(
+    assert.deepStrictEqual(
+      reading,
       [
         ...Object.values(HANDLERS).map((h) => h.file),
         ...Object.keys(ALSO_SHARED),
@@ -343,90 +350,105 @@ describe('one metadata read per type, shared by handler and batch', () => {
         !(file in EXCLUDED) &&
         /\.read(Object)?Metadata\(/.test(codeOf(join(HANDLERS_DIR, file))),
     );
-    expect(direct).toEqual([]);
+    assert.deepStrictEqual(direct, []);
   });
 
   it('the batch reads exactly the types of those handlers, and the types named without one', () => {
-    expect([...METADATA_READ_TYPES].sort()).toEqual(
+    assert.deepStrictEqual(
+      [...METADATA_READ_TYPES].sort(),
       [...Object.keys(HANDLERS), ...Object.keys(WITHOUT_HANDLER)].sort(),
     );
   });
 
-  it.each(Object.keys(WITHOUT_HANDLER))(
-    "%s: the batch part is the type's metadata request",
-    async (type) => {
-      const expected = WITHOUT_HANDLER[type];
-      const fake = envelopeConnection((parts) =>
-        envelopeResponse(
-          parts.map(() => ({
-            status: 200,
-            statusText: 'OK',
-            headers: { 'content-type': 'application/xml' },
-            body: DOC,
-          })),
-        ),
-      );
-      const context = {
-        connection: fake.connection,
-        logger: undefined,
-        batchAvailability: createBatchAvailability(),
-      } as unknown as HandlerContext;
-      const { descriptions } = await withinTurns(
-        metadataDescriptions(context, [targetOf(type)]),
-      );
-      expect(fake.envelopes).toHaveLength(1);
-      const parts = fake.envelopes[0]?.parts ?? [];
-      expect(parts).toHaveLength(1);
-      const inner = parts[0];
-      expect({
-        method: inner?.method,
-        url: inner?.url,
-        accept: lowerHeaders(inner?.headers).accept,
-        body: (inner?.body ?? '').trim(),
-      }).toEqual({ ...expected, body: '' });
-      expect([...descriptions.values()]).toEqual(['Placeholder']);
-    },
-  );
+  for (const type of Object.keys(WITHOUT_HANDLER)) {
+    it(
+      format("%s: the batch part is the type's metadata request", type),
+      async () => {
+        const expected = WITHOUT_HANDLER[type];
+        const fake = envelopeConnection((parts) =>
+          envelopeResponse(
+            parts.map(() => ({
+              status: 200,
+              statusText: 'OK',
+              headers: { 'content-type': 'application/xml' },
+              body: DOC,
+            })),
+          ),
+        );
+        const context = {
+          connection: fake.connection,
+          logger: undefined,
+          batchAvailability: createBatchAvailability(),
+        } as unknown as HandlerContext;
+        const { descriptions } = await withinTurns(
+          metadataDescriptions(context, [targetOf(type)]),
+        );
+        assert.equal(fake.envelopes.length, 1);
+        const parts = fake.envelopes[0]?.parts ?? [];
+        assert.equal(parts.length, 1);
+        const inner = parts[0];
+        assert.deepStrictEqual(
+          {
+            method: inner?.method,
+            url: inner?.url,
+            accept: lowerHeaders(inner?.headers).accept,
+            body: (inner?.body ?? '').trim(),
+          },
+          { ...expected, body: '' },
+        );
+        assert.deepStrictEqual([...descriptions.values()], ['Placeholder']);
+      },
+    );
+  }
 
-  it.each(Object.keys(HANDLERS))(
-    "%s: the batch part is the handler's request whole, at the version 22.0.x read",
-    async (type) => {
-      const direct = await handlerRequest(type);
-      const fake = envelopeConnection((parts) =>
-        envelopeResponse(
-          parts.map(() => ({
-            status: 200,
-            statusText: 'OK',
-            headers: { 'content-type': 'application/xml' },
-            body: DOC,
-          })),
-        ),
-      );
-      const context = {
-        connection: fake.connection,
-        logger: undefined,
-        batchAvailability: createBatchAvailability(),
-      } as unknown as HandlerContext;
-      const { descriptions } = await withinTurns(
-        metadataDescriptions(context, [targetOf(type)]),
-      );
-      expect(fake.envelopes).toHaveLength(1);
-      const parts = fake.envelopes[0]?.parts ?? [];
-      expect(parts).toHaveLength(1);
-      const inner = parts[0];
-      const version = WALK_VERSION[type] ?? '';
-      expect({
-        method: inner?.method,
-        url: inner?.url,
-        headers: lowerHeaders(inner?.headers),
-        // The envelope frames an empty body with its line break.
-        body: (inner?.body ?? '').trim(),
-      }).toEqual({ ...direct, url: atVersion(direct.url, version) });
-      expect(new URLSearchParams(inner?.url.split('?')[1]).get('version')).toBe(
-        version,
-      );
-      expect(direct.headers.accept).toBeTruthy();
-      expect([...descriptions.values()]).toEqual(['Placeholder']);
-    },
-  );
+  for (const type of Object.keys(HANDLERS)) {
+    it(
+      format(
+        "%s: the batch part is the handler's request whole, at the version 22.0.x read",
+        type,
+      ),
+      async () => {
+        const direct = await handlerRequest(type);
+        const fake = envelopeConnection((parts) =>
+          envelopeResponse(
+            parts.map(() => ({
+              status: 200,
+              statusText: 'OK',
+              headers: { 'content-type': 'application/xml' },
+              body: DOC,
+            })),
+          ),
+        );
+        const context = {
+          connection: fake.connection,
+          logger: undefined,
+          batchAvailability: createBatchAvailability(),
+        } as unknown as HandlerContext;
+        const { descriptions } = await withinTurns(
+          metadataDescriptions(context, [targetOf(type)]),
+        );
+        assert.equal(fake.envelopes.length, 1);
+        const parts = fake.envelopes[0]?.parts ?? [];
+        assert.equal(parts.length, 1);
+        const inner = parts[0];
+        const version = WALK_VERSION[type] ?? '';
+        assert.deepStrictEqual(
+          {
+            method: inner?.method,
+            url: inner?.url,
+            headers: lowerHeaders(inner?.headers),
+            // The envelope frames an empty body with its line break.
+            body: (inner?.body ?? '').trim(),
+          },
+          { ...direct, url: atVersion(direct.url, version) },
+        );
+        assert.equal(
+          new URLSearchParams(inner?.url.split('?')[1]).get('version'),
+          version,
+        );
+        assert.ok(direct.headers.accept);
+        assert.deepStrictEqual([...descriptions.values()], ['Placeholder']);
+      },
+    );
+  }
 });

@@ -1,5 +1,8 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { readAdtRefusal } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { return_answer } from '../../lib/answer';
@@ -58,34 +61,38 @@ const REFUSALS = [
 ];
 
 describe('a real refusal, read and then answered', () => {
-  it.each(REFUSALS)('%s comes back as an error with a sentence', (name) => {
-    const result = return_answer(failureFrom(name), (v) => v, {
-      tool: 'AnyTool',
-      detail: 'terse',
+  for (const name of REFUSALS) {
+    it(format('%s comes back as an error with a sentence', name), () => {
+      const result = return_answer(failureFrom(name), (v) => v, {
+        tool: 'AnyTool',
+        detail: 'terse',
+      });
+
+      assert.equal(result.isError, true);
+      const payload = JSON.parse(result.content[0].text);
+      assert.equal(payload.origin, 'refusal');
+      assert.equal(typeof payload.message, 'string');
+      assert.ok(payload.message.length > 0);
+      assert.ok(payload.messages.length > 0);
+      assert.ok(['E', 'W', 'I', 'S'].includes(payload.messages[0].type));
     });
+  }
 
-    expect(result.isError).toBe(true);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.origin).toBe('refusal');
-    expect(typeof payload.message).toBe('string');
-    expect(payload.message.length).toBeGreaterThan(0);
-    expect(payload.messages.length).toBeGreaterThan(0);
-    expect(['E', 'W', 'I', 'S']).toContain(payload.messages[0].type);
-  });
-
-  it.each(REFUSALS)(
-    '%s never leaks a credential the strategy attached',
-    (name) => {
-      for (const detail of ['terse', 'full', 'raw'] as const) {
-        const text = return_answer(failureFrom(name), (v) => v, {
-          tool: 'AnyTool',
-          detail,
-        }).content[0].text;
-        expect(text).not.toContain('Bearer');
-        expect(text).not.toContain('authorization');
-      }
-    },
-  );
+  for (const name of REFUSALS) {
+    it(
+      format('%s never leaks a credential the strategy attached', name),
+      () => {
+        for (const detail of ['terse', 'full', 'raw'] as const) {
+          const text = return_answer(failureFrom(name), (v) => v, {
+            tool: 'AnyTool',
+            detail,
+          }).content[0].text;
+          assert.ok(!text.includes('Bearer'));
+          assert.ok(!text.includes('authorization'));
+        }
+      },
+    );
+  }
 
   it('keeps the T100 key where the document had one', () => {
     const payload = JSON.parse(
@@ -96,7 +103,7 @@ describe('a real refusal, read and then answered', () => {
       ).content[0].text,
     );
 
-    expect(payload.messages[0].t100).toEqual({
+    assert.deepStrictEqual(payload.messages[0].t100, {
       id: 'SADT_RESOURCE',
       no: '026',
       values: ['CLASS', 'ZMCP_BLD_ANSCH01', 'ZZ_INVALID_LOCK_HANDLE_0001'],
@@ -112,8 +119,8 @@ describe('a real refusal, read and then answered', () => {
       ).content[0].text,
     );
 
-    expect(payload.messages[0].t100).toBeUndefined();
-    expect(payload.messages[0].text).toContain('already editing');
+    assert.equal(payload.messages[0].t100, undefined);
+    assert.ok(payload.messages[0].text.includes('already editing'));
   });
 
   it('gives the document back at every detail, not only raw', () => {
@@ -130,7 +137,7 @@ describe('a real refusal, read and then answered', () => {
           detail,
         }).content[0].text,
       );
-      expect(payload.raw_body).toBe(corpusBody(name));
+      assert.equal(payload.raw_body, corpusBody(name));
     }
   });
 });

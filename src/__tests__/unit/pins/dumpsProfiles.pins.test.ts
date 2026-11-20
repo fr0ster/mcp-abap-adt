@@ -8,6 +8,7 @@
  * class under the profiler id it is given. SAP's answers are minimal
  * documents of each kind; only the requests are asserted.
  */
+import { describe } from 'node:test';
 import { pinCases } from '../../helpers/pinCases';
 
 const FEED = {

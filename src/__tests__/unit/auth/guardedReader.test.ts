@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it, type Mock, mock } from 'node:test';
 import * as z from 'zod';
 /**
  * A reader the answer site does not own — a `BaseMcpServer` override — may
@@ -46,11 +48,11 @@ const group = {
   registerHandlers: () => {},
 };
 
-let stderr: jest.SpyInstance;
+let stderr: Mock<typeof process.stderr.write>;
 beforeEach(() => {
-  stderr = jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  stderr = mock.method(process.stderr, 'write', () => true);
 });
-afterEach(() => stderr.mockRestore());
+afterEach(() => stderr.mock.restore());
 
 it("the tool wrapper: a reader's throw answers the fixed unknown words", async () => {
   const server = new ThrowingReaderServer();
@@ -63,16 +65,16 @@ it("the tool wrapper: a reader's throw answers the fixed unknown words", async (
       name: 'StubTool',
       arguments: {},
     })) as { isError?: boolean; content: Array<{ text: string }> };
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     const text = result.content[0].text;
-    expect(JSON.parse(text)).toEqual({
+    assert.deepStrictEqual(JSON.parse(text), {
       error: 'authentication_failed',
       kind: 'unknown',
       message: FIXED.reason,
       ...(FIXED.hint !== undefined ? { hint: FIXED.hint } : {}),
     });
-    expect(text).not.toContain(READER_SECRET);
-    expect(text).not.toContain('MCP error');
+    assert.ok(!text.includes(READER_SECRET));
+    assert.ok(!text.includes('MCP error'));
   } finally {
     await client.close();
   }

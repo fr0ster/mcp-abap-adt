@@ -46,7 +46,7 @@
   "scripts": {
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "tsc -p tsconfig.json",
-    "test": "npm --prefix .. test -- --roots compact-readonly-entries/src",
+    "test": "npm --prefix .. test -- --root compact-readonly-entries/src",
     "lint:check": "biome check src",
     "prepublishOnly": "npm run build"
   },

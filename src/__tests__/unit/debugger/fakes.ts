@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import { analyseDebuggerFreed } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -6,8 +7,32 @@ import type {
   DebugSessionPorts,
   RunOutcome,
 } from '../../../lib/debugger/DebugSession';
+import type { AnswerValue } from '../../../lib/json';
 import { corpusBody, corpusSidecar } from '../../helpers/adtCorpus';
 import { okResponse, refusedResponse } from '../../helpers/fakeClient';
+import { advanceTimersByTimeAsync } from '../../helpers/fakeTime';
+
+/** `value`, a field of an answer, as the string it must be: fails when it is none. */
+export function stringOf(value: AnswerValue | undefined): string {
+  assert.ok(typeof value === 'string', `not a string: ${String(value)}`);
+  return value;
+}
+
+/**
+ * `{ message: <a string holding words> }` over an answer's
+ * field: an object whose one key is `message`, a string holding `words`.
+ */
+export function assertMessageHolding(
+  value: AnswerValue | undefined,
+  words: string,
+): void {
+  assert.ok(
+    typeof value === 'object' && value !== null && !Array.isArray(value),
+    'not an object',
+  );
+  assert.deepStrictEqual(Object.keys(value), ['message']);
+  assert.ok(stringOf(Reflect.get(value, 'message')).includes(words));
+}
 
 export function deferred<T>() {
   let resolve!: (v: T) => void;
@@ -19,10 +44,13 @@ export function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-/** Advance microtasks until `cond` holds — a poll is created only after the awaits before it. */
+/**
+ * Advance microtasks until `cond` holds — a poll is created only after the
+ * awaits before it. Bounded: after 100 advances of zero fake time it throws,
+ * so a condition that never holds fails rather than hangs.
+ */
 export async function until(cond: () => boolean): Promise<void> {
-  for (let i = 0; i < 100 && !cond(); i++)
-    await jest.advanceTimersByTimeAsync(0);
+  for (let i = 0; i < 100 && !cond(); i++) await advanceTimersByTimeAsync(0);
   if (!cond()) throw new Error('condition never held');
 }
 

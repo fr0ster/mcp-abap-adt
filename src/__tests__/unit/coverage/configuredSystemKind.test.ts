@@ -5,10 +5,13 @@
  * type is not a statement of the kind, and nothing defaults to `onprem`.
  */
 
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { adtStandIn } from '../../helpers/adtStandIn';
+import { assertRejects, assertThrows } from '../../helpers/assertions';
 import { getSystemType } from '../../integration/helpers/configHelpers';
 import {
   configuredSystemKindOf,
@@ -58,16 +61,18 @@ const BASIC_SESSION = [
 
 describe('configuredSystemKind', () => {
   it('configuredSystemKind answers nothing when nothing states the kind', () => {
-    expect(configuredSystemKindOf({}, {})).toBeUndefined();
-    expect(
+    assert.equal(configuredSystemKindOf({}, {}), undefined);
+    assert.equal(
       configuredSystemKindOf(configWithSession(BASIC_SESSION), {}),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('a JWT session without SAP_SYSTEM_TYPE gives undefined', () => {
-    expect(
+    assert.equal(
       configuredSystemKindOf(configWithSession(JWT_SESSION), {}),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('takes the config, then the environment, then the session file', () => {
@@ -77,28 +82,31 @@ describe('configuredSystemKind', () => {
         system_type: 'legacy',
       },
     );
-    expect(configuredSystemKindOf(config, { SAP_SYSTEM_TYPE: 'onprem' })).toBe(
+    assert.equal(
+      configuredSystemKindOf(config, { SAP_SYSTEM_TYPE: 'onprem' }),
       'legacy',
     );
     const unstated = configWithSession([
       ...JWT_SESSION,
       'SAP_SYSTEM_TYPE=cloud',
     ]);
-    expect(
+    assert.equal(
       configuredSystemKindOf(unstated, { SAP_SYSTEM_TYPE: 'onprem' }),
-    ).toBe('onprem');
-    expect(configuredSystemKindOf(unstated, {})).toBe('cloud');
+      'onprem',
+    );
+    assert.equal(configuredSystemKindOf(unstated, {}), 'cloud');
   });
 
   it('a word that names no kind states nothing', () => {
-    expect(
+    assert.equal(
       configuredSystemKindOf(
         { environment: { system_type: 'jwt' } },
         {
           SAP_SYSTEM_TYPE: '',
         },
       ),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 });
 
@@ -110,27 +118,30 @@ describe('testDestinationName', () => {
   });
 
   it('is the name of the session file environment.env names, without .env', () => {
-    expect(testDestinationName(named('your-system.env'))).toBe('your-system');
-    expect(testDestinationName(named('other-system'))).toBe('other-system');
+    assert.equal(testDestinationName(named('your-system.env')), 'your-system');
+    assert.equal(testDestinationName(named('other-system')), 'other-system');
   });
 
   it("a path into the stores' sessions directory names its file's destination", () => {
-    expect(
+    assert.equal(
       testDestinationName(named(path.join(base, 'sessions', 'DEST.env'))),
-    ).toBe('DEST');
+      'DEST',
+    );
   });
 
   it('a path elsewhere, or a file not named .env, names no destination', () => {
-    expect(
+    assert.equal(
       testDestinationName(named(path.join(base, 'elsewhere', 'DEST.env'))),
-    ).toBeUndefined();
-    expect(
+      undefined,
+    );
+    assert.equal(
       testDestinationName(named(path.join(base, 'sessions', 'DEST.ENV'))),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 
   it('auth_broker.abap.destination is not read: without environment.env there is none', () => {
-    expect(
+    assert.equal(
       testDestinationName({
         auth_broker: {
           paths: { service_keys_dir: base },
@@ -138,7 +149,8 @@ describe('testDestinationName', () => {
         },
         environment: {},
       }),
-    ).toBeUndefined();
+      undefined,
+    );
   });
 });
 
@@ -164,7 +176,7 @@ describe('getSystemType', () => {
     fs.writeFileSync(file, 'environment: {}\n');
     process.env.MCP_TEST_CONFIG = file;
     delete process.env.SAP_SYSTEM_TYPE;
-    expect(() => getSystemType()).toThrow('no system kind stated');
+    assertThrows(() => getSystemType(), 'no system kind stated');
   });
 });
 
@@ -193,16 +205,18 @@ describe('hard mode', () => {
       const saved = process.env.SAP_SYSTEM_TYPE;
       delete process.env.SAP_SYSTEM_TYPE;
       try {
-        await expect(createHardModeClient('full', stdio)).rejects.toThrow(
+        await assertRejects(
+          createHardModeClient('full', stdio),
           'hard mode launches nothing: no system kind stated',
         );
-        await expect(createHardModeClient('compact', http)).rejects.toThrow(
+        await assertRejects(
+          createHardModeClient('compact', http),
           'hard mode launches nothing: no system kind stated',
         );
       } finally {
         if (saved !== undefined) process.env.SAP_SYSTEM_TYPE = saved;
       }
-      expect(stand.requests).toEqual([]);
+      assert.deepStrictEqual(stand.requests, []);
     } finally {
       await stand.close();
     }
@@ -211,26 +225,30 @@ describe('hard mode', () => {
 
 describe('LambdaTester', () => {
   it('LambdaTester skips with its reason when no kind is stated', () => {
-    expect(testerSystemKind(configWithSession(JWT_SESSION), {})).toEqual({
-      skip: expect.stringContaining('no system kind stated'),
-    });
+    const verdict = testerSystemKind(configWithSession(JWT_SESSION), {});
+    assert.ok('skip' in verdict);
+    const { skip, ...rest } = verdict;
+    assert.ok(skip.includes('no system kind stated'));
+    assert.deepStrictEqual(rest, {});
   });
 
   it("JWT credential with onprem stated: the tester's kind is onprem", () => {
-    expect(
+    assert.deepStrictEqual(
       testerSystemKind(
         configWithSession(JWT_SESSION, { system_type: 'onprem' }),
         {},
       ),
-    ).toEqual({ kind: 'onprem', isCloudSystem: false });
+      { kind: 'onprem', isCloudSystem: false },
+    );
   });
 
   it("basic credential with cloud stated: the tester's kind is cloud", () => {
-    expect(
+    assert.deepStrictEqual(
       testerSystemKind(
         configWithSession(BASIC_SESSION, { system_type: 'cloud' }),
         {},
       ),
-    ).toEqual({ kind: 'cloud', isCloudSystem: true });
+      { kind: 'cloud', isCloudSystem: true },
+    );
   });
 });

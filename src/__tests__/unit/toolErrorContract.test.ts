@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { beforeEach, describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -134,8 +136,8 @@ describe('tool error wire contract (#155)', () => {
       name: 'StubReturnsIsError',
       arguments: {},
     });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe('Domain ZD_NOPE not found');
+    assert.equal(result.isError, true);
+    assert.equal(result.content[0].text, 'Domain ZD_NOPE not found');
     await close();
   });
 
@@ -149,10 +151,10 @@ describe('tool error wire contract (#155)', () => {
       'StubThrowsMcpError',
     ]) {
       const result: any = await client.callTool({ name, arguments: {} });
-      expect(result.isError).toBe(true);
-      expect(result.content.length).toBeGreaterThan(0);
+      assert.equal(result.isError, true);
+      assert.ok(result.content.length > 0);
       for (const item of result.content) {
-        expect(item.text).not.toMatch(FORBIDDEN_PREFIX);
+        assert.doesNotMatch(item.text, FORBIDDEN_PREFIX);
       }
     }
     await close();
@@ -164,9 +166,9 @@ describe('tool error wire contract (#155)', () => {
       name: 'StubMultiItem',
       arguments: {},
     });
-    expect(result.content).toHaveLength(2);
-    expect(result.content[0].text).toBe('first item');
-    expect(result.content[1].text).toBe(JSON.stringify({ second: 'item' }));
+    assert.equal(result.content.length, 2);
+    assert.equal(result.content[0].text, 'first item');
+    assert.equal(result.content[1].text, JSON.stringify({ second: 'item' }));
     await close();
   });
 
@@ -176,8 +178,8 @@ describe('tool error wire contract (#155)', () => {
       name: 'StubThrowsAxios',
       arguments: {},
     });
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toContain('Resource not found');
+    assert.equal(result.isError, true);
+    assert.ok(result.content[0].text.includes('Resource not found'));
     await close();
   });
 
@@ -187,21 +189,18 @@ describe('tool error wire contract (#155)', () => {
       name: 'StubThrowsMcpError',
       arguments: {},
     });
-    expect(result.isError).toBe(true);
+    assert.equal(result.isError, true);
     // McpError.message is `MCP error -32602: object_name is required`; the
     // boundary must deliver the bare text.
-    expect(result.content[0].text).toBe('object_name is required');
+    assert.equal(result.content[0].text, 'object_name is required');
     await close();
   });
 });
 
 describe('BaseHandlerGroup registration path honours the same contract (#155)', () => {
   it('returns isError with unprefixed, uncollapsed content for all five cases', async () => {
-    // Note: BaseHandlerGroup/McpServer are imported statically at module scope
-    // above, not via dynamic import() — ts-jest's CommonJS transpilation of this
-    // project (see tsconfig.test.json, no "type": "module") does not support
-    // `await import()` without the `--experimental-vm-modules` Node flag, which
-    // this repo's jest setup does not enable. Static import carries the same
+    // Note: BaseHandlerGroup/McpServer are imported statically at module
+    // scope above, not via dynamic import(). Static import carries the same
     // module instances the runtime uses, so the test still exercises the real
     // registration path.
 
@@ -243,41 +242,41 @@ describe('BaseHandlerGroup registration path honours the same contract (#155)', 
       name: 'StubReturnsIsError',
       arguments: {},
     });
-    expect(single.isError).toBe(true);
-    expect(single.content[0].text).toBe('Domain ZD_NOPE not found');
+    assert.equal(single.isError, true);
+    assert.equal(single.content[0].text, 'Domain ZD_NOPE not found');
 
     const thrown: any = await client.callTool({
       name: 'StubThrowsPlainError',
       arguments: {},
     });
-    expect(thrown.isError).toBe(true);
-    expect(thrown.content[0].text).toBe('Failed to read class: ZZ not found');
+    assert.equal(thrown.isError, true);
+    assert.equal(thrown.content[0].text, 'Failed to read class: ZZ not found');
 
     const multi: any = await client.callTool({
       name: 'StubMultiItem',
       arguments: {},
     });
-    expect(multi.content).toHaveLength(2);
-    expect(multi.content[0].text).toBe('first item');
-    expect(multi.content[1].text).toBe(JSON.stringify({ second: 'item' }));
+    assert.equal(multi.content.length, 2);
+    assert.equal(multi.content[0].text, 'first item');
+    assert.equal(multi.content[1].text, JSON.stringify({ second: 'item' }));
 
     const axios: any = await client.callTool({
       name: 'StubThrowsAxios',
       arguments: {},
     });
-    expect(axios.isError).toBe(true);
-    expect(axios.content[0].text).toContain('Resource not found');
+    assert.equal(axios.isError, true);
+    assert.ok(axios.content[0].text.includes('Resource not found'));
 
     const mcp: any = await client.callTool({
       name: 'StubThrowsMcpError',
       arguments: {},
     });
-    expect(mcp.isError).toBe(true);
-    expect(mcp.content[0].text).toBe('object_name is required');
+    assert.equal(mcp.isError, true);
+    assert.equal(mcp.content[0].text, 'object_name is required');
 
     for (const result of [single, thrown, multi, axios, mcp]) {
       for (const item of result.content) {
-        expect(item.text).not.toMatch(FORBIDDEN_PREFIX);
+        assert.doesNotMatch(item.text, FORBIDDEN_PREFIX);
       }
     }
 

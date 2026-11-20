@@ -80,7 +80,8 @@ so that no package goes out on top of a dependency that is missing.
 4. **Build and test**:
    ```bash
    npm ci --ignore-scripts   # as the workflows do: no dependency's install script runs
-   npm run prepare           # only to install this checkout's git hook (husky)
+   npm run prepare           # only to install this checkout's git hook (husky): it runs
+                             # `biome check --staged` on the staged files, then the build
    npm run build          # all eighteen packages
    npm run test:check
    npm test               # every package's suites, once
@@ -190,14 +191,13 @@ so that no package goes out on top of a dependency that is missing.
 - `ci.yml` (push and pull request to `main` / `develop`): Ubuntu, macOS and Windows × Node 22 and
   24 — install with `npm ci --ignore-scripts`, Biome lint (root and each package's `lint:check`),
   build, test type-check, tests, the server-runtime, server, http, sse, background-runs-memory and
-  responsible-rules test type-check; on Ubuntu / Node 22 also `npm audit --omit=dev --audit-level=moderate`
-  (production dependencies; the picomatch advisory reaches the tree only through jest, jest-util and
-  lint-staged, all dev only; the whole tree again once the tests leave Jest, #361), `npm pack` of all eighteen packages, an install of
+  responsible-rules test type-check; on Ubuntu / Node 22 also `npm audit --audit-level=moderate`
+  (the whole tree, dev dependencies included), `npm pack` of all eighteen packages, an install of
   the tarballs (`--ignore-scripts`) that runs each of the twelve bins' `--version` and `--help`,
   the twelve Docker images built from those tarballs and checked (`scripts/ci/check-images.mjs`),
   and the Glama reference images (`docker/Dockerfile.inspect.onprem`, `docker/Dockerfile.inspect.cloud`) once their pinned `core` is on npm.
 - `release.yml` (tag `v*.*.*`): Ubuntu × Node 22 and 24 — the same install and
-  `npm audit --omit=dev --audit-level=moderate`, lint, build and tests — on Node 22 also the packing, the
+  `npm audit --audit-level=moderate`, lint, build and tests — on Node 22 also the packing, the
   install, the bins, the twelve images and the Glama reference image —, then a GitHub Release
   (`softprops/action-gh-release`, generated notes).
 

@@ -1,3 +1,13 @@
+import assert from 'node:assert/strict';
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  it,
+  type Mock,
+  mock,
+} from 'node:test';
+import { format } from 'node:util';
 import * as z from 'zod';
 /**
  * What the MCP client sees of a failure: the JSON answer, row by
@@ -44,9 +54,9 @@ const ALLOWED_KEYS = [
 
 function payloadOf(read: ReadFailure): Record<string, unknown> {
   const answer = answerFailure(read);
-  expect(answer.isError).toBe(true);
-  expect(answer.content).toHaveLength(1);
-  expect(answer.content[0].type).toBe('text');
+  assert.equal(answer.isError, true);
+  assert.equal(answer.content.length, 1);
+  assert.equal(answer.content[0].type, 'text');
   return JSON.parse(answer.content[0].text);
 }
 
@@ -65,7 +75,7 @@ describe('the failure answer, row by row', () => {
   it('a chain failure: authentication_failed, its kind, reason and hint', () => {
     const error = authError['credential-refused']({ credential: 'token' });
     const payload = payloadOf(read(new AuthProviderFailure(error)));
-    expect(payload).toEqual({
+    assert.deepStrictEqual(payload, {
       error: 'authentication_failed',
       kind: 'credential-refused',
       message: error.reason,
@@ -79,8 +89,8 @@ describe('the failure answer, row by row', () => {
       ...read(new AuthProviderFailure(error)),
       server: 'Logins are off.',
     });
-    expect(payload.server).toBe('Logins are off.');
-    expect(payload.kind).toBe('renewal-declined');
+    assert.equal(payload.server, 'Logins are off.');
+    assert.equal(payload.kind, 'renewal-declined');
   });
 
   it('a destination refusal: destination_refused, cause_kind, no kind', () => {
@@ -90,7 +100,7 @@ describe('the failure answer, row by row', () => {
       hint: 'a hint',
       causeKind: 'configuration',
     });
-    expect(payload).toEqual({
+    assert.deepStrictEqual(payload, {
       error: 'destination_refused',
       message: 'Destination "d" cannot be used: issuedBy',
       hint: 'a hint',
@@ -98,7 +108,7 @@ describe('the failure answer, row by row', () => {
     });
   });
 
-  it.each([
+  for (const [code, thrown, words] of [
     [
       'inspection_only',
       new ServerRefusal('inspection_only'),
@@ -119,12 +129,17 @@ describe('the failure answer, row by row', () => {
       new ServerRefusal('destination_refused', '--mcp: refused.'),
       '--mcp: refused.',
     ],
-  ])(
-    "the server's own refusal %s: its code and fixed words",
-    (code, thrown, words) => {
-      expect(payloadOf(read(thrown))).toEqual({ error: code, message: words });
-    },
-  );
+  ]) {
+    it(
+      format("the server's own refusal %s: its code and fixed words", code),
+      () => {
+        assert.deepStrictEqual(payloadOf(read(thrown)), {
+          error: code,
+          message: words,
+        });
+      },
+    );
+  }
 });
 
 describe('never in the answer', () => {
@@ -134,7 +149,7 @@ describe('never in the answer', () => {
   );
 
   it('the fixture carries diagnostics (else the test proves nothing)', () => {
-    expect(renderDiagnostics(error)).toBeDefined();
+    assert.notEqual(renderDiagnostics(error), undefined);
   });
 
   it('diagnostics, facts beyond kind, a thrown message, a URL with a query, state', () => {
@@ -145,17 +160,18 @@ describe('never in the answer', () => {
     const answer = answerFailure(read(thrown));
     const text = answer.content[0].text;
     const payload = JSON.parse(text);
+    const allowed: readonly string[] = ALLOWED_KEYS;
     for (const key of Object.keys(payload)) {
-      expect(ALLOWED_KEYS).toContain(key);
+      assert.ok(allowed.includes(key));
     }
-    expect(text).not.toContain('diagnostics');
-    expect(text).not.toContain('facts');
-    expect(text).not.toContain('redirect-mismatch');
-    expect(text).not.toContain(URI_PLAIN);
-    expect(text).not.toContain('?state=');
-    expect(text).not.toContain('STATE-SECRET-1');
-    expect(text).not.toContain('CODE-SECRET-2');
-    expect(text).not.toContain('refused at');
+    assert.ok(!text.includes('diagnostics'));
+    assert.ok(!text.includes('facts'));
+    assert.ok(!text.includes('redirect-mismatch'));
+    assert.ok(!text.includes(URI_PLAIN));
+    assert.ok(!text.includes('?state='));
+    assert.ok(!text.includes('STATE-SECRET-1'));
+    assert.ok(!text.includes('CODE-SECRET-2'));
+    assert.ok(!text.includes('refused at'));
   });
 });
 
@@ -166,18 +182,19 @@ describe('the stderr line', () => {
       { configuredUri: URI_PLAIN, strategyUri: URI_PLAIN },
     );
     const failure = read(new AuthProviderFailure(error));
-    expect(failureLogFields(failure)).toEqual(logFields(error));
+    assert.deepStrictEqual(failureLogFields(failure), logFields(error));
     const line = failureLogLine('MCP', failure);
-    expect(line).toBe(
+    assert.equal(
+      line,
       `[MCP] authentication_failed: ${JSON.stringify(logFields(error))}`,
     );
-    expect(line).toContain('diagnostics');
+    assert.ok(line.includes('diagnostics'));
   });
 
   it('a failure with no chain error: fixed words and its code only', () => {
     const failure = read(new ServerRefusal('inspection_only'));
-    expect(failureLogFields(failure)).toBeUndefined();
-    expect(failureLogLine('MCP', failure)).toBe('[MCP] inspection_only');
+    assert.equal(failureLogFields(failure), undefined);
+    assert.equal(failureLogLine('MCP', failure), '[MCP] inspection_only');
   });
 });
 
@@ -193,25 +210,23 @@ describe('the answer sites read the failure first', () => {
   /** The one stderr line every site writes: fixed words + logFields. */
   const LINE = `[MCP] authentication_failed: ${JSON.stringify(logFields(error))}\n`;
   let written: string[];
-  let stderr: jest.SpyInstance;
+  let stderr: Mock<typeof process.stderr.write>;
   beforeEach(() => {
     stateSystemKind();
     written = [];
-    stderr = jest
-      .spyOn(process.stderr, 'write')
-      .mockImplementation((chunk: unknown) => {
-        written.push(String(chunk));
-        return true;
-      });
+    stderr = mock.method(process.stderr, 'write', (chunk: unknown) => {
+      written.push(String(chunk));
+      return true;
+    });
   });
-  afterEach(() => stderr.mockRestore());
+  afterEach(() => stderr.mock.restore());
 
   it('return_error: a thrown chain failure, not its message', () => {
     const thrown = { refusal: error, message: 'server text SECRET-3' };
     const result = return_error(thrown);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text)).toEqual(expected);
-    expect(written).toEqual([LINE]);
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), expected);
+    assert.deepStrictEqual(written, [LINE]);
   });
 
   it("return_answer: an IAdtError carrying a refusal, not failurePayload's message", () => {
@@ -227,8 +242,8 @@ describe('the answer sites read the failure first', () => {
       }),
     } as unknown as IAdtResponse<never, IAdtError>;
     const result = return_answer(failed, (v) => v, ctx);
-    expect(JSON.parse(result.content[0].text)).toEqual(expected);
-    expect(written).toEqual([LINE]);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), expected);
+    assert.deepStrictEqual(written, [LINE]);
   });
 
   it('answer(): a thrown refusal, not client_threw with its message', async () => {
@@ -239,9 +254,9 @@ describe('the answer sites read the failure first', () => {
       },
       (v) => v,
     );
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text)).toEqual(expected);
-    expect(written).toEqual([LINE]);
+    assert.equal(result.isError, true);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), expected);
+    assert.deepStrictEqual(written, [LINE]);
   });
 
   it("BaseHandlerGroup's registration path: the same answer and the same line", async () => {
@@ -277,9 +292,9 @@ describe('the answer sites read the failure first', () => {
         name: 'StubThrowsRefusal',
         arguments: {},
       })) as { isError?: boolean; content: Array<{ text: string }> };
-      expect(result.isError).toBe(true);
-      expect(JSON.parse(result.content[0].text)).toEqual(expected);
-      expect(written).toEqual([LINE]);
+      assert.equal(result.isError, true);
+      assert.deepStrictEqual(JSON.parse(result.content[0].text), expected);
+      assert.deepStrictEqual(written, [LINE]);
     } finally {
       await client.close();
     }

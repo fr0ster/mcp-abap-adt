@@ -6,6 +6,10 @@
  * batch mode. The handler is replaced by one recording the context it is
  * called in; the long calls run on the ADT stand-in.
  */
+
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format } from 'node:util';
 import { AdtBatchConnection } from '@mcp-abap-adt/adt-clients';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -17,6 +21,7 @@ import type {
   LineMatchStrategy,
   SapAnswerStrategy,
 } from '../../../embeddable/index';
+import * as searchSourceHandler from '../../../handlers/system/readonly/handleSearchSource';
 import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
 import { LateBoundConnection } from '../../../lib/batch/lateBound';
 import { createAbapConnection } from '../../../lib/connectionFactory';
@@ -28,18 +33,17 @@ import { stateSystemKind } from '../../helpers/systemKind';
 process.env.SAP_SYSTEM_TYPE = 'onprem';
 
 const seen: HandlerContext[] = [];
-jest.mock('../../../handlers/system/readonly/handleSearchSource', () => {
-  const actual = jest.requireActual(
-    '../../../handlers/system/readonly/handleSearchSource',
-  );
-  return {
-    ...actual,
-    handleSearchSource: async (context: HandlerContext) => {
-      seen.push(context);
-      return { isError: false, content: [{ type: 'text', text: 'recorded' }] };
-    },
-  };
-});
+// handleSearchSource replaced on the module that defines it (the search
+// group reads it at call time); its other names
+// stay real.
+mock.method(
+  searchSourceHandler,
+  'handleSearchSource',
+  async (context: HandlerContext) => {
+    seen.push(context);
+    return { isError: false, content: [{ type: 'text', text: 'recorded' }] };
+  },
+);
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 const ARGS = { query: 'x', packages: ['Z'], background: false };
@@ -78,44 +82,48 @@ async function clientOf(server: McpServer | EmbeddableMcpServer) {
 }
 
 describe('registerOnServer, through an actual long call', () => {
-  it.each([
+  for (const [_name, given] of [
     ['with the options', true],
     ['without the options', false],
-  ] as const)('%s', async (_name, given) => {
-    const exporter = new HandlerExporter({
-      systemType: 'onprem',
-      ...(given
-        ? { sapAnswerStrategy: exporterSap, lineMatchStrategy: exporterLines }
-        : {}),
-    });
-    const server = new McpServer({ name: 'routes', version: '1.0.0' });
-    exporter.registerOnServer(server, async () => built);
-    const client = await clientOf(server);
-    try {
-      const answer = await client.callTool({
-        name: 'SearchSource',
-        arguments: ARGS,
+  ] as const) {
+    it(format('%s', _name), async () => {
+      const exporter = new HandlerExporter({
+        systemType: 'onprem',
+        ...(given
+          ? { sapAnswerStrategy: exporterSap, lineMatchStrategy: exporterLines }
+          : {}),
       });
-      expect(answer.isError).toBeFalsy();
-      expect(seen).toHaveLength(1);
-      const [context] = seen;
-      // The long call's own connection, not the provider's.
-      expect(context?.connection).not.toBe(built);
-      if (given) {
-        expect(context?.sapAnswerStrategy).toBe(exporterSap);
-        expect(context?.lineMatchStrategy).toBe(exporterLines);
-      } else {
-        expect(context !== undefined && 'sapAnswerStrategy' in context).toBe(
-          false,
-        );
-        expect(context !== undefined && 'lineMatchStrategy' in context).toBe(
-          false,
-        );
+      const server = new McpServer({ name: 'routes', version: '1.0.0' });
+      exporter.registerOnServer(server, async () => built);
+      const client = await clientOf(server);
+      try {
+        const answer = await client.callTool({
+          name: 'SearchSource',
+          arguments: ARGS,
+        });
+        assert.ok(!answer.isError);
+        assert.equal(seen.length, 1);
+        const [context] = seen;
+        // The long call's own connection, not the provider's.
+        assert.notEqual(context?.connection, built);
+        if (given) {
+          assert.equal(context?.sapAnswerStrategy, exporterSap);
+          assert.equal(context?.lineMatchStrategy, exporterLines);
+        } else {
+          assert.equal(
+            context !== undefined && 'sapAnswerStrategy' in context,
+            false,
+          );
+          assert.equal(
+            context !== undefined && 'lineMatchStrategy' in context,
+            false,
+          );
+        }
+      } finally {
+        await client.close();
       }
-    } finally {
-      await client.close();
-    }
-  });
+    });
+  }
 });
 
 describe('createRegistry() hosted by an EmbeddableMcpServer', () => {
@@ -136,9 +144,9 @@ describe('createRegistry() hosted by an EmbeddableMcpServer', () => {
     const client = await clientOf(server);
     try {
       await client.callTool({ name: 'SearchSource', arguments: ARGS });
-      expect(seen).toHaveLength(1);
-      expect(seen[0]?.sapAnswerStrategy).toBe(serverSap);
-      expect(seen[0]?.lineMatchStrategy).toBe(serverLines);
+      assert.equal(seen.length, 1);
+      assert.equal(seen[0]?.sapAnswerStrategy, serverSap);
+      assert.equal(seen[0]?.lineMatchStrategy, serverLines);
     } finally {
       await client.close();
     }
@@ -146,48 +154,63 @@ describe('createRegistry() hosted by an EmbeddableMcpServer', () => {
 });
 
 describe('batch mode', () => {
-  it.each([
+  for (const [_name, strategies] of [
     ['the SAP-answer strategy given', { sapAnswerStrategy: serverSap }],
     ['the line match given', { lineMatchStrategy: serverLines }],
     [
       'both given',
       { sapAnswerStrategy: serverSap, lineMatchStrategy: serverLines },
     ],
-  ])(
-    'SearchSource in an open batch is refused batch_not_recordable before its handler, %s (DO26: it is no batch entry)',
-    async (_name, strategies) => {
-      const owner = new InstanceBatch({ keepRawParts: false });
-      const target = new LateBoundConnection();
-      const batch = new AdtBatchConnection(target, {
-        endpoint: 'communication',
-      });
-      owner.begin('communication', { connection: batch, target, recorded: [] });
-      const exporter = new HandlerExporter({ systemType: 'onprem' });
-      const server = new EmbeddableMcpServer({
-        connection: built,
-        handlersRegistry: exporter.createRegistry(),
-        systemType: 'onprem',
-        logger: silent,
-        batch: owner,
-        ...strategies,
-      });
-      const client = await clientOf(server);
-      try {
-        const answer = await client.callTool({
-          name: 'SearchSource',
-          arguments: ARGS,
-        });
-        expect(answer.isError).toBe(true);
-        const content = answer.content;
-        const text =
-          Array.isArray(content) && typeof content[0]?.text === 'string'
-            ? content[0].text
-            : '';
-        expect(JSON.parse(text).error).toBe('batch_not_recordable');
-        expect(seen).toEqual([]);
-      } finally {
-        await client.close();
-      }
+  ] satisfies [
+    string,
+    {
+      sapAnswerStrategy?: SapAnswerStrategy;
+      lineMatchStrategy?: LineMatchStrategy;
     },
-  );
+  ][]) {
+    it(
+      format(
+        'SearchSource in an open batch is refused batch_not_recordable before its handler, %s (DO26: it is no batch entry)',
+        _name,
+      ),
+      async () => {
+        const owner = new InstanceBatch({ keepRawParts: false });
+        const target = new LateBoundConnection();
+        const batch = new AdtBatchConnection(target, {
+          endpoint: 'communication',
+        });
+        owner.begin('communication', {
+          connection: batch,
+          target,
+          recorded: [],
+        });
+        const exporter = new HandlerExporter({ systemType: 'onprem' });
+        const server = new EmbeddableMcpServer({
+          connection: built,
+          handlersRegistry: exporter.createRegistry(),
+          systemType: 'onprem',
+          logger: silent,
+          batch: owner,
+          ...strategies,
+        });
+        const client = await clientOf(server);
+        try {
+          const answer = await client.callTool({
+            name: 'SearchSource',
+            arguments: ARGS,
+          });
+          assert.equal(answer.isError, true);
+          const content = answer.content;
+          const text =
+            Array.isArray(content) && typeof content[0]?.text === 'string'
+              ? content[0].text
+              : '';
+          assert.equal(JSON.parse(text).error, 'batch_not_recordable');
+          assert.deepStrictEqual(seen, []);
+        } finally {
+          await client.close();
+        }
+      },
+    );
+  }
 });

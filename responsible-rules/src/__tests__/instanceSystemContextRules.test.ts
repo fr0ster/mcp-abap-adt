@@ -7,6 +7,8 @@
  * stated (no header, no `SAP_RESPONSIBLE`, no `SAP_USERNAME`).
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as z from 'zod';
@@ -99,14 +101,15 @@ it('the instance systemContext reaches the rules for an injected connection', as
       arguments: {},
     })) as { isError?: boolean; content: Array<{ text: string }> };
     const text = answer.content[0]?.text ?? '';
-    expect(text).not.toContain('system_user_unknown');
-    expect(answer.isError).toBeFalsy();
-    expect(JSON.parse(text)).toEqual({
+    assert.ok(!text.includes('system_user_unknown'));
+    assert.ok(!answer.isError);
+    assert.deepStrictEqual(JSON.parse(text), {
       responsible: 'OWNER',
       masterSystem: 'SYS',
     });
     // The system was asked: the rules made the parameters.
-    expect(requests.some((url) => url.includes('systeminformation'))).toBe(
+    assert.equal(
+      requests.some((url) => url.includes('systeminformation')),
       true,
     );
   } finally {

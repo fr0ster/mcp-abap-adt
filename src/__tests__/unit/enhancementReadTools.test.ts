@@ -1,5 +1,9 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import { handleGetEnhancementImpl } from '../../handlers/enhancement/readonly/handleGetEnhancementImpl';
 import { handleGetEnhancementSpot } from '../../handlers/enhancement/readonly/handleGetEnhancementSpot';
+import { assertMatchObject } from '../helpers/assertions';
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -91,19 +95,21 @@ describe('GetEnhancementSpot', () => {
     const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'SADT_REST_RFC_APPLICATION',
     });
-    expect(r.isError).toBe(false);
-    expect(json(r).metadata.name).toBe('SADT_REST_RFC_APPLICATION');
-    expect(json(r).metadata.type).toBe('ENHS/XSB');
-    expect(connection.calls).toHaveLength(1);
+    assert.equal(r.isError, false);
+    assert.equal(json(r).metadata.name, 'SADT_REST_RFC_APPLICATION');
+    assert.equal(json(r).metadata.type, 'ENHS/XSB');
+    assert.equal(connection.calls.length, 1);
     // adt-clients' request: the subtype's own media type, a header, never
     // the body of the GET.
-    expect(connection.calls[0]?.url).toBe(
+    assert.equal(
+      connection.calls[0]?.url,
       '/sap/bc/adt/enhancements/enhsxsb/sadt_rest_rfc_application?version=active',
     );
-    expect(connection.calls[0]?.headers?.Accept).toBe(
+    assert.equal(
+      connection.calls[0]?.headers?.Accept,
       'application/vnd.sap.adt.enh.enhs.v2+xml',
     );
-    expect(connection.calls[0]?.data).toBeUndefined();
+    assert.equal(connection.calls[0]?.data, undefined);
   });
 
   it("reads the spot's document as before: name, description, type, package, interface, BAdI definitions", async () => {
@@ -113,7 +119,7 @@ describe('GetEnhancementSpot', () => {
     const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'SADT_REST_RFC_APPLICATION',
     });
-    expect(json(r).metadata).toEqual({
+    assert.deepStrictEqual(json(r).metadata, {
       name: 'SADT_REST_RFC_APPLICATION',
       description: 'REST application class registration',
       type: 'ENHS/XSB',
@@ -145,8 +151,8 @@ describe('GetEnhancementSpot', () => {
     const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'SADT_REST_RFC_APPLICATION',
     });
-    expect(json(r).metadata.description).toBe('REST & RFC');
-    expect(json(r).metadata.links).toEqual([
+    assert.equal(json(r).metadata.description, 'REST & RFC');
+    assert.deepStrictEqual(json(r).metadata.links, [
       {
         href: '/sap/bc/adt/enhancements/enhsxsb/x',
         rel: 'self',
@@ -167,10 +173,10 @@ describe('GetEnhancementSpot', () => {
     const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_PLAIN',
     });
-    expect(r.isError).toBe(true);
-    expect(text(r)).toMatch(/not available through ADT/);
-    expect(text(r)).toMatch(/SAP GUI/);
-    expect(text(r)).toMatch(/ENHS\/XS/);
+    assert.equal(r.isError, true);
+    assert.match(text(r), /not available through ADT/);
+    assert.match(text(r), /SAP GUI/);
+    assert.match(text(r), /ENHS\/XS/);
   });
 
   it('passes any other failure through as it was', async () => {
@@ -184,10 +190,10 @@ describe('GetEnhancementSpot', () => {
     const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_B',
     });
-    expect(r.isError).toBe(true);
-    expect(text(r)).not.toMatch(/not available through ADT/);
+    assert.equal(r.isError, true);
+    assert.doesNotMatch(text(r), /not available through ADT/);
     // The method's error as it is, with the step.
-    expect(JSON.parse(text(r))).toMatchObject({
+    assertMatchObject(JSON.parse(text(r)), {
       status: 500,
       step: 'read enhancement spot',
     });
@@ -200,9 +206,9 @@ describe('GetEnhancementSpot', () => {
     const r = await handleGetEnhancementSpot(ctx(connection), {
       enhancement_spot: 'ZSPOT_B',
     });
-    expect(r.isError).toBe(true);
-    expect(JSON.parse(text(r)).status).toBe(401);
-    expect(connection.calls).toHaveLength(1);
+    assert.equal(r.isError, true);
+    assert.equal(JSON.parse(text(r)).status, 401);
+    assert.equal(connection.calls.length, 1);
   });
 });
 
@@ -220,14 +226,15 @@ describe('GetEnhancementImpl', () => {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });
-    expect(r.isError).toBe(false);
-    expect(json(r).source_code).toBe(source);
-    expect(connection.calls).toHaveLength(1);
+    assert.equal(r.isError, false);
+    assert.equal(json(r).source_code, source);
+    assert.equal(connection.calls.length, 1);
     // adt-clients' source read of the plugin.
-    expect(connection.calls[0]?.url).toBe(
+    assert.equal(
+      connection.calls[0]?.url,
       '/sap/bc/adt/enhancements/enhoxhh/zplugin/source/main?version=active',
     );
-    expect(connection.calls[0]?.headers?.Accept).toBe('text/plain');
+    assert.equal(connection.calls[0]?.headers?.Accept, 'text/plain');
   });
 
   /** What the tool answers as `source_code` for a plugin read answering `data`. */
@@ -246,30 +253,33 @@ describe('GetEnhancementImpl', () => {
   const b64 = (text: string) => Buffer.from(text, 'utf-8').toString('base64');
 
   it('reads a source element written as base64, decoded', async () => {
-    await expect(
-      sourceRead(
+    assert.equal(
+      await sourceRead(
         `<enh:enhancement xmlns:enh="http://www.sap.com/adt/enhancements"><enh:source>${b64(PLUGIN_SOURCE)}</enh:source></enh:enhancement>`,
       ),
-    ).resolves.toBe(PLUGIN_SOURCE);
+      PLUGIN_SOURCE,
+    );
   });
 
   // XML reads a line end as LF (XML 1.0 §2.11), CDATA included.
   it('reads a source element written as CDATA, as XML reads it', async () => {
-    await expect(
-      sourceRead(
+    assert.equal(
+      await sourceRead(
         `<enh:enhancement xmlns:enh="http://www.sap.com/adt/enhancements"><enh:source>\n<![CDATA[${PLUGIN_SOURCE}]]>\n</enh:source></enh:enhancement>`,
       ),
-    ).resolves.toBe(PLUGIN_SOURCE.split('\r\n').join('\n'));
+      PLUGIN_SOURCE.split('\r\n').join('\n'),
+    );
   });
 
   // Read through the XML parser: a `>` inside an attribute value does not
   // end the element's start tag.
   it("reads a source element whose attribute value holds '>'", async () => {
-    await expect(
-      sourceRead(
+    assert.equal(
+      await sourceRead(
         `<enh:enhancement xmlns:enh="http://www.sap.com/adt/enhancements"><enh:source enh:note="a>b">${b64(PLUGIN_SOURCE)}</enh:source></enh:enhancement>`,
       ),
-    ).resolves.toBe(PLUGIN_SOURCE);
+      PLUGIN_SOURCE,
+    );
   });
 
   it('answers not_found when SAP answers the plugin with no source', async () => {
@@ -280,28 +290,33 @@ describe('GetEnhancementImpl', () => {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZGONE',
     });
-    expect(r.isError).toBe(false);
-    expect(json(r).status).toBe('not_found');
-    expect(connection.calls).toHaveLength(1);
+    assert.equal(r.isError, false);
+    assert.equal(json(r).status, 'not_found');
+    assert.equal(connection.calls.length, 1);
   });
 
-  it.each([
+  for (const [collection, label] of [
     ['enhoxh', 'class enhancement'],
     ['ENHOXHB', 'BAdI implementation'],
     ['enhsxsb', 'BAdI enhancement spot'],
-  ])(
-    'refuses %s before any request — it has no source through ADT',
-    async (collection, label) => {
-      const connection = connectionAnswering([]);
-      const r = await handleGetEnhancementImpl(ctx(connection), {
-        enhancement_spot: collection,
-        enhancement_name: 'ZANY',
-      });
-      expect(r.isError).toBe(true);
-      expect(text(r)).toMatch(new RegExp(label));
-      expect(connection.calls).toHaveLength(0);
-    },
-  );
+  ]) {
+    it(
+      format(
+        'refuses %s before any request — it has no source through ADT',
+        collection,
+      ),
+      async () => {
+        const connection = connectionAnswering([]);
+        const r = await handleGetEnhancementImpl(ctx(connection), {
+          enhancement_spot: collection,
+          enhancement_name: 'ZANY',
+        });
+        assert.equal(r.isError, true);
+        assert.match(text(r), new RegExp(label));
+        assert.equal(connection.calls.length, 0);
+      },
+    );
+  }
 
   it('says a class enhancement is not available through ADT when the name says so', async () => {
     const connection = connectionAnswering([
@@ -314,9 +329,9 @@ describe('GetEnhancementImpl', () => {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZCLASS_ENH',
     });
-    expect(r.isError).toBe(true);
-    expect(text(r)).toMatch(/not available through ADT/);
-    expect(text(r)).toMatch(/ENHO\/XH/);
+    assert.equal(r.isError, true);
+    assert.match(text(r), /not available through ADT/);
+    assert.match(text(r), /ENHO\/XH/);
   });
 
   it('points a source code plugin asked under a spot name at enhoxhh', async () => {
@@ -330,12 +345,12 @@ describe('GetEnhancementImpl', () => {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZPLUGIN',
     });
-    expect(r.isError).toBe(true);
-    expect(text(r)).toMatch(/enhoxhh/);
+    assert.equal(r.isError, true);
+    assert.match(text(r), /enhoxhh/);
     // Only the search: a spot name is no collection to read source from.
-    expect(connection.calls.map((c) => c.url)).toEqual([
-      expect.stringContaining('informationsystem/search'),
-    ]);
+    const urls = connection.calls.map((c) => c.url);
+    assert.equal(urls.length, 1);
+    assert.ok(urls[0]?.includes('informationsystem/search'));
   });
 
   it('a collection name nothing explains is refused, naming enhoxhh', async () => {
@@ -344,8 +359,8 @@ describe('GetEnhancementImpl', () => {
       enhancement_spot: 'ZSOME_SPOT',
       enhancement_name: 'ZUNKNOWN',
     });
-    expect(r.isError).toBe(true);
-    expect(text(r)).toMatch(/enhancement_spot "enhoxhh"/);
+    assert.equal(r.isError, true);
+    assert.match(text(r), /enhancement_spot "enhoxhh"/);
   });
 
   it('keeps the failure of a source code plugin already asked under enhoxhh', async () => {
@@ -360,10 +375,10 @@ describe('GetEnhancementImpl', () => {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });
-    expect(r.isError).toBe(true);
-    expect(text(r)).toMatch(/403/);
-    expect(text(r)).not.toMatch(/read it with enhancement_spot/);
-    expect(JSON.parse(text(r)).step).toBe('read enhancement source');
+    assert.equal(r.isError, true);
+    assert.match(text(r), /403/);
+    assert.doesNotMatch(text(r), /read it with enhancement_spot/);
+    assert.equal(JSON.parse(text(r)).step, 'read enhancement source');
   });
 
   it('a 401 on the plugin ends as it came, with no search', async () => {
@@ -374,8 +389,8 @@ describe('GetEnhancementImpl', () => {
       enhancement_spot: 'enhoxhh',
       enhancement_name: 'ZPLUGIN',
     });
-    expect(r.isError).toBe(true);
-    expect(JSON.parse(text(r)).status).toBe(401);
-    expect(connection.calls).toHaveLength(1);
+    assert.equal(r.isError, true);
+    assert.equal(JSON.parse(text(r)).status, 401);
+    assert.equal(connection.calls.length, 1);
   });
 });

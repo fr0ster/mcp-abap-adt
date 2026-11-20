@@ -11,6 +11,9 @@
  * declared the variant — real adt-clients code, no SAP.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   ADT_SEARCH_TYPES_CLOUD,
   ADT_SEARCH_TYPES_ONPREM,
@@ -154,7 +157,7 @@ async function searched(
       { action: 'search_object', object_name: 'Z*', object_type: value },
     );
   }
-  expect(connection.requests).toHaveLength(1);
+  assert.equal(connection.requests.length, 1);
   const [request] = connection.requests;
   if (request === undefined) throw new Error('no request was sent');
   return new URL(request.url, 'https://system.invalid').searchParams.get(
@@ -205,9 +208,10 @@ describe('a lower-case value is a friendly name, an upper-case one a code, main 
   });
 
   it('the friendly names whose upper case is a word of the tables: view, func, stru', () => {
-    expect(
+    assert.deepStrictEqual(
       TYPE_NAME_LIST.filter((name) => TABLE_WORDS.has(name.toUpperCase())),
-    ).toEqual(['view', 'func', 'stru']);
+      ['view', 'func', 'stru'],
+    );
   });
 
   const codeCases = VARIANTS.flatMap((variant) =>
@@ -216,68 +220,101 @@ describe('a lower-case value is a friendly name, an upper-case one a code, main 
     ),
   );
 
-  it.each(codeCases)(
-    '%s on %s: VIEW sends exactly what VIEW/DV sends, under /ddic/views',
-    async (_argument, variant, send) => {
-      const byCode = await run(send, variant, 'VIEW/DV');
-      const byUpper = await run(send, variant, 'VIEW');
-      expect(byCode.requests.length).toBeGreaterThan(0);
-      expect(decodeURIComponent(byCode.requests.join('\n'))).toContain(
-        '/sap/bc/adt/ddic/views/',
-      );
-      expect(byUpper.requests).toEqual(byCode.requests);
-    },
-  );
+  for (const [_argument, variant, send] of codeCases) {
+    it(
+      format(
+        '%s on %s: VIEW sends exactly what VIEW/DV sends, under /ddic/views',
+        _argument,
+        variant,
+      ),
+      async () => {
+        const byCode = await run(send, variant, 'VIEW/DV');
+        const byUpper = await run(send, variant, 'VIEW');
+        assert.ok(byCode.requests.length > 0);
+        assert.ok(
+          decodeURIComponent(byCode.requests.join('\n')).includes(
+            '/sap/bc/adt/ddic/views/',
+          ),
+        );
+        assert.deepStrictEqual(byUpper.requests, byCode.requests);
+      },
+    );
+  }
 
-  it.each(codeCases)(
-    '%s on %s: view and View send exactly what DDLS/DF sends',
-    async (_argument, variant, send) => {
-      const byCode = await run(send, variant, 'DDLS/DF');
-      expect(byCode.requests.length).toBeGreaterThan(0);
-      expect(decodeURIComponent(byCode.requests.join('\n'))).not.toContain(
-        '/sap/bc/adt/ddic/views/',
-      );
-      expect((await run(send, variant, 'view')).requests).toEqual(
-        byCode.requests,
-      );
-      expect((await run(send, variant, 'View')).requests).toEqual(
-        byCode.requests,
-      );
-    },
-  );
+  for (const [_argument, variant, send] of codeCases) {
+    it(
+      format(
+        '%s on %s: view and View send exactly what DDLS/DF sends',
+        _argument,
+        variant,
+      ),
+      async () => {
+        const byCode = await run(send, variant, 'DDLS/DF');
+        assert.ok(byCode.requests.length > 0);
+        assert.ok(
+          !decodeURIComponent(byCode.requests.join('\n')).includes(
+            '/sap/bc/adt/ddic/views/',
+          ),
+        );
+        assert.deepStrictEqual(
+          (await run(send, variant, 'view')).requests,
+          byCode.requests,
+        );
+        assert.deepStrictEqual(
+          (await run(send, variant, 'View')).requests,
+          byCode.requests,
+        );
+      },
+    );
+  }
 
   // `func` and `stru` collide too; their upper case is a search name that
   // lists the code the name stands for, so the reading does not change.
   // (Where-used names a function module GROUP|MODULE, which these ZV
   // objects are not; it is left to the activation tools here.)
-  it.each(codeCases.filter(([argument]) => argument.startsWith('Activate')))(
-    '%s on %s: STRU and FUNC are read as stru and func',
-    async (_argument, variant, send) => {
-      const byName = await run(send, variant, 'stru');
-      const byUpper = await run(send, variant, 'STRU');
-      expect(byName.requests.length).toBeGreaterThan(0);
-      expect(byUpper.requests).toEqual(byName.requests);
-      // A function module names its group; without one both are refused
-      // naming the same code, and nothing is sent.
-      const funcName = await run(send, variant, 'func');
-      const funcUpper = await run(send, variant, 'FUNC');
-      expect(funcUpper.requests).toEqual([]);
-      expect(funcUpper.answered).toContain(
-        'objects[].parentName is required for ZV (FUGR/FF)',
-      );
-      expect(funcUpper.answered).toEqual(funcName.answered);
-    },
-  );
+  for (const [_argument, variant, send] of codeCases.filter(([argument]) =>
+    argument.startsWith('Activate'),
+  )) {
+    it(
+      format(
+        '%s on %s: STRU and FUNC are read as stru and func',
+        _argument,
+        variant,
+      ),
+      async () => {
+        const byName = await run(send, variant, 'stru');
+        const byUpper = await run(send, variant, 'STRU');
+        assert.ok(byName.requests.length > 0);
+        assert.deepStrictEqual(byUpper.requests, byName.requests);
+        // A function module names its group; without one both are refused
+        // naming the same code, and nothing is sent.
+        const funcName = await run(send, variant, 'func');
+        const funcUpper = await run(send, variant, 'FUNC');
+        assert.deepStrictEqual(funcUpper.requests, []);
+        assert.ok(
+          funcUpper.answered.includes(
+            'objects[].parentName is required for ZV (FUGR/FF)',
+          ),
+        );
+        assert.deepStrictEqual(funcUpper.answered, funcName.answered);
+      },
+    );
+  }
 
-  it.each(VARIANTS)(
-    'GetWhereUsed.object_type on %s: STRU sends exactly what stru sends',
-    async (variant) => {
-      const byName = await run(whereUsedOne, variant, 'stru');
-      const byUpper = await run(whereUsedOne, variant, 'STRU');
-      expect(byName.requests.length).toBeGreaterThan(0);
-      expect(byUpper.requests).toEqual(byName.requests);
-    },
-  );
+  for (const variant of VARIANTS) {
+    it(
+      format(
+        'GetWhereUsed.object_type on %s: STRU sends exactly what stru sends',
+        variant,
+      ),
+      async () => {
+        const byName = await run(whereUsedOne, variant, 'stru');
+        const byUpper = await run(whereUsedOne, variant, 'STRU');
+        assert.ok(byName.requests.length > 0);
+        assert.deepStrictEqual(byUpper.requests, byName.requests);
+      },
+    );
+  }
 
   const tableCases = VARIANTS.flatMap((variant) =>
     TABLE_ARGUMENTS.map(
@@ -285,28 +322,42 @@ describe('a lower-case value is a friendly name, an upper-case one a code, main 
     ),
   );
 
-  it.each(tableCases)(
-    '%s on %s: VIEW is the dictionary view, which it takes no code of: refused, nothing sent',
-    async (_argument, variant, send) => {
-      const { requests, answered } = await run(send, variant, 'VIEW');
-      expect(requests).toEqual([]);
-      expect(answered).toContain('"VIEW" is not one of: CLAS/OC');
-    },
-  );
+  for (const [_argument, variant, send] of tableCases) {
+    it(
+      format(
+        '%s on %s: VIEW is the dictionary view, which it takes no code of: refused, nothing sent',
+        _argument,
+        variant,
+      ),
+      async () => {
+        const { requests, answered } = await run(send, variant, 'VIEW');
+        assert.deepStrictEqual(requests, []);
+        assert.ok(answered.includes('"VIEW" is not one of: CLAS/OC'));
+      },
+    );
+  }
 
-  it.each(tableCases)(
-    '%s on %s: view and View are the CDS view, DDLS/DF',
-    async (_argument, variant, send) => {
-      const byCode = await run(send, variant, 'DDLS/DF');
-      expect(byCode.requests.length).toBeGreaterThan(0);
-      expect((await run(send, variant, 'view')).requests).toEqual(
-        byCode.requests,
-      );
-      expect((await run(send, variant, 'View')).requests).toEqual(
-        byCode.requests,
-      );
-    },
-  );
+  for (const [_argument, variant, send] of tableCases) {
+    it(
+      format(
+        '%s on %s: view and View are the CDS view, DDLS/DF',
+        _argument,
+        variant,
+      ),
+      async () => {
+        const byCode = await run(send, variant, 'DDLS/DF');
+        assert.ok(byCode.requests.length > 0);
+        assert.deepStrictEqual(
+          (await run(send, variant, 'view')).requests,
+          byCode.requests,
+        );
+        assert.deepStrictEqual(
+          (await run(send, variant, 'View')).requests,
+          byCode.requests,
+        );
+      },
+    );
+  }
 
   const searchCases = VARIANTS.flatMap((variant) =>
     (['SearchObject', 'HandlerSystem'] as const).map(
@@ -314,17 +365,23 @@ describe('a lower-case value is a friendly name, an upper-case one a code, main 
     ),
   );
 
-  it.each(searchCases)(
-    '%s on %s: VIEW is the search name VIEW; view and View are DDLS',
-    async (tool, variant) => {
-      expect(await searched(tool, variant, 'VIEW')).toBe('VIEW');
-      expect(await searched(tool, variant, 'view')).toBe('DDLS');
-      expect(await searched(tool, variant, 'View')).toBe('DDLS');
-      // A friendly name in upper case that is no word of the tables stays one.
-      expect(await searched(tool, variant, 'CLASS')).toBe('CLAS');
-      expect(await searched(tool, variant, 'DBVIEW')).toBe('VIEW');
-      expect(await searched(tool, variant, 'STRU')).toBe('STRU');
-      expect(await searched(tool, variant, 'FUNC')).toBe('FUNC');
-    },
-  );
+  for (const [tool, variant] of searchCases) {
+    it(
+      format(
+        '%s on %s: VIEW is the search name VIEW; view and View are DDLS',
+        tool,
+        variant,
+      ),
+      async () => {
+        assert.equal(await searched(tool, variant, 'VIEW'), 'VIEW');
+        assert.equal(await searched(tool, variant, 'view'), 'DDLS');
+        assert.equal(await searched(tool, variant, 'View'), 'DDLS');
+        // A friendly name in upper case that is no word of the tables stays one.
+        assert.equal(await searched(tool, variant, 'CLASS'), 'CLAS');
+        assert.equal(await searched(tool, variant, 'DBVIEW'), 'VIEW');
+        assert.equal(await searched(tool, variant, 'STRU'), 'STRU');
+        assert.equal(await searched(tool, variant, 'FUNC'), 'FUNC');
+      },
+    );
+  }
 });

@@ -6,6 +6,9 @@
  * taken — a refusal sends nothing.
  */
 
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { format } from 'node:util';
 import {
   TOOL_DEFINITION as HandlerUnitTestRun,
   handleHandlerUnitTestRun,
@@ -17,6 +20,7 @@ import {
 } from '../../handlers/unit_test/shared/runTarget';
 import { compactUnitTestRunSchema } from '../../lib/compact/compactSchemas';
 import { defineTool } from '../../lib/handlers/interfaces';
+import { assertRejects } from '../helpers/assertions';
 import { declaredRequired, jsonAt, listedJson } from '../helpers/listedJson';
 import {
   type RecordedRequest,
@@ -49,65 +53,81 @@ describe('HandlerUnitTestRun with target: started by target, answered with its r
     ['without runner', {}],
     ['runner async', { runner: 'async' }],
   ];
-  it.each(runners)(
-    '%s: an object target (PROG/P) goes as an osl:flatObjectSet with one osl:object',
-    async (_case, extra) => {
-      const { connection, result } = await start({
-        target: { kind: 'object', name: 'zreport', type: 'PROG/P' },
-        title: 'Nightly',
-        context: 'Suite',
-        ...extra,
-      });
+  for (const [_case, extra] of runners) {
+    it(
+      format(
+        '%s: an object target (PROG/P) goes as an osl:flatObjectSet with one osl:object',
+        _case,
+      ),
+      async () => {
+        const { connection, result } = await start({
+          target: { kind: 'object', name: 'zreport', type: 'PROG/P' },
+          title: 'Nightly',
+          context: 'Suite',
+          ...extra,
+        });
 
-      expect(result.isError).toBe(false);
-      expect(connection.requests.map(line)).toEqual([
-        'POST /sap/bc/adt/abapunit/runs',
-      ]);
-      const sent = body(connection.requests[0]);
-      expect(sent).toContain('<osl:objectSet xsi:type="osl:flatObjectSet">');
-      expect(sent).toContain('<osl:object name="ZREPORT" type="PROG/P"/>');
-      expect(sent).toContain('title="Nightly"');
-      expect(sent).toContain('context="Suite"');
-      expect(sent).toContain(
-        '<aunit:scope ownTests="true" foreignTests="false" addForeignTestsAsPreview="true"/>',
-      );
-      expect(JSON.parse(textOf(result))).toEqual({
-        success: true,
-        run_id: RUN,
-      });
-    },
-  );
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(connection.requests.map(line), [
+          'POST /sap/bc/adt/abapunit/runs',
+        ]);
+        const sent = body(connection.requests[0]);
+        assert.ok(
+          sent.includes('<osl:objectSet xsi:type="osl:flatObjectSet">'),
+        );
+        assert.ok(sent.includes('<osl:object name="ZREPORT" type="PROG/P"/>'));
+        assert.ok(sent.includes('title="Nightly"'));
+        assert.ok(sent.includes('context="Suite"'));
+        assert.ok(
+          sent.includes(
+            '<aunit:scope ownTests="true" foreignTests="false" addForeignTestsAsPreview="true"/>',
+          ),
+        );
+        assert.deepStrictEqual(JSON.parse(textOf(result)), {
+          success: true,
+          run_id: RUN,
+        });
+      },
+    );
+  }
 
-  it.each([
+  for (const [include, attribute] of [
     [true, 'true'],
     [false, 'false'],
-  ])(
-    'a package target with include_subpackages %s goes as an osl:packageSet',
-    async (include, attribute) => {
-      const { connection, result } = await start({
-        target: {
-          kind: 'package',
-          name: '$zpkg',
-          include_subpackages: include,
-        },
-      });
+  ] satisfies Array<[boolean, string]>) {
+    it(
+      format(
+        'a package target with include_subpackages %s goes as an osl:packageSet',
+        include,
+      ),
+      async () => {
+        const { connection, result } = await start({
+          target: {
+            kind: 'package',
+            name: '$zpkg',
+            include_subpackages: include,
+          },
+        });
 
-      expect(result.isError).toBe(false);
-      expect(connection.requests.map(line)).toEqual([
-        'POST /sap/bc/adt/abapunit/runs',
-      ]);
-      const sent = body(connection.requests[0]);
-      expect(sent).toContain('<osl:objectSet xsi:type="osl:packageSet">');
-      expect(sent).toContain(
-        `<osl:package name="$ZPKG" includeSubpackages="${attribute}"/>`,
-      );
-      expect(sent).not.toContain('osl:object ');
-      expect(JSON.parse(textOf(result))).toEqual({
-        success: true,
-        run_id: RUN,
-      });
-    },
-  );
+        assert.equal(result.isError, false);
+        assert.deepStrictEqual(connection.requests.map(line), [
+          'POST /sap/bc/adt/abapunit/runs',
+        ]);
+        const sent = body(connection.requests[0]);
+        assert.ok(sent.includes('<osl:objectSet xsi:type="osl:packageSet">'));
+        assert.ok(
+          sent.includes(
+            `<osl:package name="$ZPKG" includeSubpackages="${attribute}"/>`,
+          ),
+        );
+        assert.ok(!sent.includes('osl:object '));
+        assert.deepStrictEqual(JSON.parse(textOf(result)), {
+          success: true,
+          run_id: RUN,
+        });
+      },
+    );
+  }
 
   it("a CDS view's assigned tests run as DDLS/DF with foreign_tests, the risk levels and durations as given", async () => {
     const { connection, result } = await start({
@@ -117,17 +137,23 @@ describe('HandlerUnitTestRun with target: started by target, answered with its r
       duration: { short: true, medium: false, long: false },
     });
 
-    expect(result.isError).toBe(false);
+    assert.equal(result.isError, false);
     const sent = body(connection.requests[0]);
-    expect(sent).toContain('<osl:object name="ZI_VIEW" type="DDLS/DF"/>');
-    expect(sent).toContain(
-      '<aunit:scope ownTests="true" foreignTests="true" addForeignTestsAsPreview="true"/>',
+    assert.ok(sent.includes('<osl:object name="ZI_VIEW" type="DDLS/DF"/>'));
+    assert.ok(
+      sent.includes(
+        '<aunit:scope ownTests="true" foreignTests="true" addForeignTestsAsPreview="true"/>',
+      ),
     );
-    expect(sent).toContain(
-      '<aunit:riskLevel harmless="true" dangerous="false" critical="false"/>',
+    assert.ok(
+      sent.includes(
+        '<aunit:riskLevel harmless="true" dangerous="false" critical="false"/>',
+      ),
     );
-    expect(sent).toContain(
-      '<aunit:duration short="true" medium="false" long="false"/>',
+    assert.ok(
+      sent.includes(
+        '<aunit:duration short="true" medium="false" long="false"/>',
+      ),
     );
   });
 });
@@ -158,38 +184,40 @@ describe('HandlerUnitTestRun: refused before anything is sent', () => {
   ];
   it('a target type outside the run registry: refused by the schema, nothing sent', async () => {
     const connection = recordingConnection([STARTED]);
-    const refused = expect(
+    const refused = assertRejects(
       defineTool(HandlerUnitTestRun, handleHandlerUnitTestRun).call(
         { connection },
         { target: { kind: 'object', name: 'zcl_a', type: 'ZZZZ/ZZ' } },
       ),
-    ).rejects.toThrow(
       'Invalid arguments for tool HandlerUnitTestRun: Invalid option',
     );
     await refused;
-    expect(connection.requests).toEqual([]);
+    assert.deepStrictEqual(connection.requests, []);
   });
 
-  it.each(refusals)('%s', async (_case, args, words) => {
-    const { connection, result } = await start(args);
+  for (const [_case, args, words] of refusals) {
+    it(format('%s', _case), async () => {
+      const { connection, result } = await start(args);
 
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain(words);
-    expect(textOf(result)).toContain('nothing was sent');
-    expect(connection.requests).toEqual([]);
-  });
+      assert.equal(result.isError, true);
+      assert.ok(textOf(result).includes(words));
+      assert.ok(textOf(result).includes('nothing was sent'));
+      assert.deepStrictEqual(connection.requests, []);
+    });
+  }
 });
 
 describe("HandlerUnitTestRun's schema", () => {
   it("takes target as RunAbapUnit's own schema piece: the same fields and words", () => {
-    expect(compactUnitTestRunSchema.shape.target).toBe(RUN_TARGET_OPTIONAL);
-    expect(RUN_ABAP_UNIT.inputSchema.shape.target).toBe(RUN_TARGET_FIELD);
-    expect(jsonAt(listedJson(compactUnitTestRunSchema), 'target')).toEqual(
+    assert.equal(compactUnitTestRunSchema.shape.target, RUN_TARGET_OPTIONAL);
+    assert.equal(RUN_ABAP_UNIT.inputSchema.shape.target, RUN_TARGET_FIELD);
+    assert.deepStrictEqual(
+      jsonAt(listedJson(compactUnitTestRunSchema), 'target'),
       jsonAt(listedJson(RUN_ABAP_UNIT.inputSchema), 'target'),
     );
   });
 
   it('requires neither tests nor target by schema: the handler takes exactly one', () => {
-    expect(declaredRequired(compactUnitTestRunSchema)).toEqual([]);
+    assert.deepStrictEqual(declaredRequired(compactUnitTestRunSchema), []);
   });
 });

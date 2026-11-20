@@ -8,20 +8,11 @@
  * Real adt-clients code throughout (`AdtBatchConnection`, `AdtClient`); only
  * the connections are fakes.
  */
-jest.mock('../../../lib/connectionFactory', () => ({
-  createAbapConnection: jest.fn(),
-  systemKindOf: jest.fn(() => 'onprem'),
-  // A long read outside a batch opens a connection of its own: a sibling
-  // of the stand's, built by the mock below.
-  siblingRecordOf: jest.fn(() => ({
-    settings: {},
-    credential: {},
-    kind: 'onprem',
-  })),
-  // A view over a connection keeps its kind: the kind is mocked above.
-  withSystemKindOf: jest.fn((view: object) => view),
-}));
 
+import assert from 'node:assert/strict';
+import { describe, it, mock } from 'node:test';
+import * as connectionFactory from '../../../lib/connectionFactory';
+import { assertMatchObject } from '../../helpers/assertions';
 import type { InnerRequest, PartAnswer } from '../../helpers/batchEnvelope';
 import {
   envelopeConnection,
@@ -34,6 +25,10 @@ import {
   SAP_EXCEPTION_HEADERS,
   unsupportedMediaTypeBody,
 } from '../../helpers/sapRefusals';
+
+// lib/connectionFactory's names replaced on the module that defines them
+// (mock.method; their callers read them at call time); the names not replaced stay real.
+mock.method(connectionFactory, 'createAbapConnection', () => undefined);
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -92,15 +87,21 @@ describe('no retry in batch mode', () => {
     });
     await s.call('HandlerUpdate', WRITE);
     const { summary } = await s.end();
-    expect(summary).toEqual({ recorded: 2, sent: 2, received: 2 });
+    assert.deepStrictEqual(summary, { recorded: 2, sent: 2, received: 2 });
     const envelopes = s.built.flatMap((b) => b.envelopes);
-    expect(envelopes).toHaveLength(1);
-    expect(envelopes[0]?.parts.map((p) => p.method)).toEqual(['GET', 'PUT']);
+    assert.equal(envelopes.length, 1);
+    assert.deepStrictEqual(
+      envelopes[0]?.parts.map((p) => p.method),
+      ['GET', 'PUT'],
+    );
     const [read, write] = await s.answers([1, 2]);
-    expect(payloadOf(read as never)).toMatchObject({ status: 406 });
-    expect(payloadOf(write as never)).toMatchObject({ status: 415 });
+    assertMatchObject(payloadOf(read as never), { status: 406 });
+    assertMatchObject(payloadOf(write as never), { status: 415 });
     // Nothing else reached the connection.
-    expect(s.built.flatMap((b) => b.directs)).toEqual([]);
+    assert.deepStrictEqual(
+      s.built.flatMap((b) => b.directs),
+      [],
+    );
     await s.close();
   });
 
@@ -123,13 +124,13 @@ describe('no retry in batch mode', () => {
     });
     const { answer, summary } = await s.end();
     // the batch end's error, as it came; its one number answers the same.
-    expect(answer.isError).toBe(true);
-    expect(summary).toMatchObject({ status: 406, step: 'execute' });
+    assert.equal(answer.isError, true);
+    assertMatchObject(summary, { status: 406, step: 'execute' });
     const [entry] = await s.answers([1]);
-    expect(entry).toEqual({ number: 1, ...answer });
+    assert.deepStrictEqual(entry, { number: 1, ...answer });
     const envelopes = s.built.flatMap((b) => b.envelopes);
-    expect(envelopes).toHaveLength(1);
-    expect(envelopes[0]?.accept).toBe('multipart/mixed');
+    assert.equal(envelopes.length, 1);
+    assert.equal(envelopes[0]?.accept, 'multipart/mixed');
     await s.close();
   });
 
@@ -140,17 +141,17 @@ describe('no retry in batch mode', () => {
       part: picky,
     });
     const answer = await s.call('HandlerUpdate', WRITE);
-    expect(answer.isError).toBeFalsy();
+    assert.ok(!answer.isError);
     const puts = s.built
       .flatMap((b) => b.directs)
       .filter((d) => d.method === 'PUT');
-    expect(puts).toHaveLength(2);
+    assert.equal(puts.length, 2);
     const contentType = (i: number) =>
       Object.entries(puts[i]?.headers ?? {}).find(
         ([k]) => k.toLowerCase() === 'content-type',
       )?.[1];
-    expect(contentType(0)).not.toBe(SUPPORTED);
-    expect(contentType(1)).toBe(SUPPORTED);
+    assert.notEqual(contentType(0), SUPPORTED);
+    assert.equal(contentType(1), SUPPORTED);
     await s.close();
   });
 });

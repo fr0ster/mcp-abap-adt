@@ -1,6 +1,10 @@
+import assert from 'node:assert/strict';
+import { afterEach, describe, it } from 'node:test';
+import { format } from 'node:util';
 import { liveDebugPorts, requestUserOf } from '../../../lib/debugger/ports';
 import { runWithRequestContext } from '../../../lib/requestContext';
 import { resetSystemContextCache } from '../../../lib/systemContext';
+import { assertMatchObject, assertThrows } from '../../helpers/assertions';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
 // The process declares its system type, as every launcher requires: the ADT
@@ -22,39 +26,42 @@ describe('the request user, no rules', () => {
   it('is the stated responsible, upper case, and sends nothing', async () => {
     process.env.SAP_USERNAME = 'processlogin';
     await runWithRequestContext({ responsible: 'resp_user' }, async () => {
-      expect(requestUserOf()).toBe('RESP_USER');
+      assert.equal(requestUserOf(), 'RESP_USER');
     });
   });
   it('no responsible: the scope login; both: the responsible', async () => {
     await runWithRequestContext({ login: 'scopelogin' }, async () => {
-      expect(requestUserOf()).toBe('SCOPELOGIN');
+      assert.equal(requestUserOf(), 'SCOPELOGIN');
     });
     await runWithRequestContext(
       { login: 'scopelogin', responsible: 'resp_user' },
       async () => {
-        expect(requestUserOf()).toBe('RESP_USER');
+        assert.equal(requestUserOf(), 'RESP_USER');
       },
     );
   });
   it('the process SAP_USERNAME is no login: system_user_unknown', () => {
     process.env.SAP_USERNAME = 'processlogin';
-    expect(() => requestUserOf()).toThrow(
-      expect.objectContaining({ serverRefusal: 'system_user_unknown' }),
+    assertMatchObject(
+      assertThrows(() => requestUserOf()),
+      { serverRefusal: 'system_user_unknown' },
     );
   });
   it('neither: system_user_unknown', () => {
-    expect(() => requestUserOf()).toThrow(
-      expect.objectContaining({ serverRefusal: 'system_user_unknown' }),
+    assertMatchObject(
+      assertThrows(() => requestUserOf()),
+      { serverRefusal: 'system_user_unknown' },
     );
   });
   it('the live ports ask the stated value, not the connection', async () => {
     const conn = recordingConnection([]);
     await runWithRequestContext({ login: 'scopelogin' }, async () => {
-      await expect(
-        liveDebugPorts().requestUser({ connection: conn as never }),
-      ).resolves.toBe('SCOPELOGIN');
+      assert.equal(
+        await liveDebugPorts().requestUser({ connection: conn as never }),
+        'SCOPELOGIN',
+      );
     });
-    expect(conn.requests).toHaveLength(0);
+    assert.equal(conn.requests.length, 0);
   });
 });
 
@@ -65,24 +72,29 @@ describe('our own run', () => {
     ideId: 'FEDCBA9876543210'.repeat(2),
   };
 
-  it.each([
+  for (const [_kind, target] of [
     ['class', { kind: 'class' as const, name: 'CLASS_A' }],
     ['program', { kind: 'program' as const, name: 'PROGRAM_A' }],
-  ])('of a %s carries the given ids in its passport', async (_kind, target) => {
-    const conn = recordingConnection([{ status: 200, data: 'out' }]);
-    await expect(run(conn as any, target, debuggee)).resolves.toEqual({
-      ok: true,
-      output: 'out',
-    });
-    const passport = conn.requests[0].headers?.['SAP-PASSPORT'];
-    expect(passport).toEqual(expect.any(String));
-    expect(passport).toContain(debuggee.terminalId);
-    expect(passport).toContain(debuggee.ideId);
-  });
+  ] satisfies [string, Parameters<typeof run>[1]][]) {
+    it(
+      format('of a %s carries the given ids in its passport', _kind),
+      async () => {
+        const conn = recordingConnection([{ status: 200, data: 'out' }]);
+        assert.deepStrictEqual(await run(conn as any, target, debuggee), {
+          ok: true,
+          output: 'out',
+        });
+        const passport = conn.requests[0].headers?.['SAP-PASSPORT'];
+        assert.ok(typeof passport === 'string');
+        assert.ok(passport.includes(debuggee.terminalId));
+        assert.ok(passport.includes(debuggee.ideId));
+      },
+    );
+  }
 
   it('without ids carries no passport', async () => {
     const conn = recordingConnection([{ status: 200, data: 'out' }]);
     await run(conn as any, { kind: 'class', name: 'CLASS_A' });
-    expect(conn.requests[0].headers?.['SAP-PASSPORT']).toBeUndefined();
+    assert.equal(conn.requests[0].headers?.['SAP-PASSPORT'], undefined);
   });
 });

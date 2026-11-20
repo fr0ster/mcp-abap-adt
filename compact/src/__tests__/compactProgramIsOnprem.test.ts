@@ -1,82 +1,162 @@
-import { readdirSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
-import { compactReadOnlyEntries } from '@mcp-abap-adt/compact-readonly-entries';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import {
   jsonFind,
   listedJson,
 } from '../../../src/__tests__/helpers/listedJson';
 
 /**
- * A compact tool offered on cloud must not offer PROGRAM without saying where
- * it works.
+ * ABAP Cloud has no program of one's own: nothing creates or changes one
+ * there (the create is refused `403`, the transport `404`), but a delivered
+ * program is read, checked and asked about (the cloud ADT table,
+ * `ADT_TYPES_CLOUD`, measured). So a compact tool that creates or changes an
+ * object may offer PROGRAM on cloud only by saying it is onprem only; a tool
+ * that reads or checks one may offer it there.
  *
- * ABAP Cloud has no programs — `RuntimeRunProgram` and its profiling sibling
- * are `['onprem']`, and nothing creates, locks or checks one there. The
- * compact tools are nevertheless declared for both, deliberately: the pattern
- * is to declare broad and let the platform-specific path fail on the server
- * rather than hide a whole tool from a system where most of it works.
- *
- * **That pattern only holds up if the description says so.** A caller reading
- * `PROGRAM(object_name*)` on a cloud system has been told it is available and
- * finds out otherwise from a refusal. `HandlerCreate` and `HandlerGet` marked
- * it; `HandlerLock`, `HandlerUnlock`, `HandlerCheckRun`, `HandlerValidate`
- * and (as added) `HandlerProfileRun` did not — the convention was applied to
- * half the tools that needed it, which is how a convention stops being one.
- *
- * Read from the sources rather than from a list kept here, so a new compact
- * tool offering PROGRAM is covered the day it is written.
+ * Read from each tool's cloud statement (`variants.cloud`: its description
+ * and its `object_type` / `target_type` members), never from the source
+ * text. Which tool writes is stated here, one entry per compact tool, and the
+ * list must name every tool the two packages export (the opt-in data tool
+ * included), so a new tool is
+ * classified the day it is written.
  */
-// The compact tools live in two packages now, so the scan covers both halves.
-const COMPACT_DIRS = [
-  join(__dirname, '../../../compact-readonly-entries/src/handlers'),
-  join(__dirname, '../../../compact-modify/src/handlers'),
-];
+const WRITES = 'creates or changes an object';
+const READS = 'reads or checks';
 
-/** Every compact tool file, as `[label, absolute path]`. */
-const handlers: Array<[string, string]> = COMPACT_DIRS.flatMap((dir) =>
-  readdirSync(dir)
-    .filter((name) => name.startsWith('handleHandler') && name.endsWith('.ts'))
-    .map((name) => [name, join(dir, name)] as [string, string]),
-);
+const KIND_OF: Readonly<Record<string, typeof WRITES | typeof READS>> = {
+  HandlerActivate: WRITES,
+  HandlerCreate: WRITES,
+  HandlerDelete: WRITES,
+  HandlerLock: WRITES,
+  HandlerUnlock: WRITES,
+  HandlerUpdate: WRITES,
+  HandlerTransportCreate: WRITES,
+  HandlerTransportMoveObjects: WRITES,
+  HandlerTransportSortAndCompress: WRITES,
+  HandlerProfileSchedule: WRITES,
+  HandlerCdsUnitTestResult: READS,
+  HandlerCdsUnitTestStatus: READS,
+  HandlerCheckRun: READS,
+  HandlerDeletionCheck: READS,
+  HandlerDumpList: READS,
+  HandlerDumpView: READS,
+  HandlerGet: READS,
+  HandlerGetData: READS,
+  HandlerProfileList: READS,
+  HandlerProfileRun: READS,
+  HandlerProfileView: READS,
+  HandlerServiceBindingListTypes: READS,
+  HandlerServiceBindingValidate: READS,
+  HandlerSystem: READS,
+  HandlerUnitTestResult: READS,
+  HandlerUnitTestRun: READS,
+  HandlerUnitTestStatus: READS,
+  HandlerValidate: READS,
+};
 
-/** The `description:` string of a tool definition, as written. */
-function descriptionOf(source: string): string {
-  const found = source.match(/description:\s*\n?\s*'((?:[^'\\]|\\.)*)'/);
-  return found ? found[1] : '';
-}
+/** The read tools that offer a delivered program on cloud (measured table). */
+const READS_PROGRAM_ON_CLOUD = [
+  'HandlerCheckRun',
+  'HandlerDeletionCheck',
+  'HandlerGet',
+] as const;
 
-function availabilityOf(source: string): string {
-  const found = source.match(/available_in:\s*\[([^\]]*)\]/);
-  return found ? found[1] : '';
-}
+describe('compact tools and PROGRAM on ABAP cloud', () => {
+  // The opt-in data tool too: a compact binary serves it on request.
+  const entries = [
+    ...compactReadOnlyEntries(),
+    ...compactDataEntries(),
+    ...compactModifyEntries(),
+  ];
 
-describe('compact tools that mention PROGRAM', () => {
-  it('finds the tools to check, so the assertion is not vacuous', () => {
-    expect(handlers.length).toBeGreaterThan(10);
+  /** The tool's cloud statement: its description and the members it offers. */
+  const onCloud = (entry: (typeof entries)[number]) => {
+    const definition = entry.toolDefinition;
+    if (!definition.available_in?.includes('cloud')) return undefined;
+    // A tool with no variants states one definition for every system it is
+    // served on: on cloud, that one.
+    const stated = definition.variants?.cloud ?? definition;
+    const schema = listedJson(stated.inputSchema);
+    const members = [
+      ...(jsonFind(schema, 'object_type')?.enum ?? []),
+      ...(jsonFind(schema, 'target_type')?.enum ?? []),
+    ].filter((value) => typeof value === 'string');
+    return { description: stated.description, members };
+  };
+
+  /** Whether the cloud statement offers PROGRAM: as a member, or by name. */
+  const offersProgram = (stated: {
+    description: string;
+    members: readonly string[];
+  }) =>
+    stated.members.includes('PROGRAM') ||
+    /\bPROGRAM\b/.test(stated.description);
+
+  it('classifies every compact tool, and no other', () => {
+    assert.deepStrictEqual(
+      entries.map((entry) => entry.toolDefinition.name).sort(),
+      Object.keys(KIND_OF).sort(),
+    );
   });
 
-  it.each(handlers)(
-    '%s says where PROGRAM works, if it offers one',
-    (name, file) => {
-      const source = readFileSync(file, 'utf8');
-      const description = descriptionOf(source);
-      // `\bPROGRAM\b`, not `PROGRAM\(`. The first version of this test looked
-      // for the parenthesised form every lifecycle tool uses —
-      // `PROGRAM(object_name*)` — and silently skipped `HandlerProfileRun`,
-      // which writes `target_type*(CLASS|PROGRAM)`. It passed with the marker
-      // removed: a guard that checks nothing, in a file about guards that check
-      // nothing.
-      const offersProgram = /\bPROGRAM\b/.test(description);
-      const onCloud = availabilityOf(source).includes('cloud');
-      if (!offersProgram || !onCloud) return;
+  it('reads the cloud descriptions, so the checks below are not vacuous', () => {
+    const read = entries
+      .map(onCloud)
+      .filter((stated) => stated !== undefined && stated.description !== '');
+    assert.ok(read.length > 0);
+    // Every write tool of KIND_OF is served on cloud and yields a cloud
+    // statement there, variants or not, so the write rule below examines
+    // each of them: none is skipped as absent from cloud.
+    const writesOnCloud = entries
+      .filter(
+        (entry) =>
+          KIND_OF[entry.toolDefinition.name] === WRITES &&
+          onCloud(entry) !== undefined,
+      )
+      .map((entry) => entry.toolDefinition.name)
+      .sort();
+    assert.deepStrictEqual(
+      writesOnCloud,
+      Object.keys(KIND_OF)
+        .filter((name) => KIND_OF[name] === WRITES)
+        .sort(),
+    );
+  });
 
-      expect({ name, marked: /onprem only/.test(description) }).toEqual({
-        name,
-        marked: true,
+  it('a tool that creates or changes an object offers PROGRAM on cloud only as onprem only', () => {
+    const offending = entries
+      .filter((entry) => KIND_OF[entry.toolDefinition.name] === WRITES)
+      .flatMap((entry) => {
+        const stated = onCloud(entry);
+        if (stated === undefined || !offersProgram(stated)) return [];
+        return stated.description.includes('onprem only')
+          ? []
+          : [entry.toolDefinition.name];
       });
-    },
-  );
+    assert.deepStrictEqual(offending, []);
+  });
+
+  it('a tool that reads or checks offers a delivered program on cloud', () => {
+    assert.deepStrictEqual(
+      entries
+        .filter((entry) => {
+          const stated = onCloud(entry);
+          return (
+            KIND_OF[entry.toolDefinition.name] === READS &&
+            stated !== undefined &&
+            stated.members.includes('PROGRAM')
+          );
+        })
+        .map((entry) => entry.toolDefinition.name)
+        .sort(),
+      [...READS_PROGRAM_ON_CLOUD],
+    );
+  });
 });
 
 /**
@@ -104,18 +184,19 @@ describe('compact tools that offer INCLUDE on ABAP cloud', () => {
   };
 
   it('finds tools that offer INCLUDE on premise, so the check is not vacuous', () => {
-    expect(
+    assert.ok(
       entries.filter((entry) => membersOn(entry, 'onprem').includes('INCLUDE'))
-        .length,
-    ).toBeGreaterThan(5);
+        .length > 5,
+    );
   });
 
   it('offers it only where cloud serves it', () => {
-    expect(
+    assert.deepStrictEqual(
       entries
         .filter((entry) => membersOn(entry, 'cloud').includes('INCLUDE'))
         .map((entry) => entry.toolDefinition.name)
         .sort(),
-    ).toEqual(['HandlerDeletionCheck', 'HandlerGet']);
+      ['HandlerDeletionCheck', 'HandlerGet'],
+    );
   });
 });

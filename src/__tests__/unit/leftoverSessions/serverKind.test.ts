@@ -7,17 +7,18 @@
  * answers. Against the ADT stand-in.
  */
 
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { systemKindOf } from '../../../lib/connectionFactory';
+import { assertMatchObject } from '../../helpers/assertions';
 import { type LeftoverStand, leftoverStand } from './harness';
-
-jest.setTimeout(30_000);
 
 let stand: LeftoverStand | undefined;
 const previousType = process.env.SAP_SYSTEM_TYPE;
 
 beforeEach(() => {
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
+  mock.method(process.stderr, 'write', () => true);
 });
 
 afterEach(async () => {
@@ -25,7 +26,7 @@ afterEach(async () => {
   stand = undefined;
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
-  jest.restoreAllMocks();
+  mock.restoreAll();
   resetProcessLatchForTests();
 });
 
@@ -40,10 +41,10 @@ describe('systemType onprem, SAP_SYSTEM_TYPE unset', () => {
   it('the logon at the start builds an on-premise connection', async () => {
     delete process.env.SAP_SYSTEM_TYPE;
     stand = await leftoverStand({ systemType: 'onprem' });
-    expect(await stand.start()).toEqual({ session: 'logged_on' });
-    expect(stand.files()).toHaveLength(1);
+    assert.deepStrictEqual(await stand.start(), { session: 'logged_on' });
+    assert.equal(stand.files().length, 1);
     const [handle] = stand.files();
-    expect(stand.file(handle ?? '')).toMatchObject({
+    assertMatchObject(stand.file(handle ?? ''), {
       destination: { system: 'onprem' },
     });
   });
@@ -52,7 +53,10 @@ describe('systemType onprem, SAP_SYSTEM_TYPE unset', () => {
     stand = await leftoverStand({ systemType: 'onprem' });
     const { handle } = await leftoverWith(stand);
     delete process.env.SAP_SYSTEM_TYPE;
-    expect(await stand.start()).toEqual({ session: 'picked_up', handle });
+    assert.deepStrictEqual(await stand.start(), {
+      session: 'picked_up',
+      handle,
+    });
   });
 
   it("a leftover's logoff is sent, not refused system_type_required", async () => {
@@ -63,8 +67,8 @@ describe('systemType onprem, SAP_SYSTEM_TYPE unset', () => {
     delete process.env.SAP_SYSTEM_TYPE;
     await stand.start();
     const off = await stand.call('LogoffLeftoverSession', { handle });
-    expect(off.isError).toBe(false);
-    expect(off.text).toContain('logged_off');
+    assert.equal(off.isError, false);
+    assert.ok(off.text.includes('logged_off'));
   });
 });
 
@@ -73,11 +77,11 @@ it('systemType cloud with SAP_SYSTEM_TYPE=onprem: the logon and its file are clo
   stand = await leftoverStand({ systemType: 'cloud' });
   await stand.start();
   const [handle] = stand.files();
-  expect(stand.file(handle ?? '')).toMatchObject({
+  assertMatchObject(stand.file(handle ?? ''), {
     destination: { system: 'cloud' },
   });
   const connection = await stand.server.connectionForTest();
-  expect(systemKindOf(connection)).toBe('cloud');
+  assert.equal(systemKindOf(connection), 'cloud');
 });
 
 it('without systemType, SAP_SYSTEM_TYPE answers', async () => {
@@ -85,7 +89,7 @@ it('without systemType, SAP_SYSTEM_TYPE answers', async () => {
   stand = await leftoverStand();
   await stand.start();
   const [handle] = stand.files();
-  expect(stand.file(handle ?? '')).toMatchObject({
+  assertMatchObject(stand.file(handle ?? ''), {
     destination: { system: 'cloud' },
   });
 });
@@ -109,9 +113,10 @@ it("the server's logger reaches the connection it builds", async () => {
     timeout: 10_000,
   });
   // The connection's own wire lines name the request it sent.
-  expect(
+  assert.equal(
     lines
       .slice(before)
       .some((line) => line.includes('/sap/bc/adt/probe/logger')),
-  ).toBe(true);
+    true,
+  );
 });

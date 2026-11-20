@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { handleAmdpDebugCancel } from '../../../handlers/debugger/debug/handleAmdpDebugCancel';
 import { handleAmdpDebugGetTable } from '../../../handlers/debugger/debug/handleAmdpDebugGetTable';
 import { handleAmdpDebugSetBreakpoints } from '../../../handlers/debugger/debug/handleAmdpDebugSetBreakpoints';
@@ -112,7 +114,7 @@ describe('AMDP debugger handlers', () => {
       'AmdpDebugCancel',
       'AmdpDebugStop',
     ])
-      expect(names).toContain(n);
+      assert.ok(names.includes(n));
   });
 
   it('start passes stop_existing, the breakpoints and the run, and answers the handle', async () => {
@@ -123,7 +125,7 @@ describe('AMDP debugger handlers', () => {
       breakpoints: [{ class_name: 'zcl_a', line: 14 }],
       run: { kind: 'class', name: 'zcl_a' },
     });
-    expect(f.calls).toEqual([
+    assert.deepStrictEqual(f.calls, [
       [
         'start',
         {
@@ -133,7 +135,7 @@ describe('AMDP debugger handlers', () => {
         },
       ],
     ]);
-    expect(json(r)).toEqual({
+    assert.deepStrictEqual(json(r), {
       mainId: 'M1',
       breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
       state_handle: state.handle,
@@ -149,9 +151,12 @@ describe('AMDP debugger handlers', () => {
     const r: any = await handleAmdpDebugStart(context, {
       breakpoints: [{ class_name: 'zcl_a', line: 14 }],
     });
-    expect(r.isError).toBe(true);
-    expect(r.content.map((c: any) => c.text).join('\n')).toContain(
-      state.handle,
+    assert.equal(r.isError, true);
+    assert.ok(
+      r.content
+        .map((c: any) => c.text)
+        .join('\n')
+        .includes(state.handle),
     );
     const g = fakeAmdp();
     g.amdp.holdsState = () => false;
@@ -162,8 +167,8 @@ describe('AMDP debugger handlers', () => {
     const r2: any = await handleAmdpDebugStart(other.context, {
       breakpoints: [{ class_name: 'zcl_a', line: 14 }],
     });
-    expect(r2.isError).toBe(true);
-    expect(r2.content).toHaveLength(1);
+    assert.equal(r2.isError, true);
+    assert.equal(r2.content.length, 1);
   });
 
   it('start without stop_existing does not stop an existing one', async () => {
@@ -172,7 +177,7 @@ describe('AMDP debugger handlers', () => {
     await handleAmdpDebugStart(context, {
       breakpoints: [{ class_name: 'ZCL_A', line: 1 }],
     });
-    expect((f.calls[0][1] as any).stopExisting).toBe(false);
+    assert.equal((f.calls[0][1] as any).stopExisting, false);
   });
 
   it('set breakpoints replaces the list on the session', async () => {
@@ -182,10 +187,10 @@ describe('AMDP debugger handlers', () => {
       state_handle: state.handle,
       breakpoints: [{ class_name: 'ZCL_A', line: 20 }],
     });
-    expect(f.calls).toEqual([
+    assert.deepStrictEqual(f.calls, [
       ['setBreakpoints', [{ class_name: 'ZCL_A', line: 20 }]],
     ]);
-    expect(json(r)).toEqual({
+    assert.deepStrictEqual(json(r), {
       breakpoints: [{ class_name: 'ZCL_A', line: 20, state: 'VALID' }],
     });
   });
@@ -198,11 +203,11 @@ describe('AMDP debugger handlers', () => {
       hold_seconds: 3,
     });
     await handleAmdpDebugWait(context, { state_handle: state.handle });
-    expect(f.calls).toEqual([
+    assert.deepStrictEqual(f.calls, [
       ['wait', 3],
       ['wait', 10],
     ]);
-    expect(json(r)).toEqual({
+    assert.deepStrictEqual(json(r), {
       state: 'event',
       events: [
         {
@@ -227,11 +232,11 @@ describe('AMDP debugger handlers', () => {
       state_handle: state.handle,
       action: 'continue',
     });
-    expect(f.calls).toEqual([
+    assert.deepStrictEqual(f.calls, [
       ['step', 'over'],
       ['step', 'continue'],
     ]);
-    expect(json(a)).toEqual({ state: 'moving' });
+    assert.deepStrictEqual(json(a), { state: 'moving' });
   });
 
   it('get table passes the variable and the query; a blank variable is an error', async () => {
@@ -246,19 +251,19 @@ describe('AMDP debugger handlers', () => {
       state_handle: state.handle,
       variable: 'lt_x',
     });
-    expect(f.calls).toEqual([
+    assert.deepStrictEqual(f.calls, [
       ['getTable', 'lt_x', 'SELECT 1 FROM :lt_x'],
       ['getTable', 'lt_x', undefined],
     ]);
-    expect(json(r)).toEqual([{ A: '1' }]);
+    assert.deepStrictEqual(json(r), [{ A: '1' }]);
     for (const variable of ['', '  ']) {
       const e: any = await handleAmdpDebugGetTable(context, {
         state_handle: state.handle,
         variable,
       });
-      expect(e.isError).toBe(true);
+      assert.equal(e.isError, true);
     }
-    expect(f.calls).toHaveLength(2);
+    assert.equal(f.calls.length, 2);
   });
 
   it('cancel cancels the debuggee', async () => {
@@ -267,8 +272,8 @@ describe('AMDP debugger handlers', () => {
     const r: any = await handleAmdpDebugCancel(context, {
       state_handle: state.handle,
     });
-    expect(f.calls).toEqual([['cancel']]);
-    expect(r.content[0].text).toBe('cancelled');
+    assert.deepStrictEqual(f.calls, [['cancel']]);
+    assert.equal(r.content[0].text, 'cancelled');
   });
 
   it("every tool but the start refuses a handle that is not the instance's", async () => {
@@ -289,10 +294,10 @@ describe('AMDP debugger handlers', () => {
       handleAmdpDebugStop,
     ]) {
       const r: any = await h(context, args);
-      expect(r.isError).toBe(true);
-      expect(r.content[0].text).toContain('state is not available');
+      assert.equal(r.isError, true);
+      assert.ok(r.content[0].text.includes('state is not available'));
     }
-    expect(f.calls).toEqual([]);
+    assert.deepStrictEqual(f.calls, []);
   });
 
   it('an AMDP stop invalidates the handle once nothing else is held; with ABAP still held, the handle stays', async () => {
@@ -301,8 +306,8 @@ describe('AMDP debugger handlers', () => {
       const { context, state } = install(f.amdp, abapHolds);
       const old = state.handle;
       await handleAmdpDebugStop(context, { state_handle: old });
-      expect(f.calls).toEqual([['stop']]);
-      expect(state.handle === old).toBe(abapHolds);
+      assert.deepStrictEqual(f.calls, [['stop']]);
+      assert.equal(state.handle === old, abapHolds);
     }
   });
 
@@ -326,7 +331,7 @@ describe('AMDP debugger handlers', () => {
       { connection: {}, state, debugger: () => instance } as any,
       { state_handle: state.handle, action: 'over' },
     );
-    expect(r.isError).toBe(true);
-    expect(r.content[0].text).toContain('state is not available');
+    assert.equal(r.isError, true);
+    assert.ok(r.content[0].text.includes('state is not available'));
   });
 });

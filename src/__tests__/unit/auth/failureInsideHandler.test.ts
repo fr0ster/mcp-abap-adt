@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import * as z from 'zod';
 /**
  * An auth failure inside a handler. A credential SAP refused (its `401`) is
@@ -28,8 +30,6 @@ import { recordingConnection } from '../../helpers/recordingConnection';
 import { stateSystemKind } from '../../helpers/systemKind';
 import { StandServer, silent } from '../backgroundRuns/harness';
 import { oneToolGroup } from '../stateful/harness';
-
-jest.setTimeout(30_000);
 
 const PASSWORD = 'never-in-an-answer-1234';
 
@@ -77,23 +77,26 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
         name: 'GetClass',
         arguments: { class_name: 'ZCL_REFUSED' },
       })) as Result;
-      expect(result.isError).toBe(true);
+      assert.equal(result.isError, true);
       const payload = payloadOf(result);
       const words = render('credential-refused', {
         credential: 'user-password',
       });
-      expect(payload.origin).toBe('connection');
-      expect(payload.message).toBe(
+      assert.equal(payload.origin, 'connection');
+      assert.equal(
+        payload.message,
         words.hint !== undefined
           ? `${words.reason} â€” ${words.hint}`
           : words.reason,
       );
       // The server did not recognise or re-render it.
-      expect(payload.error).toBeUndefined();
+      assert.equal(payload.error, undefined);
       const text = JSON.stringify(result);
-      expect(text).not.toContain(PASSWORD);
-      expect(text).not.toContain(
-        Buffer.from(`INSIDE_USER:${PASSWORD}`).toString('base64'),
+      assert.ok(!text.includes(PASSWORD));
+      assert.ok(
+        !text.includes(
+          Buffer.from(`INSIDE_USER:${PASSWORD}`).toString('base64'),
+        ),
       );
     } finally {
       await client.close().catch(() => undefined);
@@ -159,7 +162,7 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
         name: 'GetClass',
         arguments: { class_name: 'ZCL_REFUSED' },
       })) as Result;
-      expect(result.isError).toBe(true);
+      assert.equal(result.isError, true);
       const payload = payloadOf(result);
       const words = render('connection', {
         problem: 'refused-after-renewal',
@@ -168,14 +171,14 @@ describe('an auth failure inside a handler reaches the client in the connectionâ
       // adt-clients 33 rejects with the refusal as it came: the chain's
       // answer, in the connection's own fixed words and hint; nothing of the
       // server's, and not dressed as SAP's answer.
-      expect(payload.error).toBe('authentication_failed');
-      expect(payload.kind).toBe('connection');
-      expect(payload.message).toBe(words.reason);
-      expect(payload.hint).toBe(words.hint);
-      expect(payload.origin).toBeUndefined();
+      assert.equal(payload.error, 'authentication_failed');
+      assert.equal(payload.kind, 'connection');
+      assert.equal(payload.message, words.reason);
+      assert.equal(payload.hint, words.hint);
+      assert.equal(payload.origin, undefined);
 
       await client.callTool({ name: 'CaptureConnection', arguments: {} });
-      expect(seen).toBe(connection);
+      assert.equal(seen, connection);
     } finally {
       await client.close().catch(() => undefined);
       await server.close?.();

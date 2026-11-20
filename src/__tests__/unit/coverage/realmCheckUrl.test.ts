@@ -11,31 +11,42 @@
 const realmChecked: string[] = [];
 let stubRealmCheck = false;
 
-jest.mock('../../integration/helpers/realmCheck', () => {
-  const actual = jest.requireActual('../../integration/helpers/realmCheck');
-  return {
-    ...actual,
-    realmCheck: jest.fn((...args: unknown[]) => {
-      const [, url] = args;
-      if (typeof url === 'string') realmChecked.push(url);
-      return stubRealmCheck ? Promise.resolve() : actual.realmCheck(...args);
-    }),
-  };
-});
-
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { format, isDeepStrictEqual } from 'node:util';
 import { AuthBrokerFactory } from '../../../../server-runtime/src/stdio/auth/brokerFactory';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
+import { assertRejects, assertThrows } from '../../helpers/assertions';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import { setUpLiveRun } from '../../integration/globalSetup';
+import * as realmCheckModule from '../../integration/helpers/realmCheck';
 import {
   parseRealmCheckUrls,
   realmCheckUrlMissingWords,
 } from '../../integration/helpers/realmCheck';
 
-jest.setTimeout(60_000);
+// The real check, read before it is replaced.
+const realRealmCheck = realmCheckModule.realmCheck;
+/**
+ * realmCheck replaced on the module that defines it (the live run's setup
+ * reads it at call time): it records the URL it is asked about and runs the
+ * real check unless a case stubs it. Every case
+ * restores every mock after it, so it is replaced before each.
+ */
+function recordRealmChecks(): void {
+  mock.method(
+    realmCheckModule,
+    'realmCheck',
+    (...args: Parameters<typeof realRealmCheck>) => {
+      const [, url] = args;
+      if (typeof url === 'string') realmChecked.push(url);
+      return stubRealmCheck ? Promise.resolve() : realRealmCheck(...args);
+    },
+  );
+}
 
 const REPO = repositoryRoot(__dirname);
 const SAVED = [
@@ -57,6 +68,7 @@ beforeEach(async () => {
   delete process.env.SAP_URL;
   realmChecked.length = 0;
   stubRealmCheck = false;
+  recordRealmChecks();
   stand = await adtStandIn();
   dir = fs.mkdtempSync(path.join(os.tmpdir(), 'realm-check-url-'));
   fs.mkdirSync(path.join(dir, 'sessions'));
@@ -67,7 +79,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   await stand.close();
   fs.rmSync(dir, { recursive: true, force: true });
   for (const key of SAVED) {
@@ -117,11 +129,11 @@ const run = () => setUpLiveRun({ rootDir: REPO, named: [] });
 describe("globalSetup's realm check by the destination's wire", () => {
   it('RFC with environment.realm_check_url: the check runs against it', async () => {
     configure(RFC_SESSION, [`realm_check_url: ${JSON.stringify(stand.url)}`]);
-    await expect(run()).rejects.toThrow('realm');
-    expect(realmChecked).toEqual([stand.url]);
-    expect(stand.requests).toHaveLength(1);
-    expect(stand.requests[0]?.url).toContain('/sap/bc/adt/discovery');
-    expect(stand.requests[0]?.authorization).toBeUndefined();
+    await assertRejects(run(), 'realm');
+    assert.deepStrictEqual(realmChecked, [stand.url]);
+    assert.equal(stand.requests.length, 1);
+    assert.ok(stand.requests[0]?.url.includes('/sap/bc/adt/discovery'));
+    assert.equal(stand.requests[0]?.authorization, undefined);
   });
 
   it('RFC: the setting is checked even where the session also states a SAP_URL', async () => {
@@ -129,17 +141,18 @@ describe("globalSetup's realm check by the destination's wire", () => {
       [...RFC_SESSION, 'SAP_URL=https://sentinel.example.test'],
       [`realm_check_url: ${JSON.stringify(stand.url)}`],
     );
-    await expect(run()).rejects.toThrow('realm');
-    expect(realmChecked).toEqual([stand.url]);
+    await assertRejects(run(), 'realm');
+    assert.deepStrictEqual(realmChecked, [stand.url]);
   });
 
   it('RFC without it: refused naming the setting, nothing sent', async () => {
     configure(RFC_SESSION, []);
-    await expect(run()).rejects.toThrow(
+    await assertRejects(
+      run(),
       realmCheckUrlMissingWords('environment.realm_check_url'),
     );
-    expect(realmChecked).toEqual([]);
-    expect(stand.requests).toEqual([]);
+    assert.deepStrictEqual(realmChecked, []);
+    assert.deepStrictEqual(stand.requests, []);
   });
 
   it("HTTP: the session's SAP_URL is checked, the setting not read", async () => {
@@ -153,23 +166,30 @@ describe("globalSetup's realm check by the destination's wire", () => {
       ],
       ['realm_check_url: "https://other.example.test"'],
     );
-    await expect(run()).rejects.toThrow('realm');
-    expect(realmChecked).toEqual([stand.url]);
-    expect(stand.requests).toHaveLength(1);
+    await assertRejects(run(), 'realm');
+    assert.deepStrictEqual(realmChecked, [stand.url]);
+    assert.equal(stand.requests.length, 1);
   });
 
-  it('RFC with a realm-check URL reaches the factory, which reads the stated address', async () => {
+  it('RFC with a realm-check URL reaches the factory, which reads the stated address', async (t) => {
     stubRealmCheck = true;
     configure(RFC_SESSION, [`realm_check_url: ${JSON.stringify(stand.url)}`]);
-    const settingsFor = jest.spyOn(AuthBrokerFactory.prototype, 'settingsFor');
+    const settingsFor = t.mock.method(
+      AuthBrokerFactory.prototype,
+      'settingsFor',
+    );
     // Stopped before any logon: no RFC connection is opened.
-    jest
-      .spyOn(AuthBrokerFactory.prototype, 'getProvider')
-      .mockRejectedValue(new Error('stopped before the logon'));
+    t.mock.method(AuthBrokerFactory.prototype, 'getProvider', async () => {
+      throw new Error('stopped before the logon');
+    });
     await run();
-    expect(realmChecked).toEqual([stand.url]);
-    expect(settingsFor).toHaveBeenCalledWith('STAND');
-    await expect(settingsFor.mock.results[0]?.value).resolves.toEqual({
+    assert.deepStrictEqual(realmChecked, [stand.url]);
+    assert.ok(
+      settingsFor.mock.calls.some((c) =>
+        isDeepStrictEqual(c.arguments, ['STAND']),
+      ),
+    );
+    assert.deepStrictEqual(await settingsFor.mock.calls[0]?.result, {
       authType: 'basic',
       connectionType: 'rfc',
       client: '100',
@@ -177,41 +197,49 @@ describe("globalSetup's realm check by the destination's wire", () => {
       ashost: 'host.example.test',
       sysnr: '00',
     });
-    expect(stand.requests).toEqual([]);
+    assert.deepStrictEqual(stand.requests, []);
   });
 });
 
 describe('MCP_LIVE_REALM_CHECK_URLS: whitespace-separated absolute http(s) URLs', () => {
   it('a URL with a port is one entry (the path delimiter splits nothing)', () => {
-    expect(parseRealmCheckUrls('https://saphost.example:44300')).toEqual([
-      'https://saphost.example:44300',
-    ]);
+    assert.deepStrictEqual(
+      parseRealmCheckUrls('https://saphost.example:44300'),
+      ['https://saphost.example:44300'],
+    );
   });
 
   it('two entries, in order; surrounding and repeated whitespace dropped', () => {
-    expect(
+    assert.deepStrictEqual(
       parseRealmCheckUrls(
         '  https://one.example.test:44300 \n\t http://two.example.test:8000  ',
       ),
-    ).toEqual([
-      'https://one.example.test:44300',
-      'http://two.example.test:8000',
-    ]);
+      ['https://one.example.test:44300', 'http://two.example.test:8000'],
+    );
   });
 
   it('none stated: no entry', () => {
-    expect(parseRealmCheckUrls(undefined)).toEqual([]);
-    expect(parseRealmCheckUrls('   ')).toEqual([]);
+    assert.deepStrictEqual(parseRealmCheckUrls(undefined), []);
+    assert.deepStrictEqual(parseRealmCheckUrls('   '), []);
   });
 
-  it.each(['saphost.example', 'https', 'ftp://saphost.example', '//saphost'])(
-    'a non-URL entry (%s) is refused by its position, never its value',
-    (entry) => {
-      expect(() =>
-        parseRealmCheckUrls(`https://one.example.test ${entry}`),
-      ).toThrow(
-        'MCP_LIVE_REALM_CHECK_URLS: entry 2 is not an absolute http(s) URL; nothing was sent',
-      );
-    },
-  );
+  for (const entry of [
+    'saphost.example',
+    'https',
+    'ftp://saphost.example',
+    '//saphost',
+  ]) {
+    it(
+      format(
+        'a non-URL entry (%s) is refused by its position, never its value',
+        entry,
+      ),
+      () => {
+        assertThrows(
+          () => parseRealmCheckUrls(`https://one.example.test ${entry}`),
+          'MCP_LIVE_REALM_CHECK_URLS: entry 2 is not an absolute http(s) URL; nothing was sent',
+        );
+      },
+    );
+  }
 });

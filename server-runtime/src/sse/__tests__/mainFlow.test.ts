@@ -5,6 +5,8 @@
  * The server enforces it; the client sent both at once.
  */
 
+import assert from 'node:assert/strict';
+import { it } from 'node:test';
 import type {
   HandlerContext,
   HandlerEntry,
@@ -12,8 +14,6 @@ import type {
 } from '@mcp-abap-adt/lib/handlers';
 import { HighLevelHandlersGroup } from '../../../../src/lib/handlers/groups/HighLevelHandlersGroup';
 import { sseStand, until } from './shutdown/harness';
-
-jest.setTimeout(30_000);
 
 const SOURCE = 'CLASS zcl_placeholder DEFINITION. ENDCLASS.';
 
@@ -63,7 +63,7 @@ it('two UpdateClass sent at once on one SSE connection: the second starts only a
     );
     await new Promise((resolve) => setTimeout(resolve, 100));
     // The first holds the flow: nothing of the second has reached SAP.
-    expect(s.indexOf(of('ZCL_SECOND'))).toBe(-1);
+    assert.equal(s.indexOf(of('ZCL_SECOND')), -1);
     held.release();
     await connection.answer(1);
     await connection.answer(2);
@@ -74,8 +74,8 @@ it('two UpdateClass sent at once on one SSE connection: the second starts only a
       if (r.url.includes('_action=UNLOCK') && of('ZCL_FIRST')(r.url))
         firstUnlock = i;
     });
-    expect(firstUnlock).toBeGreaterThanOrEqual(0);
-    expect(s.indexOf(of('ZCL_SECOND'))).toBeGreaterThan(firstUnlock);
+    assert.ok(firstUnlock >= 0);
+    assert.ok(s.indexOf(of('ZCL_SECOND')) > firstUnlock);
   } finally {
     await s.close();
   }

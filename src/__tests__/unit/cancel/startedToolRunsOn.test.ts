@@ -1,4 +1,7 @@
+import assert from 'node:assert/strict';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import * as z from 'zod';
+import { assertMatchObject } from '../../helpers/assertions';
 /**
  * A started tool runs to its end: a tool call cannot be cancelled. A
  * client's MCP cancel sent while the tool's first request is on the wire
@@ -54,8 +57,6 @@ import {
   toolRequests,
 } from '../stateful/harness';
 
-jest.setTimeout(30_000);
-
 async function until(done: () => boolean, limitMs = 10_000): Promise<void> {
   const end = Date.now() + limitMs;
   while (!done()) {
@@ -95,11 +96,11 @@ const SOURCE = `define service ${SERVICE_DEFINITION} { expose ZI_X; }`;
 let previousType: string | undefined;
 beforeEach(() => {
   previousType = process.env.SAP_SYSTEM_TYPE;
-  jest.spyOn(process.stderr, 'write').mockImplementation(() => true);
-  jest.spyOn(console, 'error').mockImplementation(() => {});
+  mock.method(process.stderr, 'write', () => true);
+  mock.method(console, 'error', () => {});
 });
 afterEach(() => {
-  jest.restoreAllMocks();
+  mock.restoreAll();
   if (previousType === undefined) delete process.env.SAP_SYSTEM_TYPE;
   else process.env.SAP_SYSTEM_TYPE = previousType;
 });
@@ -127,13 +128,14 @@ it('UpdateServiceDefinition (activate: true) cancelled after its LOCK answered: 
       .catch(() => 'the client stopped waiting');
     await held.arrived;
     cancel.abort('the user cancelled');
-    expect(await call).toBe('the client stopped waiting');
+    assert.equal(await call, 'the client stopped waiting');
     await pause();
     // A live call, its signal not aborted.
-    expect(activeTools().map((t) => t.name)).toEqual([
-      'UpdateServiceDefinition',
-    ]);
-    expect(activeTools()[0]?.signal.aborted).toBe(false);
+    assert.deepStrictEqual(
+      activeTools().map((t) => t.name),
+      ['UpdateServiceDefinition'],
+    );
+    assert.equal(activeTools()[0]?.signal.aborted, false);
 
     held.release();
     await until(() => activeTools().length === 0);
@@ -147,22 +149,25 @@ it('UpdateServiceDefinition (activate: true) cancelled after its LOCK answered: 
         r.url.includes(SERVICE_DEFINITION.toLowerCase()) &&
         r.url.includes('/source/main'),
     );
-    expect({
-      lock: of(isLock).length,
-      update: update.length,
-      unlock: of(isUnlock).length,
-      activation: of(isActivation).length,
-      log: shown(sent),
-    }).toMatchObject({ lock: 1, update: 1, unlock: 1, activation: 1 });
+    assertMatchObject(
+      {
+        lock: of(isLock).length,
+        update: update.length,
+        unlock: of(isUnlock).length,
+        activation: of(isActivation).length,
+        log: shown(sent),
+      },
+      { lock: 1, update: 1, unlock: 1, activation: 1 },
+    );
     const at = (match: (r: (typeof sent)[number]) => boolean) =>
       sent.findIndex(match);
-    expect(at(isLock)).toBeLessThan(sent.indexOf(update[0] as never));
-    expect(sent.indexOf(update[0] as never)).toBeLessThan(at(isUnlock));
-    expect(at(isUnlock)).toBeLessThan(at(isActivation));
+    assert.ok(at(isLock) < sent.indexOf(update[0] as never));
+    assert.ok(sent.indexOf(update[0] as never) < at(isUnlock));
+    assert.ok(at(isUnlock) < at(isActivation));
     // The handler ran once, to its end: its answer was produced.
-    expect(runs.started).toBe(1);
-    expect(runs.answers).toHaveLength(1);
-    expect((runs.answers[0] as { isError?: boolean }).isError).toBeFalsy();
+    assert.equal(runs.started, 1);
+    assert.equal(runs.answers.length, 1);
+    assert.ok(!(runs.answers[0] as { isError?: boolean }).isError);
   } finally {
     await s.close();
   }
@@ -204,7 +209,7 @@ describe('no request of a started tool carries a signal', () => {
     return at as never;
   }
 
-  it("stdio's kept connection: two calls in flight at once, every request of theirs without a signal, both on the one connection", async () => {
+  it("stdio's kept connection: two calls in flight at once, every request of theirs without a signal, both on the one connection", async (t) => {
     process.env.SAP_SYSTEM_TYPE = 'onprem';
     // The class stdio's connections are built of: its prototype's requests are watched.
     const owner = requestOwner(
@@ -215,13 +220,14 @@ describe('no request of a started tool carries a signal', () => {
     );
     const seen: Array<{ on: unknown; options: IAbapRequestOptions }> = [];
     const original = owner.makeAdtRequest;
-    jest.spyOn(owner, 'makeAdtRequest').mockImplementation(function (
-      this: unknown,
-      options: IAbapRequestOptions,
-    ) {
-      seen.push({ on: this, options });
-      return original.call(this, options);
-    });
+    t.mock.method(
+      owner,
+      'makeAdtRequest',
+      function (this: unknown, options: IAbapRequestOptions) {
+        seen.push({ on: this, options });
+        return original.call(this, options);
+      },
+    );
 
     // stdio's provider is the same for the process's life.
     const provider = new BasicAuthProvider('SIGNAL_USER', 'signal-password');
@@ -253,13 +259,16 @@ describe('no request of a started tool carries a signal', () => {
       const probes = seen.filter((s) =>
         String(s.options.url).startsWith(PROBE_PATH),
       );
-      expect(probes.map((s) => s.options.url)).toEqual([
-        `${PROBE_PATH}one`,
-        `${PROBE_PATH}two`,
-      ]);
-      expect(probes.filter((s) => 'signal' in s.options)).toEqual([]);
+      assert.deepStrictEqual(
+        probes.map((s) => s.options.url),
+        [`${PROBE_PATH}one`, `${PROBE_PATH}two`],
+      );
+      assert.deepStrictEqual(
+        probes.filter((s) => 'signal' in s.options),
+        [],
+      );
       // stdio keeps one connection: both calls ran on it.
-      expect(new Set(probes.map((s) => s.on)).size).toBe(1);
+      assert.equal(new Set(probes.map((s) => s.on)).size, 1);
     } finally {
       await client.close();
     }
@@ -344,19 +353,25 @@ describe('no request of a started tool carries a signal', () => {
       await until(() => activeTools().length === 0);
 
       // The tool was handed the consumer's connection, its own function on it.
-      expect(handed).toEqual([{ connection: true, request: true }]);
-      expect(received.some((o) => String(o.url).includes('_action=LOCK'))).toBe(
+      assert.deepStrictEqual(handed, [{ connection: true, request: true }]);
+      assert.equal(
+        received.some((o) => String(o.url).includes('_action=LOCK')),
         true,
       );
-      expect(
+      assert.equal(
         received.some((o) => String(o.url).includes('_action=UNLOCK')),
-      ).toBe(true);
-      expect(
+        true,
+      );
+      assert.equal(
         received.some((o) =>
           String(o.url).startsWith('/sap/bc/adt/activation'),
         ),
-      ).toBe(true);
-      expect(received.filter((o) => 'signal' in o)).toEqual([]);
+        true,
+      );
+      assert.deepStrictEqual(
+        received.filter((o) => 'signal' in o),
+        [],
+      );
     } finally {
       await client.close();
       await (connection as unknown as { disconnect(): Promise<void> })
@@ -374,7 +389,7 @@ describe('no request of a started tool carries a signal', () => {
           client: '100',
           connectionType: 'rfc',
         }),
-        disconnect: jest.fn(async () => {}),
+        disconnect: mock.fn(async () => {}),
       });
     const injected = rfc();
     const calls: unknown[][] = [];
@@ -420,11 +435,14 @@ describe('no request of a started tool carries a signal', () => {
           description: 'd',
         },
       });
-      expect(calls).toEqual([[]]);
-      expect(received.length).toBeGreaterThan(0);
-      expect(received.filter((o) => 'signal' in o)).toEqual([]);
-      expect(injected.requests).toHaveLength(0);
-      expect(made[0]?.disconnect).toHaveBeenCalledTimes(1);
+      assert.deepStrictEqual(calls, [[]]);
+      assert.ok(received.length > 0);
+      assert.deepStrictEqual(
+        received.filter((o) => 'signal' in o),
+        [],
+      );
+      assert.equal(injected.requests.length, 0);
+      assert.equal(made[0]?.disconnect.mock.callCount(), 1);
     } finally {
       await client.close();
     }

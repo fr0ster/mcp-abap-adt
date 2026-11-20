@@ -132,6 +132,58 @@ describe('UpdateTextElements', () => {
     assert.ok(!urls.some((url) => url.includes('/sap/bc/adt/activation')));
   });
 
+  it('answers the symbols SAP saved beside the refusal of the selections', async () => {
+    const { connection } = standIn('onprem', (request) =>
+      request.method === 'PUT' && request.url.includes('/source/selections')
+        ? refused(406, 'Length of text symbol P_TEST exceeds 30 characters')
+        : request.method === 'PUT'
+          ? { data: '@MaxLength:20\r\n001=First symbol' }
+          : undefined,
+    );
+    const result = await handleUpdateTextElements(
+      { connection, logger: undefined },
+      {
+        object_kind: 'program',
+        object_name: 'ZPROG_X',
+        symbols: [SYMBOL],
+        selections: [{ name: 'P_TEST', text: 'x'.repeat(31) }],
+        activate: false,
+      },
+    );
+    assert.equal(result.isError, true);
+    const answer = json(result);
+    assert.equal(answer.step, 'update selections');
+    assert.match(JSON.stringify(answer), /exceeds 30 characters/);
+    assert.deepEqual(answer.parts, [
+      { part: 'symbols', saved: '@MaxLength:20\r\n001=First symbol' },
+    ]);
+  });
+
+  it('answers each part SAP saved, and the activation beside them', async () => {
+    const { connection } = standIn('onprem', (request) =>
+      request.method === 'PUT' ? { data: `saved ${request.url}` } : undefined,
+    );
+    const result = await handleUpdateTextElements(
+      { connection, logger: undefined },
+      {
+        object_kind: 'program',
+        object_name: 'ZPROG_X',
+        symbols: [SYMBOL],
+        headings: { list_header: 'Header' },
+        activate: true,
+      },
+    );
+    assert.notEqual(result.isError, true);
+    const answer = json(result);
+    assert.deepEqual(
+      (answer.parts as { part: string }[]).map((entry) => entry.part),
+      ['symbols', 'headings'],
+    );
+    assert.ok(
+      'result' in answer || 'activated' in answer || 'messages' in answer,
+    );
+  });
+
   it('activates the object and its text elements in one request', async () => {
     const { connection } = standIn('onprem');
     const result = await handleUpdateTextElements(

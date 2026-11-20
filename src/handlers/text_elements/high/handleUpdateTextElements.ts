@@ -75,7 +75,7 @@ import {
 } from '../textElementsShared';
 
 const DESCRIPTION =
-  "Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers whether SAP saved each part and, when activated, whether SAP activated them, with its messages.";
+  "Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers parts: each part SAP saved with SAP's answer, the list saved; when activated, whether SAP activated them, with its messages, beside the parts. A part SAP refuses ends the writes: the answer is SAP's failure, beside the parts saved before it (inactive).";
 
 /** The object kinds UpdateTextElements writes on `variant`. */
 function kindsOn(variant: ProjectionVariant) {
@@ -268,6 +268,9 @@ type PartsArgs = Pick<
   | 'transport_request'
 >;
 
+/** A part SAP saved: the part and SAP's answer to its PUT, which echoes the list saved. */
+type SavedPart = { part: string; saved: string };
+
 /**
  * One PUT per part given, in order, under `lockHandle`; the first refused
  * ends the writes, its step naming the part (the parts before it are
@@ -278,6 +281,7 @@ async function writeParts(
   texts: TextsHandler,
   args: PartsArgs,
   lockHandle: string,
+  saved: SavedPart[] = [],
 ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> {
   let last: IAdtResponse<AdtReading<unknown>, IAdtError> = failed(
     {
@@ -302,6 +306,7 @@ async function writeParts(
       ),
     )();
     if (!last.ok) return last;
+    saved.push({ part: config.part, saved: last.getResult().value?.raw ?? '' });
   }
   return last;
 }
@@ -329,8 +334,24 @@ export async function handleUpdateTextElements(
   const detail = detailOf(args);
   const object = { objectKind: libraryKind(kind), objectName };
 
+  // Each part SAP saved, answered beside the call's outcome: a refused part
+  // leaves the parts before it saved (inactive), and an activation adds its
+  // messages beside them.
+  const saved: SavedPart[] = [];
   return answer(
-    { tool: 'UpdateTextElements', detail },
+    {
+      tool: 'UpdateTextElements',
+      detail,
+      beside: () =>
+        saved.length > 0
+          ? {
+              parts: saved.map(({ part, saved: text }) => ({
+                part,
+                saved: text,
+              })),
+            }
+          : undefined,
+    },
     async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
       const texts = textElementsClientOf(connection, logger).getTextElements(
         resultsFor(textElementsDocuments),
@@ -338,7 +359,7 @@ export async function handleUpdateTextElements(
 
       const written = await withLock(
         () => texts.lock(object, { analyse: analyseLock }),
-        (lockHandle) => writeParts(context, texts, args, lockHandle),
+        (lockHandle) => writeParts(context, texts, args, lockHandle, saved),
         (lockHandle) =>
           texts.unlock(object, lockHandle, { analyse: analyseException }),
         { type: 'TEXT', name: objectName },

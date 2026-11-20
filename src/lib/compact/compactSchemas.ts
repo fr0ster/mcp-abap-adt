@@ -2245,6 +2245,15 @@ function systemProperties(
           where_used: whereUsedTypeDescription(variant),
         }),
       ),
+    container: z
+      .enum(['program', 'function_group'])
+      .optional()
+      .describe(
+        said(actions, {
+          where_used:
+            'with object_type PROG/PX, required: whose text elements they are, program or function_group; taken by PROG/PX alone.',
+        }),
+      ),
     maxResults: z
       .number()
       .optional()
@@ -2275,6 +2284,12 @@ function systemProperties(
           object_type: z
             .string()
             .describe('Type of the ABAP object, as object_type takes it'),
+          container: z
+            .enum(['program', 'function_group'])
+            .optional()
+            .describe(
+              'With object_type PROG/PX, required: whose text elements they are, program or function_group.',
+            ),
         }),
       )
       .optional()
@@ -2445,6 +2460,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
     where_used: [
       'object_name',
       'object_type',
+      'container',
       'objects',
       'enable_all_types',
       'enable_only_types',
@@ -2529,7 +2545,7 @@ const ACTION_SENTENCES: Readonly<Record<SystemAction, string>> = {
   search_object:
     'search_object(object_name*, object_type, maxResults, detail) the objects whose name matches object_name, a name or a mask',
   where_used:
-    'where_used(object_name* and object_type*, or objects*; enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package',
+    'where_used(object_name* and object_type*, or objects*; container, enable_all_types, enable_only_types, disable_types) every object that uses, calls or references the object named, with its type and package',
   package_tree:
     'package_tree(package_name* or package_names*; include_subpackages, max_depth, include_descriptions, debug) the subpackages and objects of a package as a tree',
   transports:

@@ -330,8 +330,8 @@ export type TypeNameFor<P> = ServedCodeName<typeof TYPE_NAMES, P>;
  * `getWhereUsed` codes but `TABL/DTT` — SAP serves no where-used for a
  * table's technical settings: `usageReferences?uri=/sap/bc/adt/ddic/db/settings/{t}`
  * answered 200 "Where-Used List is not supported for Technical Table
- * Settings.", 0 results, on premise and on the cloud (measured 2026-11-19) —
- * and `PROG/PX`, which needs its container.
+ * Settings.", 0 results, on premise and on the cloud (measured 2026-11-19).
+ * `PROG/PX` names its container (`GetWhereUsed`'s `container`).
  */
 export type WhereUsedCode<V extends ProjectionVariant> = Exclude<
   AdtWhereUsedCode<V>,
@@ -339,10 +339,7 @@ export type WhereUsedCode<V extends ProjectionVariant> = Exclude<
 >;
 
 /** The where-used codes GetWhereUsed leaves out ({@link WhereUsedCode}). */
-const NOT_WHERE_USED = [
-  'TABL/DTT',
-  'PROG/PX',
-] as const satisfies readonly AdtTypeCode[];
+const NOT_WHERE_USED = ['TABL/DTT'] as const satisfies readonly AdtTypeCode[];
 
 /** GetWhereUsed's `object_type` codes. */
 export const WHERE_USED_CODES = projected<
@@ -378,6 +375,7 @@ export const WHERE_USED_CODES = projected<
     'ENHO/XHH',
     'ENHO/XHB',
     'ENHS/XSB',
+    'PROG/PX',
   ],
   cloud: [
     'CLAS/OC',
@@ -408,6 +406,7 @@ export const WHERE_USED_CODES = projected<
     'ENHO/XHH',
     'ENHO/XHB',
     'ENHS/XSB',
+    'PROG/PX',
   ],
 });
 
@@ -479,7 +478,7 @@ export function codesWithNames(
  * (`WHERE_USED_CODES`) or a name standing for one (`WHERE_USED_NAMES`).
  */
 export function whereUsedTypeDescription(variant: ProjectionVariant): string {
-  return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
+  return `Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): ${codesWithNames(WHERE_USED_CODES[variant], WHERE_USED_NAMES[variant])}. A function module is named as object_name says. PROG/PX is a program's or a function group's text elements; container says which. ${NAME_CASE_SENTENCE} ${MAIN_TYPE_SENTENCE}`;
 }
 
 // ---------------------------------------------------------------------------

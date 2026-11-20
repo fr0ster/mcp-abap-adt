@@ -43,6 +43,7 @@ import { TOOL_DEFINITION as GetTable } from '../../handlers/table/high/handleGet
 import { TOOL_DEFINITION as GetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
 import { TOOL_DEFINITION as GetTableSettings } from '../../handlers/table/readonly/handleGetTableSettings.js';
 import { TOOL_DEFINITION as GetTableType } from '../../handlers/table_type/high/handleGetTableType.js';
+import { TOOL_DEFINITION as GetTextElements } from '../../handlers/text_elements/readonly/handleGetTextElements.js';
 import { TOOL_DEFINITION as ListTransports } from '../../handlers/transport/readonly/handleListTransports.js';
 import { TOOL_DEFINITION as ReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
 import { TOOL_DEFINITION as GetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult.js';
@@ -79,6 +80,7 @@ export const READ_DEFINITIONS = {
   GetTable,
   GetTableSettings,
   GetTableType,
+  GetTextElements,
   ReadTransportObjects,
   GetCdsUnitTestResult,
   GetUnitTestResult,

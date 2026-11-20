@@ -82,6 +82,7 @@ const TOOL_NEEDS_BY_NAME = {
   GetDomain: { api: 'domain', operation: 'readMetadata' },
   GetTableType: { api: 'tableType', operation: 'readMetadata' },
   GetTableSettings: { api: 'tableSettings', operation: 'readMetadata' },
+  GetTextElements: { api: 'textElements', operation: 'read' },
   CreateTableType: { api: 'tableType', operation: 'create' },
   UpdateTableType: { api: 'tableType', operation: 'updateMetadata' },
   DeleteTableType: { api: 'tableType', operation: 'delete' },

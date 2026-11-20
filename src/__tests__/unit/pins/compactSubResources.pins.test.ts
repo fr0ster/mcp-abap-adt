@@ -558,6 +558,8 @@ describe('cloud', () => {
       ],
     },
     {
+      // The cloud offers no lock of a program's text elements (T11): the
+      // member is refused at the boundary, nothing sent.
       tool: 'HandlerLock',
       variant: 'cloud',
       stand: 'recording',
@@ -565,18 +567,8 @@ describe('cloud', () => {
         object_type: 'PROGRAM_TEXT_ELEMENTS',
         object_name: 'ZMCP_PIN_TP',
       },
-      answers: [{ status: 200, data: LOCK_SUCCESS_XML }],
-      expected: [
-        {
-          method: 'POST',
-          url: '/sap/bc/adt/textelements/programs/zmcp_pin_tp?_action=LOCK&accessMode=MODIFY',
-          headers: {
-            Accept:
-              'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9',
-          },
-          body: undefined,
-        },
-      ],
+      refusal: 'thrown',
+      expected: 'nothing-sent',
     },
     {
       tool: 'HandlerLock',
@@ -640,6 +632,8 @@ describe('cloud', () => {
       ],
     },
     {
+      // The cloud offers no lock of a program's text elements (T11): the
+      // member is refused at the boundary, nothing sent.
       tool: 'HandlerUnlock',
       variant: 'cloud',
       stand: 'recording',
@@ -648,15 +642,8 @@ describe('cloud', () => {
         object_name: 'ZMCP_PIN_TP',
         lock_handle: HANDLE,
       },
-      answers: [{ status: 200 }],
-      expected: [
-        {
-          method: 'POST',
-          url: '/sap/bc/adt/textelements/programs/zmcp_pin_tp?_action=UNLOCK&lockHandle=B92E65858E83454C783181344F429D4BFD8E395D',
-          headers: {},
-          body: undefined,
-        },
-      ],
+      refusal: 'thrown',
+      expected: 'nothing-sent',
     },
     {
       tool: 'HandlerUnlock',

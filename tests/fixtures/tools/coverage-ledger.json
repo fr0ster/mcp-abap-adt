@@ -956,10 +956,7 @@
   "HandlerLock#PROGRAM_TEXT_ELEMENTS": {
     "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
     "live": {
-      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
-      "cloud": {
-        "reason": "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is locked"
-      }
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts"
     }
   },
   "HandlerLock#TABLE_SETTINGS": {
@@ -1128,10 +1125,7 @@
   "HandlerUnlock#PROGRAM_TEXT_ELEMENTS": {
     "unit": "src/__tests__/unit/pins/compactSubResources.pins.test.ts",
     "live": {
-      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
-      "cloud": {
-        "reason": "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is locked"
-      }
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts"
     }
   },
   "HandlerUnlock#TABLE_SETTINGS": {

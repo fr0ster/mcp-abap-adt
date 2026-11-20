@@ -7,10 +7,12 @@
  * `target_type`) picks the member groups, under `members`, the keywords that
  * name each member, and its `semantic` may list the objects it works on as
  * items, each naming its member: `{ before, items: [{ member?, text }], join,
- * after }`, read `before` + the items (`A, B or C`, `join` `and` or `or`) +
- * `after`. Given the members a variant offers, a keyword grouped under
- * another member and an item naming one are left out; without, every
- * word stays.
+ * serial?, after }`, read `before` + the items (`A, B or C`, `join` `and` or
+ * `or`; with `serial: true` and three or more items, `A, B, or C`) +
+ * `after`. An item may name `members` (a non-empty list) in place of
+ * `member`, never both. Given the members a variant offers, a keyword
+ * grouped under another member, and an item none of whose members is
+ * offered, are left out; without, every word stays.
  */
 
 import { isJsonObject, type JsonValue, jsonAt } from '../json';
@@ -23,9 +25,10 @@ export interface ToolSearchText {
   readonly semantic: string;
 }
 
-/** One item of a semantic list: its words, and the member they name. */
+/** One item of a semantic list: its words, and the members they name. */
 interface SemanticItem {
-  readonly member: string | undefined;
+  /** Kept while any one of these is offered; every member when absent. */
+  readonly members: readonly string[] | undefined;
   readonly text: string;
 }
 
@@ -34,6 +37,8 @@ interface SemanticList {
   readonly before: string;
   readonly items: readonly SemanticItem[];
   readonly join: 'and' | 'or';
+  /** A comma before the joining word of three or more items. */
+  readonly serial: boolean;
   readonly after: string;
 }
 
@@ -76,6 +81,36 @@ export function membersOf(value: JsonValue | undefined): [string, JsonValue][] {
     : [];
 }
 
+/**
+ * The members an item names — its `member`, or its non-empty `members` —
+ * or the refusal; `undefined` when it names none.
+ */
+function itemMembers(
+  item: JsonValue,
+  at: string,
+): readonly string[] | undefined {
+  const member = jsonAt(item, 'member');
+  const members = jsonAt(item, 'members');
+  if (member !== undefined && members !== undefined) {
+    throw malformed(`${at}.members`);
+  }
+  if (members !== undefined) {
+    const named = strings(members, `${at}.members`);
+    if (named.length === 0) throw malformed(`${at}.members`);
+    return named;
+  }
+  if (member === undefined) return undefined;
+  if (typeof member !== 'string') throw malformed(`${at}.member`);
+  return [member];
+}
+
+/** `serial` as the file states it (absent is `false`), or the refusal. */
+function serialOf(value: JsonValue | undefined, where: string): boolean {
+  if (value === undefined) return false;
+  if (typeof value !== 'boolean') throw malformed(where);
+  return value;
+}
+
 /** A semantic list as the file states it, or the refusal. */
 function semanticList(value: JsonValue, where: string): SemanticList {
   const join = stringAt(value, 'join', where);
@@ -87,13 +122,13 @@ function semanticList(value: JsonValue, where: string): SemanticList {
     items: items.map((item, index) => {
       const at = `${where}.items[${index}]`;
       if (typeof item !== 'object' || item === null) throw malformed(at);
-      const member = jsonAt(item, 'member');
-      if (member !== undefined && typeof member !== 'string') {
-        throw malformed(`${at}.member`);
-      }
-      return { member, text: stringAt(item, 'text', at) };
+      return {
+        members: itemMembers(item, at),
+        text: stringAt(item, 'text', at),
+      };
     }),
     join,
+    serial: serialOf(jsonAt(value, 'serial'), `${where}.serial`),
     after: stringAt(value, 'after', where),
   };
 }
@@ -127,23 +162,28 @@ export function entryOf(name: string, value: JsonValue): SearchEntry {
   };
 }
 
-/** `A, B and C` / `A, B or C`. */
-function joined(texts: readonly string[], join: 'and' | 'or'): string {
+/** `A, B and C` / `A, B or C`; serial, `A, B, and C` (two: `A and B`). */
+function joined(
+  texts: readonly string[],
+  join: 'and' | 'or',
+  serial: boolean,
+): string {
   if (texts.length <= 1) return texts.join('');
-  return `${texts.slice(0, -1).join(', ')} ${join} ${texts[texts.length - 1]}`;
+  const last = serial && texts.length > 2 ? `, ${join} ` : ` ${join} `;
+  return `${texts.slice(0, -1).join(', ')}${last}${texts[texts.length - 1]}`;
 }
 
 /**
  * The texts of `entry` for a variant offering `offered` (every member when
  * absent): a keyword grouped under a member not offered, and a semantic item
- * naming one, left out.
+ * none of whose members is offered, left out.
  */
 export function rendered(
   entry: SearchEntry,
   offered: readonly string[] | undefined,
 ): ToolSearchText {
-  const keeps = (member: string | undefined) =>
-    member === undefined || offered === undefined || offered.includes(member);
+  const keeps = (member: string) =>
+    offered === undefined || offered.includes(member);
   const dropped = new Set(
     [...entry.members]
       .filter(([member]) => !keeps(member))
@@ -159,9 +199,14 @@ export function rendered(
         ? semantic
         : `${semantic.before}${joined(
             semantic.items
-              .filter((item) => keeps(item.member))
+              .filter(
+                (item) =>
+                  item.members === undefined ||
+                  item.members.some((member) => keeps(member)),
+              )
               .map((item) => item.text),
             semantic.join,
+            semantic.serial,
           )}${semantic.after}`,
   });
 }

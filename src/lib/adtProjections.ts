@@ -1404,22 +1404,42 @@ const LOCK_ONPREM = [
 /** HandlerLock's `object_type`. */
 export const COMPACT_LOCK = projected<
   ServedName<'onprem', typeof COMPACT_LOCK_ROUTES>,
-  ServedName<'cloud', typeof COMPACT_LOCK_ROUTES>
+  Exclude<
+    ServedName<'cloud', typeof COMPACT_LOCK_ROUTES>,
+    'PROGRAM_TEXT_ELEMENTS'
+  >
 >()({
   onprem: LOCK_ONPREM,
+  // ABAP Cloud holds no program of the customer's: its text elements are
+  // locked for no write (HandlerUpdate leaves them out there; the lock of a
+  // delivered program is refused, Code on the cloud: `RS_ACCESS_PERMISSION`,
+  // `RS_EXTEND_CHECK`, design fact T11).
   cloud: LOCK_ONPREM.filter(
-    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+    (member) =>
+      member !== 'PROGRAM' &&
+      member !== 'INCLUDE' &&
+      member !== 'PROGRAM_TEXT_ELEMENTS',
   ),
 });
 
 /** HandlerUnlock's `object_type`. */
 export const COMPACT_UNLOCK = projected<
   ServedName<'onprem', typeof COMPACT_UNLOCK_ROUTES>,
-  ServedName<'cloud', typeof COMPACT_UNLOCK_ROUTES>
+  Exclude<
+    ServedName<'cloud', typeof COMPACT_UNLOCK_ROUTES>,
+    'PROGRAM_TEXT_ELEMENTS'
+  >
 >()({
   onprem: LOCK_ONPREM,
+  // ABAP Cloud holds no program of the customer's: its text elements are
+  // locked for no write (HandlerUpdate leaves them out there; the lock of a
+  // delivered program is refused, Code on the cloud: `RS_ACCESS_PERMISSION`,
+  // `RS_EXTEND_CHECK`, design fact T11).
   cloud: LOCK_ONPREM.filter(
-    (member) => member !== 'PROGRAM' && member !== 'INCLUDE',
+    (member) =>
+      member !== 'PROGRAM' &&
+      member !== 'INCLUDE' &&
+      member !== 'PROGRAM_TEXT_ELEMENTS',
   ),
 });
 

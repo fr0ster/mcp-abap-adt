@@ -28,8 +28,14 @@ import {
   handleHandlerActivate,
   TOOL_DEFINITION,
 } from '../../../../compact-modify/src/handlers/handleHandlerActivate';
-import { handleHandlerLock } from '../../../../compact-modify/src/handlers/handleHandlerLock';
-import { handleHandlerUnlock } from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
+import {
+  TOOL_DEFINITION as HandlerLock,
+  handleHandlerLock,
+} from '../../../../compact-modify/src/handlers/handleHandlerLock';
+import {
+  TOOL_DEFINITION as HandlerUnlock,
+  handleHandlerUnlock,
+} from '../../../../compact-modify/src/handlers/handleHandlerUnlock';
 import {
   TOOL_DEFINITION as HandlerUpdate,
   handleHandlerUpdate,
@@ -326,6 +332,21 @@ describe("HandlerUpdate: the sub-resources under the caller's lock", () => {
 });
 
 describe('HandlerLock and HandlerUnlock: the sub-resources', () => {
+  it("offers a program's text elements on premise and not on the cloud, as HandlerUpdate", () => {
+    for (const definition of [HandlerLock, HandlerUnlock]) {
+      assert.ok(
+        (definition.variants.onprem.members ?? []).includes(
+          'PROGRAM_TEXT_ELEMENTS',
+        ),
+      );
+      assert.ok(
+        !(definition.variants.cloud.members ?? []).includes(
+          'PROGRAM_TEXT_ELEMENTS',
+        ),
+      );
+    }
+  });
+
   it("locks TABLE_SETTINGS with the settings' own lock", async () => {
     const { connection, requests } = system('onprem');
     const result = await handleHandlerLock(

@@ -389,6 +389,11 @@ const WALKS: Readonly<Record<string, Walk>> = {
     send: (context, value, variant) =>
       handleHandlerUpdate(context, {
         ...compactArguments(stated(HandlerUpdate, variant), value),
+        // A sub-resource writes what is named: a setting, or a part.
+        ...(value === 'TABLE_SETTINGS' ? { data_class: 'APPL1' } : {}),
+        ...(value.endsWith('_TEXT_ELEMENTS')
+          ? { symbols: [{ key: '001', text: 'Text', max_length: 10 }] }
+          : {}),
         lock_handle: 'LOCKHANDLE',
         object_type: value,
       }),

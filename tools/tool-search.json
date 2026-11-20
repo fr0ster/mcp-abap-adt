@@ -264,31 +264,15 @@
     "semantic": "Add a class, program or other object to a transport request or task, so it is transported with it."
   },
   "AmdpDebugCancel": {
-    "keywords": [
-      "AMDP",
-      "cancel",
-      "abort",
-      "SQLScript"
-    ],
+    "keywords": ["AMDP", "cancel", "abort", "SQLScript"],
     "semantic": "Cancel the execution of the AMDP method being debugged."
   },
   "AmdpDebugGetTable": {
-    "keywords": [
-      "AMDP table variable",
-      "rows",
-      "SQLScript",
-      "AMDP",
-      "debug"
-    ],
+    "keywords": ["AMDP table variable", "rows", "SQLScript", "AMDP", "debug"],
     "semantic": "Show the rows of a table variable where the AMDP method stopped."
   },
   "AmdpDebugSetBreakpoints": {
-    "keywords": [
-      "AMDP breakpoints",
-      "SQLScript",
-      "AMDP",
-      "breakpoint"
-    ],
+    "keywords": ["AMDP breakpoints", "SQLScript", "AMDP", "breakpoint"],
     "semantic": "Set the breakpoints of an AMDP debug session."
   },
   "AmdpDebugStart": {
@@ -303,32 +287,15 @@
     "semantic": "Start debugging an AMDP method (SQLScript) with breakpoints on its lines."
   },
   "AmdpDebugStep": {
-    "keywords": [
-      "AMDP",
-      "step",
-      "SQLScript",
-      "continue",
-      "debug"
-    ],
+    "keywords": ["AMDP", "step", "SQLScript", "continue", "debug"],
     "semantic": "Step the stopped AMDP method over a statement or to the next stop."
   },
   "AmdpDebugStop": {
-    "keywords": [
-      "AMDP",
-      "stop debugging",
-      "end session",
-      "SQLScript"
-    ],
+    "keywords": ["AMDP", "stop debugging", "end session", "SQLScript"],
     "semantic": "Stop debugging the AMDP method and end the AMDP debug session."
   },
   "AmdpDebugWait": {
-    "keywords": [
-      "AMDP",
-      "wait",
-      "AMDP events",
-      "SQLScript",
-      "debug"
-    ],
+    "keywords": ["AMDP", "wait", "AMDP events", "SQLScript", "debug"],
     "semantic": "Wait until the AMDP method being debugged stops at an SQLScript breakpoint."
   },
   "CheckBehaviorDefinition": {
@@ -965,21 +932,11 @@
     "semantic": "Start recording debugger calls at the stopped program to send them together."
   },
   "DebugBatchEnd": {
-    "keywords": [
-      "debugger batch",
-      "send debugger calls",
-      "batch",
-      "debugger"
-    ],
+    "keywords": ["debugger batch", "send debugger calls", "batch", "debugger"],
     "semantic": "Send the recorded debugger calls together and end the debugger batch."
   },
   "DebugCreateMemorySnapshot": {
-    "keywords": [
-      "memory snapshot",
-      "memory dump",
-      "debugger",
-      "memory"
-    ],
+    "keywords": ["memory snapshot", "memory dump", "debugger", "memory"],
     "semantic": "Write a memory snapshot of the program stopped in the debugger."
   },
   "DebugCreateWatchpoint": {
@@ -1001,30 +958,15 @@
     "semantic": "Remove one breakpoint from a debug session."
   },
   "DebugDeleteWatchpoint": {
-    "keywords": [
-      "delete watchpoint",
-      "remove watchpoint",
-      "debugger"
-    ],
+    "keywords": ["delete watchpoint", "remove watchpoint", "debugger"],
     "semantic": "Remove a watchpoint."
   },
   "DebugGetMemorySizes": {
-    "keywords": [
-      "memory usage",
-      "memory sizes",
-      "debugger",
-      "memory"
-    ],
+    "keywords": ["memory usage", "memory sizes", "debugger", "memory"],
     "semantic": "Show how much memory the program stopped in the debugger uses."
   },
   "DebugGetStack": {
-    "keywords": [
-      "call stack",
-      "stack",
-      "stack trace",
-      "debugger",
-      "frames"
-    ],
+    "keywords": ["call stack", "stack", "stack trace", "debugger", "frames"],
     "semantic": "Show the call stack of the program stopped in the debugger."
   },
   "DebugGetVariables": {
@@ -1039,19 +981,11 @@
     "semantic": "Show the values of variables of the program stopped in the debugger."
   },
   "DebugListBreakpoints": {
-    "keywords": [
-      "list breakpoints",
-      "breakpoints",
-      "debug"
-    ],
+    "keywords": ["list breakpoints", "breakpoints", "debug"],
     "semantic": "List the breakpoints of a debug session."
   },
   "DebugListWatchpoints": {
-    "keywords": [
-      "list watchpoints",
-      "watchpoints",
-      "debugger"
-    ],
+    "keywords": ["list watchpoints", "watchpoints", "debugger"],
     "semantic": "List the watchpoints of the program stopped in the debugger."
   },
   "DebugSetBreakpoints": {
@@ -1078,12 +1012,7 @@
     "semantic": "Switch debugger settings at the current stop: system debugging, update debugging, exception objects, background RFC."
   },
   "DebugSetStackPosition": {
-    "keywords": [
-      "stack frame",
-      "select frame",
-      "call stack",
-      "debugger"
-    ],
+    "keywords": ["stack frame", "select frame", "call stack", "debugger"],
     "semantic": "Select a frame of the call stack to read its variables."
   },
   "DebugSetVariable": {
@@ -1120,21 +1049,11 @@
     "semantic": "Step through the program stopped in the debugger: into, over, out of a call, or continue."
   },
   "DebugStepToLine": {
-    "keywords": [
-      "run to line",
-      "jump to line",
-      "goto line",
-      "debugger"
-    ],
+    "keywords": ["run to line", "jump to line", "goto line", "debugger"],
     "semantic": "Run or jump the program stopped in the debugger to a line."
   },
   "DebugStop": {
-    "keywords": [
-      "stop debugging",
-      "end debug session",
-      "debugger",
-      "release"
-    ],
+    "keywords": ["stop debugging", "end debug session", "debugger", "release"],
     "semantic": "Stop debugging: release the program, remove the breakpoints and end the debug session."
   },
   "DebugTakeOverListener": {
@@ -1149,12 +1068,7 @@
     "semantic": "Start debugging and take over from another debugger that listens for the same user."
   },
   "DebugTerminate": {
-    "keywords": [
-      "terminate",
-      "abort program",
-      "end debuggee",
-      "debugger"
-    ],
+    "keywords": ["terminate", "abort program", "end debuggee", "debugger"],
     "semantic": "Terminate the program stopped in the debugger."
   },
   "DebugWait": {
@@ -1324,19 +1238,11 @@
     "semantic": "Delete an existing ABAP interface from the system."
   },
   "DeleteLocalDefinitions": {
-    "keywords": [
-      "local definitions",
-      "clear definitions include",
-      "class"
-    ],
+    "keywords": ["local definitions", "clear definitions include", "class"],
     "semantic": "Clear the definitions include of a global class, so it holds no class-local definitions."
   },
   "DeleteLocalMacros": {
-    "keywords": [
-      "local macros",
-      "clear macros include",
-      "class"
-    ],
+    "keywords": ["local macros", "clear macros include", "class"],
     "semantic": "Clear the macros include of a global class, so it holds no DEFINE macros."
   },
   "DeleteLocalTestClass": {
@@ -2174,12 +2080,7 @@
     "semantic": "Read the class-local type and constant definitions of a global class, from its definitions include."
   },
   "GetLocalMacros": {
-    "keywords": [
-      "local macros",
-      "macros include",
-      "DEFINE",
-      "class"
-    ],
+    "keywords": ["local macros", "macros include", "DEFINE", "class"],
     "semantic": "Read the DEFINE macros that a global class declares in its macros include."
   },
   "GetLocalTestClass": {
@@ -2358,12 +2259,7 @@
     "semantic": "List what a class, interface, program or function group defines — its methods, attributes, types, events, forms or modules — with their visibility and the source lines each occupies."
   },
   "GetObjectStructure": {
-    "keywords": [
-      "object structure",
-      "ADT structure",
-      "tree",
-      "components"
-    ],
+    "keywords": ["object structure", "ADT structure", "tree", "components"],
     "semantic": "Show the structure of a repository object as a tree of its parts."
   },
   "GetObjectVersionDiff": {
@@ -2887,12 +2783,7 @@
     "semantic": "Show what a DDIC type is: a domain, data element, table type or structure with its technical type."
   },
   "GetUnitTestResult": {
-    "keywords": [
-      "unit test result",
-      "test run result",
-      "run id",
-      "ABAP Unit"
-    ],
+    "keywords": ["unit test result", "test run result", "run id", "ABAP Unit"],
     "semantic": "Read the result of an ABAP Unit test run that was still running when it started."
   },
   "GetWhereUsed": {
@@ -2947,80 +2838,33 @@
     ],
     "semantic": "Activate one object or several objects together after a change.",
     "members": {
-      "CLASS": [
-        "class"
-      ],
-      "PROGRAM": [
-        "program",
-        "report"
-      ],
-      "INTERFACE": [
-        "interface"
-      ],
-      "FUNCTION_GROUP": [
-        "function group"
-      ],
-      "TABLE": [
-        "table"
-      ],
-      "STRUCTURE": [
-        "structure"
-      ],
-      "DDL": [
-        "CDS view",
-        "DDL"
-      ],
-      "DOMAIN": [
-        "domain"
-      ],
-      "DATA_ELEMENT": [
-        "data element"
-      ],
-      "BEHAVIOR_DEFINITION": [
-        "behavior definition"
-      ],
-      "METADATA_EXTENSION": [
-        "metadata extension"
-      ],
-      "PACKAGE": [
-        "package"
-      ],
-      "SERVICE_DEFINITION": [
-        "service definition"
-      ],
-      "SERVICE_BINDING": [
-        "service binding"
-      ],
-      "FUNCTION_MODULE": [
-        "function module",
-        "BAPI"
-      ]
+      "CLASS": ["class"],
+      "PROGRAM": ["program", "report"],
+      "INTERFACE": ["interface"],
+      "FUNCTION_GROUP": ["function group"],
+      "TABLE": ["table"],
+      "STRUCTURE": ["structure"],
+      "DDL": ["CDS view", "DDL"],
+      "DOMAIN": ["domain"],
+      "DATA_ELEMENT": ["data element"],
+      "BEHAVIOR_DEFINITION": ["behavior definition"],
+      "METADATA_EXTENSION": ["metadata extension"],
+      "PACKAGE": ["package"],
+      "SERVICE_DEFINITION": ["service definition"],
+      "SERVICE_BINDING": ["service binding"],
+      "FUNCTION_MODULE": ["function module", "BAPI"]
     }
   },
   "HandlerBackgroundRunDiscard": {
-    "keywords": [
-      "discard run",
-      "background run",
-      "clean up"
-    ],
+    "keywords": ["discard run", "background run", "clean up"],
     "semantic": "Discard the kept result of a finished background run."
   },
   "HandlerBackgroundRunGet": {
-    "keywords": [
-      "background run",
-      "run result",
-      "run status",
-      "run handle"
-    ],
+    "keywords": ["background run", "run result", "run status", "run handle"],
     "semantic": "Check one of my background runs and read its result when it has finished."
   },
   "HandlerBackgroundRunList": {
-    "keywords": [
-      "background runs",
-      "my runs",
-      "running",
-      "list runs"
-    ],
+    "keywords": ["background runs", "my runs", "running", "list runs"],
     "semantic": "List my background runs and whether each is still running."
   },
   "HandlerBatch": {
@@ -3100,48 +2944,19 @@
       "after": " and see its errors and warnings."
     },
     "members": {
-      "CLASS": [
-        "class"
-      ],
-      "PROGRAM": [
-        "program",
-        "report"
-      ],
-      "INTERFACE": [
-        "interface"
-      ],
-      "FUNCTION_GROUP": [
-        "function group"
-      ],
-      "FUNCTION_MODULE": [
-        "function module",
-        "BAPI"
-      ],
-      "TABLE": [
-        "table"
-      ],
-      "STRUCTURE": [
-        "structure"
-      ],
-      "DDL": [
-        "CDS view",
-        "DDL"
-      ],
-      "DOMAIN": [
-        "domain"
-      ],
-      "DATA_ELEMENT": [
-        "data element"
-      ],
-      "PACKAGE": [
-        "package"
-      ],
-      "BEHAVIOR_DEFINITION": [
-        "behavior definition"
-      ],
-      "METADATA_EXTENSION": [
-        "metadata extension"
-      ]
+      "CLASS": ["class"],
+      "PROGRAM": ["program", "report"],
+      "INTERFACE": ["interface"],
+      "FUNCTION_GROUP": ["function group"],
+      "FUNCTION_MODULE": ["function module", "BAPI"],
+      "TABLE": ["table"],
+      "STRUCTURE": ["structure"],
+      "DDL": ["CDS view", "DDL"],
+      "DOMAIN": ["domain"],
+      "DATA_ELEMENT": ["data element"],
+      "PACKAGE": ["package"],
+      "BEHAVIOR_DEFINITION": ["behavior definition"],
+      "METADATA_EXTENSION": ["metadata extension"]
     }
   },
   "HandlerCreate": {
@@ -3206,57 +3021,22 @@
       "after": "."
     },
     "members": {
-      "PACKAGE": [
-        "package"
-      ],
-      "DOMAIN": [
-        "domain"
-      ],
-      "DATA_ELEMENT": [
-        "data element"
-      ],
-      "TRANSPORT": [
-        "transport"
-      ],
-      "TABLE": [
-        "table"
-      ],
-      "STRUCTURE": [
-        "structure"
-      ],
-      "DDL": [
-        "CDS view",
-        "DDL"
-      ],
-      "SERVICE_DEFINITION": [
-        "service definition"
-      ],
-      "SERVICE_BINDING": [
-        "service binding"
-      ],
-      "CLASS": [
-        "class"
-      ],
-      "PROGRAM": [
-        "program",
-        "report"
-      ],
-      "INTERFACE": [
-        "interface"
-      ],
-      "FUNCTION_GROUP": [
-        "function group"
-      ],
-      "FUNCTION_MODULE": [
-        "function module",
-        "BAPI"
-      ],
-      "BEHAVIOR_DEFINITION": [
-        "behavior definition"
-      ],
-      "METADATA_EXTENSION": [
-        "metadata extension"
-      ]
+      "PACKAGE": ["package"],
+      "DOMAIN": ["domain"],
+      "DATA_ELEMENT": ["data element"],
+      "TRANSPORT": ["transport"],
+      "TABLE": ["table"],
+      "STRUCTURE": ["structure"],
+      "DDL": ["CDS view", "DDL"],
+      "SERVICE_DEFINITION": ["service definition"],
+      "SERVICE_BINDING": ["service binding"],
+      "CLASS": ["class"],
+      "PROGRAM": ["program", "report"],
+      "INTERFACE": ["interface"],
+      "FUNCTION_GROUP": ["function group"],
+      "FUNCTION_MODULE": ["function module", "BAPI"],
+      "BEHAVIOR_DEFINITION": ["behavior definition"],
+      "METADATA_EXTENSION": ["metadata extension"]
     }
   },
   "HandlerDebugBatch": {
@@ -3362,54 +3142,21 @@
       "after": "."
     },
     "members": {
-      "PACKAGE": [
-        "package"
-      ],
-      "DOMAIN": [
-        "domain"
-      ],
-      "DATA_ELEMENT": [
-        "data element"
-      ],
-      "TABLE": [
-        "table"
-      ],
-      "STRUCTURE": [
-        "structure"
-      ],
-      "DDL": [
-        "CDS view",
-        "DDL"
-      ],
-      "SERVICE_DEFINITION": [
-        "service definition"
-      ],
-      "SERVICE_BINDING": [
-        "service binding"
-      ],
-      "CLASS": [
-        "class"
-      ],
-      "PROGRAM": [
-        "program",
-        "report"
-      ],
-      "INTERFACE": [
-        "interface"
-      ],
-      "FUNCTION_GROUP": [
-        "function group"
-      ],
-      "FUNCTION_MODULE": [
-        "function module",
-        "BAPI"
-      ],
-      "BEHAVIOR_DEFINITION": [
-        "behavior definition"
-      ],
-      "METADATA_EXTENSION": [
-        "metadata extension"
-      ]
+      "PACKAGE": ["package"],
+      "DOMAIN": ["domain"],
+      "DATA_ELEMENT": ["data element"],
+      "TABLE": ["table"],
+      "STRUCTURE": ["structure"],
+      "DDL": ["CDS view", "DDL"],
+      "SERVICE_DEFINITION": ["service definition"],
+      "SERVICE_BINDING": ["service binding"],
+      "CLASS": ["class"],
+      "PROGRAM": ["program", "report"],
+      "INTERFACE": ["interface"],
+      "FUNCTION_GROUP": ["function group"],
+      "FUNCTION_MODULE": ["function module", "BAPI"],
+      "BEHAVIOR_DEFINITION": ["behavior definition"],
+      "METADATA_EXTENSION": ["metadata extension"]
     }
   },
   "HandlerDeletionCheck": {
@@ -3514,60 +3261,23 @@
       "after": "."
     },
     "members": {
-      "PACKAGE": [
-        "package"
-      ],
-      "DOMAIN": [
-        "domain"
-      ],
-      "DATA_ELEMENT": [
-        "data element"
-      ],
-      "TABLE": [
-        "table"
-      ],
-      "STRUCTURE": [
-        "structure"
-      ],
-      "DDL": [
-        "CDS view",
-        "DDL"
-      ],
-      "SERVICE_DEFINITION": [
-        "service definition"
-      ],
-      "SERVICE_BINDING": [
-        "service binding"
-      ],
-      "CLASS": [
-        "class"
-      ],
-      "PROGRAM": [
-        "program",
-        "report"
-      ],
-      "INCLUDE": [
-        "include"
-      ],
-      "INTERFACE": [
-        "interface"
-      ],
-      "FUNCTION_GROUP": [
-        "function group"
-      ],
-      "FUNCTION_MODULE": [
-        "function module",
-        "BAPI"
-      ],
-      "BEHAVIOR_DEFINITION": [
-        "behavior definition"
-      ],
-      "METADATA_EXTENSION": [
-        "metadata extension"
-      ],
-      "TRANSPORT": [
-        "transport"
-      ]
+      "PACKAGE": ["package"],
+      "DOMAIN": ["domain"],
+      "DATA_ELEMENT": ["data element"],
+      "TABLE": ["table"],
+      "STRUCTURE": ["structure"],
+      "DDL": ["CDS view", "DDL"],
+      "SERVICE_DEFINITION": ["service definition"],
+      "SERVICE_BINDING": ["service binding"],
+      "CLASS": ["class"],
+      "PROGRAM": ["program", "report"],
+      "INCLUDE": ["include"],
+      "INTERFACE": ["interface"],
+      "FUNCTION_GROUP": ["function group"],
+      "FUNCTION_MODULE": ["function module", "BAPI"],
+      "BEHAVIOR_DEFINITION": ["behavior definition"],
+      "METADATA_EXTENSION": ["metadata extension"],
+      "TRANSPORT": ["transport"]
     }
   },
   "HandlerGetData": {
@@ -3605,13 +3315,7 @@
     "semantic": "Log off a leftover SAP session so that its locks are released."
   },
   "HandlerLock": {
-    "keywords": [
-      "lock",
-      "lock object",
-      "lock handle",
-      "enqueue",
-      "edit lock"
-    ],
+    "keywords": ["lock", "lock object", "lock handle", "enqueue", "edit lock"],
     "semantic": "Lock an object before changing it and get its lock handle."
   },
   "HandlerProfileList": {
@@ -3650,13 +3354,8 @@
       "after": " and see its output, optionally under the profiler or in the background."
     },
     "members": {
-      "CLASS": [
-        "run class"
-      ],
-      "PROGRAM": [
-        "run program",
-        "execute report"
-      ]
+      "CLASS": ["run class"],
+      "PROGRAM": ["run program", "execute report"]
     }
   },
   "HandlerProfileSchedule": {
@@ -3770,12 +3469,7 @@
     "semantic": "Check whether an ABAP Unit test run has finished."
   },
   "HandlerUnlock": {
-    "keywords": [
-      "unlock",
-      "release lock",
-      "lock handle",
-      "dequeue"
-    ],
+    "keywords": ["unlock", "release lock", "lock handle", "dequeue"],
     "semantic": "Release the lock on an object after changing it."
   },
   "HandlerUpdate": {
@@ -3831,54 +3525,21 @@
       "after": "."
     },
     "members": {
-      "PACKAGE": [
-        "package"
-      ],
-      "DOMAIN": [
-        "domain"
-      ],
-      "DATA_ELEMENT": [
-        "data element"
-      ],
-      "FUNCTION_GROUP": [
-        "function group"
-      ],
-      "TABLE": [
-        "table"
-      ],
-      "STRUCTURE": [
-        "structure"
-      ],
-      "DDL": [
-        "CDS view",
-        "DDL"
-      ],
-      "SERVICE_DEFINITION": [
-        "service definition"
-      ],
-      "CLASS": [
-        "class"
-      ],
-      "PROGRAM": [
-        "program",
-        "report"
-      ],
-      "INTERFACE": [
-        "interface"
-      ],
-      "FUNCTION_MODULE": [
-        "function module",
-        "BAPI"
-      ],
-      "BEHAVIOR_DEFINITION": [
-        "behavior definition"
-      ],
-      "METADATA_EXTENSION": [
-        "metadata extension"
-      ],
-      "SERVICE_BINDING": [
-        "service binding"
-      ]
+      "PACKAGE": ["package"],
+      "DOMAIN": ["domain"],
+      "DATA_ELEMENT": ["data element"],
+      "FUNCTION_GROUP": ["function group"],
+      "TABLE": ["table"],
+      "STRUCTURE": ["structure"],
+      "DDL": ["CDS view", "DDL"],
+      "SERVICE_DEFINITION": ["service definition"],
+      "CLASS": ["class"],
+      "PROGRAM": ["program", "report"],
+      "INTERFACE": ["interface"],
+      "FUNCTION_MODULE": ["function module", "BAPI"],
+      "BEHAVIOR_DEFINITION": ["behavior definition"],
+      "METADATA_EXTENSION": ["metadata extension"],
+      "SERVICE_BINDING": ["service binding"]
     }
   },
   "HandlerValidate": {
@@ -4583,12 +4244,7 @@
     "semantic": "Write the class-local type and constant definitions of a global class, in its definitions include."
   },
   "UpdateLocalMacros": {
-    "keywords": [
-      "local macros",
-      "macros include",
-      "DEFINE",
-      "class"
-    ],
+    "keywords": ["local macros", "macros include", "DEFINE", "class"],
     "semantic": "Write the DEFINE macros that a global class declares in its macros include."
   },
   "UpdateLocalTestClass": {

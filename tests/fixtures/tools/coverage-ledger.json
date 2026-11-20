@@ -624,6 +624,13 @@
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
     }
   },
+  "GetTableSettings": {
+    "unit": "src/__tests__/unit/pins/tableSettingsTextElements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
+    }
+  },
   "GetTableTypeVersions": {
     "unit": "src/__tests__/unit/pins/versions.pins.test.ts",
     "live": {
@@ -650,6 +657,13 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/versions.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/versions.live.test.ts"
+    }
+  },
+  "GetTextElements": {
+    "unit": "src/__tests__/unit/pins/tableSettingsTextElements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
     }
   },
   "GetTransaction": {
@@ -1105,6 +1119,20 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/serviceBinding.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/serviceBinding.live.test.ts"
+    }
+  },
+  "UpdateTableSettings": {
+    "unit": "src/__tests__/unit/pins/tableSettingsTextElements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/tableSettings.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
+    }
+  },
+  "UpdateTextElements": {
+    "unit": "src/__tests__/unit/pins/tableSettingsTextElements.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
     }
   },
   "ValidateServiceBinding": {

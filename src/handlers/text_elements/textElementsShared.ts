@@ -43,3 +43,53 @@ export const OBJECT_NAME_FIELD = z
   .string()
   .min(1, 'object_name is required')
   .describe('Name of the program, function group or class.');
+
+export const SYMBOLS = z
+  .array(
+    z.object({
+      key: z.string().describe('Symbol key, up to 3 characters.'),
+      text: z.string().describe('Symbol text, up to its maximum length.'),
+      max_length: z
+        .number()
+        .int()
+        .positive()
+        .describe('Maximum length of the text.'),
+    }),
+  )
+  .optional()
+  .describe('The text symbols: the whole list; symbols left out are deleted.');
+
+export const SELECTIONS = z
+  .array(
+    z.object({
+      name: z
+        .string()
+        .describe(
+          'Name of the parameter or select-option, up to 8 characters.',
+        ),
+      text: z.string().describe('Selection text, up to 30 characters.'),
+      ddic_reference: z
+        .boolean()
+        .optional()
+        .describe(
+          "true takes the dictionary field's label as the text, in place of text.",
+        ),
+    }),
+  )
+  .optional()
+  .describe(
+    'The selection texts (programs and function groups): the whole list; texts left out are deleted.',
+  );
+
+export const HEADINGS = z
+  .object({
+    list_header: z.string().optional(),
+    column_header_1: z.string().optional(),
+    column_header_2: z.string().optional(),
+    column_header_3: z.string().optional(),
+    column_header_4: z.string().optional(),
+  })
+  .optional()
+  .describe(
+    'The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.',
+  );

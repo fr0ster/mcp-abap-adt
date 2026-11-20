@@ -65,64 +65,17 @@ import { cleanupOf, failed } from '../../../lib/strategies/stepResponse';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { byVariant } from '../../../lib/variantDefinition';
 import {
+  HEADINGS,
   libraryKind,
   OBJECT_KINDS,
   OBJECT_NAME_FIELD,
   type ObjectKind,
+  SELECTIONS,
+  SYMBOLS,
 } from '../textElementsShared';
 
 const DESCRIPTION =
   "Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers whether SAP saved each part and, when activated, whether SAP activated them, with its messages.";
-
-export const SYMBOLS = z
-  .array(
-    z.object({
-      key: z.string().describe('Symbol key, up to 3 characters.'),
-      text: z.string().describe('Symbol text, up to its maximum length.'),
-      max_length: z
-        .number()
-        .int()
-        .positive()
-        .describe('Maximum length of the text.'),
-    }),
-  )
-  .optional()
-  .describe('The text symbols: the whole list; symbols left out are deleted.');
-
-export const SELECTIONS = z
-  .array(
-    z.object({
-      name: z
-        .string()
-        .describe(
-          'Name of the parameter or select-option, up to 8 characters.',
-        ),
-      text: z.string().describe('Selection text, up to 30 characters.'),
-      ddic_reference: z
-        .boolean()
-        .optional()
-        .describe(
-          "true takes the dictionary field's label as the text, in place of text.",
-        ),
-    }),
-  )
-  .optional()
-  .describe(
-    'The selection texts (programs and function groups): the whole list; texts left out are deleted.',
-  );
-
-export const HEADINGS = z
-  .object({
-    list_header: z.string().optional(),
-    column_header_1: z.string().optional(),
-    column_header_2: z.string().optional(),
-    column_header_3: z.string().optional(),
-    column_header_4: z.string().optional(),
-  })
-  .optional()
-  .describe(
-    'The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.',
-  );
 
 /** The object kinds UpdateTextElements writes on `variant`. */
 function kindsOn(variant: ProjectionVariant) {

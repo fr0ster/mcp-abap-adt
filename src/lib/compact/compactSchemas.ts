@@ -2,12 +2,12 @@ import * as z from 'zod';
 import {
   AMDP_FLAG,
   SETTINGS_SHAPE,
-} from '../../handlers/table/high/handleUpdateTableSettings';
+} from '../../handlers/table/tableSettingsFields';
 import {
   HEADINGS,
   SELECTIONS,
   SYMBOLS,
-} from '../../handlers/text_elements/high/handleUpdateTextElements';
+} from '../../handlers/text_elements/textElementsShared';
 import { RUN_TARGET_OPTIONAL } from '../../handlers/unit_test/shared/runTarget';
 import {
   type ACTIVATION_CODES,
@@ -460,6 +460,10 @@ const BACKGROUND_READS = [
   'BEHAVIOR_IMPLEMENTATION',
   'METADATA_EXTENSION',
   'TRANSPORT',
+  'TABLE_SETTINGS',
+  'PROGRAM_TEXT_ELEMENTS',
+  'FUNCTION_GROUP_TEXT_ELEMENTS',
+  'CLASS_TEXT_ELEMENTS',
 ] as const;
 
 /** HandlerGet's `background`, listing the read types left. */

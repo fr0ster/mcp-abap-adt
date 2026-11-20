@@ -2687,7 +2687,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatetextelements-high-level-text-elements"></a>
 #### UpdateTextElements (High-Level / Text Elements)
-**Description:** Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers whether SAP saved each part and, when activated, whether SAP activated them, with its messages.
+**Description:** Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers parts: each part SAP saved with SAP's answer, the list saved; when activated, whether SAP activated them, with its messages, beside the parts. A part SAP refuses ends the writes: the answer is SAP's failure, beside the parts saved before it (inactive).
 
 **Source:** `src/handlers/text_elements/high/handleUpdateTextElements.ts`
 

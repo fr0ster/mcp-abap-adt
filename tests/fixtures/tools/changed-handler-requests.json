@@ -7311,19 +7311,6 @@
     ],
     "ended": "answered"
   },
-  "cloud HandlerLock PROGRAM_TEXT_ELEMENTS": {
-    "requests": [
-      {
-        "method": "POST",
-        "url": "/sap/bc/adt/textelements/programs/obj_a?_action=LOCK&accessMode=MODIFY",
-        "data": null,
-        "headers": {
-          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
-        }
-      }
-    ],
-    "ended": "answered"
-  },
   "cloud HandlerLock FUNCTION_GROUP_TEXT_ELEMENTS": {
     "requests": [
       {
@@ -7522,17 +7509,6 @@
       {
         "method": "POST",
         "url": "/sap/bc/adt/ddic/db/settings/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
-        "data": null,
-        "headers": {}
-      }
-    ],
-    "ended": "answered"
-  },
-  "cloud HandlerUnlock PROGRAM_TEXT_ELEMENTS": {
-    "requests": [
-      {
-        "method": "POST",
-        "url": "/sap/bc/adt/textelements/programs/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
         "data": null,
         "headers": {}
       }

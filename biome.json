@@ -11,11 +11,7 @@
       "!!**/dist",
       "!src/__tests__/unit/sources/__fixtures__",
       "!src/__tests__/unit/coverage/__fixtures__/coverage",
-      "!scripts/**/__fixtures__",
-      "!tests/fixtures/tools/listed-schemas.json",
-      "!tests/fixtures/tools/variant-surface.json",
-      "!tests/fixtures/tools/http-surface.json",
-      "!tests/fixtures/tools/stdio-sse-surface.json"
+      "!scripts/**/__fixtures__"
     ]
   },
   "formatter": {
@@ -55,6 +51,14 @@
     }
   },
   "overrides": [
+    {
+      "includes": [
+        "tests/fixtures/tools/listed-schemas.json",
+        "tests/fixtures/tools/variant-surface.json",
+        "tests/fixtures/tools/stdio-sse-surface.json"
+      ],
+      "formatter": { "enabled": false }
+    },
     {
       "includes": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts"],
       "linter": {

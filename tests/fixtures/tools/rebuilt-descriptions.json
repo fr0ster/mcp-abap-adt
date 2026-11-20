@@ -260,7 +260,7 @@
     "inputSchema.objects.description": "where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.",
     "inputSchema.objects[].object_name.description": "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",
     "inputSchema.objects[].object_type.description": "Type of the ABAP object, as object_type takes it",
-    "inputSchema.objects[].container.description": "With object_type PROG/PX, required: whose text elements they are, program or function_group.",
+    "inputSchema.objects[].container.description": "With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.",
     "inputSchema.objects[].container.enum": [
       "program",
       "function_group"

@@ -2288,7 +2288,7 @@ function systemProperties(
             .enum(['program', 'function_group'])
             .optional()
             .describe(
-              'With object_type PROG/PX, required: whose text elements they are, program or function_group.',
+              'With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.',
             ),
         }),
       )

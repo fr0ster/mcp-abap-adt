@@ -1,0 +1,19 @@
+# Table technical settings and text elements — implementation report
+
+One line per lettered task of the plan: commits, tests, mutations, concerns.
+
+- **(b) install and breaks** — commits `0ca7f6bc4` (adt-clients 46.1.0, adt-strategies 0.26.0, interfaces-adt 30.1.0; registry-only lockfile), `d8030d5a8` (projections: TABLE_CODES takes the three codes; where-used excludes TABL/DTT and, until (f), PROG/PX; activation excludes the text elements until (e); where-used keeps the container), `316cc4810` + `5fd753054` (a main type never stands for a sub-resource code), `8e0273302` (the 46.x library's stateful sites listed; two table-type cases reject a 403 as the shipped connection does), `eb3d737a1` (style). Tests: `unit/mainTypeSubResources.test.ts`, `typecheck/adtBoundary.typecheck.ts`. Mutations: drop the sub-resource skip at run time (3 cases red) and in the types (2 typecheck errors). Concerns: the design's "stateful-sites.json unchanged" was wrong, since it lists the library's sites too; the table-type message assertions held only because the stand-in resolved a 403, which adt-clients 46.x reads as a failure (`143dcbde`).
+- **(c) the four tools** — commits `88a268dec` (GetTableSettings, client contract `getTableSettings`), `dfc1ac47e` (UpdateTableSettings), `d23315c59` (live: settings), `e7edfdc5d` (`textElementsClientOf`: one more member on `IServerAdtClient` hit TS2590), `980bfa8d4` (GetTextElements), `56cfc97d3` (UpdateTextElements, the three parts' header pairs), `356818253` (live: text elements, the `text_elements_cloud_read` config section), `e45f8e179` (functional descriptions), `86cd424dc` (live calls in statement form), `20f07f643` (surfaces, counts, fixtures), `a77253c18` (tool pages), `c57cb2826` (left-out codes as typed lists), `9b571a587` (counts; the search word "add" left the text write, it outranked AddTransportObject).
+  - Tests: `unit/tableSettings/{get,update}TableSettings.test.ts`, `unit/textElements/{get,update}TextElements.test.ts` (node:test, listed); live `coverage/tableSettings.live.test.ts`, `coverage/textElements.live.test.ts` (not run here).
+  - Mutations, each watched red and reverted:
+    - GetTableSettings: on-prem strategy on the cloud, a dropped field, the dropped AMDP flag, the version ignored.
+    - UpdateTableSettings: activating after a refused unlock, the unlock skipped, activation judged by `analyseException`, the cloud flag ignored, the area-key rule dropped, the no-setting rule dropped, the write without a lock. A four-attribute translation does not compile, so the type refuses it.
+    - GetTextElements: the function group addressed as a program, three parts for a class, the per-kind rule dropped, the ddic flag dropped, the version ignored.
+    - UpdateTextElements: the unlock skipped after a refused part, activating after a refused unlock, the pair built for a class, `program` on the cloud, the no-part rule dropped, the class rule dropped, the part order changed.
+  - Concerns:
+    1. **The coverage ledger has no rows for the four tools.** A ledger row needs a `pinCases` unit file, and on this branch `pinCases` is Jest-bound (`jest.useFakeTimers`). New tests are node:test only, so the pins wait for #361, whose `pinCases` runs on node:test. Until then the ledger guard refuses the new tools' `liveCall`s as orphans.
+    2. The plan's live file paths became `coverage/*.live.test.ts`, the coverage pattern.
+    3. A write answers terse `SUCCESS` (`terseWrite`) rather than the saved list; detail `full`/`raw` gives SAP's answer.
+    4. A selection text's name is answered without SAP's padding to eight.
+- **Status at this push** — (b) and (c) are done; (d) compact, (e) ActivateObjects, (f) the where-used container and (g) docs and CHANGELOG are not started. Local CI on `9b571a587`: lint, build and test:check are green. In `npm test` only the coverage ledger guard is red, because the four tools have no ledger row (concern 1 under (c)).
+

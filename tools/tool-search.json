@@ -4851,5 +4851,87 @@
       "ATC results"
     ],
     "semantic": "Read across the system by action: search source code in packages, find objects by name or pattern, list where an object is used, show a package tree, list transport requests, and read ATC findings and results."
+  },
+  "GetTableSettings": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "technical settings",
+      "settings",
+      "data class",
+      "size category",
+      "buffering",
+      "logging",
+      "storage type",
+      "database table",
+      "table",
+      "TABL"
+    ],
+    "semantic": "Show the technical settings of an ABAP database table: data class, size category, buffering and logging."
+  },
+  "UpdateTableSettings": {
+    "keywords": [
+      "update",
+      "change",
+      "set",
+      "write",
+      "save",
+      "technical settings",
+      "settings",
+      "data class",
+      "size category",
+      "buffering",
+      "logging",
+      "AMDP",
+      "database table",
+      "table",
+      "TABL"
+    ],
+    "semantic": "Set the technical settings of an ABAP database table, such as its data class, size category, buffering or logging."
+  },
+  "GetTextElements": {
+    "keywords": [
+      "read",
+      "show",
+      "display",
+      "get",
+      "view",
+      "text elements",
+      "text symbols",
+      "selection texts",
+      "list headings",
+      "column headings",
+      "texts",
+      "program",
+      "report",
+      "function group",
+      "class"
+    ],
+    "semantic": "Show the text elements of an ABAP program, function group or class: its text symbols, selection texts and list headings."
+  },
+  "UpdateTextElements": {
+    "keywords": [
+      "update",
+      "change",
+      "edit",
+      "write",
+      "save",
+      "add",
+      "delete",
+      "text elements",
+      "text symbols",
+      "selection texts",
+      "list headings",
+      "column headings",
+      "texts",
+      "program",
+      "report",
+      "function group",
+      "class"
+    ],
+    "semantic": "Change the text elements of an ABAP program, function group or class: add, edit or delete its text symbols, selection texts and headings."
   }
 }

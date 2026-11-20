@@ -921,7 +921,9 @@ describe.each<TransportName>(['stdio', 'http', 'sse'])(
       // 24.0.0: GetObjectDraft, one more; batch mode is the compact sets'
       // (BatchBegin, BatchEnd, BatchAnswers left), three fewer; the debugger
       // batch reads its answers with DebugBatchAnswers, one more.
-      expect(full.tools).toHaveLength(onStdio ? 267 : onHttp ? 267 : 265);
+      // A table's technical settings and the text elements: their reads and
+      // writes, four more.
+      expect(full.tools).toHaveLength(onStdio ? 271 : onHttp ? 271 : 269);
       expect(full.tools).toEqual(
         expect.arrayContaining([
           'DebugStartListener',

@@ -556,6 +556,12 @@ describe('the MCP tool surface', () => {
    * **23.1.0: `ListATCResults` and `GetATCResult` arrived** (on premise and
    * cloud): the stored ATC results, `GET …/atc/results` and one by its
    * Display ID. Every other row was checked unchanged.
+   *
+   * **A table's technical settings and the text elements arrived**
+   * (`GetTableSettings`, `UpdateTableSettings`, `GetTextElements`,
+   * `UpdateTextElements`, on premise and cloud): adt-clients 46.1.0's
+   * `getTableSettings()` and `getTextElements()`. Every other row was checked
+   * unchanged.
    */
   it('adds tools only deliberately', () => {
     const arrived = [...read(current).keys()].filter(

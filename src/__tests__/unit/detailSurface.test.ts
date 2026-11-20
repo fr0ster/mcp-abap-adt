@@ -270,7 +270,9 @@ const JSON_ANSWERING: readonly string[] = [
   'UpdateServiceDefinition',
   'UpdateStructure',
   'UpdateTable',
+  'UpdateTableSettings',
   'UpdateTableType',
+  'UpdateTextElements',
   'UpdateUnitTest',
   'ValidateServiceBinding',
 ];

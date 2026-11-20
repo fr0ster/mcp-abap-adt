@@ -88,8 +88,9 @@ describe("lib's read and write handler barrels", () => {
     // absent one in the callee's words before the call (62). The six reads
     // compact `HandlerSystem` calls beside SearchObject and GetWhereUsed:
     // SearchSource, GetPackageTree, ListTransports and the three ATC reads
-    // (68).
-    expect(read).toHaveLength(68);
+    // (68). A table's technical settings and the text elements: their reads
+    // (70).
+    expect(read).toHaveLength(70);
     // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
     // added the eight unit-test tools per carrier (report, function group,
     // module, CDS run) and the compact facade's run start. 19.0.0 deleted the
@@ -118,8 +119,9 @@ describe("lib's read and write handler barrels", () => {
     // the server writes program includes: `CreateInclude` (94),
     // `UpdateInclude` and `UpdateIncludeMetadata` (96),
     // `DeleteInclude` (97); and table types: `CreateTableType` (98),
-    // `UpdateTableType` (99), `DeleteTableType` (100).
-    expect(write).toHaveLength(100);
+    // `UpdateTableType` (99), `DeleteTableType` (100). A table's technical
+    // settings and the text elements: their writes (102).
+    expect(write).toHaveLength(102);
   });
 
   it('share not one symbol', () => {

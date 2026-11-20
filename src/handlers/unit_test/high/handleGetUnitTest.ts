@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start is not yet recorded) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by RunUnitTest.'),
     ...DETAIL_SHAPE,

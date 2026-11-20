@@ -530,7 +530,7 @@ describe('the schema', () => {
       'a run SAP answers running is read again by long polling',
     );
     expect(GetUnitTestResult_Tool.description).toContain(
-      'a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start is not yet recorded) answers the run_id and that status at once',
+      'a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once',
     );
   });
 });

@@ -7589,7 +7589,7 @@
   },
   "cloud HandlerActivate object_adt_type PROG/I": {
     "requests": [],
-    "ended": "error answer: objects[].type \"PROG/I\" is not one of: CLAS/OC, INTF/OI, FUGR/F, FUGR/FF, FUGR/I, DEVC/K, DDLS/DF, VIEW/DV, TABL/DT, TABL/DS, TTYP/DA, DOMA/DD, DTEL/DE, DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB, class, function, functiongroup, interface, package, table, structure, domain, dataelement, view, functionmodule, function_module, func, stru, dbview, CLAS/OC, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension; nothing was sent"
+    "ended": "error answer: objects[].type \"PROG/I\" is not one of: CLAS/OC, INTF/OI, FUGR/F, FUGR/FF, FUGR/I, DEVC/K, DDLS/DF, VIEW/DV, TABL/DT, TABL/DS, TTYP/DA, DOMA/DD, DTEL/DE, DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB, PROG/PX, CLAS/OCX, class, function, functiongroup, interface, package, table, structure, domain, dataelement, view, functionmodule, function_module, func, stru, dbview, CLAS/OC, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension; nothing was sent"
   },
   "cloud HandlerGetData object_name": {
     "requests": [

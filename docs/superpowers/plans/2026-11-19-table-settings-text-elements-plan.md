@@ -35,6 +35,13 @@ interfaces-adt 30.1.0, adt-clients 46.1.0 and adt-strategies 0.26.0.
    with its `/textelements/classes/{c}` uri is matched to the `CLAS/OCX` reference. Mutation: match
    by name.
 8. **c3, c4 and (d):** function groups are served on cloud. No skip of their own.
+9. **(d): compact HandlerUpdate writes under the caller's lock; the four types gain
+   HandlerLock/HandlerUnlock (owner's compact rule).** HandlerGet reads each type in one operation;
+   HandlerUpdate writes under `lock_handle` (`patchMetadata` for `TABLE_SETTINGS`, one PUT per part
+   for the text elements), with no lock, unlock or activation inside; HandlerLock/HandlerUnlock (and
+   LockObjectLow/UnlockObjectLow, which they route through) take the TABT and TEXT locks. Every new
+   route gets pins, ledger rows, live calls and batch entries. The live suites run lock → update →
+   unlock → activate through compact on both systems.
 
 ## Global constraints
 

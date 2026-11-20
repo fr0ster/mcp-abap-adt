@@ -44,6 +44,12 @@ Read from the published contract: interfaces-adt 30.1.0 (`IAdtTableSettings.ts`)
     by its uri, with no name matching and no description line of its own.
 11. **The `patchMetadata` contract is the published one** (below). It replaces the earlier "to be
     built there" sketch.
+12. **Compact HandlerUpdate writes under the caller's lock; the four types gain HandlerLock/HandlerUnlock
+    (owner's compact rule).** One operation per compact handler: HandlerGet reads, HandlerUpdate writes
+    under the caller's `lock_handle` (`TABLE_SETTINGS`: `patchMetadata`; the text elements: one PUT per
+    part given), HandlerLock/HandlerUnlock take the TABT settings lock and the TEXT lock, HandlerActivate
+    activates the text elements, and a table's settings are activated with the `TABLE`. The table
+    below ("→ UpdateTableSettings", "→ UpdateTextElements") is replaced by this.
 
 ## Intent
 

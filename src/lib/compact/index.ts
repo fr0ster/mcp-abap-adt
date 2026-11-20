@@ -128,6 +128,7 @@ export {
   textsOf,
   when,
 } from './memberTexts.js';
+export { isSourceless, SOURCELESS } from './sourceless.js';
 export {
   LEGACY_SUB_RESOURCE_WORDS,
   subResourceRefusal,

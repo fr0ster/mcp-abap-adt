@@ -199,6 +199,12 @@ describe('the coverage ledger guard', () => {
     // where no live case runs, for the reason stated.
     assertEquals(reasonRows(readJson(LEDGER)), [
       {
+        key: 'HandlerActivate#PROGRAM_TEXT_ELEMENTS',
+        kind: 'cloud',
+        reason:
+          "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is left inactive to activate",
+      },
+      {
         key: 'HandlerTransportMoveObjects',
         kind: 'cloud',
         reason:

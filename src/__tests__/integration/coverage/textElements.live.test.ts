@@ -199,6 +199,13 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
     );
     await textElementsWhereUsed(N.program, 'program');
     await twoSymbols('program', N.program);
+    // The text elements alone activate (measured on premise, §10 steps
+    // 51–52).
+    const activated = await liveCall('HandlerActivate', {
+      object_type: 'PROGRAM_TEXT_ELEMENTS',
+      object_name: N.program,
+    });
+    succeeded('HandlerActivate PROGRAM_TEXT_ELEMENTS', activated);
     const written = await liveCall('UpdateTextElements', {
       object_kind: 'program',
       object_name: N.program,
@@ -251,6 +258,12 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
     );
     await textElementsWhereUsed(N.group, 'function_group');
     await twoSymbols('function_group', N.group);
+    // The text elements alone activate (measured on premise, §12.1).
+    const activated = await liveCall('HandlerActivate', {
+      object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+      object_name: N.group,
+    });
+    succeeded('HandlerActivate FUNCTION_GROUP_TEXT_ELEMENTS', activated);
     const written = await liveCall('UpdateTextElements', {
       object_kind: 'function_group',
       object_name: N.group,
@@ -291,6 +304,13 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       ]),
     );
     await twoSymbols('class', N.class);
+    // The class's text elements alone: unverified until this run (the pair
+    // is measured, §8, §14).
+    const activated = await liveCall('HandlerActivate', {
+      object_type: 'CLASS_TEXT_ELEMENTS',
+      object_name: N.class,
+    });
+    succeeded('HandlerActivate CLASS_TEXT_ELEMENTS', activated);
     const written = await liveCall('UpdateTextElements', {
       object_kind: 'class',
       object_name: N.class,

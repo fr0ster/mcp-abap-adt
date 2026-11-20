@@ -680,6 +680,29 @@
       "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
     }
   },
+  "HandlerActivate#CLASS_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/textElementsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerActivate#FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/textElementsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/textElements.live.test.ts"
+    }
+  },
+  "HandlerActivate#PROGRAM_TEXT_ELEMENTS": {
+    "unit": "src/__tests__/unit/pins/textElementsCompact.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/textElements.live.test.ts",
+      "cloud": {
+        "reason": "ABAP Cloud holds no program of the customer's: its text elements are never written there, so none is left inactive to activate"
+      }
+    }
+  },
   "HandlerBackgroundRunDiscard": {
     "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
     "live": {

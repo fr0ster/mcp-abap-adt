@@ -2819,6 +2819,162 @@
     "requests": [],
     "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TRANSPORT. It offers: source. at part"
   },
+  "onprem HandlerGet TABLE_SETTINGS part=source": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/db/settings/tab_a?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.table.settings.v2+xml"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTableSettings\",\n  \"detail\": \"terse\",\n  \"message\": \"the answer is no ts:tableSettings document\"\n}"
+  },
+  "onprem HandlerGet TABLE_SETTINGS part=metadata": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "onprem HandlerGet TABLE_SETTINGS part=urls": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "onprem HandlerGet TABLE_SETTINGS part=contents": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "onprem HandlerGet TABLE_SETTINGS part=main_programs": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "onprem HandlerGet TABLE_SETTINGS part=draft": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "onprem HandlerGet PROGRAM_TEXT_ELEMENTS part=source": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/programs/prog_a/source/symbols?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.symbols.v1"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/programs/prog_a/source/selections?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.selections.v1"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/programs/prog_a/source/headings?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.headings.v1"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTextElements\",\n  \"detail\": \"terse\",\n  \"message\": \"text elements headings: 0 line(s), not 6\"\n}"
+  },
+  "onprem HandlerGet PROGRAM_TEXT_ELEMENTS part=metadata": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet PROGRAM_TEXT_ELEMENTS part=urls": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet PROGRAM_TEXT_ELEMENTS part=contents": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet PROGRAM_TEXT_ELEMENTS part=main_programs": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet PROGRAM_TEXT_ELEMENTS part=draft": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=source": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/functiongroups/fugr_a/source/symbols?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.symbols.v1"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/functiongroups/fugr_a/source/selections?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.selections.v1"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/functiongroups/fugr_a/source/headings?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.headings.v1"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTextElements\",\n  \"detail\": \"terse\",\n  \"message\": \"text elements headings: 0 line(s), not 6\"\n}"
+  },
+  "onprem HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=metadata": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=urls": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=contents": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=main_programs": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=draft": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet CLASS_TEXT_ELEMENTS part=source": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/classes/clas_a/source/symbols?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.symbols.v1"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerGet CLASS_TEXT_ELEMENTS part=metadata": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet CLASS_TEXT_ELEMENTS part=urls": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet CLASS_TEXT_ELEMENTS part=contents": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet CLASS_TEXT_ELEMENTS part=main_programs": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "onprem HandlerGet CLASS_TEXT_ELEMENTS part=draft": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
   "onprem HandlerLock CLASS": {
     "requests": [
       {
@@ -3055,6 +3211,58 @@
     ],
     "ended": "answered"
   },
+  "onprem HandlerLock TABLE_SETTINGS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/ddic/db/settings/obj_a?_action=LOCK&accessMode=MODIFY",
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerLock PROGRAM_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/programs/obj_a?_action=LOCK&accessMode=MODIFY",
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerLock FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/functiongroups/obj_a?_action=LOCK&accessMode=MODIFY",
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerLock CLASS_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/classes/obj_a?_action=LOCK&accessMode=MODIFY",
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
   "onprem HandlerUnlock CLASS": {
     "requests": [
       {
@@ -3239,6 +3447,50 @@
       {
         "method": "POST",
         "url": "/sap/bc/adt/businessservices/bindings/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerUnlock TABLE_SETTINGS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/ddic/db/settings/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+        "data": null,
+        "headers": {}
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerUnlock PROGRAM_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/programs/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+        "data": null,
+        "headers": {}
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerUnlock FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/functiongroups/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+        "data": null,
+        "headers": {}
+      }
+    ],
+    "ended": "answered"
+  },
+  "onprem HandlerUnlock CLASS_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/classes/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+        "data": null,
+        "headers": {}
       }
     ],
     "ended": "answered"
@@ -3589,6 +3841,22 @@
       }
     ],
     "ended": "answered"
+  },
+  "onprem HandlerUpdate TABLE_SETTINGS": {
+    "requests": [],
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"HandlerUpdate\",\n  \"detail\": \"terse\",\n  \"message\": \"Name at least one setting to write\"\n}"
+  },
+  "onprem HandlerUpdate PROGRAM_TEXT_ELEMENTS": {
+    "requests": [],
+    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
+  },
+  "onprem HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "requests": [],
+    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
+  },
+  "onprem HandlerUpdate CLASS_TEXT_ELEMENTS": {
+    "requests": [],
+    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
   },
   "onprem HandlerValidate CLASS": {
     "requests": [
@@ -6664,6 +6932,162 @@
     "requests": [],
     "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TRANSPORT. It offers: source. at part"
   },
+  "cloud HandlerGet TABLE_SETTINGS part=source": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/ddic/db/settings/tab_a?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.table.settings.v2+xml"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTableSettings\",\n  \"detail\": \"terse\",\n  \"message\": \"the answer is no ts:tableSettings document\"\n}"
+  },
+  "cloud HandlerGet TABLE_SETTINGS part=metadata": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "cloud HandlerGet TABLE_SETTINGS part=urls": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "cloud HandlerGet TABLE_SETTINGS part=contents": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "cloud HandlerGet TABLE_SETTINGS part=main_programs": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
+  },
+  "cloud HandlerGet TABLE_SETTINGS part=draft": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TABLE_SETTINGS. It offers: source. at part"
+  },
+  "cloud HandlerGet PROGRAM_TEXT_ELEMENTS part=source": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/programs/prog_a/source/symbols?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.symbols.v1"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/programs/prog_a/source/selections?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.selections.v1"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/programs/prog_a/source/headings?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.headings.v1"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTextElements\",\n  \"detail\": \"terse\",\n  \"message\": \"text elements headings: 0 line(s), not 6\"\n}"
+  },
+  "cloud HandlerGet PROGRAM_TEXT_ELEMENTS part=metadata": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet PROGRAM_TEXT_ELEMENTS part=urls": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet PROGRAM_TEXT_ELEMENTS part=contents": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet PROGRAM_TEXT_ELEMENTS part=main_programs": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
+  },
+  "cloud HandlerGet PROGRAM_TEXT_ELEMENTS part=draft": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=PROGRAM_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=source": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/functiongroups/fugr_a/source/symbols?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.symbols.v1"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/functiongroups/fugr_a/source/selections?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.selections.v1"
+        }
+      },
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/functiongroups/fugr_a/source/headings?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.headings.v1"
+        }
+      }
+    ],
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTextElements\",\n  \"detail\": \"terse\",\n  \"message\": \"text elements headings: 0 line(s), not 6\"\n}"
+  },
+  "cloud HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=metadata": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=urls": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=contents": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=main_programs": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
+  },
+  "cloud HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=draft": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=FUNCTION_GROUP_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet CLASS_TEXT_ELEMENTS part=source": {
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/textelements/classes/clas_a/source/symbols?version=active",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.textelements.symbols.v1"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "cloud HandlerGet CLASS_TEXT_ELEMENTS part=metadata": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet CLASS_TEXT_ELEMENTS part=urls": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet CLASS_TEXT_ELEMENTS part=contents": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
+  "cloud HandlerGet CLASS_TEXT_ELEMENTS part=main_programs": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: Invalid option: expected one of \"source\"|\"metadata\"|\"urls\"|\"contents\"|\"object_structure\"|\"node_structure\"|\"virtual_folders\"|\"activation_status\"|\"activation_results\"|\"draft\" at part"
+  },
+  "cloud HandlerGet CLASS_TEXT_ELEMENTS part=draft": {
+    "requests": [],
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=CLASS_TEXT_ELEMENTS. It offers: source. at part"
+  },
   "cloud HandlerLock CLASS": {
     "requests": [
       {
@@ -6874,6 +7298,58 @@
     ],
     "ended": "answered"
   },
+  "cloud HandlerLock TABLE_SETTINGS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/ddic/db/settings/obj_a?_action=LOCK&accessMode=MODIFY",
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "cloud HandlerLock PROGRAM_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/programs/obj_a?_action=LOCK&accessMode=MODIFY",
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "cloud HandlerLock FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/functiongroups/obj_a?_action=LOCK&accessMode=MODIFY",
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
+  "cloud HandlerLock CLASS_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/classes/obj_a?_action=LOCK&accessMode=MODIFY",
+        "data": null,
+        "headers": {
+          "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+        }
+      }
+    ],
+    "ended": "answered"
+  },
   "cloud HandlerUnlock CLASS": {
     "requests": [
       {
@@ -7037,6 +7513,50 @@
       {
         "method": "POST",
         "url": "/sap/bc/adt/businessservices/bindings/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER"
+      }
+    ],
+    "ended": "answered"
+  },
+  "cloud HandlerUnlock TABLE_SETTINGS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/ddic/db/settings/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+        "data": null,
+        "headers": {}
+      }
+    ],
+    "ended": "answered"
+  },
+  "cloud HandlerUnlock PROGRAM_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/programs/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+        "data": null,
+        "headers": {}
+      }
+    ],
+    "ended": "answered"
+  },
+  "cloud HandlerUnlock FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/functiongroups/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+        "data": null,
+        "headers": {}
+      }
+    ],
+    "ended": "answered"
+  },
+  "cloud HandlerUnlock CLASS_TEXT_ELEMENTS": {
+    "requests": [
+      {
+        "method": "POST",
+        "url": "/sap/bc/adt/textelements/classes/obj_a?_action=UNLOCK&lockHandle=LOCK_HANDLE_PLACEHOLDER",
+        "data": null,
+        "headers": {}
       }
     ],
     "ended": "answered"
@@ -7359,6 +7879,18 @@
       }
     ],
     "ended": "answered"
+  },
+  "cloud HandlerUpdate TABLE_SETTINGS": {
+    "requests": [],
+    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"HandlerUpdate\",\n  \"detail\": \"terse\",\n  \"message\": \"Name at least one setting to write\"\n}"
+  },
+  "cloud HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS": {
+    "requests": [],
+    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
+  },
+  "cloud HandlerUpdate CLASS_TEXT_ELEMENTS": {
+    "requests": [],
+    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
   },
   "cloud HandlerValidate CLASS": {
     "requests": [

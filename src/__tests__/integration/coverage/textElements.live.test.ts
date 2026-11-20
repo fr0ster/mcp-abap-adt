@@ -13,6 +13,11 @@
  *   the pair activated and left the inactive list, §8, §12.1, §13, §14).
  * - A part is written whole: an entry left out is deleted (Code, both
  *   systems: `lcl_textpool->save`; measured on both, §8, §14).
+ * - `ActivateObjects` takes the text elements as references: the program
+ *   alone leaves `PROG/PX` in `still_inactive` (measured on premise, §8),
+ *   and each object named with its text elements activates both (§8, §10,
+ *   §12.1, §13.4). Where-used of a program's and of a function group's text
+ *   elements is answered (`PROG/PX` with its `container`, §11, §13.6).
  *
  * The cleanup deletes every object and reads it absent.
  */
@@ -110,6 +115,36 @@ async function twoSymbols(kind: string, name: string): Promise<void> {
   ]);
 }
 
+/** `ActivateObjects` of `objects`, answered as SAP answered it. */
+async function activateObjects(
+  objects: { name: string; type: string; parentName?: string }[],
+) {
+  return livePrepare('ActivateObjects', { objects });
+}
+
+/** The types `still_inactive` of an answer names. */
+function stillInactiveTypes(text: string): unknown[] {
+  const listed = member(JSON.parse(text), 'still_inactive');
+  return Array.isArray(listed)
+    ? listed.map((entry) => member(entry, 'type'))
+    : [];
+}
+
+/** The where-used of text elements in `container`: SAP answers a list. */
+async function textElementsWhereUsed(
+  name: string,
+  container: 'program' | 'function_group',
+): Promise<void> {
+  succeeded(
+    `GetWhereUsed PROG/PX ${container}`,
+    await livePrepare('GetWhereUsed', {
+      object_name: name,
+      object_type: 'PROG/PX',
+      container,
+    }),
+  );
+}
+
 liveSuite(['onprem', 'cloud'], 'Text elements', () => {
   after(async () => {
     await deleteRecorded();
@@ -148,6 +183,21 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
         ...onRequest(),
       }),
     );
+    await twoSymbols('program', N.program);
+    // The program alone runs nothing: its text elements are still inactive
+    // (measured on premise, `texts-translation.md` §8).
+    const alone = await activateObjects([{ name: N.program, type: 'PROG/P' }]);
+    assert.equal(alone.isError, true, alone.text);
+    assert.ok(stillInactiveTypes(alone.text).includes('PROG/PX'), alone.text);
+    // Both named: both activate (§8, §10).
+    succeeded(
+      'ActivateObjects program pair',
+      await activateObjects([
+        { name: N.program, type: 'PROG/P' },
+        { name: N.program, type: 'PROG/PX' },
+      ]),
+    );
+    await textElementsWhereUsed(N.program, 'program');
     await twoSymbols('program', N.program);
     const written = await liveCall('UpdateTextElements', {
       object_kind: 'program',
@@ -191,6 +241,16 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       },
     );
     await twoSymbols('function_group', N.group);
+    // The group and its text elements, at the group's address (§12.1, §13.4).
+    succeeded(
+      'ActivateObjects function group pair',
+      await activateObjects([
+        { name: N.group, type: 'FUGR/F' },
+        { name: N.group, type: 'PROG/PX', parentName: N.group },
+      ]),
+    );
+    await textElementsWhereUsed(N.group, 'function_group');
+    await twoSymbols('function_group', N.group);
     const written = await liveCall('UpdateTextElements', {
       object_kind: 'function_group',
       object_name: N.group,
@@ -220,6 +280,15 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
         description: DESCRIPTION,
         package_name: ownPackage(),
       },
+    );
+    await twoSymbols('class', N.class);
+    // The class and its text elements (measured on both, §8, §14).
+    succeeded(
+      'ActivateObjects class pair',
+      await activateObjects([
+        { name: N.class, type: 'CLAS/OC' },
+        { name: N.class, type: 'CLAS/OCX' },
+      ]),
     );
     await twoSymbols('class', N.class);
     const written = await liveCall('UpdateTextElements', {

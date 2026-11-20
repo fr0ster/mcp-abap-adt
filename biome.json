@@ -1,89 +1,93 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
-	"vcs": {
-		"enabled": true,
-		"clientKind": "git",
-		"useIgnoreFile": true
-	},
-	"files": {
-		"includes": [
-			"**",
-			"!!**/dist",
-			"!src/__tests__/unit/sources/__fixtures__",
-			"!src/__tests__/unit/coverage/__fixtures__/coverage",
-			"!scripts/**/__fixtures__"
-		]
-	},
-	"formatter": {
-		"enabled": true,
-		"indentStyle": "space",
-		"indentWidth": 2
-	},
-	"linter": {
-		"enabled": true,
-		"rules": {
-			"recommended": true,
-			"suspicious": {
-				"noExplicitAny": "error",
-				"noImplicitAnyLet": "error"
-			},
-			"nursery": {
-				"noUnsafeTypeAssertion": "error"
-			},
-			"correctness": {
-				"noUnusedVariables": "warn",
-				"noUnusedImports": "warn"
-			}
-		}
-	},
-	"javascript": {
-		"formatter": {
-			"quoteStyle": "single",
-			"semicolons": "always"
-		}
-	},
-	"assist": {
-		"enabled": true,
-		"actions": {
-			"source": {
-				"organizeImports": "on"
-			}
-		}
-	},
-	"overrides": [
-		{
-			"includes": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts"],
-			"linter": {
-				"rules": {
-					"suspicious": {
-						"noExplicitAny": "off",
-						"noImplicitAnyLet": "off"
-					},
-					"nursery": {
-						"noUnsafeTypeAssertion": "off"
-					},
-					"correctness": {
-						"noUnusedVariables": "off",
-						"noUnusedImports": "off",
-						"noUnsafeFinally": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": [
-				"**/__tests__/helpers/**",
-				"**/__tests__/**/helpers/**",
-				"**/__tests__/**/testers/**"
-			],
-			"linter": {
-				"rules": {
-					"suspicious": {
-						"noExplicitAny": "error",
-						"noImplicitAnyLet": "error"
-					}
-				}
-			}
-		}
-	]
+  "$schema": "https://biomejs.dev/schemas/2.5.15/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": [
+      "**",
+      "!!**/dist",
+      "!src/__tests__/unit/sources/__fixtures__",
+      "!src/__tests__/unit/coverage/__fixtures__/coverage",
+      "!scripts/**/__fixtures__",
+      "!tests/fixtures/tools/listed-schemas.json",
+      "!tests/fixtures/tools/variant-surface.json",
+      "!tests/fixtures/tools/http-surface.json",
+      "!tests/fixtures/tools/stdio-sse-surface.json"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noImplicitAnyLet": "error"
+      },
+      "nursery": {
+        "noUnsafeTypeAssertion": "error"
+      },
+      "correctness": {
+        "noUnusedVariables": "warn",
+        "noUnusedImports": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always"
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/__tests__/**", "**/*.test.ts", "**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noImplicitAnyLet": "off"
+          },
+          "nursery": {
+            "noUnsafeTypeAssertion": "off"
+          },
+          "correctness": {
+            "noUnusedVariables": "off",
+            "noUnusedImports": "off",
+            "noUnsafeFinally": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [
+        "**/__tests__/helpers/**",
+        "**/__tests__/**/helpers/**",
+        "**/__tests__/**/testers/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noExplicitAny": "error",
+            "noImplicitAnyLet": "error"
+          }
+        }
+      }
+    }
+  ]
 }

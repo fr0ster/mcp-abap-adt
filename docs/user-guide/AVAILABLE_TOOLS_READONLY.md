@@ -1211,7 +1211,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getunittestresult-read-only-unit-test"></a>
 #### GetUnitTestResult (Read-Only / Unit Test)
-**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
+**Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start is not yet recorded) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -1249,4 +1249,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-18*
+*Last updated: 2026-11-20*

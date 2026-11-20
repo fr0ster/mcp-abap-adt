@@ -4,14 +4,14 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { readRunOnce, unfinishedRun } from '../shared/pollRun';
+import { readGivenRun, unfinishedRun } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+    '[read-only] Retrieve CDS unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start is not yet recorded) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by unit test run.'),
     ...DETAIL_SHAPE,
@@ -28,7 +28,7 @@ export async function handleGetCdsUnitTest(
   if (!run_id) return return_error(new Error('run_id is required'));
 
   // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getStatus`/
-  // `getResult` unchanged — same `readRunOnce` reconstruction and same
+  // `getResult` unchanged — same `readGivenRun` reconstruction and same
   // "neither takes an options object" as `GetUnitTest`. No fixture in the
   // corpus captures a CDS run specifically (only the plain-class
   // `unittest-run-passing`/`refusal-unittest-run-failing` cases are
@@ -40,7 +40,7 @@ export async function handleGetCdsUnitTest(
   return answer(
     { tool: 'GetCdsUnitTest', detail },
     () =>
-      readRunOnce(
+      readGivenRun(
         (id, withLongPolling) =>
           cdsUnitTest.getStatus(id, withLongPolling, {
             analyse: analyseException,

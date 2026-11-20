@@ -4,14 +4,14 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { readRunOnce, unfinishedRun } from '../shared/pollRun';
+import { readGivenRun, unfinishedRun } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
+    '[read-only] Retrieve ABAP Unit test run status and result for a previously started run_id: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its status and result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start is not yet recorded) answers the run_id and that status at once, and any other status is an error stating what SAP answered.',
   inputSchema: z.object({
     run_id: z.string().describe('Run identifier returned by RunUnitTest.'),
     ...DETAIL_SHAPE,
@@ -29,7 +29,7 @@ export async function handleGetUnitTest(
 
   // The pre-migration handler called the v18 convenience `.read({runId})`,
   // which answered status and result together. That method no longer
-  // exists on `AdtUnitTest` in v19. Its work moved here: `readRunOnce`
+  // exists on `AdtUnitTest` in v19. Its work moved here: `readGivenRun`
   // reconstructs it (one long-polled status read, then the result once
   // the run is confirmed `FINISHED`) rather than fetching both blindly —
   // see `pollRun.ts`'s own comment for why a naive `pair()` was wrong here.
@@ -41,7 +41,7 @@ export async function handleGetUnitTest(
   return answer(
     { tool: 'GetUnitTest', detail },
     () =>
-      readRunOnce(
+      readGivenRun(
         (id, withLongPolling) =>
           unitTest.getStatus(id, withLongPolling, {
             analyse: analyseException,

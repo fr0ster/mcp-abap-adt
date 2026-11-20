@@ -763,6 +763,9 @@ const WRITES: BatchEntryCase[] = [
     'SERVICE_BINDING',
     'INCLUDE',
     'TABLE_TYPE',
+    'PROGRAM_TEXT_ELEMENTS',
+    'FUNCTION_GROUP_TEXT_ELEMENTS',
+    'CLASS_TEXT_ELEMENTS',
   ].map((object_type) => ({
     tool: 'HandlerActivate',
     args: { object_type, object_name: 'OBJ_A' },

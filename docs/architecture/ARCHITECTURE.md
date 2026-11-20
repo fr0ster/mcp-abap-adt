@@ -892,6 +892,12 @@ parallel ("The stateful window and the main flow"); a background run, a listed l
 read and the debugger tools that work on the debugger's own connections are outside
 that order. A client may send calls in parallel; they are answered in turn.
 
+Starting with 24.1.1, connection 25.0.1 can finish a stateless HTTP syntax check
+on a temporary SAP session when SAP rejects its CSRF token and signals session
+replacement. The check stays in its original MCP call and the connector logs
+off the temporary SAP session. Later calls obtain the instance's replacement
+connection through the normal session lifecycle.
+
 - **A long call on the main connection holds the flow; `background: true` or a tool on
   its own connection does not.** A unit-test or ATC run, a class or program run or a
   profiling run in the foreground, an activation and the creates and updates that

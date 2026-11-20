@@ -97,6 +97,12 @@ stated, else the login (`SAP_USERNAME`, `x-sap-login`), and the master system
 `system_user_unknown`, and a stdio start ends with exit `1`. A `401` is answered as it came. The
 library applies no rules unless an embedder passes them. See
 [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+
+On supported SAP HTTP connections, 24.1.1 can retry a standalone syntax check
+such as `CheckClass` in the same MCP call after SAP returns a CSRF 403 and the
+connector detects session replacement. See
+[Syntax checks after session loss](docs/user-guide/AUTHENTICATION.md#syntax-checks-after-session-loss).
+
 Coming from 23.x? See the [24.0 migration note](docs/MIGRATION-24.0.md) — an RFC destination states its address (`SAP_ASHOST` and `SAP_SYSNR`, or the message-server keys), `SAP_CLIENT` and `SAP_LANGUAGE`, and no `SAP_URL`; over MCP two arguments become required (`CreateDomain`'s `package_name`, compact `HandlerCreate` `BEHAVIOR_IMPLEMENTATION`'s `behavior_definition`) and a few tools declare arguments their handlers already read; compact `HandlerSearch` and `HandlerWhereUsed` became `HandlerSystem`'s `search_object` and `where_used`, beside six reads compact did not have; an embedder writes a tool's `inputSchema` in zod, builds an entry with `defineTool`, calls it as `entry.call(context, args)` and registers it with `registerTool(server, entry)`.
 Coming from 22.x? See the [23.0 migration note](docs/MIGRATION-23.0.md) — `CreateProgram` no longer offers `include` (create an include with `CreateInclude`); an embedder registering the `./handlers` groups on its own `McpServer` states `systemType` (`SAP_SYSTEM_TYPE` is not read there), and `HandlerExporter` serves no background run and no debugger.
 Coming from 21.x? See the [22.0 migration note](docs/MIGRATION-22.0.md) — the tools, their enums and the object types each argument accepts are the declared system type's (onprem or cloud), inspection needs `--system-type` too, `function` / `func` are the function module, main types stand for their one code, `RunATC` on cloud offers no program, and `ValidateServiceBinding` requires `package_name`.

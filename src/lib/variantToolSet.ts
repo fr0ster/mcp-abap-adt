@@ -81,6 +81,7 @@ const TOOL_NEEDS_BY_NAME = {
   GetDdl: { api: 'ddl', operation: 'read' },
   GetDomain: { api: 'domain', operation: 'readMetadata' },
   GetTableType: { api: 'tableType', operation: 'readMetadata' },
+  GetTableSettings: { api: 'tableSettings', operation: 'readMetadata' },
   CreateTableType: { api: 'tableType', operation: 'create' },
   UpdateTableType: { api: 'tableType', operation: 'updateMetadata' },
   DeleteTableType: { api: 'tableType', operation: 'delete' },

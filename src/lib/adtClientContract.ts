@@ -53,6 +53,7 @@ import type {
   IAdtSearchObjectsParamsOf,
   IAdtServiceBindingTypes,
   IAdtServiceGroupReadable,
+  IAdtTableSettingsPatchable,
   IAdtTransportMoveObjects,
   IAdtTransportObjectActions,
   IAdtTransportSortAndCompress,
@@ -116,6 +117,8 @@ import type {
   IStructureResults,
   ITableConfig,
   ITableResults,
+  ITableSettingsConfig,
+  ITableSettingsResults,
   ITableTypeConfig,
   ITableTypeResults,
   ITransformationConfig,
@@ -553,6 +556,23 @@ export type TableApi<
     ReturnType<R['versions']>,
     ReturnType<R['versionSource']>
   >;
+
+/**
+ * What the server calls on `getTableSettings()`'s answer: the settings read
+ * at a stated version, the settings' own lock, and the patch that writes the
+ * named settings over the rest as read (adt-clients 46.1.0). The patch is
+ * typed by the variant: a cloud change may name `isWritableByAMDP`, an
+ * on-premise one may not (interfaces-adt 30.1.0).
+ */
+export type TableSettingsApi<
+  R extends ITableSettingsResults,
+  V extends AdtVariant,
+> = StatedMetadataReadable<ITableSettingsConfig, ReturnType<R['metadata']>> &
+  IAdtTableSettingsPatchable<
+    ReturnType<R['metadataUpdated']>,
+    Extract<V, AdtModernVariant>
+  > &
+  IAdtLockable<ITableSettingsConfig>;
 
 /** What the server calls on `getTableType()`'s answer. */
 export type DdicTableTypeApi<
@@ -1414,6 +1434,15 @@ export type IServerAdtClient<V extends AdtVariant = AdtModernVariant> =
       'table',
       {
         getTable<R extends ITableResults>(results: R): TableApi<R, V>;
+      }
+    > &
+    ServedOn<
+      V,
+      'tableSettings',
+      {
+        getTableSettings<R extends ITableSettingsResults>(
+          results: R,
+        ): TableSettingsApi<R, V>;
       }
     > &
     ServedOn<

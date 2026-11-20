@@ -41,6 +41,7 @@ import { TOOL_DEFINITION as GetWhereUsed } from '../../handlers/system/readonly/
 import { TOOL_DEFINITION as SearchSource } from '../../handlers/system/readonly/handleSearchSource.js';
 import { TOOL_DEFINITION as GetTable } from '../../handlers/table/high/handleGetTable.js';
 import { TOOL_DEFINITION as GetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
+import { TOOL_DEFINITION as GetTableSettings } from '../../handlers/table/readonly/handleGetTableSettings.js';
 import { TOOL_DEFINITION as GetTableType } from '../../handlers/table_type/high/handleGetTableType.js';
 import { TOOL_DEFINITION as ListTransports } from '../../handlers/transport/readonly/handleListTransports.js';
 import { TOOL_DEFINITION as ReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
@@ -76,6 +77,7 @@ export const READ_DEFINITIONS = {
   GetObjectStructure,
   GetServiceBindingPreviewUrl,
   GetTable,
+  GetTableSettings,
   GetTableType,
   ReadTransportObjects,
   GetCdsUnitTestResult,

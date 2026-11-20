@@ -131,6 +131,10 @@ import {
   handleGetTable,
 } from '../../../handlers/table/high/handleGetTable';
 import {
+  TOOL_DEFINITION as GetTableSettings_Tool,
+  handleGetTableSettings,
+} from '../../../handlers/table/readonly/handleGetTableSettings';
+import {
   TOOL_DEFINITION as GetTableType_Tool,
   handleGetTableType,
 } from '../../../handlers/table_type/high/handleGetTableType';
@@ -240,6 +244,7 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       defineTool(GetDataElement_Tool, handleGetDataElement),
       defineTool(GetDdl_Tool, handleGetDdl),
       defineTool(GetDomain_Tool, handleGetDomain),
+      defineTool(GetTableSettings_Tool, handleGetTableSettings),
       defineTool(GetTableType_Tool, handleGetTableType),
       defineTool(GetFunctionGroup_Tool, handleGetFunctionGroup),
       defineTool(GetFunctionInclude_Tool, handleGetFunctionInclude),

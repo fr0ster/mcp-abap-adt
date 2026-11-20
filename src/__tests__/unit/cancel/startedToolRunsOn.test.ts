@@ -197,11 +197,11 @@ describe('no request of a started tool carries a signal', () => {
     return client;
   }
 
-  /** The prototype that owns a built connection's `makeAdtRequest`. */
+  /** The shared request method, below the factory's per-instance wrapper. */
   function requestOwner(connection: object): {
     makeAdtRequest(options: IAbapRequestOptions): Promise<unknown>;
   } {
-    let at: object | null = connection;
+    let at: object | null = Object.getPrototypeOf(connection);
     while (at && !Object.hasOwn(at, 'makeAdtRequest')) {
       at = Object.getPrototypeOf(at);
     }

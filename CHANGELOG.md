@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [24.1.1] - 2026-11-21
+
+### Fixed
+
+- **Retry a stateless syntax check after a lost SAP session.** With `@mcp-abap-adt/connection` `^25.0.1`, the server's HTTP connection retries an ADT `checkruns` request once in a fresh SAP session when SAP rejects its CSRF token and the connector detects the session replacement. The same MCP call returns the check result or the relogon error. Operations under a lock remain bound to their original SAP session.
+
 ## [24.1.0] - 2026-11-20
 
 ### Added

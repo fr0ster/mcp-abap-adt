@@ -13,7 +13,7 @@ import {
   resolvePackageName,
   resolveTransportRequest,
 } from '../helpers/configHelpers';
-import type { LiveAnswer } from '../helpers/live';
+import { type LiveAnswer, livePrepare } from '../helpers/live';
 import { CREATION_PACKAGES } from '../helpers/packageGuard';
 
 /** Whether the configured system is the on-premise one. */
@@ -67,4 +67,34 @@ export function member(value: unknown, key: string): unknown {
 /** An answer's JSON payload. */
 export function payloadOf(answer: LiveAnswer): unknown {
   return JSON.parse(answer.text);
+}
+
+/** A compact lock a case holds: released by its unlock, or by the suite's end. */
+interface HeldLock {
+  readonly object_type: string;
+  readonly object_name: string;
+  readonly lock_handle: string;
+}
+
+const held: HeldLock[] = [];
+
+/** Records a lock handle the case now holds, until its unlock is sent. */
+export function holdLock(lock: HeldLock): void {
+  held.push(lock);
+}
+
+/** The case sent the unlock of `handle`: the suite's end sends none. */
+export function lockReleased(handle: string): void {
+  const at = held.findIndex((lock) => lock.lock_handle === handle);
+  if (at >= 0) held.splice(at, 1);
+}
+
+/**
+ * The unlock of every lock a case still holds — one whose write threw before
+ * its own unlock was sent — sent at the suite's end.
+ */
+export async function releaseHeldLocks(): Promise<void> {
+  for (const lock of held.splice(0)) {
+    await livePrepare('HandlerUnlock', { ...lock });
+  }
 }

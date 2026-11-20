@@ -35,11 +35,14 @@ import {
 } from '../helpers/live';
 import { skipRunningTest } from '../helpers/runningTest';
 import {
+  holdLock,
+  lockReleased,
   member,
   onPremise,
   onRequest,
   ownPackage,
   payloadOf,
+  releaseHeldLocks,
   request,
   succeeded,
 } from './ownObjects';
@@ -64,6 +67,7 @@ const DDL = [
 
 liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
   after(async () => {
+    await releaseHeldLocks();
     await deleteRecorded();
     await expectAbsent({ tool: 'GetTable', args: { table_name: TABLE } });
   });
@@ -128,6 +132,13 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
       'lock_handle',
     );
     assert.equal(typeof handle, 'string', locked.text);
+    if (typeof handle === 'string') {
+      holdLock({
+        object_type: 'TABLE_SETTINGS',
+        object_name: TABLE,
+        lock_handle: handle,
+      });
+    }
     const written = await liveCall('HandlerUpdate', {
       object_type: 'TABLE_SETTINGS',
       table_name: TABLE,
@@ -140,6 +151,7 @@ liveSuite(['onprem', 'cloud'], "A table's technical settings", () => {
       object_name: TABLE,
       lock_handle: handle,
     });
+    lockReleased(String(handle));
     succeeded('HandlerUpdate TABLE_SETTINGS', written);
     succeeded('HandlerUnlock TABLE_SETTINGS', unlocked);
     succeeded(

@@ -36,11 +36,14 @@ import {
 } from '../helpers/live';
 import { skipRunningTest } from '../helpers/runningTest';
 import {
+  holdLock,
+  lockReleased,
   member,
   onPremise,
   onRequest,
   ownPackage,
   payloadOf,
+  releaseHeldLocks,
   request,
   succeeded,
 } from './ownObjects';
@@ -147,6 +150,7 @@ async function textElementsWhereUsed(
 
 liveSuite(['onprem', 'cloud'], 'Text elements', () => {
   after(async () => {
+    await releaseHeldLocks();
     await deleteRecorded();
     await expectAbsent({
       tool: 'GetFunctionGroup',
@@ -344,6 +348,13 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       'lock_handle',
     );
     assert.equal(typeof handle, 'string', locked.text);
+    if (typeof handle === 'string') {
+      holdLock({
+        object_type: 'PROGRAM_TEXT_ELEMENTS',
+        object_name: N.program,
+        lock_handle: handle,
+      });
+    }
     const written = await liveCall('HandlerUpdate', {
       object_type: 'PROGRAM_TEXT_ELEMENTS',
       program_name: N.program,
@@ -356,6 +367,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       object_name: N.program,
       lock_handle: handle,
     });
+    lockReleased(String(handle));
     succeeded('HandlerUpdate PROGRAM_TEXT_ELEMENTS', written);
     succeeded('HandlerUnlock PROGRAM_TEXT_ELEMENTS', unlocked);
     succeeded(
@@ -389,6 +401,13 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       'lock_handle',
     );
     assert.equal(typeof handle, 'string', locked.text);
+    if (typeof handle === 'string') {
+      holdLock({
+        object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
+        object_name: N.group,
+        lock_handle: handle,
+      });
+    }
     const written = await liveCall('HandlerUpdate', {
       object_type: 'FUNCTION_GROUP_TEXT_ELEMENTS',
       function_group_name: N.group,
@@ -401,6 +420,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       object_name: N.group,
       lock_handle: handle,
     });
+    lockReleased(String(handle));
     succeeded('HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS', written);
     succeeded('HandlerUnlock FUNCTION_GROUP_TEXT_ELEMENTS', unlocked);
     succeeded(
@@ -434,6 +454,13 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       'lock_handle',
     );
     assert.equal(typeof handle, 'string', locked.text);
+    if (typeof handle === 'string') {
+      holdLock({
+        object_type: 'CLASS_TEXT_ELEMENTS',
+        object_name: N.class,
+        lock_handle: handle,
+      });
+    }
     const written = await liveCall('HandlerUpdate', {
       object_type: 'CLASS_TEXT_ELEMENTS',
       class_name: N.class,
@@ -446,6 +473,7 @@ liveSuite(['onprem', 'cloud'], 'Text elements', () => {
       object_name: N.class,
       lock_handle: handle,
     });
+    lockReleased(String(handle));
     succeeded('HandlerUpdate CLASS_TEXT_ELEMENTS', written);
     succeeded('HandlerUnlock CLASS_TEXT_ELEMENTS', unlocked);
     succeeded(

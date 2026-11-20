@@ -15,5 +15,5 @@ One line per lettered task of the plan: commits, tests, mutations, concerns.
     2. The plan's live file paths became `coverage/*.live.test.ts`, the coverage pattern.
     3. A write answers terse `SUCCESS` (`terseWrite`) rather than the saved list; detail `full`/`raw` gives SAP's answer.
     4. A selection text's name is answered without SAP's padding to eight.
-- **Status at this push** — (b) and (c) are done; (d) compact, (e) ActivateObjects, (f) the where-used container and (g) docs and CHANGELOG are not started. Local CI on `9b571a587`: lint, build and test:check are green. In `npm test` only the coverage ledger guard is red, because the four tools have no ledger row (concern 1 under (c)).
+- **Status at this push** — (b) and (c) are done; (d) compact, (e) ActivateObjects, (f) the where-used container and (g) docs and CHANGELOG are not started. Local CI (lint, build, test:check, npm test) on the pushed head: everything passes except the coverage ledger guard, which is red because the four tools have no ledger row (concern 1 under (c)).
 

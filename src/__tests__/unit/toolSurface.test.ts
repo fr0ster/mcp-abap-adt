@@ -211,9 +211,11 @@ describe('the MCP tool surface', () => {
           relaxed: ['object_name', 'object_type'],
           added: ['objects'],
         },
+        // `container` names whose text elements PROG/PX is (optional: required
+        // with PROG/PX alone, the code it arrived with).
         'system/GetWhereUsed': {
           relaxed: ['object_name', 'object_type'],
-          added: ['objects'],
+          added: ['container', 'objects'],
         },
       };
       const listed = LIST_ARGUMENTS[tool];

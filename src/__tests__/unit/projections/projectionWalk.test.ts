@@ -483,6 +483,8 @@ const WALKS: Readonly<Record<string, Walk>> = {
     send: (context, value) =>
       handleGetWhereUsed(context, {
         object_type: value,
+        // PROG/PX names its container: a program's, at its code's collection.
+        ...(value === 'PROG/PX' ? { container: 'program' as const } : {}),
         object_name:
           value === 'FUGR/FF' ||
           value === 'functionmodule' ||
@@ -506,8 +508,13 @@ const WALKS: Readonly<Record<string, Walk>> = {
     send: (context, value) =>
       handleActivateObjects(context, {
         objects: [
-          { name: 'ZOBJ_A', type: value, parentName: 'ZFG_A' },
-          { name: 'ZOBJ_B', type: value, parentName: 'ZFG_A' },
+          // A PROG/PX with a parent is a function group's text elements:
+          // the walk names the program's, at its code's collection.
+          ...['ZOBJ_A', 'ZOBJ_B'].map((name) => ({
+            name,
+            type: value,
+            ...(value === 'PROG/PX' ? {} : { parentName: 'ZFG_A' }),
+          })),
         ],
       }),
     routes: new Map([

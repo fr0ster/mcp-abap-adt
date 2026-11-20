@@ -42,6 +42,10 @@ const RESULT = {
   data: corpusBody(`unittest-run-passing--03-results-${RUN.toLowerCase()}`),
 };
 /** No start time recorded, as SAP answered it (measured, its result links left out). */
+/** A run in progress, as SAP answered it (measured, its run details left out). */
+const RUNNING = {
+  data: '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="RUNNING"/></aunit:run>',
+};
 const NOT_STARTED = {
   data: '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="NOT_STARTED"/><aunit:time/></aunit:run>',
 };
@@ -134,6 +138,25 @@ for (const tool of RUN_TOOLS) {
       const connection = recordingConnection([
         STARTED,
         NOT_STARTED,
+        NOT_STARTED,
+        FINISHED,
+        RESULT,
+      ]);
+      const result = await tool.call(connection);
+      assert.equal(result.isError, false);
+      assert.deepEqual(statusReads(connection), [STATUS_URL, LONG_POLL_URL]);
+      assert.equal(connection.requests.length, 3);
+      assert.deepEqual(answerOf(result), {
+        success: true,
+        run_id: RUN,
+        status: 'NOT_STARTED',
+      });
+    });
+
+    it('a NOT_STARTED after a RUNNING first read follows a long-polled read: answered as SAP named it', async () => {
+      const connection = recordingConnection([
+        STARTED,
+        RUNNING,
         NOT_STARTED,
         FINISHED,
         RESULT,

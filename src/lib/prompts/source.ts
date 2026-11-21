@@ -3,7 +3,7 @@
  * kind, its members there, its properties and its required arguments.
  */
 import * as z from 'zod';
-import type { ToolDefinition } from '../handlers/interfaces.js';
+import type { SapEnvironment, ToolDefinition } from '../handlers/interfaces.js';
 import { listedTool } from '../listedTool.js';
 import { withStateHandle } from '../state/stateHandleArgument.js';
 import type { AbapSystemKind } from '../systemKind.js';
@@ -34,6 +34,24 @@ export function listedPromptTool(
       ? withStateHandle(listed.inputSchema)
       : listed.inputSchema,
   };
+}
+
+/**
+ * The kind the prompts read for a listing on `environment`: the stated kind,
+ * or none stated (the on-premise statement, as tools are listed then);
+ * `undefined` for `legacy`, where no prompt is listed.
+ */
+export function promptKindOf(
+  environment: SapEnvironment | undefined,
+): { readonly kind: AbapSystemKind | undefined } | undefined {
+  switch (environment) {
+    case 'onprem':
+    case 'cloud':
+    case undefined:
+      return { kind: environment };
+    case 'legacy':
+      return undefined;
+  }
 }
 
 /** The prompts' source: the listed tools by name, the kind and the `state_handle` declaration. */

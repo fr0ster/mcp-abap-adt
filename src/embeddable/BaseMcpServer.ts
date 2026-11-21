@@ -147,6 +147,15 @@ import {
 } from '../lib/ownedConnections.js';
 import { freshConnectionAvailable } from '../lib/packageSessions.js';
 import {
+  type AbapPrompt,
+  abapPrompts,
+  type ListedPromptTool,
+  type PromptSource,
+  promptKindOf,
+  promptSourceOf,
+  registerPrompts,
+} from '../lib/prompts/index.js';
+import {
   raceRequestSignal,
   runWithRequestSignal,
   throwIfRequestAborted,
@@ -451,6 +460,20 @@ export abstract class BaseMcpServer extends McpServer {
   /** Whether every tool declares `state_handle` (`stateHandleArgument` option). */
   private readonly stateHandleArgument: boolean;
 
+  /** Whether the prompts are registered (`prompts` option). */
+  private readonly promptsServed: boolean;
+
+  /**
+   * What the prompts read of this instance's listing, set by
+   * `registerHandlers`: the tools it listed on its kind. `undefined` before,
+   * for a registry registering its own tools, with `prompts: false`, and on
+   * `legacy`.
+   */
+  protected promptSource: PromptSource | undefined;
+
+  /** The prompts `registerHandlers` registered, in their order. */
+  protected listedPrompts: readonly AbapPrompt[] = [];
+
   /**
    * The corrected request header pairs of the systems this instance talks
    * to (`adtHeaderPairs` option), keyed by system: the host's, shared by its
@@ -597,6 +620,12 @@ export abstract class BaseMcpServer extends McpServer {
      */
     stateHandleArgument?: boolean | undefined;
     /**
+     * Whether the prompts are registered (default `true`): the prompts of the
+     * common ABAP work, built from the tools this instance lists on its kind.
+     * `false`: none is, and no `prompts` capability is declared.
+     */
+    prompts?: boolean | undefined;
+    /**
      * The first birth a tool call makes takes up the destination's one
      * leftover session (stdio's `--deferred-logon --restore-session`).
      * Default `false`: such a birth is a logon.
@@ -663,6 +692,7 @@ export abstract class BaseMcpServer extends McpServer {
     if (this.longSession !== undefined) this.state.attach(this.longSession);
     this.longSessionPort = this.longSessionPortOf(this.longSession);
     this.stateHandleArgument = options.stateHandleArgument === true;
+    this.promptsServed = options.prompts !== false;
     this.adtHeaderPairs = options.adtHeaderPairs ?? new AdtHeaderPairs();
     // One kind per server, fixed here: the stated `systemType`, else
     // `SAP_SYSTEM_TYPE` as it is now (an embedder's fallback). Nothing
@@ -1887,6 +1917,8 @@ export abstract class BaseMcpServer extends McpServer {
         ),
       );
 
+      // Every tool listed, as listed: what the prompts are built from.
+      const promptTools: ListedPromptTool[] = [];
       for (const group of groups) {
         const handlers = group.getHandlers();
         for (const entry of handlers) {
@@ -1912,12 +1944,10 @@ export abstract class BaseMcpServer extends McpServer {
           ) {
             this.longToolsInTheCall.add(name);
           }
-          const listed = listedTool(
-            this.longToolsInTheCall.has(name)
-              ? longToolInTheCall(entry.toolDefinition)
-              : entry.toolDefinition,
-            environment,
-          );
+          const definition = this.longToolsInTheCall.has(name)
+            ? longToolInTheCall(entry.toolDefinition)
+            : entry.toolDefinition;
+          const listed = listedTool(definition, environment);
           if (!listed.listed) {
             this.logger.debug(
               listed.reason === 'not-served'
@@ -2267,6 +2297,7 @@ export abstract class BaseMcpServer extends McpServer {
             : listed.inputSchema;
           const declared = withHandle !== listed.inputSchema;
           const inputSchema = withHandle;
+          promptTools.push({ definition, inputSchema });
 
           // Tracked from its entry, with its own request signal (`trackCall`).
           const toolName = entry.toolDefinition.name;
@@ -2294,6 +2325,7 @@ export abstract class BaseMcpServer extends McpServer {
           );
         }
       }
+      this.registerListedPrompts(promptTools);
     } else {
       // A registry that registers its own tools: no connection is injected,
       // but every tool it registers goes through the same call tracking —
@@ -2302,6 +2334,24 @@ export abstract class BaseMcpServer extends McpServer {
       handlersRegistry.registerAllTools(this.trackingRegistrations());
     }
   }
+  /**
+   * Registers the prompts built from `tools`, the tools this instance listed
+   * on its kind — unless `prompts: false`, or on `legacy`, where none is
+   * listed. Before any `connect`, as the tools are.
+   */
+  private registerListedPrompts(tools: readonly ListedPromptTool[]): void {
+    if (!this.promptsServed) return;
+    const stated = promptKindOf(statedEnvironment(this.statedSystemType()));
+    if (stated === undefined) return;
+    this.promptSource = promptSourceOf(
+      stated.kind,
+      this.stateHandleArgument,
+      tools,
+    );
+    this.listedPrompts = abapPrompts(this.promptSource);
+    registerPrompts(this, this.listedPrompts);
+  }
+
   /**
    * The registry's groups, and — on an instance that holds a strategy — the
    * background-run tools beside every listed long tool they carry (the

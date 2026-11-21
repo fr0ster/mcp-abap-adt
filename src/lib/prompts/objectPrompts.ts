@@ -27,6 +27,7 @@ import type {
   ArgumentValue,
   ListedPromptTool,
   ObjectOperation,
+  PromptArgumentsSchema,
   PromptInstruction,
   PromptSource,
   PromptStep,
@@ -151,7 +152,9 @@ const NAME_WORDS =
   "The object's name (for a function module, as the type's arguments state).";
 
 /** The prompt arguments every object prompt takes: `object_type`, completed from `served` (lowercase), and `name`. */
-export function objectArguments(served: readonly string[]): z.ZodRawShape {
+export function objectArguments(
+  served: readonly string[],
+): PromptArgumentsSchema {
   return {
     object_type: completable(z.string().describe(OBJECT_TYPE_WORDS), (typed) =>
       completeFrom(served, typed),
@@ -326,7 +329,7 @@ export function objectPrompt(
   operation: ObjectOperation,
   sentence: string,
   rows: readonly ServedRow[],
-  extra: z.ZodRawShape,
+  extra: PromptArgumentsSchema,
   instruction: (
     row: ServedRow,
     name: string,

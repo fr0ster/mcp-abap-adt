@@ -106,11 +106,17 @@ export interface PromptInstruction {
   notes: readonly string[];
 }
 
+/** A prompt's arguments: MCP prompt arguments are strings. */
+export type PromptArgumentsSchema = Readonly<
+  Record<string, z.ZodType<string | undefined, string | undefined>>
+>;
+
 /** One prompt as the server registers it. */
 export interface AbapPrompt {
   name: PromptName;
   description: string;
-  argsSchema: z.ZodRawShape;
+  /** Its arguments: each a string, required or optional. */
+  argsSchema: PromptArgumentsSchema;
   /** The instruction for the given arguments; throws a prompt refusal for arguments it refuses. */
   instruction(args: Record<string, string | undefined>): PromptInstruction;
 }

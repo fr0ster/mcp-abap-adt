@@ -259,6 +259,14 @@ export interface EmbeddableMcpServerBaseOptions {
    * @default stderr, always on
    */
   stateLogger?: StateLogger;
+
+  /**
+   * Whether the prompts of the common ABAP work are registered, built from
+   * the tools this instance lists on its kind. `false`: none is, and no
+   * `prompts` capability is declared.
+   * @default true
+   */
+  prompts?: boolean;
 }
 
 /**
@@ -315,6 +323,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       // connection the server built, so this instance arms no timer.
       sessionKeepAliveMs: 0,
       stateLogger: options.stateLogger,
+      prompts: options.prompts,
       ...(options.transportCloseEndsSession !== undefined && {
         transportCloseEndsSession: options.transportCloseEndsSession,
       }),

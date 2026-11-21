@@ -3,9 +3,6 @@
  * lists, on its kind, after its deny list — a prompt answers an instruction
  * naming those tools, and sends nothing to a system.
  */
-import { renderInstruction } from './instruction.js';
-import type { AbapPrompt, GetPromptResult } from './types.js';
-
 export { completeFrom } from './completion.js';
 export { jsonLiteral, renderInstruction } from './instruction.js';
 export { abapPrompts } from './prompts.js';
@@ -16,6 +13,8 @@ export {
   transportReadsWords,
   transportTakesWords,
 } from './refusals.js';
+export { registerPrompts } from './register.js';
+export { promptResult } from './result.js';
 export { matchServed, requiredArgument, type ServedType } from './served.js';
 export {
   hasProperty,
@@ -24,6 +23,7 @@ export {
   listedProperty,
   longToolStep,
   membersOn,
+  promptKindOf,
   promptSourceOf,
   requiredArguments,
   type StepWords,
@@ -34,6 +34,7 @@ export type {
   ArgumentValue,
   ListedPromptTool,
   ObjectOperation,
+  PromptArgumentsSchema,
   PromptInstruction,
   PromptName,
   PromptSource,
@@ -41,22 +42,3 @@ export type {
   ReadEntryField,
   RequiredArgument,
 } from './types.js';
-
-/** `prompt`'s answer for `args`: one user message, the instruction's text. */
-export function promptResult(
-  prompt: AbapPrompt,
-  args: Record<string, string | undefined>,
-): GetPromptResult {
-  return {
-    description: prompt.description,
-    messages: [
-      {
-        role: 'user',
-        content: {
-          type: 'text',
-          text: renderInstruction(prompt.instruction(args)),
-        },
-      },
-    ],
-  };
-}

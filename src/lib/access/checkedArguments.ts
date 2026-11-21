@@ -6,6 +6,7 @@
  * rows by its name.
  */
 import type { ToolArgs, ToolDefinition } from '../handlers/interfaces.js';
+import { isArgObject } from '../toolArgValue.js';
 import type { AccessCall, NamedValue } from './accessChecks.js';
 
 /** The arguments that name a package. */
@@ -27,6 +28,18 @@ export const TABLE_ARGUMENTS: ReadonlyMap<string, string> = new Map([
   ['HandlerGetData', 'object_name'],
 ]);
 
+/**
+ * The tools that take an ABAP Unit run target, and the argument holding it:
+ * a target of kind `package` names a package in its `name`, checked as
+ * `<argument>.name`. The named package alone is checked, not the
+ * subpackages a run with `include_subpackages` covers; an object target
+ * names no package.
+ */
+export const PACKAGE_TARGET_ARGUMENTS: ReadonlyMap<string, string> = new Map([
+  ['RunAbapUnit', 'target'],
+  ['HandlerUnitTestRun', 'target'],
+]);
+
 /** The arguments a tool dispatches on. */
 const DISPATCH_ARGUMENTS: readonly string[] = [
   'object_type',
@@ -38,6 +51,8 @@ const DISPATCH_ARGUMENTS: readonly string[] = [
 /** What a tool's calls are checked on, computed once at registration. */
 export interface CheckedArguments {
   readonly packages: readonly string[];
+  /** The run-target argument whose package kind names a package (`PACKAGE_TARGET_ARGUMENTS`). */
+  readonly packageTarget: string | undefined;
   readonly requests: readonly string[];
   readonly table: string | undefined;
   readonly dispatch: string | undefined;
@@ -66,6 +81,11 @@ export function checkedArgumentsOf(
   const packages = changes
     ? PACKAGE_ARGUMENTS.filter((argument) => declared.has(argument))
     : [];
+  const targetArgument = PACKAGE_TARGET_ARGUMENTS.get(definition.name);
+  const packageTarget =
+    changes && targetArgument !== undefined && declared.has(targetArgument)
+      ? targetArgument
+      : undefined;
   const requests = changes
     ? REQUEST_ARGUMENTS.filter((argument) => declared.has(argument))
     : [];
@@ -74,11 +94,17 @@ export function checkedArgumentsOf(
     tableArgument !== undefined && declared.has(tableArgument)
       ? tableArgument
       : undefined;
-  if (packages.length === 0 && requests.length === 0 && table === undefined) {
+  if (
+    packages.length === 0 &&
+    packageTarget === undefined &&
+    requests.length === 0 &&
+    table === undefined
+  ) {
     return undefined;
   }
   return {
     packages,
+    packageTarget,
     requests,
     table,
     dispatch: DISPATCH_ARGUMENTS.find((argument) => declared.has(argument)),
@@ -106,6 +132,21 @@ function namedValues(
 }
 
 /**
+ * The package a run target names: `<argument>.name` when the target's kind
+ * is `package`, trimmed and upper-cased; nothing for an object target.
+ */
+function packageTargetValues(
+  args: ToolArgs,
+  argument: string | undefined,
+): NamedValue[] {
+  if (argument === undefined) return [];
+  const target = args[argument];
+  if (!isArgObject(target) || target.kind !== 'package') return [];
+  const value = named(target, 'name');
+  return value === undefined ? [] : [{ argument: `${argument}.name`, value }];
+}
+
+/**
  * Whether the call creates the package `package_name` under
  * `super_package`: `CreatePackage`, or `HandlerCreate` with `object_type`
  * `PACKAGE`. No other call: `CheckPackage` declares `super_package` and never
@@ -126,7 +167,10 @@ export function accessCallOf(
   checked: CheckedArguments,
   args: ToolArgs,
 ): AccessCall | undefined {
-  const packages = namedValues(args, checked.packages);
+  const packages = [
+    ...namedValues(args, checked.packages),
+    ...packageTargetValues(args, checked.packageTarget),
+  ];
   const requests = namedValues(args, checked.requests);
   const tables =
     checked.table === undefined ? [] : namedValues(args, [checked.table]);

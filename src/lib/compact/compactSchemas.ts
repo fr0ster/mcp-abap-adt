@@ -1815,7 +1815,7 @@ const LOCK_PROPERTIES = {
     .string()
     .optional()
     .describe(
-      'PACKAGE: the package this package belongs to; a top-level package has none. The lock names the package by object_name alone.',
+      "PACKAGE: accepted for compatibility; the lock uses the package's name.",
     ),
 };
 

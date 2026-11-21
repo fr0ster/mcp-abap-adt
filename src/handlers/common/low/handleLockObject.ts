@@ -83,7 +83,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        'The package this package belongs to; a top-level package has none. The lock names the package by object_name alone.',
+        "Accepted for compatibility; the lock uses the package's name.",
       ),
   }),
 } as const;

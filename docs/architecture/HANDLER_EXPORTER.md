@@ -77,6 +77,34 @@ registry handed to a server runs its run tools as the server's own: with `backgr
 given `backgroundRuns` (24.0.0) (its options have no
 `includeDebug`). A server instance (`EmbeddableMcpServer`) serves them.
 
+### Prompts
+
+The prompt module is `@mcp-abap-adt/lib/prompts` (`src/lib/prompts/`): the nine MCP prompts
+(`create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`,
+`transport`), built from the entries the registry lists on its kind, after the deny list.
+
+- **A server instance** (`BaseMcpServer`, `EmbeddableMcpServer`, and so every binary) registers
+  the prompts after its tools, from the same listing; a `createRegistry()` registry handed to
+  either gets them. The option `prompts: false` registers none.
+- **A plain registration** (`registerOnServer`, `createRegistry().registerAllTools(mcpServer)`)
+  registers no prompt, so the embedder's own prompt names stay its own. `registerAbapPrompts(mcpServer, registry)`
+  (`@mcp-abap-adt/lib/prompts`) registers them, from the registry's groups and the kind they
+  state, with no background-run strategy and no `state_handle`:
+
+  ```typescript
+  import { registerAbapPrompts } from "@mcp-abap-adt/lib/prompts";
+
+  const registry = exporter.createRegistry();
+  registry.registerAllTools(mcpServer);
+  registerAbapPrompts(mcpServer, registry);
+  ```
+
+  `createRegistry()` returns a `CompositeHandlersRegistry`, the type the function takes. On a
+  legacy kind none is registered; a second call on the same server throws the SDK's
+  `Prompt <name> is already registered`.
+
+See [PROMPTS.md](../user-guide/PROMPTS.md) for what each binary lists.
+
 ## Connection Provider
 
 The `connectionProvider` (`ConnectionProvider`: `() => IAbapConnection | Promise<IAbapConnection>`,

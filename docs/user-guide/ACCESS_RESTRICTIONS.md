@@ -82,6 +82,14 @@ does not see it and cannot call it. No call checks a deny list.
   `where_used` takes no deniable object type: the 23.x entries `HandlerWhereUsed.<TYPE>` match
   nothing and are named in the start line, and nothing replaces them.
 - A batch can record only registered tools and values: a denied one cannot be recorded.
+- **The prompts follow the deny list.** A prompt lists the `object_type` values whose tools are
+  registered: `CreateClass` or `HandlerCreate.CLASS` removes `class` from `create`;
+  `HandlerLock.CLASS` removes `class` (and every class include) from compact `update`;
+  `HandlerSystem.where_used` removes compact `where_used`; `HandlerSystem.transports` removes
+  `list` from compact `transport`. A prompt with no value left is not listed, and `Create*` or
+  `HandlerCreate` removes the `create` prompt. No prompt reads a deny entry itself; a value
+  outside the served set is refused by `prompts/get`
+  ([PROMPTS.md](PROMPTS.md)).
 
 ## Allowed packages, allowed requests
 

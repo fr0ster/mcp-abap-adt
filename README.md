@@ -265,6 +265,59 @@ batch mode. Over Streamable HTTP, send the `state_handle` `HandlerBatch` `action
 `state_handle` argument (or in the `x-mcp-state-handle` request header) on every call of the batch. See
 [Batch Mode](docs/user-guide/BATCH_MODE.md), with the list of every recordable call.
 
+## Prompts
+
+Every binary lists MCP prompts beside its tools: ready-made requests an MCP client offers the
+user (Claude Code shows them as `/mcp__<server>__<prompt>`). A prompt answers with an
+instruction that names the tools to call, in order, with the user's values filled in; the model
+follows it with the tools of the same binary. Nine prompts, plain names:
+
+| Prompt | Arguments | Asks the model to |
+|---|---|---|
+| `create` | `object_type`, `name`, `package_name`, `description`, `transport_request` | create the object |
+| `get` | `object_type`, `name` | read the object |
+| `update` | `object_type`, `name`, `change`, `transport_request` | read the object, write it with the change described in words (compact: lock, write, unlock) |
+| `delete` | `object_type`, `name`, `transport_request` | delete the object |
+| `activate` | `object_type`, `name` | activate the object |
+| `check` | `object_type`, `name` | check the object |
+| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module, CDS view or package |
+| `where_used` | `object_type`, `name`, `container` | list the objects that use the object |
+| `transport` | `action`, `number`, `description`, `user`, `object_type`, `name`, `target_number` | work with transport requests: create, create a task, list, get, list objects, read the log, add, remove or move an object, sort and compress |
+
+`object_type` completes in lower case and is accepted in any case. A function module also takes
+`function_group`. Each binary lists the prompts its tools serve, with the `object_type` values
+its tools serve on the system kind: the read-only binaries list `get`, `where_used` and
+`transport` (and, compact, `check`); a denied tool or value removes its `object_type` values,
+and a prompt with none left is not listed. [PROMPTS.md](docs/user-guide/PROMPTS.md) lists the
+prompts and values per binary and kind.
+
+One example per family. `/get class ZCL_DEMO` on a full binary answers:
+
+```
+Get the CLASS "ZCL_DEMO".
+1. Call GetClass with class_name: "ZCL_DEMO".
+```
+
+On a compact binary the same prompt answers:
+
+```
+Get the CLASS "ZCL_DEMO".
+1. Call HandlerGet with object_type: "CLASS", class_name: "ZCL_DEMO", background: false.
+CLASS takes CLASS(class_name*); * marks a required argument.
+```
+
+`/update class ZCL_DEMO change="add a method that returns the current date"` on a compact
+binary answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write
+with `HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the
+user did not give is listed in the instruction as still to fill.
+
+A `prompts/get` with an `object_type` the binary does not serve is refused with the protocol's
+invalid-params error and names the types it serves. `BaseMcpServer` and `EmbeddableMcpServer`
+register the prompts after the tools; the option `prompts: false` registers none. A plain
+registration on an SDK `McpServer` registers none of its own accord;
+`registerAbapPrompts(server, registry)` adds them
+([HANDLER_EXPORTER.md](docs/architecture/HANDLER_EXPORTER.md)).
+
 ## Registries
 
 Published in the official MCP Registry and listed on Glama.ai.
@@ -314,6 +367,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
 - **[Batch Mode](docs/user-guide/BATCH_MODE.md)** - The compact binaries' `HandlerBatch`: record independent calls, send them together in batch envelopes at the batch's end, read their answers by number; which calls are recorded
+- **[MCP Prompts](docs/user-guide/PROMPTS.md)** - The nine prompts (`create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) per binary and kind, their `object_type` values, how a client shows them, the refusal
 - **[Tool Search](docs/user-guide/TOOL_SEARCH.md)** - The three texts each listed tool carries — `description` for the model, `keywords` for BM25, `semantic` for vector search — and where a client reads them
 - **[Debugger](docs/user-guide/DEBUGGER.md)** - The `debug` set of the write binaries: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves

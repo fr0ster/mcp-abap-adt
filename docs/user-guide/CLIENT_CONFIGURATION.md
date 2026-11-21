@@ -549,6 +549,21 @@ A destination with browser login renews its token itself: with the refresh token
 
 **Note:** Over HTTP and SSE the user and password come only from the headers (as shown above).
 
+## MCP Prompts in clients
+
+Every binary lists MCP prompts (`prompts/list`) beside its tools: `create`, `get`, `update`,
+`delete`, `activate`, `check`, `unit_test`, `where_used` and `transport`. A client shows them
+where it shows server prompts:
+
+- **Claude Code**: slash commands named `/mcp__<server>__<prompt>`, with the arguments after the
+  name (`/mcp__abap__get class ZCL_DEMO`); the value of a completed argument (`object_type`) is
+  offered as the user types.
+- **Other clients** (Claude Desktop, Cursor, Cline, VS Code and others): the prompt picker or
+  slash menu of the client's MCP integration; the client asks for the arguments in a form.
+
+The prompt's answer is an instruction for the model; the model then calls the tools of the same
+binary. A client with no prompt support lists the tools as before. See [PROMPTS.md](PROMPTS.md).
+
 ## Related Documentation
 
 - [Installation Guide](../installation/INSTALLATION.md)

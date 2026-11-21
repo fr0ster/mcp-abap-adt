@@ -22,7 +22,13 @@ const OUTPUT_PATHS = {
   ),
   high: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_HIGH.md'),
   legacy: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LEGACY.md'),
+  prompts: path.join(__dirname, '../docs/user-guide/PROMPTS.md'),
 };
+/** The prompts every binary lists, per binary and kind: a committed fixture. */
+const LISTED_PROMPTS_PATH = path.join(
+  __dirname,
+  '../tests/fixtures/tools/listed-prompts.json',
+);
 // `low` left in 19.0.0: the low set is not served by the full binaries,
 // and the low handler files that remain serve compact and high only.
 // `batch` left in 24.0.0: batch mode is the compact sets' (`HandlerBatch`).
@@ -37,6 +43,7 @@ Reads the built tool sets (dist; run npm run build first) and generates:
   docs/user-guide/AVAILABLE_TOOLS_READONLY.md
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
   docs/user-guide/AVAILABLE_TOOLS_LEGACY.md   (only when a tool declares legacy)
+  docs/user-guide/PROMPTS.md                  (from tests/fixtures/tools/listed-prompts.json)
 
 Output hierarchy:
   1) Group (level)
@@ -191,7 +198,10 @@ function moduleIndex() {
     for (const [key, value] of Object.entries(exported)) {
       if (isDefinition(value)) {
         if (!byDefinition.has(value)) byDefinition.set(value, file);
-        if (typeof value.inputSchema === 'object' && !bySchema.has(value.inputSchema))
+        if (
+          typeof value.inputSchema === 'object' &&
+          !bySchema.has(value.inputSchema)
+        )
           bySchema.set(value.inputSchema, file);
       } else if (
         typeof value === 'function' &&
@@ -314,9 +324,10 @@ function servedEntries(toolSet) {
   return toolSet
     .groups({ connection: null }, 'stdio', DOCUMENTED)
     .flatMap((group) =>
-      group
-        .getHandlers()
-        .map((entry) => ({ definition: entry.toolDefinition, group: group.constructor.name })),
+      group.getHandlers().map((entry) => ({
+        definition: entry.toolDefinition,
+        group: group.constructor.name,
+      })),
     );
 }
 
@@ -351,7 +362,13 @@ function loadToolsFromHandlers() {
   // The read-only group as it stands alone: within the full set it lists
   // only what the high group does not.
   const { ReadOnlyHandlersGroup } = require(
-    path.join(DIST_ROOT, 'lib', 'handlers', 'groups', 'ReadOnlyHandlersGroup.js'),
+    path.join(
+      DIST_ROOT,
+      'lib',
+      'handlers',
+      'groups',
+      'ReadOnlyHandlersGroup.js',
+    ),
   );
   for (const entry of new ReadOnlyHandlersGroup({
     connection: null,
@@ -373,11 +390,10 @@ function loadToolsFromHandlers() {
 function readOnlySetTools() {
   const { fullReadOnlyToolSet } = builtToolSets();
   const moduleOf = moduleIndex();
-  return servedEntries(fullReadOnlyToolSet)
-    .map(({ definition, group }) => ({
-      ...documentedTool(definition, group, moduleOf),
-      level: 'readonly',
-    }));
+  return servedEntries(fullReadOnlyToolSet).map(({ definition, group }) => ({
+    ...documentedTool(definition, group, moduleOf),
+    level: 'readonly',
+  }));
 }
 
 function levelTitle(level) {
@@ -404,6 +420,118 @@ function groupByLevelAndObject(tools) {
   }
 
   return grouped;
+}
+
+/** The listed prompts fixture: { listings, prompts }. */
+function loadListedPrompts() {
+  return JSON.parse(fs.readFileSync(LISTED_PROMPTS_PATH, 'utf8'));
+}
+
+const PROMPT_CALL_PREFIX = 'asks the model to call ';
+
+/** The tools a prompt's description says it asks the model to call. */
+function promptTools(description) {
+  const at = description.indexOf(PROMPT_CALL_PREFIX);
+  if (at < 0) return [];
+  const names = description.slice(at + PROMPT_CALL_PREFIX.length);
+  return names.replace(/\.$/, '').split(', ');
+}
+
+/** Tool name -> the prompts whose descriptions name it. */
+function promptsOfTools(listed) {
+  const byTool = new Map();
+  for (const [promptName, entries] of Object.entries(listed.prompts)) {
+    for (const entry of entries) {
+      for (const tool of promptTools(entry.value.prompt.description)) {
+        const names = byTool.get(tool) || new Set();
+        names.add(promptName);
+        byTool.set(tool, names);
+      }
+    }
+  }
+  return byTool;
+}
+
+/** The line a tool's entry carries when a prompt asks the model to call it. */
+function promptPointer(tool, byTool) {
+  const names = byTool.get(tool.name);
+  if (names === undefined) return '';
+  const shown = [...names].sort().map((name) => `\`${name}\``);
+  const noun = shown.length === 1 ? 'prompt' : 'prompts';
+  return `**Prompt:** the ${shown.join(', ')} ${noun} ask${shown.length === 1 ? 's' : ''} the model to call this tool ([PROMPTS.md](PROMPTS.md)).\n\n`;
+}
+
+const PROMPT_KINDS = [
+  ['onprem', 'On-premise system (`onprem`)'],
+  ['cloud', 'Cloud system (`cloud`)'],
+  [
+    'none',
+    'No system kind stated (stdio inspection mode, an embedder that states none)',
+  ],
+  ['legacy', 'Legacy system (`legacy`)'],
+];
+
+/** One argument's completion values, as the page lists them. */
+function completionWords(completions) {
+  return Object.entries(completions)
+    .map(
+      ([argument, values]) =>
+        `\`${argument}\`: ${values.map((v) => `\`${v}\``).join(', ')}`,
+    )
+    .join('; ');
+}
+
+/** What one binary lists on one kind: prompt name -> its completions. */
+function listingOf(listed, kind, binary) {
+  const names = listed.listings[`${kind} ${binary}`] || [];
+  const shown = {};
+  for (const name of names) {
+    const entry = listed.prompts[name].find((candidate) =>
+      candidate.listedBy.includes(`${kind} ${binary}`),
+    );
+    shown[name] = entry.value.completions;
+  }
+  return shown;
+}
+
+function generatePromptsMarkdown(listed) {
+  const binaries = [
+    ...new Set(Object.keys(listed.listings).map((key) => key.split(' ')[1])),
+  ];
+  let md = `# MCP Prompts - MCP ABAP ADT Server\n\n`;
+  md += `Generated from the prompts every binary lists (\`tests/fixtures/tools/listed-prompts.json\`, by \`npm run docs:tools\`), not from docs.\n\n`;
+  md += `## What a prompt is\n\n`;
+  md += `A prompt is a ready-made request the MCP client offers the user: a slash command in Claude Code (\`/mcp__<server>__create class ZCL_DEMO package_name=ZPKG\`), an entry in the prompt picker of other clients. The server answers with an instruction that names the tools to call, in order, with the arguments filled from the values the user gave. The model follows the instruction with the tools the same binary serves.\n\n`;
+  md += `Nine prompts: \`create\`, \`get\`, \`update\`, \`delete\`, \`activate\`, \`check\`, \`unit_test\`, \`where_used\`, \`transport\`. The object prompts take \`object_type\` and \`name\` (a function module also takes \`function_group\`); \`object_type\` completes in lower case and is accepted in any case. Each binary lists the prompts its tools serve, and the \`object_type\` values its tools serve on the system kind.\n\n`;
+  md += `## Refusal\n\n`;
+  md += `A \`prompts/get\` with an \`object_type\` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: \`<prompt>: object_type "<value>" is not served by this server; it serves <list>.\` A required argument that is absent or blank is refused the same way: \`<prompt>: <argument> is required.\`\n\n`;
+  md += `A prompt whose tools are denied (\`--deny-actions\`, [ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md)) loses those \`object_type\` values; a prompt with none left is not listed.\n\n`;
+  md += `\`prompts: false\` on \`BaseMcpServer\` or \`EmbeddableMcpServer\` lists none; \`registerAbapPrompts(server, registry)\` adds them to a plain registration ([HANDLER_EXPORTER.md](../architecture/HANDLER_EXPORTER.md)).\n\n`;
+  for (const [kind, title] of PROMPT_KINDS) {
+    md += `## ${title}\n\n`;
+    const groups = new Map();
+    for (const binary of binaries) {
+      const shown = listingOf(listed, kind, binary);
+      const signature = JSON.stringify(shown);
+      const group = groups.get(signature) || { binaries: [], shown };
+      group.binaries.push(binary);
+      groups.set(signature, group);
+    }
+    for (const group of groups.values()) {
+      const heading = group.binaries.map((b) => `\`${b}\``).join(', ');
+      md += `### ${heading}\n\n`;
+      const names = Object.keys(group.shown);
+      if (names.length === 0) {
+        md += `No prompt is listed.\n\n`;
+        continue;
+      }
+      for (const name of names) {
+        md += `- \`${name}\` - ${completionWords(group.shown[name])}\n`;
+      }
+      md += `\n`;
+    }
+  }
+  return md;
 }
 
 function renderParams(tool) {
@@ -496,7 +624,8 @@ function httpSurfaces() {
   };
 }
 
-function generateMarkdown(tools, surface) {
+function generateMarkdown(tools, surface, listedPrompts) {
+  const byTool = promptsOfTools(listedPrompts);
   const grouped = groupByLevelAndObject(tools);
   const summary = {
     total: tools.length,
@@ -574,6 +703,7 @@ function generateMarkdown(tools, surface) {
         md += `#### ${toolHeading}\n`;
         md += `**Description:** ${tool.description || 'No description'}\n\n`;
         md += `**Source:** \`${tool.filePath}\`\n\n`;
+        md += promptPointer(tool, byTool);
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
@@ -594,7 +724,9 @@ function generateLevelMarkdown(
   intro,
   appendix,
   appendixNavigation,
+  listedPrompts,
 ) {
+  const byTool = promptsOfTools(listedPrompts);
   const levelTools = tools.filter((t) => t.level === level);
   const grouped = groupByLevelAndObject(levelTools);
   const objects = Object.values(grouped[level]).sort((a, b) =>
@@ -635,6 +767,7 @@ function generateLevelMarkdown(
       md += `#### ${toolHeading}\n`;
       md += `**Description:** ${tool.description || 'No description'}\n\n`;
       md += `**Source:** \`${tool.filePath}\`\n\n`;
+      md += promptPointer(tool, byTool);
       md += optIn(tool);
       md += `**Parameters:**\n`;
       md += renderParams(tool);
@@ -738,7 +871,8 @@ function main() {
 
   console.log(`✅ Found ${tools.length} tools`);
   const surfaces = httpSurfaces();
-  const markdownAll = generateMarkdown(tools, surfaces.all);
+  const listedPrompts = loadListedPrompts();
+  const markdownAll = generateMarkdown(tools, surfaces.all, listedPrompts);
   fs.writeFileSync(OUTPUT_PATHS.all, markdownAll, 'utf8');
   fs.writeFileSync(
     OUTPUT_PATHS.readonly,
@@ -748,6 +882,7 @@ function main() {
       READ_ONLY_PAGE_INTRO,
       httpSectionMarkdown(surfaces.readonly),
       httpNavigationMarkdown(surfaces.readonly),
+      listedPrompts,
     ),
     'utf8',
   );
@@ -759,7 +894,13 @@ function main() {
       HIGH_PAGE_INTRO,
       `<a id="${anchorFromHeading(HTTP_HEADING)}"></a>\n## ${HTTP_HEADING}\n\n${stateHandleRule(surfaces.all)}\n\n`,
       httpNavigationMarkdown(undefined),
+      listedPrompts,
     ),
+    'utf8',
+  );
+  fs.writeFileSync(
+    OUTPUT_PATHS.prompts,
+    generatePromptsMarkdown(listedPrompts),
     'utf8',
   );
   // The legacy page writes itself back when there is something to put on it.
@@ -790,6 +931,7 @@ function main() {
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.all}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.readonly}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.high}`);
+  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.prompts}`);
   console.log(
     declaresLegacy
       ? `✅ Documentation generated: ${OUTPUT_PATHS.legacy}`
@@ -814,6 +956,7 @@ module.exports = {
   loadToolsFromHandlers,
   generateMarkdown,
   generateLevelMarkdown,
+  generatePromptsMarkdown,
   httpSectionMarkdown,
   httpNavigationMarkdown,
   stateHandleRule,

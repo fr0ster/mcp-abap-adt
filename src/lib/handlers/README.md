@@ -48,6 +48,22 @@ const mcpServer = new McpServer({ name: "mcp-abap-adt", version: "1.0.0" });
 handlersRegistry.registerAllTools(mcpServer);
 ```
 
+### Prompts on a plain registration
+
+`registerAllTools(server)` registers no MCP prompt. `registerAbapPrompts(server, registry)`
+(`@mcp-abap-adt/lib/prompts`) registers the nine prompts (`create`, `get`, `update`, `delete`,
+`activate`, `check`, `unit_test`, `where_used`, `transport`) for the tools the registry lists on
+the kind its groups state:
+
+```typescript
+import { registerAbapPrompts } from "@mcp-abap-adt/lib/prompts";
+
+handlersRegistry.registerAllTools(mcpServer);
+registerAbapPrompts(mcpServer, handlersRegistry);
+```
+
+`BaseMcpServer` registers them itself after its tools; `prompts: false` turns that off.
+
 ### Which variant a plain registration lists
 
 `registerAllTools(mcpServer)` (and `registerTool`) on a plain SDK `McpServer` lists the

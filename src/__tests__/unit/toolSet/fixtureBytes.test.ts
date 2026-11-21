@@ -24,6 +24,7 @@ import {
   transportSurfaces,
   variantSurface,
 } from '../../helpers/fixtureRenderings';
+import { listedPromptTools } from '../../helpers/promptTools';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import { listBinaries, listBinaryPrompts } from '../../helpers/servedTools';
 
@@ -70,7 +71,7 @@ describe('the tool-surface fixtures, byte for byte', () => {
       standIn,
     );
     assert.equal(
-      renderListedPrompts(listings),
+      renderListedPrompts(listings, listedPromptTools(listings)),
       committed('listed-prompts.json'),
     );
   });

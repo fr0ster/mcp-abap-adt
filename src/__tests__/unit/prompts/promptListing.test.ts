@@ -45,6 +45,7 @@ import {
   toolsNamed,
 } from '../../helpers/promptArguments';
 import { promptSourceFor } from '../../helpers/promptSources';
+import { askedOf, listedPromptTools } from '../../helpers/promptTools';
 import { repositoryRoot } from '../../helpers/repoRoot';
 import {
   binaryClient,
@@ -102,22 +103,6 @@ const TEXT_BINARIES: readonly TextBinary[] = [
   },
 ];
 
-/** The arguments `listed` lists as required. */
-const requiredOf = (listed: ListedPrompt): string[] =>
-  (listed.prompt.arguments ?? [])
-    .filter(({ required }) => required === true)
-    .map(({ name }) => name);
-
-/** Every `<prompt, value, arguments>` a listed prompt is asked for. */
-function asked(listed: ListedPrompt) {
-  const name = listed.prompt.name;
-  const values = listed.completions[closedArgumentOf(name)] ?? [];
-  return values.map((value) => ({
-    value,
-    args: promptArguments(name, value, requiredOf(listed)),
-  }));
-}
-
 /** The text of a `prompts/get` answer. */
 function textOfAnswer(messages: ReadonlyArray<{ content: { type: string } }>) {
   return messages
@@ -150,7 +135,7 @@ async function answeredBy(
   }
   const texts: Array<{ key: string; text: string }> = [];
   for (const listed of await promptsOf(client)) {
-    for (const { value, args } of asked(listed)) {
+    for (const { value, args } of askedOf(listed)) {
       if (!binary.asks(listed.prompt.name, value)) continue;
       const { messages } = await client.getPrompt({
         name: listed.prompt.name,
@@ -177,6 +162,8 @@ describe('the prompts each binary lists and answers (WRITE_LISTED_PROMPTS=1, WRI
   let listings: PromptListing[] = [];
   const answered: Answered[] = [];
   const texts: PromptTexts = new Map();
+  let toolsOf: (listing: PromptListing, prompt: string) => readonly string[] =
+    () => [];
   const saved = process.env.SAP_SYSTEM_TYPE;
 
   before(async () => {
@@ -184,6 +171,7 @@ describe('the prompts each binary lists and answers (WRITE_LISTED_PROMPTS=1, WRI
     resetProcessLatchForTests();
     standIn = await adtStandIn();
     listings = await listBinaryPrompts(LISTED_TYPES, standIn);
+    toolsOf = listedPromptTools(listings);
     for (const systemType of TEXT_TYPES) {
       declare(systemType);
       for (const binary of TEXT_BINARIES) {
@@ -203,7 +191,11 @@ describe('the prompts each binary lists and answers (WRITE_LISTED_PROMPTS=1, WRI
       for (const { key, text } of each) recordText(texts, key, listing, text);
     }
     for (const [variable, file, rendered] of [
-      ['WRITE_LISTED_PROMPTS', LISTED_PROMPTS, renderListedPrompts(listings)],
+      [
+        'WRITE_LISTED_PROMPTS',
+        LISTED_PROMPTS,
+        renderListedPrompts(listings, toolsOf),
+      ],
       ['WRITE_PROMPT_TEXTS', PROMPT_TEXTS, renderPromptTexts(texts)],
     ] as const) {
       if (process.env[variable] === '1') {
@@ -223,7 +215,7 @@ describe('the prompts each binary lists and answers (WRITE_LISTED_PROMPTS=1, WRI
 
   it('test 1: the listing per kind equals listed-prompts.json', () => {
     assert.equal(
-      renderListedPrompts(listings),
+      renderListedPrompts(listings, toolsOf),
       fs.readFileSync(LISTED_PROMPTS, 'utf8'),
     );
   });

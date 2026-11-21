@@ -115,17 +115,24 @@ export function renderListedSchemas(fixture: {
  * The prompts every binary lists, per declared system type: `listings`
  * names each `<system type> <binary>` and the prompts it lists (none on
  * `legacy`); `prompts` holds, per prompt, each distinct listed value — the
- * prompt as `prompts/list` answers it and what its arguments complete —
- * with every listing that lists it. One line per listing and per value, so
- * a change reads as that line.
+ * prompt as `prompts/list` answers it, what its arguments complete and
+ * `tools`, the tools its steps call (`toolsOf`, read from the instruction
+ * data, never from a text) — with every listing that lists it. One line per
+ * listing and per value, so a change reads as that line.
  */
 export function renderListedPrompts(
   listings: readonly PromptListing[],
+  toolsOf: (listing: PromptListing, prompt: string) => readonly string[],
 ): string {
   const byPrompt = new Map<string, Map<string, Listed>>();
-  for (const { systemType, bin, prompts } of listings) {
+  for (const listing of listings) {
+    const { systemType, bin, prompts } = listing;
     for (const { prompt, completions } of prompts) {
-      const value = { prompt, completions };
+      const value = {
+        prompt,
+        completions,
+        tools: toolsOf(listing, prompt.name),
+      };
       const key = JSON.stringify(value);
       const values = byPrompt.get(prompt.name) ?? new Map<string, Listed>();
       byPrompt.set(prompt.name, values);

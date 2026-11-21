@@ -348,6 +348,8 @@ export interface ListedPrompt {
 export interface PromptListing {
   readonly systemType: DeclaredType;
   readonly bin: string;
+  readonly transport: ServedTransport;
+  readonly kind: ToolSetKind;
   readonly prompts: readonly ListedPrompt[];
 }
 
@@ -392,6 +394,8 @@ export async function listBinaryPrompts(
           listings.push({
             systemType,
             bin: BINARIES[transport][kind].bin,
+            transport,
+            kind,
             prompts: await promptsOf(client),
           });
         } finally {

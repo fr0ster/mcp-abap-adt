@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import * as z from 'zod';
 import { InMemoryBackgroundRuns } from '../../../../background-runs-memory/src/InMemoryBackgroundRuns';
@@ -17,14 +18,17 @@ import { compactToolSet } from '../../../../compact/src/launcher';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import type { ServedTransport } from '../../../lib/config/binaries';
+import { HandlerExporter } from '../../../lib/handlers/HandlerExporter';
 import type {
   IHandlersRegistry,
   SapEnvironment,
 } from '../../../lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
   type AbapPrompt,
   membersOn,
   type PromptSource,
+  registerAbapPrompts,
 } from '../../../lib/prompts';
 import { registryOf, type ToolSet } from '../../../lib/toolSet';
 import { promptSourceFor } from '../../helpers/promptSources';
@@ -66,7 +70,7 @@ class PromptServer extends BaseMcpServer {
   }
 }
 
-async function connected(server: BaseMcpServer): Promise<Client> {
+async function connected(server: McpServer): Promise<Client> {
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'prompt-registration', version: '1' });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
@@ -228,4 +232,229 @@ describe("the server's prompt source equals the helper's", () => {
       });
     }
   }
+});
+
+/** The registry `exporter.createRegistry()` hands out, as the composite it is. */
+function exportedRegistry(
+  exporter: HandlerExporter,
+): CompositeHandlersRegistry {
+  const registry = exporter.createRegistry();
+  assert.ok(registry instanceof CompositeHandlersRegistry);
+  return registry;
+}
+
+/** The arguments a prompt's closed set is completed for. */
+const CLOSED_ARGUMENTS = ['object_type', 'action'];
+
+/**
+ * What `client`'s server answers: its listing, and for each prompt and each
+ * value its closed argument completes, the text (or the refusal) of a
+ * `prompts/get` with every required argument filled.
+ */
+async function answers(client: Client) {
+  const { prompts } = await client.listPrompts();
+  const gets: Array<{ prompt: string; value: string; outcome: string }> = [];
+  for (const prompt of prompts) {
+    const closed = prompt.arguments?.find(({ name }) =>
+      CLOSED_ARGUMENTS.includes(name),
+    );
+    assert.ok(closed, `${prompt.name} takes a closed argument`);
+    const { completion } = await client.complete({
+      ref: { type: 'ref/prompt', name: prompt.name },
+      argument: { name: closed.name, value: '' },
+    });
+    for (const value of completion.values) {
+      const args: Record<string, string> = {};
+      for (const argument of prompt.arguments ?? []) {
+        if (argument.name === closed.name) args[argument.name] = value;
+        else if (argument.required === true) args[argument.name] = 'SOME_NAME';
+      }
+      const outcome = await client
+        .getPrompt({ name: prompt.name, arguments: args })
+        .then(
+          ({ messages }) =>
+            messages
+              .map(({ content }) =>
+                content.type === 'text' ? content.text : content.type,
+              )
+              .join('\n'),
+          (error: Error) => error.message,
+        );
+      gets.push({ prompt: prompt.name, value, outcome });
+    }
+  }
+  return { prompts, gets };
+}
+
+/** An SDK server with `registry`'s tools registered plainly, and its prompts. */
+function plainServer(registry: CompositeHandlersRegistry): McpServer {
+  const server = new McpServer({ name: 'plain', version: '1' });
+  registry.registerAllTools(server);
+  registerAbapPrompts(server, registry);
+  return server;
+}
+
+const noConnection = () => {
+  throw new Error('no call reaches a connection here');
+};
+
+describe('registerAbapPrompts: the opt-in for a plain registration', () => {
+  it('registerAllTools alone lists no prompt', async () => {
+    const server = new McpServer({ name: 'plain', version: '1' });
+    exportedRegistry(
+      new HandlerExporter({ systemType: 'onprem' }),
+    ).registerAllTools(server);
+    const client = await connected(server);
+    try {
+      assert.equal(client.getServerCapabilities()?.prompts, undefined);
+      await assert.rejects(client.listPrompts(), (error: Error) => {
+        assert.ok(error instanceof McpError);
+        assert.equal(error.code, ErrorCode.MethodNotFound);
+        return true;
+      });
+    } finally {
+      await client.close();
+    }
+  });
+
+  const cases: ReadonlyArray<{
+    readonly name: string;
+    readonly systemType: SapEnvironment | undefined;
+    readonly registry: () => CompositeHandlersRegistry;
+  }> = [
+    {
+      name: "the exporter's groups on onprem",
+      systemType: 'onprem',
+      registry: () =>
+        exportedRegistry(new HandlerExporter({ systemType: 'onprem' })),
+    },
+    {
+      name: "the exporter's groups on cloud",
+      systemType: 'cloud',
+      registry: () =>
+        exportedRegistry(new HandlerExporter({ systemType: 'cloud' })),
+    },
+    {
+      name: 'the compact groups, no kind stated',
+      systemType: undefined,
+      registry: () => registryOf(compactToolSet, 'stdio', { dataTools: false }),
+    },
+  ];
+  for (const { name, systemType, registry } of cases) {
+    it(`lists what BaseMcpServer lists, texts included: ${name}`, async () => {
+      const plain = await connected(plainServer(registry()));
+      const served = await connected(
+        new PromptServer(registry(), {
+          ...(systemType !== undefined && { systemType }),
+        }),
+      );
+      try {
+        const expected = await answers(served);
+        assert.ok(expected.prompts.length > 0);
+        assert.deepEqual(await answers(plain), expected);
+      } finally {
+        await plain.close();
+        await served.close();
+      }
+    });
+  }
+
+  it('plainListing lists the tools registerAllTools registers', () => {
+    for (const registry of [
+      registryOf(compactToolSet, 'stdio', { dataTools: false }),
+      exportedRegistry(new HandlerExporter({ systemType: 'cloud' })),
+    ]) {
+      registry.registerAllTools(new McpServer({ name: 'plain', version: '1' }));
+      assert.deepEqual(
+        registry
+          .plainListing()
+          .tools.map(({ definition }) => definition.name)
+          .sort(),
+        registry.getRegisteredTools().sort(),
+      );
+    }
+  });
+
+  it('groups stating different kinds are refused before any prompt', () => {
+    const registry = new CompositeHandlersRegistry([
+      ...exportedRegistry(
+        new HandlerExporter({ systemType: 'onprem' }),
+      ).getHandlerGroups(),
+      ...exportedRegistry(
+        new HandlerExporter({ systemType: 'cloud' }),
+      ).getHandlerGroups(),
+    ]);
+    const server = new McpServer({ name: 'plain', version: '1' });
+    assert.throws(() => registerAbapPrompts(server, registry), {
+      message: /^The handler groups state different system types: /,
+    });
+  });
+
+  it('legacy lists no prompt', async () => {
+    const client = await connected(
+      plainServer(
+        exportedRegistry(new HandlerExporter({ systemType: 'legacy' })),
+      ),
+    );
+    try {
+      assert.equal(client.getServerCapabilities()?.prompts, undefined);
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("the exporter's registry: where_used names no background argument", async () => {
+    const client = await connected(
+      plainServer(
+        exportedRegistry(new HandlerExporter({ systemType: 'onprem' })),
+      ),
+    );
+    try {
+      const { messages } = await client.getPrompt({
+        name: 'where_used',
+        arguments: { object_type: 'class', name: 'SOME_CLASS' },
+      });
+      const [message] = messages;
+      assert.ok(message && message.content.type === 'text');
+      assert.ok(message.content.text.includes('GetWhereUsed'));
+      assert.ok(!message.content.text.includes('background'));
+    } finally {
+      await client.close();
+    }
+  });
+
+  it("a second registerAbapPrompts throws the SDK's words for the first prompt", () => {
+    const registry = exportedRegistry(
+      new HandlerExporter({ systemType: 'onprem' }),
+    );
+    const server = plainServer(registry);
+    const first = new PromptServer(
+      exportedRegistry(new HandlerExporter({ systemType: 'onprem' })),
+      { systemType: 'onprem' },
+    ).prompts[0];
+    assert.ok(first);
+    assert.throws(() => registerAbapPrompts(server, registry), {
+      message: `Prompt ${first.name} is already registered`,
+    });
+  });
+
+  it("registerOnServer, then registerAbapPrompts, lists the full set's prompts", async () => {
+    const exporter = new HandlerExporter({ systemType: 'onprem' });
+    const server = new McpServer({ name: 'embedder', version: '1' });
+    exporter.registerOnServer(server, noConnection);
+    registerAbapPrompts(server, exportedRegistry(exporter));
+    const client = await connected(server);
+    const served = await connected(
+      new PromptServer(exportedRegistry(exporter), { systemType: 'onprem' }),
+    );
+    try {
+      assert.deepEqual(
+        (await client.listPrompts()).prompts,
+        (await served.listPrompts()).prompts,
+      );
+    } finally {
+      await client.close();
+      await served.close();
+    }
+  });
 });

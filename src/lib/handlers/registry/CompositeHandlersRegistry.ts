@@ -1,6 +1,11 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { isBackgroundRunTool } from '../../backgroundRuns/tools.js';
+import {
+  isBackgroundRunTool,
+  longToolInTheCall,
+} from '../../backgroundRuns/tools.js';
 import { listedTool } from '../../listedTool.js';
+import { isLongTool } from '../../longTools.js';
+import type { ListedPromptTool } from '../../prompts/types.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type {
   HandlerEntry,
@@ -68,6 +73,8 @@ export class CompositeHandlersRegistry<
    * Registers all tools from all handler groups on MCP server, each group
    * on the variant its context states. Groups stating different variants —
    * one of them none included — are refused before anything is registered.
+   * It registers no prompt: `registerAbapPrompts(server, registry)` is the
+   * opt-in.
    */
   registerAllTools(server: McpServer): void {
     this.registerGroups((group) => group.registerHandlers(server));
@@ -87,6 +94,37 @@ export class CompositeHandlersRegistry<
     this.registerGroups((group) =>
       group.registerHandlersOnCall(server, callContext),
     );
+  }
+
+  /**
+   * What a plain registration (`registerAllTools`) lists, as the prompts
+   * read it: the one variant every group states, and each tool as it is
+   * listed there — no background-run tool, a long tool answered in the call
+   * (`BaseHandlerGroup.registerOneTool`), a name listed once. Groups stating
+   * different variants are refused first, as `registerAllTools` refuses
+   * them.
+   */
+  plainListing(): {
+    kind: SapEnvironment | undefined;
+    tools: readonly ListedPromptTool[];
+  } {
+    const kind = this.refuseDifferentVariants();
+    const tools: ListedPromptTool[] = [];
+    const names = new Set<string>();
+    for (const group of this.handlerGroups) {
+      for (const entry of group.getHandlers()) {
+        const name = entry.toolDefinition.name;
+        if (isBackgroundRunTool(name) || names.has(name)) continue;
+        const definition = isLongTool(name)
+          ? longToolInTheCall(entry.toolDefinition)
+          : entry.toolDefinition;
+        const listed = listedTool(definition, kind);
+        if (!listed.listed) continue;
+        names.add(name);
+        tools.push({ definition, inputSchema: listed.inputSchema });
+      }
+    }
+    return { kind, tools };
   }
 
   /**

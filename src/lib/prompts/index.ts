@@ -13,7 +13,7 @@ export {
   transportReadsWords,
   transportTakesWords,
 } from './refusals.js';
-export { registerPrompts } from './register.js';
+export { registerAbapPrompts, registerPrompts } from './register.js';
 export { promptResult } from './result.js';
 export { matchServed, requiredArgument, type ServedType } from './served.js';
 export {

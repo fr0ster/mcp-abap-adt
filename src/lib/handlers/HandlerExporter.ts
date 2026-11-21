@@ -515,6 +515,11 @@ export class HandlerExporter {
    * on a clock and nothing is retried. The connection is the provider's: each
    * call uses what it returns, and a lock held across calls needs the
    * provider to return the same connection.
+   *
+   * It registers no prompt. The prompts of the common ABAP work are an
+   * opt-in: `registerAbapPrompts(server, registry)`
+   * (`@mcp-abap-adt/lib/prompts`), given the registry `createRegistry()`
+   * returns, registers the prompts of these tools on the same server.
    */
   registerOnServer(
     server: McpServer,
@@ -554,6 +559,12 @@ export class HandlerExporter {
    * resolver, rules, logger and `SearchSource` strategies
    * (`sapAnswerStrategy`, `lineMatchStrategy`) are that server's options,
    * and this exporter's do not apply.
+   *
+   * Handed to a server, it gets that server's prompts, built from the tools
+   * the server lists (its `prompts` option turns them off). Registered
+   * plainly (`registerAllTools`), it registers no prompt:
+   * `registerAbapPrompts(mcpServer, registry)` (`@mcp-abap-adt/lib/prompts`)
+   * is the opt-in. The registry is a `CompositeHandlersRegistry`.
    */
   createRegistry(): IHandlersRegistry {
     return new ExportedRegistry(this.registryGroups, this.handlerGroups);

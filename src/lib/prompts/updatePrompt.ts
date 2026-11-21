@@ -7,6 +7,7 @@ import * as z from 'zod';
 import { jsonLiteral } from './instruction.js';
 import {
   compactNamed,
+  familyRows,
   headline,
   lockToolsFor,
   objectPrompt,
@@ -58,12 +59,15 @@ function changeNotes(args: PromptArguments): readonly string[] {
 
 /** `update`: read the object, then write it. */
 export function updatePrompt(source: PromptSource): AbapPrompt | undefined {
-  const reads = servedRows(source, FULL_ROWS.get, COMPACT_ROWS.get);
+  // A write reads with its own family's read: a full read listed beside
+  // the compact tools serves no compact write.
+  const reads = {
+    full: familyRows(source, FULL_ROWS.get, COMPACT_ROWS.get, 'full'),
+    compact: familyRows(source, FULL_ROWS.get, COMPACT_ROWS.get, 'compact'),
+  };
   const readOf = (row: ServedRow): ServedRow | undefined => {
     const readType = readTypeOf(row.type);
-    return reads.find(
-      (read) => read.type === readType && read.family === row.family,
-    );
+    return reads[row.family].find((read) => read.type === readType);
   };
   const rows = servedRows(source, FULL_ROWS.update, COMPACT_ROWS.update).filter(
     (row) =>

@@ -90,6 +90,39 @@ export function offers(
   );
 }
 
+/** `type`'s full row, where its tool is listed. */
+function fullRowOf(
+  source: PromptSource,
+  full: Partial<Record<PromptObjectType, FullRow>>,
+  type: PromptObjectType,
+): ServedRow | undefined {
+  const row = full[type];
+  const tool = row === undefined ? undefined : listed(source, row.tool);
+  return row === undefined || tool === undefined
+    ? undefined
+    : { family: 'full', type, tool, name: row.name, content: row.content };
+}
+
+/** `member`'s compact row, where its tool offers it and `alsoNeeds` holds. */
+function compactRowOf<M extends PromptObjectType>(
+  source: PromptSource,
+  compact: CompactRow<M>,
+  member: M,
+  alsoNeeds: (type: M) => boolean,
+): ServedRow | undefined {
+  const tool = listed(source, compact.tool);
+  return offers(source, tool, member) && alsoNeeds(member)
+    ? {
+        family: 'compact',
+        type: member,
+        tool,
+        name: compact.name[member],
+        content: compact.content?.[member],
+        token: compact.token(member),
+      }
+    : undefined;
+}
+
 /**
  * The types an operation serves, each with its row: the full row where its
  * tool is listed, else the compact row where its tool offers the type and
@@ -103,34 +136,35 @@ export function servedRows<M extends PromptObjectType>(
   alsoNeeds: (type: M) => boolean = () => true,
 ): readonly ServedRow[] {
   const served = new Map<PromptObjectType, ServedRow>();
-  const viaFull = (type: PromptObjectType): ServedRow | undefined => {
-    const row = full[type];
-    const tool = row === undefined ? undefined : listed(source, row.tool);
-    return row === undefined || tool === undefined
-      ? undefined
-      : { family: 'full', type, tool, name: row.name, content: row.content };
-  };
-  const compactTool = listed(source, compact.tool);
   for (const member of compact.members) {
-    const fullRow = viaFull(member);
-    if (fullRow !== undefined) {
-      served.set(member, fullRow);
-    } else if (offers(source, compactTool, member) && alsoNeeds(member)) {
-      served.set(member, {
-        family: 'compact',
-        type: member,
-        tool: compactTool,
-        name: compact.name[member],
-        content: compact.content?.[member],
-        token: compact.token(member),
-      });
-    }
+    const row =
+      fullRowOf(source, full, member) ??
+      compactRowOf(source, compact, member, alsoNeeds);
+    if (row !== undefined) served.set(member, row);
   }
   for (const type of PROMPT_OBJECT_TYPES) {
-    const fullRow = served.has(type) ? undefined : viaFull(type);
-    if (fullRow !== undefined) served.set(type, fullRow);
+    const row = served.has(type) ? undefined : fullRowOf(source, full, type);
+    if (row !== undefined) served.set(type, row);
   }
   return [...served.values()];
+}
+
+/**
+ * The rows of one family alone: every full row whose tool is listed, or
+ * every compact row its tool offers — so a step of one family finds a row
+ * of its own family where both are listed.
+ */
+export function familyRows<M extends PromptObjectType>(
+  source: PromptSource,
+  full: Partial<Record<PromptObjectType, FullRow>>,
+  compact: CompactRow<M>,
+  family: ServedRow['family'],
+): readonly ServedRow[] {
+  return family === 'full'
+    ? PROMPT_OBJECT_TYPES.flatMap((type) => fullRowOf(source, full, type) ?? [])
+    : compact.members.flatMap(
+        (member) => compactRowOf(source, compact, member, () => true) ?? [],
+      );
 }
 
 /** The tools of `rows`, with those `alsoCalls` names per row, each once, in row order. */

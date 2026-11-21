@@ -89,6 +89,23 @@ const ACTIVATION_TOOLS: ReadonlySet<string> = new Set([
 const ACTIVATION_OBJECTS = 'objects';
 const ACTIVATION_ADT_TYPE = 'object_adt_type';
 
+/**
+ * The tools that send transport entries, each `pgmid` `type` `name`: a move
+ * sends a list, `objects[]` of `object_name`, `object_type` and `pgmid`; an
+ * add or a remove one object by the same arguments. An entry `R3TR DEVC`
+ * names a package. The program id left out or blank is `R3TR`, as sent.
+ */
+const TRANSPORT_LIST_TOOLS: ReadonlySet<string> = new Set([
+  'MoveTransportObjects',
+  'HandlerTransportMoveObjects',
+]);
+const TRANSPORT_OBJECT_TOOLS: ReadonlySet<string> = new Set([
+  'AddTransportObject',
+  'RemoveTransportObject',
+]);
+const TRANSPORT_OBJECTS = 'objects';
+const PGMID = 'pgmid';
+
 /** The arguments a tool dispatches on. */
 const DISPATCH_ARGUMENTS: readonly string[] = [
   'object_type',
@@ -115,6 +132,11 @@ export interface CheckedArguments {
    * are checked, and with `single` its one object named by `object_name`.
    */
   readonly activation: { readonly single: boolean } | undefined;
+  /**
+   * Transport entries (`TRANSPORT_LIST_TOOLS`, `TRANSPORT_OBJECT_TOOLS`):
+   * an `R3TR DEVC` entry's name is checked as a package.
+   */
+  readonly transportEntries: 'list' | 'object' | undefined;
 }
 
 /** Every property a definition declares, on any variant. */
@@ -169,6 +191,16 @@ export function checkedArgumentsOf(
             (declared.has(OBJECT_TYPE) || declared.has(ACTIVATION_ADT_TYPE)),
         }
       : undefined;
+  const transportEntries = !changes
+    ? undefined
+    : TRANSPORT_LIST_TOOLS.has(definition.name) &&
+        declared.has(TRANSPORT_OBJECTS)
+      ? 'list'
+      : TRANSPORT_OBJECT_TOOLS.has(definition.name) &&
+          declared.has(OBJECT_NAME) &&
+          declared.has(OBJECT_TYPE)
+        ? 'object'
+        : undefined;
   const requests = changes
     ? REQUEST_ARGUMENTS.filter((argument) => declared.has(argument))
     : [];
@@ -183,7 +215,8 @@ export function checkedArgumentsOf(
     requests.length === 0 &&
     table === undefined &&
     packageObject === undefined &&
-    activation === undefined
+    activation === undefined &&
+    transportEntries === undefined
   ) {
     return undefined;
   }
@@ -195,6 +228,7 @@ export function checkedArgumentsOf(
     dispatch: DISPATCH_ARGUMENTS.find((argument) => declared.has(argument)),
     packageObject,
     activation,
+    transportEntries,
   };
 }
 
@@ -284,6 +318,42 @@ function activationValues(
 }
 
 /**
+ * Whether a transport entry is `R3TR DEVC`: the type `DEVC` and the program
+ * id `R3TR`, either trimmed and in any case, a program id left out or blank
+ * standing for `R3TR`.
+ */
+function namesPackageEntry(entry: ToolArgs): boolean {
+  if (named(entry, OBJECT_TYPE) !== 'DEVC') return false;
+  const pgmid = named(entry, PGMID);
+  return pgmid === undefined || pgmid === 'R3TR';
+}
+
+/**
+ * The packages a call's transport entries name: each `R3TR DEVC` entry of
+ * `objects[]` as `objects[].object_name`, or the one object as `object_name`.
+ */
+function transportEntryValues(
+  args: ToolArgs,
+  entries: CheckedArguments['transportEntries'],
+): NamedValue[] {
+  if (entries === 'object') {
+    return namesPackageEntry(args) ? namedValues(args, [OBJECT_NAME]) : [];
+  }
+  if (entries !== 'list') return [];
+  const objects = args[TRANSPORT_OBJECTS];
+  if (!isArgList(objects)) return [];
+  const values: NamedValue[] = [];
+  for (const entry of objects) {
+    if (!isArgObject(entry) || !namesPackageEntry(entry)) continue;
+    const value = named(entry, OBJECT_NAME);
+    if (value !== undefined) {
+      values.push({ argument: `${TRANSPORT_OBJECTS}[].${OBJECT_NAME}`, value });
+    }
+  }
+  return values;
+}
+
+/**
  * Whether the call creates the package `package_name` under
  * `super_package`: `CreatePackage`, or `HandlerCreate` with `object_type`
  * `PACKAGE`. No other call: `CheckPackage` declares `super_package` and never
@@ -314,6 +384,7 @@ export function accessCallOf(
     ),
     ...packageTargetValues(args, checked.packageTarget),
     ...activationValues(args, checked.activation),
+    ...transportEntryValues(args, checked.transportEntries),
   ];
   if (
     checked.packageObject !== undefined &&

@@ -555,11 +555,14 @@ Every binary lists MCP prompts (`prompts/list`) beside its tools: `create`, `get
 `delete`, `activate`, `check`, `unit_test`, `where_used` and `transport`. A client shows them
 where it shows server prompts:
 
-- **Claude Code**: slash commands named `/mcp__<server>__<prompt>`, with the arguments after the
-  name (`/mcp__abap__get class ZCL_DEMO`); the value of a completed argument (`object_type`) is
-  offered as the user types.
-- **Other clients** (Claude Desktop, Cursor, Cline, VS Code and others): the prompt picker or
-  slash menu of the client's MCP integration; the client asks for the arguments in a form.
+- **Claude Code**: in [its own words](https://code.claude.com/docs/en/mcp.md#use-mcp-prompts-as-commands), "Claude Code lists each MCP prompt as `/servername:promptname (MCP)`. Typing `/mcp__servername__promptname` also runs it." The arguments follow the
+  name, space-separated ("Claude Code splits the arguments on whitespace, so each argument is a
+  single token"): for a server named `abap`, `get` is listed as `/abap:get (MCP)`, and
+  `/mcp__abap__get class ZCL_DEMO` runs it; the value of a completed argument
+  (`object_type`) is offered as the user types.
+- **Other clients** (Claude Desktop, Cursor, Cline, VS Code and others) show prompts in their own
+  pickers: the prompt picker or slash menu of the client's MCP integration, which asks for the
+  arguments in its own way.
 
 The prompt's answer is an instruction for the model; the model then calls the tools of the same
 binary. A client with no prompt support lists the tools as before. See [PROMPTS.md](PROMPTS.md).

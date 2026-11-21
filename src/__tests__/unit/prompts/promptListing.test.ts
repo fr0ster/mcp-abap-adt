@@ -29,7 +29,7 @@ import { getCompleter } from '@modelcontextprotocol/sdk/server/completable.js';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { EMPTIED_INCLUDE_TYPES } from '../../../lib/compact/compactSchemas';
 import type { ServedTransport } from '../../../lib/config/binaries';
-import { abapPrompts } from '../../../lib/prompts';
+import { abapPrompts } from '../../../lib/prompts/prompts';
 import { statedSystemKind } from '../../../lib/systemKind';
 import { BINARIES, type ToolSetKind } from '../../../lib/toolSet';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';

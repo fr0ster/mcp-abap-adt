@@ -149,15 +149,14 @@ import {
   runAsOwner,
 } from '../lib/ownedConnections.js';
 import { freshConnectionAvailable } from '../lib/packageSessions.js';
-import {
-  type AbapPrompt,
-  abapPrompts,
-  type ListedPromptTool,
-  type PromptSource,
-  promptKindOf,
-  promptSourceOf,
-  registerPrompts,
-} from '../lib/prompts/index.js';
+import { abapPrompts } from '../lib/prompts/prompts.js';
+import { registerPrompts } from '../lib/prompts/register.js';
+import { promptKindOf, promptSourceOf } from '../lib/prompts/source.js';
+import type {
+  AbapPrompt,
+  ListedPromptTool,
+  PromptSource,
+} from '../lib/prompts/types.js';
 import {
   raceRequestSignal,
   runWithRequestSignal,

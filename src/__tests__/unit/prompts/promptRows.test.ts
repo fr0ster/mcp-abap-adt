@@ -13,13 +13,13 @@ import { readOnlyToolSet as compactReadOnlyToolSet } from '../../../../compact-r
 import { readOnlyToolSet as coreReadOnlyToolSet } from '../../../../core-ro/src/launcher';
 import type { ToolDefinition } from '../../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
-import type { ObjectOperation } from '../../../lib/prompts';
 import {
   COMPACT_ROWS,
   FULL_ROWS,
   PROMPT_OBJECT_TYPES,
   type PromptObjectType,
 } from '../../../lib/prompts/objectRows';
+import type { ObjectOperation } from '../../../lib/prompts/types';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import { fullToolSet, type ToolSet } from '../../../lib/toolSet';
 import { promptSourceFor } from '../../helpers/promptSources';

@@ -9,27 +9,32 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
+import { completeFrom } from '../../../lib/prompts/completion';
 import {
-  type AbapPrompt,
-  completeFrom,
-  hasProperty,
   jsonLiteral,
-  type ListedPromptTool,
-  longToolStep,
-  matchServed,
-  membersOn,
-  notServedWords,
-  type PromptInstruction,
-  type PromptSource,
-  promptRefusal,
-  promptResult,
   renderInstruction,
-  requiredArgument,
-  requiredArguments,
+} from '../../../lib/prompts/instruction';
+import {
+  notServedWords,
+  promptRefusal,
   requiredWords,
-  toolStep,
   transportTakesWords,
-} from '../../../lib/prompts';
+} from '../../../lib/prompts/refusals';
+import { promptResult } from '../../../lib/prompts/result';
+import { matchServed, requiredArgument } from '../../../lib/prompts/served';
+import {
+  hasProperty,
+  longToolStep,
+  membersOn,
+  requiredArguments,
+  toolStep,
+} from '../../../lib/prompts/source';
+import type {
+  AbapPrompt,
+  ListedPromptTool,
+  PromptInstruction,
+  PromptSource,
+} from '../../../lib/prompts/types';
 import { fullToolSet } from '../../../lib/toolSet';
 import { promptSourceFor } from '../../helpers/promptSources';
 

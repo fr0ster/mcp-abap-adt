@@ -2,8 +2,10 @@ import * as z from 'zod';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { RUNNER_FIELD, SCOPE_FIELD, WAIT_FIELD } from '../shared/runner';
 /**
- * RunFunctionModuleUnitTest — run the ABAP Unit tests that exercise one
- * function module and answer the result.
+ * RunFunctionModuleUnitTest — run the ABAP Unit tests of the function group
+ * holding one function module and answer the result: SAP replaces a FUNC
+ * run object by its function group (`CL_AUL_TEST_SUITE->replace_func_w_fugr`,
+ * read on premise and on the cloud).
  */
 
 import { answer } from '../../../lib/answer';
@@ -24,11 +26,11 @@ export const TOOL_DEFINITION = {
   name: 'RunFunctionModuleUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Runs the ABAP Unit tests of the function module named by function_module_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group, called with wait left out.",
+    "Runs the ABAP Unit tests of the module's whole function group: the function module named by function_module_name is run, and SAP runs the tests of the function group holding it. runner async (default), addressed by function_module_name alone: the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group, called with wait left out.",
   inputSchema: z.object({
     function_module_name: z
       .string()
-      .describe('Function module whose tests run.'),
+      .describe('Function module whose function group the tests run for.'),
     function_group_name: z
       .string()
       .optional()

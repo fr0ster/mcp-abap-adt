@@ -186,7 +186,8 @@ lists, with the arguments their listed schemas take. The tables that map an oper
 `TRANSPORT_ACTIONS`); an operation without rows does not compile.
 
 `BaseMcpServer` registers the prompts after the tools (`prompts: false` turns them off); a plain
-registration registers them only through `registerAbapPrompts(server, registry)`. A denied tool
+registration registers them only through `registerAbapPrompts(server, registry)`, the one export
+of `@mcp-abap-adt/lib/prompts`; the rows, steps and builders stay internal. A denied tool
 or value leaves the prompt's `object_type` values, and a prompt with none left is not
 registered. `listed-prompts.json` and `prompt-texts.json` (`tests/fixtures/tools/`) pin the
 listing and the texts per binary and kind. See

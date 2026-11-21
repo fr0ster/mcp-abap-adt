@@ -25,6 +25,19 @@ export function requiredWords(prompt: PromptName, argument: string): string {
   return `${prompt}: ${argument} is required.`;
 }
 
+/**
+ * `function_group` is given for an object type whose steps read none: the
+ * types that read it are named (lowercase).
+ */
+export function functionGroupReadWords(
+  prompt: PromptName,
+  takers: readonly string[],
+): string {
+  return takers.length === 0
+    ? `${prompt}: function_group is read with no object_type this server serves.`
+    : `${prompt}: function_group is read with object_type ${takers.join(', ')} only.`;
+}
+
 /** A transport action misses arguments it takes. */
 export function transportTakesWords(
   action: string,

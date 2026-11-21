@@ -268,7 +268,10 @@ batch mode. Over Streamable HTTP, send the `state_handle` `HandlerBatch` `action
 ## Prompts
 
 Every binary lists MCP prompts beside its tools: ready-made requests an MCP client offers the
-user (Claude Code shows them as `/mcp__<server>__<prompt>`). A prompt answers with an
+user. In [Claude Code's words](https://code.claude.com/docs/en/mcp.md#use-mcp-prompts-as-commands), "Claude Code lists each MCP prompt as
+`/servername:promptname (MCP)`. Typing `/mcp__servername__promptname` also runs it." For a
+server named `abap`: `/abap:get (MCP)` in the list, `/mcp__abap__get class ZCL_DEMO` typed.
+Other clients show prompts in their own pickers. A prompt answers with an
 instruction that names the tools to call, in order, with the user's values filled in; the model
 follows it with the tools of the same binary. Nine prompts, plain names:
 
@@ -280,12 +283,14 @@ follows it with the tools of the same binary. Nine prompts, plain names:
 | `delete` | `object_type`, `name`, `transport_request` | delete the object |
 | `activate` | `object_type`, `name` | activate the object |
 | `check` | `object_type`, `name` | check the object |
-| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module, CDS view or package |
+| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module (its whole function group's), CDS view or package |
 | `where_used` | `object_type`, `name`, `container` | list the objects that use the object |
 | `transport` | `action`, `number`, `description`, `user`, `object_type`, `name`, `target_number` | work with transport requests: create, create a task, list, get, list objects, read the log, add, remove or move an object, sort and compress |
 
-`object_type` completes in lower case and is accepted in any case. A function module also takes
-`function_group`. Each binary lists the prompts its tools serve, with the `object_type` values
+`object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and
+are accepted in any case. A function module also takes `function_group` (not in `unit_test`: a
+run names the module alone and covers the ABAP Unit tests of its whole function group); given
+for another type, it is refused, not dropped. Each binary lists the prompts its tools serve, with the `object_type` values
 its tools serve on the system kind: the read-only binaries list `get`, `where_used` and
 `transport` (and, compact, `check`); a denied tool or value removes its `object_type` values,
 and a prompt with none left is not listed. [PROMPTS.md](docs/user-guide/PROMPTS.md) lists the
@@ -306,10 +311,24 @@ Get the CLASS "ZCL_DEMO".
 CLASS takes CLASS(class_name*); * marks a required argument.
 ```
 
-`/update class ZCL_DEMO change="add a method that returns the current date"` on a compact
-binary answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write
-with `HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the
-user did not give is listed in the instruction as still to fill.
+A value of several words does not fit a slash command, whose arguments Claude Code splits on
+whitespace; a client that asks for the arguments in a form, or a `prompts/get`, takes it whole.
+`update` with these arguments on a compact binary:
+
+```json
+{
+  "name": "update",
+  "arguments": {
+    "object_type": "class",
+    "name": "ZCL_DEMO",
+    "change": "add a method that returns the current date"
+  }
+}
+```
+
+answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write with
+`HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the user did
+not give is listed in the instruction as still to fill.
 
 A `prompts/get` with an `object_type` the binary does not serve is refused with the protocol's
 invalid-params error and names the types it serves. `BaseMcpServer` and `EmbeddableMcpServer`

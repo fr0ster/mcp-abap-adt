@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { compactToolSet } from '../../../../compact/src/launcher';
-import type { PromptSource } from '../../../lib/prompts';
 import { jsonLiteral } from '../../../lib/prompts/instruction';
 import { deletePrompt } from '../../../lib/prompts/objectPrompts';
+import type { PromptSource } from '../../../lib/prompts/types';
 import { updatePrompt } from '../../../lib/prompts/updatePrompt';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import { fullToolSet, type ToolSet } from '../../../lib/toolSet';

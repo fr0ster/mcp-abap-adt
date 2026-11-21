@@ -11,12 +11,12 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { readOnlyToolSet as compactReadOnlyToolSet } from '../../../../compact-ro/src/launcher';
-import type { PromptSource, ReadEntryField } from '../../../lib/prompts';
 import {
   ENTRY_ARGUMENT,
   OBJECT_DIRECTORY_TYPE,
 } from '../../../lib/prompts/transportEntry';
 import { transportPrompt } from '../../../lib/prompts/transportPrompt';
+import type { PromptSource, ReadEntryField } from '../../../lib/prompts/types';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import {
   fullReadOnlyToolSet,
@@ -102,6 +102,46 @@ describe('the texts (spec §2.5)', () => {
         '1. Call HandlerSystem with action: "transports", background: false.',
       ].join('\n'),
     );
+  });
+});
+
+describe('action is accepted in any case (M9)', () => {
+  const prompt = promptOf(transportPrompt, core);
+
+  for (const given of ['CREATE', 'Create', ' create ']) {
+    it(`${JSON.stringify(given)} reads as create`, () => {
+      assert.equal(
+        textOf(prompt, { action: given, description: 'some words' }),
+        textOf(prompt, { action: 'create', description: 'some words' }),
+      );
+    });
+  }
+
+  it('an unknown action is refused naming the served ones in lower case', () => {
+    assertRefused(
+      prompt,
+      { action: 'RELEASE' },
+      'transport: action "RELEASE" is not served by this server; it serves create, create_task, list, get, objects, log, add_object, remove_object, move_objects, sort_compress.',
+    );
+  });
+
+  it('object_type is completed for an action given in upper case', async () => {
+    assert.equal(
+      (await completionOf(prompt, 'object_type', '', { action: 'ADD_OBJECT' }))
+        .length,
+      16,
+    );
+    assert.deepEqual(
+      await completionOf(prompt, 'object_type', '', { action: 'LIST' }),
+      [],
+    );
+  });
+
+  it('action completes in lower case', async () => {
+    assert.deepEqual(await completionOf(prompt, 'action', 'CREATE'), [
+      'create',
+      'create_task',
+    ]);
   });
 });
 

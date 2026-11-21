@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { readOnlyToolSet as compactReadOnlyToolSet } from '../../../../compact-ro/src/launcher';
-import type { PromptSource } from '../../../lib/prompts';
+import type { PromptSource } from '../../../lib/prompts/types';
 import { whereUsedPrompt } from '../../../lib/prompts/whereUsedPrompt';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import {
@@ -196,6 +196,24 @@ describe('container', () => {
     );
   });
 
+  for (const given of ['PROGRAM', 'Function_Group']) {
+    it(`${given} is accepted in any case and sent in lower case`, () => {
+      const [step] = prompt.instruction({
+        object_type: 'text_elements',
+        name: 'SOME_PROGRAM',
+        container: given,
+      }).steps;
+      assert.ok(
+        step?.arguments.some(
+          ([name, value]) =>
+            name === 'container' &&
+            value.from === 'user' &&
+            value.value === given.toLowerCase(),
+        ),
+      );
+    });
+  }
+
   it('screen is refused naming the listed values', () => {
     assertRefused(
       prompt,
@@ -206,6 +224,34 @@ describe('container', () => {
       },
       'where_used: container is one of program, function_group.',
     );
+  });
+
+  it('is completed only for text_elements, in any case, or before object_type is given', async () => {
+    const both = ['program', 'function_group'];
+    for (const objectType of [
+      'text_elements',
+      'TEXT_ELEMENTS',
+      ' Text_Elements ',
+    ]) {
+      assert.deepEqual(
+        await completionOf(prompt, 'container', '', {
+          object_type: objectType,
+        }),
+        both,
+        objectType,
+      );
+    }
+    assert.deepEqual(
+      await completionOf(prompt, 'container', '', { object_type: 'class' }),
+      [],
+    );
+    assert.deepEqual(
+      await completionOf(prompt, 'container', '', { object_type: '' }),
+      both,
+    );
+    assert.deepEqual(await completionOf(prompt, 'container', 'PRO'), [
+      'program',
+    ]);
   });
 
   it('is completed from the listed enum', async () => {

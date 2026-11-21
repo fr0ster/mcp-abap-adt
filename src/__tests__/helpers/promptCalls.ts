@@ -7,11 +7,8 @@
 import assert from 'node:assert/strict';
 import { getCompleter } from '@modelcontextprotocol/sdk/server/completable.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
-import {
-  type AbapPrompt,
-  type PromptSource,
-  renderInstruction,
-} from '../../lib/prompts';
+import { renderInstruction } from '../../lib/prompts/instruction';
+import type { AbapPrompt, PromptSource } from '../../lib/prompts/types';
 
 /** The prompt `factory` builds from `source`, which must list it. */
 export function promptOf(

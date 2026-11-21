@@ -22,6 +22,16 @@ export function matchServed<T extends string>(
 }
 
 /**
+ * `values` keyed by their lowercase form: the map `matchServed` reads, so a
+ * closed set of values is accepted in any case and answered as listed.
+ */
+export function lowercaseKeyed<T extends string>(
+  values: readonly T[],
+): ReadonlyMap<string, T> {
+  return new Map(values.map((value) => [value.toLowerCase(), value]));
+}
+
+/**
  * An argument as given: `undefined` when absent, empty or blank, else its
  * value trimmed.
  */

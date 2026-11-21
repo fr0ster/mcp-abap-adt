@@ -56,6 +56,8 @@ commit and push it, and read what went wrong.
   list. On onprem, link, pull and push are SAP's synchronous writes and end on SAP's answer;
   a caller's cancel does not cut them. How such a write may run in the background follows the
   existing background-run rules.
+- **Any git host.** The remote repository can be on any git host reachable from the SAP system
+  over HTTPS.
 - **Git credentials stay secret.** A user, password or token for the remote repository
   reaches SAP's abapGit request and nothing else: not a log line, not a tool answer, not an
   error text, not a background-run record.

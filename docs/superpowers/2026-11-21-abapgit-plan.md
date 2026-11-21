@@ -57,9 +57,6 @@ load-bearing by the named mutation (break it, watch the test go red, revert).
   "**`background: true` is refused, never run in the foreground**" when it cannot run.
 - Cloud wait: "poll R1 until the entry shows a **new** log key **and** a terminal `status` (`S`,
   `W`, `E`, `A`); blank (initial) and `R` mean waiting."
-- Release gate: "If on a backend SAP forwards the credential to any URL other than the approved
-  endpoint — another host or another path alike — every credentialed call on that backend is
-  refused in fixed words until that is solved."
 
 The same owner rules bind every package: no retries and no timeouts; static types first;
 availability from the system; functional tool descriptions; compact keeps a minimal tool count;
@@ -94,13 +91,9 @@ interfaces packages) may be linked during development. Before tagging every link
 is released: every range resolves on the registry, the sibling is published first in order, and a
 clean install from the registry outside the repo installs.
 
-**Gates: what blocks and what does not.** Gates are recorded per backend (onprem, cloud) in
-adt-clients' ERRATA and in the server's `credentialGate.ts` table. **Blocks publishing** (G5) and
-the 24.2.0 release: a red unit, type or build check; a red functional live case on either backend;
-a T100 assertion that ran and failed (the §5.3 error contract would be wrong). **Never blocks:** a
-redirect gate that failed or could not be run (no remote, no evidence) — that backend is recorded
-"credentials refused" and ships with every credential-bearing route refused (T6.3); a later passing
-run flips it in a patch.
+**What blocks publishing** (G5) and the 24.2.0 release: a red unit, type or build check; a red
+functional live case on either backend; a T100 assertion that ran and failed on a backend (the §5.3
+error contract would be wrong).
 
 ## P1 — interfaces-adt-connection
 
@@ -286,7 +279,8 @@ sends. First failure: today's `getErrorLog` sends the absolute URL. Mutation: ac
 exactly as spec §3.1 says (R13/R14 `abapgitexternalrepo:user` / `password`). Test
 `src/__tests__/unit/clients/abapGit/credentialWire.test.ts`: per member and both forms, the exact
 element or header carries the values; they occur in no other header, element, URL, query, result or
-`IAdtError`. First failure: R13 writes `remoteUser`. Mutation: also write R13 `remotePassword` → red.
+`IAdtError`; the remote URLs used are of several hosts (none assumed), and no member parses a host or
+adds `.git`. First failure: R13 writes `remoteUser`. Mutation: also write R13 `remotePassword` → red.
 
 **T5.3 New members** (spec §3.2) implementing the T2.1 atoms; `link` gains `folderLogic`, its
 `branchName` default kept, deprecated. Test `src/__tests__/unit/clients/abapGit/members.test.ts`,
@@ -333,7 +327,7 @@ test:check && npm run test:unit` → green.
 one per member with `available_in` by route. Helper `src/__tests__/helpers/abapGitRemote.ts`: reads
 `~/.config/mcp-abap-adt/sessions/abapgit-live.env` (`ABAPGIT_REPO_URL`, `ABAPGIT_USER`,
 `ABAPGIT_TOKEN`; the token never printed or logged), makes and deletes the run's two object-empty
-branches through GitHub's Git Data API, keeps the recovery ledger (gitignored, beside the test
+branches through GitHub's Git Data API (the only host-specific code, test-only), keeps the recovery ledger (gitignored, beside the test
 config). Unit test `src/__tests__/unit/abapGitLedger.test.ts` over a stubbed R1: a cancelled or
 uncorrelated cloud run leaves its fixtures and a ledger entry; a later run waits while an entry is
 blank or `R`, cleans up once terminal, verifies the cleanup and removes the entry. First failure:
@@ -346,31 +340,12 @@ missing helper. Mutation: clean up while `R` → red.
   logged, not asserted. **T100 gate closes on a backend** when its case "a SAP refusal for the run's
   known key (`getFile` of a filename the repository does not hold, credentialed) carries
   `messageClass` and `messageNumber`" passes there.
-- `…/abapGit/AbapGitRedirect.test.ts` — **redirect gate**, onprem and cloud. Needs, not in the code:
-  one redirecting remote per case (another host; another path on the same host), from the owner,
-  each hop recording what it received (the recorder's log is read by the test; the token is
-  compared, never printed). **Evidence required per probed route, all three positive:** (1) the
-  first hop received the credential; (2) the first hop answered the redirect and the target
-  received the follow-up request; (3) that follow-up carried no credential. A route whose evidence is
-  missing any of the three counts as failed. **Route coverage:** every credentialed route that would
-  be enabled — pull (R4/R5), push (R10), branch switch (R15), files and checks (R12, R11, R9, R6),
-  external repo (R13/R14), link (R2) — is either probed or shown by SAP code to share a probed
-  route's transport path. **The shared-path ground** is a read of each route's call chain from its
-  resource class down to the abapGit HTTP client (onprem: `ZCL_ABAPGIT_RES_*` →
-  `ZCL_ABAPGIT_GIT_TRANSPORT` / `ZCL_ABAPGIT_HTTP_ADT`, seen in `RES_REPO_INFO_EXT`; cloud:
-  `CL_ABAPGIT_RES_*` → `CL_ABAPGIT_GIT_TRANSPORT` / `CL_ABAPGIT_HTTP`), quoted with class and line in
-  ERRATA; not yet read for every route, so until it is, a route is probed or stays refused. Probed
-  at minimum: R13 (upload-pack), R11 with credentials (receive-pack), R10 (push). **The gate opens a
-  route on a backend** only on that evidence and coverage; otherwise it skips or fails, and the
-  backend's credential-bearing routes stay refused (never a publishing blocker). The result per
-  backend and route goes into ERRATA and sets T6.3's table.
-
 Run: `bash -o pipefail -c 'npm test -- integration/clients/abapGit 2>&1 | tee test-run.log'` — the
 exit status is the run's.
 
 **T5.7 Review and release prep.** Whole-PR review; sibling links removed, every range resolving on
 the registry (adt-strategies 0.27.0 already published); root `npm run check`; after publishing, a
-clean install of 46.2.0 outside the repo; gate G5 (what blocks it: "Gates" above).
+clean install of 46.2.0 outside the repo; gate G5 (what blocks it: "What blocks publishing" above).
 
 ## P6 — server (this repo, PR #374)
 
@@ -400,24 +375,27 @@ failure → red.
 
 **T6.3 Endpoint binding.** `src/lib/abapGit/approvedEndpoints.ts`: `parseApprovedEndpoints(config)`
 (start error for userinfo, query, fragment, non-https); `matchEndpoint(url, endpoints): { sendUrl;
-credentials } | undefined` — host compared case-insensitively, path case-sensitively and exactly.
+credentials } | undefined` — host compared case-insensitively, path case-sensitively and exactly;
+any `https://` host and port, no host list, no host-specific parsing; the credential is a user and a
+password or token (spec §5.4).
 Sources: stdio file beside the session `.env` (location in `CLI_OPTIONS.md`); Streamable HTTP
 headers **per call** (nothing carried over on a `state_handle`); SSE opening-GET headers held by the
 instance. **A key-only route whose R1 URL matches only an alias:** the credential is attached (the
 alias is the owner's configured equivalent of that endpoint) and no URL is sent, since SAP uses its
 stored URL. `CLI_OPTIONS.md` and `AUTHENTICATION.md` state it: a configured trusted alias authorises
-that exact URL as a recipient of the credential. **Redirect gate:**
-`src/lib/abapGit/credentialGate.ts`, a per-backend, per-route table set from T5.6 (default: refused):
-a route whose gate did not open on that backend refuses every credential-bearing call of it (R2, R4, R5, R6, R9–R15) in fixed words before anything
-is sent; calls with no match are still sent anonymously. Test `endpointBinding.test.ts`: exact
+that exact URL as a recipient of the credential. Calls with no match are sent anonymously. Test `endpointBinding.test.ts`: exact
 match; alias on a URL route sends the configured URL; alias-only match on a key-only route attaches,
 sends no URL; `.git`, trailing `/`, port and path case near-misses do not match, host case does; no
 match sent anonymously (§9.3 a); userinfo/query/fragment in an argument refused before sending;
 key-addressed calls take R1's URL and ignore an argument URL; successive Streamable HTTP calls on
 one `state_handle` with another remote, another token or no headers each bind only their own (or
-none); SSE headers dropped with the stream; with the gate unclosed, every credential-bearing route
-refused (table-driven over the route list). First failure: missing module. Mutations: strip a
-trailing `/` → red; carry headers over the `state_handle` → red; skip the gate for one route → red.
+none); SSE headers dropped with the stream; endpoints on several hosts (a GitHub, a GitLab, an Azure
+DevOps `…/_git/<repo>` path, a self-hosted host on a non-default port) each match exactly and
+attach their own credential. Host agnosticism: `src/__tests__/unit/abapGit/hostAgnostic.test.ts`
+finds no host name (`github`, `gitlab`, `bitbucket`, `azure`, `gitea`) in `src/lib/abapGit/`,
+`src/handlers/abapgit/` or `src/lib/compact/abapGit/` (plain string search of our own source), and
+`toolDescriptionsCarryNoLiterals.test.ts` gains a host-name class. First failure: missing module. Mutations: strip a
+trailing `/` → red; carry headers over the `state_handle` → red.
 
 **T6.4 The mandatory pre-dispatch step**, outside the optional `IAccessChecks`.
 `src/lib/abapGit/admission.ts`: `admitAbapGitCall(call: AbapGitCall, context):
@@ -502,8 +480,11 @@ regenerates `AVAILABLE_TOOLS.md`, `AVAILABLE_TOOLS_READONLY.md`, `AVAILABLE_TOOL
 `compact/tools/generate-docs.js` regenerates `compact/docs/AVAILABLE_TOOLS.md`;
 `ACCESS_RESTRICTIONS.md`: the import refusal with spec §4.3's SAP code grounds (child tasks
 included), arguments per tool, the R1 pre-read exception and fail-closed cases, both compact tools'
-deny values; `AUTHENTICATION.md` and `CLI_OPTIONS.md`: approved endpoints per transport, the alias
-rule on key-only routes, the redirect gate; `CHANGELOG.md` 24.2.0 highlights naming the five
+deny values; `AUTHENTICATION.md` and `CLI_OPTIONS.md`: supported hosts as "any git host over HTTPS"
+(GitHub, GitLab, Bitbucket, Azure DevOps, Gitea, self-hosted), a worked configuration of a
+credential for a non-GitHub remote (stdio file entry and the three HTTP headers), the TLS trust the
+SAP system needs (spec §5.4), approved endpoints per transport, the alias
+rule on key-only routes; `CHANGELOG.md` 24.2.0 highlights naming the five
 dependency minors; `package.json` and every `server*.json` description. Each package's own CHANGELOG
 entry is in its own PR (T1.1, T2.1, T3.3, T4.2, T5.5).
 
@@ -513,9 +494,8 @@ entry is in its own PR (T1.1, T2.1, T3.3, T4.2, T5.5).
 goes into #374's description first.
 
 **T6.13 Release.** After #374 merges into `main`, the 24.2.0 release PR #371 merges `main`. What
-blocks it is the "Gates" paragraph: functional live runs and the T100 assertion on both backends.
-A failed or unverified redirect gate does not block: that backend ships with its credential-bearing
-routes refused (T6.3), as recorded in ERRATA and the server docs.
+blocks it is the "What blocks publishing" paragraph: functional live runs and the T100 assertion on
+both backends.
 
 ## Review Focus
 
@@ -523,6 +503,6 @@ routes refused (T6.3), as recorded in ERRATA and the server docs.
 |---|---|
 | A credential leaks through a resend, a followed redirect, a log line, or the raw response handed to an injected reader or analyser | T3.1, T3.2, T5.4, T6.8 |
 | Access checks: batch not refused first; link or pull reaching SAP under restrictions; R1 read twice, or after dispatch or a background start | T6.4 |
-| Endpoint binding: a near-miss or carried-over header binds; an argument URL trusted on a key route; the legacy `getErrorLog`/`pull` wrapper sends a foreign link; credentials sent on a backend whose redirect gate did not close | T5.1, T5.6, T6.3 |
+| Endpoint binding: a near-miss or carried-over header binds; an argument URL trusted on a key route; the legacy `getErrorLog`/`pull` wrapper sends a foreign link | T5.1, T6.3 |
 | abapGit listed or callable where discovery lacks it; a failed discovery cached; a listing holding its connection | T6.2 |
 | A cloud run misread or its fixtures deleted early: no new log key, a foreign R8 pairing, cleanup before a terminal state | T5.6, T6.4, T6.9 |

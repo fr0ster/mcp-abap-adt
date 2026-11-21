@@ -407,7 +407,9 @@ No tool argument carries a credential.
 
 - The credential configuration lists **approved endpoints**: each an exact remote URL — scheme
   (`https`), host (lower-cased), a non-default port when there is one, and path — with its
-  credential and optional trusted aliases of the same form. No `.git` or trailing `/` is merged:
+  credential and optional trusted aliases of the same form. Any host and any port: there is no host
+  list and no host-specific parsing (§5.4). The credential is what SAP's abapGit takes, a user and a
+  password or token (`IAbapGitCredentials`). No `.git` or trailing `/` is merged:
   `…/repo`, `…/repo/` and `…/repo.git` are three endpoints. Userinfo, query or fragment in a
   configured URL or alias is a start error; in a `url` argument a refusal before sending.
 - A credential is attached only when the target matches an approved URL or one of its aliases
@@ -419,13 +421,8 @@ No tool argument carries a credential.
 - **No match:** sent without credentials (SAP answers as for a public repository; a private one
   fails with SAP's structured error). Recommended over refusing, since the credential never leaves
   for an unbound host either way (§9.3).
-- **Release gate — redirects, per backend:** before the release, measure live on onprem and cloud
-  whether SAP's abapGit HTTP client forwards the credential when the remote redirects, in two
-  cases: to **another host**, and to **another path on the same host** (a renamed GitHub
-  repository redirects its old URL to the new path). If on a backend SAP forwards the credential
-  to any URL other than the approved endpoint — another host or another path alike — every
-  credentialed call on that backend is refused in fixed words until that is solved. Unverified until then (§10). Also unverified: whether a key's stored URL can change
-  after linking (no ADT route changes it; R1 is read on every call).
+- Unverified: whether a key's stored URL can change after linking (no ADT route changes it; R1 is
+  read on every call).
 
 ### 5.2 Scope per transport
 
@@ -463,6 +460,35 @@ no attempt is made to detect a credential in them.
 - Calls with no credential and not R8 (R1, R3, R7, R13 for an unbound URL…) keep the ordinary
   answer. R1's answer is the repository list SAP keeps (cloud strips credentials from URLs at
   link, Code; userinfo is refused before link).
+
+### 5.4 Hosts (Code, both systems, 2026-11-21, read-only)
+
+The remote can be any git host SAP reaches over HTTPS (GitHub, GitLab, Bitbucket, Azure DevOps,
+Gitea, a self-hosted server). Read: `ZCL_ABAPGIT_HTTP`, `ZCL_ABAPGIT_GIT_TRANSPORT`,
+`ZCL_ABAPGIT_HTTP_CLIENT`, `ZCL_ABAPGIT_HTTP_AGENT`, `ZCL_ABAPGIT_HTTP_ADT`, `ZCL_ABAPGIT_URL`
+(onprem) and their `CL_` twins (cloud; `CL_ABAPGIT_HTTP_ADT` does not exist there). A search of
+every source for `github`, `gitlab`, `bitbucket`, `azure`, `visualstudio`, `gitea` and `codecommit`
+finds only:
+
+- **User agent, not a branch:** `get_agent` (on `ZCL_ABAPGIT_HTTP` L231–237, cl `CL_ABAPGIT_HTTP`
+  L312–318) sends `git/2.0 (abapGit <version>)` to every host; its comment names Bitbucket's need
+  for the `git/` prefix.
+- **abapGit's own repository:** `is_abapgit_repo` (on `ZCL_ABAPGIT_URL` L74–80, cl `CL_ABAPGIT_URL`
+  L134–140) is true for a `github.com` URL ending `/abapGit` or `/abapGit.git`. It is not in the
+  transport or authentication path read here; its callers were not read.
+
+No host decides anything else:
+
+- **Authentication** is chosen by the server's `www-authenticate` answer, not by host:
+  `acquire_login_details` (on `ZCL_ABAPGIT_HTTP` L86–135, the `CASE` L117–133; cl `CL_ABAPGIT_HTTP`
+  L61–110, `CASE` L92–108) runs Digest when the scheme is Digest, else Basic with the user and the
+  password (`ii_client->authenticate`). A token goes as the password.
+- **URL parsing** takes any host and an optional `.git`: `regex` (on `ZCL_ABAPGIT_URL` L120–132, cl
+  `CL_ABAPGIT_URL` L198–210) matches `^(https?://[^/]*)(.*/)(.*)\.git$`, else the same without `.git`.
+- `*_GIT_TRANSPORT`, `*_HTTP_CLIENT` and `*_HTTP_AGENT` name no host on either system. The TLS
+  identity is fixed, not per host: the abapGit exit's `get_ssl_id` (`*_HTTP_AGENT` L86), `ANONYM`
+  in onprem `ZCL_ABAPGIT_HTTP_ADT->determine_access_level` (L41), `<client>_CA` in cloud
+  `CL_ABAPGIT_HTTP->determine_access_level` (L236). The host's certificate must be trusted there.
 
 ## 6. Errors
 
@@ -553,16 +579,16 @@ elsewhere with the reason, route-specific cases gated by system kind in code:
 - `ACCESS_RESTRICTIONS.md`: the import refusal with §4.3's SAP code grounds (SAP-created child
   tasks included), the arguments per tool, the R1 pre-read and fail-closed cases, both compact
   tools' deny values.
-- `AUTHENTICATION.md`, `CLI_OPTIONS.md`: approved endpoints per transport.
+- `AUTHENTICATION.md`, `CLI_OPTIONS.md`: approved endpoints per transport; supported hosts named as
+  "any git host over HTTPS" with examples (GitHub, GitLab, Bitbucket, Azure DevOps, Gitea,
+  self-hosted), a credential configured for a non-GitHub remote, and the TLS trust SAP needs (§5.4).
 - adt-clients README and `ERRATA.md` (§3.3); the `checkExternalRepo` defect in its CHANGELOG;
   connection's two options and the CSRF ground (§4.7) in its CHANGELOG.
 - CHANGELOG highlights: 24.2.0, interfaces-adt-connection, interfaces-adt, connection,
   adt-strategies, adt-clients.
 - **Release order:** interfaces-adt-connection → interfaces-adt → connection → adt-strategies →
   adt-clients, each published to the registry before the next builds on it; then the server from
-  the registry. **Release gate:** the redirect measurement of §5.1 on both backends, host and path
-  redirects: credentialed calls ship only where SAP forwards credentials to no URL but the
-  approved endpoint.
+  the registry.
 
 ## 9. Open decisions
 
@@ -586,7 +612,6 @@ What a decision above rests on is marked ★.
 - That an abapGit route's error document actually carries `T100KEY-ID` / `T100KEY-NO`: Code says
   it does (`CL_ADT_EXCEPTION_UTILITY` L94–97, both systems); not measured on these routes. The
   first live run asserts it.
-- ★ The redirect behaviour of §5.1 (host and path redirects), a release gate on each backend.
 - ★ Whether the connector's CSRF path runs on RFC (§4.7).
 - Which `CL_ADT_WB_RES_APP` proxy serves a request (`get_request_proxy`, not read); both check CSRF
   first.

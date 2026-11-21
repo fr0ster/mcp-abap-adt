@@ -170,6 +170,13 @@ async function create(
   return answerOf(result);
 }
 
+/** Whether `url` reads the package `name`: its path, the query left out. */
+const readsPackage = (url: string, name: string) =>
+  url
+    .toLowerCase()
+    .split('?')[0]
+    ?.endsWith(`/packages/${name.toLowerCase()}`) === true;
+
 /** Requests that are not reads: the create and anything after it. */
 const writes = (connection: RecordingConnection) =>
   connection.requests.filter(
@@ -205,9 +212,7 @@ for (const tool of ['CreatePackage', 'HandlerCreate'] as const) {
           connection.requests.some(
             (request) =>
               request.method.toUpperCase() === 'GET' &&
-              request.url
-                .toLowerCase()
-                .endsWith(`/packages/${parent.toLowerCase()}`),
+              readsPackage(request.url, parent),
           ),
           JSON.stringify(connection.requests.map((r) => r.url)),
         );
@@ -217,7 +222,7 @@ for (const tool of ['CreatePackage', 'HandlerCreate'] as const) {
   }
 
   it(`${tool}: with no list configured nothing is read for the parent`, async () => {
-    const connection = connectionWithout('ZTEAM_NOPE');
+    const connection = recordingConnection();
     const answer = await create(
       tool,
       connection,
@@ -228,7 +233,7 @@ for (const tool of ['CreatePackage', 'HandlerCreate'] as const) {
     assert.notEqual(answer.error, 'package_tree_unreadable');
     assert.equal(
       connection.requests.some((request) =>
-        request.url.toLowerCase().endsWith('/packages/zteam_nope'),
+        readsPackage(request.url, 'ZTEAM_NOPE'),
       ),
       false,
     );

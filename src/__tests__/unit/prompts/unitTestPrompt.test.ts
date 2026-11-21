@@ -64,8 +64,8 @@ describe('the texts (spec §2.3)', () => {
       [
         'Run the unit tests of the PACKAGE "SOME_PACKAGE".',
         '1. Call HandlerUnitTestRun with target: {"kind":"package","name":"SOME_PACKAGE","include_subpackages":true}; keep the run_id it answers.',
-        '2. Call HandlerUnitTestStatus with run_id: the run_id from step 1, with_long_polling: true, until the status is FINISHED.',
-        '3. Call HandlerUnitTestResult with run_id: the run_id from step 1.',
+        '2. Call HandlerUnitTestStatus with run_id: the run_id from step 1, with_long_polling: true; keep the status it answers.',
+        '3. When the status is FINISHED: call HandlerUnitTestResult with run_id: the run_id from step 1. For any other status, answer the user with the run_id and the status SAP named, so the user can ask again.',
       ].join('\n'),
     );
   });
@@ -242,4 +242,29 @@ describe('blank values (review focus 3)', () => {
       'unit_test: name is required.',
     );
   });
+});
+
+describe('the compact run is read once (no polling)', () => {
+  for (const type of ['class', 'program', 'package'] as const) {
+    it(`${type}: one status call, the result read on FINISHED`, () => {
+      const { steps } = promptOf(unitTestPrompt, compactOnprem).instruction({
+        object_type: type,
+        name: 'SOME_NAME',
+        include_subpackages: 'false',
+      });
+      const status = steps.filter(
+        ({ tool }) => tool === 'HandlerUnitTestStatus',
+      );
+      assert.equal(status.length, 1);
+      for (const step of steps) assert.equal(step.repeat, undefined);
+      const result = steps.find(({ tool }) => tool === 'HandlerUnitTestResult');
+      assert.equal(result?.condition, 'When the status is FINISHED');
+      const text = textOf(promptOf(unitTestPrompt, compactOnprem), {
+        object_type: type,
+        name: 'SOME_NAME',
+        include_subpackages: 'false',
+      });
+      assert.ok(!text.includes('until'), text);
+    });
+  }
 });

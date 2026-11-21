@@ -496,6 +496,14 @@ function generatePromptsMarkdown(listed) {
   md += `## What a prompt is\n\n`;
   md += `A prompt is a ready-made request the MCP client offers the user: a slash command in Claude Code (\`/mcp__<server>__create class ZCL_DEMO package_name=ZPKG\`), an entry in the prompt picker of other clients. The server answers with an instruction that names the tools to call, in order, with the arguments filled from the values the user gave. The model follows the instruction with the tools the same binary serves.\n\n`;
   md += `Nine prompts: \`create\`, \`get\`, \`update\`, \`delete\`, \`activate\`, \`check\`, \`unit_test\`, \`where_used\`, \`transport\`. The object prompts take \`object_type\` and \`name\` (a function module also takes \`function_group\`); \`object_type\` completes in lower case and is accepted in any case. Each binary lists the prompts its tools serve, and the \`object_type\` values its tools serve on the system kind.\n\n`;
+  md += `## Autocompletion\n\n`;
+  md += `A client that supports MCP completion (\`completion/complete\`) completes a prompt's closed arguments with exactly what this binary serves, matching what the user typed without regard to case:\n\n`;
+  md += `- \`object_type\` (every object prompt, \`unit_test\`, \`where_used\`): the values this binary's tools serve on the system kind, after \`--deny-actions\`, in lower case.\n`;
+  md += `- \`transport\` \`action\`: the actions this binary serves.\n`;
+  md += `- \`transport\` \`object_type\`: the transport object types, when the action given takes one (or no action is given yet).\n`;
+  md += `- \`where_used\` \`container\`: the values the where-used tool lists.\n`;
+  md += `- \`unit_test\` \`include_subpackages\`: \`true\`, \`false\`.\n\n`;
+  md += `The lists per binary and kind below are these completions.\n\n`;
   md += `## Refusal\n\n`;
   md += `A \`prompts/get\` with an \`object_type\` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: \`<prompt>: object_type "<value>" is not served by this server; it serves <list>.\` A required argument that is absent or blank is refused the same way: \`<prompt>: <argument> is required.\`\n\n`;
   md += `A prompt whose tools are denied (\`--deny-actions\`, [ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md)) loses those \`object_type\` values; a prompt with none left is not listed.\n\n`;

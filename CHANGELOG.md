@@ -5,16 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-21
+## [24.2.0] - 2026-11-21
 
-### Fixed
+### Highlights
 
-- **A top-level package can be created, locked and unlocked.** A package bound to a transport layer with no super package was refused before any request: `CreatePackage` and compact `HandlerCreate` `PACKAGE` required `super_package`, and `LockObjectLow` and compact `HandlerLock` `PACKAGE` answered "super_package is required for package locking.". SAP's package lock reads the package by its name alone, and adt-clients' `AdtPackage.lock()` sends the LOCK from the name alone; a create with no super package writes an empty `<pak:superPackage/>` (measured on premise, 2026-11-21: create `201`, LOCK `200`, UNLOCK `200`).
-  - `CreatePackage` and `HandlerCreate` `PACKAGE`: `super_package` is optional, the package this package belongs to.
-  - `LockObjectLow` and `HandlerLock` `PACKAGE` lock the package by its name alone: `super_package` stays an optional argument, and `HandlerLock`'s description names `PACKAGE(object_name*, super_package)`.
-- **A package's lock and unlock are checked by the package itself (security).** Under the allowed-packages list, a `PACKAGE` lock was checked by the `super_package` it was given, never by the package it locked, and an unlock by nothing, so a package outside the list could be locked and, under that lock, written. `HandlerLock`, `HandlerUnlock`, `LockObjectLow` and `UnlockObjectLow` with `object_type` `PACKAGE` now check `object_name`, by the same rule as every package argument, and `super_package` is checked only on a package create (`CreatePackage`, `HandlerCreate` `PACKAGE`), where it is sent; on the lock it is accepted for compatibility and reaches no check, and `CheckPackage`'s is no longer checked either. A package's update and delete were already checked by `package_name`.
-
-## [<V>] - <release day>
+Your MCP client can now offer ready-made ABAP requests as slash commands: nine prompts (`create`,
+`get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) that tell
+the model which tools to call, in order, with your values filled in. In a client that supports MCP completion, their arguments autocomplete:
+`object_type` with the types this binary serves on the system kind, the transport `action` with the
+actions it serves. Every binary lists them, on
+premise and on BTP ABAP Cloud; the read-only ones list only the prompts that change nothing. A
+structure package or a local (LOCAL) package can now be created, locked and unlocked with no super
+package, and under the allowed-packages
+list a package's lock and unlock are checked by the package itself. See [MCP Prompts](docs/user-guide/PROMPTS.md).
 
 ### Added
 
@@ -28,7 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The README opens with what the server does**, grouped by what a user wants (analyse, develop, test, transports, debug, govern, work with agents), each item linked to its page; its Features list is taken from the generated tool listings, and the docs indexes lead with the features. The package and MCP Registry descriptions and the npm keywords name the key capabilities.
 - **A denied `HandlerSystem` action leaves its search texts**: `HandlerSystem` lists its actions as `members` per variant, and its keywords and semantic sentence are grouped by action (`tools/tool-search.json`), so `HandlerSystem.where_used` or `HandlerSystem.transports` removes that action's words from `tools/list`. The sentence with every action offered reads as before, the ATC findings and results in one item.
+
+### Fixed
+
+- **A package with no super package can be created, locked and unlocked.** SAP allows no super package for a structure package or a package in software component `LOCAL`; in an ABAP-Cloud-type component the top level must be a structure package (TR 462). Such a package was refused before any request: `CreatePackage` and compact `HandlerCreate` `PACKAGE` required `super_package`, and `LockObjectLow` and compact `HandlerLock` `PACKAGE` answered "super_package is required for package locking.". SAP's package lock reads the package by its name alone, and adt-clients' `AdtPackage.lock()` sends the LOCK from the name alone; a create with no super package writes an empty `<pak:superPackage/>` (measured on premise, 2026-11-21: create `201`, LOCK `200`, UNLOCK `200`).
+  - `CreatePackage` and `HandlerCreate` `PACKAGE`: `super_package` is optional, the package this package belongs to.
+  - `LockObjectLow` and `HandlerLock` `PACKAGE` lock the package by its name alone: `super_package` stays an optional argument, and `HandlerLock`'s description names `PACKAGE(object_name*, super_package)`.
+- **A package's lock and unlock are checked by the package itself (security).** Under the allowed-packages list, a `PACKAGE` lock was checked by the `super_package` it was given, never by the package it locked, and an unlock by nothing, so a package outside the list could be locked and, under that lock, written. `HandlerLock`, `HandlerUnlock`, `LockObjectLow` and `UnlockObjectLow` with `object_type` `PACKAGE` now check `object_name`, by the same rule as every package argument, and `super_package` is checked only on a package create (`CreatePackage`, `HandlerCreate` `PACKAGE`), where it is sent; on the lock it is accepted for compatibility and reaches no check, and `CheckPackage`'s is no longer checked either. A package's update and delete were already checked by `package_name`.
 
 ## [24.1.1] - 2026-11-21
 

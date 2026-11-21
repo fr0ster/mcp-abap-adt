@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/lib",
-  "version": "24.1.1",
+  "version": "24.2.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -201,17 +201,26 @@
     "sap",
     "adt",
     "mcp",
-    "model-context-protocol",
     "mcp-server",
+    "model-context-protocol",
     "abap-cloud",
     "sap-btp",
+    "s4hana",
+    "on-premise",
+    "where-used",
+    "atc",
+    "abap-unit",
+    "transports",
+    "mcp-prompts",
+    "access-control",
+    "crud",
+    "debugger",
     "xsuaa",
     "jwt-auth",
-    "service-key",
-    "crud"
+    "service-key"
   ],
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
-  "description": "ADT tool handlers and an embeddable MCP server for SAP ABAP. The standalone server is @mcp-abap-adt/core.",
+  "description": "ADT tool handlers and an embeddable MCP server for SAP ABAP on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: CRUD of ABAP, DDIC, CDS and RAP objects, where-used, ATC, unit tests, transports, the ABAP and AMDP debugger, MCP prompts with argument autocompletion and access restrictions (deny lists, allowed packages, requests and tables), the data tools off by default. The standalone server is @mcp-abap-adt/core.",
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"

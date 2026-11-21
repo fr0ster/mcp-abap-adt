@@ -117,7 +117,9 @@ with `Accept: */*` → onprem 200, cloud 400 (git-integration research, 2026-11-
 Every route is stateless: none reads anything but its URI, query, headers and body (Code).
 SAP keeps the git credentials in static class data for the ABAP session (§2.2), so a
 stateful session would keep them for its later requests. Required: **every abapGit request
-goes stateless on the wire, a request after a failure included** (pinned by test, §7).
+goes stateless on the wire, a request after a failure included** (pinned by test, §7). The
+connection takes `stateful` from its session mode, which another caller may have set, so the
+request carries its own `stateless: true` (§3.4), which wins over the mode for that request.
 
 ## 3. adt-clients additions
 
@@ -179,20 +181,21 @@ No credential is part of a result, an `IAdtError`, or the request an error descr
 | Member | Route | Arguments (options: `IAdtAnalyseOptions<E>`, `credentials?`, and `headers` where noted) | Result slot |
 |---|---|---|---|
 | `listRepos` | R1 | — | `repos` |
-| `link` | R2 v3 | `package`, `url`, `branchName`, `transportRequest?`, `folderLogic?` (cloud); `headers`. New form: `credentials: IAbapGitCredentials \| null` required (`null` = anonymous), args without `remoteUser`/`remotePassword`; the legacy form's options carry `credentials?: never`, so the forms never mix, and at run time the new form is `options.credentials !== undefined` | `linked` |
+| `link` | R2 v3 | `package`, `url`, `branchName`, `transportRequest?`, `folderLogic?` (cloud); `headers`. New form: `credentials: IAbapGitCredentials \| null` required (`null` = anonymous), args without `remoteUser`/`remotePassword`; the legacy form's options carry `credentials?: never`, so the forms never mix, and at run time the new form is `options.credentials !== undefined` | `linked` (legacy); `linkedFacts` (new form) |
 | `unlink` | R3 | `repositoryId`; its `transportRequest` sends a `corrNr` neither handler reads (kept, documented) | `unlinked` |
-| `pullRepo` (new, key-based) | R4 | `key`, `branchName` (required; the server passes R1's), `transportRequest?`, `selection?` (with it: `pull.req.v1`; the server never sends one, §4.3); `headers` | `pulled` |
+| `listReposQuiet` (new) | R1 | — ; sends `noLog`, `stateless`, no credential: the server's pre-read (§4.4) | `reposFacts` |
+| `pullRepo` (new, key-based) | R4 | `key`, `branchName` (required; the server passes R1's), `transportRequest?`, `selection?` (with it: `pull.req.v1`; the server never sends one, §4.3); `headers` | `repoPulled` |
 | `pull` (existing) | R4 by `pullLink` | deprecated; the same wrapper: `pullLink` must be exactly `/sap/bc/adt/abapgit/repos/{key}/pull`, its key goes to `pullRepo`'s path builder, anything else refused; an accepted link keeps today's request, callbacks and answer | `pulled` |
-| `pullRepoInDialog` | R5 | as `pullRepo` | `pulled` |
+| `pullRepoInDialog` | R5 | as `pullRepo` | `repoPulledInDialog` |
 | `getModifiedObjects` | R6 | `key` | `modifiedObjects` |
 | `getStatus` | R7 | `key` (sends Content-Type `…repos.v2+xml`) | `status` (text) |
-| `getRunLog` (new) | R8 | `key`, `appLogKey` — SAP loads the log by `appLogKey` alone (cl `RES_REPO_OBJ_LOG->get` L23 reads only `app_log_key`), so the pairing is the caller's to check (§4.1) | `errorLog` |
+| `getRunLog` (new) | R8 | `key`, `appLogKey` — SAP loads the log by `appLogKey` alone (cl `RES_REPO_OBJ_LOG->get` L23 reads only `app_log_key`), so the pairing is the caller's to check (§4.1) | `runLog` |
 | `getErrorLog` (existing) | R8 by link | a wrapper: extracts the `{key}` and `{id}` segments of a `logLink` that is exactly the path `/sap/bc/adt/abapgit/repos/{key}/log/{id}` (no scheme, host, query, fragment, `..` or empty segment), validates them as `getRunLog` does, and calls the same key-based path builder; anything else is **refused** in fixed words, nothing sent. An accepted link keeps today's request, callbacks and answer (deprecated, pointing to `getRunLog`). Kept for existing callers; chosen over deprecation alone, which would leave the absolute-URL hole open. | `errorLog` |
 | `getStaging` | R9 | `key` | `staging` |
 | `push` | R10 | `key`, `staged: IAbapGitStagedObject[]`, `comment: { text; author: { name; email }; committer: { name; email } }` — all required; the library builds the `abapgitstaging` document | `pushed` (`nothing`) |
 | `checkRepo` | R11 | `key` | `checked` (`nothing`) |
 | `getFile` | R12 | `key`, `filename`, `version: 'local' \| 'remote'` | `file` (text) |
-| `checkExternalRepo` | R13 | `url`; `headers`. New form as `link`'s (`credentials: IAbapGitCredentials \| null`) | `externalRepo` |
+| `checkExternalRepo` | R13 | `url`; `headers`. New form as `link`'s (`credentials: IAbapGitCredentials \| null`) | `externalRepo` (legacy); `externalRepoFacts` (new form) |
 | `getBranchInfo` | R14 | `url`, `branch`, `package`; `headers` | `branchInfo` |
 | `switchBranch` | R15 | `key`, `branch`, `create: boolean` (required; `?create=true` only when true) | `switched` (`nothing`) |
 
@@ -200,13 +203,18 @@ No credential is part of a result, an `IAdtError`, or the request an error descr
   `refs/heads/master` default for this minor, deprecated, removed in the next adt-clients major.
 - `IAbapGitPullSelection = { overwriteObjects; packageWarningObjects }` with the entries R6
   answers, so R6's reading feeds `pullRepo` unchanged.
-- **Existing custom result strategies keep working:** the new slots of `IAbapGitResults` are
-  optional; a member whose slot a caller's `results` does not give answers its shipped default
-  (`abapGitDocuments`). A type test pins a 46.x-shaped `results` object compiling unchanged.
+- **Result slots (owner's ruling): new forms get new slot names.** `repos`, `linked`, `pulled`,
+  `errorLog` and `externalRepo` stay as they are, with their `abapGitDocuments` defaults. The new
+  slots (`reposFacts`, `linkedFacts`, `externalRepoFacts`, `repoPulled`, `repoPulledInDialog`,
+  `runLog`, `modifiedObjects`, `status`, `staging`, `pushed`, `checked`, `file`, `branchInfo`,
+  `switched`) are optional, typed `IAbapGitFactsResultStrategy`, and fall back to `abapGitFacts`
+  only. A type test pins a 46.x-shaped `results` object compiling unchanged.
 - Readings added to adt-strategies (every field SAP sends): `abapGitStaging`,
   `abapGitModifiedObjects`, `abapGitBranchInfo`, `abapGitObjectResults`; `abapGitRepos` gains
-  `status`, `statusText`, `folderLogic`, the e-mail fields, every link with its `rel`, and the
-  application log key parsed from the `log_link`/`status_link` paths.
+  `folderLogic`, the e-mail fields and every link with its `rel`, and keeps its `status` /
+  `statusText` contract (`''` when absent, owner's ruling); absence is exposed by a separate new
+  reading, `abapGitRepoRunStates` (`runStatus` and `appLogKey` `undefined` when absent; `appLogKey`
+  parsed from the `log_link` path only).
 
 ### 3.3 Default verdicts and errata entries
 
@@ -235,6 +243,8 @@ R7 answers a fixed text (Code); onprem R4 ignores `branchName` (Code); R11/R15 s
   With `noLog`, a line, if any, carries method, the path without query, the integer status and
   the byte count. The error the connection throws keeps its fields for the caller (adt-clients),
   which reduces it to §5.3 before anything else sees it.
+- **`stateless: true`** — the request goes stateless on HTTP and RFC whatever the connection's
+  session mode (§2.5); sent on every new form.
 - **`noResend: true`** — gates every replay of the request; the initial CSRF token fetch before a
   mutation still happens. Gated paths:
   - the CSRF recovery (`shouldRetryCsrf`, `AbstractAbapConnection.ts` L1916–1937, resend L1515–1535);
@@ -335,7 +345,8 @@ Push, unlink, branch switch, cloud branch info and the reads stay under restrict
   alike, **before foreground or background dispatch** (before a background run is started) and
   before any credential is resolved. It reads top-level arguments, which is where every abapGit
   argument is (§4.2).
-- For a call addressed by `repository_key`, the server first sends exactly one request:
+- For a call addressed by `repository_key`, the server first sends exactly one request
+  (`listReposQuiet`):
   `GET /sap/bc/adt/abapgit/repos`, Accept `application/abapgit.adt.repos.v2+xml`, stateless, no
   credential, no wire log. It is sent for every key-addressed call that writes, binds a
   credential (§5.1) or reads the run log (§4.1); its entry supplies the package, the remote URL,
@@ -467,6 +478,7 @@ no attempt is made to detect a credential in them.
 | Route | Kept fields ← XML source (ST read, Code) |
 |---|---|
 | every route | `status` ← HTTP status (integer) |
+| R1 (`listReposQuiet`) | `repos[]`: `key`, `package`, `url`, `branchName`, `runStatus`, `appLogKey` (from `log_link`) |
 | every error | `messageClass` ← `properties/entry[@key="T100KEY-ID"]`, `messageNumber` ← `entry[@key="T100KEY-NO"]` (three-digit string, as SAP writes it) — the keys `src/lib/debugger/readings.ts` L494 already reads. Code, both systems: `CL_ADT_EXCEPTION_UTILITY->create_exc_response` adds `T100KEY-ID` and `T100KEY-NO` for every exception that `IS INSTANCE OF if_t100_message` (L94–97), and `T100KEY-V1`…`V4` from the message variables (L49, dropped); the abapGit exceptions `ZCX_ADT_REST_ABAPGIT` / `CX_ADT_REST_ABAPGIT` implement `if_t100_dyn_msg` and raise `MESSAGE ID … NUMBER …` (`raise_with_error`). That `if_t100_dyn_msg` includes `if_t100_message` is SAP's standard interface, not read here. Absent → `status` alone |
 | R11 cloud auth error | also `gitHttpStatus` ← `properties/entry[@key="http_status"]` as an integer (`CL_ABAPGIT_REPOSITORY_AUTH->handle_auth_exception`); `LONGTEXT` dropped |
 | R2, R4 (onprem), R8 | `objects[]` ← `abapObjects:abapObject`: `type` ← `abapObjects:type`, `name` ← `abapObjects:name`, `package` ← `abapObjects:package`, `status` ← `abapObjects:status`, `messageType` ← `abapObjects:msgType` (one of `S`, `I`, `W`, `E`, `A`, documented as SAP's message type); `abapObjects:msgText` dropped (`ZABAPGIT_ST_REPO_POST_RES`, `ABAPGIT_ST_REPO_POST_RES_V2`) |

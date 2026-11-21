@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **MCP prompts**: every binary lists nine prompts beside its tools, the slash commands a client shows its user (`prompts/list`, `prompts/get`): `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used` and `transport` (one prompt with an `action` argument).
+- **MCP prompts**: the binaries list up to nine prompts beside their tools, the slash commands a client shows its user (`prompts/list`, `prompts/get`): `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used` and `transport` (one prompt with an `action` argument).
   - A prompt answers with an instruction that names the tools to call, in order, with the user's values filled in: the full binaries name `Create<Type>`, `Get<Type>`, ...; the compact binaries name `HandlerCreate`, `HandlerGet`, ... with `object_type`. `update` takes `change`, a description in words; the compact `update` reads, locks, writes under the lock and unlocks. A value the user did not give is listed in the instruction as still to fill; a function module also takes `function_group`.
   - Per binary and kind: a prompt lists the `object_type` values whose tools the binary registers on the system kind, and `object_type` completes in lower case and is accepted in any case. The read-only binaries list `get`, `where_used` and `transport` (compact-ro also `check`). A `prompts/get` with a value the binary does not serve is refused with the protocol's invalid-params error naming the served values.
   - The deny list acts through the registered tools: a denied tool or value removes its `object_type` values, and a prompt with none left is not registered.

@@ -217,7 +217,7 @@ the compact ones none of the full set's high tools; only read-only reads may app
 
 ### Prompts
 
-Each binary lists nine MCP prompts beside its tools, built from the tools the binary lists
+Each binary lists up to nine MCP prompts beside its tools, built from the tools the binary lists
 (after the deny list): a prompt lists the `object_type` values whose tools are all registered,
 and a prompt with none left is not listed. The read-only binaries list `get`, `where_used` and
 `transport` (compact-ro: `get`, `check`, `where_used`, `transport`); the write binaries list all

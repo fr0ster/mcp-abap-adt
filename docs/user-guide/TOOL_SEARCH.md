@@ -84,7 +84,7 @@ the members the tool offers on the server's declared system type.
 
 `HandlerSystem` groups by `action` the same way: its `members` are its actions
 (`search_source`, `search_object`, `where_used`, `package_tree`, `transports`,
-`atc_findings`, `atc_results`), each keyword under the action it names, and
+`atc_findings`, `atc_results`, `atc_result`), each keyword under the action it names, and
 its `semantic` sentence is a list of one item per action. A denied action
 (`HandlerSystem.where_used`, [ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md))
 leaves its keywords and its item out of the texts of `tools/list`; with every

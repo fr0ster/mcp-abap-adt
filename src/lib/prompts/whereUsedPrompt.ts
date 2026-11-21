@@ -168,6 +168,13 @@ export function whereUsedPrompt(source: PromptSource): AbapPrompt | undefined {
   );
   const containerByName = lowercaseKeyed(containers);
   const nameWords = listedProperty(row.tool, 'object_name')?.description;
+  /** Whether `objectType` as given so far reads `container`: text elements, or none given yet. */
+  const readsContainer = (objectType: string | undefined): boolean => {
+    const given = objectType?.trim();
+    return given === undefined || given === ''
+      ? true
+      : matchServed(given, byLowercase) === 'TEXT_ELEMENTS';
+  };
   return {
     name: 'where_used',
     description: `Lists the objects that use the object of object_type named name: asks the model to call ${row.tool.definition.name}.`,
@@ -175,7 +182,10 @@ export function whereUsedPrompt(source: PromptSource): AbapPrompt | undefined {
       ...objectArguments(served),
       container: completable(
         z.string().optional().describe(CONTAINER_WORDS),
-        (typed) => completeFrom(containers, typed ?? ''),
+        (typed, context) =>
+          readsContainer(context?.arguments?.object_type)
+            ? completeFrom(containers, typed ?? '')
+            : [],
       ),
     },
     instruction: (args): PromptInstruction => {

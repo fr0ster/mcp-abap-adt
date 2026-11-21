@@ -226,6 +226,34 @@ describe('container', () => {
     );
   });
 
+  it('is completed only for text_elements, in any case, or before object_type is given', async () => {
+    const both = ['program', 'function_group'];
+    for (const objectType of [
+      'text_elements',
+      'TEXT_ELEMENTS',
+      ' Text_Elements ',
+    ]) {
+      assert.deepEqual(
+        await completionOf(prompt, 'container', '', {
+          object_type: objectType,
+        }),
+        both,
+        objectType,
+      );
+    }
+    assert.deepEqual(
+      await completionOf(prompt, 'container', '', { object_type: 'class' }),
+      [],
+    );
+    assert.deepEqual(
+      await completionOf(prompt, 'container', '', { object_type: '' }),
+      both,
+    );
+    assert.deepEqual(await completionOf(prompt, 'container', 'PRO'), [
+      'program',
+    ]);
+  });
+
   it('is completed from the listed enum', async () => {
     assert.deepEqual(await completionOf(prompt, 'container'), [
       'program',

@@ -339,9 +339,11 @@ the compact tool set of `@mcp-abap-adt/lib/tool-set` on every transport.
   exporter's entries. A registry that registers its own tools is its own.
 - Two strategies ship: `listedAccessChecks(lists)` (names and prefixes, and one read: a package
   create's given `super_package`) and `packageTreeAccessChecks(lists)` (also `ZFOO/**`). Both
-  read through the `IPackageReader` they are handed: one package metadata read per step, on the
-  call's connection, counted only when the document names the package read. A caller of
-  `check` whose reader cannot read a create's parent gets `package_tree_unreadable`.
+  read through the `IPackageReader` they are handed (one package metadata read per step, on the
+  call's connection); a reader that throws refuses the call `package_tree_unreadable`. The
+  server's own reader throws unless SAP's document names the package read. A reader an embedder
+  gives must throw for a missing, empty or mismatched document: a resolved `undefined` reads as
+  a top-level package and is accepted.
   `accessChecksFor(lists)` picks the one the launchers use. An embedder may give its own.
 - Handlers an embedder takes into its own hands — parsing the exported entries' arguments
   itself, a registry of its own — are its own.

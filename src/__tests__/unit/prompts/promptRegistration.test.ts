@@ -185,6 +185,38 @@ describe('BaseMcpServer lists the prompts', () => {
     }
   });
 
+  it('transport answers prompts/get with an argument its action reads none of', async () => {
+    for (const [kind, args, headline] of [
+      [
+        'core',
+        { action: 'get', number: 'SOME_TASK', description: 'unread' },
+        'Get the transport request "SOME_TASK".',
+      ],
+      [
+        'core-ro',
+        { action: 'list', object_type: 'class' },
+        'List transport requests.',
+      ],
+    ] as const) {
+      const server = new PromptServer(
+        registryOf(toolSets.stdio[kind], 'stdio', { dataTools: false }),
+        { systemType: 'onprem', backgroundRuns: true },
+      );
+      const client = await connected(server);
+      try {
+        const { messages } = await client.getPrompt({
+          name: 'transport',
+          arguments: args,
+        });
+        const [first] = messages;
+        assert.ok(first?.content.type === 'text', kind);
+        assert.ok(first.content.text.startsWith(`${headline}\n`), kind);
+      } finally {
+        await client.close();
+      }
+    }
+  });
+
   it('legacy lists no prompt', () => {
     const server = new PromptServer(
       registryOf(compactToolSet, 'stdio', { dataTools: false }),

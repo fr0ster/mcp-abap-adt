@@ -93,7 +93,8 @@ does not see it and cannot call it. No call checks a deny list.
 
 ## Allowed packages, allowed requests
 
-Checked once per call, at the handler's start, before anything is sent. A call that names a
+Checked once per call, at the handler's start, before the call's own requests are sent (a subtree
+entry first reads the package tree, below). A call that names a
 package (`package_name`, `super_package`, or `target.name` of a unit run whose `target.kind` is
 `package`: `RunAbapUnit`, compact `HandlerUnitTestRun`) or a request (`transport_request`,
 `transport_number`, `target_number`) in its arguments runs only when each name matches its own

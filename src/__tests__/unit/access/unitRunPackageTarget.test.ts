@@ -26,6 +26,10 @@ import {
 
 const NAME = 'test';
 
+/** A package's metadata document as SAP answers it: its name, no super package. */
+const topPackageDocument = (name: string) =>
+  `<?xml version="1.0" encoding="utf-8"?><pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="${name}" adtcore:type="DEVC/K"><pak:superPackage/></pak:package>`;
+
 const allowedPackages = (...entries: string[]) =>
   listedAccessChecks({
     allowedPackages: entries.map((entry) => parsePackageEntry(entry, NAME)),
@@ -146,8 +150,9 @@ for (const tool of ['RunAbapUnit', 'HandlerUnitTestRun'] as const) {
           allowedPackages: [parsePackageEntry('ZFOO/**', NAME)],
         }),
         { target: PACKAGE_TARGET('ZCHILD') },
+        recordingConnection([{ data: topPackageDocument('ZCHILD') }]),
       );
-      // The stand-in answers no document: ZCHILD has no super package.
+      // ZCHILD's document names no super package: it is top level.
       assert.equal(answer.error, 'package_not_allowed');
       assert.equal(
         answer.message,

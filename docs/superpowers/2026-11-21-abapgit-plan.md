@@ -246,8 +246,10 @@ the session's context cookie from that request. Test `src/__tests__/statelessReq
 and RFC: from `setSessionType('stateful')` and with an explicit `X-Sap-Adt-SessionType: Stateful`
 header, the request goes stateless (no session header, no context cookie on the wire) and the next
 ordinary request is stateful again; after a refusal of a stateless request the next one is stateless
-too. First failure: the request goes stateful. Mutations: read the mode first → red; strip the
-header but keep the cookie → red.
+too. The RFC case is seeded with an explicit `sap-contextid` cookie and a mixed-case stateful header,
+so the absence assertion exercises the filter before `HEADER_FIELDS` (`RfcTransport.ts` ~L638, ~L974).
+First failure: the request goes stateful. Mutations: read the mode first → red; strip the header but
+keep the cookie → red.
 
 **T3.4 Docs.** `CHANGELOG.md` 25.1.0: the three options (`noResend` with SAP-endpoint redirects and
 `validateStatus`), the CSRF ground of spec §4.7; `README.md` request options. Run in the repo:
@@ -299,7 +301,8 @@ strategy:** an isolated source layout outside the workspace — a copy of the re
 there, `tsconfig.base.json`, `biome.json`, `tools/`) holding `packages/adt-clients` only, so
 `../../tsconfig.base.json` resolves and adt-strategies comes from the registry; `npm install
 --ignore-scripts` there, `npm ls @mcp-abap-adt/adt-strategies` shows the registry 0.27.0 path,
-`npm run build` green.
+`npm run build` run from `packages/adt-clients` there (never the root `npm run build`, which selects
+the omitted workspaces) green.
 In the workspace, npm regenerates the lockfile; only the sibling link remains (owner's exception).
 
 **T5.1 Key path builder and link wrappers.** `abapGit/paths.ts`: `repoPath(key, ...segments)` encodes
@@ -333,7 +336,14 @@ class generic stays the result-values map `T extends AbapGitValues` (default
 `ResultValuesOf<typeof abapGitDocuments>` plus the facts defaults' values); `AbapGitValues` gains the
 new slots as optional keys; a new member's result is `FactsValue<T, slot>` — `T[slot]` when the map
 has it, else the `abapGitFacts` default's value; the constructor keeps `(connection, { logger,
-results })`, and `create` keeps its two overloads, returning `AdtAbapGitClient<ResultValuesOf<R>>`. Test `members.test.ts`, one case per member: method;
+results })`, and `create` keeps its two overloads, returning `AdtAbapGitClient<ResultValuesOf<R>>`.
+**Facts-aware mappings:** today `ResultStrategiesOf<T>` rejects a facts reader and `ResultValuesOf<R>`
+maps one to `never` (`src/.../resultStrategy.ts` ~L79; `AdtAbapGitClient.ts` ~L77), so the client uses
+`AbapGitStrategiesOf<T>` and `AbapGitValuesOf<R>` (in `abapGit/types.ts`): per slot, a facts slot
+(the new names) maps to `IAbapGitFactsResultStrategy<T[slot], F>` and back to its `T`; every legacy
+slot maps exactly as `ResultStrategiesOf` / `ResultValuesOf` do (they are reused for those keys). The
+constructor's `results` is `AbapGitStrategiesOf<T>`, `create<R>` returns
+`AdtAbapGitClient<AbapGitValuesOf<R>>`. Test `members.test.ts`, one case per member: method;
 path from `key`; query (`?create=true` only when true; `filename`, `version`); Content-Type and
 Accept (R6's exact Accept; R7 Content-Type `…repos.v2+xml`); body (R10's `abapgitstaging`); options
 `timeout: 0`, `stateless: true`; and named cases: **R6's reading fed as `selection` to `pullRepo` and
@@ -343,6 +353,8 @@ finished; **strict non-2xx with no analyser** (a `404` and a `500` are each the 
 success); a **custom `reposFacts` reader returning a count** (its `T` differs from R1's facts `F`)
 types the result as the count while its analyser still receives the facts; every legacy
 member's request and answer equal its 46.1.0 fixture (no new flags). Type tests
+`src/__tests__/typechecks/abapGitResultsFacts.ts` (a supplied facts reader infers its result through
+`create` and through `new` with its values map; the 46.x explicit generic still compiles) and
 `src/__tests__/typechecks/abapGitResults46.ts` (46.x `results`, the `{ logger, results }`
 constructor and the explicit `AdtAbapGitClient<ResultValuesOf<typeof results>>` of
 `AbapGit.test.ts` compile, both constructor paths) and
@@ -403,10 +415,12 @@ L0 from the ledger → the restart case red; clean up while `R` → red.
   `messageNumber`" ran and passed there. A skip closes neither.
 
 **T5.7 Review, release prep and the published artifact.** Whole-PR review; sibling links gone, every
-range on the registry; root `npm run check`. **Source binding:** the `adt-clients-v46.2.0` tag names
-`HEAD` on a clean tree (the check `tools/publish-changed.js` makes, ~L371). Then, on that tree:
-`npm pack --json` in the package → record the tarball's `integrity` with the tag's commit in the
-PR; the T5.6 runs (both backends) use that tarball; the owner publishes
+range on the registry; root `npm run check`. **Source binding, in this order:** (1) a clean checkout
+of the `adt-clients-v46.2.0` tag, verified to name `HEAD` on a clean tree (the check
+`tools/publish-changed.js` makes, ~L371); (2) in that same checkout, the clean build (`rm -rf dist`,
+then the package's `npm run build`), the root `npm run check`, and `npm pack --json` in the package;
+(3) record the tarball's `integrity` with the tag's commit in the PR — a `dist` built before the tag
+check is never packed; the T5.6 runs (both backends) use that tarball; the owner publishes
 that same file (`npm publish <tarball>`, not `tools/publish-changed.js`, which rebuilds); after
 publishing, `npm view @mcp-abap-adt/adt-clients@46.2.0 dist.integrity` equals the recorded value and
 a clean install outside the repo installs. The clients repository's `README.md` release section
@@ -464,9 +478,11 @@ The signal passes through every instance factory — stdio's launcher, `SseServe
 `StreamableHttpServer.ts` (~L705) — not only through `accessChecks`. **A pre-validation seam:** the
 SDK validates `request.params.arguments` against the schema before our callback (an undeclared
 `background` vanishes; a denied compact enum value fails validation before the batch refusal), so
-`BaseMcpServer` wraps the `tools/call` request handler (installed after registration, ~L2311,
-delegating to the SDK's) and runs admission's raw-params steps on the **unvalidated**
-`request.params` first; the rest runs before any connection, for every abapGit tool and compact
+during registration (~L2311) `BaseMcpServer` captures the `tools/call` callback the SDK's `McpServer`
+installed (its handler map, reached through the public `server.setRequestHandler` path the SDK uses,
+`mcp.js` ~L140, `protocol.js` ~L909) and installs through `setRequestHandler(CallToolRequestSchema,
+…)` a wrapper that runs admission's raw-params steps on the **unvalidated** `request.params`, then
+delegates to the captured callback with the original `request` and `extra`; the rest runs before any connection, for every abapGit tool and compact
 action, whether or not an `IAccessChecks` is configured. Order: (1) batch refusal (no connection, no discovery, no entry or number); (2) a denied compact
 action; (2a) `background` on a call whose schema does not declare it (cloud, or another action),
 refused in fixed words; (3) import refusal of link and pull
@@ -489,8 +505,15 @@ is stripped → the batch-with-background case red; a second R1 in the backgroun
 `status_link` for R8 → red. **Real `tools/call` tests** (`admissionSeam.test.ts`, through the MCP
 server, not the function): batch with a denied compact action → the batch refusal, not a schema
 error; cloud `PullAbapGitRepo` with `background: true` → refused, nothing sent; an SSE and a
-Streamable HTTP instance under a request-only signal refuse link. Mutation: run admission after
-the SDK's validation → both seam cases red.
+Streamable HTTP instance under a request-only signal refuse link; an admitted call with an
+argument of the wrong type still gets the SDK's own validation error (delegation intact). Mutations:
+run admission after the SDK's validation → both seam cases red; skip the delegation → the
+validation case red. **The batch race:** the early raw batch check stays for precedence, and
+admission re-checks the batch state at dispatch, after the call takes its main-flow turn
+(`BaseMcpServer.ts` ~L2041, ordered with batch transitions) and before connection acquisition,
+discovery, R1 or credential resolution. Test (`admissionSeam.test.ts`): a call passes the early
+check, `BatchBegin` runs in between, the call is refused at dispatch with zero requests. Mutation:
+drop the dispatch-time re-check → red.
 
 **T6.5 Full tools** (spec §4.1): handlers over `AdtAbapGitClient` taking the handoff; snake_case
 arguments, no credential argument, functional descriptions; `ListAbapGitRepos` with §9.2 (a)

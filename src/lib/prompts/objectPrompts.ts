@@ -10,6 +10,7 @@ import type { JsonValue } from '../json.js';
 import { completeFrom } from './completion.js';
 import {
   functionGroupArgument,
+  functionGroupTakers,
   nameArguments,
   type ObjectName,
   objectNameOf,
@@ -188,19 +189,23 @@ function byLowercase(
 
 const OBJECT_TYPE_WORDS =
   "The object's type; the values are the types this server serves for the operation.";
-const NAME_WORDS =
+const NAME_WORDS = "The object's name.";
+const FUNCTION_MODULE_NAME_WORDS =
   "The object's name; for a function module, its own name, with its function group in function_group.";
 
 /** The prompt arguments every object prompt takes: `object_type`, completed from `served` (lowercase), and `name`. */
 export function objectArguments(
   served: readonly string[],
+  takers: readonly string[] = functionGroupTakers(served),
 ): PromptArgumentsSchema {
   return {
     object_type: completable(z.string().describe(OBJECT_TYPE_WORDS), (typed) =>
       completeFrom(served, typed),
     ),
-    name: z.string().describe(NAME_WORDS),
-    ...functionGroupArgument(served),
+    name: z
+      .string()
+      .describe(takers.length === 0 ? NAME_WORDS : FUNCTION_MODULE_NAME_WORDS),
+    ...functionGroupArgument(takers),
   };
 }
 
@@ -227,7 +232,17 @@ export function objectOf(
   }
   const name = requiredArgument(args, 'name');
   if (name === undefined) throw promptRefusal(requiredWords(operation, 'name'));
-  return { row, named: objectNameOf(name, args) };
+  const served = rows.map(({ type }) => type.toLowerCase());
+  return {
+    row,
+    named: objectNameOf(
+      operation,
+      row.type,
+      name,
+      args,
+      functionGroupTakers(served),
+    ),
+  };
 }
 
 /** The types whose name is their class's: the class includes and the unit tests. */

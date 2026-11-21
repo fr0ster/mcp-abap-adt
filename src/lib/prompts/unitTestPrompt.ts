@@ -118,6 +118,8 @@ function targetArguments(
 interface RunRow {
   readonly type: RunType;
   readonly tools: readonly string[];
+  /** Whether its steps read the function group: a function module run by its own tool. */
+  readonly readsGroup: boolean;
   readonly steps: (
     named: ObjectName,
     includeSubpackages: boolean | undefined,
@@ -134,6 +136,7 @@ function fullRunRow(source: PromptSource, type: RunType): RunRow | undefined {
   return {
     type,
     tools: result === undefined ? [runName] : [runName, 'GetUnitTestResult'],
+    readsGroup: perType !== undefined && type === 'FUNCTION_MODULE',
     steps: (named, includeSubpackages) => [
       toolStep(
         run,
@@ -168,6 +171,7 @@ function compactRunRow(tools: CompactRunTools, type: RunType): RunRow {
       tools.status.definition.name,
       tools.result.definition.name,
     ],
+    readsGroup: false,
     steps: (named, includeSubpackages) => [
       toolStep(
         tools.run,
@@ -235,13 +239,16 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
   const byLowercase = new Map(
     rows.map((row) => [row.type.toLowerCase(), row.type]),
   );
+  const takers = rows
+    .filter(({ readsGroup }) => readsGroup)
+    .map(({ type }) => type.toLowerCase());
   return {
     name: 'unit_test',
     description: `Runs the ABAP Unit tests of the object of object_type named name, or of a package: asks the model to call ${[
       ...new Set(rows.flatMap(({ tools }) => tools)),
     ].join(', ')} and read the result.`,
     argsSchema: {
-      ...objectArguments(served),
+      ...objectArguments(served, takers),
       include_subpackages: completable(
         z.string().optional().describe(INCLUDE_SUBPACKAGES_WORDS),
         (typed) => completeFrom(['true', 'false'], typed ?? ''),
@@ -265,7 +272,10 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
         requiredArgument(args, 'include_subpackages'),
         row.type,
       );
-      const steps = row.steps(objectNameOf(name, args), includeSubpackages);
+      const steps = row.steps(
+        objectNameOf('unit_test', row.type, name, args, takers),
+        includeSubpackages,
+      );
       const [first, ...rest] = steps;
       const stillToFill =
         row.type === 'PACKAGE' &&

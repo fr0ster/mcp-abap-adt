@@ -288,7 +288,8 @@ follows it with the tools of the same binary. Nine prompts, plain names:
 | `transport` | `action`, `number`, `description`, `user`, `object_type`, `name`, `target_number` | work with transport requests: create, create a task, list, get, list objects, read the log, add, remove or move an object, sort and compress |
 
 `object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and
-are accepted in any case. A function module also takes `function_group`. Each binary lists the prompts its tools serve, with the `object_type` values
+are accepted in any case. A function module also takes `function_group`; given for another
+type, it is refused, not dropped. Each binary lists the prompts its tools serve, with the `object_type` values
 its tools serve on the system kind: the read-only binaries list `get`, `where_used` and
 `transport` (and, compact, `check`); a denied tool or value removes its `object_type` values,
 and a prompt with none left is not listed. [PROMPTS.md](docs/user-guide/PROMPTS.md) lists the

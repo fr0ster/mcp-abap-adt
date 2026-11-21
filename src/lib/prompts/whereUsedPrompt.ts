@@ -8,7 +8,11 @@ import * as z from 'zod';
 import type { TextElementsContainer } from '../../handlers/system/readonly/handleGetWhereUsed.js';
 import { WHERE_USED_CODES, type WhereUsedCode } from '../adtProjections.js';
 import { completeFrom } from './completion.js';
-import { nameArguments, objectNameOf } from './functionModule.js';
+import {
+  functionGroupTakers,
+  nameArguments,
+  objectNameOf,
+} from './functionModule.js';
 import { jsonLiteral } from './instruction.js';
 import {
   objectArguments,
@@ -201,7 +205,13 @@ export function whereUsedPrompt(source: PromptSource): AbapPrompt | undefined {
               row.tool,
               type,
               'object_name',
-              objectNameOf(name, args),
+              objectNameOf(
+                'where_used',
+                type,
+                name,
+                args,
+                functionGroupTakers(served),
+              ),
             ),
             ['object_type', userValue(WHERE_USED_AS[type])],
             ...(container === undefined

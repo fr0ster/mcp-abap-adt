@@ -4,9 +4,10 @@
 
 Implements [the goal](2026-11-21-abapgit-goal.md): the whole git loop on a package through MCP,
 offered exactly where each system's abapGit handler serves it, in the full and compact sets,
-reads in `-ro`, every write checked against the access restrictions, git credentials kept
-secret, SAP's answer returned as it is. Ships in mcp-abap-adt 24.2.0 on minors of
-`@mcp-abap-adt/interfaces-adt`, `@mcp-abap-adt/adt-strategies` and `@mcp-abap-adt/adt-clients`.
+reads in `-ro`, every write checked against the access restrictions (link and pull refused
+while any are configured), git credentials kept secret, SAP's answer returned as it is — for
+credentialed calls and the run log, as structure and facts only (the goal as amended, §2.4). Ships in mcp-abap-adt 24.2.0 on minors of
+`@mcp-abap-adt/interfaces-adt`, `@mcp-abap-adt/adt-strategies`, `@mcp-abap-adt/connection` and `@mcp-abap-adt/adt-clients`.
 
 Grounds used below:
 
@@ -96,18 +97,19 @@ with `Accept: */*` → onprem 200, cloud 400 (git-integration research, 2026-11-
 | branch switch (R15), onprem | the repository's selected branch; with `create=true` a new remote branch. |
 | cloud branch info (R14) | a repository link, deleted and committed in the same request (L184). |
 
-### 2.4 What this changes in the goal's words (for the owner)
+### 2.4 Goal changes (accepted by the owner, written into the goal)
 
-- **Stage is a read.** R9 is a GET that changes nothing. "Stage" in the goal is fulfilled by
-  `GetAbapGitStaging` (R9, what changed) plus choosing which of its objects and files go into
-  `PushAbapGitRepo`'s `objects` (R10's `staged_objects`): SAP keeps no staging state between
-  the two.
-- **Cloud branch info writes and undoes a link** (R14).
-- **No route reads one repository** (R3 is DELETE only).
-- **Onprem serves no error log and no status**; its pull and push answer synchronously.
-- **Cloud status** (R7) answers a fixed text; the run state is R1's `status`.
-
-§9.2 and §9.4 propose the goal changes these need.
+- **Stage is a read, in `-ro`.** R9 is a GET that changes nothing. "Stage" is fulfilled by
+  `GetAbapGitStaging` (what changed) plus choosing which of its objects and files go into
+  `PushAbapGitRepo`'s `objects` (R10's `staged_objects`): SAP keeps no staging state between them.
+- **Cloud branch info is a write, outside `-ro`**, with its package checked (R14 commits a link
+  and deletes it).
+- **Cloud status comes from the repository list** (R1 `status`, `statusText`, log key). R7, which
+  answers a fixed text, stays an adt-clients member with no server tool.
+- **Link and pull are refused while any package or request restriction is configured** (§4.3).
+- **For credentialed calls and the run log, structure and facts only** (§5.3), not SAP's text.
+- Facts that need no goal change: no route reads one repository (R3 is DELETE only); onprem
+  serves no error log and no status, and its pull and push answer synchronously.
 
 ### 2.5 Session
 
@@ -157,13 +159,13 @@ No credential is part of a result, an `IAdtError`, or the request an error descr
 | `listRepos` | R1 | — | `repos` |
 | `link` | R2 v3 | `package`, `url`, `branchName`, `transportRequest?`, `folderLogic?` (cloud); `headers` | `linked` |
 | `unlink` | R3 | `repositoryId`; its `transportRequest` sends a `corrNr` neither handler reads (kept, documented) | `unlinked` |
-| `pullRepo` (new, key-based) | R4 | `key`, `branchName`, `transportRequest?`, `selection?` (with it: `pull.req.v1`); `headers` | `pulled` |
-| `pull` (existing) | R4 by `pullLink` | deprecated; `pullLink` refused unless it is a path `/sap/bc/adt/abapgit/repos/{key}/pull` (no scheme, no host) | `pulled` |
+| `pullRepo` (new, key-based) | R4 | `key`, `branchName` (required; the server passes R1's), `transportRequest?`, `selection?` (with it: `pull.req.v1`; the server never sends one, §4.3); `headers` | `pulled` |
+| `pull` (existing) | R4 by `pullLink` | deprecated; the same wrapper: `pullLink` must be exactly `/sap/bc/adt/abapgit/repos/{key}/pull`, its key goes to `pullRepo`'s path builder, anything else refused | `pulled` |
 | `pullRepoInDialog` | R5 | as `pullRepo` | `pulled` |
 | `getModifiedObjects` | R6 | `key` | `modifiedObjects` |
 | `getStatus` | R7 | `key` (sends Content-Type `…repos.v2+xml`) | `status` (text) |
-| `getRunLog` (new) | R8 | `key`, `appLogKey` | `errorLog` |
-| `getErrorLog` (existing) | R8 by link | **refuses** (fixed words, nothing sent) a `logLink` that is not a path `/sap/bc/adt/abapgit/repos/{key}/log/{id}` — an absolute URL, another path, `..`, a query; kept for existing callers. Chosen over deprecation alone, which would leave the absolute-URL hole open. | `errorLog` |
+| `getRunLog` (new) | R8 | `key`, `appLogKey` — SAP loads the log by `appLogKey` alone (cl `RES_REPO_OBJ_LOG->get` L23 reads only `app_log_key`), so the pairing is the caller's to check (§4.1) | `errorLog` |
+| `getErrorLog` (existing) | R8 by link | a wrapper: extracts the `{key}` and `{id}` segments of a `logLink` that is exactly the path `/sap/bc/adt/abapgit/repos/{key}/log/{id}` (no scheme, host, query, fragment, `..` or empty segment), validates them as `getRunLog` does, and calls the same key-based path builder; anything else is **refused** in fixed words, nothing sent. Kept for existing callers; chosen over deprecation alone, which would leave the absolute-URL hole open. | `errorLog` |
 | `getStaging` | R9 | `key` | `staging` |
 | `push` | R10 | `key`, `staged: IAbapGitStagedObject[]`, `comment: { text; author: { name; email }; committer: { name; email } }` — all required; the library builds the `abapgitstaging` document | `pushed` (`nothing`) |
 | `checkRepo` | R11 | `key` | `checked` (`nothing`) |
@@ -193,6 +195,15 @@ answers success (Code); R9 cloud 409 while a run waits or runs (Code); R3 `corrN
 R7 answers a fixed text (Code); onprem R4 ignores `branchName` (Code); R11/R15 success status is
 **not asserted** until measured (§10).
 
+### 3.4 `@mcp-abap-adt/connection` additions (minor)
+
+Two per-request options, used by every credentialed abapGit request and the R8 read:
+
+- **no CSRF resend** — see §4.7 for the ground;
+- **no wire log** — the request, its headers, body and answer are not written by the
+  connection's RFC or HTTP wire logging (RFC wire logging prints bodies, with no per-request
+  switch today: unverified beyond `connectionFactory.ts`'s own words).
+
 ## 4. Server tools
 
 Common to all:
@@ -202,26 +213,26 @@ Common to all:
   anything is sent and before any credential is resolved; no batch entry and no number is taken
   (`batch_not_recordable`, the existing refusal for calls that cannot be recorded).
 - **Arguments** never carry a credential. A repository is addressed by `repository_key`.
-- **Answer:** the adt-strategies reading as JSON, credentials removed (§5.3); an error is SAP's
-  answer (§6).
+- **Answer:** the adt-strategies reading as JSON; for a credentialed call and R8, only the
+  structured fields of §5.3.
 
 ### 4.1 Full set
 
 | Tool | Route | Sys | -ro | Arguments | Result | Package checked | Request checked |
 |---|---|---|---|---|---|---|---|
-| `ListAbapGitRepos` | R1 | both | yes | `package_name?`, `repository_key?` (§9.3) | repositories; on cloud the run state (`status`, `statusText`, log key) | — | — |
+| `ListAbapGitRepos` | R1 | both | yes | `package_name?`, `repository_key?` (§9.2) | repositories; on cloud the run state (`status`, `statusText`, log key) | — | — |
 | `CheckAbapGitExternalRepo` | R13 | both | yes | `url` | accessMode, branches | — | — |
-| `GetAbapGitBranchInfo` | R14 | cloud | no (§9.2) | `url`, `branch`, `package_name` | the branch with folderLogic, accessMode | `package_name` | — |
-| `LinkAbapGitRepo` | R2 v3 | both | no | `package_name`, `url`, `branch`, `transport_request?`, `folder_logic?` (cloud) | SAP's answer (empty object list on both, Code) | `package_name` + §4.3 | `transport_request` |
+| `GetAbapGitBranchInfo` | R14 | cloud | no | `url`, `branch`, `package_name` | the branch with folderLogic, accessMode | `package_name` | — |
+| `LinkAbapGitRepo` | R2 v3 | both | no | `package_name`, `url`, `branch`, `transport_request?`, `folder_logic?` (cloud) | done (SAP's object list is empty on both, Code) | refused under restrictions (§4.3) | refused under restrictions |
 | `UnlinkAbapGitRepo` | R3 | both | no | `repository_key` | done | repository's package (§4.4) | — |
-| `PullAbapGitRepo` | R4 | both | no | `repository_key`, `branch` (cloud; onprem has none, Code), `transport_request?`, `objects?` (cloud: the R6 selection) | onprem: done; cloud: accepted, with the run's log key when R1 shows it | repository's package + §4.3 | `transport_request` |
+| `PullAbapGitRepo` | R4 | both | no | `repository_key`, `transport_request?` — no branch: the server sends R1's `branchName` (cloud reads it; onprem ignores it, Code) | onprem: done; cloud: accepted | refused under restrictions (§4.3) | refused under restrictions |
 | `GetAbapGitModifiedObjects` | R6 | cloud | yes | `repository_key` | overwriteObjects, packageWarningObjects (each with its package) | — | — |
-| `GetAbapGitStaging` | R9 | both | yes (§9.2) | `repository_key` | unstaged and ignored objects with files; SAP's proposed author and committer | — | — |
+| `GetAbapGitStaging` | R9 | both | yes | `repository_key` | unstaged and ignored objects with files; SAP's proposed author and committer | — | — |
 | `PushAbapGitRepo` | R10 | both | no | `repository_key`, `objects` (objects and files chosen from the staging answer), `comment`, `author` {name, email}, `committer` {name, email} — all required, no default | onprem: done; cloud: accepted | repository's package (§4.4) | — |
 | `CheckAbapGitRepo` | R11 | both | yes | `repository_key` | SAP's status, or SAP's error (cloud: `http_status`) | — | — |
 | `GetAbapGitFile` | R12 | both | yes | `repository_key`, `filename`, `version` (required) | the file text | — | — |
 | `SwitchAbapGitBranch` | R15 | onprem | no | `repository_key`, `branch`, `create` (required) | SAP's status | repository's package (§4.4) | — |
-| `GetAbapGitErrorLog` | R8 | cloud | yes | `repository_key`, `app_log_key` (from `ListAbapGitRepos`) — never a URL | object results | — | — |
+| `GetAbapGitErrorLog` | R8 | cloud | yes | `repository_key`, `app_log_key` — never a URL. The server first reads R1 and requires that entry's `log_link` to carry exactly this `app_log_key`; else refused, nothing sent | object results: type, name, package, status, message type (no message text, §5.3) | — | — |
 
 Author and committer are required because R10 takes them from the body only (Code) and the
 server keeps no earlier staging answer; the staging answer shows SAP's proposal to copy.
@@ -238,242 +249,306 @@ Arguments are top-level and the full tool's, so the existing hook sees `package_
 schema and description narrowed as `HandlerSystem`'s are; a variant's enum holds only what that
 system kind serves.
 
-### 4.3 Packages SAP writes beyond the root (P0) — §9.5 decides
+### 4.3 Restrictions (owner's decision)
 
-The package check of `package_name` or the repository's package cannot bound what §2.3 lists:
-onprem link and pull write the whole remote, into subpackages and into objects held by other
-packages; cloud pull writes what its job recomputes (by name) and deletes confirmed deletions.
-With no package or request restriction configured, nothing changes: SAP's authorization decides.
-With one configured, §9.5.
+**While any `allowed-packages` or `allowed-requests` entry is configured, link and pull are
+refused on both systems** (full tools and compact actions), in fixed words
+(`abapgit_import_not_allowed`: "linking or pulling a repository writes objects that the allowed
+packages and requests cannot bound, so it is refused while access restrictions are
+configured"), nothing sent. The grounds, for ACCESS_RESTRICTIONS (all Code, §2.3):
+
+- onprem link (`perform_import`, local types of `ZCL_ABAPGIT_RES_REPOS` L41–75) and onprem pull
+  (`ZCL_ABAPGIT_RES_REPO_PULL->post` L60–171) set every overwrite and package-warning decision
+  to `'Y'`: they write subpackages and objects held by other packages;
+- cloud pull's job recomputes its decisions at run time and matches the selection by object
+  name only (`CL_ABAPGIT_BG_ACTION_PULL`, `deserialize_checks` L113, decisions L123–154), and
+  deletes confirmed deletions (`delete_unnecessary_objects` L39–72): a selection checked before
+  submit does not bound what the job writes. No selective pull is offered;
+- cloud pull with a request creates a task under it for the user when they have none
+  (`CL_ABAPGIT_RES_REPO_PULL->check_and_create_task`, `TR_INSERT_NEW_COMM` L76), and "an entry
+  for a request does not cover its tasks".
+
+With no restriction configured, link and pull are served; SAP's authorization decides.
+
+Push, unlink, branch switch, cloud branch info and the reads stay under restrictions:
+
+| Tool | Package checked | From |
+|---|---|---|
+| `GetAbapGitBranchInfo` | `package_name` | the argument (R14 links into it; no repository exists yet) |
+| `PushAbapGitRepo`, `UnlinkAbapGitRepo`, `SwitchAbapGitBranch` | the repository's package | the R1 entry for `repository_key` (§4.4) |
+| reads | — | reads are not checked, as for every tool |
 
 ### 4.4 Where the key-based checks run
 
 - One step in the access layer (`accessChecks.ts`), for the full tool and the compact action
   alike, **before foreground or background dispatch** (before a background run is started) and
-  before any credential is resolved.
+  before any credential is resolved. It reads top-level arguments, which is where every abapGit
+  argument is (§4.2).
 - For a call addressed by `repository_key`, the server first sends exactly one request:
-  `GET /sap/bc/adt/abapgit/repos` with Accept `application/abapgit.adt.repos.v2+xml` (stateless,
-  no credential). It is sent when a package restriction is configured or a credential would be
-  attached (§5.1). ACCESS_RESTRICTIONS states it as an exception to "makes no call to SAP to find
-  an object's package", like the package-tree read; "before anything is sent" becomes "before
-  anything but this read is sent".
-- **Fail closed:** a key R1 does not list, an entry with a blank package, or an unreadable R1
-  refuses the call in fixed words. Unlike other tools, a blank `package_name` on `link` or
-  `branch_info` is refused, not passed.
-- The R1 entry's `url` is the URL the credential binding (§5.1) is matched against.
+  `GET /sap/bc/adt/abapgit/repos`, Accept `application/abapgit.adt.repos.v2+xml`, stateless, no
+  credential, no wire log. It is sent for every key-addressed call that writes, binds a
+  credential (§5.1) or reads the run log (§4.1); its entry supplies the package, the remote URL,
+  the branch and the log key. ACCESS_RESTRICTIONS states it as an exception to "makes no call to
+  SAP to find an object's package", like the package-tree read: "before anything is sent"
+  becomes "before anything but this read is sent".
+- **Fail closed:** a key R1 does not list, an entry with a blank package or URL, or an unreadable
+  R1 refuses the call in fixed words. A blank `package_name` on `branch_info` or `link` is
+  refused, not passed as other tools' blanks are.
 
 ### 4.5 Discovery and listing
 
 Required by the goal: a system whose discovery does not list `/sap/bc/adt/abapgit/repos` lists
-no abapGit tool and no abapGit compact action. Per transport:
+no abapGit tool and no abapGit compact tool.
 
-- **stdio:** discovery is read once the connection exists, before the tools are listed. With
-  `--deferred-logon` no connection exists at listing time: §9.1.
-- **SSE:** read on the opening GET's connection, before its instance answers `tools/list`.
-- **Streamable HTTP:** each request carries its destination and gets its connection
-  (Inference about the per-request wiring, to confirm in the plan); `tools/list` reads discovery
-  on that request's connection, cached per system key for the process.
-- **Failed discovery** (error, no collection): no abapGit tool is listed (fail closed), and the
-  start line / log names the reason.
-- Compact enums are built from the same answer and the system kind.
-- `available_in`: cloud-only `GetAbapGitBranchInfo`, `GetAbapGitModifiedObjects`,
-  `GetAbapGitErrorLog`; onprem-only `SwitchAbapGitBranch`.
+- **Registration** stays by system kind at instance creation (`BaseMcpServer.registerHandlers`,
+  `available_in`): cloud-only `GetAbapGitBranchInfo`, `GetAbapGitModifiedObjects`,
+  `GetAbapGitErrorLog`; onprem-only `SwitchAbapGitBranch`; compact enums per variant.
+- **Listing:** the server's `tools/list` answer is filtered by the discovery of the system the
+  request is for: the abapGit tools (full) or `HandlerAbapGitGet` / `HandlerAbapGit` (compact)
+  are left out unless that system's discovery lists `/abapgit/repos`. The filter runs inside the
+  request's context, so it works where handlers were registered before any request existed
+  (Streamable HTTP: a pooled instance per `state_handle`, `StreamableHttpServer.ts`, its dispatch
+  under `runWithRequestContext`).
+- **Calls:** an abapGit call checks the same availability first and is refused "abapGit is not
+  served by this system" in fixed words, nothing else sent — a client that calls an unlisted tool
+  meets the same answer.
+- **Reading and caching:** discovery is read on the request's own connection
+  (`GET /sap/bc/adt/discovery`), once per system key, and kept for the process; no clock expires
+  it (no timeouts). A failed or unreadable discovery is not cached: that request lists no abapGit
+  tool (fail closed) and the next request reads again. The kept answer is dropped by the
+  connection-reset hook (`registerConnectionResetHook`).
+- Per transport: stdio reads at its first `tools/list` with its connection; SSE on the opening
+  GET's instance; Streamable HTTP per request as above. **stdio `--deferred-logon`** has no
+  connection at its first listing: §9.1.
 
 ### 4.6 Long runs, pinned
 
 | Action | onprem | cloud |
 |---|---|---|
-| link | R2 synchronous (full import). In the call by default; `background: true` makes it a code run (§9.6). | R2 synchronous, link only: in the call. |
-| pull | R4 synchronous: as link. | R4: answers 202 at once; SAP's job runs; state through `ListAbapGitRepos`, log through `GetAbapGitErrorLog`. **No cancel exists** (no route). |
-| push | R10 synchronous: as link. | R10: 202 at once, as pull. No cancel. |
-| switch, unlink, checks, reads | in the call. | in the call. |
+| link | R2 synchronous (full import). In the call; with `background: true` a code run. | R2 synchronous, link only: in the call; no `background`. |
+| pull | R4 synchronous: as link. | R4: 202 at once; SAP's job runs; state through `ListAbapGitRepos`, log through `GetAbapGitErrorLog`. **No cancel exists** (no route). No `background`. |
+| push | R10 synchronous: as link. | R10: 202 at once, as pull. No cancel. No `background`. |
+| switch, unlink, checks, reads | in the call; no `background`. | in the call; no `background`. |
 
-Code-run behaviour as the server has it today (`backgroundRuns/tools.ts`, `run.ts`): the run
-detaches from the caller's cancel; `DiscardBackgroundRun` cannot cut a running code run; a
-Streamable HTTP disconnect leaves calls and runs going; an SSE stream close or stdio close logs
-the run's connection off, which **cuts SAP's dialog mid-import** — a partly imported package,
-named in the docs. A host with no background store refuses `background: true` in its fixed
-words; the call then runs in the call. An in-call write is not cut by the client's cancel
-either (no SAP cancel for a running dialog request): it ends on SAP's answer.
+- `background` is declared only on onprem `LinkAbapGitRepo`, `PullAbapGitRepo`, `PushAbapGitRepo`
+  and, in compact, on the onprem variant of `HandlerAbapGit` (boolean, optional, **no default**,
+  described for `link`, `pull`, `push` only; another action given `background` is refused). The
+  cloud variants' schemas do not declare it. These join `BACKGROUND_TOOLS`
+  (`backgroundRuns/tools.ts`), whose source test keeps schemas and the list equal.
+- **`background: true` is refused, never run in the foreground,** when the host has no background
+  store or a fresh connection for the run cannot be made (the existing fixed words of
+  `contract.ts`); the caller may call again without it.
+- Code-run behaviour as it is today (`backgroundRuns/run.ts`): the run detaches from the caller's
+  cancel; `DiscardBackgroundRun` cannot cut a running code run; a Streamable HTTP disconnect leaves
+  calls and runs going; an SSE stream close or stdio close logs the run's connection off, which
+  **cuts SAP's dialog mid-import** (a partly imported package; named in the docs). An in-call
+  write is not cut by the client's cancel either: it ends on SAP's answer.
+- The background-run record and stored answer of an abapGit run hold only §5.3's fields.
 
-**Existing connector behaviour for the owner (not changed here):** on a CSRF failure the
-connection fetches a new token and **resends the request** (`AbstractAbapConnection`, L1515–1527,
-`@mcp-abap-adt/connection`). For R2/R4/R10/R15 that is a resend of a credentialed write. SAP
-refuses CSRF before the handler runs (Inference), so the first attempt should have done nothing.
+### 4.7 CSRF resend (owner's question, answered from code)
+
+- **SAP refuses a bad CSRF token before any abapGit resource handler runs.** ADT's ICF
+  application `CL_ADT_WB_RES_APP` (identical on onprem and cloud): its local class
+  `lcl_rfc_request_proxy_abs->handle_request` calls `handle_csrf( )` (L117, which validates by
+  `m_server->validate_xsrf_token` L80 and raises `CX_ADT_REST_CSRF_TOKEN`) **before**
+  `call_adt_rfc_endpoint` (L125), which reaches the resource handlers. The REST library's own
+  `CL_REST_HTTP_HANDLER->if_http_extension~handle_request` does the same: `handle_csrf_token` (L180)
+  before `get_root_handler( )->handle( )` (identical on both). Which proxy serves a given request
+  (`get_request_proxy`) was not read; both paths check first.
+- **But the connector resends on more than SAP's refusal.** `@mcp-abap-adt/connection` 25.0.1
+  `AbstractAbapConnection.shouldRetryCsrf` (L1916–1937) resends on a 403 whose text holds `CSRF`,
+  on **any status whose text holds `CSRF token`**, and on a 401 to a mutation sent without a token.
+  An abapGit handler's own 500 whose message carried those words would be resent after the handler
+  ran. That branch is not grounded as "before".
+- **Therefore (owner's rule, "after" case):** the credentialed abapGit requests are sent with the
+  connection's new no-resend option (§3.4); a CSRF refusal reaches the model as a structured error
+  and the call may be made again. `@mcp-abap-adt/connection` joins the release order. The
+  SAP-side "before" is recorded with its ground for every other caller of the resend.
+- Over RFC, ADT requests go to `SADT_REST_RFC_ENDPOINT` without the ICF application; whether the
+  connector's CSRF path runs at all on RFC: unverified (§10).
 
 ## 5. Credentials
 
-No tool argument carries a credential (tool-argument credentials are dropped).
+No tool argument carries a credential.
 
-### 5.1 Bound to the remote
+### 5.1 Bound to an approved endpoint
 
-- The server's credential configuration maps a **remote URL** to its credential. Key: scheme +
-  host (lower-cased, default port dropped) + path (trailing `/` and `.git` normalised), compared
-  exactly; userinfo, query or fragment in a configured key is a start error.
-- A credential is attached only to a call whose target remote matches its key exactly:
+- The credential configuration lists **approved endpoints**: each an exact remote URL — scheme
+  (`https`), host (lower-cased), a non-default port when there is one, and path — with its
+  credential and optional trusted aliases of the same form. No `.git` or trailing `/` is merged:
+  `…/repo`, `…/repo/` and `…/repo.git` are three endpoints. Userinfo, query or fragment in a
+  configured URL or alias is a start error; in a `url` argument a refusal before sending.
+- A credential is attached only when the target matches an approved URL or one of its aliases
+  exactly:
   - `CheckAbapGitExternalRepo`, `GetAbapGitBranchInfo`, `LinkAbapGitRepo`: the `url` argument;
+    when an alias matches, the **configured URL** is what SAP is sent;
   - every key-addressed tool: the `url` of the R1 entry for that key, read first (§4.4) — never a
     URL from the arguments.
-- A `url` argument with userinfo is refused before sending (cloud would take credentials from
-  it, onprem would store and echo it; §2.2).
-- **No match** (§9.7): (a) sent without credentials (SAP answers as it does for a public repo;
-  a private one fails with SAP's error); (b) refused in fixed words. **Recommend (a)**: a public
-  repository needs none, and the credential never leaves for an unbound host either way.
+- **No match:** sent without credentials (SAP answers as for a public repository; a private one
+  fails with SAP's structured error). Recommended over refusing, since the credential never leaves
+  for an unbound host either way (§9.3).
+- Unverified (§10): whether abapGit follows an HTTP redirect from the approved host to another one
+  with the credential; whether a repository key's stored URL can change after linking (no ADT
+  route changes it; R1 is read on every call).
 
 ### 5.2 Scope per transport
 
 - **stdio:** the destination's configuration (a file beside its session `.env`, its location in
   CLI_OPTIONS), read at start.
-- **Streamable HTTP:** per call, request headers the client application sets
-  (`x-abapgit-remote`, `x-abapgit-user`, `x-abapgit-token`): one binding per call, used for that
-  call only.
-- **SSE:** the same headers on the opening GET, held by that stream's instance and dropped with
-  it.
+- **Streamable HTTP:** per call, headers the client application sets (`x-abapgit-remote`,
+  `x-abapgit-user`, `x-abapgit-token`): one approved endpoint for that call only.
+- **SSE:** the same headers on the opening GET, held by that stream's instance and dropped with it.
 
-### 5.3 Kept out of every output
+### 5.3 Structure and facts only (owner's decision; no redactor)
 
-- **Values:** the user, the raw token and the base64 of the token are the secret values of a
-  call. Every text leaving the server for that call — the answer, an error, a background run's
-  stored answer (`BackgroundRunAnswer`, which keeps SAP's text), a log line — has each of those
-  exact values replaced by `[redacted]` before it is written. This covers SAP echoing a
-  credential, R8's message texts included. It changes SAP's text only where it carried the
-  secret; a short user name may also mask an identical unrelated word (accepted, documented).
-- **Wire logs:** HTTP (`withHttpWireLog`, `connectionFactory.ts`, which prints bodies): the body
-  of every request under `/sap/bc/adt/abapgit/` is logged by its size alone; `Username` joins the
-  redacted header names (`Password` is already covered by `password`). RFC: the connection
-  package prints bodies under `DEBUG_RFC_WIRE` with no per-request switch the server is known to
-  have (unverified); until one exists, a credentialed abapGit call is refused while
-  `DEBUG_RFC_WIRE` is on.
-- **Records:** the background-run record keeps tool, object and start (`BackgroundRunStart`); the
-  run's closure holds the credential only until SAP answers.
+For every abapGit request that carries a credential, and for the R8 read, the server keeps
+**only parsed fields of a stable contract**, built from SAP's answer by the adt-strategies
+reading; everything else is dropped **before** any log line, the tool answer and the
+background-run record — the rule of auth-providers' "No server text reaches anything":
+
+| Kept | Dropped |
+|---|---|
+| HTTP status (integer) | raw body, headers, status text |
+| object lists: type, name, package, status, message type (R2/R4/R8); staging objects and files (names, paths, states), SAP's proposed author and committer (R9); overwrite and warning entries with action codes (R6); access mode and branch names, SHA-1, type, head flag (R13/R14) | message texts (`msgText`, `actionDescription`, `displayName`) |
+| on an error: SAP's message class and number (the ADT exception's T100 key) | the exception's text, message variables, properties (`LONGTEXT`, `http_status` text) |
+| R12: the file content (it is the requested payload, not server text about the call) | — |
+
+- The T100 key is read from the ADT exception document's key fields; which elements carry it on
+  these routes is unverified (§10): when absent, the error is status alone.
+- Cloud R11's auth failure keeps `http_status` as an integer fact (`401`/`403`/`404`), parsed,
+  never its text.
+- Wire logging is off for these requests (§3.4) on HTTP and RFC; the server's own
+  `withHttpWireLog` skips them too.
+- Calls with no credential and no R8 (R1, R3, R7, R13 for a public URL…) keep the ordinary answer.
+  R1's answer is the repository list SAP keeps, which holds no credential (cloud strips them from
+  URLs at link, Code; userinfo is refused before link).
 
 ## 6. Errors
 
-- SAP's answer reaches the model as it is (status, T100 text, cloud's `http_status` and
-  `LONGTEXT`, cloud's 409 text), with only §5.3's exact secret values replaced. No retry, no
-  resolution, no merge.
-- Server refusals before sending, fixed words: access codes; unknown key or blank package
-  (§4.4); URL with userinfo; abapGit not served; batch mode; `DEBUG_RFC_WIRE` with a credential;
-  a credential with no match only if §9.7 chooses (b).
+- Credentialed calls and R8: the structured error of §5.3. Other abapGit calls: SAP's answer as
+  every other ADT tool gives it. No retry, no resolution, no merge, no CSRF resend (§4.7).
+- Server refusals before sending, fixed words: access codes; `abapgit_import_not_allowed`
+  (§4.3); unknown key, blank package or URL, unreadable R1 (§4.4); a run-log key R1 does not show
+  for that repository (§4.1); URL with userinfo, query or fragment; abapGit not served (§4.5);
+  batch mode; `background` where it is not declared or cannot run (§4.6).
 
 ## 7. Tests
 
-**Unit** (interfaces-adt typechecks, adt-strategies, adt-clients, server):
+**Unit** (interfaces-adt typechecks, adt-strategies, adt-clients, connection, server):
 
-- per member: method, path built from `key`, query, Content-Type, Accept, body, the wire fields
-  of §3.1, credentials in no other header or element; `getErrorLog`/`pull` refusing absolute and
-  foreign links; the 46.x `results` type test;
-- readings over sanitised captured documents;
-- strict verdicts and `analyse` per errata entry;
-- server: schemas per variant and set, `-ro` membership, deny entries, batch refusal with no
-  entry, the R1 pre-read and fail-closed cases, credential binding (match, near-miss host or path,
-  no match), userinfo refusal, discovery listing per transport and on a failed discovery, the
-  stateless session type on every abapGit request including after an error;
+- per member: method, path built from `key`, query, Content-Type, Accept, body, the wire fields of
+  §3.1, credentials in no other header or element; the `getErrorLog`/`pull` wrappers calling the
+  key-based builders and refusing absolute, foreign or malformed links; the 46.x `results` type
+  test;
+- connection: the no-resend option (a 403 `CSRF` answer is not resent; without the option it is)
+  and the no-wire-log option on HTTP and RFC;
+- readings and the §5.3 structured contract over sanitised captured documents;
+- server: schemas per variant and set (`background` only where §4.6 declares it), `-ro`
+  membership, deny entries, batch refusal with no entry, the R1 pre-read and fail-closed cases,
+  the import refusal under each restriction kind, the run-log pairing, approved-endpoint matching
+  (exact, alias sending the configured URL, `.git` / trailing `/` / port / case near-misses, no
+  match sent anonymously), userinfo/query/fragment refusal, `tools/list` filtering and call
+  refusal per transport and on a failed discovery, stateless session type on every abapGit
+  request including after an error;
 - **canaries** for the user, the raw token and the base64 password, over HTTP and RFC, through
-  success, SAP error (a stubbed SAP echoing each value), refusal, background run, both wire logs:
-  none appears in any answer, error, run record or log line.
+  success, a stubbed SAP that echoes each value in body, headers, status text and exception
+  fields, refusal, background run and both wire logs on: none appears in any answer, error, run
+  record or log line.
 
 **Live** (adt-clients integration and server `liveSuite`), each stating where it runs, skipped
 elsewhere with the reason, route-specific cases gated by system kind in code:
 
 - **Repository:** the private test repository from `abapgit-live.env` (`ABAPGIT_REPO_URL`,
   `ABAPGIT_USER`, `ABAPGIT_TOKEN`); without it the suite skips with that reason.
-- **Isolated branches:** each run creates its own branches from the default branch through
-  GitHub's REST API with the test token (`POST /repos/{owner}/{repo}/git/refs`) and deletes them
-  at the end (`DELETE …/git/refs/heads/{name}`), including after a failure. Two per run: the
-  run's branch and a second one for the switch. Whether the token has the scope: unverified
-  (§10); without it the suite skips with that reason.
-- **Package:** created and deleted by the suite. onprem: transportable, under the configured super
-  package, in the configured software component, recorded in the configured request (a `$`
-  package cannot be transported, so the request path would not run). cloud: under the configured
-  super package in `ZLOCAL` (no `$TMP` on cloud; no request).
+- **Run-owned fixtures:** every name carries the run id — the package, the ABAP objects the test
+  creates (so parallel runs and SAP's package-warning approval touch only this run's objects), and
+  two branches.
+- **Object-empty branches:** the run creates its branch through GitHub's REST API with the test
+  token as a commit holding only the abapGit settings file (`.abapgit.xml`, starting folder
+  `/src/`) and no object (Git Data API: blob, tree, commit, then `POST …/git/refs`), and a second
+  branch from it for the switch; both deleted at the end (`DELETE …/git/refs/heads/{name}`).
+  Whether the token has the scope: unverified (§10); without it the suite skips with that reason.
+- **Package:** onprem: transportable, under the configured super package, in the configured
+  software component, recorded in the configured request (a `$` package cannot be transported, so
+  the request path would not run). cloud: under the configured super package in `ZLOCAL` (no
+  `$TMP` on cloud; no request).
 - **Flow and assertions:**
-  1. check external repo (branches include the run's branch); cloud: branch info;
-  2. link on the run's branch; assert R1 lists the key with the package, URL and branch; onprem:
-     assert the remote's objects are in the package (`GetPackageContents`);
-  3. create one object in the package; staging shows it unstaged; push it with explicit author and
-     committer; cloud: wait for the run (below); assert the remote branch has the file
-     (`GetAbapGitFile` `version: remote`);
-  4. change the file in the remote through GitHub's API; onprem: pull, assert the object changed;
-     cloud: modified objects lists it, selective pull of it, wait, assert the change; cloud R5:
-     adt-clients live case only (the server does not use it);
-  5. onprem: switch to the second branch, assert R1's `branchName`; switch back;
+  1. check external repo (the run's branch is listed); cloud: branch info for the run's package;
+  2. link on the run's branch; assert R1 lists the key with the package, URL and branch;
+  3. create one run-owned object; staging shows it unstaged; push it with explicit author and
+     committer; cloud: wait (below); assert the remote branch holds its file (`GetAbapGitFile`
+     `version: remote`);
+  4. change the file in the remote through GitHub's API; pull; cloud: wait; assert the object's
+     source changed in SAP; cloud R5: an adt-clients live case only (the server does not use it);
+  5. onprem: switch to the second branch, assert R1's `branchName` changed; switch back, assert;
   6. checks; file local and remote;
-  7. cleanup, also after a failure: wait for any cloud run to reach a terminal status first, then
-     unlink (assert R1 no longer lists the key), delete the objects and the package (assert gone),
-     delete the branches.
-- **Waiting on a cloud run:** note R1's log key before submitting; poll R1 until the entry shows
-  a **new** log key and a terminal `status` (`S`, `W`, `E`, `A`); blank (`' '`, initial) and `R`
-  mean waiting. Read the error log by that key and assert it belongs to this run. That a new log
-  key appears per run: Inference (§10). The poll ends on SAP's answer or the test's own cancel;
-  no server timeout.
+  7. under a configured allowed-packages entry: link and pull refused with nothing sent; push,
+     unlink and switch checked against the repository's package;
+  8. cleanup: only after every cloud run of this repository is terminal; unlink (assert R1 no longer
+     lists the key), delete the objects and the package (assert gone), delete the branches.
+- **Waiting on a cloud run:** before submitting, note R1's log key for the repository; poll R1
+  until the entry shows a **new** log key **and** a terminal `status` (`S`, `W`, `E`, `A`); blank
+  (initial) and `R` mean waiting. Read the run log by that key (paired as §4.1) and assert it is
+  this run's. That a new log key appears per run is Inference (§10). The poll ends on SAP's answer
+  or the test's own cancel; no server timeout.
+- **Recovery:** when a poll is cancelled, or a run cannot be correlated (no new log key, or a
+  status that never becomes terminal before the test's cancel), the run does **not** unlink or
+  delete. It keeps its fixtures, records their names in a gitignored ledger beside the test
+  config, and fails naming them. Every later run first works the ledger: for each recorded
+  repository it reads R1, waits until no run of it is blank or `R`, then cleans up as in step 8
+  and removes the entry.
 - R11 and R15 success statuses are logged, not asserted, until measured (§10).
 
 ## 8. Docs
 
 - README: first screen ("Primary workflows", "Why teams use it") names the git loop; a Features
-  section on abapGit: offered per system, credential binding, long-run behaviour, what an import
-  can write (§2.3).
+  section on abapGit: offered per system, approved endpoints, long-run behaviour, what an import
+  writes (§2.3), and that link and pull are refused under access restrictions.
 - Tool references: `AVAILABLE_TOOLS.md`, `AVAILABLE_TOOLS_READONLY.md`, `AVAILABLE_TOOLS_HIGH.md`,
   the generated compact page.
-- `ACCESS_RESTRICTIONS.md`: arguments per tool, the R1 pre-read, fail-closed cases, §9.5's rule,
-  the cloud task note, both compact tools' deny values.
-- `AUTHENTICATION.md`, `CLI_OPTIONS.md`: the credential binding per transport.
-- adt-clients README and `ERRATA.md` (§3.3); the `checkExternalRepo` defect in its CHANGELOG.
-- CHANGELOG highlights: 24.2.0, interfaces-adt, adt-strategies, adt-clients.
-- Release order: interfaces-adt → adt-strategies → adt-clients, each published before the next
-  builds on it; then the server from the registry.
+- `ACCESS_RESTRICTIONS.md`: the import refusal with §4.3's SAP code grounds (SAP-created child
+  tasks included), the arguments per tool, the R1 pre-read and fail-closed cases, both compact
+  tools' deny values.
+- `AUTHENTICATION.md`, `CLI_OPTIONS.md`: approved endpoints per transport.
+- adt-clients README and `ERRATA.md` (§3.3); the `checkExternalRepo` defect in its CHANGELOG;
+  connection's two options and the CSRF ground (§4.7) in its CHANGELOG.
+- CHANGELOG highlights: 24.2.0, interfaces-adt, adt-strategies, connection, adt-clients.
+- **Release order:** interfaces-adt → adt-strategies → connection → adt-clients, each published to
+  the registry before the next builds on it; then the server from the registry.
 
 ## 9. Open decisions
 
-1. **Listing under stdio `--deferred-logon`** (no connection when tools are listed). (a) list no
-   abapGit tool until the logon, then send `notifications/tools/list_changed`; (b) list none for
-   the process (a goal change: deferred logon lists no abapGit). The old "list and refuse later"
-   option is dropped: it breaks the goal. **Recommend (a)**; whether the supported clients reload
-   on that notification is unverified.
-2. **Goal change — `-ro` lists.** Proposed: move "stage" into the `-ro` reads (R9 changes
-   nothing; staging is the choice of R10's objects) and move "read its branches" on cloud out of
-   `-ro` (R14 commits a link and deletes it), with its `package_name` checked as for link.
-   **Recommend** accepting it; the spec is written to it.
-3. **"Read one repository".** (a) filters on `ListAbapGitRepos` applied by a result strategy over
-   the one R1 answer; (b) list only. **Recommend (a)** (cloud's list is 446 entries, 1 MB).
-4. **Goal change — status.** Proposed: the cloud status operation is `ListAbapGitRepos`'s run
-   state (R1 `status`, `statusText`, log key); R7 stays a client member (`getStatus`, served) with
-   no server tool, since it answers a fixed text. **Recommend** accepting it.
-5. **abapGit writes under package or request restrictions** (§4.3):
-   (a) refused whenever any package or request restriction is configured;
-   (b) allowed only when a subtree entry covers the repository's root package, the writes into
-   other packages documented as SAP's behaviour that cannot be bounded;
-   (c) cloud: read R6 first, check every listed object's package (the warning entries name the
-   other package), and send a selective pull of exactly the allowed list — the job only says
-   `'Y'` to names in it (Code), though it matches names without type and recomputes at run time;
-   onprem offers no such list.
-   **Recommend (c) for cloud pull and (a) for onprem link and pull**; push, unlink and switch
-   write nothing into packages and keep the plain root-package check.
-   Requests: cloud pull may create a task under the checked request; "an entry for a request does
-   not cover its tasks" is about the request a call names, and the task is SAP's, not an argument.
-   **Recommend** stating that, rather than refusing cloud pull when requests are restricted.
-6. **onprem long writes.** (a) in the call only; (b) opt-in `background: true` as a code run
-   (§4.6), with its cut-on-stream-close behaviour. **Recommend (b)**, opt-in.
-7. **A call whose remote matches no credential:** (a) send anonymously, (b) refuse.
-   **Recommend (a)** (§5.1).
-8. **The CSRF resend** of credentialed writes (§4.6): leave as connector behaviour, or ask the
-   connector for a no-resend option on these calls. Flagged, no recommendation beyond leaving it
-   until a refusal-before-handler is measured.
+1. **stdio `--deferred-logon`** (no connection at the first listing). (a) list no abapGit tool
+   until the logon, then send `notifications/tools/list_changed`; (b) list none for the process (a
+   goal change). **Recommend (a)**; whether the supported clients reload on that notification is
+   unverified.
+2. **"Read one repository".** (a) `package_name` / `repository_key` filters on `ListAbapGitRepos`,
+   applied by a result strategy over the one R1 answer; (b) list only. **Recommend (a)** (cloud's
+   list: 446 entries, 1 MB).
+3. **No approved endpoint matches:** (a) send without credentials; (b) refuse. **Recommend (a)**.
+4. **onprem long writes:** (a) in the call only; (b) opt-in `background: true` as a code run (§4.6).
+   **Recommend (b)**.
 
 ## 10. Not verified
 
+What a decision above rests on is marked ★.
+
 - Every status except R1's and discovery's is from Code, not a live request; R11 and R15 success
-  (framework default, Inference) is kept out of asserted contracts.
-- R15 with a branch name holding `/` in the `{branch}` segment — needs a POST; to measure in the
-  first live run.
-- R10's object reference fields come from the `sadt_object_reference` include (not read); the
-  live push verifies the builder.
-- Whether onprem `deserialize` deletes objects removed from the remote.
-- Whether a cloud run always writes a new application log key to R1 (live flow relies on it).
+  (framework default, Inference) stay out of asserted contracts.
+- ★ Which elements of the ADT exception document carry the T100 key on these routes (§5.3).
+- ★ Whether the connection's RFC wire logging can be switched off per request today (§3.4 adds it).
+- ★ Whether the connector's CSRF path runs on RFC (§4.7).
+- Which `CL_ADT_WB_RES_APP` proxy serves a request (`get_request_proxy`, not read); both check CSRF
+  first.
+- ★ Whether abapGit follows redirects with the credential; whether a key's stored URL can change
+  (§5.1).
+- ★ Whether a cloud run always writes a new log key to R1 (live correlation, §7).
+- ★ Whether the test token may create and delete branches (live fixtures, §7).
+- ★ Whether clients reload on `tools/list_changed` (§9.1).
+- R15 with a branch name holding `/` — needs a POST; measured in the first live run.
+- R10's object reference fields (`sadt_object_reference` include, not read); the live push verifies
+  the builder.
+- Whether onprem `deserialize` deletes objects removed from the remote (moot under restrictions:
+  refused; documented as unknown otherwise).
 - The private-repository effect of the `checkExternalRepo` field defect.
-- Whether the test token can create and delete branches.
-- Per-request connection wiring of Streamable HTTP for discovery (§4.5).
-- An RFC per-request body switch in the connection package (§5.3).
-- Whether CSRF is refused before the abapGit handler runs (§4.6).
-- No read-only GET could settle any of these without a link, so none was sent in this revision.
+- No read-only GET could settle these without a link, so none was sent in this revision.

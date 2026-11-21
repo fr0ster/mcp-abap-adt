@@ -18,8 +18,9 @@ commit and push it, and read what went wrong.
   - check an external repository before linking it, and on cloud read its branches;
   - link a package to a repository, and unlink it;
   - pull, and on cloud read the objects a pull would modify;
-  - read the repository's files and its checks, and on cloud its status;
-  - stage, then commit and push;
+  - read the repository's files and its checks, and on cloud its status (the run state the
+    repository list carries);
+  - stage (read what changed and choose what to commit), then commit and push;
   - on onprem, switch the branch;
   - read the error log of a pull or a push.
 
@@ -34,17 +35,21 @@ commit and push it, and read what went wrong.
   same operations in its own shape. Both follow the existing tool rules: functional
   descriptions, typed schemas, result strategies.
 - **Reads in `-ro`, writes outside it.** These go in the `-ro` binaries:
-  - list and read repositories;
-  - check an external repository and read its branches;
-  - read files, checks, status and modified objects;
+  - list and read repositories, with their status;
+  - check an external repository;
+  - read what changed for staging, files, checks and modified objects;
   - read the error log.
 
-  Link, unlink, pull, stage, push and branch switch change the system or the remote
+  Link, unlink, pull, push, branch switch and, on cloud, reading a branch's details (SAP links
+  the repository and removes the link to answer it) change the system or the remote
   repository, so they are not in `-ro`.
-- **Access restrictions hold.** Every write names a package (the repository's) and, where it
-  takes one, a transport request. These are checked against `allowed-packages` and
-  `allowed-requests` before anything is sent, like every other write. Each operation can be
-  denied through `--deny-actions` like any other tool.
+- **Access restrictions hold.** Link and pull write objects the allowed packages and requests
+  cannot bound (SAP's import overwrites objects in subpackages and in other packages, and
+  creates tasks), so they are refused while any `allowed-packages` or `allowed-requests` entry
+  is configured. Every other write is checked against the repository's package, read from
+  SAP's repository list, and fails closed when it cannot be read. With no restriction
+  configured, everything is served. Each operation can be denied through `--deny-actions` like
+  any other tool.
 - **Long operations end on SAP's answer or the caller's cancel.** A pull or a push can take
   long, and nothing ends it on the server's clock: there is no timeout. Today only reads run
   in the background, so the spec decides how a long abapGit write runs, from the existing
@@ -54,7 +59,11 @@ commit and push it, and read what went wrong.
   error text, not a background-run record.
 - **SAP's answer reaches the model as it is.** A conflict, an authorisation refusal or a
   failed check is SAP's verdict, returned like every other ADT answer. The server does not
-  retry, merge or resolve anything.
+  retry, merge or resolve anything. **For an abapGit call that carries git credentials, and
+  for the error log**, SAP's verdict reaches the model as structure and facts only: the
+  status, the object lists, and SAP's message class and number. SAP's text, bodies, headers
+  and exception fields are dropped before any log, answer or background-run record, so no
+  credential SAP might echo can reach them.
 
 ## Where it is built
 

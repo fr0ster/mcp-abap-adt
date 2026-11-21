@@ -285,3 +285,44 @@ describe('a user value stays inside its literal through a real prompt (review fo
     });
   }
 });
+
+describe('a service binding over Streamable HTTP carries the state_handle its lock answers, when it answers one', () => {
+  const text = () =>
+    textOf(
+      promptOf(updatePrompt, sourceOf(compactToolSet, 'onprem', [], 'http')),
+      { object_type: 'service_binding', name: 'SOME_BINDING' },
+    );
+
+  it('keeps the lock_handle, and the state_handle when the lock answers one', () => {
+    const lines = text().split('\n');
+    const lock = lines.find((line) => line.startsWith('2. '));
+    assert.ok(lock?.includes('; keep the lock_handle it answers.'), lock);
+    assert.ok(
+      lock?.includes(
+        'A binding open in an editing session answers an empty lock_handle alone: the write and the unlock take that empty lock_handle.',
+      ),
+      lock,
+    );
+    for (const step of ['3. ', '4. ']) {
+      const line = lines.find((each) => each.startsWith(step));
+      assert.ok(
+        line?.includes(
+          'state_handle: the state_handle step 2 answered, when it answered one',
+        ),
+        line,
+      );
+    }
+  });
+
+  it('a class carries the state_handle from the lock as before', () => {
+    const lines = textOf(
+      promptOf(updatePrompt, sourceOf(compactToolSet, 'onprem', [], 'http')),
+      { object_type: 'class', name: 'SOME_CLASS' },
+    ).split('\n');
+    assert.ok(
+      lines.some((line) =>
+        line.includes('state_handle: the state_handle from step 2'),
+      ),
+    );
+  });
+});

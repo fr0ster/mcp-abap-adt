@@ -159,7 +159,7 @@ interface CompactRunTools {
   readonly result: ListedPromptTool;
 }
 
-/** The compact row of `type`: run, status until finished, result. */
+/** The compact row of `type`: run, one long-polled status read, the result when it is FINISHED. */
 function compactRunRow(tools: CompactRunTools, type: RunType): RunRow {
   return {
     type,
@@ -182,9 +182,12 @@ function compactRunRow(tools: CompactRunTools, type: RunType): RunRow {
           ['run_id', stepValue(1, 'run_id')],
           ['with_long_polling', userValue(true)],
         ],
-        { repeat: 'the status is FINISHED' },
+        { keeps: ['status'] },
       ),
-      toolStep(tools.result, [['run_id', stepValue(1, 'run_id')]]),
+      toolStep(tools.result, [['run_id', stepValue(1, 'run_id')]], {
+        condition: 'When the status is FINISHED',
+        note: 'For any other status, answer the user with the run_id and the status SAP named, so the user can ask again.',
+      }),
     ],
   };
 }

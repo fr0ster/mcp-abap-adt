@@ -107,7 +107,8 @@ package (`package_name`, `super_package`) or a request (`transport_request`, `tr
 - **A task is matched as given**: an entry for a request does not cover its tasks.
 - A subtree entry makes the server read the package tree: a package below an allowed subtree is
   found by reading each super package up to the subtree's root. For a package create the new
-  package's parent is the call's `super_package`. A tree that cannot be read (SAP does not
+  package's parent is the call's `super_package`; a top-level package has none, so its create
+  runs when an exact or prefix entry names it. A tree that cannot be read (SAP does not
   answer a package, or a package is met twice) refuses the call.
 
 ## Denied tables, allowed tables

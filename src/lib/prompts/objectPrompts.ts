@@ -327,9 +327,23 @@ export function underLock(
   const handle: StepArguments = [
     ['lock_handle', stepValue(first, 'lock_handle')],
   ];
-  const state: StepArguments = source.stateHandle
-    ? [['state_handle', stepValue(first, 'state_handle')]]
-    : [];
+  // A service binding open in an editing session answers an empty
+  // lock_handle alone (HandlerLock keeps no lock for it), so its
+  // state_handle is carried when the lock answers one.
+  const emptyHandle = locks.target === 'SERVICE_BINDING';
+  const state: StepArguments = !source.stateHandle
+    ? []
+    : emptyHandle
+      ? [
+          [
+            'state_handle',
+            {
+              from: 'model',
+              writes: `the state_handle step ${first} answered, when it answered one`,
+            },
+          ],
+        ]
+      : [['state_handle', stepValue(first, 'state_handle')]];
   const lockNamed: StepArguments = [
     ['object_type', userValue(locks.target)],
     ...nameArguments(locks.lock, locks.target, 'object_name', named),
@@ -341,9 +355,13 @@ export function underLock(
   return [
     toolStep(locks.lock, lockNamed, {
       lead: `Lock ${what}`,
-      keeps: source.stateHandle
-        ? ['lock_handle', 'state_handle']
-        : ['lock_handle'],
+      keeps:
+        source.stateHandle && !emptyHandle
+          ? ['lock_handle', 'state_handle']
+          : ['lock_handle'],
+      ...(emptyHandle && {
+        note: 'A binding open in an editing session answers an empty lock_handle alone: the write and the unlock take that empty lock_handle.',
+      }),
     }),
     write(handle, state),
     toolStep(locks.unlock, [...unlockNamed, ...handle, ...state], {

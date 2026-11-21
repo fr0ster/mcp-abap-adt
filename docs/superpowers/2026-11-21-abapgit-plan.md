@@ -83,7 +83,7 @@ mcp-abap-adt-interfaces, P4/P5 share mcp-abap-adt-clients; still one PR each).
 | P4 | `@mcp-abap-adt/adt-strategies` (`~/prj/mcp-abap-adt-clients/packages/adt-strategies`) | 0.26.0 → 0.27.0 |
 | **G4** | **owner publishes adt-strategies 0.27.0** | |
 | P5 | `@mcp-abap-adt/adt-clients` (`…/packages/adt-clients`) | 46.1.0 → 46.2.0 |
-| **G5** | **owner publishes adt-clients 46.2.0** — after T5.0's registry-backed run and T5.6's gates closed | |
+| **G5** | **owner publishes adt-clients 46.2.0** — after T5.6's run on the isolated install (T5.0) | |
 | P6 | server, this repo, PR #374; ships in 24.2.0 (#371) | |
 
 **Dependencies.** A package depends on another repository's package only as published on the
@@ -93,6 +93,14 @@ of the same repository and release (adt-strategies and adt-clients in mcp-abap-a
 interfaces packages) may be linked during development. Before tagging every link is gone from what
 is released: every range resolves on the registry, the sibling is published first in order, and a
 clean install from the registry outside the repo installs.
+
+**Gates: what blocks and what does not.** Gates are recorded per backend (onprem, cloud) in
+adt-clients' ERRATA and in the server's `credentialGate.ts` table. **Blocks publishing** (G5) and
+the 24.2.0 release: a red unit, type or build check; a red functional live case on either backend;
+a T100 assertion that ran and failed (the §5.3 error contract would be wrong). **Never blocks:** a
+redirect gate that failed or could not be run (no remote, no evidence) — that backend is recorded
+"credentials refused" and ships with every credential-bearing route refused (T6.3); a later passing
+run flips it in a patch.
 
 ## P1 — interfaces-adt-connection
 
@@ -116,10 +124,17 @@ of every `IAdtAbapGitClient` member. New exports:
 - `IAbapGitCredentials { readonly user: string; readonly password: string }`;
   `IAbapGitMemberOptions<E extends IAdtError = IAdtError> = IAdtAnalyseOptions<E> & { credentials?:
   IAbapGitCredentials | undefined }`.
-- `IAbapGitStructuredError extends IAdtError`: `messageClass?`, `messageNumber?`, `gitHttpStatus?`;
-  its required `origin` as SAP's, its required `message` fixed words built from status and T100 key,
-  `response` the reduced response, no text of SAP's (spec §5.3). `IAbapGitFactsResponse<F>`:
-  `status: number`, `facts: F` — no headers, body or status text.
+- **A typed facts exchange** (new types only; `IResultStrategy`, `IAnalyse` and `IAdtError` are not
+  touched, since they take `IAdtWireResponse`):
+  - `IAbapGitFactsResponse<F> { status: number; facts: F }` — no headers, body or status text;
+  - `IAbapGitErrorFacts { status; messageClass?; messageNumber?; gitHttpStatus? }`;
+  - `IAbapGitStructuredError extends IAdtError` with `facts: IAbapGitErrorFacts`,
+    `response?: undefined` (narrowed: no wire response), `request?: { method; path }` without query,
+    its required `origin` and `message` (fixed words from status and T100 key, no text of SAP's);
+  - `IAbapGitFactsResultStrategy<T, F> = (answer: IAbapGitFactsResponse<F>) => T`;
+  - `IAbapGitFactsAnalyse<F, E extends IAbapGitStructuredError = IAbapGitStructuredError>
+    = (verdict: IAbapGitStructuredError | AdtNoFailure, answer?: IAbapGitFactsResponse<F>) => E |
+    AdtNoFailure`.
 - Argument types: `IAbapGitRepoKeyArgs { key }`; `IAbapGitPullRepoArgs { key; branchName;
   transportRequest?; selection? }` (`branchName` required); `IAbapGitPullSelection {
   overwriteObjects; packageWarningObjects }`; `IAbapGitRunLogArgs { key; appLogKey }`;
@@ -128,16 +143,21 @@ of every `IAdtAbapGitClient` member. New exports:
   `IAbapGitFileArgs { key; filename; version: 'local' | 'remote' }`; `IAbapGitBranchInfoArgs { url;
   branch; package }`; `IAbapGitSwitchBranchArgs { key; branch; create: boolean }`.
 - **Credentials on existing members** through new overload atoms `IAdtAbapGitLinkWithCredentials`,
-  `IAdtAbapGitPullWithCredentials`, `IAdtAbapGitCheckExternalRepoWithCredentials`: the same two
-  overload shapes, `args` typed `Omit<…Args, 'remoteUser' | 'remotePassword'> & { remoteUser?:
-  never; remotePassword?: never }`, options carrying `credentials`. **Exclusivity lives in those
-  `never` fields:** both forms in one call match no overload; the deprecated fields keep working
-  through the untouched old overloads.
+  `IAdtAbapGitPullWithCredentials`, `IAdtAbapGitCheckExternalRepoWithCredentials`: `args` typed
+  `Omit<…Args, 'remoteUser' | 'remotePassword'> & { remoteUser?: never; remotePassword?: never }`,
+  options carrying a required `credentials` and typed with the facts exchange (`analyse:
+  IAbapGitFactsAnalyse<E>`, result `IAdtResponse<TFacts, E>`). **Exclusivity lives in two places:**
+  the `never` fields on the new overloads, and `credentials?: never` added to the options of each
+  legacy overload of `link`, `pull` and `checkExternalRepo`, so an options variable holding
+  `headers` and `credentials` no longer matches the legacy branch. This stays a minor: no existing
+  options type had `credentials`, so every caller that compiled before still compiles (pinned
+  below); the deprecated fields keep working through the legacy overloads.
 - **New members as atoms**, one exported interface each, generic only over its result `T`, each with
   the client's two overload shapes — `<E extends IAdtError>(args, options: …IAbapGitMemberOptions<E>
   & { analyse: IAnalyse<E> }): Promise<IAdtResponse<T, E>>` and `(args, options?:
   …IAbapGitMemberOptions): Promise<IAdtResponse<T>>`, with `{ headers: IAdtHeaders } &` where the
-  route takes headers (H):
+  route takes headers (H); a member that takes `credentials` has a third shape with a required
+  `credentials` typed by the facts exchange, and its uncredentialed shapes carry `credentials?: never`:
 
   | Atom | Member | Args |
   |---|---|---|
@@ -158,11 +178,15 @@ of every `IAdtAbapGitClient` member. New exports:
 Tests (`src/__typechecks__/abapGit.ts`, `downstreamStillCompiles.ts`; first failure: missing
 exports): an existing caller of every old overload compiles, `pull` without `branchName` and with
 `remoteUser`/`remotePassword` included; an existing class implementing the four-parameter
-`IAdtAbapGitClient` compiles; `credentials` with `remoteUser` (literal and variable),
+`IAdtAbapGitClient` compiles; existing callers passing an options variable with `headers` and
+`analyse` compile; `credentials` with `remoteUser` (literal and variable), **an options variable
+holding `headers` and `credentials` beside args with `remoteUser`** (the legacy-branch case),
+an `IResultStrategy` given where an `IAbapGitFactsResultStrategy` is required and the reverse,
 `push` without `comment.committer`, `switchBranch` without `create`, `getFile` with
 `version: 'head'`, `pullRepo` without `branchName` are each `@ts-expect-error`; an `analyse`
-returning an `IAdtError` subtype types `E` through. Mutation: drop a `never` field → the both-forms
-case goes red. Run: `npm run build && npm run test:check && npm run check:surface && npm run
+returning an `IAdtError` subtype types `E` through, and an `IAbapGitFactsAnalyse` returning an
+`IAbapGitStructuredError` subtype likewise. Mutations: drop a `never` field → the both-forms case
+red; drop `credentials?: never` from the legacy options → the legacy-branch case red. Run: `npm run build && npm run test:check && npm run check:surface && npm run
 check:graph` → green. CHANGELOG 30.2.0.
 
 **T2.2 Review and release prep.** Whole-PR review; `npm run check`; gate G2.
@@ -238,8 +262,14 @@ interfaces-adt-connection `^5.2.0`, connection `^25.1.0` (dev: the tests and the
 **adt-strategies moves to `dependencies`, `^0.27.0`**, because `abapGitFacts` is imported at
 runtime. `npm install --ignore-scripts` regenerates the lockfile; connection 25.1.0 and
 adt-strategies 0.27.0 resolve from the registry; no `"link": true` but the repository's own
-development sibling links, which T5.7 removes before tagging. `npm ls @mcp-abap-adt/connection
-@mcp-abap-adt/adt-strategies` shows the registry versions; the T5.6 live run runs on this install.
+development sibling links, which T5.7 removes before tagging. **Isolated install before G5:** `npm
+pack` adt-clients into a temporary directory outside the workspace and run there `npm install
+--ignore-scripts <tarball>`, every dependency (adt-strategies 0.27.0, connection, the interfaces)
+from the registry. The T5.6 suite loads the client under test through one helper,
+`src/__tests__/helpers/abapGitUnderTest.ts`: with `ABAPGIT_CLIENT_UNDER_TEST` set to that install it
+`require`s from there and asserts the resolved paths (`require.resolve`) of adt-clients,
+adt-strategies and connection lie inside it and none inside the workspace — the pre-G5 run sets it.
+Unit test of the helper: a path inside the workspace is refused.
 
 **T5.1 Key path builder and link wrappers.** `abapGit/paths.ts`: `repoPath(key, ...segments)`,
 URL-encoded segments. The existing low-level internal function `pullRepo(connection, headers, args)`
@@ -270,20 +300,28 @@ without its slot answers `abapGitDocuments`' default. Header pairs for the new r
 `requestHeaders.test.ts`. First failure: the members do not exist. Mutations: a second request after
 `202` → the cloud case red; stateful after a failure → red.
 
-**T5.4 The structured boundary** (`src/clients/abapGit/structuredExchange.ts`). For every member
-called with `credentials` (either form) and for `getRunLog` / `getErrorLog`, the wire response is
-reduced **inside the client, before either callback**: the member calls `answeringExchange`
-(`src/utils/adtResponse.ts`) with the reduced response, never the raw one. **What injected strategies
-receive:** a custom result reader gets `IAbapGitFactsResponse<F>`; a custom `analyse` gets the
-`IAbapGitStructuredError` (compatible `IAdtError`: `origin`, fixed `message`, R11's `gitHttpStatus`
-kept); neither can reach the raw `IAdtWireResponse`. Shipped default result: `abapGitFacts`. These
-members and every write send `noLog: true, noResend: true`. Test
-`src/__tests__/unit/clients/abapGit/structuredBoundary.test.ts`, its member list the table of
-credentialed and log members (a new member without the boundary fails), run with both credential
-forms and both log methods: a recording custom reader and custom analyser hold no echoed canary
-(body, headers, status text, `msgText`, `LONGTEXT`, `T100KEY-V*`); R11's error keeps
-`gitHttpStatus`; the recorded options carry both flags. First failure: the reader gets `wire.data`.
-Mutations: pass the raw response to `analyse` → red; drop `noResend` on `push` → red.
+**T5.4 The typed facts exchange** (`src/clients/abapGit/structuredExchange.ts`).
+`answeringFactsExchange<T, F, E extends IAbapGitStructuredError>(run, reduce, read:
+IAbapGitFactsResultStrategy<T, F>, analyse?: IAbapGitFactsAnalyse<F, E>): Promise<IAdtResponse<T,
+E>>` serves every member called with `credentials` (either form) and `getRunLog` / `getErrorLog`;
+these members never call `answeringExchange` (`src/utils/adtResponse.ts`), whose catch hands
+`error.response` to `analyse`. **Both paths reduce before either callback:** an answer is reduced
+by `abapGitFacts[route]`; a thrown value is reduced by `abapGitErrorFacts(error.response)` into a
+fresh `IAbapGitStructuredError` — the thrown object, its `message` and its `response` go no
+further. **What injected strategies receive:** the reader `IAbapGitFactsResponse<F>`, `analyse` the
+`IAbapGitStructuredError` (R11's `gitHttpStatus` kept); the facts result slots of
+`IAbapGitResults` are typed `IAbapGitFactsResultStrategy`, so a raw reader cannot be plugged in.
+Shipped default result: `abapGitFacts`. These members and every write send `noLog: true,
+noResend: true`. Test `src/__tests__/unit/clients/abapGit/structuredBoundary.test.ts`, its member
+list the table of credentialed and log members (a new member without the boundary fails), with both
+credential forms and both log methods, on an answered failure and on a **thrown** one (the
+connection throws an error whose `message` and `response` carry the canaries): a recording custom
+reader and custom analyser hold no echoed canary (body, headers, status text, `msgText`, `LONGTEXT`,
+`T100KEY-V*`, the thrown `message`); R11's error keeps `gitHttpStatus`; the recorded options carry
+both flags. Type probe `src/__tests__/typechecks/abapGitFactsExchange.ts`: a raw `IResultStrategy`
+as a facts slot and an `IAnalyse` as a credentialed member's `analyse` are `@ts-expect-error`.
+First failure: the analyser gets `error.response`. Mutations: pass the thrown response to `analyse`
+→ red; drop `noResend` on `push` → red.
 
 **T5.5 Docs.** `docs/usage/ERRATA.md` entries of spec §3.3 with their Code grounds; `README.md` and
 `docs/usage/CLIENT_API_REFERENCE.md` (members, credentials, boundary, flags); the `AdtAbapGitClient`
@@ -309,19 +347,30 @@ missing helper. Mutation: clean up while `R` → red.
   known key (`getFile` of a filename the repository does not hold, credentialed) carries
   `messageClass` and `messageNumber`" passes there.
 - `…/abapGit/AbapGitRedirect.test.ts` — **redirect gate**, onprem and cloud. Needs, not in the code:
-  one redirecting remote per case (another host; another path on the same host), from the owner.
-  It probes every git operation the gate covers with a credentialed call over each redirect: the
-  upload-pack fetch (R13; R12 and R9 on a repository linked to the redirecting URL), the
-  receive-pack check (R11 with credentials) and the push (R10). **The gate closes on a backend** only
-  when every probed route asserts the credential did not reach the redirect target; without the
-  remotes it skips and stays closed. The result per backend goes into ERRATA and sets T6.3's table.
+  one redirecting remote per case (another host; another path on the same host), from the owner,
+  each hop recording what it received (the recorder's log is read by the test; the token is
+  compared, never printed). **Evidence required per probed route, all three positive:** (1) the
+  first hop received the credential; (2) the first hop answered the redirect and the target
+  received the follow-up request; (3) that follow-up carried no credential. A route whose evidence is
+  missing any of the three counts as failed. **Route coverage:** every credentialed route that would
+  be enabled — pull (R4/R5), push (R10), branch switch (R15), files and checks (R12, R11, R9, R6),
+  external repo (R13/R14), link (R2) — is either probed or shown by SAP code to share a probed
+  route's transport path. **The shared-path ground** is a read of each route's call chain from its
+  resource class down to the abapGit HTTP client (onprem: `ZCL_ABAPGIT_RES_*` →
+  `ZCL_ABAPGIT_GIT_TRANSPORT` / `ZCL_ABAPGIT_HTTP_ADT`, seen in `RES_REPO_INFO_EXT`; cloud:
+  `CL_ABAPGIT_RES_*` → `CL_ABAPGIT_GIT_TRANSPORT` / `CL_ABAPGIT_HTTP`), quoted with class and line in
+  ERRATA; not yet read for every route, so until it is, a route is probed or stays refused. Probed
+  at minimum: R13 (upload-pack), R11 with credentials (receive-pack), R10 (push). **The gate opens a
+  route on a backend** only on that evidence and coverage; otherwise it skips or fails, and the
+  backend's credential-bearing routes stay refused (never a publishing blocker). The result per
+  backend and route goes into ERRATA and sets T6.3's table.
 
 Run: `bash -o pipefail -c 'npm test -- integration/clients/abapGit 2>&1 | tee test-run.log'` — the
 exit status is the run's.
 
 **T5.7 Review and release prep.** Whole-PR review; sibling links removed, every range resolving on
 the registry (adt-strategies 0.27.0 already published); root `npm run check`; after publishing, a
-clean install of 46.2.0 outside the repo; gate G5.
+clean install of 46.2.0 outside the repo; gate G5 (what blocks it: "Gates" above).
 
 ## P6 — server (this repo, PR #374)
 
@@ -356,9 +405,10 @@ Sources: stdio file beside the session `.env` (location in `CLI_OPTIONS.md`); St
 headers **per call** (nothing carried over on a `state_handle`); SSE opening-GET headers held by the
 instance. **A key-only route whose R1 URL matches only an alias:** the credential is attached (the
 alias is the owner's configured equivalent of that endpoint) and no URL is sent, since SAP uses its
-stored URL; documented in `CLI_OPTIONS.md` / `AUTHENTICATION.md`. **Redirect gate:**
-`src/lib/abapGit/credentialGate.ts`, a per-backend table set from T5.6: a backend whose gate did not
-close refuses every credential-bearing route (R2, R4, R5, R6, R9–R15) in fixed words before anything
+stored URL. `CLI_OPTIONS.md` and `AUTHENTICATION.md` state it: a configured trusted alias authorises
+that exact URL as a recipient of the credential. **Redirect gate:**
+`src/lib/abapGit/credentialGate.ts`, a per-backend, per-route table set from T5.6 (default: refused):
+a route whose gate did not open on that backend refuses every credential-bearing call of it (R2, R4, R5, R6, R9–R15) in fixed words before anything
 is sent; calls with no match are still sent anonymously. Test `endpointBinding.test.ts`: exact
 match; alias on a URL route sends the configured URL; alias-only match on a key-only route attaches,
 sends no URL; `.git`, trailing `/`, port and path case near-misses do not match, host case does; no
@@ -462,9 +512,10 @@ entry is in its own PR (T1.1, T2.1, T3.3, T4.2, T5.5).
 **T6.12 Delete the goal, spec and plan** once implemented, before the release; what they still owe
 goes into #374's description first.
 
-**T6.13 Release.** After #374 merges into `main`, the 24.2.0 release PR #371 merges `main`. Per
-backend: the T100 gate closed by its passing assertion, and the redirect gate closed by its passing
-assertions or that backend's credential-bearing routes refused (T6.3).
+**T6.13 Release.** After #374 merges into `main`, the 24.2.0 release PR #371 merges `main`. What
+blocks it is the "Gates" paragraph: functional live runs and the T100 assertion on both backends.
+A failed or unverified redirect gate does not block: that backend ships with its credential-bearing
+routes refused (T6.3), as recorded in ERRATA and the server docs.
 
 ## Review Focus
 

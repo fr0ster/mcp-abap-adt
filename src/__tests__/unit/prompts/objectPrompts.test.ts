@@ -545,19 +545,28 @@ describe('abapPrompts', () => {
   it('lists the prompts a binary serves, in the order of the operations', () => {
     assert.deepEqual(
       abapPrompts(coreOnprem).map(({ name }) => name),
-      ['create', 'get', 'update', 'delete', 'activate', 'check', 'unit_test'],
+      [
+        'create',
+        'get',
+        'update',
+        'delete',
+        'activate',
+        'check',
+        'unit_test',
+        'where_used',
+      ],
     );
     assert.deepEqual(
       abapPrompts(sourceOf(compactReadOnlyToolSet, 'cloud')).map(
         ({ name }) => name,
       ),
-      ['get', 'check'],
+      ['get', 'check', 'where_used'],
     );
     assert.deepEqual(
       abapPrompts(sourceOf(fullReadOnlyToolSet, 'onprem')).map(
         ({ name }) => name,
       ),
-      ['get'],
+      ['get', 'where_used'],
     );
   });
 });

@@ -382,6 +382,16 @@ function problemsOf(
         );
       }
     }
+    // A plain `z.object` strips a key it does not declare, so the parse
+    // alone passes an argument the tool does not take.
+    const unlisted = Object.keys(args).filter(
+      (name) => !Object.hasOwn(tool.inputSchema.shape, name),
+    );
+    if (unlisted.length > 0) {
+      problems.push(
+        `${where}: ${unlisted.join(', ')} is no property of the listed schema`,
+      );
+    }
     const parsed = tool.inputSchema.safeParse(args);
     if (!parsed.success) {
       problems.push(

@@ -178,7 +178,9 @@ package create's given `super_package`; `packageTreeAccessChecks(lists)` also ma
 entries. Both read through the `IPackageReader` they are handed; a reader that throws refuses the
 call `package_tree_unreadable`. The server's own reader throws unless SAP's document names the
 package read. A reader an embedder gives must throw for a missing, empty or mismatched
-document: a resolved `undefined` reads as a top-level package and is accepted. An embedder may
+document: a resolved `undefined` reads as a top-level package — a create's parent counts as
+read, and a subtree walk ends there, refused `package_not_allowed` when no allowed root was
+reached. An embedder may
 give its own strategy. `HandlerExporter` takes `deniedActions` (parsed with
 `parseDeniedEntry`); `withoutDenied(groups, denied)` and `registryOf(…, denied)` narrow groups.
 Handlers an embedder takes into its own hands (a registry of its own, its own parsing of the

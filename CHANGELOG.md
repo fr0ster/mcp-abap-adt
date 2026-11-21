@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-11-21
+
+### Fixed
+
+- **A unit run's package target is checked against the allowed packages (security).** `RunAbapUnit` and compact `HandlerUnitTestRun` take a run target, and a target of kind `package` names a package in `target.name`; the allowed-packages check read only top-level arguments, so a run of a package outside the list was sent to SAP. Such a target is now checked before anything is sent, by the same rule as every package argument (exact, prefix, subtree), and refused `package_not_allowed` naming `target.name`. The package named in the target is checked; the subpackages a run with `include_subpackages` covers are not checked one by one. An object target (a class, a program, ...) and `HandlerUnitTestRun`'s `tests` list are not checked: the server makes no call to find an object's package.
+
 ## [<V>] - <release day>
 
 ### Added

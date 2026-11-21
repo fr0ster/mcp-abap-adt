@@ -632,9 +632,10 @@ elsewhere with the reason, route-specific cases gated by system kind in code:
   connection's two options and the CSRF ground (§4.7) in its CHANGELOG.
 - CHANGELOG highlights: 24.2.0, interfaces-adt-connection, interfaces-adt, connection,
   adt-strategies, adt-clients.
-- **Release order:** interfaces-adt-connection → interfaces-adt → connection → adt-strategies →
-  adt-clients, each published to the registry before the next builds on it; then the server from
-  the registry.
+- **Release order:** interfaces-adt-connection → interfaces-adt → connection, each published to
+  the registry before the next builds on it; then adt-strategies and adt-clients in one PR and one
+  publish run (owner's ruling: strategies first, then clients, both tested together from their
+  tarballs); then the server from the registry.
 
 ## 9. Open decisions
 

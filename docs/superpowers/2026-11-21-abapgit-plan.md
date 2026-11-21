@@ -67,7 +67,10 @@ both systems; a live test states where it runs and skips with a reason elsewhere
 
 ## Release order, dependencies and gates
 
-One PR per package in its repository, holding all of that package's tasks.
+One PR per package in its repository, holding all of that package's tasks — except P4 and P5,
+which are **one PR** in mcp-abap-adt-clients with **one joint gate** G5 (owner's ruling).
+**Lesson (a note, not a redo):** packages of one repository that do not depend on each other's new
+API ship in one PR and one publish run; P1 and P2 could have done so (both are already published).
 
 | # | Package (repo, directory) | Version |
 |---|---|---|
@@ -78,9 +81,8 @@ One PR per package in its repository, holding all of that package's tasks.
 | P3 | `@mcp-abap-adt/connection` (`~/prj/mcp-abap-connection`) | 25.0.1 → 25.1.0 |
 | **G3** | **owner publishes connection 25.1.0** | |
 | P4 | `@mcp-abap-adt/adt-strategies` (`~/prj/mcp-abap-adt-clients`, `packages/adt-strategies`) | 0.26.0 → 0.27.0 |
-| **G4** | **owner publishes adt-strategies 0.27.0** | |
-| P5 | `@mcp-abap-adt/adt-clients` (same repo, `packages/adt-clients`) | 46.1.0 → 46.2.0 |
-| **G5** | **owner publishes the tested adt-clients 46.2.0 tarball** (T5.7) | |
+| P5 | `@mcp-abap-adt/adt-clients` (same repo and **same PR** as P4, `packages/adt-clients`) | 46.1.0 → 46.2.0 |
+| **G5** | **joint gate: the owner publishes both tested tarballs, adt-strategies then adt-clients** (T5.7) | |
 | P6 | server, this repo, PR #374; ships in 24.2.0 (#371) | |
 
 **Raise floors after each gate** — the first task of every later package that uses the new API:
@@ -97,9 +99,9 @@ the repo installs.
 | G1 | interfaces-adt (T2.0) | nothing | its new types reference no new -connection type (`IAdtError`, `AdtNoFailure`, `IAdtHeaders` are its own); `^5.0.0` stays |
 | G1 | connection (T3.0) | interfaces-adt-connection `^5.2.0` | implements `noLog`, `noResend`, `stateless` |
 | G2 | adt-strategies (T4.0) | interfaces-adt `^30.2.0` | `IAbapGitFactsResponse`, `IAbapGitStructuredError` |
-| G3, G4 | adt-clients (T5.0) | interfaces-adt `^30.2.0`, -connection `^5.2.0`, adt-strategies `^0.27.0` (moves to runtime `dependencies`), connection `^25.1.0` (dev) | the atoms, the flags, `abapGitFacts` at runtime, the live wire |
+| G2, G3 (the P4/P5 PR waits for G3) | adt-clients (T5.0) | interfaces-adt `^30.2.0`, -connection `^5.2.0` (registry), adt-strategies `^0.27.0` in runtime `dependencies` (the sibling link during development), connection `^25.1.0` (dev) | the atoms, the flags, `abapGitFacts` at runtime, the live wire |
 | G5 | server, root `package.json` `@mcp-abap-adt/lib` (T6.1) | all five: -connection `^5.2.0`, -adt `^30.2.0`, connection `^25.1.0`, adt-strategies `^0.27.0`, adt-clients `^46.2.0` | every new form |
-| G4 (in P5's PR) | adt-clients-legacy | dev `adt-strategies ^0.26.0` → `^0.27.0`, no version bump, no publish | its dev range excludes 0.27.0 once the sibling is there; peer `adt-clients ^46.1.0` and interfaces-adt `^30.1.0` already accept the new minors and it uses no new API, so `release:publish` (versions not on the registry only) skips it; its tests run green in the PR |
+| the P4/P5 PR | adt-clients-legacy | dev `adt-strategies ^0.26.0` → `^0.27.0`, no version bump, no publish | its dev range excludes 0.27.0 once the sibling is there; peer `adt-clients ^46.1.0` and interfaces-adt `^30.1.0` already accept the new minors and it uses no new API, so `release:publish` (versions not on the registry only) skips it; its tests run green in the PR |
 
 **Gates per backend.** Four live gates, each recorded on its own at G5 and again at the release:
 functional onprem, functional cloud, T100 onprem, T100 cloud (adt-clients' run at G5, the server's
@@ -287,23 +289,17 @@ keep `msgText` → red; drop `messageNumber` or `gitHttpStatus` → red.
 `abapGitFacts`); CHANGELOG 0.27.0. Run in the package: `npm test`; root `npm run build && npm run
 test:check && npm run lint:check` → green.
 
-**T4.4 Review and release prep.** Whole-PR review; root `npm run check`; gate G4.
+**T4.4 Release prep.** None of its own: P4 ships with P5 (T5.7, joint gate G5).
 
 ## P5 — adt-clients
 
 Files: one per member under `packages/adt-clients/src/clients/abapGit/`; `src/clients/AdtAbapGitClient.ts`;
 slots in `src/clients/abapGit/types.ts`; entry `src/index.abapgit.ts` (`./abapgit`).
 
-**T5.0 Floors, after G3 and G4.** Ranges as the floors table; adt-strategies moves to runtime
-`dependencies` (`abapGitFacts` is imported at runtime). **The first build resolves the published
-strategy:** an isolated source layout outside the workspace — a copy of the repository root
-(`package.json` with `workspaces` reduced to `packages/adt-clients`, `package-lock.json` regenerated
-there, `tsconfig.base.json`, `biome.json`, `tools/`) holding `packages/adt-clients` only, so
-`../../tsconfig.base.json` resolves and adt-strategies comes from the registry; `npm install
---ignore-scripts` there, `npm ls @mcp-abap-adt/adt-strategies` shows the registry 0.27.0 path,
-`npm run build` run from `packages/adt-clients` there (never the root `npm run build`, which selects
-the omitted workspaces) green.
-In the workspace, npm regenerates the lockfile; only the sibling link remains (owner's exception).
+**T5.0 Floors, after G3.** Ranges as the floors table; adt-strategies `^0.27.0` moves to runtime
+`dependencies` (`abapGitFacts` is imported at runtime) and resolves through the same-repo sibling
+link during development (owner's standing exception); npm regenerates the lockfile; no other link.
+Nothing here needs adt-strategies on the registry: the pair is proved from its tarballs (T5.7).
 
 **T5.1 Key path builder and link wrappers.** `abapGit/paths.ts`: `repoPath(key, ...segments)` encodes
 and validates each segment: empty, `.` and `..` are refused (axios would collapse `/repos/./pull`). The internal `pullRepo(connection, headers, args)`
@@ -413,7 +409,8 @@ token never printed or logged), makes and deletes the run's two branches through
 API (test-only, the only host-specific code), keeps the ledger (gitignored, beside the test config),
 each entry naming its backend and system key. `src/__tests__/helpers/abapGitUnderTest.ts`: loads
 adt-clients, adt-strategies and connection **only** from `ABAPGIT_CLIENT_UNDER_TEST` (the isolated
-install: the packed tarball plus `@mcp-abap-adt/connection@25.1.0` from the registry), builds the
+install of T5.7: a temporary directory outside the workspace holding both tarballs plus
+`@mcp-abap-adt/connection@25.1.0` and the interfaces from the registry), builds the
 SAP connection from that copy, and asserts every resolved path lies inside it. Unit tests:
 `abapGitUnderTest.test.ts` (a workspace path refused, client and connection alike);
 `abapGitLedger.test.ts` over a stubbed R1 — **the correlation sequence:** terminal status with key
@@ -433,16 +430,19 @@ L0 from the ledger → the restart case red; clean up while `R` → red.
   (`getFile` of a filename the repository does not hold, credentialed) carries `messageClass` and
   `messageNumber`" ran and passed there. A skip closes neither.
 
-**T5.7 Review, release prep and the published artifact.** Whole-PR review; sibling links gone, every
-range on the registry; root `npm run check`. **Source binding, in this order:** (1) a clean checkout
-of the `adt-clients-v46.2.0` tag, verified to name `HEAD` on a clean tree (the check
-`tools/publish-changed.js` makes, ~L371); (2) in that same checkout, the clean build (`rm -rf dist`,
-then the package's `npm run build`), the root `npm run check`, and `npm pack --json` in the package;
-(3) record the tarball's `integrity` with the tag's commit in the PR — a `dist` built before the tag
-check is never packed; the T5.6 runs (both backends) use that tarball; the owner publishes
-that same file (`npm publish <tarball>`, not `tools/publish-changed.js`, which rebuilds); after
-publishing, `npm view @mcp-abap-adt/adt-clients@46.2.0 dist.integrity` equals the recorded value and
-a clean install outside the repo installs. The clients repository's `README.md` release section
+**T5.7 Review, release prep and the published artifacts (P4 and P5 together).** Whole-PR review;
+every range on the registry or the pair's own (adt-strategies 0.27.0); root `npm run check`.
+**Source binding, in this order:** (1) a clean checkout with the tags `adt-strategies-v0.27.0` and
+`adt-clients-v46.2.0` both naming `HEAD` on a clean tree (the check `tools/publish-changed.js`
+makes, ~L371); (2) in that same checkout, the clean build (`rm -rf dist` in both packages, then each
+package's `npm run build`), the root `npm run check`, and `npm pack --json` in **both** packages;
+(3) record both `integrity` values with the tags' commit in the PR — a `dist` built before the tag
+check is never packed. **The isolated install:** a temporary directory outside the workspace with
+both tarballs, `@mcp-abap-adt/connection@25.1.0` and the interfaces from the registry; the T5.6 runs
+on onprem and cloud load only from there, and the four gates close on those tarballs. The owner
+publishes the same two files in order, adt-strategies then adt-clients (`npm publish <tarball>`,
+not `tools/publish-changed.js`, which rebuilds); after publishing, both `npm view … dist.integrity`
+equal the recorded values and a clean install outside the repo installs. The clients repository's `README.md` release section
 (~L37) documents this tarball publish path for a package whose gate is a tested artifact. Gate G5.
 
 ## P6 — server (this repo, PR #374)
@@ -593,7 +593,7 @@ grounds, arguments per tool, the R1 pre-read exception, fail-closed cases, compa
 credential configured, TLS trust, approved endpoints per transport, the alias rule); CHANGELOG
 24.2.0 highlights naming the five minors; `package.json` and every `server*.json` description.
 
-**T6.11 Whole-branch review** of #374 (P1–P5 each close with their own).
+**T6.11 Whole-branch review** of #374 (P1, P2, P3 and the P4/P5 PR each close with their own).
 
 **T6.12 Delete the goal, spec and plan** once implemented, before the release; what they still owe
 goes into #374's description first.

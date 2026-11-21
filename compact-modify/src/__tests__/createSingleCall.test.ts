@@ -504,7 +504,6 @@ describe('HandlerCreate is one POST', () => {
   // schema: what the target requires or lists is refused in its words,
   // naming the target, before any request (spec §3).
   for (const [objectType, change, target, at] of [
-    ['PACKAGE', { super_package: undefined }, 'CreatePackage', 'super_package'],
     ['PACKAGE', { package_type: 'X' }, 'CreatePackage', 'package_type'],
     ['TRANSPORT', { description: undefined }, 'CreateTransport', 'description'],
     ['TABLE', { table_name: undefined }, 'CreateTable', 'table_name'],

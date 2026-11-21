@@ -2117,7 +2117,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `package_type` (string, optional (default: development), one of: `development`, `structure`) - Package type: 'development' (default) or 'structure'
 - `record_changes` (boolean, optional) - Enable change recording for the package. Required for transportable packages. Default: false.
 - `software_component` (string, optional) - Software component. If not provided, SAP will set a default.
-- `super_package` (string, required) - Parent package name. Required for structure packages.
+- `super_package` (string, optional) - The package this package belongs to; a top-level package has none.
 - `transport_layer` (string, optional) - Transport layer. Required for transportable packages.
 - `transport_request` (string, optional) - Transport request number, not a task. Required if the package is transportable.
 

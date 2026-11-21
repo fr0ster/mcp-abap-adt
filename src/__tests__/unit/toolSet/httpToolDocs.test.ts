@@ -14,10 +14,24 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { describe, it } from 'node:test';
+import {
+  compactDataEntries,
+  compactReadOnlyEntries,
+} from '@mcp-abap-adt/compact-readonly-entries';
 import { compactToolSet as compactHttpSet } from '../../../../compact-http/src/launcher';
 import { readOnlyToolSet as compactHttpRoSet } from '../../../../compact-http-ro/src/launcher';
+import { compactModifyEntries } from '../../../../compact-modify/src/group';
+import { compactBackgroundRunEntries } from '../../../lib/compact/backgroundRuns/group';
+import { compactBatchEntries } from '../../../lib/compact/batch/group';
+import {
+  compactDebugBatchEntries,
+  compactDebugEntries,
+} from '../../../lib/compact/debug/group';
+import { compactLeftoverSessionEntries } from '../../../lib/compact/session/group';
 import { STATE_HANDLE_ARGUMENT_WORDS } from '../../../lib/state/stateHandleArgument';
 import {
+  compactReadOnlyToolSetOf,
+  compactToolSetOf,
   fullReadOnlyToolSet,
   fullToolSet,
   streamableHttpSurface,
@@ -185,6 +199,26 @@ describe('the compact tool page (compact docs:tools)', () => {
       !COMPACT.includes(
         'each with its `-ro`, the same without the leftover-session tools)',
       ),
+    );
+  });
+
+  it('is the page generated now from the compact tools, whole', () => {
+    assert.equal(
+      COMPACT,
+      compactGenerator.compactPage({
+        readOnly: { compactReadOnlyEntries, compactDataEntries },
+        modify: { compactModifyEntries },
+        debug: { compactDebugEntries, compactDebugBatchEntries },
+        background: { compactBackgroundRunEntries },
+        session: { compactLeftoverSessionEntries },
+        batch: { compactBatchEntries },
+        toolSet: {
+          compactToolSetOf,
+          compactReadOnlyToolSetOf,
+          streamableHttpSurface,
+        },
+      }).text,
+      'compact/docs/AVAILABLE_TOOLS.md is stale: run `npm run build` and `npm --prefix compact run docs:tools`',
     );
   });
 });

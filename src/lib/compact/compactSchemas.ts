@@ -202,7 +202,9 @@ const CREATE_PROPERTIES = {
   super_package: z
     .string()
     .optional()
-    .describe('Super package (PACKAGE create).'),
+    .describe(
+      'The package this package belongs to (PACKAGE create); a top-level package has none.',
+    ),
   package_type: z
     .string()
     .optional()
@@ -1812,13 +1814,15 @@ const LOCK_PROPERTIES = {
   super_package: z
     .string()
     .optional()
-    .describe('Super package of the package to lock. Required for PACKAGE.'),
+    .describe(
+      "PACKAGE: accepted for compatibility; the lock uses the package's name.",
+    ),
 };
 
 /** A member of `HandlerLock`'s `object_type`. */
 type LockMember = (typeof COMPACT_LOCK.onprem)[number];
 
-/** What `HandlerLock` takes: the object's type and name; a package its super package. */
+/** What `HandlerLock` takes: the object's type and name; a package also its super package. */
 export const COMPACT_LOCK_TAKES = takesOf<
   keyof ReturnType<typeof lifecycleObjectSchema> | keyof typeof LOCK_PROPERTIES,
   LockMember

@@ -46,7 +46,7 @@ function named<M extends string>(
 type CreateMember = (typeof COMPACT_CREATE.onprem)[number];
 
 const CREATE_TOKENS: Tokens<CreateMember> = {
-  PACKAGE: 'PACKAGE(package_name*, super_package*)',
+  PACKAGE: 'PACKAGE(package_name*, super_package)',
   DOMAIN: 'DOMAIN(domain_name*, package_name*)',
   DATA_ELEMENT: 'DATA_ELEMENT(data_element_name*, package_name*)',
   TRANSPORT: 'TRANSPORT(description*)',

@@ -202,7 +202,9 @@ const CREATE_PROPERTIES = {
   super_package: z
     .string()
     .optional()
-    .describe('Super package (PACKAGE create).'),
+    .describe(
+      'The package this package belongs to (PACKAGE create); a top-level package has none.',
+    ),
   package_type: z
     .string()
     .optional()

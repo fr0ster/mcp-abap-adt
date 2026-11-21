@@ -336,6 +336,12 @@ describe('function_group given for a type that reads none is refused (M4)', () =
         assert.ok(text.includes(call), text);
         assert.ok(!text.includes('function_group'), text);
         assert.ok(
+          text.startsWith(
+            'Run the ABAP Unit tests of the whole function group of the FUNCTION_MODULE "ZFM".\n',
+          ),
+          text,
+        );
+        assert.ok(
           text.includes(
             "A run of a function module runs the ABAP Unit tests of the module's whole function group.",
           ),

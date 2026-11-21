@@ -286,7 +286,10 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
             ]
           : steps;
       return {
-        headline: `Run the unit tests of the ${row.type} ${jsonLiteral(name)}.`,
+        headline:
+          row.type === 'FUNCTION_MODULE'
+            ? `Run the ABAP Unit tests of the whole function group of the FUNCTION_MODULE ${jsonLiteral(name)}.`
+            : `Run the unit tests of the ${row.type} ${jsonLiteral(name)}.`,
         steps: stillToFill,
         notes:
           row.type === 'FUNCTION_MODULE' ? [FUNCTION_MODULE_RUN_WORDS] : [],

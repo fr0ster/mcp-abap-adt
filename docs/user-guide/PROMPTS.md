@@ -6,7 +6,7 @@ Generated from the prompts every binary lists (`tests/fixtures/tools/listed-prom
 
 A prompt is a ready-made request the MCP client offers the user. Claude Code, in [its own words](https://code.claude.com/docs/en/mcp.md#use-mcp-prompts-as-commands), "lists each MCP prompt as `/servername:promptname (MCP)`. Typing `/mcp__servername__promptname` also runs it." For a server named `abap`, `get` is listed as `/abap:get (MCP)`, and `/mcp__abap__get class ZCL_DEMO` runs it. Other clients show prompts in their own pickers. The server answers with an instruction that names the tools to call, in order, with the arguments filled from the values the user gave. The model follows the instruction with the tools the same binary serves.
 
-Nine prompts: `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`. The object prompts take `object_type` and `name` (a function module also takes `function_group`); `object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and are accepted in any case. Each binary lists the prompts its tools serve, and the `object_type` values its tools serve on the system kind.
+Nine prompts: `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`. The object prompts take `object_type` and `name` (a function module also takes `function_group`, except in `unit_test`, whose run names the module alone and covers the ABAP Unit tests of its whole function group); `object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and are accepted in any case. Each binary lists the prompts its tools serve, and the `object_type` values its tools serve on the system kind.
 
 ## Refusal
 

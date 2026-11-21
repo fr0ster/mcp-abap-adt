@@ -133,30 +133,12 @@ describe('every prompt serving function_module takes function_group', () => {
     [
       'compact',
       compactOnprem,
-      [
-        'create',
-        'get',
-        'update',
-        'delete',
-        'activate',
-        'check',
-        'unit_test',
-        'where_used',
-      ],
+      ['create', 'get', 'update', 'delete', 'activate', 'check', 'where_used'],
     ],
     [
       'core',
       coreOnprem,
-      [
-        'create',
-        'get',
-        'update',
-        'delete',
-        'activate',
-        'check',
-        'unit_test',
-        'where_used',
-      ],
+      ['create', 'get', 'update', 'delete', 'activate', 'check', 'where_used'],
     ],
   ] as const) {
     for (const name of names) {
@@ -167,6 +149,17 @@ describe('every prompt serving function_module takes function_group', () => {
         assert.ok(schema.safeParse(undefined).success, 'optional');
       });
     }
+  }
+
+  for (const [label, source] of [
+    ['core', coreOnprem],
+    ['compact', compactOnprem],
+  ] as const) {
+    it(`${label} unit_test takes none: a run names the module alone`, () => {
+      const prompt = listed(source, 'unit_test');
+      assert.equal(prompt.argsSchema.function_group, undefined);
+      assert.equal(prompt.argsSchema.name?.description, "The object's name.");
+    });
   }
 
   it('a prompt serving no function module takes none (core transport)', () => {
@@ -222,14 +215,17 @@ describe('the form per tool', () => {
     );
   });
 
-  it('core unit_test: function_module_name and function_group_name', () => {
-    const sent = userArguments(firstStep(coreOnprem, 'unit_test'));
-    assert.equal(sent.function_module_name, 'ZFM');
-    assert.equal(sent.function_group_name, 'ZFG');
+  it('core unit_test: function_module_name alone; nothing to fill', () => {
+    const [step] = listed(coreOnprem, 'unit_test').instruction(MODULE).steps;
+    assert.ok(step);
+    assert.equal(step.tool, 'RunFunctionModuleUnitTest');
+    assert.deepEqual(userArguments(step), { function_module_name: 'ZFM' });
+    assert.deepEqual(step.stillToFill, []);
   });
 
   it('compact unit_test: the FUNC target names the module alone; nothing to fill', () => {
-    const step = firstStep(compactOnprem, 'unit_test');
+    const [step] = listed(compactOnprem, 'unit_test').instruction(MODULE).steps;
+    assert.ok(step);
     assert.deepEqual(userArguments(step).target, {
       kind: 'object',
       name: 'ZFM',
@@ -307,6 +303,48 @@ describe('function_group given for a type that reads none is refused (M4)', () =
         }
       });
     }
+  }
+
+  for (const [label, source, call] of [
+    [
+      'core',
+      coreOnprem,
+      'RunFunctionModuleUnitTest with function_module_name: "ZFM"',
+    ],
+    [
+      'compact',
+      compactOnprem,
+      'HandlerUnitTestRun with target: {"kind":"object","name":"ZFM","type":"FUNC"}',
+    ],
+  ] as const) {
+    it(`${label} unit_test function_module: the module's name alone, its group's tests, through prompts/get`, async () => {
+      const client = await clientOf(source);
+      try {
+        const { prompts } = await client.listPrompts();
+        const unitTest = prompts.find(({ name }) => name === 'unit_test');
+        assert.ok(unitTest);
+        assert.ok(
+          !unitTest.arguments?.some(({ name }) => name === 'function_group'),
+        );
+        const { messages } = await client.getPrompt({
+          name: 'unit_test',
+          arguments: MODULE,
+        });
+        const [first] = messages;
+        assert.ok(first?.content.type === 'text');
+        const text = first.content.text;
+        assert.ok(text.includes(call), text);
+        assert.ok(!text.includes('function_group'), text);
+        assert.ok(
+          text.includes(
+            "A run of a function module runs the ABAP Unit tests of the module's whole function group.",
+          ),
+          text,
+        );
+      } finally {
+        await client.close();
+      }
+    });
   }
 
   it('a blank function_group is not given, so it is not refused', async () => {

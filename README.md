@@ -283,13 +283,14 @@ follows it with the tools of the same binary. Nine prompts, plain names:
 | `delete` | `object_type`, `name`, `transport_request` | delete the object |
 | `activate` | `object_type`, `name` | activate the object |
 | `check` | `object_type`, `name` | check the object |
-| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module, CDS view or package |
+| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module (its whole function group's), CDS view or package |
 | `where_used` | `object_type`, `name`, `container` | list the objects that use the object |
 | `transport` | `action`, `number`, `description`, `user`, `object_type`, `name`, `target_number` | work with transport requests: create, create a task, list, get, list objects, read the log, add, remove or move an object, sort and compress |
 
 `object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and
-are accepted in any case. A function module also takes `function_group`; given for another
-type, it is refused, not dropped. Each binary lists the prompts its tools serve, with the `object_type` values
+are accepted in any case. A function module also takes `function_group` (not in `unit_test`: a
+run names the module alone and covers the ABAP Unit tests of its whole function group); given
+for another type, it is refused, not dropped. Each binary lists the prompts its tools serve, with the `object_type` values
 its tools serve on the system kind: the read-only binaries list `get`, `where_used` and
 `transport` (and, compact, `check`); a denied tool or value removes its `object_type` values,
 and a prompt with none left is not listed. [PROMPTS.md](docs/user-guide/PROMPTS.md) lists the

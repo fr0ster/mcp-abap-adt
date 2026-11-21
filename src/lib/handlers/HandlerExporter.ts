@@ -36,11 +36,7 @@ import { RuntimeRunHandlersGroup } from './groups/RuntimeRunHandlersGroup.js';
 import { SearchHandlersGroup } from './groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from './groups/SystemHandlersGroup.js';
 import { NoDedupStrategy } from './groups/strategies/index.js';
-import type {
-  HandlerEntry,
-  IHandlersRegistry,
-  SapEnvironment,
-} from './interfaces.js';
+import type { HandlerEntry, SapEnvironment } from './interfaces.js';
 import { argumentsRefusalOf } from './interfaces.js';
 import { noConnection } from './noConnection.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
@@ -564,9 +560,9 @@ export class HandlerExporter {
    * the server lists (its `prompts` option turns them off). Registered
    * plainly (`registerAllTools`), it registers no prompt:
    * `registerAbapPrompts(mcpServer, registry)` (`@mcp-abap-adt/lib/prompts`)
-   * is the opt-in. The registry is a `CompositeHandlersRegistry`.
+   * is the opt-in, and takes this registry as it is returned.
    */
-  createRegistry(): IHandlersRegistry {
+  createRegistry(): CompositeHandlersRegistry {
     return new ExportedRegistry(this.registryGroups, this.handlerGroups);
   }
 }

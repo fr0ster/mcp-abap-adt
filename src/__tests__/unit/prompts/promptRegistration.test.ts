@@ -273,14 +273,9 @@ describe("the server's prompt source equals the helper's", () => {
   }
 });
 
-/** The registry `exporter.createRegistry()` hands out, as the composite it is. */
-function exportedRegistry(
-  exporter: HandlerExporter,
-): CompositeHandlersRegistry {
-  const registry = exporter.createRegistry();
-  assert.ok(registry instanceof CompositeHandlersRegistry);
-  return registry;
-}
+/** The registry `exporter.createRegistry()` hands out. */
+const exportedRegistry = (exporter: HandlerExporter) =>
+  exporter.createRegistry();
 
 /** The arguments a prompt's closed set is completed for. */
 const CLOSED_ARGUMENTS = ['object_type', 'action'];

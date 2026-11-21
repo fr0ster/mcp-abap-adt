@@ -310,10 +310,24 @@ Get the CLASS "ZCL_DEMO".
 CLASS takes CLASS(class_name*); * marks a required argument.
 ```
 
-`/update class ZCL_DEMO change="add a method that returns the current date"` on a compact
-binary answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write
-with `HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the
-user did not give is listed in the instruction as still to fill.
+A value of several words does not fit a slash command, whose arguments Claude Code splits on
+whitespace; a client that asks for the arguments in a form, or a `prompts/get`, takes it whole.
+`update` with these arguments on a compact binary:
+
+```json
+{
+  "name": "update",
+  "arguments": {
+    "object_type": "class",
+    "name": "ZCL_DEMO",
+    "change": "add a method that returns the current date"
+  }
+}
+```
+
+answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write with
+`HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the user did
+not give is listed in the instruction as still to fill.
 
 A `prompts/get` with an `object_type` the binary does not serve is refused with the protocol's
 invalid-params error and names the types it serves. `BaseMcpServer` and `EmbeddableMcpServer`

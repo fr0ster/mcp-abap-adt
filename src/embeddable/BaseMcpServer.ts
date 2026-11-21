@@ -4,7 +4,10 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { Logger } from '@mcp-abap-adt/logger';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  McpServer,
+  type RegisteredPrompt,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
 import type { IAccessChecks } from '../lib/access/accessChecks.js';
 import {
@@ -473,6 +476,12 @@ export abstract class BaseMcpServer extends McpServer {
 
   /** The prompts `registerHandlers` registered, in their order. */
   protected listedPrompts: readonly AbapPrompt[] = [];
+
+  /** Every tool the registrations so far listed: what the prompts are built from. */
+  private readonly promptTools: ListedPromptTool[] = [];
+
+  /** The SDK's handles of {@link listedPrompts}, removed when a registration rebuilds them. */
+  private registeredPrompts: readonly RegisteredPrompt[] = [];
 
   /**
    * The corrected request header pairs of the systems this instance talks
@@ -2335,21 +2344,26 @@ export abstract class BaseMcpServer extends McpServer {
     }
   }
   /**
-   * Registers the prompts built from `tools`, the tools this instance listed
-   * on its kind — unless `prompts: false`, or on `legacy`, where none is
-   * listed. Before any `connect`, as the tools are.
+   * Registers the prompts built from every tool this instance listed on its
+   * kind, `tools` (this registration's) joining those of the registrations
+   * before: the prompts an earlier registration registered are removed and
+   * the set is registered again, so each name is registered once. Nothing
+   * with `prompts: false`, or on `legacy`, where none is listed. Before any
+   * `connect`, as the tools are.
    */
   private registerListedPrompts(tools: readonly ListedPromptTool[]): void {
     if (!this.promptsServed) return;
     const stated = promptKindOf(statedEnvironment(this.statedSystemType()));
     if (stated === undefined) return;
+    this.promptTools.push(...tools);
+    for (const registered of this.registeredPrompts) registered.remove();
     this.promptSource = promptSourceOf(
       stated.kind,
       this.stateHandleArgument,
-      tools,
+      this.promptTools,
     );
     this.listedPrompts = abapPrompts(this.promptSource);
-    registerPrompts(this, this.listedPrompts);
+    this.registeredPrompts = registerPrompts(this, this.listedPrompts);
   }
 
   /**

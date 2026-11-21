@@ -2,25 +2,28 @@
  * How the prompts reach an SDK `McpServer`: each prompt registered with its
  * description and arguments, its answer the instruction's text.
  */
-import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import type {
+  McpServer,
+  RegisteredPrompt,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CompositeHandlersRegistry } from '../handlers/registry/CompositeHandlersRegistry.js';
 import { abapPrompts } from './prompts.js';
 import { promptResult } from './result.js';
 import { promptKindOf, promptSourceOf } from './source.js';
 import type { AbapPrompt } from './types.js';
 
-/** Registers each of `prompts` on `server`, in their order. */
+/** Registers each of `prompts` on `server`, in their order; answers what was registered. */
 export function registerPrompts(
   server: McpServer,
   prompts: readonly AbapPrompt[],
-): void {
-  for (const prompt of prompts) {
+): RegisteredPrompt[] {
+  return prompts.map((prompt) =>
     server.registerPrompt(
       prompt.name,
       { description: prompt.description, argsSchema: prompt.argsSchema },
       (args) => promptResult(prompt, args),
-    );
-  }
+    ),
+  );
 }
 
 /**

@@ -46,7 +46,10 @@ interface ServerOptions {
 
 /** A server registering `registry` as every binary does, reading back its prompts. */
 class PromptServer extends BaseMcpServer {
-  constructor(registry: IHandlersRegistry, options: ServerOptions = {}) {
+  constructor(
+    registry: IHandlersRegistry | undefined,
+    options: ServerOptions = {},
+  ) {
     super({
       name: 'prompt-registration',
       logger: silent,
@@ -58,6 +61,10 @@ class PromptServer extends BaseMcpServer {
         backgroundRuns: new InMemoryBackgroundRuns(),
       }),
     });
+    if (registry !== undefined) this.registerHandlers(registry);
+  }
+
+  register(registry: IHandlersRegistry): void {
     this.registerHandlers(registry);
   }
 
@@ -121,6 +128,38 @@ describe('BaseMcpServer lists the prompts', () => {
         assert.equal(error.code, ErrorCode.MethodNotFound);
         return true;
       });
+    } finally {
+      await client.close();
+    }
+  });
+
+  it('a second registration rebuilds the prompts from every tool listed so far', async () => {
+    const server = new PromptServer(undefined, {
+      systemType: 'onprem',
+      backgroundRuns: true,
+    });
+    server.register(
+      registryOf(toolSets.stdio['core-ro'], 'stdio', { dataTools: false }),
+    );
+    assert.deepEqual(
+      server.prompts.map(({ name }) => name),
+      ['get', 'where_used', 'transport'],
+    );
+    server.register(registryOf(compactToolSet, 'stdio', { dataTools: false }));
+    const client = await connected(server);
+    try {
+      const listed = (await client.listPrompts()).prompts.map(
+        ({ name }) => name,
+      );
+      assert.deepEqual(
+        listed,
+        server.prompts.map(({ name }) => name),
+      );
+      assert.equal(listed.length, 9);
+      const source = server.source;
+      assert.ok(source);
+      assert.ok(source.tools.has('GetClass'), 'the first registration stays');
+      assert.ok(source.tools.has('HandlerCreate'), 'the second one joins');
     } finally {
       await client.close();
     }

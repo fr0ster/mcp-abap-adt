@@ -1,0 +1,75 @@
+# abapGit — goal
+
+## What it is for
+
+An agent working through mcp-abap-adt changes ABAP objects in a package. When that
+package's history lives in git, the agent today has to stop and hand the work to a person
+with Eclipse ADT or SAP GUI to link, pull, stage, commit and push it. Both systems already
+serve abapGit through ADT (`/sap/bc/adt/abapgit/…`), and `@mcp-abap-adt/adt-clients`
+already speaks part of it. With this change, the agent can run the whole git loop on a
+package through MCP: find the repository, link it, pull it, see what changed, stage it,
+commit and push it, and read what went wrong.
+
+## The behaviour
+
+- **The whole loop, as each system serves it.** The agent can do each of these as its own
+  tool call:
+  - list the linked repositories and read one;
+  - check an external repository before linking it, and on cloud read its branches;
+  - link a package to a repository, and unlink it;
+  - pull, and on cloud read the objects a pull would modify;
+  - read the repository's files and its checks, and on cloud its status;
+  - stage, then commit and push;
+  - on onprem, switch the branch;
+  - read the error log of a pull or a push.
+
+  Each operation is offered exactly where the system's abapGit handler serves it. The
+  measured route sets differ: cloud is SAP's own `CL_ABAPGIT_RES_*`; onprem is the
+  open-source abapGit ADT backend installed as Z objects. Nothing is offered that the
+  system does not serve, and nothing it serves is left out.
+- **Availability comes from the system.** abapGit is offered only when the system's
+  discovery lists `/sap/bc/adt/abapgit/repos`. A system without the backend, for example an
+  onprem system without the open-source abapGit ADT backend, lists no abapGit tool.
+- **Full and compact.** The full set has a tool per operation. The compact set exposes the
+  same operations in its own shape. Both follow the existing tool rules: functional
+  descriptions, typed schemas, result strategies.
+- **Reads in `-ro`, writes outside it.** These go in the `-ro` binaries:
+  - list and read repositories;
+  - check an external repository and read its branches;
+  - read files, checks, status and modified objects;
+  - read the error log.
+
+  Link, unlink, pull, stage, push and branch switch change the system or the remote
+  repository, so they are not in `-ro`.
+- **Access restrictions hold.** Every write names a package (the repository's) and, where it
+  takes one, a transport request. These are checked against `allowed-packages` and
+  `allowed-requests` before anything is sent, like every other write. Each operation can be
+  denied through `--deny-actions` like any other tool.
+- **Long operations end on SAP's answer or the caller's cancel.** A pull or a push can take
+  long, and nothing ends it on the server's clock: there is no timeout. Today only reads run
+  in the background, so the spec decides how a long abapGit write runs, from the existing
+  background-run rules.
+- **Git credentials stay secret.** A user, password or token for the remote repository
+  reaches SAP's abapGit request and nothing else: not a log line, not a tool answer, not an
+  error text, not a background-run record.
+- **SAP's answer reaches the model as it is.** A conflict, an authorisation refusal or a
+  failed check is SAP's verdict, returned like every other ADT answer. The server does not
+  retry, merge or resolve anything.
+
+## Where it is built
+
+- **adt-clients first:** a minor release that adds the operations `AdtAbapGitClient` lacks
+  (stage, push, checks, files, status, branch info, branch switch, pull v2 / modified
+  objects), each pinned by unit tests and by live tests on the system that serves it. It is
+  published to the registry before the server builds on it.
+- **mcp-abap-adt:** the tools, the access checks, the background runs, and the docs. That
+  means the README first screen and the feature lists, the tool references, the access
+  restrictions page, and the CHANGELOG highlights. Each tool is pinned by unit tests and by
+  live tests on onprem and cloud. Ships in 24.2.0.
+
+## What it needs that is not in the code
+
+- A git repository for the live tests that the tests may link, pull, commit and push to on
+  both systems, together with its credentials kept in the sessions folder, never in a
+  repository.
+- On each system, a package of our own that the tests link and unlink.

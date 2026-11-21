@@ -554,19 +554,20 @@ describe('abapPrompts', () => {
         'check',
         'unit_test',
         'where_used',
+        'transport',
       ],
     );
     assert.deepEqual(
       abapPrompts(sourceOf(compactReadOnlyToolSet, 'cloud')).map(
         ({ name }) => name,
       ),
-      ['get', 'check', 'where_used'],
+      ['get', 'check', 'where_used', 'transport'],
     );
     assert.deepEqual(
       abapPrompts(sourceOf(fullReadOnlyToolSet, 'onprem')).map(
         ({ name }) => name,
       ),
-      ['get', 'where_used'],
+      ['get', 'where_used', 'transport'],
     );
   });
 });

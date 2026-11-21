@@ -9,6 +9,7 @@ import {
   deletePrompt,
   getPrompt,
 } from './objectPrompts.js';
+import { transportPrompt } from './transportPrompt.js';
 import type { AbapPrompt, PromptSource } from './types.js';
 import { unitTestPrompt } from './unitTestPrompt.js';
 import { updatePrompt } from './updatePrompt.js';
@@ -25,6 +26,7 @@ export function abapPrompts(source: PromptSource): readonly AbapPrompt[] {
     checkPrompt,
     unitTestPrompt,
     whereUsedPrompt,
+    transportPrompt,
   ]
     .map((prompt) => prompt(source))
     .filter((prompt) => prompt !== undefined);

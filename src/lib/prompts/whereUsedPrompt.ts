@@ -50,10 +50,7 @@ export type WhereUsedType =
   | 'TEXT_ELEMENTS';
 
 /** The where-used code of each type, a code both kinds serve. */
-export const WHERE_USED_AS: {
-  readonly [T in WhereUsedType]: WhereUsedCode<'onprem'> &
-    WhereUsedCode<'cloud'>;
-} = {
+export const WHERE_USED_AS = {
   CLASS: 'CLAS/OC',
   INTERFACE: 'INTF/OI',
   PROGRAM: 'PROG/P',
@@ -72,6 +69,9 @@ export const WHERE_USED_AS: {
   SERVICE_DEFINITION: 'SRVD/SRV',
   SERVICE_BINDING: 'SRVB/SVB',
   TEXT_ELEMENTS: 'PROG/PX',
+} as const satisfies {
+  readonly [T in WhereUsedType]: WhereUsedCode<'onprem'> &
+    WhereUsedCode<'cloud'>;
 };
 
 /** The types in the order they are offered. */

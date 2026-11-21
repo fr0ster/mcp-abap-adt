@@ -57,13 +57,19 @@ export type ReadEntryField = keyof Pick<
 
 /**
  * Where an argument's value comes from: the user's value; a value an earlier
- * step answers; one the model writes; or the transport entries an earlier
+ * step answers; one the model writes (from a prompt argument it waits for,
+ * when `awaits` names one); or the transport entries an earlier
  * step read, each sent with `fields` (sent field, read field).
  */
 export type ArgumentValue =
   | { from: 'user'; value: JsonValue }
   | { from: 'step'; step: number; field: string }
-  | { from: 'model'; writes: string }
+  | {
+      from: 'model';
+      writes: string;
+      /** The prompt argument the value waits for: listed still to fill until it is given. */
+      awaits?: RequiredArgument;
+    }
   | {
       from: 'entries';
       step: number;

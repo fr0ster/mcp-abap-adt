@@ -131,9 +131,23 @@ export function listedProperty(
 /** Optional parts of a step: everything but its tool, arguments and what is still to fill. */
 export type StepWords = Omit<PromptStep, 'tool' | 'arguments' | 'stillToFill'>;
 
+/** The prompt arguments the values of `args` wait for, each once, in order. */
+function awaited(
+  args: readonly (readonly [string, ArgumentValue])[],
+): readonly RequiredArgument[] {
+  const awaits = new Map<string, RequiredArgument>();
+  for (const [, value] of args) {
+    if (value.from === 'model' && value.awaits !== undefined) {
+      awaits.set(value.awaits.name, value.awaits);
+    }
+  }
+  return [...awaits.values()];
+}
+
 /**
  * A step calling `tool` with `args`; its still-to-fill list is the tool's
- * required arguments `args` sets none of.
+ * required arguments `args` sets none of, then the prompt arguments its
+ * values wait for.
  */
 export function toolStep(
   tool: ListedPromptTool,
@@ -145,7 +159,10 @@ export function toolStep(
     ...words,
     tool: tool.definition.name,
     arguments: args,
-    stillToFill: requiredArguments(tool).filter(({ name }) => !set.has(name)),
+    stillToFill: [
+      ...requiredArguments(tool).filter(({ name }) => !set.has(name)),
+      ...awaited(args),
+    ],
   };
 }
 

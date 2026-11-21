@@ -374,6 +374,18 @@ function oneCall(
   };
 }
 
+/**
+ * The package a create puts the object in: `package_name`, and for a
+ * package, whose own name is its `package_name`, its parent `super_package`.
+ */
+function parentArgument(row: ServedRow, args: PromptArguments): StepArguments {
+  const parent = requiredArgument(args, 'package_name');
+  const key = row.type === 'PACKAGE' ? 'super_package' : 'package_name';
+  return parent !== undefined && hasProperty(row.tool, key)
+    ? [[key, userValue(parent)]]
+    : [];
+}
+
 /** `create`: the type's create call. */
 export function createPrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.create, COMPACT_ROWS.create);
@@ -395,8 +407,8 @@ export function createPrompt(source: PromptSource): AbapPrompt | undefined {
         row,
         toolStep(row.tool, [
           ...compactNamed(row, named),
+          ...parentArgument(row, args),
           ...optionalArguments(row.tool, args, [
-            'package_name',
             'description',
             'transport_request',
           ]),

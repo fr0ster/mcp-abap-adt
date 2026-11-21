@@ -137,7 +137,11 @@ members). **Legacy forms unchanged (owner's ruling, keeping the release a minor)
 callbacks, wire fields, behaviour and answer, marked `@deprecated` with a pointer to `getRunLog`,
 the key-based `pullRepo` and the new form.
 Their only changes are additive and refuse only new misuse: the link validation of `getErrorLog`
-and `pull` below, and `credentials?: never` on their options; no previously compiling call breaks.
+and `pull` below, and `credentials?: never` on their options. Every call that compiled before still
+compiles, with one edge case stated plainly: an options **variable** that carried an extra,
+undeclared `credentials` property compiled against the legacy form before, and is now rejected (or,
+when its value is a credential or `null` and the args fit, selects the new form). It stays a minor
+because `credentials` was never a declared field; both CHANGELOGs name it.
 The server uses only the new forms and the existing `listRepos` and `unlink`, never a legacy
 form (pinned by test). No
 retry, no timeout (`timeout: 0`), no lenient reading, no polling. Every member addressed by a
@@ -238,11 +242,15 @@ R7 answers a fixed text (Code); onprem R4 ignores `branchName` (Code); R11/R15 s
   - the dead-pooled-socket resend (`HttpTransport.sendPooled`, L1325–1362) — the owner's named
     exception for ordinary calls (#314); gated here because SAP may already have run an abapGit
     write it read before the socket died.
+  - a redirect from SAP's own endpoint: the request goes with `maxRedirects: 0`, so a `3xx` is
+    returned, not followed (following would replay the request). This concerns SAP's ADT endpoint
+    only; it is not a gate on git hosts.
   The first failure is then the caller's answer.
 
-adt-clients sends both flags on **every new-form write** (R2, R4, R5, R10, R14, R15) and on `unlink`
-(R3, an existing write that is not deprecated), on every new form called with or without a
-credential, and on `getRunLog` — never on a legacy form of §3, which keeps today's options, since a write carries user-given content (R10's commit message, author and
+adt-clients sends both flags on **every new-form write** (R2, R4, R5, R10, R14, R15), on every new
+form called with or without a credential, and on `getRunLog` — never on a legacy form of §3, which
+keeps today's options, and never on the existing `unlink` (R3), which keeps today's behaviour (no
+credential, no user content; a call that succeeds today after CSRF recovery keeps succeeding), since a write carries user-given content (R10's commit message, author and
 committer) and may already have run when a replay would start.
 
 ## 4. Server tools

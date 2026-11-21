@@ -21,9 +21,9 @@ load-bearing by the named mutation (break it, watch the test go red, revert).
   member takes a URL to send to, except the existing `pull`/`getErrorLog`."
 - "No credential is part of a result, an `IAdtError`, or the request an error describes (`method`,
   `url`)."
-- "adt-clients sends both flags on **every new-form write** (R2, R4, R5, R10, R14, R15) and on `unlink`
-  (R3, an existing write that is not deprecated), on every new form called with or without a
-  credential, and on `getRunLog` — never on a legacy form of §3, which keeps today's options"
+- "adt-clients sends both flags on **every new-form write** (R2, R4, R5, R10, R14, R15), on every new
+  form called with or without a credential, and on `getRunLog` — never on a legacy form of §3, which
+  keeps today's options, and never on the existing `unlink` (R3), which keeps today's behaviour"
 - Legacy forms: as spec §3 ("Legacy forms unchanged") — `getErrorLog(logLink)`,
   `pull({ pullLink })` and the `remoteUser`/`remotePassword` forms keep today's behaviour,
   deprecated; the facts exchange and the flags serve the new members.
@@ -120,9 +120,13 @@ interface and overload stays exactly as it is: `IAbapGitLinkArgs`, `IAbapGitPull
 optional `branchName`), `IAbapGitUnlinkArgs`, `IAbapGitExternalRepoCredentials`, and both overloads
 of every `IAdtAbapGitClient` member. New exports:
 
-- `IAbapGitCredentials { readonly user: string; readonly password: string }`;
-  `IAbapGitMemberOptions<E extends IAdtError = IAdtError> = IAdtAnalyseOptions<E> & { credentials?:
-  IAbapGitCredentials | undefined }`.
+- `IAbapGitCredentials { readonly user: string; readonly password: string }`.
+- **Facts options, not extending `IAdtAnalyseOptions`** (so no wire-typed `analyse` is inherited):
+  `IAbapGitFactsOptions<F, E extends IAbapGitStructuredError = IAbapGitStructuredError> = {
+  readonly analyse?: IAbapGitFactsAnalyse<F, E>; readonly credentials?: IAbapGitCredentials }`, and
+  for the new forms of `link` / `checkExternalRepo` `IAbapGitNewFormOptions<F, E> =
+  Omit<IAbapGitFactsOptions<F, E>, 'credentials'> & { readonly credentials: IAbapGitCredentials |
+  null }`.
 - **A typed facts exchange** (new types only; `IResultStrategy`, `IAnalyse` and `IAdtError` are not
   touched, since they take `IAdtWireResponse`):
   - `IAbapGitFactsResponse<F> { status: number; facts: F }` — no headers, body or status text;
@@ -147,14 +151,16 @@ of every `IAdtAbapGitClient` member. New exports:
   `IAdtAbapGitCheckExternalRepoNewForm`: `args` typed `Omit<…Args, 'remoteUser' | 'remotePassword'>
   & { remoteUser?: never; remotePassword?: never }`, options carrying a required
   `credentials: IAbapGitCredentials | null` (`null` = anonymous; at run time the new form is
-  `options.credentials !== undefined`) and typed with the facts exchange (`analyse:
-  IAbapGitFactsAnalyse<TFacts, E>`, result `IAdtResponse<TFacts, E>`). **Exclusivity lives in two places:**
+  `options.credentials !== undefined`) and typed with the facts exchange (`IAbapGitNewFormOptions`,
+  result `IAdtResponse<TFacts, E>`). **Exclusivity lives in two places:**
   the `never` fields on the new overloads, and `credentials?: never` added to the options of each
   legacy overload of `link`, `pull` and `checkExternalRepo` (it rejects an object and `null`), so an
   options variable holding `headers` and `credentials` no longer matches the legacy branch and the
   two forms never mix. Pulling with a credential is the new member `pullRepo`. This stays a minor: no existing
-  options type had `credentials`, so every caller that compiled before still compiles (pinned
-  below); the deprecated fields keep working through the legacy overloads.
+  options type declared `credentials`; every caller that compiled before still compiles (pinned
+  below) with one edge case, stated in spec §3 and both CHANGELOGs: an options variable carrying an
+  extra, undeclared `credentials` property is now rejected, or selects the new form when its value
+  is a credential or `null`. The deprecated fields keep working through the legacy overloads.
 - **Legacy members unchanged, deprecated** (spec §3): `getErrorLog(logLink)` and the
   `remoteUser`/`remotePassword` forms of `link`, `pull`, `checkExternalRepo` keep their wire-typed
   callbacks (`IAnalyse`, `IResultStrategy`) exactly; each gains a `@deprecated` tag naming its
@@ -167,10 +173,10 @@ of every `IAdtAbapGitClient` member. New exports:
   form.
 - **New members as atoms**, one exported interface each, generic only over its result `T`, each with
   two facts-typed shapes — `<E extends IAbapGitStructuredError>(args, options:
-  …IAbapGitMemberOptions & { analyse: IAbapGitFactsAnalyse<T, E> }): Promise<IAdtResponse<T, E>>`
-  and `(args, options?: …IAbapGitMemberOptions): Promise<IAdtResponse<T>>`, with
-  `{ headers: IAdtHeaders } &` where the route takes headers (H); `IAbapGitMemberOptions` carries
-  `credentials?: IAbapGitCredentials` (absent = anonymous; these members have no legacy form):
+  IAbapGitFactsOptions<T, E> & { analyse: IAbapGitFactsAnalyse<T, E> }): Promise<IAdtResponse<T,
+  E>>` and `(args, options?: IAbapGitFactsOptions<T>): Promise<IAdtResponse<T>>`, with
+  `{ headers: IAdtHeaders } &` where the route takes headers (H); `credentials` absent = anonymous
+  (these members have no legacy form):
 
   | Atom | Member | Args |
   |---|---|---|
@@ -204,12 +210,17 @@ an `IResultStrategy` given where an `IAbapGitFactsResultStrategy` is required an
 `version: 'head'`, `pullRepo` without `branchName` are each `@ts-expect-error`; an `analyse`
 returning an `IAdtError` subtype types `E` through on a legacy call, and an `IAbapGitFactsAnalyse`
 returning an `IAbapGitStructuredError` subtype on a new form; an `IAnalyse` on any `pullRepo`
-overload, a new-form `link` with `credentials: undefined` or with `remoteUser`, and a legacy call
-with `credentials: null` are each `@ts-expect-error`. Mutations: drop a `never` field → the both-forms case
+overload (with and without other options — no fallback overload takes it), a new-form `link` with
+`credentials: undefined` or with `remoteUser`, and a legacy call with `credentials: null` are each
+`@ts-expect-error`; a facts analyser on `pullRepo` compiles and infers `E`; the edge case is pinned
+as stated (an options variable with an extra `credentials` object against the legacy args is
+`@ts-expect-error`). Mutation: let `IAbapGitFactsOptions` extend `IAdtAnalyseOptions` → the
+`IAnalyse` case red. Mutations: drop a `never` field → the both-forms case
 red; drop `credentials?: never` from the legacy options → the legacy-branch case red. Run: `npm run build && npm run test:check && npm run check:surface && npm run
 check:graph` → green. CHANGELOG 30.2.0: the new members and types; the legacy members unchanged
 and deprecated, with their replacements; `credentials?: never` on the legacy options as the one
-additive restriction.
+additive restriction, and its edge case (an options variable with an undeclared `credentials`
+property no longer compiles against the legacy form, or selects the new form).
 
 **T2.2 Review and release prep.** Whole-PR review; `npm run check`; gate G2.
 
@@ -219,9 +230,10 @@ additive restriction.
 
 **T3.1 `noResend`.** `src/connection/AbstractAbapConnection.ts`: no replay in the CSRF recovery
 (`shouldRetryCsrf` and its resend) or `answerCredentialFailure` with `noResend`;
-`src/connection/HttpTransport.ts` `sendPooled`: no fresh-socket resend. **Redirects:** an HTTP
-redirect would replay the request (body included), so with `noResend` it is not followed
-(`maxRedirects: 0`): the `3xx` is the caller's answer. Tests, new `src/__tests__/noResend.test.ts`
+`src/connection/HttpTransport.ts` `sendPooled`: no fresh-socket resend. **SAP-endpoint redirects,
+part of `noResend`:** a redirect from SAP's ADT endpoint would replay a request that must not be
+replayed, so with `noResend` it is not followed (`maxRedirects: 0`): the `3xx` is the caller's
+answer. This is not a gate on git hosts. Tests, new `src/__tests__/noResend.test.ts`
 and `pooledResend.test.ts`: a mutation with `noResend` still runs exactly one CSRF fetch before its
 one send; a `500` whose body holds `CSRF token`, a `403` `CSRF token validation failed` and a `401`
 to a mutation sent without a token are each sent once with `noResend`, resent once without; a
@@ -239,7 +251,7 @@ body) and the answer side (body, header, status text): no logger call holds any 
 each written line has exactly the four facts; the thrown error still carries status and body. First
 failure: today's preview holds the body canary. Mutation: drop the check in each path → that case red.
 
-**T3.3 Docs.** `CHANGELOG.md` 25.1.0: both options, the redirect rule, the CSRF ground of spec
+**T3.3 Docs.** `CHANGELOG.md` 25.1.0: both options (`noResend` covering SAP-endpoint redirects), the CSRF ground of spec
 §4.7 (SAP checks CSRF before any resource handler; the connector's resend is wider); `README.md`
 request options. Run: `npm run build && npm run lint:check && npm run test:ci && npm run
 test:shape` → green.
@@ -352,8 +364,9 @@ further. **What injected strategies receive:** the reader `IAbapGitFactsResponse
 `IAbapGitStructuredError` (R11's `gitHttpStatus` kept); the facts result slots of
 `IAbapGitResults` are typed `IAbapGitFactsResultStrategy`, so a raw reader cannot be plugged in.
 Shipped default result: `abapGitFacts`. Every new-form call that writes (R2, R4, R5, R10, R14,
-R15), every new form with or without a credential, `getRunLog` and `unlink` send `noLog: true,
-noResend: true`; no legacy form does. Test `src/__tests__/unit/clients/abapGit/structuredBoundary.test.ts`, its member
+R15), every new form with or without a credential, and `getRunLog` send `noLog: true,
+noResend: true`; no legacy form does, and `unlink` keeps today's options (a case asserts it sends
+neither flag). Test `src/__tests__/unit/clients/abapGit/structuredBoundary.test.ts`, its member
 list the table of new forms (a new form without the boundary fails), credentialed and anonymous,
 on an answered failure and on a **thrown** one (the
 connection throws an error whose `message` and `response` carry the canaries): a recording custom
@@ -369,7 +382,9 @@ First failure: the analyser gets `error.response`. Mutations: pass the thrown re
 paragraph of `CLAUDE.md` is the controller's, with the owner's approval of the text; `CHANGELOG.md`
 46.2.0: the new members and the facts exchange on them; the legacy members unchanged and
 deprecated, with their replacements; the link validation of `getErrorLog` and `pull` (an absolute
-or foreign link is refused); the `checkExternalRepo` defect. Run: `npm run build && npm run lint:check && npm run
+or foreign link is refused); the `credentials?: never` edge case (an options variable with an
+undeclared `credentials` property no longer compiles against the legacy form, or selects the new
+form); `unlink` unchanged; the `checkExternalRepo` defect. Run: `npm run build && npm run lint:check && npm run
 test:check && npm run test:unit` → green.
 
 **T5.6 Live (controller runs).** `src/__tests__/helpers/test-config.yaml.template` `abapgit` cases,
@@ -557,7 +572,7 @@ blocks the release.
 
 | Failure mode most likely to bite | Pinned by |
 |---|---|
-| A credential leaks through a resend, a followed redirect, a log line, or the raw response handed to an injected reader or analyser | T3.1, T3.2, T5.4, T6.8 |
+| A credential leaks through a resend (SAP-endpoint redirects included), a log line, or the raw response handed to an injected reader or analyser | T3.1, T3.2, T5.4, T6.8 |
 | Access checks: batch not refused first; link or pull reaching SAP under restrictions; R1 read twice, or after dispatch or a background start | T6.4 |
 | Endpoint binding: a near-miss or carried-over header binds; an argument URL trusted on a key route; the legacy `getErrorLog`/`pull` wrapper sends a foreign link | T5.1, T6.3 |
 | abapGit listed or callable where discovery lacks it; a failed discovery cached; a listing holding its connection | T6.2 |

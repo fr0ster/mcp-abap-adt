@@ -5,7 +5,11 @@
  * one the `-ro` twin does not serve; tables on the tools that read a table's
  * rows by its name.
  */
-import { ACTIVATION_CODES, ACTIVATION_NAMES } from '../adtProjections.js';
+import {
+  ACTIVATION_CODES,
+  ACTIVATION_NAMES,
+  type TableMainOf,
+} from '../adtProjections.js';
 import { acceptedCodeOf } from '../adtTypeCode.js';
 import type {
   ToolArgs,
@@ -105,6 +109,8 @@ const TRANSPORT_OBJECT_TOOLS: ReadonlySet<string> = new Set([
 ]);
 const TRANSPORT_OBJECTS = 'objects';
 const PGMID = 'pgmid';
+/** A package's object-directory type: the main type of its code. */
+const PACKAGE_DIRECTORY_TYPE: TableMainOf<'DEVC/K'> = 'DEVC';
 
 /** The arguments a tool dispatches on. */
 const DISPATCH_ARGUMENTS: readonly string[] = [
@@ -323,7 +329,7 @@ function activationValues(
  * standing for `R3TR`.
  */
 function namesPackageEntry(entry: ToolArgs): boolean {
-  if (named(entry, OBJECT_TYPE) !== 'DEVC') return false;
+  if (named(entry, OBJECT_TYPE) !== PACKAGE_DIRECTORY_TYPE) return false;
   const pgmid = named(entry, PGMID);
   return pgmid === undefined || pgmid === 'R3TR';
 }

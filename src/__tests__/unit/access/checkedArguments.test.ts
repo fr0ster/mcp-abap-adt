@@ -162,15 +162,17 @@ const FULL: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
   [['CheckPackage'], ['package_name']],
   [['ValidateServiceBinding'], ['package_name']],
   [
-    [
-      'CreateTransportTask',
-      'AddTransportObject',
-      'RemoveTransportObject',
-      'SortAndCompressTransportTask',
-    ],
+    ['CreateTransportTask', 'SortAndCompressTransportTask'],
     ['transport_number'],
   ],
-  [['MoveTransportObjects'], ['transport_number', 'target_number']],
+  [
+    ['AddTransportObject', 'RemoveTransportObject'],
+    ['object_name', 'transport_number'],
+  ],
+  [
+    ['MoveTransportObjects'],
+    ['objects[].object_name', 'transport_number', 'target_number'],
+  ],
   [['RunAbapUnit'], ['target.name']],
   [['ActivateObjects'], ['objects[].name']],
 ];
@@ -181,7 +183,10 @@ const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['HandlerDelete', ['package_name', 'transport_request']],
   ['HandlerLock', ['object_name']],
   ['HandlerUnlock', ['object_name']],
-  ['HandlerTransportMoveObjects', ['transport_number', 'target_number']],
+  [
+    'HandlerTransportMoveObjects',
+    ['objects[].object_name', 'transport_number', 'target_number'],
+  ],
   ['HandlerTransportSortAndCompress', ['transport_number']],
   ['HandlerUnitTestRun', ['target.name']],
   ['HandlerActivate', ['object_name', 'objects[].name']],
@@ -197,6 +202,8 @@ const argumentsOf = (checked: CheckedArguments): string[] =>
     ...(checked.packageObject === undefined ? [] : [checked.packageObject]),
     ...(checked.activation === undefined ? [] : ['objects[].name']),
     ...(checked.activation?.single === true ? ['object_name'] : []),
+    ...(checked.transportEntries === 'list' ? ['objects[].object_name'] : []),
+    ...(checked.transportEntries === 'object' ? ['object_name'] : []),
   ].sort();
 
 describe('the checked package and request arguments', () => {
@@ -317,6 +324,7 @@ describe('accessCallOf', () => {
     dispatch: 'object_type',
     packageObject: undefined,
     activation: undefined,
+    transportEntries: undefined,
   };
   const lock: CheckedArguments = {
     packages: ['super_package'],
@@ -326,6 +334,7 @@ describe('accessCallOf', () => {
     dispatch: 'object_type',
     packageObject: 'object_name',
     activation: undefined,
+    transportEntries: undefined,
   };
 
   it('names a package lock by its object_name, and its super_package nowhere', () => {
@@ -402,6 +411,7 @@ describe('accessCallOf on a run target', () => {
     dispatch: undefined,
     packageObject: undefined,
     activation: undefined,
+    transportEntries: undefined,
   };
 
   it('names a package target as target.name, trimmed and upper-cased', () => {

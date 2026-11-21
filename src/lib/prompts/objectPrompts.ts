@@ -39,12 +39,14 @@ export type ServedRow =
       readonly type: PromptObjectType;
       readonly tool: ListedPromptTool;
       readonly name: string;
+      readonly content: string | undefined;
     }
   | {
       readonly family: 'compact';
       readonly type: PromptObjectType;
       readonly tool: ListedPromptTool;
       readonly name: string;
+      readonly content: string | undefined;
       readonly token: string;
     };
 
@@ -99,7 +101,7 @@ export function servedRows<M extends PromptObjectType>(
     const tool = row === undefined ? undefined : listed(source, row.tool);
     return row === undefined || tool === undefined
       ? undefined
-      : { family: 'full', type, tool, name: row.name };
+      : { family: 'full', type, tool, name: row.name, content: row.content };
   };
   const compactTool = listed(source, compact.tool);
   for (const member of compact.members) {
@@ -112,6 +114,7 @@ export function servedRows<M extends PromptObjectType>(
         type: member,
         tool: compactTool,
         name: compact.name[member],
+        content: compact.content?.[member],
         token: compact.token(member),
       });
     }
@@ -245,7 +248,7 @@ export interface LockTools {
 }
 
 /** The object a compact write of `type` locks: `LOCKED_AS`'s, else the type itself. */
-const LOCK_TARGETS: ReadonlyMap<string, string> = new Map(
+export const LOCK_TARGETS: ReadonlyMap<string, string> = new Map(
   Object.entries(LOCKED_AS),
 );
 
@@ -316,11 +319,11 @@ function described(
   rows: readonly ServedRow[],
   alsoCalls?: (row: ServedRow) => readonly string[],
 ): string {
-  return `${sentence}: asks the model to call ${toolsOf(rows, alsoCalls)}.`;
+  return `${sentence} ${toolsOf(rows, alsoCalls)}.`;
 }
 
 /** One object prompt: its served rows, its arguments and its instruction per row. */
-function objectPrompt(
+export function objectPrompt(
   operation: ObjectOperation,
   sentence: string,
   rows: readonly ServedRow[],
@@ -367,7 +370,7 @@ export function createPrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.create, COMPACT_ROWS.create);
   return objectPrompt(
     'create',
-    'Creates an ABAP object of object_type named name in package_name',
+    'Creates an ABAP object of object_type named name in package_name: asks the model to call',
     rows,
     {
       package_name: z.string().optional().describe(PACKAGE_WORDS),
@@ -418,7 +421,7 @@ export function getPrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.get, COMPACT_ROWS.get);
   return objectPrompt(
     'get',
-    'Reads an ABAP object of object_type named name',
+    'Reads an ABAP object of object_type named name: asks the model to call',
     rows,
     {},
     (row, name) =>
@@ -445,7 +448,7 @@ export function deletePrompt(source: PromptSource): AbapPrompt | undefined {
   );
   return objectPrompt(
     'delete',
-    'Deletes an ABAP object of object_type named name',
+    'Deletes an ABAP object of object_type named name: asks the model to call',
     rows,
     {
       transport_request: z
@@ -508,7 +511,7 @@ export function activatePrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.activate, COMPACT_ROWS.activate);
   return objectPrompt(
     'activate',
-    'Activates an ABAP object of object_type named name',
+    'Activates an ABAP object of object_type named name: asks the model to call',
     rows,
     {},
     (row, name) => ({
@@ -525,7 +528,7 @@ export function checkPrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = servedRows(source, FULL_ROWS.check, COMPACT_ROWS.check);
   return objectPrompt(
     'check',
-    'Runs a syntax check of an ABAP object of object_type named name',
+    'Runs a syntax check of an ABAP object of object_type named name: asks the model to call',
     rows,
     {},
     (row, name) =>

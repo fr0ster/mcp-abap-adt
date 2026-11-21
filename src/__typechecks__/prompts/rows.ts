@@ -7,6 +7,7 @@
  */
 
 import { TOOL_DEFINITION as CreateClass } from '../../handlers/class/high/handleCreateClass';
+import { TOOL_DEFINITION as UpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import type { COMPACT_CREATE_TAKES } from '../../lib/compact/compactSchemas';
 import {
   type CompactNameKey,
@@ -32,3 +33,18 @@ export const lockedWithoutLocalTypes: typeof LOCKED_AS = {
   CDS_UNIT_TEST: 'CLASS',
   BEHAVIOR_IMPLEMENTATION: 'CLASS',
 };
+
+// @ts-expect-error a behavior implementation is written under the class's lock (ruling C9), so it needs its entry
+export const lockedWithoutBehaviorImplementation: typeof LOCKED_AS = {
+  LOCAL_TEST_CLASS: 'CLASS',
+  LOCAL_TYPES: 'CLASS',
+  LOCAL_DEFINITIONS: 'CLASS',
+  LOCAL_MACROS: 'CLASS',
+  UNIT_TEST: 'CLASS',
+  CDS_UNIT_TEST: 'CLASS',
+};
+
+export const wrongContentKey = fullRow(UpdateClass, 'class_name', {
+  // @ts-expect-error UpdateClass takes no ddl_code
+  content: 'ddl_code',
+});

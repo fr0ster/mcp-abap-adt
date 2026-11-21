@@ -196,6 +196,24 @@ describe('container', () => {
     );
   });
 
+  for (const given of ['PROGRAM', 'Function_Group']) {
+    it(`${given} is accepted in any case and sent in lower case`, () => {
+      const [step] = prompt.instruction({
+        object_type: 'text_elements',
+        name: 'SOME_PROGRAM',
+        container: given,
+      }).steps;
+      assert.ok(
+        step?.arguments.some(
+          ([name, value]) =>
+            name === 'container' &&
+            value.from === 'user' &&
+            value.value === given.toLowerCase(),
+        ),
+      );
+    });
+  }
+
   it('screen is refused naming the listed values', () => {
     assertRefused(
       prompt,

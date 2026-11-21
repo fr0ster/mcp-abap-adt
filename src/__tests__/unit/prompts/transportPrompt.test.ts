@@ -105,6 +105,46 @@ describe('the texts (spec §2.5)', () => {
   });
 });
 
+describe('action is accepted in any case (M9)', () => {
+  const prompt = promptOf(transportPrompt, core);
+
+  for (const given of ['CREATE', 'Create', ' create ']) {
+    it(`${JSON.stringify(given)} reads as create`, () => {
+      assert.equal(
+        textOf(prompt, { action: given, description: 'some words' }),
+        textOf(prompt, { action: 'create', description: 'some words' }),
+      );
+    });
+  }
+
+  it('an unknown action is refused naming the served ones in lower case', () => {
+    assertRefused(
+      prompt,
+      { action: 'RELEASE' },
+      'transport: action "RELEASE" is not served by this server; it serves create, create_task, list, get, objects, log, add_object, remove_object, move_objects, sort_compress.',
+    );
+  });
+
+  it('object_type is completed for an action given in upper case', async () => {
+    assert.equal(
+      (await completionOf(prompt, 'object_type', '', { action: 'ADD_OBJECT' }))
+        .length,
+      16,
+    );
+    assert.deepEqual(
+      await completionOf(prompt, 'object_type', '', { action: 'LIST' }),
+      [],
+    );
+  });
+
+  it('action completes in lower case', async () => {
+    assert.deepEqual(await completionOf(prompt, 'action', 'CREATE'), [
+      'create',
+      'create_task',
+    ]);
+  });
+});
+
 describe('the actions per binary', () => {
   for (const [family, set, actions] of [
     [

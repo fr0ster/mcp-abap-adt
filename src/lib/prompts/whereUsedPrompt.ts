@@ -5,6 +5,7 @@
  */
 import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import * as z from 'zod';
+import type { TextElementsContainer } from '../../handlers/system/readonly/handleGetWhereUsed.js';
 import { WHERE_USED_CODES, type WhereUsedCode } from '../adtProjections.js';
 import { completeFrom } from './completion.js';
 import { nameArguments, objectNameOf } from './functionModule.js';
@@ -17,7 +18,7 @@ import {
 } from './objectPrompts.js';
 import type { PromptObjectType } from './objectRows.js';
 import { notServedWords, promptRefusal, requiredWords } from './refusals.js';
-import { matchServed, requiredArgument } from './served.js';
+import { lowercaseKeyed, matchServed, requiredArgument } from './served.js';
 import { listedProperty, longToolStep } from './source.js';
 import type {
   AbapPrompt,
@@ -113,15 +114,21 @@ function whereUsedRow(source: PromptSource): WhereUsedRow | undefined {
     : undefined;
 }
 
+/** Whose text elements they are: the closed set the where-used tools take. */
+const CONTAINERS: readonly TextElementsContainer[] = [
+  'program',
+  'function_group',
+];
+
 const CONTAINER_WORDS =
   'For text_elements: whose text elements they are, program or function_group.';
 
-/** `container` as given: required with text elements, read with them alone, one of the listed values. */
+/** `container` as given: required with text elements, read with them alone, one of the listed values in any case. */
 function containerOf(
   given: string | undefined,
   type: WhereUsedType,
-  values: readonly string[],
-): string | undefined {
+  listed: ReadonlyMap<string, TextElementsContainer>,
+): TextElementsContainer | undefined {
   if (type !== 'TEXT_ELEMENTS') {
     if (given === undefined) return undefined;
     throw promptRefusal(
@@ -131,12 +138,13 @@ function containerOf(
   if (given === undefined) {
     throw promptRefusal(requiredWords('where_used', 'container'));
   }
-  if (!values.includes(given)) {
+  const container = matchServed(given, listed);
+  if (container === undefined) {
     throw promptRefusal(
-      `where_used: container is one of ${values.join(', ')}.`,
+      `where_used: container is one of ${[...listed.values()].join(', ')}.`,
     );
   }
-  return given;
+  return container;
 }
 
 /** `where_used`: the objects that use the object. */
@@ -150,7 +158,11 @@ export function whereUsedPrompt(source: PromptSource): AbapPrompt | undefined {
   if (types.length === 0) return undefined;
   const served = types.map((type) => type.toLowerCase());
   const byLowercase = new Map(types.map((type) => [type.toLowerCase(), type]));
-  const containers = listedProperty(row.tool, 'container')?.values ?? [];
+  const listedContainers = listedProperty(row.tool, 'container')?.values ?? [];
+  const containers = CONTAINERS.filter((container) =>
+    listedContainers.includes(container),
+  );
+  const containerByName = lowercaseKeyed(containers);
   const nameWords = listedProperty(row.tool, 'object_name')?.description;
   return {
     name: 'where_used',
@@ -178,7 +190,7 @@ export function whereUsedPrompt(source: PromptSource): AbapPrompt | undefined {
       const container = containerOf(
         requiredArgument(args, 'container'),
         type,
-        containers,
+        containerByName,
       );
       return {
         headline: `List where the ${type} ${jsonLiteral(name)} is used.`,

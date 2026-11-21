@@ -34,7 +34,7 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `get`, `objects`, `log`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `list`, `get`, `objects`, `log`
 
 ### `mcp-abap-adt-compact`, `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse`
 
@@ -53,7 +53,7 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `local_test_class`, `local_types`, `local_definitions`, `local_macros`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `objects`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `list`, `objects`
 
 ## Cloud system (`cloud`)
 
@@ -73,7 +73,7 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `get`, `objects`, `log`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `list`, `get`, `objects`, `log`
 
 ### `mcp-abap-adt-compact`, `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse`
 
@@ -92,7 +92,7 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `local_test_class`, `local_types`, `local_definitions`, `local_macros`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `objects`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `list`, `objects`
 
 ## No system kind stated (stdio inspection mode, an embedder that states none)
 
@@ -112,7 +112,7 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `get`, `objects`, `log`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `list`, `get`, `objects`, `log`
 
 ### `mcp-abap-adt-compact`, `mcp-abap-adt-compact-http`, `mcp-abap-adt-compact-sse`
 
@@ -131,7 +131,7 @@ A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCE
 - `get` - `object_type`: `package`, `domain`, `data_element`, `table`, `structure`, `table_type`, `ddl`, `service_definition`, `service_binding`, `class`, `local_test_class`, `local_types`, `local_definitions`, `local_macros`, `program`, `include`, `interface`, `function_group`, `function_module`, `behavior_definition`, `behavior_implementation`, `metadata_extension`
 - `check` - `object_type`: `class`, `program`, `interface`, `function_group`, `function_module`, `table`, `structure`, `table_type`, `ddl`, `domain`, `data_element`, `package`, `behavior_definition`, `metadata_extension`
 - `where_used` - `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `function_module`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`, `text_elements`; `container`: `program`, `function_group`
-- `transport` - `action`: `list`, `objects`; `object_type`: `class`, `interface`, `program`, `include`, `function_group`, `package`, `ddl`, `table`, `structure`, `table_type`, `domain`, `data_element`, `behavior_definition`, `metadata_extension`, `service_definition`, `service_binding`
+- `transport` - `action`: `list`, `objects`
 
 ## Legacy system (`legacy`)
 

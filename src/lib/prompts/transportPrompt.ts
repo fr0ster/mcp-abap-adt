@@ -65,11 +65,19 @@ interface ServedAction {
 /** A row of an action: what it serves on `source`, when its tools are listed. */
 type ActionRow = (source: PromptSource) => ServedAction | undefined;
 
-/** An action: the arguments it requires, those it reads besides, its rows in preference order. */
+/**
+ * An action: the arguments it requires, those it reads besides, its rows in
+ * preference order, and what its `number` and `user` name in the words of
+ * those arguments.
+ */
 interface TransportAction {
   readonly takes: readonly TransportArgument[];
   readonly alsoReads: readonly TransportArgument[];
   readonly rows: readonly ActionRow[];
+  /** Its `number` names a task. */
+  readonly numberIsTask?: true;
+  /** Whose user id its `user` is. */
+  readonly userIs?: string;
 }
 
 /** One call of a tool, when it is listed. */
@@ -301,6 +309,7 @@ export const TRANSPORT_ACTIONS = {
   create_task: {
     takes: ['number', 'user'],
     alsoReads: [],
+    userIs: "the task's owner",
     rows: [
       oneCall(
         'CreateTransportTask',
@@ -315,6 +324,7 @@ export const TRANSPORT_ACTIONS = {
   list: {
     takes: [],
     alsoReads: ['user'],
+    userIs: 'whose requests are listed',
     rows: [
       oneCall(
         'ListTransports',
@@ -377,6 +387,7 @@ export const TRANSPORT_ACTIONS = {
     ],
   },
   add_object: {
+    numberIsTask: true,
     takes: ['number', 'object_type', 'name'],
     alsoReads: [],
     rows: [
@@ -400,11 +411,13 @@ export const TRANSPORT_ACTIONS = {
     ],
   },
   remove_object: {
+    numberIsTask: true,
     takes: ['number', 'object_type', 'name'],
     alsoReads: [],
     rows: [removeRow],
   },
   move_objects: {
+    numberIsTask: true,
     takes: ['number', 'target_number'],
     alsoReads: ['object_type', 'name'],
     rows: [
@@ -413,6 +426,7 @@ export const TRANSPORT_ACTIONS = {
     ],
   },
   sort_compress: {
+    numberIsTask: true,
     takes: ['number'],
     alsoReads: [],
     rows: [
@@ -457,16 +471,44 @@ const ARGUMENTS: readonly TransportArgument[] = [
   'target_number',
 ];
 
-const WORDS: { readonly [A in TransportArgument | 'action']: string } = {
+/** The words of the arguments whose words name no action. */
+const WORDS: {
+  readonly [A in
+    | Exclude<TransportArgument, 'number' | 'user'>
+    | 'action']: string;
+} = {
   action: 'What to do with transport requests.',
-  number:
-    'The number of the request or task the action works on (a task for add_object, remove_object, move_objects, sort_compress).',
   description: "The new request's description.",
-  user: "An SAP user id: the task's owner (create_task), or whose requests are listed (list).",
   object_type: "The object's type.",
   name: "The object's name.",
   target_number: 'The task the entries move to.',
 };
+
+/** `argument`'s words, naming only the served `actions`. */
+function wordsOf(
+  argument: TransportArgument,
+  actions: readonly ActionName[],
+): string {
+  const of = (action: ActionName): TransportAction => TRANSPORT_ACTIONS[action];
+  switch (argument) {
+    case 'number': {
+      const tasks = actions.filter((action) => of(action).numberIsTask);
+      const head = 'The number of the request or task the action works on';
+      return tasks.length === 0
+        ? `${head}.`
+        : `${head} (a task for ${tasks.join(', ')}).`;
+    }
+    case 'user':
+      return `An SAP user id: ${actions
+        .flatMap((action) => {
+          const whose = of(action).userIs;
+          return whose === undefined ? [] : [`${whose} (${action})`];
+        })
+        .join(', or ')}.`;
+    default:
+      return WORDS[argument];
+  }
+}
 
 /** The served actions of `source`, each with the first row that serves it. */
 function servedActions(
@@ -549,6 +591,9 @@ export function transportPrompt(source: PromptSource): AbapPrompt | undefined {
     TRANSPORT_OBJECT_TYPES.map((type) => [type.toLowerCase(), type]),
   );
   const objectTypeValues = [...objectTypes.keys()];
+  const declared = ARGUMENTS.filter((argument) =>
+    actions.some((action) => readsOf(action).includes(argument)),
+  );
   const readsObjectType = (action: string | undefined): boolean => {
     const named =
       action === undefined ? undefined : actionByName.get(action.trim());
@@ -560,7 +605,15 @@ export function transportPrompt(source: PromptSource): AbapPrompt | undefined {
     ...new Set(actions.flatMap((action) => served.get(action)?.tools ?? [])),
   ];
   const optional = (argument: TransportArgument) =>
-    z.string().optional().describe(WORDS[argument]);
+    z.string().optional().describe(wordsOf(argument, actions));
+  const schemaOf = (argument: TransportArgument) =>
+    argument === 'object_type'
+      ? completable(optional('object_type'), (typed, context) =>
+          readsObjectType(context?.arguments?.action)
+            ? completeFrom(objectTypeValues, typed ?? '')
+            : [],
+        )
+      : optional(argument);
   return {
     name: 'transport',
     description: `Works with transport requests by action: asks the model to call ${tools.join(', ')}.`,
@@ -568,16 +621,9 @@ export function transportPrompt(source: PromptSource): AbapPrompt | undefined {
       action: completable(z.string().describe(WORDS.action), (typed) =>
         completeFrom(actions, typed),
       ),
-      number: optional('number'),
-      description: optional('description'),
-      user: optional('user'),
-      object_type: completable(optional('object_type'), (typed, context) =>
-        readsObjectType(context?.arguments?.action)
-          ? completeFrom(objectTypeValues, typed ?? '')
-          : [],
+      ...Object.fromEntries(
+        declared.map((argument) => [argument, schemaOf(argument)]),
       ),
-      name: optional('name'),
-      target_number: optional('target_number'),
     },
     instruction: (args): PromptInstruction => {
       const given = requiredArgument(args, 'action');

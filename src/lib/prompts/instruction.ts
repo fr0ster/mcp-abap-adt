@@ -48,11 +48,11 @@ function stepLine(step: PromptStep, n: number): string {
   const before = [step.lead, step.condition].filter(
     (words) => words !== undefined,
   );
-  const call = `call ${step.tool} with ${step.arguments
+  const call = `${step.tool} with ${step.arguments
     .map(([name, value]) => `${name}: ${valueText(value)}`)
     .join(', ')}`;
   const opened =
-    before.length === 0 ? `C${call.slice(1)}` : `${before.join(', ')}: ${call}`;
+    before.length === 0 ? `Call ${call}` : `${before.join(', ')}: call ${call}`;
   const repeat = step.repeat === undefined ? '' : `, until ${step.repeat}`;
   const keeps =
     step.keeps === undefined || step.keeps.length === 0

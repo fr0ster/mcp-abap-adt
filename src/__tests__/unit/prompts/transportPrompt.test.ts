@@ -439,3 +439,73 @@ describe('the sent entry fields come from ENTRY_ARGUMENT alone', () => {
     }
   });
 });
+
+describe('the arguments declared are those a served action reads', () => {
+  const coreRo = sourceOf(fullReadOnlyToolSet);
+  const compactRo = sourceOf(compactReadOnlyToolSet);
+  const declared = (source: PromptSource) =>
+    Object.keys(promptOf(transportPrompt, source).argsSchema);
+  const describedAs = (source: PromptSource, argument: string) =>
+    promptOf(transportPrompt, source).argsSchema[argument]?.description;
+
+  it('core declares every argument', () => {
+    assert.deepEqual(declared(core), [
+      'action',
+      'number',
+      'description',
+      'user',
+      'object_type',
+      'name',
+      'target_number',
+    ]);
+  });
+
+  it('core-ro declares the number and the user (list, get, objects, log)', () => {
+    assert.deepEqual(declared(coreRo), ['action', 'number', 'user']);
+  });
+
+  it('compact-ro declares the number and the user (list, objects)', () => {
+    assert.deepEqual(declared(compactRo), ['action', 'number', 'user']);
+  });
+
+  it('core-ro and compact-ro complete no object_type', async () => {
+    for (const source of [coreRo, compactRo]) {
+      const prompt = promptOf(transportPrompt, source);
+      assert.equal(prompt.argsSchema.object_type, undefined);
+      assert.deepEqual(await completionOf(prompt, 'action', ''), [
+        ...(source === coreRo
+          ? ['list', 'get', 'objects', 'log']
+          : ['list', 'objects']),
+      ]);
+    }
+  });
+
+  it('the number and user words name only the served actions', () => {
+    assert.equal(
+      describedAs(core, 'number'),
+      'The number of the request or task the action works on (a task for add_object, remove_object, move_objects, sort_compress).',
+    );
+    assert.equal(
+      describedAs(core, 'user'),
+      "An SAP user id: the task's owner (create_task), or whose requests are listed (list).",
+    );
+    for (const source of [coreRo, compactRo]) {
+      assert.equal(
+        describedAs(source, 'number'),
+        'The number of the request or task the action works on.',
+      );
+      assert.equal(
+        describedAs(source, 'user'),
+        'An SAP user id: whose requests are listed (list).',
+      );
+    }
+    assert.equal(
+      describedAs(compact, 'number'),
+      'The number of the request or task the action works on (a task for move_objects, sort_compress).',
+    );
+    assert.equal(
+      describedAs(compact, 'user'),
+      'An SAP user id: whose requests are listed (list).',
+    );
+  });
+});

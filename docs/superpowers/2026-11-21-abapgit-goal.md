@@ -50,10 +50,12 @@ commit and push it, and read what went wrong.
   SAP's repository list, and fails closed when it cannot be read. With no restriction
   configured, everything is served. Each operation can be denied through `--deny-actions` like
   any other tool.
-- **Long operations end on SAP's answer or the caller's cancel.** A pull or a push can take
-  long, and nothing ends it on the server's clock: there is no timeout. Today only reads run
-  in the background, so the spec decides how a long abapGit write runs, from the existing
-  background-run rules.
+- **Long operations end on SAP's answer; nothing runs on the server's clock.** A pull or a
+  push can take long, and there is no timeout. On cloud, SAP runs pull and push as its own
+  background job, which no route can cancel: the caller follows its status in the repository
+  list. On onprem, link, pull and push are SAP's synchronous writes and end on SAP's answer;
+  a caller's cancel does not cut them. How such a write may run in the background follows the
+  existing background-run rules.
 - **Git credentials stay secret.** A user, password or token for the remote repository
   reaches SAP's abapGit request and nothing else: not a log line, not a tool answer, not an
   error text, not a background-run record.

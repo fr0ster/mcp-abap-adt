@@ -7,7 +7,8 @@ offered exactly where each system's abapGit handler serves it, in the full and c
 reads in `-ro`, every write checked against the access restrictions (link and pull refused
 while any are configured), git credentials kept secret, SAP's answer returned as it is — for
 credentialed calls and the run log, as structure and facts only (the goal as amended, §2.4). Ships in mcp-abap-adt 24.2.0 on minors of
-`@mcp-abap-adt/interfaces-adt`, `@mcp-abap-adt/adt-strategies`, `@mcp-abap-adt/connection` and `@mcp-abap-adt/adt-clients`.
+`@mcp-abap-adt/interfaces-adt`, `@mcp-abap-adt/interfaces-adt-connection`, `@mcp-abap-adt/connection`,
+`@mcp-abap-adt/adt-strategies` and `@mcp-abap-adt/adt-clients`.
 
 Grounds used below:
 
@@ -124,7 +125,12 @@ Contracts in `@mcp-abap-adt/interfaces-adt` (`src/adt/IAdtAbapGit.ts`), readings
 `@mcp-abap-adt/adt-strategies` (`results/abapGit.ts`), requests and path building in
 `AdtAbapGitClient` (`clients/abapGit/*`). One member per endpoint and method; each answers
 through the result strategy the client was built with (shipped default: the document as it
-arrived) and is judged by the caller's `analyse` (default strict: every non-2xx an error). No
+arrived) and is judged by the caller's `analyse` (default strict: every non-2xx an error).
+**Precedence:** for a member called with `credentials`, and for `getRunLog` / `getErrorLog`, the
+structured contract of §5.3 takes precedence over both defaults — the shipped default result is
+the facts reading (`abapGitFacts`), not the raw document, and the error carries the status and
+the T100 key only, never SAP's text (§3.3's "error with SAP's text" applies to the other
+members). No
 retry, no timeout (`timeout: 0`), no lenient reading, no polling. Every member addressed by a
 repository builds its path from `key` (URL-encoded segment); no member takes a URL to send to,
 except the existing `pull`/`getErrorLog` below.
@@ -188,21 +194,41 @@ No credential is part of a result, an `IAdtError`, or the request an error descr
 
 ### 3.3 Default verdicts and errata entries
 
-Strict: 2xx success, else an error with SAP's text. `ERRATA.md` entries, each with its ground:
+Strict: 2xx success, else an error — with SAP's text, except where §3's precedence gives the
+structured error. `ERRATA.md` entries, each with its ground:
 R4/R10 cloud 202 is accepted, not finished, and R5 202 is finished (Code); R4 onprem 200 says
 nothing about objects (Code); R15 with `create: false` on a missing branch changes nothing and
 answers success (Code); R9 cloud 409 while a run waits or runs (Code); R3 `corrNr` unread (Code);
 R7 answers a fixed text (Code); onprem R4 ignores `branchName` (Code); R11/R15 success status is
 **not asserted** until measured (§10).
 
-### 3.4 `@mcp-abap-adt/connection` additions (minor)
+### 3.4 Request options in `@mcp-abap-adt/interfaces-adt-connection` and `@mcp-abap-adt/connection` (minors)
 
-Two per-request options, used by every credentialed abapGit request and the R8 read:
+`IAbapRequestOptions` (interfaces-adt-connection; today `url`, `method`, `timeout`, `data`,
+`params`, `headers`) gains two optional flags, implemented by connection (25.0.1 read):
 
-- **no CSRF resend** — see §4.7 for the ground;
-- **no wire log** — the request, its headers, body and answer are not written by the
-  connection's RFC or HTTP wire logging (RFC wire logging prints bodies, with no per-request
-  switch today: unverified beyond `connectionFactory.ts`'s own words).
+- **`noLog: true`** — nothing of the request or its answer is written anywhere by the connection
+  or the server's wrapper. It covers every path that writes today:
+  - the refusal preview: `AbstractAbapConnection.ts` L1743–1783 puts `dataPreview(refusal.data)`
+    into `errorDetails` and logs it at `error` (or `debug` for 404);
+  - the RFC status text: `RfcTransport.ts` L1133 logs `RFC ← <status> <statusText>`, L1135–1137
+    the body under `logWire`;
+  - both wire loggers (HTTP and RFC `logWire`);
+  - the server's `withHttpWireLog` (`connectionFactory.ts` L242–290: params, headers, body, the
+    answer's status text and body, the thrown message and body).
+  With `noLog`, a line, if any, carries method, the path without query, the integer status and
+  the byte count. The error the connection throws keeps its fields for the caller (adt-clients),
+  which reduces it to §5.3 before anything else sees it.
+- **`noResend: true`** — gates every replay of the request; the initial CSRF token fetch before a
+  mutation still happens. Gated paths:
+  - the CSRF recovery (`shouldRetryCsrf`, `AbstractAbapConnection.ts` L1916–1937, resend L1515–1535);
+  - the resend after credential renewal (`answerCredentialFailure`, L1866–1901);
+  - the dead-pooled-socket resend (`HttpTransport.sendPooled`, L1325–1362) — the owner's named
+    exception for ordinary calls (#314); gated here because SAP may already have run an abapGit
+    write it read before the socket died.
+  The first failure is then the caller's answer.
+
+adt-clients sends both flags on every credentialed member and on `getRunLog`/`getErrorLog`.
 
 ## 4. Server tools
 
@@ -274,7 +300,7 @@ Push, unlink, branch switch, cloud branch info and the reads stay under restrict
 
 | Tool | Package checked | From |
 |---|---|---|
-| `GetAbapGitBranchInfo` | `package_name` | the argument (R14 links into it; no repository exists yet) |
+| `GetAbapGitBranchInfo` | `package_name` | the argument. Ruling: it is the package SAP links into — R14's temporary link targets `request_data-package` (`CL_ABAPGIT_RES_REPO_BRANCH_EXT->post` L120 → `link_repo` → `new_online( iv_package = package )`, deleted at L184); no repository entry exists yet to read it from. The repository-list rule is for operations on an already linked repository. |
 | `PushAbapGitRepo`, `UnlinkAbapGitRepo`, `SwitchAbapGitBranch` | the repository's package | the R1 entry for `repository_key` (§4.4) |
 | reads | — | reads are not checked, as for every tool |
 
@@ -303,17 +329,20 @@ no abapGit tool and no abapGit compact tool.
 - **Registration** stays by system kind at instance creation (`BaseMcpServer.registerHandlers`,
   `available_in`): cloud-only `GetAbapGitBranchInfo`, `GetAbapGitModifiedObjects`,
   `GetAbapGitErrorLog`; onprem-only `SwitchAbapGitBranch`; compact enums per variant.
-- **Listing:** the server's `tools/list` answer is filtered by the discovery of the system the
-  request is for: the abapGit tools (full) or `HandlerAbapGitGet` / `HandlerAbapGit` (compact)
-  are left out unless that system's discovery lists `/abapgit/repos`. The filter runs inside the
+- **Listing hook:** after registration, the server installs its own async `tools/list` request
+  handler. It keeps the schemas registration built (the SDK's list, untouched) and filters each
+  reply: the abapGit tools (full) or `HandlerAbapGitGet` / `HandlerAbapGit` (compact) are left out
+  unless discovery of the system the request reaches lists `/abapgit/repos`. It runs inside the
   request's context, so it works where handlers were registered before any request existed
-  (Streamable HTTP: a pooled instance per `state_handle`, `StreamableHttpServer.ts`, its dispatch
-  under `runWithRequestContext`).
+  (Streamable HTTP: a pooled instance per `state_handle`, `StreamableHttpServer.ts`, dispatched
+  under `runWithRequestContext`). Its connection use is released when the reply is built, as a
+  call's is.
 - **Calls:** an abapGit call checks the same availability first and is refused "abapGit is not
   served by this system" in fixed words, nothing else sent — a client that calls an unlisted tool
   meets the same answer.
 - **Reading and caching:** discovery is read on the request's own connection
-  (`GET /sap/bc/adt/discovery`), once per system key, and kept for the process; no clock expires
+  (`GET /sap/bc/adt/discovery`) and cached **by the system that connection actually reaches**
+  (its system key, `adtSystemKey`), never by `state_handle` or instance; kept for the process; no clock expires
   it (no timeouts). A failed or unreadable discovery is not cached: that request lists no abapGit
   tool (fail closed) and the next request reads again. The kept answer is dropped by the
   connection-reset hook (`registerConnectionResetHook`).
@@ -360,8 +389,8 @@ no abapGit tool and no abapGit compact tool.
   on **any status whose text holds `CSRF token`**, and on a 401 to a mutation sent without a token.
   An abapGit handler's own 500 whose message carried those words would be resent after the handler
   ran. That branch is not grounded as "before".
-- **Therefore (owner's rule, "after" case):** the credentialed abapGit requests are sent with the
-  connection's new no-resend option (§3.4); a CSRF refusal reaches the model as a structured error
+- **Therefore (owner's rule, "after" case):** the credentialed abapGit requests are sent with
+  `noResend` (§3.4), which also gates the renewal and pooled-socket resends; a CSRF refusal reaches the model as a structured error
   and the call may be made again. `@mcp-abap-adt/connection` joins the release order. The
   SAP-side "before" is recorded with its ground for every other caller of the resend.
 - Over RFC, ADT requests go to `SADT_REST_RFC_ENDPOINT` without the ICF application; whether the
@@ -387,9 +416,12 @@ No tool argument carries a credential.
 - **No match:** sent without credentials (SAP answers as for a public repository; a private one
   fails with SAP's structured error). Recommended over refusing, since the credential never leaves
   for an unbound host either way (§9.3).
-- Unverified (§10): whether abapGit follows an HTTP redirect from the approved host to another one
-  with the credential; whether a repository key's stored URL can change after linking (no ADT
-  route changes it; R1 is read on every call).
+- **Release gate — redirects, per backend:** before the release, measure live on onprem and cloud
+  whether SAP's abapGit HTTP client forwards the credential when the remote redirects to another
+  host or path (a renamed GitHub repository redirects its old URL). If it forwards across hosts
+  on a backend, every credentialed call on that backend is refused in fixed words until that is
+  solved. Unverified until then (§10). Also unverified: whether a key's stored URL can change
+  after linking (no ADT route changes it; R1 is read on every call).
 
 ### 5.2 Scope per transport
 
@@ -401,32 +433,37 @@ No tool argument carries a credential.
 
 ### 5.3 Structure and facts only (owner's decision; no redactor)
 
-For every abapGit request that carries a credential, and for the R8 read, the server keeps
-**only parsed fields of a stable contract**, built from SAP's answer by the adt-strategies
-reading; everything else is dropped **before** any log line, the tool answer and the
-background-run record — the rule of auth-providers' "No server text reaches anything":
+For every abapGit request that carries a credential, and for the R8 read, the server keeps only
+the fields named below, parsed from SAP's document by the adt-strategies facts reading. Anything
+not named — raw bodies, headers, status texts, message texts, exception texts, message variables
+and properties — is dropped **before** any log line, the tool answer and the background-run record
+(the rule of auth-providers' "No server text reaches anything"). Names, paths, branch names and
+author/committer are data the user and the repository supply: they are kept as named fields, and
+no attempt is made to detect a credential in them.
 
-| Kept | Dropped |
+| Route | Kept fields ← XML source (ST read, Code) |
 |---|---|
-| HTTP status (integer) | raw body, headers, status text |
-| object lists: type, name, package, status, message type (R2/R4/R8); staging objects and files (names, paths, states), SAP's proposed author and committer (R9); overwrite and warning entries with action codes (R6); access mode and branch names, SHA-1, type, head flag (R13/R14) | message texts (`msgText`, `actionDescription`, `displayName`) |
-| on an error: SAP's message class and number (the ADT exception's T100 key) | the exception's text, message variables, properties (`LONGTEXT`, `http_status` text) |
-| R12: the file content (it is the requested payload, not server text about the call) | — |
+| every route | `status` ← HTTP status (integer) |
+| every error | `messageClass` ← `properties/entry[@key="T100KEY-ID"]`, `messageNumber` ← `entry[@key="T100KEY-NO"]` (three-digit string, as SAP writes it) — the keys `src/lib/debugger/readings.ts` L494 already reads. Code, both systems: `CL_ADT_EXCEPTION_UTILITY->create_exc_response` adds `T100KEY-ID` and `T100KEY-NO` for every exception that `IS INSTANCE OF if_t100_message` (L94–97), and `T100KEY-V1`…`V4` from the message variables (L49, dropped); the abapGit exceptions `ZCX_ADT_REST_ABAPGIT` / `CX_ADT_REST_ABAPGIT` implement `if_t100_dyn_msg` and raise `MESSAGE ID … NUMBER …` (`raise_with_error`). That `if_t100_dyn_msg` includes `if_t100_message` is SAP's standard interface, not read here. Absent → `status` alone |
+| R11 cloud auth error | also `gitHttpStatus` ← `properties/entry[@key="http_status"]` as an integer (`CL_ABAPGIT_REPOSITORY_AUTH->handle_auth_exception`); `LONGTEXT` dropped |
+| R2, R4 (onprem), R8 | `objects[]` ← `abapObjects:abapObject`: `type` ← `abapObjects:type`, `name` ← `abapObjects:name`, `package` ← `abapObjects:package`, `status` ← `abapObjects:status`, `messageType` ← `abapObjects:msgType` (one of `S`, `I`, `W`, `E`, `A`, documented as SAP's message type); `abapObjects:msgText` dropped (`ZABAPGIT_ST_REPO_POST_RES`, `ABAPGIT_ST_REPO_POST_RES_V2`) |
+| R6 | `overwriteObjects[]`, `packageWarningObjects[]` ← `agitpullmodifiedobjects:abapgitobjects`: `uri`, `type`, `name`, `packageName` ← the `adtcore` object-reference attributes (include `sadt_object_reference`, not read: §10), `action` ← `@agitpullmodifiedobjects:action` (integer); `@actionDescription` dropped |
+| R9 | `unstaged[]`, `staged[]`, `ignored[]` ← `abapgitstaging:*_objects/abapgitobject`: `wbkey` ← `@wbkey`, `version` ← `@version`, `uri`, `type`, `name`, `packageName` ← the object reference; `files[]` ← `abapgitfile`: `name` ← `@name`, `path` ← `@path`, `localState` ← `@localState`, `remoteState` ← `@remoteState`; `author` / `committer` {`name`, `email`} ← `abapgit_comment/author|committer/@name, @email`; links and `@comment` dropped |
+| R13, R14 | `accessMode` ← `abapgitexternalrepo:accessMode`; `branches[]` ← `abapgitexternalrepo:branch`: `sha1` ← `sha1` (onprem) or `sha` (cloud, `ABAPGIT_ST_REPO_INFO_EXT_RS_V2`), `name`, `type`, `isHead`; R14 also keeps `folderLogic` ← `abapgitexternalrepo:folderLogic` (a fixed SAP value, `FULL` or `PREFIX`); `displayName` and links dropped |
+| R12 | `content` ← the response text, **only as the content of the named file** (`filename`, `version` echoed from the arguments). Returning the repository's own content is the purpose of the call; it is never logged and never kept as a whole response body elsewhere |
+| R10, R15 | `status` alone |
 
-- The T100 key is read from the ADT exception document's key fields; which elements carry it on
-  these routes is unverified (§10): when absent, the error is status alone.
-- Cloud R11's auth failure keeps `http_status` as an integer fact (`401`/`403`/`404`), parsed,
-  never its text.
-- Wire logging is off for these requests (§3.4) on HTTP and RFC; the server's own
-  `withHttpWireLog` skips them too.
-- Calls with no credential and no R8 (R1, R3, R7, R13 for a public URL…) keep the ordinary answer.
-  R1's answer is the repository list SAP keeps, which holds no credential (cloud strips them from
-  URLs at link, Code; userinfo is refused before link).
+- **R10's commit message** (the user's `comment`) is sent to SAP and excluded from every log line
+  and from the background-run record (which keeps tool, object and start only).
+- Wire logging is off for these requests (`noLog`, §3.4).
+- Calls with no credential and not R8 (R1, R3, R7, R13 for an unbound URL…) keep the ordinary
+  answer. R1's answer is the repository list SAP keeps (cloud strips credentials from URLs at
+  link, Code; userinfo is refused before link).
 
 ## 6. Errors
 
 - Credentialed calls and R8: the structured error of §5.3. Other abapGit calls: SAP's answer as
-  every other ADT tool gives it. No retry, no resolution, no merge, no CSRF resend (§4.7).
+  every other ADT tool gives it. No retry, no resolution, no merge; credentialed calls go with `noResend` (§3.4, §4.7).
 - Server refusals before sending, fixed words: access codes; `abapgit_import_not_allowed`
   (§4.3); unknown key, blank package or URL, unreadable R1 (§4.4); a run-log key R1 does not show
   for that repository (§4.1); URL with userinfo, query or fragment; abapGit not served (§4.5);
@@ -440,8 +477,6 @@ background-run record — the rule of auth-providers' "No server text reaches an
   §3.1, credentials in no other header or element; the `getErrorLog`/`pull` wrappers calling the
   key-based builders and refusing absolute, foreign or malformed links; the 46.x `results` type
   test;
-- connection: the no-resend option (a 403 `CSRF` answer is not resent; without the option it is)
-  and the no-wire-log option on HTTP and RFC;
 - readings and the §5.3 structured contract over sanitised captured documents;
 - server: schemas per variant and set (`background` only where §4.6 declares it), `-ro`
   membership, deny entries, batch refusal with no entry, the R1 pre-read and fail-closed cases,
@@ -450,10 +485,15 @@ background-run record — the rule of auth-providers' "No server text reaches an
   match sent anonymously), userinfo/query/fragment refusal, `tools/list` filtering and call
   refusal per transport and on a failed discovery, stateless session type on every abapGit
   request including after an error;
-- **canaries** for the user, the raw token and the base64 password, over HTTP and RFC, through
-  success, a stubbed SAP that echoes each value in body, headers, status text and exception
-  fields, refusal, background run and both wire logs on: none appears in any answer, error, run
-  record or log line.
+- **canaries** for the user, the raw token and the base64 password, over HTTP and RFC: a stubbed
+  SAP echoes each value in every **dropped** place (body text, headers, status text, `msgText`,
+  `actionDescription`, `displayName`, exception text, message variables, `LONGTEXT`) and the tests
+  assert that the answer, error, run record and log lines hold exactly §5.3's kept fields and none
+  of the values; kept fields are exercised field by field, with the canary placed in a kept field
+  shown to pass through as data (names, paths, file content are not inspected);
+- connection: a 500 whose body holds `CSRF token` and a 403 `CSRF token validation failed` are each
+  sent once with `noResend` and resent once without; the renewal and pooled-socket resends are not
+  taken with `noResend`; `noLog` writes no body, header or status text on HTTP and RFC.
 
 **Live** (adt-clients integration and server `liveSuite`), each stating where it runs, skipped
 elsewhere with the reason, route-specific cases gated by system kind in code:
@@ -512,9 +552,11 @@ elsewhere with the reason, route-specific cases gated by system kind in code:
 - `AUTHENTICATION.md`, `CLI_OPTIONS.md`: approved endpoints per transport.
 - adt-clients README and `ERRATA.md` (§3.3); the `checkExternalRepo` defect in its CHANGELOG;
   connection's two options and the CSRF ground (§4.7) in its CHANGELOG.
-- CHANGELOG highlights: 24.2.0, interfaces-adt, adt-strategies, connection, adt-clients.
-- **Release order:** interfaces-adt → adt-strategies → connection → adt-clients, each published to
-  the registry before the next builds on it; then the server from the registry.
+- CHANGELOG highlights: 24.2.0, interfaces-adt-connection, interfaces-adt, connection,
+  adt-strategies, adt-clients.
+- **Release order:** interfaces-adt-connection → interfaces-adt → connection → adt-strategies →
+  adt-clients, each published to the registry before the next builds on it; then the server from
+  the registry. **Release gate:** the redirect measurement of §5.1 on both backends.
 
 ## 9. Open decisions
 
@@ -535,13 +577,14 @@ What a decision above rests on is marked ★.
 
 - Every status except R1's and discovery's is from Code, not a live request; R11 and R15 success
   (framework default, Inference) stay out of asserted contracts.
-- ★ Which elements of the ADT exception document carry the T100 key on these routes (§5.3).
-- ★ Whether the connection's RFC wire logging can be switched off per request today (§3.4 adds it).
+- That an abapGit route's error document actually carries `T100KEY-ID` / `T100KEY-NO`: Code says
+  it does (`CL_ADT_EXCEPTION_UTILITY` L94–97, both systems); not measured on these routes. The
+  first live run asserts it.
+- ★ The redirect behaviour of §5.1, a release gate on each backend.
 - ★ Whether the connector's CSRF path runs on RFC (§4.7).
 - Which `CL_ADT_WB_RES_APP` proxy serves a request (`get_request_proxy`, not read); both check CSRF
   first.
-- ★ Whether abapGit follows redirects with the credential; whether a key's stored URL can change
-  (§5.1).
+- Whether a key's stored URL can change after linking (§5.1).
 - ★ Whether a cloud run always writes a new log key to R1 (live correlation, §7).
 - ★ Whether the test token may create and delete branches (live fixtures, §7).
 - ★ Whether clients reload on `tools/list_changed` (§9.1).

@@ -7,6 +7,7 @@ import { completable } from '@modelcontextprotocol/sdk/server/completable.js';
 import * as z from 'zod';
 import { WHERE_USED_CODES, type WhereUsedCode } from '../adtProjections.js';
 import { completeFrom } from './completion.js';
+import { nameArguments, objectNameOf } from './functionModule.js';
 import { jsonLiteral } from './instruction.js';
 import {
   objectArguments,
@@ -184,7 +185,12 @@ export function whereUsedPrompt(source: PromptSource): AbapPrompt | undefined {
         steps: [
           longToolStep(row.tool, [
             ...row.opening,
-            ['object_name', userValue(name)],
+            ...nameArguments(
+              row.tool,
+              type,
+              'object_name',
+              objectNameOf(name, args),
+            ),
             ['object_type', userValue(WHERE_USED_AS[type])],
             ...(container === undefined
               ? []

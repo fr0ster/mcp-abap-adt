@@ -299,10 +299,21 @@ describe('the prompts each binary lists and answers (WRITE_LISTED_PROMPTS=1, WRI
             const filled = new Set(step.arguments.map(([name]) => name));
             // Ruling C8: a package's run (the first step) lists the prompt's
             // own include_subpackages still to fill while the user gave none.
-            const promptLevel =
-              prompt.name === 'unit_test' && value === 'package' && index === 0
+            // A function module's name waits for the prompt's own
+            // function_group where its tool's form carries the group.
+            const awaitsGroup = step.arguments.some(
+              ([, argument]) =>
+                argument.from === 'model' &&
+                argument.awaits?.name === 'function_group',
+            );
+            const promptLevel = [
+              ...(prompt.name === 'unit_test' &&
+              value === 'package' &&
+              index === 0
                 ? ['include_subpackages']
-                : [];
+                : []),
+              ...(awaitsGroup ? ['function_group'] : []),
+            ];
             assert.deepEqual(
               step.stillToFill.map(({ name }) => name),
               [...listed.filter((name) => !filled.has(name)), ...promptLevel],

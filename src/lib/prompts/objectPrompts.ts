@@ -8,6 +8,12 @@ import * as z from 'zod';
 import { EMPTIED_INCLUDE_TYPES } from '../compact/compactSchemas.js';
 import type { JsonValue } from '../json.js';
 import { completeFrom } from './completion.js';
+import {
+  functionGroupArgument,
+  nameArguments,
+  type ObjectName,
+  objectNameOf,
+} from './functionModule.js';
 import { jsonLiteral } from './instruction.js';
 import {
   COMPACT_ROWS,
@@ -149,7 +155,7 @@ function byLowercase(
 const OBJECT_TYPE_WORDS =
   "The object's type; the values are the types this server serves for the operation.";
 const NAME_WORDS =
-  "The object's name (for a function module, as the type's arguments state).";
+  "The object's name; for a function module, its own name, with its function group in function_group.";
 
 /** The prompt arguments every object prompt takes: `object_type`, completed from `served` (lowercase), and `name`. */
 export function objectArguments(
@@ -160,6 +166,7 @@ export function objectArguments(
       completeFrom(served, typed),
     ),
     name: z.string().describe(NAME_WORDS),
+    ...functionGroupArgument(served),
   };
 }
 
@@ -168,7 +175,7 @@ export function objectOf(
   operation: ObjectOperation,
   rows: readonly ServedRow[],
   args: PromptArguments,
-): { readonly row: ServedRow; readonly name: string } {
+): { readonly row: ServedRow; readonly named: ObjectName } {
   const objectType = requiredArgument(args, 'object_type');
   if (objectType === undefined) {
     throw promptRefusal(requiredWords(operation, 'object_type'));
@@ -186,7 +193,7 @@ export function objectOf(
   }
   const name = requiredArgument(args, 'name');
   if (name === undefined) throw promptRefusal(requiredWords(operation, 'name'));
-  return { row, name };
+  return { row, named: objectNameOf(name, args) };
 }
 
 /** The types whose name is their class's: the class includes and the unit tests. */
@@ -215,17 +222,15 @@ export function takesLine(type: PromptObjectType, token: string): string {
   return `${type} takes ${token}; * marks a required argument.`;
 }
 
-/** `object_type` and the name, as a compact step opens. */
+/** `object_type` and the name, as a compact step opens; the name in the form the row's tool takes. */
 export function compactNamed(
   row: ServedRow,
-  name: string,
+  named: ObjectName,
 ): (readonly [string, ArgumentValue])[] {
+  const name = nameArguments(row.tool, row.type, row.name, named);
   return row.family === 'compact'
-    ? [
-        ['object_type', userValue(row.type)],
-        [row.name, userValue(name)],
-      ]
-    : [[row.name, userValue(name)]];
+    ? [['object_type', userValue(row.type)], ...name]
+    : [...name];
 }
 
 /** The optional arguments `keys` that `args` give and the listed schema of `tool` has. */
@@ -280,7 +285,7 @@ export function underLock(
   source: PromptSource,
   locks: LockTools,
   type: PromptObjectType,
-  name: string,
+  named: ObjectName,
   write: (handle: StepArguments, state: StepArguments) => PromptStep,
   first: number,
 ): readonly PromptStep[] {
@@ -291,19 +296,23 @@ export function underLock(
   const state: StepArguments = source.stateHandle
     ? [['state_handle', stepValue(first, 'state_handle')]]
     : [];
-  const named: StepArguments = [
+  const lockNamed: StepArguments = [
     ['object_type', userValue(locks.target)],
-    ['object_name', userValue(name)],
+    ...nameArguments(locks.lock, locks.target, 'object_name', named),
+  ];
+  const unlockNamed: StepArguments = [
+    ['object_type', userValue(locks.target)],
+    ...nameArguments(locks.unlock, locks.target, 'object_name', named),
   ];
   return [
-    toolStep(locks.lock, named, {
+    toolStep(locks.lock, lockNamed, {
       lead: `Lock ${what}`,
       keeps: source.stateHandle
         ? ['lock_handle', 'state_handle']
         : ['lock_handle'],
     }),
     write(handle, state),
-    toolStep(locks.unlock, [...named, ...handle, ...state], {
+    toolStep(locks.unlock, [...unlockNamed, ...handle, ...state], {
       lead: `Unlock ${what}`,
       finally: first + 1,
     }),
@@ -327,7 +336,7 @@ export function objectPrompt(
   extra: PromptArgumentsSchema,
   instruction: (
     row: ServedRow,
-    name: string,
+    named: ObjectName,
     args: PromptArguments,
   ) => PromptInstruction,
   alsoCalls?: (row: ServedRow) => readonly string[],
@@ -341,8 +350,8 @@ export function objectPrompt(
       ...extra,
     },
     instruction: (args) => {
-      const { row, name } = objectOf(operation, rows, args);
-      return instruction(row, name, args);
+      const { row, named } = objectOf(operation, rows, args);
+      return instruction(row, named, args);
     },
   };
 }
@@ -380,12 +389,12 @@ export function createPrompt(source: PromptSource): AbapPrompt | undefined {
         .optional()
         .describe(TRANSPORT_REQUEST_WORDS),
     },
-    (row, name, args) =>
+    (row, named, args) =>
       oneCall(
-        headline('Create', row.type, name),
+        headline('Create', row.type, named.name),
         row,
         toolStep(row.tool, [
-          ...compactNamed(row, name),
+          ...compactNamed(row, named),
           ...optionalArguments(row.tool, args, [
             'package_name',
             'description',
@@ -399,17 +408,17 @@ export function createPrompt(source: PromptSource): AbapPrompt | undefined {
 /** The step reading `type` named `name` with `row`'s tool: the compact read passes its part. */
 export function readStep(
   row: ServedRow,
-  name: string,
+  named: ObjectName,
   words: { readonly lead?: string } = {},
 ): PromptStep {
   if (row.family === 'full') {
-    return toolStep(row.tool, compactNamed(row, name), words);
+    return toolStep(row.tool, compactNamed(row, named), words);
   }
   const part = READ_PART(row.type);
   return longToolStep(
     row.tool,
     [
-      ...compactNamed(row, name),
+      ...compactNamed(row, named),
       ...(part === undefined ? [] : [['part', userValue(part)] as const]),
     ],
     words,
@@ -424,8 +433,8 @@ export function getPrompt(source: PromptSource): AbapPrompt | undefined {
     'Reads an ABAP object of object_type named name: asks the model to call',
     rows,
     {},
-    (row, name) =>
-      oneCall(headline('Get', row.type, name), row, readStep(row, name)),
+    (row, named) =>
+      oneCall(headline('Get', row.type, named.name), row, readStep(row, named)),
   );
 }
 
@@ -456,8 +465,8 @@ export function deletePrompt(source: PromptSource): AbapPrompt | undefined {
         .optional()
         .describe(TRANSPORT_REQUEST_WORDS),
     },
-    (row, name, args) => {
-      const text = headline('Delete', row.type, name);
+    (row, named, args) => {
+      const text = headline('Delete', row.type, named.name);
       const optional = optionalArguments(row.tool, args, ['transport_request']);
       const locks =
         row.family === 'compact' && deletedUnderLock(row.type)
@@ -470,10 +479,10 @@ export function deletePrompt(source: PromptSource): AbapPrompt | undefined {
             source,
             locks,
             row.type,
-            name,
+            named,
             (handle, state) =>
               toolStep(row.tool, [
-                ...compactNamed(row, name),
+                ...compactNamed(row, named),
                 ...handle,
                 ...optional,
                 ...state,
@@ -486,7 +495,7 @@ export function deletePrompt(source: PromptSource): AbapPrompt | undefined {
       return oneCall(
         text,
         row,
-        toolStep(row.tool, [...compactNamed(row, name), ...optional]),
+        toolStep(row.tool, [...compactNamed(row, named), ...optional]),
       );
     },
     (row) =>
@@ -514,9 +523,9 @@ export function activatePrompt(source: PromptSource): AbapPrompt | undefined {
     'Activates an ABAP object of object_type named name: asks the model to call',
     rows,
     {},
-    (row, name) => ({
-      headline: headline('Activate', row.type, name),
-      steps: [toolStep(row.tool, compactNamed(row, name))],
+    (row, named) => ({
+      headline: headline('Activate', row.type, named.name),
+      steps: [toolStep(row.tool, compactNamed(row, named))],
       notes:
         row.family === 'compact' ? [activationLine(row.type, row.token)] : [],
     }),
@@ -531,11 +540,11 @@ export function checkPrompt(source: PromptSource): AbapPrompt | undefined {
     'Runs a syntax check of an ABAP object of object_type named name: asks the model to call',
     rows,
     {},
-    (row, name) =>
+    (row, named) =>
       oneCall(
-        headline('Check', row.type, name),
+        headline('Check', row.type, named.name),
         row,
-        toolStep(row.tool, compactNamed(row, name)),
+        toolStep(row.tool, compactNamed(row, named)),
       ),
   );
 }

@@ -81,14 +81,14 @@ export function updatePrompt(source: PromptSource): AbapPrompt | undefined {
         .optional()
         .describe(TRANSPORT_REQUEST_WORDS),
     },
-    (row, name, args) => {
+    (row, named, args) => {
       const read = readOf(row);
       const locks = lockToolsFor(source, row.type);
       const write = (handle: StepArguments, state: StepArguments): PromptStep =>
         toolStep(
           row.tool,
           [
-            ...compactNamed(row, name),
+            ...compactNamed(row, named),
             ...handle,
             ...contentArgument(row),
             ...optionalArguments(row.tool, args, ['transport_request']),
@@ -97,16 +97,16 @@ export function updatePrompt(source: PromptSource): AbapPrompt | undefined {
           { lead: 'Write it' },
         );
       const readSteps =
-        read === undefined ? [] : [readStep(read, name, { lead: 'Read it' })];
+        read === undefined ? [] : [readStep(read, named, { lead: 'Read it' })];
       const steps =
         row.family === 'compact' && locks !== undefined
           ? [
               ...readSteps,
-              ...underLock(source, locks, row.type, name, write, 2),
+              ...underLock(source, locks, row.type, named, write, 2),
             ]
           : [...readSteps, write([], [])];
       return {
-        headline: headline('Update', row.type, name),
+        headline: headline('Update', row.type, named.name),
         steps,
         notes: [
           ...(row.family === 'compact' ? [takesLine(row.type, row.token)] : []),

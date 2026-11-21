@@ -65,13 +65,7 @@ describe('the worked examples', () => {
     );
   });
 
-  it('core /get function_module names function_group_name still to fill, with its listed description', () => {
-    const listed = coreOnprem.tools.get('GetFunctionModule');
-    assert.ok(listed);
-    const group = requiredArguments(listed).find(
-      ({ name }) => name === 'function_group_name',
-    );
-    assert.ok(group?.description);
+  it('core /get function_module without function_group lists function_group still to fill', () => {
     assert.equal(
       textOf(promptOf(getPrompt, coreOnprem), {
         object_type: 'function_module',
@@ -79,8 +73,22 @@ describe('the worked examples', () => {
       }),
       [
         'Get the FUNCTION_MODULE "SOME_MODULE".',
-        '1. Call GetFunctionModule with function_module_name: "SOME_MODULE".',
-        `Still to fill before the call: function_group_name (${group.description}).`,
+        '1. Call GetFunctionModule with function_module_name: "SOME_MODULE", function_group_name: the function group.',
+        'Still to fill before the call: function_group (The function group the function module belongs to.).',
+      ].join('\n'),
+    );
+  });
+
+  it('core /get function_module with function_group sends both names', () => {
+    assert.equal(
+      textOf(promptOf(getPrompt, coreOnprem), {
+        object_type: 'function_module',
+        name: 'SOME_MODULE',
+        function_group: 'SOME_GROUP',
+      }),
+      [
+        'Get the FUNCTION_MODULE "SOME_MODULE".',
+        '1. Call GetFunctionModule with function_module_name: "SOME_MODULE", function_group_name: "SOME_GROUP".',
       ].join('\n'),
     );
   });

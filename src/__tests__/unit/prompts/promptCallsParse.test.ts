@@ -27,13 +27,11 @@ import type {
 } from '../../../lib/handlers/interfaces';
 import type { JsonValue } from '../../../lib/json';
 import { LONG_TOOLS } from '../../../lib/longTools';
-import {
-  type AbapPrompt,
-  membersOn,
-  type PromptInstruction,
-  type PromptName,
-  type PromptSource,
-  type PromptStep,
+import type {
+  AbapPrompt,
+  PromptName,
+  PromptSource,
+  PromptStep,
 } from '../../../lib/prompts';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import { registryOf, type ToolSetKind } from '../../../lib/toolSet';
@@ -254,49 +252,21 @@ async function argumentsFor(
     assert.ok(container, 'where_used completes container');
     args.container = container;
   }
+  if (value === 'function_module') {
+    // A function module is named by its bare name and its function group;
+    // each step builds the form its tool takes.
+    assert.ok(
+      prompt.argsSchema.function_group,
+      `${prompt.name} takes function_group`,
+    );
+    args.function_group = 'SOME_GROUP';
+  }
   if (prompt.name === 'unit_test' && value === 'package') {
     // Ruling C8: a package's run without the flag lists it still to fill,
     // inside `target`; the flag given, the call is complete.
     args.include_subpackages = 'false';
   }
   return args;
-}
-
-/** The six prompts on one object, whose `name` a function module takes as its type's arguments state. */
-const OBJECT_PROMPTS: ReadonlySet<string> = new Set([
-  'create',
-  'get',
-  'update',
-  'delete',
-  'activate',
-  'check',
-]);
-
-/** A function module's name as a compact tool's arguments state it: its group first. */
-const GROUPED_MODULE_NAME = 'SOME_GROUP|SOME_NAME';
-
-/**
- * The instruction of `prompt` for `args`. A function module served by a
- * compact tool is named as that tool's arguments state (`GROUP|MODULE`), as
- * the prompt's `name` description asks; by a full-set tool, by its name alone.
- */
-function instructionFor(
-  source: PromptSource,
-  prompt: AbapPrompt,
-  value: string,
-  args: Record<string, string>,
-): PromptInstruction {
-  const instruction = prompt.instruction(args);
-  if (!OBJECT_PROMPTS.has(prompt.name) || value !== 'function_module') {
-    return instruction;
-  }
-  const compact = instruction.steps.some((step) => {
-    const tool = source.tools.get(step.tool);
-    return tool !== undefined && membersOn(tool, source.kind) !== undefined;
-  });
-  return compact
-    ? prompt.instruction({ ...args, name: GROUPED_MODULE_NAME })
-    : instruction;
 }
 
 /** What one instruction's calls got wrong, one line each. */
@@ -458,10 +428,7 @@ describe('every generated call parses against its tool’s listed schema (test 1
               counts[prompt.name] = values.length;
               for (const value of values) {
                 const key = `${prompt.name} ${value}`;
-                const instruction = instructionFor(
-                  source,
-                  prompt,
-                  value,
+                const instruction = prompt.instruction(
                   await argumentsFor(prompt, value),
                 );
                 calls += instruction.steps.length;

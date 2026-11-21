@@ -14,6 +14,11 @@ import { TOOL_DEFINITION as RunUnitTest } from '../../handlers/unit_test/high/ha
 import type { RunTargetArgs } from '../../handlers/unit_test/shared/runTarget.js';
 import type { JsonValue } from '../json.js';
 import { completeFrom } from './completion.js';
+import {
+  nameArguments,
+  type ObjectName,
+  objectNameOf,
+} from './functionModule.js';
 import { jsonLiteral } from './instruction.js';
 import { objectArguments, stepValue, userValue } from './objectPrompts.js';
 import { type FullRow, fullRow } from './objectRows.js';
@@ -114,7 +119,7 @@ interface RunRow {
   readonly type: RunType;
   readonly tools: readonly string[];
   readonly steps: (
-    name: string,
+    named: ObjectName,
     includeSubpackages: boolean | undefined,
   ) => readonly PromptStep[];
 }
@@ -129,12 +134,12 @@ function fullRunRow(source: PromptSource, type: RunType): RunRow | undefined {
   return {
     type,
     tools: result === undefined ? [runName] : [runName, 'GetUnitTestResult'],
-    steps: (name, includeSubpackages) => [
+    steps: (named, includeSubpackages) => [
       toolStep(
         run,
         perType === undefined
-          ? targetArguments(type, name, includeSubpackages)
-          : [[perType.name, userValue(name)]],
+          ? targetArguments(type, named.name, includeSubpackages)
+          : nameArguments(run, type, perType.name, named),
       ),
       ...(result === undefined
         ? []
@@ -163,10 +168,14 @@ function compactRunRow(tools: CompactRunTools, type: RunType): RunRow {
       tools.status.definition.name,
       tools.result.definition.name,
     ],
-    steps: (name, includeSubpackages) => [
-      toolStep(tools.run, targetArguments(type, name, includeSubpackages), {
-        keeps: ['run_id'],
-      }),
+    steps: (named, includeSubpackages) => [
+      toolStep(
+        tools.run,
+        targetArguments(type, named.name, includeSubpackages),
+        {
+          keeps: ['run_id'],
+        },
+      ),
       toolStep(
         tools.status,
         [
@@ -253,7 +262,7 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
         requiredArgument(args, 'include_subpackages'),
         row.type,
       );
-      const steps = row.steps(name, includeSubpackages);
+      const steps = row.steps(objectNameOf(name, args), includeSubpackages);
       const [first, ...rest] = steps;
       const stillToFill =
         row.type === 'PACKAGE' &&

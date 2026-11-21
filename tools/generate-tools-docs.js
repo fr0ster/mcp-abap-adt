@@ -424,7 +424,7 @@ function groupByLevelAndObject(tools) {
 
 /** The listed prompts fixture: { listings, prompts }. */
 function loadListedPrompts() {
-  return JSON.parse(fs.readFileSync(LISTED_PROMPTS_PATH, 'utf8'));
+  return require(LISTED_PROMPTS_PATH);
 }
 
 const PROMPT_CALL_PREFIX = 'asks the model to call ';
@@ -434,7 +434,8 @@ function promptTools(description) {
   const at = description.indexOf(PROMPT_CALL_PREFIX);
   if (at < 0) return [];
   const names = description.slice(at + PROMPT_CALL_PREFIX.length);
-  return names.replace(/\.$/, '').split(', ');
+  const bare = names.endsWith('.') ? names.slice(0, -1) : names;
+  return bare.split(', ');
 }
 
 /** Tool name -> the prompts whose descriptions name it. */

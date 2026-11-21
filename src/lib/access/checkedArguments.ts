@@ -11,6 +11,7 @@ import {
   type TableMainOf,
 } from '../adtProjections.js';
 import { acceptedCodeOf } from '../adtTypeCode.js';
+import { givenName } from '../givenName.js';
 import type {
   ToolArgs,
   ToolArgValue,
@@ -240,9 +241,7 @@ export function checkedArgumentsOf(
 /** `args[argument]` trimmed and upper-cased, when it is a non-blank string. */
 function named(args: ToolArgs, argument: string): string | undefined {
   const value = args[argument];
-  if (typeof value !== 'string') return undefined;
-  const text = value.trim();
-  return text.length === 0 ? undefined : text.toUpperCase();
+  return typeof value === 'string' ? givenName(value) : undefined;
 }
 
 function namedValues(

@@ -56,7 +56,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        'The package this package belongs to; a top-level package has none.',
+        'Optional: the package this package belongs to, which must exist (SAP creates the package with no super package when the named one is missing). Without one the package is top level, which SAP allows for a structure package or a package in software component LOCAL ($ or TEST names, no transport layer); in an ABAP Cloud software component the top level is a structure package (SAP answers TR 462 to any other).',
       ),
     package_type: z
       .enum(['development', 'structure'])

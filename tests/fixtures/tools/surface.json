@@ -374,7 +374,7 @@
   {
     "group": "high",
     "name": "CreatePackage",
-    "inputs": "package_name*, description, super_package*, package_type, software_component, transport_layer, transport_request, record_changes, application_component, master_language, detail",
+    "inputs": "package_name*, description, super_package, package_type, software_component, transport_layer, transport_request, record_changes, application_component, master_language, detail",
     "available_in": "cloud, onprem"
   },
   {

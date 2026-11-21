@@ -30,6 +30,7 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { givenName } from '../../../lib/givenName';
 import { createArguments } from '../../../lib/handlers/createArguments';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { MASTER_LANGUAGE_DESCRIPTION } from '../../../lib/masterLanguage';
@@ -109,11 +110,16 @@ export async function handleCreatePackage(
 ) {
   const { connection, logger } = context;
 
-  if (!args?.package_name) {
+  // The names as the access check read them (`givenName`): a blank
+  // super_package is not given, and the package is created top level.
+  const packageName = givenName(args.package_name);
+  if (packageName === undefined) {
     return return_error(new Error('package_name is required'));
   }
-
-  const packageName = args.package_name.toUpperCase();
+  const superPackage =
+    args.super_package === undefined
+      ? undefined
+      : givenName(args.super_package);
   const detail = detailOf(args);
 
   return answer(
@@ -130,7 +136,7 @@ export async function handleCreatePackage(
                 packageName,
                 // A top-level package has none: adt-clients then writes an
                 // empty `<pak:superPackage/>`.
-                superPackage: args.super_package?.toUpperCase(),
+                superPackage,
                 description: args.description || packageName,
                 packageType: args.package_type,
                 softwareComponent: args.software_component,

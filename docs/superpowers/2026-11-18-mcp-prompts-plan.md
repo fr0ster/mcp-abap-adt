@@ -62,7 +62,8 @@ decide it.
   `RunFunctionModuleUnitTest` (`runAndWait(context, 'functionModule', name)`). So
   `RUN_TARGET.function_module` is `FUNC`, named by the module's name alone, and
   `function_module` stays in the compact row. `RunFunctionModuleUnitTest` takes
-  `function_group_name` as optional, so the core text has no still-to-fill line for it.
+  `function_group_name` as optional; it is sent from the prompt's `function_group`
+  (ruling "function_module prompts take function_group", spec §2.1).
 - **Transport object-directory types (§2.5, §11 Q-T1). Code:** `adtProjections.ts` already
   states, for each code, the TADIR type of `R3TR <type>` as interfaces-adt's tables give it
   (`TableMainOf<C>`). `OBJECT_DIRECTORY_TYPE`'s values are typed
@@ -478,7 +479,7 @@ values.
 
 - [ ] Tests first (`objectPrompts.test.ts`):
   - the §5.2 texts: core onprem `/create class`; core `/get function_module`, with the
-    still-to-fill line naming `function_group_name` and its listed description; compact
+    still-to-fill line naming the prompt's `function_group` and its description; compact
     stdio `/create class`; compact stdio `/delete local_types`; core-ro `/get program`;
     compact-ro `/check class`;
   - compact `/get package` passes `part: "metadata"` and `background: false`;
@@ -585,7 +586,8 @@ listed `container` enum of the row's tool.
 - **Core:** `GetWhereUsed`. **Compact:** `HandlerSystem` `action: "where_used"`, visible
   when `where_used` is in `membersOn(HandlerSystem)`.
 - **`background: false`** is passed exactly where the listed schema has `background`.
-- **`function_module`** quotes the tool's listed `object_name` description.
+- **`function_module`** sends `object_name` as `GROUP|MODULE`, built from `name` and
+  `function_group`, and quotes the tool's listed `object_name` description.
 - **`container`** (spec §2.4): with `text_elements` it is required and passed as the call's
   `container`; absent or blank, `where_used: container is required.`; given with any other
   type, `where_used: container is read with object_type text_elements only.`; a value
@@ -832,8 +834,9 @@ test subclass, built per binary: the twelve sets × `onprem`, `cloud` and none,
     - `anyOf` / `oneOf`: the first branch.
 
     A property the helper cannot fill is a test failure naming the tool and the property.
-    It is never skipped. For example, core `get function_module` fills
-    `function_group_name: "X1"`;
+    It is never skipped;
+  - give a `function_module` prompt bare values: `name` the module, `function_group` the
+    group; each step builds its tool's form (spec §2.1);
   - give `where_used` `text_elements` its `container` as the first value of the listed
     `container` enum (`program`), the one prompt argument the generator cannot fill;
   - assert that, after the fill, every name in the listed schema's `required` is present.

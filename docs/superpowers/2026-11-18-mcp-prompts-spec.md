@@ -262,12 +262,26 @@ operation, with no prefix (owner decision 5). The six object prompts are below; 
 | `where_used` | `object_type` required, completed · `name` required · `container` optional, completed, required with `text_elements` | Lists the objects that use the object of `object_type` named `name`: asks the model to call `<tools>`. |
 | `transport` | `action` required, completed · `number` · `description` · `user` · `object_type` (completed) · `name` · `target_number` — each optional, required per action (§2.5) | Works with transport requests by `action`: asks the model to call `<tools>`. |
 
+Every prompt whose served types include `function_module` (`create`, `get`, `update`,
+`delete`, `activate`, `check`, `unit_test`, `where_used`) also takes `function_group`,
+optional at the protocol, free text (not completed). For `function_module`, `name` is the
+module's own name and `function_group` its group; a missing `function_group` is listed
+still to fill on every step whose tool's form carries the group. Each step names the module
+in the form its own tool takes (`nameArguments`, `src/lib/prompts/functionModule.ts`):
+`function_module_name` with `function_group_name` where the tool has both (the full set's
+per-type tools, `HandlerCreate`, `HandlerGet`, `HandlerUpdate`, `HandlerDelete`); else
+`object_name` as `GROUP|MODULE`, built from the two values, never taken from the user
+(`HandlerLock`, `HandlerUnlock`, `HandlerActivate`, `HandlerCheckRun`, `GetWhereUsed`,
+`HandlerSystem`).
+
 Argument descriptions (static, functional, naming nothing concrete — the repository's
 description rule, `CLAUDE.md` "What we write names nothing concrete"):
 
 - `object_type` — "The object's type; the values are the types this server serves for the
   operation."
-- `name` — "The object's name (for a function module, as the type's arguments state)."
+- `name` — "The object's name; for a function module, its own name, with its function
+  group in function_group."
+- `function_group` — "The function group the function module belongs to."
 - `include_subpackages` — "For a package: `true` runs the tests of its subpackages too."
 - `container` — "For `text_elements`: whose text elements they are, `program` or
   `function_group`."
@@ -319,7 +333,7 @@ compile error.
 | `class` | `CLAS/OC` | `RunUnitTest` (`class_name`) | `HandlerUnitTestRun` (`target: { kind: object, name, type: CLAS/OC }`) |
 | `program` | `PROG/P` | `RunProgramUnitTest` (`program_name`) | `HandlerUnitTestRun` (`PROG/P`) |
 | `function_group` | `FUGR/F` | `RunFunctionGroupUnitTest` (`function_group_name`) | `HandlerUnitTestRun` (`FUGR/F`) |
-| `function_module` | `FUGR/FF` | `RunFunctionModuleUnitTest` (`function_module_name`; `function_group_name` still to fill) | `HandlerUnitTestRun` (`FUGR/FF`) ² |
+| `function_module` | `FUGR/FF` | `RunFunctionModuleUnitTest` (`function_module_name`; `function_group_name` from `function_group`) | `HandlerUnitTestRun` (`FUGR/FF`) ² |
 | `ddl` | `DDLS/DF` | `RunAbapUnit` (`target: { kind: object, name, type: DDLS/DF }`, `scope.foreign_tests: true`) | `HandlerUnitTestRun` (the same target and scope) |
 | `package` | — | `RunAbapUnit` (`target: { kind: package, name, include_subpackages }`) | `HandlerUnitTestRun` (the same target) |
 
@@ -393,8 +407,8 @@ operation and not an `OBJECT_DIRECTORY_TYPE` key (§2.5).
   it is given with another type, and a value outside the listed enum is refused with the
   enum's values. It is completed from the listed `container` enum.
 - **A function module's name** is `GROUP|MODULE` for both tools (Measured: their
-  `object_name` description); for `function_module` the instruction quotes the listed
-  `object_name` description of the tool, so the form comes from the definition.
+  `object_name` description), built from `name` and `function_group` (§2.1); the
+  instruction also quotes the listed `object_name` description of the tool.
 - **A long tool.** `GetWhereUsed` and `HandlerSystem` are long tools: the call passes
   `background: false` where their listed schema has `background`, so the answer is the
   result itself (§5.4).
@@ -707,12 +721,12 @@ Update the CLASS "<name>".
 The change: "<words>"
 ```
 
-**core — `/get function_module <name>`** (a required argument the prompt does not fill)
+**core — `/get function_module <name>`** (no `function_group` given)
 
 ```
 Get the FUNCTION_MODULE "<name>".
-1. Call GetFunctionModule with function_module_name: "<name>".
-Still to fill before the call: function_group_name (<its description in the schema>).
+1. Call GetFunctionModule with function_module_name: "<name>", function_group_name: the function group.
+Still to fill before the call: function_group (The function group the function module belongs to.).
 ```
 
 **compact, stdio — `/create class <name> package_name=<pkg>`**
@@ -807,7 +821,7 @@ an omitted `background` reads as `true` (`readLongBackground`) and the call answ
   types per operation, under the SDK's cut of 100.
 - Other closed sets: `transport` `action` (the served actions, §2.5) and its `object_type`
   (the 16 types of `OBJECT_DIRECTORY_TYPE`); `unit_test` `include_subpackages` (`true`,
-  `false`); `where_used` `container` (the listed enum: `program`, `function_group`). `name`, `number`, `user`, `description`, `change` are not completed (names from
+  `false`); `where_used` `container` (the listed enum: `program`, `function_group`). `name`, `function_group`, `number`, `user`, `description`, `change` are not completed (names from
   the SAP system are out of scope, goal).
 - Per binary and kind (**Measured**: the listed-schemas fixture counted under §2.2;
   re-measured 2026-11-20 on the fixture after 24.1.0 — the four one-family types out, `get`

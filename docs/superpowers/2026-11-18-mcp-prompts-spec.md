@@ -274,7 +274,7 @@ description rule, `CLAUDE.md` "What we write names nothing concrete"):
 - `action`, `number`, `user`, `target_number` — §2.5.
 - `package_name` — "The package the object is created in."
 - `description` — "The object's short description."
-- `transport_request` — "The transport request the change is recorded in, not a task."
+- `transport_request` — "The transport request number the change is recorded on."
 - `change` — "What to change, in words; the model writes the new content."
 
 ### 2.2 The object types

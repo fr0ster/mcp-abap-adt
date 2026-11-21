@@ -91,9 +91,12 @@ interfaces packages) may be linked during development. Before tagging every link
 is released: every range resolves on the registry, the sibling is published first in order, and a
 clean install from the registry outside the repo installs.
 
-**What blocks publishing** (G5) and the 24.2.0 release: a red unit, type or build check; a red
-functional live case on either backend; a T100 assertion that ran and failed on a backend (the §5.3
-error contract would be wrong).
+**Gates per backend.** Four live gates, each recorded on its own at G5 and again at the release:
+functional onprem, functional cloud, T100 onprem, T100 cloud (adt-clients' run at G5, the server's
+at the release, each log kept). A gate closes only on an executed, passing assertion on that
+backend; **a skip leaves it open**, and an open gate blocks exactly as a failure does. **What
+blocks publishing** (G5) and the 24.2.0 release: a red unit, type or build check, or any of the four
+gates open or failed.
 
 ## P1 — interfaces-adt-connection
 
@@ -125,9 +128,12 @@ of every `IAdtAbapGitClient` member. New exports:
     `response?: undefined` (narrowed: no wire response), `request?: { method; path }` without query,
     its required `origin` and `message` (fixed words from status and T100 key, no text of SAP's);
   - `IAbapGitFactsResultStrategy<T, F> = (answer: IAbapGitFactsResponse<F>) => T`;
-  - `IAbapGitFactsAnalyse<F, E extends IAbapGitStructuredError = IAbapGitStructuredError>
-    = (verdict: IAbapGitStructuredError | AdtNoFailure, answer?: IAbapGitFactsResponse<F>) => E |
-    AdtNoFailure`.
+  - `IAbapGitFactsAnalyse<F, E extends IAdtError = IAbapGitStructuredError> = (verdict:
+    IAbapGitStructuredError | AdtNoFailure, answer?: IAbapGitFactsResponse<F>) => E | AdtNoFailure`
+    — the error subtype `E` is the callback's return, inferred at the member call (each facts
+    overload is `<E extends IAdtError>(…, options: … & { analyse: IAbapGitFactsAnalyse<TFacts, E> }):
+    Promise<IAdtResponse<TFacts, E>>`); the bound stays `IAdtError` so an existing analyser's return
+    type keeps compiling.
 - Argument types: `IAbapGitRepoKeyArgs { key }`; `IAbapGitPullRepoArgs { key; branchName;
   transportRequest?; selection? }` (`branchName` required); `IAbapGitPullSelection {
   overwriteObjects; packageWarningObjects }`; `IAbapGitRunLogArgs { key; appLogKey }`;
@@ -139,18 +145,35 @@ of every `IAdtAbapGitClient` member. New exports:
   `IAdtAbapGitPullWithCredentials`, `IAdtAbapGitCheckExternalRepoWithCredentials`: `args` typed
   `Omit<…Args, 'remoteUser' | 'remotePassword'> & { remoteUser?: never; remotePassword?: never }`,
   options carrying a required `credentials` and typed with the facts exchange (`analyse:
-  IAbapGitFactsAnalyse<E>`, result `IAdtResponse<TFacts, E>`). **Exclusivity lives in two places:**
+  IAbapGitFactsAnalyse<TFacts, E>`, result `IAdtResponse<TFacts, E>`). **Exclusivity lives in two places:**
   the `never` fields on the new overloads, and `credentials?: never` added to the options of each
   legacy overload of `link`, `pull` and `checkExternalRepo`, so an options variable holding
   `headers` and `credentials` no longer matches the legacy branch. This stays a minor: no existing
   options type had `credentials`, so every caller that compiled before still compiles (pinned
   below); the deprecated fields keep working through the legacy overloads.
+- **Callback types on the paths the facts exchange serves** (spec §3 precedence) — every callback
+  states what it receives:
+  - `getRunLog`: all its shapes are facts-typed (no `IAnalyse`, no `IResultStrategy`).
+  - `getErrorLog` (legacy, always the run log): both overloads keep their names and arity; `analyse`
+    narrows to `IAbapGitFactsAnalyse<TErrorLog, E>`.
+  - `link`, `pull`, `checkExternalRepo` with the deprecated fields: the legacy overloads split by
+    presence — args with `remoteUser: string` get facts-typed callbacks; args with
+    `remoteUser?: undefined` keep the wire-typed ones; the declared `IAbapGitLinkArgs` (presence
+    unknown) gets callbacks whose `answer` is `IAdtWireResponse | IAbapGitFactsResponse<F>` and whose
+    verdict is `IAdtError | AdtNoFailure` — true at run time either way.
+  - **How this stays a minor, and what narrows:** every call site that passes no callback, or an
+    analyser that reads only the verdict, compiles unchanged (pinned below). An analyser on
+    `getErrorLog` or on a deprecated-credential call that is typed to read the wire answer no longer
+    compiles — by design, since that answer would have carried SAP's echo (spec §3 precedence). Both
+    CHANGELOGs (interfaces-adt 30.2.0, adt-clients 46.2.0) name this one narrowing; the owner may
+    rule it a major instead.
 - **New members as atoms**, one exported interface each, generic only over its result `T`, each with
   the client's two overload shapes — `<E extends IAdtError>(args, options: …IAbapGitMemberOptions<E>
   & { analyse: IAnalyse<E> }): Promise<IAdtResponse<T, E>>` and `(args, options?:
   …IAbapGitMemberOptions): Promise<IAdtResponse<T>>`, with `{ headers: IAdtHeaders } &` where the
   route takes headers (H); a member that takes `credentials` has a third shape with a required
-  `credentials` typed by the facts exchange, and its uncredentialed shapes carry `credentials?: never`:
+  `credentials` typed by the facts exchange, and its uncredentialed shapes carry `credentials?: never`;
+  `getRunLog` has only facts-typed shapes:
 
   | Atom | Member | Args |
   |---|---|---|
@@ -171,8 +194,12 @@ of every `IAdtAbapGitClient` member. New exports:
 Tests (`src/__typechecks__/abapGit.ts`, `downstreamStillCompiles.ts`; first failure: missing
 exports): an existing caller of every old overload compiles, `pull` without `branchName` and with
 `remoteUser`/`remotePassword` included; an existing class implementing the four-parameter
-`IAdtAbapGitClient` compiles; existing callers passing an options variable with `headers` and
-`analyse` compile; `credentials` with `remoteUser` (literal and variable), **an options variable
+`IAdtAbapGitClient` compiles; existing call sites of `getErrorLog`, `link`, `pull` and
+`checkExternalRepo` (deprecated fields included) that pass no callback or a verdict-only analyser
+compile; a wire-reading analyser on `getErrorLog` and on a `remoteUser` call is `@ts-expect-error`
+(the named narrowing); **error-subtype inference through the member call** — `getRunLog`, `push`
+with `credentials`, `getErrorLog` and `link` with `remoteUser`, each given an analyser returning a
+subtype, type `getError()` as that subtype with no cast; `credentials` with `remoteUser` (literal and variable), **an options variable
 holding `headers` and `credentials` beside args with `remoteUser`** (the legacy-branch case),
 an `IResultStrategy` given where an `IAbapGitFactsResultStrategy` is required and the reverse,
 `push` without `comment.committer`, `switchBranch` without `create`, `getFile` with
@@ -262,7 +289,11 @@ from the registry. The T5.6 suite loads the client under test through one helper
 `src/__tests__/helpers/abapGitUnderTest.ts`: with `ABAPGIT_CLIENT_UNDER_TEST` set to that install it
 `require`s from there and asserts the resolved paths (`require.resolve`) of adt-clients,
 adt-strategies and connection lie inside it and none inside the workspace — the pre-G5 run sets it.
-Unit test of the helper: a path inside the workspace is refused.
+Since connection is a dev dependency the tarball does not bring it: the temporary directory also
+gets `npm install --ignore-scripts @mcp-abap-adt/connection@25.1.0` from the registry, and the
+helper builds the suite's SAP connection from that copy (its `createConnection`), not from the
+workspace. Unit test of the helper: a path inside the workspace is refused, for the client and for
+connection alike.
 
 **T5.1 Key path builder and link wrappers.** `abapGit/paths.ts`: `repoPath(key, ...segments)`,
 URL-encoded segments. The existing low-level internal function `pullRepo(connection, headers, args)`
@@ -337,15 +368,17 @@ missing helper. Mutation: clean up while `R` → red.
   reason without the env file, the branch scope, or `/abapgit/repos` in discovery. Works the ledger
   first; every member on the system that serves it; on cloud one cancelled-wait case (must leave a
   ledger entry) and one recovery case (must clear it); `checkRepo` / `switchBranch` success statuses
-  logged, not asserted. **T100 gate closes on a backend** when its case "a SAP refusal for the run's
-  known key (`getFile` of a filename the repository does not hold, credentialed) carries
-  `messageClass` and `messageNumber`" passes there.
+  logged, not asserted. **The functional gate closes on a backend** when every member case for
+  that backend ran and passed; **the T100 gate** when its case "a SAP refusal for the run's known key
+  (`getFile` of a filename the repository does not hold, credentialed) carries `messageClass` and
+  `messageNumber`" ran and passed there. A skip (no env file, no branch scope, no discovery entry)
+  closes neither: the gate stays open and blocks G5.
 Run: `bash -o pipefail -c 'npm test -- integration/clients/abapGit 2>&1 | tee test-run.log'` — the
 exit status is the run's.
 
 **T5.7 Review and release prep.** Whole-PR review; sibling links removed, every range resolving on
 the registry (adt-strategies 0.27.0 already published); root `npm run check`; after publishing, a
-clean install of 46.2.0 outside the repo; gate G5 (what blocks it: "What blocks publishing" above).
+clean install of 46.2.0 outside the repo; gate G5 (what blocks it: "Gates per backend" above).
 
 ## P6 — server (this repo, PR #374)
 
@@ -493,9 +526,10 @@ entry is in its own PR (T1.1, T2.1, T3.3, T4.2, T5.5).
 **T6.12 Delete the goal, spec and plan** once implemented, before the release; what they still owe
 goes into #374's description first.
 
-**T6.13 Release.** After #374 merges into `main`, the 24.2.0 release PR #371 merges `main`. What
-blocks it is the "What blocks publishing" paragraph: functional live runs and the T100 assertion on
-both backends.
+**T6.13 Release.** After #374 merges into `main`, the 24.2.0 release PR #371 merges `main`. The
+four gates ("Gates per backend") are recorded again from the server's T6.9 runs — functional and
+T100, onprem and cloud, each closed only by an executed passing assertion; a skipped or failed gate
+blocks the release.
 
 ## Review Focus
 

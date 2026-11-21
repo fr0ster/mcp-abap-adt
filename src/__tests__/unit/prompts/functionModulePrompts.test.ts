@@ -133,7 +133,16 @@ describe('every prompt serving function_module takes function_group', () => {
     [
       'compact',
       compactOnprem,
-      ['create', 'get', 'update', 'delete', 'activate', 'check', 'where_used'],
+      [
+        'create',
+        'get',
+        'update',
+        'delete',
+        'activate',
+        'check',
+        'unit_test',
+        'where_used',
+      ],
     ],
     [
       'core',
@@ -159,13 +168,6 @@ describe('every prompt serving function_module takes function_group', () => {
       });
     }
   }
-
-  it('compact unit_test takes none: its FUNC target reads no function group', () => {
-    assert.equal(
-      listed(compactOnprem, 'unit_test').argsSchema.function_group,
-      undefined,
-    );
-  });
 
   it('a prompt serving no function module takes none (core transport)', () => {
     assert.equal(
@@ -227,8 +229,7 @@ describe('the form per tool', () => {
   });
 
   it('compact unit_test: the FUNC target names the module alone; nothing to fill', () => {
-    const [step] = listed(compactOnprem, 'unit_test').instruction(MODULE).steps;
-    assert.ok(step);
+    const step = firstStep(compactOnprem, 'unit_test');
     assert.deepEqual(userArguments(step).target, {
       kind: 'object',
       name: 'ZFM',
@@ -278,16 +279,7 @@ describe('function_group given for a type that reads none is refused (M4)', () =
     [
       'core',
       coreOnprem,
-      [
-        'create',
-        'get',
-        'update',
-        'delete',
-        'activate',
-        'check',
-        'unit_test',
-        'where_used',
-      ],
+      ['create', 'get', 'update', 'delete', 'activate', 'check', 'where_used'],
     ],
     [
       'compact',

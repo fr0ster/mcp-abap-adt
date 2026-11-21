@@ -10,7 +10,7 @@ Nine prompts: `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_te
 
 ## Refusal
 
-A `prompts/get` with an `object_type` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: `<prompt>: object_type "<value>" is not served by this server; it serves <list>.` A required argument that is absent or blank is refused the same way: `<prompt>: <argument> is required.` So is a `function_group` given for an `object_type` whose steps read none: `<prompt>: function_group is read with object_type function_module only.` (compact `unit_test` runs a function module by its name alone and declares no `function_group`).
+A `prompts/get` with an `object_type` the binary does not serve (unknown, not served on the system kind, or denied) is refused with the protocol's invalid-params error and no instruction: `<prompt>: object_type "<value>" is not served by this server; it serves <list>.` A required argument that is absent or blank is refused the same way: `<prompt>: <argument> is required.` So is a `function_group` given for an `object_type` whose steps read none: `<prompt>: function_group is read with object_type function_module only.`.
 
 A prompt whose tools are denied (`--deny-actions`, [ACCESS_RESTRICTIONS.md](ACCESS_RESTRICTIONS.md)) loses those `object_type` values; a prompt with none left is not listed.
 

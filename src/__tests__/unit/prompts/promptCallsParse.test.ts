@@ -280,14 +280,13 @@ async function argumentsFor(
     assert.ok(container, 'where_used completes container');
     args.container = container;
   }
-  if (
-    value === 'function_module' &&
-    prompt.argsSchema.function_group !== undefined
-  ) {
+  if (value === 'function_module') {
     // A function module is named by its bare name and its function group;
-    // each step builds the form its tool takes. A prompt whose steps read no
-    // function group (compact unit_test, the FUNC target) declares none
-    // (functionModulePrompts.test.ts pins which do).
+    // each step builds the form its tool takes.
+    assert.ok(
+      prompt.argsSchema.function_group,
+      `${prompt.name} takes function_group`,
+    );
     args.function_group = 'SOME_GROUP';
   }
   if (prompt.name === 'unit_test' && value === 'package') {

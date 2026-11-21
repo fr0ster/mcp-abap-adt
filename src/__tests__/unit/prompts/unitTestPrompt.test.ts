@@ -250,7 +250,7 @@ describe('the compact run is read once (no polling)', () => {
       const { steps } = promptOf(unitTestPrompt, compactOnprem).instruction({
         object_type: type,
         name: 'SOME_NAME',
-        include_subpackages: 'false',
+        ...(type === 'package' && { include_subpackages: 'false' }),
       });
       const status = steps.filter(
         ({ tool }) => tool === 'HandlerUnitTestStatus',
@@ -262,7 +262,7 @@ describe('the compact run is read once (no polling)', () => {
       const text = textOf(promptOf(unitTestPrompt, compactOnprem), {
         object_type: type,
         name: 'SOME_NAME',
-        include_subpackages: 'false',
+        ...(type === 'package' && { include_subpackages: 'false' }),
       });
       assert.ok(!text.includes('until'), text);
     });

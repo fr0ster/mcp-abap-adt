@@ -94,8 +94,10 @@ does not see it and cannot call it. No call checks a deny list.
 ## Allowed packages, allowed requests
 
 Checked once per call, at the handler's start, before anything is sent. A call that names a
-package (`package_name`, `super_package`) or a request (`transport_request`, `transport_number`,
-`target_number`) in its arguments runs only when each name matches its own list.
+package (`package_name`, `super_package`, or `target.name` of a unit run whose `target.kind` is
+`package`: `RunAbapUnit`, compact `HandlerUnitTestRun`) or a request (`transport_request`,
+`transport_number`, `target_number`) in its arguments runs only when each name matches its own
+list.
 
 - Only the tools a binary's `-ro` twin does not serve are checked: **reads are not checked**
   (`GetPackage`, `GetTransport`, `HandlerGet`).
@@ -105,6 +107,9 @@ package (`package_name`, `super_package`) or a request (`transport_request`, `tr
   every package below it; `/ABC/ZFOO/**` in a namespace). Requests: an exact number or a prefix.
   Entries are upper-cased.
 - **A task is matched as given**: an entry for a request does not cover its tasks.
+- **A unit run's package target is checked by the package it names**: the subpackages a run with
+  `include_subpackages` covers are not checked one by one. An object target (a class, a program)
+  is not checked.
 - A subtree entry makes the server read the package tree: a package below an allowed subtree is
   found by reading each super package up to the subtree's root. For a package create the new
   package's parent is the call's `super_package`. A tree that cannot be read (SAP does not

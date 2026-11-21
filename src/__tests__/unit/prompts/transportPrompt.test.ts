@@ -145,51 +145,30 @@ describe('the actions per binary', () => {
   }
 });
 
-describe('each action refuses its missing and its unread argument', () => {
-  const CASES: readonly (readonly [
-    string,
-    Record<string, string>,
-    string,
-    string,
-    string,
-  ])[] = [
-    ['create', {}, 'description', 'number', 'description'],
+describe('each action refuses its missing argument', () => {
+  const CASES: readonly (readonly [string, Record<string, string>, string])[] =
     [
-      'create_task',
-      { number: 'SOME_REQUEST' },
-      'number, user',
-      'name',
-      'number, user',
-    ],
-    ['list', {}, '', 'number', 'user'],
-    ['get', {}, 'number', 'user', 'number'],
-    ['objects', {}, 'number', 'description', 'number'],
-    ['log', {}, 'number', 'target_number', 'number'],
-    [
-      'add_object',
-      { number: 'SOME_TASK', object_type: 'class' },
-      'number, object_type, name',
-      'user',
-      'number, object_type, name',
-    ],
-    [
-      'remove_object',
-      { number: 'SOME_TASK', name: 'SOME_CLASS' },
-      'number, object_type, name',
-      'description',
-      'number, object_type, name',
-    ],
-    [
-      'move_objects',
-      { number: 'SOME_TASK' },
-      'number, target_number',
-      'user',
-      'number, target_number, object_type, name',
-    ],
-    ['sort_compress', {}, 'number', 'name', 'number'],
-  ];
+      ['create', {}, 'description'],
+      ['create_task', { number: 'SOME_REQUEST' }, 'number, user'],
+      ['list', {}, ''],
+      ['get', {}, 'number'],
+      ['objects', {}, 'number'],
+      ['log', {}, 'number'],
+      [
+        'add_object',
+        { number: 'SOME_TASK', object_type: 'class' },
+        'number, object_type, name',
+      ],
+      [
+        'remove_object',
+        { number: 'SOME_TASK', name: 'SOME_CLASS' },
+        'number, object_type, name',
+      ],
+      ['move_objects', { number: 'SOME_TASK' }, 'number, target_number'],
+      ['sort_compress', {}, 'number'],
+    ];
   const prompt = promptOf(transportPrompt, core);
-  for (const [action, partial, takes, unread, reads] of CASES) {
+  for (const [action, partial, takes] of CASES) {
     if (takes !== '') {
       it(`${action}: a missing argument`, () => {
         assertRefused(
@@ -199,13 +178,6 @@ describe('each action refuses its missing and its unread argument', () => {
         );
       });
     }
-    it(`${action}: ${unread} is unread`, () => {
-      assertRefused(
-        prompt,
-        { action, ...partial, [unread]: 'SOME_VALUE' },
-        `transport: action "${action}" reads ${reads}; "${unread}" is not one of them.`,
-      );
-    });
   }
 
   it('an action the binary serves none of is refused', () => {

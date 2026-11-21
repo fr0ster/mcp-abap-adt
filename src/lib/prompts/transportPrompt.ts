@@ -18,7 +18,6 @@ import {
   notServedWords,
   promptRefusal,
   requiredWords,
-  transportReadsWords,
   transportTakesWords,
 } from './refusals.js';
 import { matchServed, requiredArgument } from './served.js';
@@ -534,21 +533,19 @@ function readsOf(action: ActionName): readonly TransportArgument[] {
   return [...takes, ...alsoReads];
 }
 
-/** The arguments given, checked against what `action` takes and reads. */
+/**
+ * The arguments `action` reads, as given and checked against what it takes;
+ * an argument it reads none of is left out.
+ */
 function givenFor(
   action: ActionName,
-  args: Readonly<Record<string, string | undefined>>,
+  given: Readonly<Record<string, string | undefined>>,
   objectTypes: ReadonlyMap<string, TransportObjectType>,
 ): Given {
-  const reads = readsOf(action);
-  for (const argument of ARGUMENTS) {
-    if (
-      requiredArgument(args, argument) !== undefined &&
-      !reads.includes(argument)
-    ) {
-      throw promptRefusal(transportReadsWords(action, reads, argument));
-    }
-  }
+  const reads: readonly TransportArgument[] = readsOf(action);
+  const args = Object.fromEntries(
+    reads.map((argument) => [argument, given[argument]]),
+  );
   const { takes } = TRANSPORT_ACTIONS[action];
   const takenList: readonly TransportArgument[] = takes;
   const objectAndName: readonly TransportArgument[] = ['object_type', 'name'];

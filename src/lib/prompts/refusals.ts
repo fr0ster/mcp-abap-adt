@@ -32,12 +32,3 @@ export function transportTakesWords(
 ): string {
   return `transport: action ${jsonLiteral(action)} takes ${takes.join(', ')}.`;
 }
-
-/** A transport action is given an argument it reads none of. */
-export function transportReadsWords(
-  action: string,
-  reads: readonly string[],
-  argument: string,
-): string {
-  return `transport: action ${jsonLiteral(action)} reads ${reads.join(', ')}; ${jsonLiteral(argument)} is not one of them.`;
-}

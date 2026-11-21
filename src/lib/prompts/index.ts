@@ -10,7 +10,6 @@ export {
   notServedWords,
   promptRefusal,
   requiredWords,
-  transportReadsWords,
   transportTakesWords,
 } from './refusals.js';
 export { registerAbapPrompts, registerPrompts } from './register.js';

@@ -28,7 +28,6 @@ import {
   requiredArguments,
   requiredWords,
   toolStep,
-  transportReadsWords,
   transportTakesWords,
 } from '../../../lib/prompts';
 import { fullToolSet } from '../../../lib/toolSet';
@@ -394,10 +393,6 @@ describe('refusals', () => {
     assert.equal(
       transportTakesWords('create', ['description']),
       'transport: action "create" takes description.',
-    );
-    assert.equal(
-      transportReadsWords('list', ['user'], 'number'),
-      'transport: action "list" reads user; "number" is not one of them.',
     );
   });
 

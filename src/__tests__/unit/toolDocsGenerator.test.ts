@@ -131,3 +131,80 @@ describe('every handler group the docs read has a page level', () => {
     });
   }
 });
+
+/**
+ * Each tool page's prompt pointer names exactly the prompts whose steps call
+ * that tool, as `listed-prompts.json` carries them (`tools`, read from the
+ * instruction data), on every page `npm run docs:tools` writes.
+ */
+describe('the prompt pointers on the tool pages name the prompts that call each tool', () => {
+  const root = repositoryRoot(__dirname);
+  const listed: {
+    prompts: Record<string, ReadonlyArray<{ value: { tools: string[] } }>>;
+  } = JSON.parse(
+    fs.readFileSync(
+      path.join(root, 'tests', 'fixtures', 'tools', 'listed-prompts.json'),
+      'utf8',
+    ),
+  );
+  const expected = new Map<string, Set<string>>();
+  for (const [prompt, entries] of Object.entries(listed.prompts)) {
+    for (const { value } of entries) {
+      for (const tool of value.tools) {
+        const names = expected.get(tool) ?? new Set<string>();
+        names.add(prompt);
+        expected.set(tool, names);
+      }
+    }
+  }
+
+  /** Tool name -> the prompts its section's pointer line names, on one page. */
+  const pointersOf = (page: string): Map<string, string[]> => {
+    const byTool = new Map<string, string[]>();
+    let tool: string | undefined;
+    for (const line of page.split('\n')) {
+      if (line.startsWith('#### ')) {
+        tool = line.slice('#### '.length).split(' (')[0];
+        if (tool !== undefined) byTool.set(tool, []);
+      } else if (tool !== undefined && line.startsWith('**Prompt:**')) {
+        byTool.set(
+          tool,
+          line
+            .split('(')[0]
+            ?.split('`')
+            .filter((_, index) => index % 2 === 1) ?? [],
+        );
+      }
+    }
+    return byTool;
+  };
+
+  for (const page of [
+    'AVAILABLE_TOOLS.md',
+    'AVAILABLE_TOOLS_HIGH.md',
+    'AVAILABLE_TOOLS_READONLY.md',
+  ]) {
+    it(page, () => {
+      const pointers = pointersOf(
+        fs.readFileSync(path.join(root, 'docs', 'user-guide', page), 'utf8'),
+      );
+      assert.ok(pointers.size > 0, `${page} lists tools`);
+      for (const [tool, named] of pointers) {
+        assert.deepEqual(
+          named,
+          [...(expected.get(tool) ?? [])].sort(),
+          `${page} ${tool}`,
+        );
+      }
+    });
+  }
+
+  it('the update and unit_test prompts point from the tools they write and run', () => {
+    for (const [tool, prompt] of [
+      ['UpdateClass', 'update'],
+      ['RunAbapUnit', 'unit_test'],
+    ] as const) {
+      assert.ok(expected.get(tool)?.has(prompt), `${prompt} calls ${tool}`);
+    }
+  });
+});

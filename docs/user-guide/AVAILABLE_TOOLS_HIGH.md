@@ -377,7 +377,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
@@ -393,6 +393,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
@@ -445,7 +447,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
@@ -461,6 +463,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update source code of an existing ABAP behavior implementation class. Updates the implementations include. Manages lock, update, unlock, and optional activation.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate behavior implementation after update. Default: true.
@@ -610,7 +614,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
@@ -627,7 +631,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
@@ -643,7 +647,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
@@ -659,7 +663,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
@@ -675,7 +679,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
@@ -690,6 +694,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
@@ -706,6 +712,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name.
@@ -720,6 +728,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update local macros in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
@@ -736,6 +746,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating test class. Default: false
 - `class_name` (string, required) - Parent class name.
@@ -750,6 +762,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
@@ -1175,7 +1189,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
@@ -1188,6 +1202,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional (default: true)) - Activate data element after update (default: true)
@@ -1282,7 +1298,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
@@ -1298,6 +1314,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
@@ -1363,6 +1381,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
@@ -1452,7 +1472,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
@@ -1465,6 +1485,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional (default: true)) - Activate domain after update (default: true)
@@ -1587,6 +1609,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `description` (string, required) - New description for the function group.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1600,6 +1624,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate function module after source update. Default: false. Set to true to activate immediately.
@@ -1635,7 +1661,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
@@ -1716,7 +1742,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -1783,6 +1809,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Writes source_code as the whole source of the ABAP include named by include_name: locks it, writes, unlocks, and activates when activate is true. Returns SAP's answer to the write (and to the activation).
 
 **Source:** `src/handlers/include/high/handleUpdateInclude.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate the include after the write. Default: false.
@@ -1877,7 +1905,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -1893,6 +1921,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate interface after update. Default: true.
@@ -2042,7 +2072,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -2115,7 +2145,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -2129,6 +2159,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.
 
 **Source:** `src/handlers/package/high/handleUpdatePackage.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `description` (string, required) - New description for the package.
@@ -2209,7 +2241,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -2225,6 +2257,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
@@ -2298,7 +2332,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -2323,6 +2357,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update publication state of an existing ABAP service binding. On premise the change is done when the call answers (result SUCCESS, completion 'done'). On ABAP Cloud SAP runs it as a background job: the call answers result STARTED, completion 'background', with SAP's severity and short text, and the service becomes usable (or stops being usable) once that job ends.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `binding_variant` (string, required (default: ODATA_V4_UI), one of: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`) - Service binding variant. Determines OData version for publish/unpublish routing.
@@ -2409,7 +2445,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -2425,6 +2461,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after update. Default: true.
@@ -2509,7 +2547,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -2525,6 +2563,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after source update. Default: true.
@@ -2707,7 +2747,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -2723,6 +2763,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate table after source update. Default: true.
@@ -2833,7 +2875,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
@@ -2846,6 +2888,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.
 
 **Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `access_type` (string, optional, one of: `standard`, `sorted`, `hashed`, `index`, `notSpecified`) - Access type of the table (ttyp:accessType).
@@ -3104,6 +3148,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
 
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `duration` (object, optional) - Durations the run accepts.
@@ -3202,6 +3248,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view. Must already exist.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -3243,6 +3291,8 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Description:** Writes test_class_source as the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are rewritten, and the class is activated.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.

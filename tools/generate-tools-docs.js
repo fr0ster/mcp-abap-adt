@@ -427,23 +427,15 @@ function loadListedPrompts() {
   return require(LISTED_PROMPTS_PATH);
 }
 
-const PROMPT_CALL_PREFIX = 'asks the model to call ';
-
-/** The tools a prompt's description says it asks the model to call. */
-function promptTools(description) {
-  const at = description.indexOf(PROMPT_CALL_PREFIX);
-  if (at < 0) return [];
-  const names = description.slice(at + PROMPT_CALL_PREFIX.length);
-  const bare = names.endsWith('.') ? names.slice(0, -1) : names;
-  return bare.split(', ');
-}
-
-/** Tool name -> the prompts whose descriptions name it. */
+/**
+ * Tool name -> the prompts whose steps call it: the fixture's `tools`, read
+ * from the prompts' instruction data, never from a description.
+ */
 function promptsOfTools(listed) {
   const byTool = new Map();
   for (const [promptName, entries] of Object.entries(listed.prompts)) {
     for (const entry of entries) {
-      for (const tool of promptTools(entry.value.prompt.description)) {
+      for (const tool of entry.value.tools) {
         const names = byTool.get(tool) || new Set();
         names.add(promptName);
         byTool.set(tool, names);

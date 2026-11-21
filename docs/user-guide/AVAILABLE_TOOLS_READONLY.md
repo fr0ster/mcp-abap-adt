@@ -238,7 +238,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
@@ -258,7 +258,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
@@ -278,7 +278,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
@@ -352,7 +352,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
@@ -369,7 +369,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
@@ -389,7 +389,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
@@ -449,7 +449,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
@@ -507,7 +507,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -528,7 +528,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -574,7 +574,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -635,7 +635,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -671,7 +671,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -689,7 +689,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -759,7 +759,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -777,7 +777,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -812,7 +812,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -1162,7 +1162,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -1198,7 +1198,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
-**Prompt:** the `get` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.

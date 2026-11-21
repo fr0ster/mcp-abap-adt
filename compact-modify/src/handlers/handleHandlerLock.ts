@@ -58,7 +58,6 @@ export async function handleHandlerLock(
   const answered = await lockObject(context, {
     object_name: args.object_name,
     object_type: COMPACT_LOCK_KINDS[member],
-    super_package: args.super_package,
   });
   // A package lock over RFC lives in a session of its own.
   return keptLock(context, answered, member === 'PACKAGE' ? 'own' : 'main');

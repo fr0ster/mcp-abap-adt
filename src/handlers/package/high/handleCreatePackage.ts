@@ -54,7 +54,10 @@ export const TOOL_DEFINITION = {
       ),
     super_package: z
       .string()
-      .describe('Parent package name. Required for structure packages.'),
+      .optional()
+      .describe(
+        'The package this package belongs to; a top-level package has none.',
+      ),
     package_type: z
       .enum(['development', 'structure'])
       .optional()
@@ -109,9 +112,6 @@ export async function handleCreatePackage(
   if (!args?.package_name) {
     return return_error(new Error('package_name is required'));
   }
-  if (!args?.super_package) {
-    return return_error(new Error('super_package is required'));
-  }
 
   const packageName = args.package_name.toUpperCase();
   const detail = detailOf(args);
@@ -128,7 +128,9 @@ export async function handleCreatePackage(
             .create(
               {
                 packageName,
-                superPackage: args.super_package.toUpperCase(),
+                // A top-level package has none: adt-clients then writes an
+                // empty `<pak:superPackage/>`.
+                superPackage: args.super_package?.toUpperCase(),
                 description: args.description || packageName,
                 packageType: args.package_type,
                 softwareComponent: args.software_component,

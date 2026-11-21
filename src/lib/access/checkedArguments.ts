@@ -14,6 +14,35 @@ export const PACKAGE_ARGUMENTS: readonly string[] = [
   'super_package',
 ];
 
+/**
+ * The argument naming a package's parent, checked only where it is sent: on
+ * a package create (`isPackageCreate`). Elsewhere (a lock, a check) the
+ * tool accepts it and sends nothing of it.
+ */
+const PARENT_ARGUMENT = 'super_package';
+
+/** The tools that can create a package, and so send its parent. */
+const PACKAGE_CREATE_TOOLS: ReadonlySet<string> = new Set([
+  'CreatePackage',
+  'HandlerCreate',
+]);
+
+/**
+ * The tools that lock or unlock an object named by `object_type` and
+ * `object_name`: with `PACKAGE`, the object is a package, checked by that
+ * name.
+ */
+const PACKAGE_OBJECT_TOOLS: ReadonlySet<string> = new Set([
+  'HandlerLock',
+  'HandlerUnlock',
+  'LockObjectLow',
+  'UnlockObjectLow',
+]);
+
+/** The arguments naming a call's object and its type. */
+const OBJECT_NAME = 'object_name';
+const OBJECT_TYPE = 'object_type';
+
 /** The arguments that name a transport request or task. */
 export const REQUEST_ARGUMENTS: readonly string[] = [
   'transport_request',
@@ -41,6 +70,11 @@ export interface CheckedArguments {
   readonly requests: readonly string[];
   readonly table: string | undefined;
   readonly dispatch: string | undefined;
+  /**
+   * The argument naming the object of a call whose `object_type` is
+   * `PACKAGE`: the package itself, checked as a package.
+   */
+  readonly packageObject: string | undefined;
 }
 
 /** Every property a definition declares, on any variant. */
@@ -64,8 +98,22 @@ export function checkedArgumentsOf(
   const declared = declaredArguments(definition);
   const changes = !readOnly.has(definition.name);
   const packages = changes
-    ? PACKAGE_ARGUMENTS.filter((argument) => declared.has(argument))
+    ? PACKAGE_ARGUMENTS.filter(
+        (argument) =>
+          declared.has(argument) &&
+          (argument !== PARENT_ARGUMENT ||
+            PACKAGE_CREATE_TOOLS.has(definition.name)),
+      )
     : [];
+  // A lock or unlock: with `object_type` `PACKAGE` its `object_name` is the
+  // package itself.
+  const packageObject =
+    changes &&
+    PACKAGE_OBJECT_TOOLS.has(definition.name) &&
+    declared.has(OBJECT_NAME) &&
+    declared.has(OBJECT_TYPE)
+      ? OBJECT_NAME
+      : undefined;
   const requests = changes
     ? REQUEST_ARGUMENTS.filter((argument) => declared.has(argument))
     : [];
@@ -74,7 +122,12 @@ export function checkedArgumentsOf(
     tableArgument !== undefined && declared.has(tableArgument)
       ? tableArgument
       : undefined;
-  if (packages.length === 0 && requests.length === 0 && table === undefined) {
+  if (
+    packages.length === 0 &&
+    requests.length === 0 &&
+    table === undefined &&
+    packageObject === undefined
+  ) {
     return undefined;
   }
   return {
@@ -82,6 +135,7 @@ export function checkedArgumentsOf(
     requests,
     table,
     dispatch: DISPATCH_ARGUMENTS.find((argument) => declared.has(argument)),
+    packageObject,
   };
 }
 
@@ -126,7 +180,19 @@ export function accessCallOf(
   checked: CheckedArguments,
   args: ToolArgs,
 ): AccessCall | undefined {
-  const packages = namedValues(args, checked.packages);
+  const packageCreate = isPackageCreate(tool, args);
+  const packages = namedValues(
+    args,
+    checked.packages.filter(
+      (argument) => argument !== PARENT_ARGUMENT || packageCreate,
+    ),
+  );
+  if (
+    checked.packageObject !== undefined &&
+    named(args, OBJECT_TYPE) === 'PACKAGE'
+  ) {
+    packages.push(...namedValues(args, [checked.packageObject]));
+  }
   const requests = namedValues(args, checked.requests);
   const tables =
     checked.table === undefined ? [] : namedValues(args, [checked.table]);
@@ -141,6 +207,6 @@ export function accessCallOf(
     packages,
     requests,
     tables,
-    packageCreate: isPackageCreate(tool, args),
+    packageCreate,
   };
 }

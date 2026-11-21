@@ -49,7 +49,7 @@ describe('the texts (spec §2.3)', () => {
       [
         'Run the unit tests of the CLASS "SOME_CLASS".',
         '1. Call RunUnitTest with class_name: "SOME_CLASS".',
-        '2. When it answers a run_id: call GetUnitTestResult with run_id: the run_id from step 1.',
+        '2. When it answers a run_id without a run_result: call GetUnitTestResult with run_id: the run_id from step 1.',
       ].join('\n'),
     );
   });

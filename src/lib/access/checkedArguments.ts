@@ -96,8 +96,8 @@ const ACTIVATION_ADT_TYPE = 'object_adt_type';
 /**
  * The tools that send transport entries, each `pgmid` `type` `name`: a move
  * sends a list, `objects[]` of `object_name`, `object_type` and `pgmid`; an
- * add or a remove one object by the same arguments. An entry `R3TR DEVC`
- * names a package. The program id left out or blank is `R3TR`, as sent.
+ * add or a remove one object by the same arguments. An entry of type
+ * `DEVC` names a package, whatever its program id (`pgmid`).
  */
 const TRANSPORT_LIST_TOOLS: ReadonlySet<string> = new Set([
   'MoveTransportObjects',
@@ -108,7 +108,6 @@ const TRANSPORT_OBJECT_TOOLS: ReadonlySet<string> = new Set([
   'RemoveTransportObject',
 ]);
 const TRANSPORT_OBJECTS = 'objects';
-const PGMID = 'pgmid';
 /** A package's object-directory type: the main type of its code. */
 const PACKAGE_DIRECTORY_TYPE: TableMainOf<'DEVC/K'> = 'DEVC';
 
@@ -140,7 +139,7 @@ export interface CheckedArguments {
   readonly activation: { readonly single: boolean } | undefined;
   /**
    * Transport entries (`TRANSPORT_LIST_TOOLS`, `TRANSPORT_OBJECT_TOOLS`):
-   * an `R3TR DEVC` entry's name is checked as a package.
+   * a `DEVC` entry's name is checked as a package.
    */
   readonly transportEntries: 'list' | 'object' | undefined;
 }
@@ -324,18 +323,16 @@ function activationValues(
 }
 
 /**
- * Whether a transport entry is `R3TR DEVC`: the type `DEVC` and the program
- * id `R3TR`, either trimmed and in any case, a program id left out or blank
- * standing for `R3TR`.
+ * Whether a transport entry names a package: its type `DEVC`, trimmed and in
+ * any case. The program id is not read: a `DEVC` entry under any program id
+ * is checked.
  */
 function namesPackageEntry(entry: ToolArgs): boolean {
-  if (named(entry, OBJECT_TYPE) !== PACKAGE_DIRECTORY_TYPE) return false;
-  const pgmid = named(entry, PGMID);
-  return pgmid === undefined || pgmid === 'R3TR';
+  return named(entry, OBJECT_TYPE) === PACKAGE_DIRECTORY_TYPE;
 }
 
 /**
- * The packages a call's transport entries name: each `R3TR DEVC` entry of
+ * The packages a call's transport entries name: each `DEVC` entry of
  * `objects[]` as `objects[].object_name`, or the one object as `object_name`.
  */
 function transportEntryValues(

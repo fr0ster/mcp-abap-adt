@@ -390,12 +390,15 @@ the thrown response on → red; drop `noResend` on `push` → red; log `error.me
 default-log case red.
 
 **T5.4a The batch invariant** (`src/batch/AdtBatchConnection.ts`, this PR). `makeAdtRequest`
-refuses any request carrying `noLog` or `noResend` before it records anything, in fixed words
-("this request cannot be recorded into a batch"), whenever the batch is open. Test
+refuses any request carrying `noLog` or `noResend` with a **synchronous throw**, before any queueing
+or recording and never as a rejected promise (the server's `createRecorder`,
+`src/lib/batch/recorder.ts` ~L208, numbers and adds an entry before it sees a rejection), in fixed
+words ("this request cannot be recorded into a batch"), whenever the batch is open. Test
 `src/__tests__/unit/batch/batchRefusesFlagged.test.ts`: a request with `noLog`, one with `noResend`
 and one with both are each refused with zero recorded entries and the envelope unchanged; an
-ordinary request is still recorded. First failure: the flagged request is recorded. Mutation: check
-after recording → red.
+ordinary request is still recorded; the call throws synchronously (no promise returned). First
+failure: the flagged request is recorded. Mutations: check after recording → red; return a rejected
+promise instead of throwing → red.
 
 **T5.5 Docs.** `docs/usage/ERRATA.md` entries of spec §3.3; `README.md`, `docs/usage/CLIENT_API_REFERENCE.md`;
 the `CLAUDE.md` paragraph is the controller's, with the owner's approval of the text; CHANGELOG
@@ -530,10 +533,12 @@ background calls bypass the main flow (`handleHandlerBatch.ts` ~L105, `ownConnec
 The early raw batch check and a dispatch-time re-check (before connection acquisition, discovery,
 R1 or credential resolution) stay for precedence and the clear `batch_not_recordable` message; what
 guarantees the outcome is T5.4a: a batch connection refuses every request carrying `noLog` or
-`noResend` before recording it. Server overlap test (`admissionSeam.test.ts`): a batch opens after
-the dispatch re-check; the abapGit call is still refused, with no batch entry and no credential in
-any record (batch envelope, run record, log line). Mutation: drop the T5.4a refusal from the stand-in
-batch connection → red.
+`noResend` before recording it. Server overlap test (`admissionSeam.test.ts`), driving the **real**
+`AdtBatchConnection` (adt-clients 46.2.0) through the real `createRecorder`, no stand-in: a batch
+opens after the dispatch re-check; the abapGit call is still refused, with zero server batch entries
+(the count `BaseMcpServer.ts` ~L2547 keeps) and no credential in any record (batch envelope, run
+record, log line). Mutation (in a local patch of the installed copy, reverted): make the refusal a
+rejected promise → an entry appears and the test goes red.
 
 **T6.5 Full tools** (spec §4.1): handlers over `AdtAbapGitClient` taking the handoff; snake_case
 arguments, no credential argument, functional descriptions; `ListAbapGitRepos` with §9.2 (a)

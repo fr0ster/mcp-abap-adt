@@ -106,6 +106,10 @@ list. A call that names several is refused whole when one is outside.
 - A package is checked by its own name on its lock, unlock, update and delete. A
   `super_package` is checked only on a package create, where it is sent; a lock or a check
   accepts it and sends nothing of it.
+- **A package create's `super_package` must be readable.** SAP creates the package with no super
+  package when the named one cannot be loaded, so while an allowed-packages list is configured
+  the server reads the given parent before the create, and a parent that cannot be read refuses
+  the call `package_tree_unreadable`. Without a list nothing is read.
 
 - Only the tools a binary's `-ro` twin does not serve are checked: **reads are not checked**
   (`GetPackage`, `GetTransport`, `HandlerGet`).

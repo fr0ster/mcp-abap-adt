@@ -117,5 +117,10 @@ describe('a token names its member with the arguments it takes', () => {
     assert.equal(unlockToken('CLASS'), 'CLASS(object_name*, lock_handle*)');
     assert.equal(checkToken('CLASS'), 'CLASS(object_name*)');
     assert.equal(readToken('CLASS'), 'CLASS(class_name*)');
+    assert.equal(activateToken('CLASS'), 'CLASS');
+    assert.equal(
+      activateToken('FUNCTION_MODULE'),
+      'FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*)',
+    );
   });
 });

@@ -11,15 +11,21 @@
  *
  * The calls go through `livePrepare`: the keys these paths stand for are
  * pinned and covered live by their family tasks; this file proves a package
- * with no parent on premise.
+ * with no parent on premise. The read is parsed as the package tools parse
+ * it, and the teardown releases a lock the case still holds under its handle
+ * before the delete, in the suite's own session (`helpers/topLevelPackage.ts`,
+ * both covered without SAP by `topLevelPackageCase.test.ts`).
  *
  * On premise only: a local (`$`) package lives on premise, and the cloud has
  * none. The package's name is read free before its create and recorded for
  * cleanup before it; it is deleted after and read absent.
  */
-import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, it } from 'node:test';
+import {
+  releaseThenDelete,
+  topLevelReadProblem,
+} from '../../helpers/topLevelPackage';
 import {
   deleteRecorded,
   expectAbsent,
@@ -32,6 +38,9 @@ import {
 
 const SUFFIX = randomBytes(2).toString('hex').toUpperCase();
 const PACKAGE = `$ZMCPTL${SUFFIX}`;
+
+/** The lock the case holds and has not released: its handle. */
+let held: string | undefined;
 
 /** The answer, or the case fails naming the step and what was answered. */
 function succeeded(step: string, answer: LiveAnswer): LiveAnswer {
@@ -46,6 +55,15 @@ function member(value: unknown, key: string): unknown {
     : undefined;
 }
 
+/** The unlock of the package under `handle`. */
+function unlock(handle: string): Promise<LiveAnswer> {
+  return livePrepare('HandlerUnlock', {
+    object_type: 'PACKAGE',
+    object_name: PACKAGE,
+    lock_handle: handle,
+  });
+}
+
 liveSuite(['onprem'], 'a top-level package', () => {
   before(async () => {
     await expectNameFree({
@@ -55,8 +73,11 @@ liveSuite(['onprem'], 'a top-level package', () => {
     recordCreated('DeletePackage', { package_name: PACKAGE });
   });
 
+  // In the suite's session, before its runner closes: a lock still held is
+  // released first, then the package is deleted.
   after(async () => {
-    await deleteRecorded();
+    await releaseThenDelete(held, unlock, deleteRecorded);
+    held = undefined;
     await expectAbsent({ tool: 'GetPackage', args: { package_name: PACKAGE } });
   });
 
@@ -78,11 +99,8 @@ liveSuite(['onprem'], 'a top-level package', () => {
         detail: 'raw',
       }),
     );
-    assert.ok(
-      read.text.includes('<pak:superPackage') &&
-        !read.text.includes('pak:superPackage adtcore:name'),
-      `the package reads no empty superPackage: ${read.text.slice(0, 2000)}`,
-    );
+    const problem = topLevelReadProblem(read.text, PACKAGE);
+    if (problem !== undefined) throw new Error(problem);
 
     const locked = succeeded(
       'HandlerLock',
@@ -95,14 +113,9 @@ liveSuite(['onprem'], 'a top-level package', () => {
     if (typeof handle !== 'string' || handle === '') {
       throw new Error(`HandlerLock answered no handle: ${locked.text}`);
     }
+    held = handle;
 
-    succeeded(
-      'HandlerUnlock',
-      await livePrepare('HandlerUnlock', {
-        object_type: 'PACKAGE',
-        object_name: PACKAGE,
-        lock_handle: handle,
-      }),
-    );
+    succeeded('HandlerUnlock', await unlock(handle));
+    held = undefined;
   });
 });

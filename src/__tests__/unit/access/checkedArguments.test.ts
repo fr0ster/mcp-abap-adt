@@ -59,7 +59,9 @@ function checkedOf(set: ToolSet): Map<string, CheckedArguments> {
     const checked = checkedArgumentsOf(entry.toolDefinition, READ_ONLY);
     if (
       checked !== undefined &&
-      (checked.packages.length > 0 || checked.requests.length > 0)
+      (checked.packages.length > 0 ||
+        checked.packageTarget !== undefined ||
+        checked.requests.length > 0)
     ) {
       out.set(name, checked);
     }
@@ -174,6 +176,7 @@ const FULL: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
     ['transport_number'],
   ],
   [['MoveTransportObjects'], ['transport_number', 'target_number']],
+  [['RunAbapUnit'], ['target.name']],
 ];
 
 const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
@@ -183,10 +186,17 @@ const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['HandlerLock', ['super_package']],
   ['HandlerTransportMoveObjects', ['transport_number', 'target_number']],
   ['HandlerTransportSortAndCompress', ['transport_number']],
+  ['HandlerUnitTestRun', ['target.name']],
 ];
 
 const argumentsOf = (checked: CheckedArguments): string[] =>
-  [...checked.packages, ...checked.requests].sort();
+  [
+    ...checked.packages,
+    ...(checked.packageTarget === undefined
+      ? []
+      : [`${checked.packageTarget}.name`]),
+    ...checked.requests,
+  ].sort();
 
 describe('the checked package and request arguments', () => {
   it('the full set checks exactly the tools of Appendix B', () => {
@@ -300,6 +310,7 @@ describe('isPackageCreate', () => {
 describe('accessCallOf', () => {
   const checked: CheckedArguments = {
     packages: ['package_name', 'super_package'],
+    packageTarget: undefined,
     requests: ['transport_request'],
     table: undefined,
     dispatch: 'object_type',
@@ -334,6 +345,34 @@ describe('accessCallOf', () => {
     );
     assert.equal(
       accessCallOf('CreateClass', checked, { package_name: '  ' }),
+      undefined,
+    );
+  });
+});
+
+describe('accessCallOf on a run target', () => {
+  const checked: CheckedArguments = {
+    packages: [],
+    packageTarget: 'target',
+    requests: [],
+    table: undefined,
+    dispatch: undefined,
+  };
+
+  it('names a package target as target.name, trimmed and upper-cased', () => {
+    assert.deepEqual(
+      accessCallOf('RunAbapUnit', checked, {
+        target: { kind: 'package', name: ' zfoo ', include_subpackages: true },
+      })?.packages,
+      [{ argument: 'target.name', value: 'ZFOO' }],
+    );
+  });
+
+  it('names nothing for an object target', () => {
+    assert.equal(
+      accessCallOf('RunAbapUnit', checked, {
+        target: { kind: 'object', name: 'YCL_X', type: 'CLAS/OC' },
+      }),
       undefined,
     );
   });

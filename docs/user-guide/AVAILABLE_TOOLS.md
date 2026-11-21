@@ -3353,7 +3353,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `package_type` (string, optional (default: development), one of: `development`, `structure`) - Package type: 'development' (default) or 'structure'
 - `record_changes` (boolean, optional) - Enable change recording for the package. Required for transportable packages. Default: false.
 - `software_component` (string, optional) - Software component. If not provided, SAP will set a default.
-- `super_package` (string, optional) - The package this package belongs to; a top-level package has none.
+- `super_package` (string, optional) - Optional: the package this package belongs to, which must exist (SAP creates the package with no super package when the named one is missing). Without one the package is top level, which SAP allows for a structure package or a package in software component LOCAL ($ or TEST names, no transport layer); in an ABAP Cloud software component the top level is a structure package (SAP answers TR 462 to any other).
 - `transport_layer` (string, optional) - Transport layer. Required for transportable packages.
 - `transport_request` (string, optional) - Transport request number, not a task. Required if the package is transportable.
 

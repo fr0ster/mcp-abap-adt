@@ -93,15 +93,23 @@ does not see it and cannot call it. No call checks a deny list.
 
 ## Allowed packages, allowed requests
 
-Checked once per call, at the handler's start, before anything is sent. A call that names a
-package (`package_name`; with `object_type` `PACKAGE`, the `object_name` of a lock or an unlock;
-on a package create, the parent `super_package`) or a request (`transport_request`,
+Checked once per call, at the handler's start, before the call's own requests are sent (a subtree
+entry first reads the package tree, below). A call that names a package (`package_name`; with
+`object_type` `PACKAGE`, the `object_name` of a lock or an unlock; on a package create, the parent
+`super_package`; the `target.name` of a unit run whose `target.kind` is `package`: `RunAbapUnit`,
+compact `HandlerUnitTestRun`; the `name` of each `objects[]` entry an activation reads as a package,
+and compact `HandlerActivate`'s `object_name` with `object_type` `PACKAGE` or an `object_adt_type`
+read so; the `object_name` of each transport entry of type `DEVC`) or a request (`transport_request`,
 `transport_number`, `target_number`) in its arguments runs only when each name matches its own
-list.
+list. A call that names several is refused whole when one is outside.
 
 - A package is checked by its own name on its lock, unlock, update and delete. A
   `super_package` is checked only on a package create, where it is sent; a lock or a check
   accepts it and sends nothing of it.
+- **A package create's `super_package` must be readable.** SAP creates the package with no super
+  package when the named one cannot be loaded, so while an allowed-packages list is configured
+  the server reads the given parent before the create, and a parent that cannot be read refuses
+  the call `package_tree_unreadable`. Without a list nothing is read.
 
 - Only the tools a binary's `-ro` twin does not serve are checked: **reads are not checked**
   (`GetPackage`, `GetTransport`, `HandlerGet`).
@@ -111,6 +119,17 @@ list.
   every package below it; `/ABC/ZFOO/**` in a namespace). Requests: an exact number or a prefix.
   Entries are upper-cased.
 - **A task is matched as given**: an entry for a request does not cover its tasks.
+- **A unit run's package target is checked by the package it names**: the subpackages a run with
+  `include_subpackages` covers are not checked one by one. An object target (a class, a program)
+  is not checked.
+- **An activation's package entries** (`ActivateObjects`, `ActivateObjectLow`, compact
+  `HandlerActivate`): an entry is a package when the activation reads its type as `DEVC/K` — the
+  code in either case, the main type `DEVC`, or the name `package`; any other entry is not checked.
+- **A transport entry of type `DEVC`** (`MoveTransportObjects` and compact
+  `HandlerTransportMoveObjects` for each `objects[]` entry, `AddTransportObject` and
+  `RemoveTransportObject` for the one object): the type in any case, whatever the program id
+  (`pgmid`). Any other entry is not checked. A remove takes the entry matching the given type,
+  name and position together, so the entry removed is the one whose name was checked.
 - A subtree entry makes the server read the package tree: a package below an allowed subtree is
   found by reading each super package up to the subtree's root. For a package create the new
   package's parent is the call's `super_package`; a top-level package has none, so its create
@@ -154,9 +173,15 @@ entries that match nothing in this binary.
 ## Embedding
 
 `BaseMcpServer` / `EmbeddableMcpServer` and `HandlerExporter` take an optional `accessChecks`
-(`IAccessChecks`): `listedAccessChecks(lists)` matches names and prefixes and reads nothing;
-`packageTreeAccessChecks(lists)` also matches subtree entries through the `IPackageReader` it is
-handed; an embedder may give its own. `HandlerExporter` takes `deniedActions` (parsed with
+(`IAccessChecks`): `listedAccessChecks(lists)` matches names and prefixes and makes one read, a
+package create's given `super_package`; `packageTreeAccessChecks(lists)` also matches subtree
+entries. Both read through the `IPackageReader` they are handed; a reader that throws refuses the
+call `package_tree_unreadable`. The server's own reader throws unless SAP's document names the
+package read. A reader an embedder gives must throw for a missing, empty or mismatched
+document: a resolved `undefined` reads as a top-level package — a create's parent counts as
+read, and a subtree walk ends there, refused `package_not_allowed` when no allowed root was
+reached. An embedder may
+give its own strategy. `HandlerExporter` takes `deniedActions` (parsed with
 `parseDeniedEntry`); `withoutDenied(groups, denied)` and `registryOf(…, denied)` narrow groups.
 Handlers an embedder takes into its own hands (a registry of its own, its own parsing of the
 exported entries' arguments) are its own. See

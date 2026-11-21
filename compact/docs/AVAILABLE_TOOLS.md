@@ -353,7 +353,7 @@ per request.
 - `description` — Human-readable object description.
 - `transport_request` — Transport request id (if required by system).
 - `master_language` — Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
-- `super_package` — The package this package belongs to (PACKAGE create); a top-level package has none.
+- `super_package` — PACKAGE create. Optional: the package this package belongs to, which must exist (SAP creates the package with no super package when the named one is missing). Without one the package is top level, which SAP allows for a structure package or a package in software component LOCAL ($ or TEST names, no transport layer); in an ABAP Cloud software component the top level is a structure package (SAP answers TR 462 to any other).
 - `package_type` — Package type (PACKAGE create).
 - `software_component` — Software component (PACKAGE create).
 - `transport_layer` — Transport layer (PACKAGE create).

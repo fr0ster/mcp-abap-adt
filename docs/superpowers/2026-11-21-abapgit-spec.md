@@ -116,8 +116,11 @@ with `Accept: */*` → onprem 200, cloud 400 (git-integration research, 2026-11-
 
 Every route is stateless: none reads anything but its URI, query, headers and body (Code).
 SAP keeps the git credentials in static class data for the ABAP session (§2.2), so a
-stateful session would keep them for its later requests. Required: **every abapGit request
-goes stateless on the wire, a request after a failure included** (pinned by test, §7). The
+stateful session would keep them for its later requests. Required: **every abapGit request that
+carries credentials or user content, and every new member, goes stateless on the wire, a request
+after a failure included** (pinned by test, §7). `unlink` is not among them (owner's ruling): it
+carries no credentials, and every credentialed call is stateless, so no credential is ever left in a
+stateful session for `unlink` to meet. The
 connection takes `stateful` from its session mode, which another caller may have set, so the
 request carries its own `stateless: true` (§3.4), which wins over the mode for that request.
 
@@ -274,7 +277,7 @@ Common to all:
 - **Stateless** (§2.5): every call goes through a new form; `ListAbapGitRepos` reads R1 through
   `listReposQuiet` like the pre-read, never through the existing `listRepos`. The one exception is
   `unlink`, unchanged by the owner's ruling: it carries no `stateless` flag and goes stateless only
-  as the connection's session mode does (open point for the owner). **Batch:** every abapGit tool and action is refused in batch mode before
+  as the connection's session mode does (§2.5). **Batch:** every abapGit tool and action is refused in batch mode before
   anything is sent and before any credential is resolved; no batch entry and no number is taken
   (`batch_not_recordable`, the existing refusal for calls that cannot be recorded).
 - **Arguments** never carry a credential. A repository is addressed by `repository_key`.

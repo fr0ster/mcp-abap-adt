@@ -244,7 +244,10 @@ R7 answers a fixed text (Code); onprem R4 ignores `branchName` (Code); R11/R15 s
   the byte count. The error the connection throws keeps its fields for the caller (adt-clients),
   which reduces it to §5.3 before anything else sees it.
 - **`stateless: true`** — the request goes stateless on HTTP and RFC whatever the connection's
-  session mode (§2.5); sent on every new form.
+  session mode (§2.5), and wins over a caller's `x-sap-adt-sessiontype: stateful` header in any
+  letter case: the shared stateful verdict (`isStatefulRequest`) answers false for it, and the
+  wire strips the conflicting header and the session's context cookie from that request. Sent on
+  every new form.
 - **`noResend: true`** — gates every replay of the request; the initial CSRF token fetch before a
   mutation still happens. Gated paths:
   - the CSRF recovery (`shouldRetryCsrf`, `AbstractAbapConnection.ts` L1916–1937, resend L1515–1535);
@@ -268,7 +271,10 @@ committer) and may already have run when a replay would start.
 Common to all:
 
 - **Availability:** §4.5.
-- **Stateless** (§2.5). **Batch:** every abapGit tool and action is refused in batch mode before
+- **Stateless** (§2.5): every call goes through a new form; `ListAbapGitRepos` reads R1 through
+  `listReposQuiet` like the pre-read, never through the existing `listRepos`. The one exception is
+  `unlink`, unchanged by the owner's ruling: it carries no `stateless` flag and goes stateless only
+  as the connection's session mode does (open point for the owner). **Batch:** every abapGit tool and action is refused in batch mode before
   anything is sent and before any credential is resolved; no batch entry and no number is taken
   (`batch_not_recordable`, the existing refusal for calls that cannot be recorded).
 - **Arguments** never carry a credential. A repository is addressed by `repository_key`.
@@ -281,7 +287,7 @@ Common to all:
 
 | Tool | Route | Sys | -ro | Arguments | Result | Package checked | Request checked |
 |---|---|---|---|---|---|---|---|
-| `ListAbapGitRepos` | R1 | both | yes | `package_name?`, `repository_key?` (§9.2) | repositories; on cloud the run state (`status`, `statusText`, log key) | — | — |
+| `ListAbapGitRepos` | R1 (`listReposQuiet`) | both | yes | `package_name?`, `repository_key?` (§9.2) | repositories; on cloud the run state (`status`, `statusText`, log key) | — | — |
 | `CheckAbapGitExternalRepo` | R13 | both | yes | `url` | accessMode, branches | — | — |
 | `GetAbapGitBranchInfo` | R14 | cloud | no | `url`, `branch`, `package_name` | the branch with folderLogic, accessMode | `package_name` | — |
 | `LinkAbapGitRepo` | R2 v3 | both | no | `package_name`, `url`, `branch`, `transport_request?`, `folder_logic?` (cloud) | done (SAP's object list is empty on both, Code) | refused under restrictions (§4.3) | refused under restrictions |
@@ -478,7 +484,7 @@ no attempt is made to detect a credential in them.
 | Route | Kept fields ← XML source (ST read, Code) |
 |---|---|
 | every route | `status` ← HTTP status (integer) |
-| R1 (`listReposQuiet`) | `repos[]`: `key`, `package`, `url`, `branchName`, `runStatus`, `appLogKey` (from `log_link`) |
+| R1 (`listReposQuiet`) | `repos[]`: `key`, `package`, `url`, `branchName`, `runStatus`, `statusText`, `appLogKey` (from `log_link`) |
 | every error | `messageClass` ← `properties/entry[@key="T100KEY-ID"]`, `messageNumber` ← `entry[@key="T100KEY-NO"]` (three-digit string, as SAP writes it) — the keys `src/lib/debugger/readings.ts` L494 already reads. Code, both systems: `CL_ADT_EXCEPTION_UTILITY->create_exc_response` adds `T100KEY-ID` and `T100KEY-NO` for every exception that `IS INSTANCE OF if_t100_message` (L94–97), and `T100KEY-V1`…`V4` from the message variables (L49, dropped); the abapGit exceptions `ZCX_ADT_REST_ABAPGIT` / `CX_ADT_REST_ABAPGIT` implement `if_t100_dyn_msg` and raise `MESSAGE ID … NUMBER …` (`raise_with_error`). That `if_t100_dyn_msg` includes `if_t100_message` is SAP's standard interface, not read here. Absent → `status` alone |
 | R11 cloud auth error | also `gitHttpStatus` ← `properties/entry[@key="http_status"]` as an integer (`CL_ABAPGIT_REPOSITORY_AUTH->handle_auth_exception`); `LONGTEXT` dropped |
 | R2, R4 (onprem), R8 | `objects[]` ← `abapObjects:abapObject`: `type` ← `abapObjects:type`, `name` ← `abapObjects:name`, `package` ← `abapObjects:package`, `status` ← `abapObjects:status`, `messageType` ← `abapObjects:msgType` (one of `S`, `I`, `W`, `E`, `A`, documented as SAP's message type); `abapObjects:msgText` dropped (`ZABAPGIT_ST_REPO_POST_RES`, `ABAPGIT_ST_REPO_POST_RES_V2`) |
@@ -599,9 +605,11 @@ elsewhere with the reason, route-specific cases gated by system kind in code:
 - **Recovery:** when a poll is cancelled, or a run cannot be correlated (no new log key, or a
   status that never becomes terminal before the test's cancel), the run does **not** unlink or
   delete. It keeps its fixtures, records their names in a gitignored ledger beside the test
-  config, and fails naming them. Every later run first works the ledger: for each recorded
-  repository it reads R1, waits until no run of it is blank or `R`, then cleans up as in step 8
-  and removes the entry.
+  config, and fails naming them. The ledger entry keeps the backend and the pre-submit log key
+  L0. Every later run first works the ledger: for each recorded repository it reads R1 and waits
+  until the entry shows a log key other than L0 **and** a terminal status — a terminal status
+  under L0 is the previous run's and keeps waiting — then cleans up as in step 8 and removes the
+  entry.
 - R11 and R15 success statuses are logged, not asserted, until measured (§10).
 
 ## 8. Docs

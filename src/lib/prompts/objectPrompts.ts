@@ -14,7 +14,7 @@ import {
   type CompactRow,
   FULL_ROWS,
   type FullRow,
-  LOCKED_AS,
+  lockTargetOf,
   PROMPT_OBJECT_TYPES,
   type PromptObjectType,
   READ_PART,
@@ -249,17 +249,12 @@ export interface LockTools {
   readonly unlock: ListedPromptTool;
 }
 
-/** The object a compact write of `type` locks: `LOCKED_AS`'s, else the type itself. */
-export const LOCK_TARGETS: ReadonlyMap<string, string> = new Map(
-  Object.entries(LOCKED_AS),
-);
-
 /** The lock and unlock tools for a write of `type`, when both are listed and offer its lock target. */
 export function lockToolsFor(
   source: PromptSource,
   type: PromptObjectType,
 ): LockTools | undefined {
-  const target = LOCK_TARGETS.get(type) ?? type;
+  const target = lockTargetOf(type);
   const lock = listed(source, 'HandlerLock');
   const unlock = listed(source, 'HandlerUnlock');
   return offers(source, lock, target) && offers(source, unlock, target)

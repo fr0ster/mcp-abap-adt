@@ -20,15 +20,15 @@ import {
   takesLine,
   underLock,
 } from './objectPrompts.js';
-import { COMPACT_ROWS, FULL_ROWS, READ_AS, READ_PART } from './objectRows.js';
+import {
+  COMPACT_ROWS,
+  FULL_ROWS,
+  READ_PART,
+  readTypeOf,
+} from './objectRows.js';
 import { requiredArgument } from './served.js';
 import { toolStep } from './source.js';
 import type { AbapPrompt, PromptSource, PromptStep } from './types.js';
-
-/** The type an update of `type` reads: `READ_AS`'s, else the type itself. */
-const READ_TYPES: ReadonlyMap<string, string> = new Map(
-  Object.entries(READ_AS),
-);
 
 const CHANGE_WORDS =
   'What to change, in words; the model writes the new content.';
@@ -60,7 +60,7 @@ function changeNotes(args: PromptArguments): readonly string[] {
 export function updatePrompt(source: PromptSource): AbapPrompt | undefined {
   const reads = servedRows(source, FULL_ROWS.get, COMPACT_ROWS.get);
   const readOf = (row: ServedRow): ServedRow | undefined => {
-    const readType = READ_TYPES.get(row.type) ?? row.type;
+    const readType = readTypeOf(row.type);
     return reads.find(
       (read) => read.type === readType && read.family === row.family,
     );

@@ -2,7 +2,8 @@
  * The prompt rows are typed against their tools (spec §9, test 8): a full
  * row's name key is a key of its tool's input, a compact row's name key a
  * property its member's takes name, and `LOCKED_AS` holds an entry for every
- * member a write locks under another object. Checked by `test:check`; never
+ * member a write locks under another object, and the lock target and the
+ * read type are looked up by a type of the vocabulary only. Checked by `test:check`; never
  * emitted. Each directive is used only because its error occurs.
  */
 
@@ -13,6 +14,8 @@ import {
   type CompactNameKey,
   fullRow,
   type LOCKED_AS,
+  lockTargetOf,
+  readTypeOf,
 } from '../../lib/prompts/objectRows';
 
 // @ts-expect-error CreateClass takes no program_name
@@ -48,3 +51,12 @@ export const wrongContentKey = fullRow(UpdateClass, 'class_name', {
   // @ts-expect-error UpdateClass takes no ddl_code
   content: 'ddl_code',
 });
+
+// @ts-expect-error CLAS is no type of the vocabulary, so it has no lock target
+export const wrongLockKey = lockTargetOf('CLAS');
+
+// @ts-expect-error CLAS is no type of the vocabulary, so it has no read type
+export const wrongReadKey = readTypeOf('CLAS');
+
+// @ts-expect-error a class include is locked as the class, never as an include
+export const wrongLockTarget: 'LOCAL_TYPES' = lockTargetOf('LOCAL_TYPES');

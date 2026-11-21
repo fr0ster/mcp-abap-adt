@@ -717,6 +717,17 @@ export const LOCKED_AS: {
   BEHAVIOR_IMPLEMENTATION: 'CLASS',
 };
 
+/** `LOCKED_AS` read by any type of the vocabulary: a type with no entry reads `undefined`. */
+const LOCKED_AS_BY_TYPE: Partial<Record<PromptObjectType, LockMember>> =
+  LOCKED_AS;
+
+/** The object a compact write of `type` locks: `LOCKED_AS`'s, else the type itself. */
+export function lockTargetOf<T extends PromptObjectType>(
+  type: T,
+): LockMember | T {
+  return LOCKED_AS_BY_TYPE[type] ?? type;
+}
+
 type ReadMember = (typeof COMPACT_READ.onprem)[number];
 
 /**
@@ -727,3 +738,13 @@ export const READ_AS: Partial<Record<UpdateMember, ReadMember>> = {
   UNIT_TEST: 'LOCAL_TEST_CLASS',
   CDS_UNIT_TEST: 'LOCAL_TEST_CLASS',
 };
+
+/** `READ_AS` read by any type of the vocabulary: a type with no entry reads `undefined`. */
+const READ_AS_BY_TYPE: Partial<Record<PromptObjectType, ReadMember>> = READ_AS;
+
+/** The type an update of `type` reads: `READ_AS`'s, else the type itself. */
+export function readTypeOf<T extends PromptObjectType>(
+  type: T,
+): ReadMember | T {
+  return READ_AS_BY_TYPE[type] ?? type;
+}

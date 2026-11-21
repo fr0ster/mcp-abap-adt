@@ -1810,16 +1810,25 @@ export const compactDeletionCheckSchema = compactDeletionCheckSchemaFor(
   COMPACT_DELETION_CHECK.onprem,
 );
 
+const LOCK_PROPERTIES = {
+  super_package: z
+    .string()
+    .optional()
+    .describe(
+      'PACKAGE: the package this package belongs to; a top-level package has none. The lock names the package by object_name alone.',
+    ),
+};
+
 /** A member of `HandlerLock`'s `object_type`. */
 type LockMember = (typeof COMPACT_LOCK.onprem)[number];
 
-/** What `HandlerLock` takes: the object's type and name. */
+/** What `HandlerLock` takes: the object's type and name; a package also its super package. */
 export const COMPACT_LOCK_TAKES = takesOf<
-  keyof ReturnType<typeof lifecycleObjectSchema>,
+  keyof ReturnType<typeof lifecycleObjectSchema> | keyof typeof LOCK_PROPERTIES,
   LockMember
 >()({
   every: ['object_type', 'object_name'],
-  members: {},
+  members: { PACKAGE: ['super_package'] },
 });
 
 export function compactLockSchemaFor<const M extends readonly LockMember[]>(
@@ -1827,6 +1836,7 @@ export function compactLockSchemaFor<const M extends readonly LockMember[]>(
 ) {
   const properties = {
     ...lifecycleObjectSchema(members),
+    ...LOCK_PROPERTIES,
   } as const;
   return z.object({
     ...offered(properties, COMPACT_LOCK_TAKES, members),

@@ -373,7 +373,11 @@ type LockMember = (typeof COMPACT_LOCK.onprem)[number];
 
 /** A HandlerLock member with the arguments it takes, as the description names it. */
 export function lockToken(member: LockMember): string {
-  return objectNamed<LockMember>(member, {}, 'object_name*');
+  return objectNamed<LockMember>(
+    member,
+    { PACKAGE: 'PACKAGE(object_name*, super_package)' },
+    'object_name*',
+  );
 }
 
 /** HandlerLock's description on `variant`, naming `members` (default: all the variant's). */

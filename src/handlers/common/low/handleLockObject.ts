@@ -79,6 +79,12 @@ export const TOOL_DEFINITION = {
         'service_binding',
       ])
       .describe('Object type'),
+    super_package: z
+      .string()
+      .optional()
+      .describe(
+        'The package this package belongs to; a top-level package has none. The lock names the package by object_name alone.',
+      ),
   }),
 } as const;
 

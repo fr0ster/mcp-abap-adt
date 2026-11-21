@@ -336,13 +336,18 @@ class generic stays the result-values map `T extends AbapGitValues` (default
 `ResultValuesOf<typeof abapGitDocuments>` plus the facts defaults' values); `AbapGitValues` gains the
 new slots as optional keys; a new member's result is `FactsValue<T, slot>` — `T[slot]` when the map
 has it, else the `abapGitFacts` default's value; the constructor keeps `(connection, { logger,
-results })`, and `create` keeps its two overloads, returning `AdtAbapGitClient<ResultValuesOf<R>>`.
+results })`, and `create` keeps its two overloads (the shipped one unchanged; the results one
+returning `AdtAbapGitClient<AbapGitValuesOf<R>>`, below).
 **Facts-aware mappings:** today `ResultStrategiesOf<T>` rejects a facts reader and `ResultValuesOf<R>`
 maps one to `never` (`src/utils/resultStrategy.ts` ~L79; `AdtAbapGitClient.ts` ~L77), so the client uses
 `AbapGitStrategiesOf<T>` and `AbapGitValuesOf<R>` (in `abapGit/types.ts`): per slot, a facts slot
 (the new names) maps to `IAbapGitFactsResultStrategy<T[slot], F>` and back to its `T`; every legacy
-slot maps exactly as `ResultStrategiesOf` / `ResultValuesOf` do (they are reused for those keys). The
-constructor's `results` is `AbapGitStrategiesOf<T>`, `create<R>` returns
+slot maps exactly as `ResultStrategiesOf` / `ResultValuesOf` do (they are reused for those keys).
+**Required, optional, omitted** are told apart by the key's optionality (`{} extends Pick<R, K>`),
+not by `undefined` in its type, so the result is the same with `exactOptionalPropertyTypes` on and
+off: a required override gives its result; an optional one gives its result `|` the default facts
+value (it may be absent at run time, then the shipped facts answer); an omitted slot gives the
+default facts value. The constructor's `results` is `AbapGitStrategiesOf<T>`; `create<R>` returns
 `AdtAbapGitClient<AbapGitValuesOf<R>>`. Test `members.test.ts`, one case per member: method;
 path from `key`; query (`?create=true` only when true; `filename`, `version`); Content-Type and
 Accept (R6's exact Accept; R7 Content-Type `…repos.v2+xml`); body (R10's `abapgitstaging`); options
@@ -353,8 +358,11 @@ finished; **strict non-2xx with no analyser** (a `404` and a `500` are each the 
 success); a **custom `reposFacts` reader returning a count** (its `T` differs from R1's facts `F`)
 types the result as the count while its analyser still receives the facts; every legacy
 member's request and answer equal its 46.1.0 fixture (no new flags). Type tests
-`src/__tests__/typechecks/abapGitResultsFacts.ts` (a supplied facts reader infers its result through
-`create` and through `new` with its values map; the 46.x explicit generic still compiles) and
+`src/__tests__/typechecks/abapGitResultsFacts.ts`, compiled twice (`tsconfig.test.exact.json` with
+`exactOptionalPropertyTypes`, and the plain test config): a required count reader infers `number`, an
+optional one `number |` the default facts value, an omitted slot the default facts value — each
+through `create` and through `new` with its values map; the 46.x explicit generic still compiles.
+Mutation: map an optional slot to its reader's result alone → the optional case red; and
 `src/__tests__/typechecks/abapGitResults46.ts` (46.x `results`, the `{ logger, results }`
 constructor and the explicit `AdtAbapGitClient<ResultValuesOf<typeof results>>` of
 `AbapGit.test.ts` compile, both constructor paths) and
@@ -380,6 +388,14 @@ canary on the success and the throw path. Type probe `abapGitFactsExchange.ts`: 
 facts slot is `@ts-expect-error`. First failure: the analyser gets `error.response`. Mutations: pass
 the thrown response on → red; drop `noResend` on `push` → red; log `error.message` → the
 default-log case red.
+
+**T5.4a The batch invariant** (`src/batch/AdtBatchConnection.ts`, this PR). `makeAdtRequest`
+refuses any request carrying `noLog` or `noResend` before it records anything, in fixed words
+("this request cannot be recorded into a batch"), whenever the batch is open. Test
+`src/__tests__/unit/batch/batchRefusesFlagged.test.ts`: a request with `noLog`, one with `noResend`
+and one with both are each refused with zero recorded entries and the envelope unchanged; an
+ordinary request is still recorded. First failure: the flagged request is recorded. Mutation: check
+after recording → red.
 
 **T5.5 Docs.** `docs/usage/ERRATA.md` entries of spec §3.3; `README.md`, `docs/usage/CLIENT_API_REFERENCE.md`;
 the `CLAUDE.md` paragraph is the controller's, with the owner's approval of the text; CHANGELOG
@@ -508,12 +524,16 @@ error; cloud `PullAbapGitRepo` with `background: true` → refused, nothing sent
 Streamable HTTP instance under a request-only signal refuse link; an admitted call with an
 argument of the wrong type still gets the SDK's own validation error (delegation intact). Mutations:
 run admission after the SDK's validation → both seam cases red; skip the delegation → the
-validation case red. **The batch race:** the early raw batch check stays for precedence, and
-admission re-checks the batch state at dispatch, after the call takes its main-flow turn
-(`BaseMcpServer.ts` ~L2041, ordered with batch transitions) and before connection acquisition,
-discovery, R1 or credential resolution. Test (`admissionSeam.test.ts`): a call passes the early
-check, `BatchBegin` runs in between, the call is refused at dispatch with zero requests. Mutation:
-drop the dispatch-time re-check → red.
+validation case red. **Batch (owner's ruling: an invariant at the connection, not ordering).**
+Ordering cannot be made airtight: `HandlerBatch` begin, `DebugBatchBegin` / `HandlerDebugBatch` and
+background calls bypass the main flow (`handleHandlerBatch.ts` ~L105, `ownConnectionTools.ts` ~L19).
+The early raw batch check and a dispatch-time re-check (before connection acquisition, discovery,
+R1 or credential resolution) stay for precedence and the clear `batch_not_recordable` message; what
+guarantees the outcome is T5.4a: a batch connection refuses every request carrying `noLog` or
+`noResend` before recording it. Server overlap test (`admissionSeam.test.ts`): a batch opens after
+the dispatch re-check; the abapGit call is still refused, with no batch entry and no credential in
+any record (batch envelope, run record, log line). Mutation: drop the T5.4a refusal from the stand-in
+batch connection → red.
 
 **T6.5 Full tools** (spec §4.1): handlers over `AdtAbapGitClient` taking the handoff; snake_case
 arguments, no credential argument, functional descriptions; `ListAbapGitRepos` with §9.2 (a)
@@ -581,7 +601,7 @@ again from the server's T6.9 runs; a skipped or failed gate blocks.
 | Failure mode most likely to bite | Pinned by |
 |---|---|
 | A credential leaks through a resend, an SAP-endpoint redirect, a log line, or the raw response handed to a reader or analyser | T3.1, T3.2, T5.4, T6.8 |
-| Access checks: batch not first; link or pull reaching SAP under any restriction signal; R1 read twice, after `background` was stripped, or after dispatch | T6.4 |
+| Access checks: a flagged request recorded into a batch (T5.4a); batch not first; link or pull reaching SAP under any restriction signal; R1 read twice, after `background` was stripped, or after dispatch | T5.4a, T6.4 |
 | Endpoint binding: a near-miss or carried-over header binds; an argument URL on a key route; the legacy wrapper sends a foreign or rebuilt-elsewhere link | T5.1, T6.3 |
 | abapGit listed or callable where discovery lacks it; a failed discovery cached; deferred stdio logging on to list | T6.2 |
 | A cloud run misread: L0 taken for L1, a foreign R8 pairing, cleanup before a terminal state | T5.6, T6.4, T6.9 |

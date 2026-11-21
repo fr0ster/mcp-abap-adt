@@ -99,7 +99,7 @@ entry first reads the package tree, below). A call that names a package (`packag
 `super_package`; the `target.name` of a unit run whose `target.kind` is `package`: `RunAbapUnit`,
 compact `HandlerUnitTestRun`; the `name` of each `objects[]` entry an activation reads as a package,
 and compact `HandlerActivate`'s `object_name` with `object_type` `PACKAGE` or an `object_adt_type`
-read so; the `object_name` of each `R3TR DEVC` transport entry) or a request (`transport_request`,
+read so; the `object_name` of each transport entry of type `DEVC`) or a request (`transport_request`,
 `transport_number`, `target_number`) in its arguments runs only when each name matches its own
 list. A call that names several is refused whole when one is outside.
 
@@ -121,10 +121,10 @@ list. A call that names several is refused whole when one is outside.
 - **An activation's package entries** (`ActivateObjects`, `ActivateObjectLow`, compact
   `HandlerActivate`): an entry is a package when the activation reads its type as `DEVC/K` — the
   code in either case, the main type `DEVC`, or the name `package`; any other entry is not checked.
-- **A transport entry `R3TR DEVC`** (`MoveTransportObjects` and compact `HandlerTransportMoveObjects`
-  for each `objects[]` entry, `AddTransportObject` and `RemoveTransportObject` for the one object):
-  the type and the program id in any case, a program id left out standing for `R3TR`. Any other
-  entry is not checked.
+- **A transport entry of type `DEVC`** (`MoveTransportObjects` and compact
+  `HandlerTransportMoveObjects` for each `objects[]` entry, `AddTransportObject` and
+  `RemoveTransportObject` for the one object): the type in any case, whatever the program id
+  (`pgmid`). Any other entry is not checked.
 - A subtree entry makes the server read the package tree: a package below an allowed subtree is
   found by reading each super package up to the subtree's root. For a package create the new
   package's parent is the call's `super_package`; a top-level package has none, so its create

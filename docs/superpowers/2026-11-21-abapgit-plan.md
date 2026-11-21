@@ -338,7 +338,7 @@ new slots as optional keys; a new member's result is `FactsValue<T, slot>` — `
 has it, else the `abapGitFacts` default's value; the constructor keeps `(connection, { logger,
 results })`, and `create` keeps its two overloads, returning `AdtAbapGitClient<ResultValuesOf<R>>`.
 **Facts-aware mappings:** today `ResultStrategiesOf<T>` rejects a facts reader and `ResultValuesOf<R>`
-maps one to `never` (`src/.../resultStrategy.ts` ~L79; `AdtAbapGitClient.ts` ~L77), so the client uses
+maps one to `never` (`src/utils/resultStrategy.ts` ~L79; `AdtAbapGitClient.ts` ~L77), so the client uses
 `AbapGitStrategiesOf<T>` and `AbapGitValuesOf<R>` (in `abapGit/types.ts`): per slot, a facts slot
 (the new names) maps to `IAbapGitFactsResultStrategy<T[slot], F>` and back to its `T`; every legacy
 slot maps exactly as `ResultStrategiesOf` / `ResultValuesOf` do (they are reused for those keys). The

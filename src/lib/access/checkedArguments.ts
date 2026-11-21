@@ -5,8 +5,14 @@
  * one the `-ro` twin does not serve; tables on the tools that read a table's
  * rows by its name.
  */
-import type { ToolArgs, ToolDefinition } from '../handlers/interfaces.js';
-import { isArgObject } from '../toolArgValue.js';
+import { ACTIVATION_CODES, ACTIVATION_NAMES } from '../adtProjections.js';
+import { acceptedCodeOf } from '../adtTypeCode.js';
+import type {
+  ToolArgs,
+  ToolArgValue,
+  ToolDefinition,
+} from '../handlers/interfaces.js';
+import { isArgList, isArgObject } from '../toolArgValue.js';
 import type { AccessCall, NamedValue } from './accessChecks.js';
 
 /** The arguments that name a package. */
@@ -69,6 +75,20 @@ export const PACKAGE_TARGET_ARGUMENTS: ReadonlyMap<string, string> = new Map([
   ['HandlerUnitTestRun', 'target'],
 ]);
 
+/**
+ * The tools that activate a list of objects, `objects[]`, each a `name` and a
+ * `type`: an entry whose type the activation reads as a package (`DEVC/K`)
+ * names that package. `HandlerActivate` also takes one object by
+ * `object_name` with `object_type` or `object_adt_type`.
+ */
+const ACTIVATION_TOOLS: ReadonlySet<string> = new Set([
+  'ActivateObjects',
+  'ActivateObjectLow',
+  'HandlerActivate',
+]);
+const ACTIVATION_OBJECTS = 'objects';
+const ACTIVATION_ADT_TYPE = 'object_adt_type';
+
 /** The arguments a tool dispatches on. */
 const DISPATCH_ARGUMENTS: readonly string[] = [
   'object_type',
@@ -90,6 +110,11 @@ export interface CheckedArguments {
    * `PACKAGE`: the package itself, checked as a package.
    */
   readonly packageObject: string | undefined;
+  /**
+   * An activation (`ACTIVATION_TOOLS`): its package entries of `objects[]`
+   * are checked, and with `single` its one object named by `object_name`.
+   */
+  readonly activation: { readonly single: boolean } | undefined;
 }
 
 /** Every property a definition declares, on any variant. */
@@ -134,6 +159,16 @@ export function checkedArgumentsOf(
     declared.has(OBJECT_TYPE)
       ? OBJECT_NAME
       : undefined;
+  const activation =
+    changes &&
+    ACTIVATION_TOOLS.has(definition.name) &&
+    declared.has(ACTIVATION_OBJECTS)
+      ? {
+          single:
+            declared.has(OBJECT_NAME) &&
+            (declared.has(OBJECT_TYPE) || declared.has(ACTIVATION_ADT_TYPE)),
+        }
+      : undefined;
   const requests = changes
     ? REQUEST_ARGUMENTS.filter((argument) => declared.has(argument))
     : [];
@@ -147,7 +182,8 @@ export function checkedArgumentsOf(
     packageTarget === undefined &&
     requests.length === 0 &&
     table === undefined &&
-    packageObject === undefined
+    packageObject === undefined &&
+    activation === undefined
   ) {
     return undefined;
   }
@@ -158,6 +194,7 @@ export function checkedArgumentsOf(
     table,
     dispatch: DISPATCH_ARGUMENTS.find((argument) => declared.has(argument)),
     packageObject,
+    activation,
   };
 }
 
@@ -197,6 +234,56 @@ function packageTargetValues(
 }
 
 /**
+ * Whether an activation reads `type` as a package: the code `DEVC/K` in
+ * either case, its main type, or a name standing for it, as the activation's
+ * own boundary reads a type (`acceptedCodeOf`, `activationPlan`), on either
+ * variant.
+ */
+function activatesPackage(type: ToolArgValue): boolean {
+  if (typeof type !== 'string') return false;
+  return (
+    acceptedCodeOf(type, ACTIVATION_CODES.onprem, ACTIVATION_NAMES.onprem) ===
+      'DEVC/K' ||
+    acceptedCodeOf(type, ACTIVATION_CODES.cloud, ACTIVATION_NAMES.cloud) ===
+      'DEVC/K'
+  );
+}
+
+/**
+ * The packages an activation names, in the order the handler reads its
+ * arguments: a non-empty `objects[]` alone (each package entry's `name`, as
+ * `objects[].name`); else, with `single`, `object_name` when
+ * `object_adt_type` is read as a package or, without it, `object_type` is
+ * `PACKAGE`.
+ */
+function activationValues(
+  args: ToolArgs,
+  activation: CheckedArguments['activation'],
+): NamedValue[] {
+  if (activation === undefined) return [];
+  const objects = args[ACTIVATION_OBJECTS];
+  if (isArgList(objects) && objects.length > 0) {
+    const values: NamedValue[] = [];
+    for (const entry of objects) {
+      if (!isArgObject(entry) || !activatesPackage(entry.type)) continue;
+      const value = named(entry, 'name');
+      if (value !== undefined) {
+        values.push({ argument: `${ACTIVATION_OBJECTS}[].name`, value });
+      }
+    }
+    return values;
+  }
+  if (!activation.single) return [];
+  const adtType = args[ACTIVATION_ADT_TYPE];
+  const single =
+    typeof adtType === 'string' && adtType !== ''
+      ? activatesPackage(adtType)
+      : named(args, OBJECT_TYPE) === 'PACKAGE';
+  if (!single) return [];
+  return namedValues(args, [OBJECT_NAME]);
+}
+
+/**
  * Whether the call creates the package `package_name` under
  * `super_package`: `CreatePackage`, or `HandlerCreate` with `object_type`
  * `PACKAGE`. No other call: `CheckPackage` declares `super_package` and never
@@ -226,6 +313,7 @@ export function accessCallOf(
       ),
     ),
     ...packageTargetValues(args, checked.packageTarget),
+    ...activationValues(args, checked.activation),
   ];
   if (
     checked.packageObject !== undefined &&

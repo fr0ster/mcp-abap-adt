@@ -10,6 +10,7 @@ import {
   getPrompt,
 } from './objectPrompts.js';
 import type { AbapPrompt, PromptSource } from './types.js';
+import { unitTestPrompt } from './unitTestPrompt.js';
 import { updatePrompt } from './updatePrompt.js';
 
 /** The prompts `source` serves, in the order of the operations. */
@@ -21,6 +22,7 @@ export function abapPrompts(source: PromptSource): readonly AbapPrompt[] {
     deletePrompt,
     activatePrompt,
     checkPrompt,
+    unitTestPrompt,
   ]
     .map((prompt) => prompt(source))
     .filter((prompt) => prompt !== undefined);

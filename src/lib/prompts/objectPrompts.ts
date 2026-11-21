@@ -150,12 +150,11 @@ const OBJECT_TYPE_WORDS =
 const NAME_WORDS =
   "The object's name (for a function module, as the type's arguments state).";
 
-/** The prompt arguments every object prompt takes: `object_type`, completed from `served`, and `name`. */
-export function objectArguments(served: readonly ServedRow[]): z.ZodRawShape {
-  const values = served.map(({ type }) => type.toLowerCase());
+/** The prompt arguments every object prompt takes: `object_type`, completed from `served` (lowercase), and `name`. */
+export function objectArguments(served: readonly string[]): z.ZodRawShape {
   return {
     object_type: completable(z.string().describe(OBJECT_TYPE_WORDS), (typed) =>
-      completeFrom(values, typed),
+      completeFrom(served, typed),
     ),
     name: z.string().describe(NAME_WORDS),
   };
@@ -339,7 +338,10 @@ export function objectPrompt(
   return {
     name: operation,
     description: described(sentence, rows, alsoCalls),
-    argsSchema: { ...objectArguments(rows), ...extra },
+    argsSchema: {
+      ...objectArguments(rows.map(({ type }) => type.toLowerCase())),
+      ...extra,
+    },
     instruction: (args) => {
       const { row, name } = objectOf(operation, rows, args);
       return instruction(row, name, args);

@@ -545,7 +545,7 @@ describe('abapPrompts', () => {
   it('lists the prompts a binary serves, in the order of the operations', () => {
     assert.deepEqual(
       abapPrompts(coreOnprem).map(({ name }) => name),
-      ['create', 'get', 'update', 'delete', 'activate', 'check'],
+      ['create', 'get', 'update', 'delete', 'activate', 'check', 'unit_test'],
     );
     assert.deepEqual(
       abapPrompts(sourceOf(compactReadOnlyToolSet, 'cloud')).map(

@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [24.2.0] - 2026-11-21
 
+### Highlights
+
+Your MCP client can now offer ready-made ABAP requests as slash commands: nine prompts (`create`,
+`get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) that tell
+the model which tools to call, in order, with your values filled in. Every binary lists them, on
+premise and on BTP ABAP Cloud; the read-only ones list only the prompts that change nothing. A
+package with no super package can now be created, locked and unlocked, and under the allowed-packages
+list a package's lock and unlock are checked by the package itself. See [MCP Prompts](docs/user-guide/PROMPTS.md).
+
 ### Added
 
 - **MCP prompts**: the binaries list up to nine prompts beside their tools, the slash commands a client shows its user (`prompts/list`, `prompts/get`): `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used` and `transport` (one prompt with an `action` argument).
@@ -19,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The README opens with what the server does**, grouped by what a user wants (analyse, develop, test, transports, debug, govern, work with agents), each item linked to its page; its Features list is taken from the generated tool listings, and the docs indexes lead with the features. The package and MCP Registry descriptions and the npm keywords name the key capabilities.
 - **A denied `HandlerSystem` action leaves its search texts**: `HandlerSystem` lists its actions as `members` per variant, and its keywords and semantic sentence are grouped by action (`tools/tool-search.json`), so `HandlerSystem.where_used` or `HandlerSystem.transports` removes that action's words from `tools/list`. The sentence with every action offered reads as before, the ATC findings and results in one item.
 
 ### Fixed

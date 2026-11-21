@@ -128,7 +128,8 @@ list. A call that names several is refused whole when one is outside.
 - **A transport entry of type `DEVC`** (`MoveTransportObjects` and compact
   `HandlerTransportMoveObjects` for each `objects[]` entry, `AddTransportObject` and
   `RemoveTransportObject` for the one object): the type in any case, whatever the program id
-  (`pgmid`). Any other entry is not checked.
+  (`pgmid`). Any other entry is not checked. A remove takes the entry matching the given type,
+  name and position together, so the entry removed is the one whose name was checked.
 - A subtree entry makes the server read the package tree: a package below an allowed subtree is
   found by reading each super package up to the subtree's root. For a package create the new
   package's parent is the call's `super_package`; a top-level package has none, so its create
@@ -174,10 +175,11 @@ entries that match nothing in this binary.
 `BaseMcpServer` / `EmbeddableMcpServer` and `HandlerExporter` take an optional `accessChecks`
 (`IAccessChecks`): `listedAccessChecks(lists)` matches names and prefixes and makes one read, a
 package create's given `super_package`; `packageTreeAccessChecks(lists)` also matches subtree
-entries. Both read through the `IPackageReader` they are handed, and a read counts only when
-the document names the package read. A caller of `check` whose reader cannot read that parent
-(it throws, or answers no document of that package) gets `package_tree_unreadable`. An embedder
-may give its own strategy. `HandlerExporter` takes `deniedActions` (parsed with
+entries. Both read through the `IPackageReader` they are handed; a reader that throws refuses the
+call `package_tree_unreadable`. The server's own reader throws unless SAP's document names the
+package read. A reader an embedder gives must throw for a missing, empty or mismatched
+document: a resolved `undefined` reads as a top-level package and is accepted. An embedder may
+give its own strategy. `HandlerExporter` takes `deniedActions` (parsed with
 `parseDeniedEntry`); `withoutDenied(groups, denied)` and `registryOf(…, denied)` narrow groups.
 Handlers an embedder takes into its own hands (a registry of its own, its own parsing of the
 exported entries' arguments) are its own. See

@@ -268,7 +268,10 @@ batch mode. Over Streamable HTTP, send the `state_handle` `HandlerBatch` `action
 ## Prompts
 
 Every binary lists MCP prompts beside its tools: ready-made requests an MCP client offers the
-user (Claude Code shows them as `/mcp__<server>__<prompt>`). A prompt answers with an
+user. In [Claude Code's words](https://code.claude.com/docs/en/mcp.md#use-mcp-prompts-as-commands), "Claude Code lists each MCP prompt as
+`/servername:promptname (MCP)`. Typing `/mcp__servername__promptname` also runs it." For a
+server named `abap`: `/abap:get (MCP)` in the list, `/mcp__abap__get class ZCL_DEMO` typed.
+Other clients show prompts in their own pickers. A prompt answers with an
 instruction that names the tools to call, in order, with the user's values filled in; the model
 follows it with the tools of the same binary. Nine prompts, plain names:
 

@@ -44,7 +44,11 @@ import { RuntimeRunHandlersGroup } from '../../lib/handlers/groups/RuntimeRunHan
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 import type { ToolDefinition } from '../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
+import { abapPrompts } from '../../lib/prompts';
 import { listedJson } from '../helpers/listedJson';
+import { toolsNamed } from '../helpers/promptArguments';
+import { promptSourceFor } from '../helpers/promptSources';
+import { TRANSPORTS, toolSets } from '../helpers/servedTools';
 
 /**
  * Classes of literal, not a list of known offenders: a new example of the same
@@ -236,4 +240,83 @@ describe('descriptions carry no incidental literals', () => {
       assert.deepStrictEqual(offenders, []);
     });
   }
+});
+
+/**
+ * Test 7 of the prompts: a prompt's description and its arguments'
+ * descriptions follow the same rule, on every binary and kind; and every
+ * tool a prompt's description names is a tool that binary lists.
+ */
+describe('prompt descriptions carry no incidental literals and name only listed tools', () => {
+  const listings = TRANSPORTS.flatMap((transport) =>
+    Object.entries(toolSets[transport]).flatMap(([kind, set]) =>
+      (['onprem', 'cloud', undefined] as const).map((systemKind) => ({
+        listing: `${systemKind ?? 'none'} ${transport} ${kind}`,
+        source: promptSourceFor(set, systemKind, {
+          transport,
+          backgroundRuns: set.backgroundRuns,
+        }),
+      })),
+    ),
+  );
+  const known = new Set(
+    listings.flatMap(({ source }) => [...source.tools.keys()]),
+  );
+  const prompts = listings.flatMap(({ listing, source }) =>
+    abapPrompts(source).map((prompt) => ({ listing, source, prompt })),
+  );
+
+  it('reads every binary and kind', () => {
+    assert.equal(listings.length, 36);
+    assert.ok(prompts.length > 150);
+  });
+
+  /** A prompt's argument descriptions, each with its argument's name. */
+  const argumentsOf = (entry: (typeof prompts)[number]) =>
+    Object.entries(entry.prompt.argsSchema).map(
+      ([name, schema]) => [name, schema.description] as const,
+    );
+
+  it('every prompt argument is described', () => {
+    const silent = prompts.flatMap((entry) =>
+      argumentsOf(entry)
+        .filter(([, text]) => text === undefined || text === '')
+        .map(([name]) => `${entry.listing} ${entry.prompt.name}.${name}`),
+    );
+    assert.deepStrictEqual(silent, []);
+  });
+
+  for (const { name } of INCIDENTAL) {
+    it(`no prompt description names ${name}`, () => {
+      const offenders = prompts
+        .filter(({ prompt }) => literalsIn(prompt.description).includes(name))
+        .map(({ listing, prompt }) => `${listing} ${prompt.name}`);
+      assert.deepStrictEqual(offenders, []);
+    });
+
+    it(`no prompt argument description names ${name}`, () => {
+      const offenders = prompts.flatMap((entry) =>
+        argumentsOf(entry)
+          .filter(([, text]) => literalsIn(text ?? '').includes(name))
+          .map(
+            ([argument]) => `${entry.listing} ${entry.prompt.name}.${argument}`,
+          ),
+      );
+      assert.deepStrictEqual(offenders, []);
+    });
+  }
+
+  it('a prompt description names only tools its binary lists', () => {
+    const offenders = prompts.flatMap(({ listing, source, prompt }) =>
+      toolsNamed(prompt.description, known)
+        .filter((tool) => !source.tools.has(tool))
+        .map((tool) => `${listing} ${prompt.name}: ${tool}`),
+    );
+    assert.deepStrictEqual(offenders, []);
+    assert.ok(
+      prompts.every(
+        ({ prompt }) => toolsNamed(prompt.description, known).length > 0,
+      ),
+    );
+  });
 });

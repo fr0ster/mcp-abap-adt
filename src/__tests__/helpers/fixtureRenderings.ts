@@ -36,7 +36,7 @@ import {
 } from '../../lib/toolSet';
 import type { AdtStandIn } from './adtStandIn';
 import { argumentSchema, PROJECTED_ARGUMENTS } from './projectedArguments';
-import type { ListedTool, Listing } from './servedTools';
+import type { ListedTool, Listing, PromptListing } from './servedTools';
 
 // ---- listed-schemas.json ----
 
@@ -107,6 +107,84 @@ export function renderListedSchemas(fixture: {
       })
       .join(',\n');
   return `{\n  "schemas": {\n${section(fixture.schemas)}\n  },\n  "search": {\n${section(fixture.search)}\n  }\n}\n`;
+}
+
+// ---- listed-prompts.json ----
+
+/**
+ * The prompts every binary lists, per declared system type: `listings`
+ * names each `<system type> <binary>` and the prompts it lists (none on
+ * `legacy`); `prompts` holds, per prompt, each distinct listed value — the
+ * prompt as `prompts/list` answers it and what its arguments complete —
+ * with every listing that lists it. One line per listing and per value, so
+ * a change reads as that line.
+ */
+export function renderListedPrompts(
+  listings: readonly PromptListing[],
+): string {
+  const byPrompt = new Map<string, Map<string, Listed>>();
+  for (const { systemType, bin, prompts } of listings) {
+    for (const { prompt, completions } of prompts) {
+      const value = { prompt, completions };
+      const key = JSON.stringify(value);
+      const values = byPrompt.get(prompt.name) ?? new Map<string, Listed>();
+      byPrompt.set(prompt.name, values);
+      const known = values.get(key);
+      if (known === undefined) {
+        values.set(key, { listedBy: [`${systemType} ${bin}`], value });
+      } else {
+        known.listedBy.push(`${systemType} ${bin}`);
+      }
+    }
+  }
+  const listed = listings
+    .map(
+      ({ systemType, bin, prompts }) =>
+        `    ${JSON.stringify(`${systemType} ${bin}`)}: ${JSON.stringify(prompts.map(({ prompt }) => prompt.name))}`,
+    )
+    .join(',\n');
+  const values = [...byPrompt]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([name, each]) => {
+      const lines = [...each.values()].map(
+        (value) => `      ${JSON.stringify(value)}`,
+      );
+      return `    ${JSON.stringify(name)}: [\n${lines.join(',\n')}\n    ]`;
+    })
+    .join(',\n');
+  return `{\n  "listings": {\n${listed}\n  },\n  "prompts": {\n${values}\n  }\n}\n`;
+}
+
+/** Texts keyed `<prompt> <value>`: each distinct text with every listing answering it. */
+export type PromptTexts = Map<string, Map<string, Listed>>;
+
+/** Records `text` as answered for `key` by `listing`. */
+export function recordText(
+  texts: PromptTexts,
+  key: string,
+  listing: string,
+  text: string,
+): void {
+  const values = texts.get(key) ?? new Map<string, Listed>();
+  texts.set(key, values);
+  const known = values.get(text);
+  if (known === undefined)
+    values.set(text, { listedBy: [listing], value: text });
+  else known.listedBy.push(listing);
+}
+
+/** `prompt-texts.json`: per `<prompt> <value>`, each distinct text and every listing answering it, one line each. */
+export function renderPromptTexts(texts: PromptTexts): string {
+  const keys = [...texts]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([key, each]) => {
+      const lines = [...each.values()].map(
+        (value) => `    ${JSON.stringify(value)}`,
+      );
+      return `  ${JSON.stringify(key)}: [\n${lines.join(',\n')}\n  ]`;
+    })
+    .join(',\n');
+  return `{\n${keys}\n}\n`;
 }
 
 // ---- variant-surface.json ----

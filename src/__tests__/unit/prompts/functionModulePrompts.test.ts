@@ -15,13 +15,13 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import type { JsonValue } from '../../../lib/json';
+import { abapPrompts } from '../../../lib/prompts/prompts';
+import { registerPrompts } from '../../../lib/prompts/register';
 import type {
   AbapPrompt,
   PromptSource,
   PromptStep,
-} from '../../../lib/prompts';
-import { abapPrompts } from '../../../lib/prompts';
-import { registerPrompts } from '../../../lib/prompts/register';
+} from '../../../lib/prompts/types';
 import { updatePrompt } from '../../../lib/prompts/updatePrompt';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import { fullToolSet, type ToolSet } from '../../../lib/toolSet';

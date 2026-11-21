@@ -11,12 +11,12 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { readOnlyToolSet as compactReadOnlyToolSet } from '../../../../compact-ro/src/launcher';
-import type { PromptSource, ReadEntryField } from '../../../lib/prompts';
 import {
   ENTRY_ARGUMENT,
   OBJECT_DIRECTORY_TYPE,
 } from '../../../lib/prompts/transportEntry';
 import { transportPrompt } from '../../../lib/prompts/transportPrompt';
+import type { PromptSource, ReadEntryField } from '../../../lib/prompts/types';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import {
   fullReadOnlyToolSet,

@@ -32,7 +32,7 @@ import type {
   PromptName,
   PromptSource,
   PromptStep,
-} from '../../../lib/prompts';
+} from '../../../lib/prompts/types';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import { registryOf, type ToolSetKind } from '../../../lib/toolSet';
 import {

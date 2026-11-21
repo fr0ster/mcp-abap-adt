@@ -44,7 +44,6 @@ set, onprem an ECC or S/4HANA system, cloud SAP BTP ABAP Cloud. **New in 24.2.0*
 
 **Work with agents**
 - **MCP prompts** (**new in 24.2.0**): nine ready-made requests — `create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport` — that a client shows as slash commands, each answering the tools to call in order; every binary on onprem and cloud (the `-ro` ones `get`, `where_used`, `transport`, compact `-ro` also `check`) — [MCP Prompts](docs/user-guide/PROMPTS.md).
-- **Argument autocompletion** (**new in 24.2.0**): in a client that supports MCP completion, the prompts complete `object_type`, the transport `action` and the other closed arguments with exactly what this binary serves, after `--deny-actions` — [Autocompletion](docs/user-guide/PROMPTS.md#autocompletion).
 - **Batch mode**: record independent calls and send them to SAP together in one ADT batch request (compact binaries, `-ro` included) — [Batch Mode](docs/user-guide/BATCH_MODE.md).
 - **Background long reads**: where-used, search, package walks and other long reads answer a handle at once and are read or cancelled later, in every binary — [Background runs](docs/user-guide/README.md#background-runs-of-the-long-reads).
 - **Tool search texts**: every tool carries keywords for BM25 and a sentence for vector search beside its description — [Tool Search](docs/user-guide/TOOL_SEARCH.md).
@@ -419,7 +418,7 @@ A family on one system kind says so; the rest are onprem and cloud.
 - **🔗 Long session over Streamable HTTP** (`mcp-abap-adt-http`, `-compact-http` and their `-ro`): every tool takes an optional `state_handle` argument that routes the call to the instance holding that state (a lock, a batch, a debug session); `SessionOpen` / `SessionClose` (compact: `HandlerSession`) keep one instance and its SAP session for a run of calls and log it off at the close, or at the idle bound. See [`@mcp-abap-adt/http`](http/README.md#held-state-and-the-long-session)
 - **🧹 Leftover sessions** (stdio binaries): `ListLeftoverSessions`, and in the write binaries `LogoffLeftoverSession` — the SAP sessions an ended process left
 - **📦 Batch mode** (compact binaries): `HandlerBatch` — see [Batch mode](#batch-mode)
-- **💬 MCP prompts** (new in 24.2.0): nine prompts beside the tools, their arguments autocompleted — see [Prompts](#prompts)
+- **💬 MCP prompts** (new in 24.2.0): nine prompts beside the tools — see [Prompts](#prompts)
 - **🛡️ Access restrictions**: `--deny-actions`, `--allowed-packages`, `--allowed-requests`, `--denied-tables` / `--allowed-tables` — see [Access restrictions](#access-restrictions)
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))

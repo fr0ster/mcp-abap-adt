@@ -11,7 +11,7 @@ This directory contains documentation for end users of the MCP ABAP ADT Server.
 - **Debugger**: ABAP and AMDP debug sessions in the write binaries — [Debugger](DEBUGGER.md)
 - **Access restrictions**: deny tools, allow only listed packages, requests or tables; draft detection — [Access restrictions](ACCESS_RESTRICTIONS.md)
 - **Read-only and compact binaries**: the twelve binaries and the tools each serves — [Handler sets](HANDLERS_MANAGEMENT.md), [Compact tools](../../compact/docs/AVAILABLE_TOOLS.md)
-- **MCP prompts** (new in 24.2.0): nine slash-command prompts per binary and kind, with argument autocompletion — [Prompts](PROMPTS.md)
+- **MCP prompts** (new in 24.2.0): nine slash-command prompts per binary and kind — [Prompts](PROMPTS.md)
 - **Batch mode**: independent calls sent to SAP together (compact binaries) — [Batch Mode](BATCH_MODE.md)
 - **Background long reads**: a handle at once, the result read or cancelled later — [Background runs](README.md#background-runs-of-the-long-reads)
 - **Tool search**: keywords and semantic texts per tool — [Tool Search](TOOL_SEARCH.md)

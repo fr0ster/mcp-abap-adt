@@ -11,9 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Your MCP client can now offer ready-made ABAP requests as slash commands: nine prompts (`create`,
 `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) that tell
-the model which tools to call, in order, with your values filled in. In a client that supports MCP completion, their arguments autocomplete:
-`object_type` with the types this binary serves on the system kind, the transport `action` with the
-actions it serves. Every binary lists them, on
+the model which tools to call, in order, with your values filled in. Every binary lists them, on
 premise and on BTP ABAP Cloud; the read-only ones list only the prompts that change nothing. A
 structure package or a local (LOCAL) package can now be created, locked and unlocked with no super
 package, and under the allowed-packages

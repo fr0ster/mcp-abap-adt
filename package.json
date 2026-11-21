@@ -220,7 +220,7 @@
     "service-key"
   ],
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
-  "description": "ADT tool handlers and an embeddable MCP server for SAP ABAP on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: CRUD of ABAP, DDIC, CDS and RAP objects, where-used, ATC, unit tests, transports, the ABAP and AMDP debugger, MCP prompts with argument autocompletion and access restrictions (deny lists, allowed packages, requests and tables), the data tools off by default. The standalone server is @mcp-abap-adt/core.",
+  "description": "ADT tool handlers and an embeddable MCP server for SAP ABAP on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: CRUD of ABAP, DDIC, CDS and RAP objects, where-used, ATC, unit tests, transports, the ABAP and AMDP debugger, MCP prompts and access restrictions (deny lists, allowed packages, requests and tables), the data tools off by default. The standalone server is @mcp-abap-adt/core.",
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"

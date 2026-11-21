@@ -145,7 +145,7 @@ function fullRunRow(source: PromptSource, type: RunType): RunRow | undefined {
         ? []
         : [
             toolStep(result, [['run_id', stepValue(1, 'run_id')]], {
-              condition: 'When it answers a run_id',
+              condition: 'When it answers a run_id without a run_result',
             }),
           ]),
     ],

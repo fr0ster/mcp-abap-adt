@@ -19,7 +19,9 @@ export {
 export { matchServed, requiredArgument, type ServedType } from './served.js';
 export {
   hasProperty,
+  type ListedProperty,
   listedPromptTool,
+  listedProperty,
   longToolStep,
   membersOn,
   promptSourceOf,

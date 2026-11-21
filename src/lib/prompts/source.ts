@@ -87,6 +87,29 @@ export function requiredArguments(
   });
 }
 
+/** A property of a listed schema as a caller reads it: its description and the values its enum lists. */
+export interface ListedProperty {
+  readonly description: string | undefined;
+  /** The string values of its enum; empty when it lists none. */
+  readonly values: readonly string[];
+}
+
+/** The property `key` of `tool`'s listed schema, read on its input side; `undefined` when it has none. */
+export function listedProperty(
+  tool: ListedPromptTool,
+  key: string,
+): ListedProperty | undefined {
+  const property = z.toJSONSchema(tool.inputSchema, {
+    target: 'draft-7',
+    io: 'input',
+  }).properties?.[key];
+  if (typeof property !== 'object') return undefined;
+  return {
+    description: property.description,
+    values: (property.enum ?? []).filter((value) => typeof value === 'string'),
+  };
+}
+
 /** Optional parts of a step: everything but its tool, arguments and what is still to fill. */
 export type StepWords = Omit<PromptStep, 'tool' | 'arguments' | 'stillToFill'>;
 

@@ -57,12 +57,7 @@ function checkedOf(set: ToolSet): Map<string, CheckedArguments> {
   const out = new Map<string, CheckedArguments>();
   for (const [name, entry] of entriesOf(set)) {
     const checked = checkedArgumentsOf(entry.toolDefinition, READ_ONLY);
-    if (
-      checked !== undefined &&
-      (checked.packages.length > 0 ||
-        checked.packageTarget !== undefined ||
-        checked.requests.length > 0)
-    ) {
+    if (checked !== undefined && argumentsOf(checked).length > 0) {
       out.set(name, checked);
     }
   }
@@ -164,7 +159,7 @@ const FULL: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
     ['package_name', 'transport_request'],
   ],
   [['CreatePackage'], ['package_name', 'super_package', 'transport_request']],
-  [['CheckPackage'], ['package_name', 'super_package']],
+  [['CheckPackage'], ['package_name']],
   [['ValidateServiceBinding'], ['package_name']],
   [
     [
@@ -183,7 +178,8 @@ const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['HandlerCreate', ['package_name', 'super_package', 'transport_request']],
   ['HandlerUpdate', ['package_name', 'transport_request']],
   ['HandlerDelete', ['package_name', 'transport_request']],
-  ['HandlerLock', ['super_package']],
+  ['HandlerLock', ['object_name']],
+  ['HandlerUnlock', ['object_name']],
   ['HandlerTransportMoveObjects', ['transport_number', 'target_number']],
   ['HandlerTransportSortAndCompress', ['transport_number']],
   ['HandlerUnitTestRun', ['target.name']],
@@ -196,6 +192,7 @@ const argumentsOf = (checked: CheckedArguments): string[] =>
       ? []
       : [`${checked.packageTarget}.name`]),
     ...checked.requests,
+    ...(checked.packageObject === undefined ? [] : [checked.packageObject]),
   ].sort();
 
 describe('the checked package and request arguments', () => {
@@ -314,7 +311,47 @@ describe('accessCallOf', () => {
     requests: ['transport_request'],
     table: undefined,
     dispatch: 'object_type',
+    packageObject: undefined,
   };
+  const lock: CheckedArguments = {
+    packages: ['super_package'],
+    packageTarget: undefined,
+    requests: [],
+    table: undefined,
+    dispatch: 'object_type',
+    packageObject: 'object_name',
+  };
+
+  it('names a package lock by its object_name, and its super_package nowhere', () => {
+    for (const args of [
+      { object_type: 'PACKAGE', object_name: 'zfoo' },
+      { object_type: 'package', object_name: 'zfoo', super_package: 'ZROOT' },
+    ]) {
+      assert.deepEqual(accessCallOf('HandlerLock', lock, args)?.packages, [
+        { argument: 'object_name', value: 'ZFOO' },
+      ]);
+    }
+  });
+
+  it('names nothing for a lock of an object that is not a package', () => {
+    assert.equal(
+      accessCallOf('HandlerLock', lock, {
+        object_type: 'CLASS',
+        object_name: 'ZCL_FOO',
+      }),
+      undefined,
+    );
+  });
+
+  it('names a super_package only on a package create', () => {
+    assert.deepEqual(
+      accessCallOf('CheckPackage', checked, {
+        package_name: 'zfoo',
+        super_package: 'YROOT',
+      })?.packages,
+      [{ argument: 'package_name', value: 'ZFOO' }],
+    );
+  });
 
   it('names the string values, trimmed and upper-cased', () => {
     assert.deepEqual(
@@ -357,6 +394,7 @@ describe('accessCallOf on a run target', () => {
     requests: [],
     table: undefined,
     dispatch: undefined,
+    packageObject: undefined,
   };
 
   it('names a package target as target.name, trimmed and upper-cased', () => {

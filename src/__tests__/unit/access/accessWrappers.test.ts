@@ -323,6 +323,149 @@ describe('path 1: a server instance', () => {
   });
 });
 
+/**
+ * A package's lock, unlock and update are checked by the package itself —
+ * `object_name` with `object_type` `PACKAGE`, `package_name` on the update —
+ * and a lock's `super_package`, which the lock never sends, reaches no
+ * check: a package outside the allowed packages is refused with and without
+ * it, and an allowed one locks.
+ */
+describe('a package is checked by its own name', () => {
+  /** A server instance serving the compact write tools, with `checks`. */
+  function compactInstance(
+    connection: RecordingConnection,
+    checks: IAccessChecks,
+  ) {
+    const context = { connection, logger: noopLogger, systemType: 'onprem' };
+    return new EmbeddableMcpServer({
+      connection,
+      systemType: 'onprem',
+      logger: noopLogger,
+      accessChecks: checks,
+      handlersRegistry: new CompositeHandlersRegistry([
+        new CompactModifyHandlersGroup(context),
+      ]),
+    });
+  }
+
+  /** Stands for the handle the case's own lock of an allowed package answered. */
+  const HELD = '<held>';
+
+  const OBJECT_WORDS =
+    'object_name names a package outside the allowed packages: YFOO';
+
+  const REFUSED: ReadonlyArray<
+    readonly [string, string, Record<string, unknown>, string]
+  > = [
+    [
+      'a lock without super_package',
+      'HandlerLock',
+      { object_type: 'PACKAGE', object_name: 'YFOO' },
+      OBJECT_WORDS,
+    ],
+    [
+      'a lock with an allowed super_package',
+      'HandlerLock',
+      { object_type: 'PACKAGE', object_name: 'YFOO', super_package: 'ZROOT' },
+      OBJECT_WORDS,
+    ],
+    [
+      'an unlock',
+      'HandlerUnlock',
+      { object_type: 'PACKAGE', object_name: 'YFOO', lock_handle: HELD },
+      OBJECT_WORDS,
+    ],
+    [
+      'an update',
+      'HandlerUpdate',
+      {
+        object_type: 'PACKAGE',
+        package_name: 'YFOO',
+        source_code: '<pak:package/>',
+        lock_handle: HELD,
+      },
+      PACKAGE_WORDS,
+    ],
+  ];
+
+  for (const [what, tool, args, words] of REFUSED) {
+    it(`refuses ${what} of a package outside the allowed packages, sending nothing more`, async () => {
+      const connection = recordingConnection();
+      const client = await clientOf(
+        compactInstance(connection, allowedPackages('Z*')),
+      );
+      // A handle this instance holds: the lock of an allowed package.
+      const locked = await client.call('HandlerLock', {
+        object_type: 'PACKAGE',
+        object_name: 'ZHELD',
+      });
+      const handle = locked.body.lock_handle;
+      assert.equal(typeof handle, 'string', JSON.stringify(locked.body));
+      const before = connection.requests.length;
+      const answer = await client.call(
+        tool,
+        Object.fromEntries(
+          Object.entries(args).map(([key, value]) => [
+            key,
+            value === HELD ? handle : value,
+          ]),
+        ),
+      );
+      await client.close();
+      assert.equal(
+        answer.body.error,
+        'package_not_allowed',
+        JSON.stringify(answer.body),
+      );
+      assert.equal(answer.body.message, words);
+      assert.equal(connection.requests.length, before);
+    });
+  }
+
+  it('locks an allowed package, its super_package left unchecked', async () => {
+    const connection = recordingConnection();
+    const client = await clientOf(
+      compactInstance(connection, allowedPackages('Z*')),
+    );
+    const answer = await client.call('HandlerLock', {
+      object_type: 'PACKAGE',
+      object_name: 'ZFOO',
+      super_package: 'YROOT',
+    });
+    await client.close();
+    assert.equal(answer.isError, false, JSON.stringify(answer.body));
+    assert.ok(
+      connection.requests.some((request) =>
+        request.url.includes('/packages/zfoo?_action=LOCK'),
+      ),
+    );
+  });
+
+  it('locks an object of another type by its name, checking no package', async () => {
+    const connection = recordingConnection();
+    const client = await clientOf(
+      compactInstance(connection, allowedPackages('Z*')),
+    );
+    const answer = await client.call('HandlerLock', {
+      object_type: 'CLASS',
+      object_name: 'YCL_FOO',
+    });
+    await client.close();
+    assert.equal(answer.isError, false, JSON.stringify(answer.body));
+  });
+
+  it('checks a package by its own name, its super_package left unchecked', async () => {
+    const connection = recordingConnection();
+    const client = await clientOf(instance(connection, allowedPackages('Z*')));
+    const answer = await client.call('CheckPackage', {
+      package_name: 'ZFOO',
+      super_package: 'YROOT',
+    });
+    await client.close();
+    assert.notEqual(answer.body.error, 'package_not_allowed');
+  });
+});
+
 /** Groups on `connection`, their context carrying `checks`. */
 function groupsOn(connection: RecordingConnection, checks: IAccessChecks) {
   const context = {

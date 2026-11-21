@@ -227,11 +227,11 @@ function page(entries, surfaces) {
             ? '**Half:** leftover-session tools of `@mcp-abap-adt/lib`, stdio binaries only (the list and the logoff in both)\n\n'
             : half === 'batch'
               ? '**Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary\n\n'
-            : half === 'readonly'
-              ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
-            : half === 'data'
-              ? "**Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.\n\n"
-              : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
+              : half === 'readonly'
+                ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
+                : half === 'data'
+                  ? "**Half:** `@mcp-abap-adt/compact-readonly-entries` (`compactDataEntries`). **Opt-in:** served only by a binary started with `--enable-data-tools` (`MCP_ENABLE_DATA_TOOLS`, `enable-data-tools`); off by default. SAP API Policy FAQ v1.3 (June 2026), Q33, says ADT APIs are not intended for reading application tables, exporting business data or running SQL against SAP systems; whether to enable it is the customer's decision.\n\n"
+                  : `**Half:** \`@mcp-abap-adt/compact-${half}\`\n\n`;
     md += `**Description:** ${tool.description}\n\n`;
     const available = tool.available_in
       ? [...tool.available_in].sort().join(', ')
@@ -253,9 +253,14 @@ function page(entries, surfaces) {
   return md;
 }
 
-function main() {
-  const readOnly = requireFresh('compact-readonly-entries');
-  const modify = requireFresh('compact-modify');
+/**
+ * The page for the compact tools the given modules export: the same entries
+ * and surfaces whatever loaded them — the built packages here, the sources
+ * in the test that pins this page (`httpToolDocs.test.ts`).
+ */
+function compactPage(modules) {
+  const { readOnly, modify, debug, background, session, batch, toolSet } =
+    modules;
   const context = () => ({});
   const entries = [
     ...readOnly
@@ -263,44 +268,35 @@ function main() {
       .map((entry) => ({ half: 'readonly', entry })),
     // The data tool (HandlerGetData), opt-in: documented, served only with
     // --enable-data-tools.
-    ...readOnly
-      .compactDataEntries()
-      .map((entry) => ({ half: 'data', entry })),
+    ...readOnly.compactDataEntries().map((entry) => ({ half: 'data', entry })),
     ...modify
       .compactModifyEntries(context)
       .map((entry) => ({ half: 'modify', entry })),
     // The debugger tools live in lib (`src/lib/compact/debug`), served by
     // the compact write binaries.
-    ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
-      .compactDebugEntries()
-      .map((entry) => ({ half: 'debug', entry })),
+    ...debug.compactDebugEntries().map((entry) => ({ half: 'debug', entry })),
     // The debugger batch beside them (`HandlerDebugBatch`).
-    ...requireFresh('.', path.join('lib', 'compact', 'debug', 'group.js'))
+    ...debug
       .compactDebugBatchEntries()
       .map((entry) => ({ half: 'debug', entry })),
     // The background-run tools live in lib (`src/lib/compact/backgroundRuns`),
     // served by the compact write binaries.
-    ...requireFresh(
-      '.',
-      path.join('lib', 'compact', 'backgroundRuns', 'group.js'),
-    )
+    ...background
       .compactBackgroundRunEntries()
       .map((entry) => ({ half: 'background', entry })),
     // The leftover-session tools live in lib (`src/lib/compact/session`),
     // served by every compact stdio binary.
-    ...requireFresh('.', path.join('lib', 'compact', 'session', 'group.js'))
+    ...session
       .compactLeftoverSessionEntries()
       .map((entry) => ({ half: 'session', entry })),
     // Batch mode lives in lib (`src/lib/compact/batch`), served by every
     // compact binary.
-    ...requireFresh('.', path.join('lib', 'compact', 'batch', 'group.js'))
-      .compactBatchEntries()
-      .map((entry) => ({ half: 'batch', entry })),
+    ...batch.compactBatchEntries().map((entry) => ({ half: 'batch', entry })),
   ];
   // The Streamable HTTP surface of both compact sets, from the registration
   // the HTTP server uses (lib's `streamableHttpSurface`).
   const { compactToolSetOf, compactReadOnlyToolSetOf, streamableHttpSurface } =
-    requireFresh('.', path.join('lib', 'toolSet.js'));
+    toolSet;
   // Documented with the data tool served, as the pages list it.
   const documented = { dataTools: true };
   const surfaces = [
@@ -320,9 +316,32 @@ function main() {
       documented,
     ),
   ];
+  return { count: entries.length, text: page(entries, surfaces) };
+}
+
+function main() {
+  const debug = requireFresh(
+    '.',
+    path.join('lib', 'compact', 'debug', 'group.js'),
+  );
+  const { count, text } = compactPage({
+    readOnly: requireFresh('compact-readonly-entries'),
+    modify: requireFresh('compact-modify'),
+    debug,
+    background: requireFresh(
+      '.',
+      path.join('lib', 'compact', 'backgroundRuns', 'group.js'),
+    ),
+    session: requireFresh(
+      '.',
+      path.join('lib', 'compact', 'session', 'group.js'),
+    ),
+    batch: requireFresh('.', path.join('lib', 'compact', 'batch', 'group.js')),
+    toolSet: requireFresh('.', path.join('lib', 'toolSet.js')),
+  });
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, page(entries, surfaces), 'utf8');
-  console.log(`✅ ${entries.length} compact tools documented: ${OUT}`);
+  fs.writeFileSync(OUT, text, 'utf8');
+  console.log(`✅ ${count} compact tools documented: ${OUT}`);
 }
 
 if (require.main === module) {
@@ -334,4 +353,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { page, parametersOf, httpSection };
+module.exports = { page, compactPage, parametersOf, httpSection };

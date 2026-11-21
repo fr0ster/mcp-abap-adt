@@ -172,6 +172,7 @@ const FULL: ReadonlyArray<readonly [readonly string[], readonly string[]]> = [
   ],
   [['MoveTransportObjects'], ['transport_number', 'target_number']],
   [['RunAbapUnit'], ['target.name']],
+  [['ActivateObjects'], ['objects[].name']],
 ];
 
 const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
@@ -183,6 +184,7 @@ const COMPACT: ReadonlyArray<readonly [string, readonly string[]]> = [
   ['HandlerTransportMoveObjects', ['transport_number', 'target_number']],
   ['HandlerTransportSortAndCompress', ['transport_number']],
   ['HandlerUnitTestRun', ['target.name']],
+  ['HandlerActivate', ['object_name', 'objects[].name']],
 ];
 
 const argumentsOf = (checked: CheckedArguments): string[] =>
@@ -193,6 +195,8 @@ const argumentsOf = (checked: CheckedArguments): string[] =>
       : [`${checked.packageTarget}.name`]),
     ...checked.requests,
     ...(checked.packageObject === undefined ? [] : [checked.packageObject]),
+    ...(checked.activation === undefined ? [] : ['objects[].name']),
+    ...(checked.activation?.single === true ? ['object_name'] : []),
   ].sort();
 
 describe('the checked package and request arguments', () => {
@@ -312,6 +316,7 @@ describe('accessCallOf', () => {
     table: undefined,
     dispatch: 'object_type',
     packageObject: undefined,
+    activation: undefined,
   };
   const lock: CheckedArguments = {
     packages: ['super_package'],
@@ -320,6 +325,7 @@ describe('accessCallOf', () => {
     table: undefined,
     dispatch: 'object_type',
     packageObject: 'object_name',
+    activation: undefined,
   };
 
   it('names a package lock by its object_name, and its super_package nowhere', () => {
@@ -395,6 +401,7 @@ describe('accessCallOf on a run target', () => {
     table: undefined,
     dispatch: undefined,
     packageObject: undefined,
+    activation: undefined,
   };
 
   it('names a package target as target.name, trimmed and upper-cased', () => {

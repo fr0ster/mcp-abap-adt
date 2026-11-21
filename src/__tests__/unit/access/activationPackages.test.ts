@@ -3,7 +3,8 @@
  * `HandlerActivate`'s single form) checks that package against the allowed
  * packages before the activation is sent: every spelling the activation
  * reads as `DEVC/K` (the code in either case, the main type `DEVC`, the
- * name `package`, compact `object_type` `PACKAGE`). A non-package entry is
+ * name `package`, compact `object_type` `PACKAGE` — the schema takes that
+ * one in upper case only). A non-package entry is
  * not checked: the server makes no call to find an object's package.
  */
 import assert from 'node:assert/strict';
@@ -154,7 +155,6 @@ for (const tool of ['ActivateObjects', 'HandlerActivate'] as const) {
 describe('HandlerActivate: the single form', () => {
   for (const args of [
     { object_type: 'PACKAGE', object_name: 'yfoo' },
-    { object_type: 'package', object_name: 'YFOO' },
     { object_adt_type: 'DEVC/K', object_name: 'YFOO' },
     { object_adt_type: 'devc', object_name: 'YFOO' },
   ]) {

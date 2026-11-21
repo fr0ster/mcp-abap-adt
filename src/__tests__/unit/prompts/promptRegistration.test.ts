@@ -31,6 +31,7 @@ import {
   registerAbapPrompts,
 } from '../../../lib/prompts';
 import { registryOf, type ToolSet } from '../../../lib/toolSet';
+import { completionOf } from '../../helpers/promptCalls';
 import { promptSourceFor } from '../../helpers/promptSources';
 import { KINDS, TRANSPORTS, toolSets } from '../../helpers/servedTools';
 
@@ -160,6 +161,25 @@ describe('BaseMcpServer lists the prompts', () => {
       assert.ok(source);
       assert.ok(source.tools.has('GetClass'), 'the first registration stays');
       assert.ok(source.tools.has('HandlerCreate'), 'the second one joins');
+      // Each prompt serves at least the types the compact set alone serves:
+      // a full read the first registration listed hides no compact update.
+      const alone = new PromptServer(
+        registryOf(compactToolSet, 'stdio', { dataTools: false }),
+        { systemType: 'onprem', backgroundRuns: true },
+      );
+      for (const prompt of alone.prompts) {
+        const joined = server.prompts.find(({ name }) => name === prompt.name);
+        assert.ok(joined, `${prompt.name} stays listed`);
+        const closed = prompt.name === 'transport' ? 'action' : 'object_type';
+        const served = new Set(await completionOf(joined, closed));
+        assert.deepEqual(
+          (await completionOf(prompt, closed)).filter(
+            (value) => !served.has(value),
+          ),
+          [],
+          `${prompt.name} serves the compact types`,
+        );
+      }
     } finally {
       await client.close();
     }

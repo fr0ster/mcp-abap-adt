@@ -546,25 +546,14 @@ describe('LockObjectLow', () => {
     assert.equal(call?.analyse, analyseLock);
   });
 
-  it('requires super_package for package locking, and uppercases it when present', async () => {
+  it('locks a package by its name alone, upper-cased', async () => {
     fakeClient = seen.client;
-    const missing: any = await handleLockObject(context as any, {
-      object_type: 'package',
-      object_name: 'ZPKG',
-    });
-    assert.equal(missing.isError, true);
-    assert.equal(seen.calls.length, 0);
-
     await handleLockObject(context as any, {
       object_type: 'package',
       object_name: 'zpkg',
-      super_package: 'zsuper',
     });
     const call = seen.calls.filter((c) => c.member === 'lock').at(-1);
-    assert.deepStrictEqual(call?.args[0], {
-      packageName: 'ZPKG',
-      superPackage: 'ZSUPER',
-    });
+    assert.deepStrictEqual(call?.args[0], { packageName: 'ZPKG' });
   });
 
   it('behavior_definition and metadata_extension reach their own factory', async () => {

@@ -113,7 +113,7 @@ describe('a token names its member with the arguments it takes', () => {
       'LOCAL_TYPES(class_name*, lock_handle*, transport_request)',
     );
     assert.equal(lockToken('CLASS'), 'CLASS(object_name*)');
-    assert.equal(lockToken('PACKAGE'), 'PACKAGE(object_name*, super_package*)');
+    assert.equal(lockToken('PACKAGE'), 'PACKAGE(object_name*)');
     assert.equal(unlockToken('CLASS'), 'CLASS(object_name*, lock_handle*)');
     assert.equal(checkToken('CLASS'), 'CLASS(object_name*)');
     assert.equal(readToken('CLASS'), 'CLASS(class_name*)');

@@ -12,10 +12,6 @@ import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { format } from 'node:util';
 import {
-  TOOL_DEFINITION as HandlerLock,
-  handleHandlerLock,
-} from '../../../compact-modify/src/handlers/handleHandlerLock';
-import {
   TOOL_DEFINITION as HandlerCheckRun,
   handleHandlerCheckRun,
 } from '../../../compact-readonly-entries/src/handlers/handleHandlerCheckRun';
@@ -41,7 +37,7 @@ const VARIANTS: readonly ProjectionVariant[] = ['onprem', 'cloud'];
 
 /** One object type of one tool, and the arguments it needs. */
 interface Need {
-  readonly tool: 'HandlerLock' | 'HandlerValidate';
+  readonly tool: 'HandlerValidate';
   readonly objectType: string;
   /** The arguments the type needs, each with a value. */
   readonly needed: Readonly<Record<string, string>>;
@@ -56,14 +52,6 @@ interface Need {
 }
 
 const NEEDS: readonly Need[] = [
-  {
-    tool: 'HandlerLock',
-    objectType: 'PACKAGE',
-    needed: { super_package: 'ZPKG_SUPER' },
-    rest: { object_name: 'ZPKG_A' },
-    token: 'PACKAGE(object_name*, super_package*)',
-    refusal: () => 'super_package is required for package locking.',
-  },
   {
     tool: 'HandlerValidate',
     objectType: 'BEHAVIOR_DEFINITION',
@@ -130,11 +118,6 @@ const NEEDS: readonly Need[] = [
 
 /** Each tool's entry: the model's call, parsed with the tool's schema first. */
 const TOOLS = {
-  HandlerLock: {
-    definition: HandlerLock,
-    send: (context: HandlerContext, args: Record<string, string>) =>
-      defineTool(HandlerLock, handleHandlerLock).call(context, args),
-  },
   HandlerValidate: {
     definition: HandlerValidate,
     send: (context: HandlerContext, args: Record<string, string>) =>

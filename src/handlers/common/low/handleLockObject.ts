@@ -79,10 +79,6 @@ export const TOOL_DEFINITION = {
         'service_binding',
       ])
       .describe('Object type'),
-    super_package: z
-      .string()
-      .optional()
-      .describe('Super package (required for package locking)'),
   }),
 } as const;
 
@@ -118,7 +114,7 @@ export async function lockObject(
   args: Omit<LockObjectArgs, 'object_type'> & { object_type: LockKind },
 ) {
   const { connection, logger } = context;
-  const { object_name, object_type, super_package } = args;
+  const { object_name, object_type } = args;
 
   if (!object_name || !object_type) {
     return return_error(new Error('object_name and object_type are required'));
@@ -126,9 +122,8 @@ export async function lockObject(
 
   const objectType = object_type;
 
-  // Two request-shape checks that stay ahead of the client call, exactly
-  // where they lived before this migration: `lock()`'s config does not
-  // itself enforce either.
+  // A request-shape check that stays ahead of the client call: `lock()`'s
+  // config does not itself enforce it.
   // Set for a function module only, and read only for one.
   let functionGroupName = '';
   let functionModuleName = '';
@@ -142,11 +137,6 @@ export async function lockObject(
       .toUpperCase()
       .split('|');
   }
-  if (objectType === 'package' && !super_package) {
-    return return_error(
-      new Error('super_package is required for package locking.'),
-    );
-  }
 
   const objectName = object_name.toUpperCase();
   const client = createAdtClient(connection, logger);
@@ -159,14 +149,9 @@ export async function lockObject(
     try {
       const locked = await createAdtClient(lockOn.connection, logger)
         .getPackage(resultsFor(packageDocuments))
-        .lock(
-          {
-            packageName: objectName,
-            // Required for a package, refused above when absent.
-            superPackage: (super_package ?? '').toUpperCase(),
-          },
-          { analyse: analyseLock },
-        );
+        // A package is locked by its name alone: SAP's lock reads no super
+        // package, and a top-level package has none.
+        .lock({ packageName: objectName }, { analyse: analyseLock });
       if (locked.ok) lockOn.keep(locked.getResult().value);
       else await lockOn.drop();
       return locked;

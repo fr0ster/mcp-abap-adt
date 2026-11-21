@@ -197,7 +197,9 @@ of every `IAdtAbapGitClient` member. New exports:
 Tests (`src/__typechecks__/abapGit.ts`, `downstreamStillCompiles.ts`; first failure: missing
 exports): an existing caller of every old overload compiles, `pull` without `branchName` and with
 `remoteUser`/`remotePassword` included; an existing class implementing the four-parameter
-`IAdtAbapGitClient` compiles; **no previously compiling call breaks**
+`IAdtAbapGitClient` compiles; **no previously compiling call breaks, except the one stated edge
+case: an options variable carrying an undeclared `credentials` property** (rejected, or the new
+form when its value is a credential or `null`; pinned by its own type test)
 (`src/__typechecks__/abapGitLegacyCalls.ts`): `getErrorLog`, and `link`, `pull` and
 `checkExternalRepo` with the deprecated fields, called with no callback, a verdict-only analyser, a
 wire-reading analyser (`answer?: IAdtWireResponse`) and a custom wire reader, all compile with the

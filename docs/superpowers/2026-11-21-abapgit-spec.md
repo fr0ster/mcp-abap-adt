@@ -126,17 +126,20 @@ Contracts in `@mcp-abap-adt/interfaces-adt` (`src/adt/IAdtAbapGit.ts`), readings
 `AdtAbapGitClient` (`clients/abapGit/*`). One member per endpoint and method; each answers
 through the result strategy the client was built with (shipped default: the document as it
 arrived) and is judged by the caller's `analyse` (default strict: every non-2xx an error).
-**Precedence:** for a new member called with `credentials`, and for `getRunLog`, the
-structured contract of §5.3 takes precedence over both defaults — the shipped default result is
+**Precedence:** for every **new form** — each new member below, and the new form of `link` and
+`checkExternalRepo` (its `credentials` option given: a credential, or `null` for an anonymous call)
+— credentialed or anonymous, the structured contract of §5.3 takes precedence over both defaults — the shipped default result is
 the facts reading (`abapGitFacts`), not the raw document, and the error carries the status and
 the T100 key only, never SAP's text (§3.3's "error with SAP's text" applies to the other
 members). **Legacy forms unchanged (owner's ruling, keeping the release a minor):**
 `getErrorLog(logLink)`, `pull({ pullLink })` and the `remoteUser`/`remotePassword` forms of `link`,
-`pull` and `checkExternalRepo` keep today's wire-typed callbacks, behaviour and answer, marked
-`@deprecated` with a pointer to `getRunLog`, the key-based `pullRepo` and the `credentials` form.
+`pull` and `checkExternalRepo` (and their calls without `credentials`) keep today's wire-typed
+callbacks, wire fields, behaviour and answer, marked `@deprecated` with a pointer to `getRunLog`,
+the key-based `pullRepo` and the new form.
 Their only changes are additive and refuse only new misuse: the link validation of `getErrorLog`
 and `pull` below, and `credentials?: never` on their options; no previously compiling call breaks.
-The server uses only the new members. No
+The server uses only the new forms and the existing `listRepos` and `unlink`, never a legacy
+form (pinned by test). No
 retry, no timeout (`timeout: 0`), no lenient reading, no polling. Every member addressed by a
 repository builds its path from `key` (URL-encoded segment); no member takes a URL to send to,
 except the existing `pull`/`getErrorLog` below.
@@ -151,15 +154,18 @@ except the existing `pull`/`getErrorLog` below.
 | R2 v3/v4 | `abapgitrepo:remoteUser`, `abapgitrepo:remotePassword` |
 | R4, R5 `repo.v3` | `abapgitrepo:remoteUser`, `abapgitrepo:remotePassword` (`ABAPGIT_ST_REPO_PULL_V2`, `ZABAPGIT_ST_REPO_PULL`) |
 | R4, R5 `pull.req.v1` | `abapgitpullrequest:user`, `abapgitpullrequest:password` (`ABAPGIT_ST_REPO_SELECTIVE_PULL`) |
-| R13, R14 | `abapgitexternalrepo:user`, `abapgitexternalrepo:password` (`…INFO_EXT_REQ`, `…RQ_V2`) |
+| R13, R14 | `abapgitexternalrepo:user`, `abapgitexternalrepo:password` (`…INFO_EXT_REQ`, `…RQ_V2`) — the new form only |
 | R6, R9–R12, R15 | header `Username`, header `Password` = base64 of the password |
 
 **Defect in the installed client:** `checkExternalRepo` writes `remoteUser`/`remotePassword`
 into R13 (`xmlBuilder.js`, `buildExternalRepoInfoBody`); the transformation is
 `extensible="deep"` with optional fields, so SAP ignores them and a private repository is
-checked anonymously (Code; the effect on a private repository is unmeasured). Fixed in this
-minor. The deprecated `remoteUser`/`remotePassword` argument fields stay (minor), map to the
-same wire fields and keep today's answer (above); giving both forms is a type error.
+checked anonymously (Code; the effect on a private repository is unmeasured). **Fixed in the new
+form only:** the new `checkExternalRepo` form writes `abapgitexternalrepo:user` / `password`. The
+deprecated `remoteUser`/`remotePassword` form keeps 46.1.0's wire fields exactly (R2/R4
+`remoteUser`/`remotePassword` as before, and on R13 the ignored `remoteUser`/`remotePassword`), so
+on R13 it never sent a credential SAP reads — the reason it is deprecated. Giving both forms is a
+type error.
 
 No credential is part of a result, an `IAdtError`, or the request an error describes (`method`,
 `url`).
@@ -169,7 +175,7 @@ No credential is part of a result, an `IAdtError`, or the request an error descr
 | Member | Route | Arguments (options: `IAdtAnalyseOptions<E>`, `credentials?`, and `headers` where noted) | Result slot |
 |---|---|---|---|
 | `listRepos` | R1 | — | `repos` |
-| `link` | R2 v3 | `package`, `url`, `branchName`, `transportRequest?`, `folderLogic?` (cloud); `headers` | `linked` |
+| `link` | R2 v3 | `package`, `url`, `branchName`, `transportRequest?`, `folderLogic?` (cloud); `headers`. New form: `credentials: IAbapGitCredentials \| null` required (`null` = anonymous), args without `remoteUser`/`remotePassword`; the legacy form's options carry `credentials?: never`, so the forms never mix, and at run time the new form is `options.credentials !== undefined` | `linked` |
 | `unlink` | R3 | `repositoryId`; its `transportRequest` sends a `corrNr` neither handler reads (kept, documented) | `unlinked` |
 | `pullRepo` (new, key-based) | R4 | `key`, `branchName` (required; the server passes R1's), `transportRequest?`, `selection?` (with it: `pull.req.v1`; the server never sends one, §4.3); `headers` | `pulled` |
 | `pull` (existing) | R4 by `pullLink` | deprecated; the same wrapper: `pullLink` must be exactly `/sap/bc/adt/abapgit/repos/{key}/pull`, its key goes to `pullRepo`'s path builder, anything else refused; an accepted link keeps today's request, callbacks and answer | `pulled` |
@@ -182,7 +188,7 @@ No credential is part of a result, an `IAdtError`, or the request an error descr
 | `push` | R10 | `key`, `staged: IAbapGitStagedObject[]`, `comment: { text; author: { name; email }; committer: { name; email } }` — all required; the library builds the `abapgitstaging` document | `pushed` (`nothing`) |
 | `checkRepo` | R11 | `key` | `checked` (`nothing`) |
 | `getFile` | R12 | `key`, `filename`, `version: 'local' \| 'remote'` | `file` (text) |
-| `checkExternalRepo` | R13 | `url`; `headers` | `externalRepo` |
+| `checkExternalRepo` | R13 | `url`; `headers`. New form as `link`'s (`credentials: IAbapGitCredentials \| null`) | `externalRepo` |
 | `getBranchInfo` | R14 | `url`, `branch`, `package`; `headers` | `branchInfo` |
 | `switchBranch` | R15 | `key`, `branch`, `create: boolean` (required; `?create=true` only when true) | `switched` (`nothing`) |
 
@@ -234,9 +240,9 @@ R7 answers a fixed text (Code); onprem R4 ignores `branchName` (Code); R11/R15 s
     write it read before the socket died.
   The first failure is then the caller's answer.
 
-adt-clients sends both flags on **every abapGit write** (R2, R3, R4, R5, R10, R14, R15), on every
-new member called with `credentials`, and on `getRunLog` — whether a credential is attached or
-not (the legacy forms of §3 keep today's options), since a write carries user-given content (R10's commit message, author and
+adt-clients sends both flags on **every new-form write** (R2, R4, R5, R10, R14, R15) and on `unlink`
+(R3, an existing write that is not deprecated), on every new form called with or without a
+credential, and on `getRunLog` — never on a legacy form of §3, which keeps today's options, since a write carries user-given content (R10's commit message, author and
 committer) and may already have run when a replay would start.
 
 ## 4. Server tools
@@ -248,6 +254,8 @@ Common to all:
   anything is sent and before any credential is resolved; no batch entry and no number is taken
   (`batch_not_recordable`, the existing refusal for calls that cannot be recorded).
 - **Arguments** never carry a credential. A repository is addressed by `repository_key`.
+- **Client forms:** every call goes through a new form of `AdtAbapGitClient` (anonymous ones with
+  `credentials: null`) or the existing `listRepos` / `unlink`; never a legacy form (§3).
 - **Answer:** the adt-strategies reading as JSON; for a credentialed call and R8, only the
   structured fields of §5.3.
 
@@ -463,8 +471,9 @@ no attempt is made to detect a credential in them.
 - **R10's commit message** (the user's `comment`) is sent to SAP and excluded from every log line
   and from the background-run record (which keeps tool, object and start only).
 - Wire logging is off for these requests (`noLog`, §3.4).
-- Calls with no credential and not R8 (R1, R3, R7, R13 for an unbound URL…) keep the ordinary
-  answer. R1's answer is the repository list SAP keeps (cloud strips credentials from URLs at
+- Answers through the new forms are the facts reading, credentialed or anonymous (R13 for an
+  unbound URL included; R7 keeps its fixed text as `text`). R1 and R3 (existing `listRepos`,
+  `unlink`) keep the ordinary answer. R1's answer is the repository list SAP keeps (cloud strips credentials from URLs at
   link, Code; userinfo is refused before link).
 
 ### 5.4 Hosts (Code, both systems, 2026-11-21, read-only)

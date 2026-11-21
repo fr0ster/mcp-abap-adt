@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-11-21
+
+### Fixed
+
+- **A top-level package can be created, locked and unlocked.** A package bound to a transport layer with no super package was refused before any request: `CreatePackage` and compact `HandlerCreate` `PACKAGE` required `super_package`, and `LockObjectLow` and compact `HandlerLock` `PACKAGE` answered "super_package is required for package locking.". SAP's package lock reads the package by its name alone, and adt-clients' `AdtPackage.lock()` sends the LOCK from the name alone; a create with no super package writes an empty `<pak:superPackage/>` (measured on premise, 2026-11-21: create `201`, LOCK `200`, UNLOCK `200`).
+  - `CreatePackage` and `HandlerCreate` `PACKAGE`: `super_package` is optional, the package this package belongs to.
+  - `LockObjectLow` and `HandlerLock` `PACKAGE` take the package's name alone: `super_package` leaves their schemas (a call that still passes it is accepted, the argument dropped), and `HandlerLock`'s description names `PACKAGE(object_name*)`. Under the allowed-packages list a package lock is no longer checked by that argument, which named the parent and was never sent.
+
 ## [<V>] - <release day>
 
 ### Added

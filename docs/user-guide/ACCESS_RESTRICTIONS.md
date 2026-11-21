@@ -172,9 +172,12 @@ entries that match nothing in this binary.
 ## Embedding
 
 `BaseMcpServer` / `EmbeddableMcpServer` and `HandlerExporter` take an optional `accessChecks`
-(`IAccessChecks`): `listedAccessChecks(lists)` matches names and prefixes and reads nothing;
-`packageTreeAccessChecks(lists)` also matches subtree entries through the `IPackageReader` it is
-handed; an embedder may give its own. `HandlerExporter` takes `deniedActions` (parsed with
+(`IAccessChecks`): `listedAccessChecks(lists)` matches names and prefixes and makes one read, a
+package create's given `super_package`; `packageTreeAccessChecks(lists)` also matches subtree
+entries. Both read through the `IPackageReader` they are handed, and a read counts only when
+the document names the package read. A caller of `check` whose reader cannot read that parent
+(it throws, or answers no document of that package) gets `package_tree_unreadable`. An embedder
+may give its own strategy. `HandlerExporter` takes `deniedActions` (parsed with
 `parseDeniedEntry`); `withoutDenied(groups, denied)` and `registryOf(…, denied)` narrow groups.
 Handlers an embedder takes into its own hands (a registry of its own, its own parsing of the
 exported entries' arguments) are its own. See

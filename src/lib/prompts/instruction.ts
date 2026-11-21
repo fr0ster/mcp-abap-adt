@@ -24,7 +24,7 @@ function valueText(value: ArgumentValue): string {
     case 'user':
       return jsonLiteral(value.value);
     case 'step':
-      return `from step ${value.step}`;
+      return `the ${value.field} from step ${value.step}`;
     case 'model':
       return value.writes;
     case 'entries':

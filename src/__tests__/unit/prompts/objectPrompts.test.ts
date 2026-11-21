@@ -117,8 +117,8 @@ describe('the worked examples', () => {
       [
         'Delete the LOCAL_TYPES of "SOME_CLASS".',
         '1. Lock the class: call HandlerLock with object_type: "CLASS", object_name: "SOME_CLASS"; keep the lock_handle it answers.',
-        '2. Call HandlerDelete with object_type: "LOCAL_TYPES", class_name: "SOME_CLASS", lock_handle: from step 1.',
-        '3. Unlock the class: call HandlerUnlock with object_type: "CLASS", object_name: "SOME_CLASS", lock_handle: from step 1 — after step 2, whatever it answered.',
+        '2. Call HandlerDelete with object_type: "LOCAL_TYPES", class_name: "SOME_CLASS", lock_handle: the lock_handle from step 1.',
+        '3. Unlock the class: call HandlerUnlock with object_type: "CLASS", object_name: "SOME_CLASS", lock_handle: the lock_handle from step 1 — after step 2, whatever it answered.',
         'LOCAL_TYPES takes LOCAL_TYPES(class_name*, lock_handle*, transport_request); * marks a required argument.',
       ].join('\n'),
     );
@@ -137,8 +137,8 @@ describe('the worked examples', () => {
       [
         'Delete the LOCAL_TYPES of "SOME_CLASS".',
         '1. Lock the class: call HandlerLock with object_type: "CLASS", object_name: "SOME_CLASS"; keep the lock_handle and the state_handle it answers.',
-        '2. Call HandlerDelete with object_type: "LOCAL_TYPES", class_name: "SOME_CLASS", lock_handle: from step 1, state_handle: from step 1.',
-        '3. Unlock the class: call HandlerUnlock with object_type: "CLASS", object_name: "SOME_CLASS", lock_handle: from step 1, state_handle: from step 1 — after step 2, whatever it answered.',
+        '2. Call HandlerDelete with object_type: "LOCAL_TYPES", class_name: "SOME_CLASS", lock_handle: the lock_handle from step 1, state_handle: the state_handle from step 1.',
+        '3. Unlock the class: call HandlerUnlock with object_type: "CLASS", object_name: "SOME_CLASS", lock_handle: the lock_handle from step 1, state_handle: the state_handle from step 1 — after step 2, whatever it answered.',
         'LOCAL_TYPES takes LOCAL_TYPES(class_name*, lock_handle*, transport_request); * marks a required argument.',
       ].join('\n'),
     );

@@ -79,7 +79,7 @@ describe('renderInstruction', () => {
       [
         'Delete the LOCAL_TYPES of "SOME_CLASS".',
         '1. Lock the class: call HandlerLock with object_type: "CLASS", object_name: "SOME_CLASS"; keep the lock_handle it answers.',
-        '2. Call HandlerDelete with object_type: "LOCAL_TYPES", class_name: "SOME_CLASS", lock_handle: from step 1.',
+        '2. Call HandlerDelete with object_type: "LOCAL_TYPES", class_name: "SOME_CLASS", lock_handle: the lock_handle from step 1.',
         'LOCAL_TYPES takes LOCAL_TYPES(class_name*, lock_handle*, transport_request); * marks a required argument.',
       ].join('\n'),
     );
@@ -123,7 +123,7 @@ describe('renderInstruction', () => {
       ],
       notes: ['The change: "add a method"'],
     });
-    assert.ok(text.includes('lock_handle: from step 2'));
+    assert.ok(text.includes('lock_handle: the lock_handle from step 2'));
     assert.ok(
       text.includes(
         '2. Lock it: call HandlerLock with object_type: "CLASS"; keep the lock_handle and the state_handle it answers.',
@@ -131,12 +131,12 @@ describe('renderInstruction', () => {
     );
     assert.ok(
       text.includes(
-        '3. Write it: call HandlerUpdate with lock_handle: from step 2, source_code: the whole new source.',
+        '3. Write it: call HandlerUpdate with lock_handle: the lock_handle from step 2, source_code: the whole new source.',
       ),
     );
     assert.ok(
       text.includes(
-        '4. Unlock it: call HandlerUnlock with lock_handle: from step 2 — after step 3, whatever it answered.',
+        '4. Unlock it: call HandlerUnlock with lock_handle: the lock_handle from step 2 — after step 3, whatever it answered.',
       ),
     );
     assert.ok(text.endsWith('\nThe change: "add a method"'));
@@ -184,8 +184,8 @@ describe('renderInstruction', () => {
       text,
       [
         'Move entries.',
-        '1. Call HandlerUnitTestStatus with run_id: from step 1, until the status is FINISHED.',
-        '2. When it answers a run_id: call GetUnitTestResult with run_id: from step 1.',
+        '1. Call HandlerUnitTestStatus with run_id: the run_id from step 1, until the status is FINISHED.',
+        '2. When it answers a run_id: call GetUnitTestResult with run_id: the run_id from step 1.',
         "3. Call HandlerTransportMoveObjects with objects: the entries to move from step 1, each as { object_name: the entry's name, pgmid: the entry's pgmid }. An entry whose position is null is named to the user and left out of the call.",
       ].join('\n'),
     );

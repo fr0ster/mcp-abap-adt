@@ -72,7 +72,7 @@ describe('the texts (spec §2.5)', () => {
       [
         'Remove the CLASS "SOME_CLASS" from the task "SOME_TASK".',
         '1. Read the task\'s entries: call ReadTransportObjects with transport_number: "SOME_TASK". Take the entry whose name is "SOME_CLASS", type "CLAS" and pgmid "R3TR".',
-        '2. Call RemoveTransportObject with transport_number: "SOME_TASK", object_name: from step 1, object_type: from step 1, position: from step 1, pgmid: from step 1. An entry whose position is null is named to the user and left out of the call.',
+        '2. Call RemoveTransportObject with transport_number: "SOME_TASK", object_name: the name from step 1, object_type: the type from step 1, position: the position from step 1, pgmid: the pgmid from step 1. An entry whose position is null is named to the user and left out of the call.',
       ].join('\n'),
     );
   });
@@ -370,6 +370,18 @@ describe('the sent entry fields come from ENTRY_ARGUMENT alone', () => {
       value.from === 'step' && value.step === 1 ? [[name, value.field]] : [],
     );
     assert.deepEqual(sorted(fromRead), sorted(PAIRS));
+  });
+
+  it('core remove_object names the read field each sent argument takes', () => {
+    const text = textOf(promptOf(transportPrompt, core), {
+      action: 'remove_object',
+      number: 'SOME_TASK',
+      object_type: 'class',
+      name: 'SOME_CLASS',
+    });
+    for (const [sent, field] of PAIRS) {
+      assert.ok(text.includes(`${sent}: the ${field} from step 1`), sent);
+    }
   });
 
   for (const [family, source] of [

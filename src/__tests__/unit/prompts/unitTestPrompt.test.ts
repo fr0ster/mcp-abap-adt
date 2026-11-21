@@ -49,7 +49,7 @@ describe('the texts (spec §2.3)', () => {
       [
         'Run the unit tests of the CLASS "SOME_CLASS".',
         '1. Call RunUnitTest with class_name: "SOME_CLASS".',
-        '2. When it answers a run_id: call GetUnitTestResult with run_id: from step 1.',
+        '2. When it answers a run_id: call GetUnitTestResult with run_id: the run_id from step 1.',
       ].join('\n'),
     );
   });
@@ -64,8 +64,8 @@ describe('the texts (spec §2.3)', () => {
       [
         'Run the unit tests of the PACKAGE "SOME_PACKAGE".',
         '1. Call HandlerUnitTestRun with target: {"kind":"package","name":"SOME_PACKAGE","include_subpackages":true}; keep the run_id it answers.',
-        '2. Call HandlerUnitTestStatus with run_id: from step 1, with_long_polling: true, until the status is FINISHED.',
-        '3. Call HandlerUnitTestResult with run_id: from step 1.',
+        '2. Call HandlerUnitTestStatus with run_id: the run_id from step 1, with_long_polling: true, until the status is FINISHED.',
+        '3. Call HandlerUnitTestResult with run_id: the run_id from step 1.',
       ].join('\n'),
     );
   });

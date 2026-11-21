@@ -310,6 +310,17 @@ without credentials. Each request (HTTP) or connection (SSE) builds its own cred
 stored, shared or cached across them. Over SSE a `POST` is routed by its `sessionId` alone: its own
 `x-sap-*` headers are not read.
 
+## Syntax checks after session loss
+
+Starting with 24.1.1, a standalone syntax check sent to the ADT `checkruns`
+endpoint over modern HTTP can be retried once in a temporary SAP session
+during the same MCP call. The connector retries after SAP returns a CSRF
+validation 403 and the response shows that the session was replaced. If
+logon to the temporary session fails, the tool returns that error.
+
+The check must be stateless and outside a critical section. An operation
+using an existing lock handle remains tied to the SAP session that acquired it.
+
 ## Errors you may meet at startup
 
 - `Destination "X" cannot be used: <fields>` — the destination states less than its

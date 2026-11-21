@@ -175,6 +175,23 @@ with the variant's description and zod schema (`listedTool`), and runs each call
 `entry.call(context, args)` with the call's context. Which groups a binary serves is its tool set
 (`@mcp-abap-adt/lib/tool-set`).
 
+### 6. Prompts
+
+The MCP prompts are built from the entries a server lists (`src/lib/prompts/`,
+`@mcp-abap-adt/lib/prompts`): each prompt is a list of steps as data (a tool, its arguments from
+the listed schema) and its text is rendered from them, so a prompt names only tools the binary
+lists, with the arguments their listed schemas take. The tables that map an operation and an
+`object_type` to its tool and argument names are typed (`FULL_ROWS`, `COMPACT_ROWS`, `READ_AS`,
+`LOCKED_AS`, `RUN_TARGET`, `WHERE_USED_AS`, `OBJECT_DIRECTORY_TYPE`, `ENTRY_ARGUMENT`,
+`TRANSPORT_ACTIONS`); an operation without rows does not compile.
+
+`BaseMcpServer` registers the prompts after the tools (`prompts: false` turns them off); a plain
+registration registers them only through `registerAbapPrompts(server, registry)`. A denied tool
+or value leaves the prompt's `object_type` values, and a prompt with none left is not
+registered. `listed-prompts.json` and `prompt-texts.json` (`tests/fixtures/tools/`) pin the
+listing and the texts per binary and kind. See
+[PROMPTS.md](../user-guide/PROMPTS.md).
+
 ## Benefits
 
 1. **Local ownership**: Each handler maintains its own description

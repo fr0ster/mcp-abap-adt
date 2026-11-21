@@ -23,6 +23,7 @@ Documentation for end users: configuration, usage, and available tools.
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
 - `BATCH_MODE.md` - Batch mode (the compact binaries' `HandlerBatch`): independent calls recorded, sent together at the batch's end, answered by number; which calls are recorded
+- `PROMPTS.md` - The MCP prompts (`create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) per binary and kind, their `object_type` values, how a client shows them, the refusal (generated)
 - `TOOL_SEARCH.md` - Tool search: the three texts per tool (`description`, `keywords` for BM25, `semantic` for vectors), where a client reads them
 - `DEBUGGER.md` - The debugger (the write binaries; no `-ro` one): debug sessions and their handle, the SAP ids, transports, what ends a session
 

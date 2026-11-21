@@ -5,7 +5,7 @@
  * ABAP cloud no keyword and no word of the semantic sentence names a member
  * the tool's enum offers on premise and not there; on premise the texts are
  * the table's own (`toolSearchText`). The members a tool's entry groups its
- * words under are its own, and each grouped keyword is one of its keywords.
+ * words under are its own (`HandlerSystem`'s are its actions), and each grouped keyword is one of its keywords.
  * A compact tool's keywords name no object kind (a word the table groups
  * under a member, in any entry) that none of its members is.
  */
@@ -21,6 +21,7 @@ import { readOnlyToolSet as compactRoSet } from '../../../../compact-ro/src/laun
 import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import type { ServerVariant } from '../../../lib/clients';
+import { SYSTEM_ACTIONS } from '../../../lib/compact';
 import { TOOL_SEARCH_META_KEY, toolSearchText } from '../../../lib/toolSearch';
 import { registryOf, type ToolSet } from '../../../lib/toolSet';
 import { PROJECTED_ARGUMENTS } from '../../helpers/projectedArguments';
@@ -189,9 +190,10 @@ describe('a compact tool’s search texts name only the members its variant offe
       const groups: unknown = Reflect.get(Object(entry), 'members');
       if (groups === undefined) continue;
       const members = membersOf(name);
-      const own = new Set([
+      const own = new Set<string>([
         ...(members?.onprem ?? []),
         ...(members?.cloud ?? []),
+        ...(name === 'HandlerSystem' ? SYSTEM_ACTIONS : []),
       ]);
       const keywords: unknown = Reflect.get(Object(entry), 'keywords');
       const listedKeywords = Array.isArray(keywords) ? keywords : [];

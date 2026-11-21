@@ -41,9 +41,10 @@ export interface ToolDefinition<S extends z.ZodObject = z.ZodObject> {
    */
   variants?: { readonly [V in AbapSystemKind]: VariantToolDefinition<S> };
   /**
-   * The members its `object_type` (or `target_type`) offers where no
-   * variant is stated: set only on a definition the deny list narrowed, so
-   * its search texts name only the members left.
+   * The members it offers where no variant is stated — the values of its
+   * `object_type`, `target_type` or, for `HandlerSystem`, `action`: set
+   * only on a definition the deny list narrowed, so its search texts name
+   * only the members left.
    */
   members?: readonly string[];
 }
@@ -53,8 +54,9 @@ export interface VariantToolDefinition<S extends z.ZodObject = z.ZodObject> {
   readonly description: string;
   readonly inputSchema: S;
   /**
-   * The members its `object_type` (or `target_type`) offers there, for a
-   * tool whose member picks the object: its search texts name only these.
+   * The members it offers there — the values of its `object_type`,
+   * `target_type` or, for `HandlerSystem`, `action`: its search texts name
+   * only these.
    */
   readonly members?: readonly string[];
 }

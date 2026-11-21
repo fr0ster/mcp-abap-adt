@@ -1,9 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2022",
-    "lib": [
-      "es2022"
-    ],
+    "lib": ["es2022"],
     "module": "node16",
     "moduleResolution": "node16",
     "isolatedModules": true,
@@ -15,20 +13,14 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "rootDir": "..",
     "outDir": "./dist",
     "paths": {
-      "@mcp-abap-adt/lib/embeddable": [
-        "../src/embeddable/index.ts"
-      ]
+      "@mcp-abap-adt/lib/embeddable": ["../src/embeddable/index.ts"]
     },
     "noEmit": true
   },
-  "include": [
-    "src/**/*"
-  ],
+  "include": ["src/**/*"],
   "exclude": []
 }

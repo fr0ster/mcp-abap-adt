@@ -215,6 +215,15 @@ the compact ones none of the full set's high tools; only read-only reads may app
 
 `ReadOnlyHandlersGroup` enforces this itself, whatever dedup strategy is passed — a strategy decides about differently named tools, and one server cannot register two tools under one name. The launcher, `EmbeddableMcpServer` and `HandlerExporter` all hand the group the names of the exposed high tools.
 
+### Prompts
+
+Each binary lists up to nine MCP prompts beside its tools, built from the tools the binary lists
+(after the deny list): a prompt lists the `object_type` values whose tools are all registered,
+and a prompt with none left is not listed. The read-only binaries list `get`, `where_used` and
+`transport` (compact-ro: `get`, `check`, `where_used`, `transport`); the write binaries list all
+nine. `prompts: false` on `BaseMcpServer` / `EmbeddableMcpServer` lists none. See
+[PROMPTS.md](PROMPTS.md).
+
 ### Config File
 
 A config file (`--conf`) states no tools: its `exposition` key stops the start with the sentence

@@ -31,7 +31,7 @@ import { return_error } from '../../../lib/utils';
  * from this file as text, and a nested `default` inside the `objects`
  * property would be reported as the default of `objects` itself.
  */
-const MOVED_ENTRY = z.object({
+export const MOVED_ENTRY = z.object({
   object_name: z.string().describe('Object name.'),
   object_type: z
     .string()

@@ -180,7 +180,29 @@ describe('lib instance registry', () => {
     });
 
     it('reads the whole exports map', () => {
-      assert.equal(entries.length, 17);
+      assert.deepStrictEqual(
+        entries.map(([key]) => key),
+        [
+          '.',
+          './handlers',
+          './utils',
+          './embeddable',
+          './config',
+          './auth',
+          './logger',
+          './request-context',
+          './handlers/read',
+          './handlers/write',
+          './compact-shared',
+          './http-transport',
+          './debugger',
+          './state',
+          './tool-set',
+          './adt-headers',
+          './tool-search',
+          './prompts',
+        ],
+      );
     });
 
     for (const [_key, src] of entries) {

@@ -238,6 +238,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -256,6 +258,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -273,6 +277,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
@@ -346,6 +352,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -360,6 +368,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
@@ -378,6 +388,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
@@ -437,6 +449,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -493,6 +507,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `function_group_name` (string, required) - Function group containing the function module.
@@ -511,6 +527,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -555,6 +573,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -615,6 +635,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
@@ -649,6 +671,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package name.
@@ -664,6 +688,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -733,6 +759,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
@@ -748,6 +776,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -781,6 +811,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -946,6 +978,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
+
+**Prompt:** the `where_used` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
@@ -1128,6 +1162,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -1162,6 +1198,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1194,6 +1232,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/transport/readonly/handleGetTransport.ts`
 
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `include_objects` (boolean, optional (default: true)) - Include list of objects in transport (default: true)
 - `include_tasks` (boolean, optional (default: true)) - Include list of tasks in transport (default: true)
@@ -1206,6 +1246,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
+
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
@@ -1221,6 +1263,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.
@@ -1232,6 +1276,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the action log of the transport request named by transport_number: one entry per lifecycle event — created, object added, object deleted, owner changed. It confirms that an object entry was taken out of the request, since a removal answers by echoing what it was asked.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
+
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1247,6 +1293,8 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
+
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1282,4 +1330,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-20*
+*Last updated: 2026-11-21*

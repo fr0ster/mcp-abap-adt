@@ -55,7 +55,9 @@
       "includes": [
         "tests/fixtures/tools/listed-schemas.json",
         "tests/fixtures/tools/variant-surface.json",
-        "tests/fixtures/tools/stdio-sse-surface.json"
+        "tests/fixtures/tools/stdio-sse-surface.json",
+        "tests/fixtures/tools/listed-prompts.json",
+        "tests/fixtures/tools/prompt-texts.json"
       ],
       "formatter": { "enabled": false }
     },

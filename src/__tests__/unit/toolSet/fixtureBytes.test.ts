@@ -1,10 +1,11 @@
 /**
  * Every tool-surface fixture equals, byte for byte, what its writer would
  * write from the current registry (`helpers/fixtureRenderings.ts`):
- * `listed-schemas.json`, `variant-surface.json`, `http-surface.json` and
- * `stdio-sse-surface.json`. The committed files are the baseline: a change
- * that moves one byte of a listed schema, description or search text fails
- * here, not only where a test compares the parsed values.
+ * `listed-schemas.json`, `variant-surface.json`, `http-surface.json`,
+ * `stdio-sse-surface.json` and `listed-prompts.json`. The committed files
+ * are the baseline: a change that moves one byte of a listed schema,
+ * description, search text or prompt fails here, not only where a test
+ * compares the parsed values.
  */
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -15,6 +16,7 @@ import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import {
   grouped,
   httpFixture,
+  renderListedPrompts,
   renderListedSchemas,
   renderSurface,
   searchOf,
@@ -22,8 +24,9 @@ import {
   transportSurfaces,
   variantSurface,
 } from '../../helpers/fixtureRenderings';
+import { listedPromptTools } from '../../helpers/promptTools';
 import { repositoryRoot } from '../../helpers/repoRoot';
-import { listBinaries } from '../../helpers/servedTools';
+import { listBinaries, listBinaryPrompts } from '../../helpers/servedTools';
 
 const FIXTURES = path.join(
   repositoryRoot(__dirname),
@@ -60,6 +63,17 @@ describe('the tool-surface fixtures, byte for byte', () => {
       search: grouped(listings, searchOf),
     });
     assert.equal(rendered, committed('listed-schemas.json'));
+  });
+
+  it('listed-prompts.json', async () => {
+    const listings = await listBinaryPrompts(
+      ['onprem', 'cloud', 'legacy', 'none'],
+      standIn,
+    );
+    assert.equal(
+      renderListedPrompts(listings, listedPromptTools(listings)),
+      committed('listed-prompts.json'),
+    );
   });
 
   it('variant-surface.json', async () => {

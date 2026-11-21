@@ -14,7 +14,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import type { Tool } from '@modelcontextprotocol/sdk/types.js';
+import type { Prompt, Tool } from '@modelcontextprotocol/sdk/types.js';
 import { InMemoryBackgroundRuns } from '../../../background-runs-memory/src/InMemoryBackgroundRuns';
 import { compactToolSet as compactStdioSet } from '../../../compact/src/launcher';
 import { compactToolSet as compactHttpSet } from '../../../compact-http/src/launcher';
@@ -322,6 +322,85 @@ export async function listBinaries(
           bin: BINARIES[transport][kind].bin,
           tools,
         });
+      }
+    }
+  }
+  return listings;
+}
+
+/** A declared system type, or none declared (`SAP_SYSTEM_TYPE` unset). */
+export type DeclaredType = SystemType | 'none';
+
+/** Declares `systemType` as a launcher reads it: `none` unsets it. */
+export function declare(systemType: DeclaredType): void {
+  if (systemType === 'none') delete process.env.SAP_SYSTEM_TYPE;
+  else process.env.SAP_SYSTEM_TYPE = systemType;
+}
+
+/** One prompt as `prompts/list` answers it, with what each argument completes. */
+export interface ListedPrompt {
+  readonly prompt: Prompt;
+  /** Argument → the values `completion/complete` answers for an empty value; only arguments that complete. */
+  readonly completions: Readonly<Record<string, readonly string[]>>;
+}
+
+/** One server's prompts: which binary, on which declared system type. */
+export interface PromptListing {
+  readonly systemType: DeclaredType;
+  readonly bin: string;
+  readonly transport: ServedTransport;
+  readonly kind: ToolSetKind;
+  readonly prompts: readonly ListedPrompt[];
+}
+
+/** The prompts `client`'s server lists, each argument's completion beside it; none without the capability. */
+export async function promptsOf(client: Client): Promise<ListedPrompt[]> {
+  if (client.getServerCapabilities()?.prompts === undefined) return [];
+  const listed: ListedPrompt[] = [];
+  for (const prompt of (await client.listPrompts()).prompts) {
+    const completions: Record<string, readonly string[]> = {};
+    for (const argument of prompt.arguments ?? []) {
+      const { completion } = await client.complete({
+        ref: { type: 'ref/prompt', name: prompt.name },
+        argument: { name: argument.name, value: '' },
+      });
+      if (completion.values.length > 0) {
+        completions[argument.name] = completion.values;
+      }
+    }
+    listed.push({ prompt, completions });
+  }
+  return listed;
+}
+
+/**
+ * The prompts of every binary (the four kinds on the three transports) on
+ * each of `systemTypes`, each declared as a launcher reads it, read as a
+ * client reads them: `prompts/list`, and `completion/complete` with an empty
+ * value for every argument of every prompt. The caller restores
+ * `SAP_SYSTEM_TYPE` afterwards.
+ */
+export async function listBinaryPrompts(
+  systemTypes: readonly DeclaredType[],
+  standIn: AdtStandIn,
+): Promise<PromptListing[]> {
+  const listings: PromptListing[] = [];
+  for (const systemType of systemTypes) {
+    declare(systemType);
+    for (const kind of KINDS) {
+      for (const transport of TRANSPORTS) {
+        const { client, close } = await binaryClient(transport, kind, standIn);
+        try {
+          listings.push({
+            systemType,
+            bin: BINARIES[transport][kind].bin,
+            transport,
+            kind,
+            prompts: await promptsOf(client),
+          });
+        } finally {
+          await close();
+        }
       }
     }
   }

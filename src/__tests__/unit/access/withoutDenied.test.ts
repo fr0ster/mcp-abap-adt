@@ -17,6 +17,7 @@ import {
   withoutDenied,
 } from '../../../lib/access/withoutDenied';
 import { COMPACT_ACTIVATE } from '../../../lib/adtProjections';
+import { SYSTEM_ACTIONS, type SystemAction } from '../../../lib/compact';
 import { BaseHandlerGroup } from '../../../lib/handlers/base/BaseHandlerGroup';
 import type {
   HandlerEntry,
@@ -26,6 +27,7 @@ import type {
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import { listedTool, searchMeta } from '../../../lib/listedTool';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { TOOL_SEARCH_META_KEY } from '../../../lib/toolSearch';
 import { fullToolSet, type ToolSet } from '../../../lib/toolSet';
 import { listedJson } from '../../helpers/listedJson';
 import { parityConnection, silentLogger } from '../../helpers/lowToCompact';
@@ -295,5 +297,108 @@ describe('withoutDenied', () => {
     for (const [index, group] of same.entries()) {
       assert.equal(group, groups[index]);
     }
+  });
+});
+
+describe('HandlerSystem keeps its actions as members', () => {
+  const systemOf = (groups: readonly IHandlerGroup[]) =>
+    entryOf(groups, 'HandlerSystem').toolDefinition;
+  const without = (action: SystemAction) =>
+    SYSTEM_ACTIONS.filter((each) => each !== action);
+
+  it('with nothing denied, both variants state all eight actions in order', () => {
+    const definition = systemOf(compact());
+    assert.deepEqual(definition.variants?.onprem.members, SYSTEM_ACTIONS);
+    assert.deepEqual(definition.variants?.cloud.members, SYSTEM_ACTIONS);
+  });
+
+  it('the un-narrowed definition states no top-level members', () => {
+    assert.equal(systemOf(compact()).members, undefined);
+  });
+
+  for (const action of ['where_used', 'transports'] as const) {
+    it(`HandlerSystem.${action}: both variants state every action but ${action}`, () => {
+      const definition = systemOf(compact(`HandlerSystem.${action}`));
+      assert.deepEqual(definition.variants?.onprem.members, without(action));
+      assert.deepEqual(definition.variants?.cloud.members, without(action));
+    });
+  }
+});
+
+describe('HandlerSystem: a denied action leaves its search texts', () => {
+  const TODAY_KEYWORDS = [
+    'search source code',
+    'grep',
+    'find object',
+    'search by name',
+    'wildcard',
+    'where used',
+    'used by',
+    'references',
+    'package tree',
+    'subpackages',
+    'transport requests',
+    'ATC findings',
+    'ATC results',
+  ];
+  const TODAY_SENTENCE =
+    'Read across the system by action: search source code in packages, find objects by name or pattern, list where an object is used, show a package tree, list transport requests, and read ATC findings and results.';
+
+  /** The search texts HandlerSystem is listed with on onprem, after `entries` are denied. */
+  function searchOf(...entries: string[]): {
+    keywords: string[];
+    semantic: string;
+  } {
+    const listed = listedTool(
+      entryOf(compact(...entries), 'HandlerSystem').toolDefinition,
+      'onprem',
+    );
+    assert.ok(listed.listed);
+    const text = listed.search._meta?.[TOOL_SEARCH_META_KEY];
+    assert.ok(text);
+    return text;
+  }
+
+  it('with nothing denied, the keywords and the sentence are today’s', () => {
+    assert.deepEqual(searchOf(), {
+      keywords: TODAY_KEYWORDS,
+      semantic: TODAY_SENTENCE,
+    });
+  });
+
+  it('HandlerSystem.where_used: no where-used keyword, no where-used phrase', () => {
+    const { keywords, semantic } = searchOf('HandlerSystem.where_used');
+    for (const word of ['where used', 'used by', 'references']) {
+      assert.equal(keywords.includes(word), false, word);
+    }
+    assert.equal(semantic.includes('list where an object is used'), false);
+  });
+
+  it('HandlerSystem.transports: no transport keyword, no transport phrase', () => {
+    const { keywords, semantic } = searchOf('HandlerSystem.transports');
+    assert.equal(keywords.includes('transport requests'), false);
+    assert.equal(semantic.includes('list transport requests'), false);
+  });
+
+  it('all three ATC actions denied: the ATC phrase and keywords leave', () => {
+    const { keywords, semantic } = searchOf(
+      'HandlerSystem.atc_findings',
+      'HandlerSystem.atc_results',
+      'HandlerSystem.atc_result',
+    );
+    assert.equal(semantic.includes('read ATC findings and results'), false);
+    assert.equal(keywords.includes('ATC findings'), false);
+    assert.equal(keywords.includes('ATC results'), false);
+    assert.ok(
+      semantic.endsWith('show a package tree, and list transport requests.'),
+      semantic,
+    );
+  });
+
+  it('only HandlerSystem.atc_findings denied: the ATC phrase stays, its keyword leaves', () => {
+    const { keywords, semantic } = searchOf('HandlerSystem.atc_findings');
+    assert.ok(semantic.includes('read ATC findings and results'), semantic);
+    assert.equal(keywords.includes('ATC findings'), false);
+    assert.ok(keywords.includes('ATC results'));
   });
 });

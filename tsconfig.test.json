@@ -12,7 +12,7 @@
     //
     // Every TypeScript file under `scripts/` is checked here (#234): a script
     // that no longer compiles is a script nobody can run.
-    "rootDir": ".",
+    "rootDir": "."
     // The compact facade lives in sibling packages now, and the tests that
     // exercise it import them by package name. `paths` come from the one
     // package-name table, `tsconfig.paths.json`, through `extends` (D27):

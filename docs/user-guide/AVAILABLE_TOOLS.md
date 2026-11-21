@@ -433,6 +433,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -451,6 +453,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -468,6 +472,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
@@ -541,6 +547,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -555,6 +563,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
@@ -573,6 +583,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP domain named by domain_name in one request: its ADT metadata document (definition, package, description), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
@@ -632,6 +644,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -688,6 +702,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `function_group_name` (string, required) - Function group containing the function module.
@@ -706,6 +722,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP include named by include_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -750,6 +768,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -796,6 +816,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
@@ -813,6 +835,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -845,6 +869,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -914,6 +940,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
@@ -929,6 +957,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -947,6 +977,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -1129,6 +1161,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
+**Prompt:** the `where_used` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `container` (string, optional, one of: `program`, `function_group`) - With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.
@@ -1280,6 +1314,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -1326,6 +1362,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1358,6 +1396,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/transport/readonly/handleGetTransport.ts`
 
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `include_objects` (boolean, optional (default: true)) - Include list of objects in transport (default: true)
 - `include_tasks` (boolean, optional (default: true)) - Include list of tasks in transport (default: true)
@@ -1370,6 +1410,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
+
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
@@ -1385,6 +1427,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
@@ -1396,6 +1440,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Lists the objects the transport request or task named by transport_number holds, each with its `position`, which a removal of the entry names. A task answers its own entries; a request answers every task's entries, each once, with its `task` number and position — the task a removal addresses.
 
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
+
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1411,6 +1457,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the result of the ABAP Unit test run named by run_id, for a run started with wait false or still running: its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes; a run SAP answers finished answers its result, the call lasting as long as the run, a run SAP reports unstarted (its answer for an unknown run_id and for a run whose start SAP has yet to record) answers the run_id and that status at once, and any other status is an error stating what SAP answered.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
+
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1501,6 +1549,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `name` (string, required) - Behavior definition name (root entity).
@@ -1513,6 +1563,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `name` (string, required) - BehaviorDefinition name.
 - `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
@@ -1524,6 +1576,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
@@ -1544,6 +1598,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1556,6 +1612,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
@@ -1571,6 +1629,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
@@ -1590,6 +1650,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `behavior_definition` (string, required) - Behavior Definition name. The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
 - `class_name` (string, required) - Behavior Implementation class name.
@@ -1606,6 +1668,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1618,6 +1682,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
@@ -1633,6 +1699,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update source code of an existing ABAP behavior implementation class. Updates the implementations include. Manages lock, update, unlock, and optional activation.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate behavior implementation after update. Default: true.
@@ -1653,6 +1721,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Class name.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1664,6 +1734,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Runs a syntax check on the ABAP class named by class_name. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/class/high/handleCheckClass.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
@@ -1677,6 +1749,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Creates the ABAP class named by class_name in the package named by package_name, in initial state: the class object alone; its source code is written by an update of the class.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
@@ -1697,6 +1771,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Class name.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -1709,6 +1785,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Delete local definitions from an ABAP class by clearing the definitions include. Manages lock, update, unlock, and optional activation.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalDefinitions.ts`
+
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
@@ -1724,6 +1802,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalMacros.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
@@ -1737,6 +1817,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Clears the local test classes include of the ABAP class named by class_name. The include is cleared under the class lock; with activate_on_delete the class is activated.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
+
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting test class. Default: false
@@ -1752,6 +1834,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTypes.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
@@ -1765,6 +1849,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
@@ -1781,6 +1867,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -1794,6 +1882,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the local macros include of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
@@ -1809,6 +1899,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -1823,6 +1915,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Parent class name.
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -1836,6 +1930,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
@@ -1852,6 +1948,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name.
@@ -1866,6 +1964,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update local macros in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
@@ -1882,6 +1982,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating test class. Default: false
 - `class_name` (string, required) - Parent class name.
@@ -1896,6 +1998,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
@@ -2248,6 +2352,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -2260,6 +2366,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
 - `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
@@ -2271,6 +2379,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP data element in SAP system. Creates the data element object in initial state.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
@@ -2300,6 +2410,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -2313,6 +2425,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -2324,6 +2438,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional (default: true)) - Activate data element after update (default: true)
@@ -2356,6 +2472,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -2367,6 +2485,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Runs a syntax check on the CDS view named by ddl_name. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_name` (string, required) - CDS view name to check, passed as ddl_name.
@@ -2380,6 +2500,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Creates the CDS view or classic DDL view named by ddl_name in the package named by package_name, in initial state: the DDL source object, its DDL source code written afterwards.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
@@ -2397,6 +2519,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -2409,6 +2533,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
@@ -2424,6 +2550,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Updates the DDL source code of the existing CDS view or classic DDL view named by ddl_name to ddl_source. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
@@ -2443,6 +2571,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `name` (string, required) - Metadata Extension name.
@@ -2455,6 +2585,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `name` (string, required) - Metadata extension name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.
@@ -2466,6 +2598,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
@@ -2483,6 +2617,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
@@ -2502,6 +2638,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `domain_name` (string, required) - Domain name.
@@ -2514,6 +2652,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/domain/high/handleCheckDomain.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
 - `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
@@ -2525,6 +2665,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP domain in SAP system. Creates the domain object in initial state.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional (default: true)) - (optional) Activate domain after creation (default: true)
@@ -2551,6 +2693,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `domain_name` (string, required) - Domain name.
@@ -2564,6 +2708,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -2575,6 +2721,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional (default: true)) - Activate domain after update (default: true)
@@ -2603,6 +2751,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group name.
@@ -2614,6 +2764,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Activates the ABAP function module named by function_module_name in the function group named by function_group_name, so its inactive version is in force.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
+
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -2628,6 +2780,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `function_group_name` (string, required) - Function group name.
 - `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
@@ -2639,6 +2793,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Runs a syntax check on the ABAP function module named by function_module_name in the function group named by function_group_name. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/function/high/handleCheckFunctionModule.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group name containing the function module.
@@ -2652,6 +2808,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
@@ -2670,6 +2828,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `description` (string, optional) - Optional description for the function module
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -2685,6 +2845,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `description` (string, required) - New description for the function group.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -2698,6 +2860,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate function module after source update. Default: false. Set to true to activate immediately.
@@ -2718,6 +2882,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - FunctionGroup name.
@@ -2730,6 +2896,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP function group named by function_group_name in one request: its ADT metadata document (package, description, contents), at the version asked. Returns it under `metadata`, with `part: "metadata"`.
 
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
@@ -2794,6 +2962,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - FunctionGroup name containing the function module.
@@ -2807,6 +2977,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. The module's metadata is read first, and the part is answered only when the function group named holds the module. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -2827,6 +2999,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/include/low/handleActivateInclude.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `include_name` (string, required) - Include name.
@@ -2838,6 +3012,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Creates the ABAP include named by include_name in the package named by package_name. The include is created inactive, holding the comment header SAP writes into a new include; its source is written afterwards.
 
 **Source:** `src/handlers/include/high/handleCreateInclude.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `description` (string, optional) - Include description. If not provided, include_name is used.
@@ -2855,6 +3031,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/include/high/handleDeleteInclude.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `include_name` (string, required) - Include name.
@@ -2867,6 +3045,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Writes source_code as the whole source of the ABAP include named by include_name: locks it, writes, unlocks, and activates when activate is true. Returns SAP's answer to the write (and to the activation).
 
 **Source:** `src/handlers/include/high/handleUpdateInclude.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate the include after the write. Default: false.
@@ -2900,6 +3080,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `interface_name` (string, required) - Interface name.
@@ -2912,6 +3094,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/interface/high/handleCheckInterface.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
 - `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
@@ -2923,6 +3107,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
@@ -2940,6 +3126,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `interface_name` (string, required) - Interface name.
@@ -2952,6 +3140,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -2967,6 +3157,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate interface after update. Default: true.
@@ -3101,6 +3293,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `metadata_extension_name` (string, required) - MetadataExtension name.
@@ -3113,6 +3307,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the CDS metadata extension named by metadata_extension_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -3132,6 +3328,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `package_name` (string, required) - Package name.
 - `super_package` (string, optional) - Optional, and not read by the check endpoint — see CheckPackageLow. Requiring it refused the call before any request was made, for a package with no parent.
@@ -3143,6 +3341,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.
 
 **Source:** `src/handlers/package/high/handleCreatePackage.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `application_component` (string, optional) - Application component (optional, e.g., BC-ABA)
@@ -3165,6 +3365,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/package/high/handleDeletePackage.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
@@ -3179,6 +3381,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package name.
@@ -3191,6 +3395,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update the description of an existing ABAP package. Locks the package, writes, and unlocks it again, whatever the write answered. Over RFC this runs in an ABAP session of its own, closed afterwards.
 
 **Source:** `src/handlers/package/high/handleUpdatePackage.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `description` (string, required) - New description for the package.
@@ -3209,6 +3415,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `program_name` (string, required) - Program name.
@@ -3221,6 +3429,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `program_name` (string, required) - Program name.
 - `version` (string, optional, one of: `active`, `inactive`) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
@@ -3232,6 +3442,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
@@ -3250,6 +3462,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `program_name` (string, required) - Program name.
@@ -3262,6 +3476,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -3277,6 +3493,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
@@ -3296,6 +3514,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `name` (string, required) - Service binding name.
@@ -3307,6 +3527,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create an OData service binding (V2 or V4, UI or Web API) for a service definition, in initial state.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional (default: true)) - Activate the service binding after create, then read its service group. Default: true.
@@ -3330,6 +3552,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
@@ -3343,6 +3567,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the OData service binding named by service_binding_name in one request, at its active version: its binding document (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), each in the response_format given. Returns the part read.
 
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `part` (string, optional (default: source), one of: `source`, `metadata`) - The document to read: "source" (default) the source code, "metadata" the ADT metadata document (package, responsible, description, ...).
@@ -3367,6 +3593,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update publication state of an existing ABAP service binding. On premise the change is done when the call answers (result SUCCESS, completion 'done'). On ABAP Cloud SAP runs it as a background job: the call answers result STARTED, completion 'background', with SAP's severity and short text, and the service becomes usable (or stops being usable) once that job ends.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `binding_variant` (string, required (default: ODATA_V4_UI), one of: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`) - Service binding variant. Determines OData version for publish/unpublish routing.
@@ -3404,6 +3632,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `name` (string, required) - Service definition name.
@@ -3415,6 +3645,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a service definition that exposes CDS views as an OData service, in initial state.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after creation. Default: true.
@@ -3434,6 +3666,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `service_definition_name` (string, required) - ServiceDefinition name.
@@ -3446,6 +3680,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -3461,6 +3697,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after update. Default: true.
@@ -3480,6 +3718,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `structure_name` (string, required) - Structure name.
@@ -3491,6 +3731,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Runs a syntax check on the ABAP structure named by structure_name. Can check existing structure (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/structure/high/handleCheckStructure.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
@@ -3504,6 +3746,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP structure in SAP system. Creates the structure object in initial state.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).
@@ -3524,6 +3768,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `structure_name` (string, required) - Structure name.
@@ -3536,6 +3782,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP structure named by structure_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -3551,6 +3799,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after source update. Default: true.
@@ -3671,6 +3921,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `table_name` (string, required) - Table name.
@@ -3682,6 +3934,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Runs a syntax check on the ABAP database table named by table_name. Can check existing table (active/inactive) or validate hypothetical DDL code. Returns syntax errors, warnings, and messages.
 
 **Source:** `src/handlers/table/high/handleCheckTable.ts`
+
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
@@ -3695,6 +3949,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Create a new ABAP table in SAP system. Creates the table object in initial state.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `description` (string, optional) - Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.
@@ -3712,6 +3968,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `table_name` (string, required) - Table name.
@@ -3724,6 +3982,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** [read-only] Reads the ABAP database table named by table_name in one request: its definition with its fields, as source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
 
 **Source:** `src/handlers/table/high/handleGetTable.ts`
+
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `end_line` (integer, optional) - Last line of the source to answer, included. Without it, to the last line.
@@ -3739,6 +3999,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate table after source update. Default: true.
@@ -3780,6 +4042,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/table_type/low/handleActivateTableType.ts`
 
+**Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `table_type_name` (string, required) - Table type name.
@@ -3792,6 +4056,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/table_type/high/handleCheckTableType.ts`
 
+**Prompt:** the `check` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
 - `version` (string, optional, one of: `active`, `inactive`) - Which version to check. Without `version` the active version is checked; pass `inactive` for the unsaved one right after a write.
@@ -3803,6 +4069,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.
 
 **Source:** `src/handlers/table_type/high/handleCreateTableType.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `access_type` (string, optional, one of: `standard`, `sorted`, `hashed`, `index`, `notSpecified`) - Access type of the table (ttyp:accessType).
@@ -3828,6 +4096,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/table_type/high/handleDeleteTableType.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `table_type_name` (string, required) - Table type name.
@@ -3841,6 +4111,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/table_type/high/handleGetTableType.ts`
 
+**Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `table_type_name` (string, required) - Table type name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -3852,6 +4124,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.
 
 **Source:** `src/handlers/table_type/high/handleUpdateTableType.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `access_type` (string, optional, one of: `standard`, `sorted`, `hashed`, `index`, `notSpecified`) - Access type of the table (ttyp:accessType).
@@ -3900,6 +4174,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `object_name` (string, required) - Object name.
@@ -3914,6 +4190,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number, task_number and task_type.
 
 **Source:** `src/handlers/transport/high/handleCreateTransport.ts`
+
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `description` (string, required) - Transport request description (mandatory)
@@ -3931,6 +4209,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
 
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `target_user` (string, required) - The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
@@ -3945,6 +4225,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/transport/high/handleMoveTransportObjects.ts`
 
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `objects` (array, required) - The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.
@@ -3958,6 +4240,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Removes the entry of the object named by object_name and object_type from the transport task named by transport_number, at position.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
+
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -3975,6 +4259,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/transport/high/handleSortAndCompressTransportTask.ts`
 
+**Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_number` (string, required) - Number of the transport task to sort and compress.
@@ -3989,6 +4275,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Creates the ABAP Unit test class named by class_name for the CDS view named by cds_view_name, from test_class_source. The view is checked to support CDS test doubles, the test class holding the local test classes is created in the package named by package_name, and it is activated.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
+
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `cds_view_name` (string, required) - CDS view under test (DDL source). Must be active and testable with test doubles.
@@ -4034,6 +4322,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
+**Prompt:** the `create` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -4048,6 +4338,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -4060,6 +4352,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Deletes the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are deleted, and the class stays.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
+
+**Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
@@ -4074,6 +4368,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `format` (string, optional, one of: `abapunit`, `junit`) - Result format: abapunit or junit.
@@ -4087,6 +4383,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Runs the ABAP Unit tests of the run target named by target. target.kind object: the tests of the object named by target.name, of the run object type target.type (CLAS/OC a class, CLAS/OCL its test class include, PROG/P a program, FUGR/F a function group, FUNC a function module, DDLS/DF a CDS view, among the listed types). target.kind package: the tests of the package named by target.name, its subpackages too when target.include_subpackages is true. A CDS view has assigned tests: test classes elsewhere marked "! @testing <view>"; they execute when scope.foreign_tests is true, and with the default scope the result lists them as a preview, unexecuted. The run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id. A long run under a client with a request time limit is started with wait false.
 
 **Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
+
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -4117,6 +4415,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
 
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `function_group_name` (string, required) - Function group whose tests run.
@@ -4131,6 +4431,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Runs the ABAP Unit tests of the function module named by function_module_name. runner async (default): the run is started; with wait true (default) its status is read at once, and a run SAP answers running is read again by long polling, SAP holding each read until the run finishes: a run SAP answers finished returns its result, the call lasting as long as the run, a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered; with wait false the call answers the run_id right after the start, and the status and result are read by run_id; suited to long suites. A long run under a client with a request time limit is started with wait false. runner sync: one request, addressed by function_group_name and function_module_name, that returns the finished result of every test of the module's function group, called with wait left out.
 
 **Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
+
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -4148,6 +4450,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
 
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `program_name` (string, required) - Report whose tests run.
@@ -4163,6 +4467,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
+**Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
+
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
 - `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
@@ -4177,6 +4483,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Writes test_class_source as the ABAP Unit test classes of the CDS view test class named by class_name. The local test classes in the test class are rewritten, and it is activated.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view. Must already exist.
@@ -4219,6 +4527,8 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Description:** Writes test_class_source as the ABAP Unit test classes of the ABAP class named by class_name. The class's local test classes are rewritten, and the class is activated.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
+
+**Prompt:** the `update` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
@@ -4727,4 +5037,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-20*
+*Last updated: 2026-11-21*

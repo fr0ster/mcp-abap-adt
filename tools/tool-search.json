@@ -4506,7 +4506,35 @@
       "ATC findings",
       "ATC results"
     ],
-    "semantic": "Read across the system by action: search source code in packages, find objects by name or pattern, list where an object is used, show a package tree, list transport requests, and read ATC findings and results."
+    "members": {
+      "search_source": ["search source code", "grep"],
+      "search_object": ["find object", "search by name", "wildcard"],
+      "where_used": ["where used", "used by", "references"],
+      "package_tree": ["package tree", "subpackages"],
+      "transports": ["transport requests"],
+      "atc_findings": ["ATC findings"],
+      "atc_results": ["ATC results"]
+    },
+    "semantic": {
+      "before": "Read across the system by action: ",
+      "items": [
+        { "member": "search_source", "text": "search source code in packages" },
+        {
+          "member": "search_object",
+          "text": "find objects by name or pattern"
+        },
+        { "member": "where_used", "text": "list where an object is used" },
+        { "member": "package_tree", "text": "show a package tree" },
+        { "member": "transports", "text": "list transport requests" },
+        {
+          "members": ["atc_findings", "atc_results", "atc_result"],
+          "text": "read ATC findings and results"
+        }
+      ],
+      "join": "and",
+      "serial": true,
+      "after": "."
+    }
   },
   "GetTableSettings": {
     "keywords": [

@@ -11,6 +11,13 @@ const SRC = path.resolve(repositoryRoot(__dirname), 'src');
 // re-export in this file, and only in an `export` declaration.
 const COMPAT_REEXPORT_FILE = path.resolve(SRC, 'lib/utils.ts');
 
+// The prompts' refusals: `prompts/get` answers a refused argument as the
+// protocol's own error, `McpError(InvalidParams, words)`, as the SDK answers an
+// argument its schema refuses — a prompt has no tool result to carry it. The
+// one module that builds those errors may name the identifier; the prompts
+// alone import it.
+const PROMPT_REFUSALS_FILE = path.resolve(SRC, 'lib/prompts/refusals.ts');
+
 function tsFiles(dir: string, out: string[] = []): string[] {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     if (entry.name === '__tests__' || entry.name === 'node_modules') continue;
@@ -31,8 +38,8 @@ function inExportDeclaration(node: ts.Node): boolean {
   return false;
 }
 
-describe('McpError is confined to the compat re-export in src (#155)', () => {
-  it('McpError appears in src only in the utils.ts re-export — no imports, no uses', () => {
+describe('McpError is confined to the compat re-export and the prompt refusals in src (#155)', () => {
+  it('McpError appears in src only in the utils.ts re-export and the prompt refusals module', () => {
     // Rationale: permitting the identifier in *any* import/export declaration
     // reopens the aliasing hole — `import { McpError as E }` writes `McpError`
     // in an import specifier (permitted) while the dangerous use is spelled `E`
@@ -59,7 +66,8 @@ describe('McpError is confined to the compat re-export in src (#155)', () => {
       const visit = (node: ts.Node) => {
         if (ts.isIdentifier(node) && node.text === 'McpError') {
           const permitted =
-            file === COMPAT_REEXPORT_FILE && inExportDeclaration(node);
+            (file === COMPAT_REEXPORT_FILE && inExportDeclaration(node)) ||
+            file === PROMPT_REFUSALS_FILE;
           if (!permitted) {
             const { line } = sf.getLineAndCharacterOfPosition(
               node.getStart(sf),

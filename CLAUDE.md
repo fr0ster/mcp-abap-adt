@@ -402,6 +402,12 @@ This holds for this repository (stated by the user 2026-10-10); a handle in
 another project may mean something else, and the global MCP rules still apply
 there.
 
+## MCP prompts
+
+- `src/lib/prompts/`: the nine MCP prompts, built from the listed tools (`PromptSource`), the steps as data and the text rendered from them; the typed rows (`FULL_ROWS`, `COMPACT_ROWS`, `READ_AS`, `LOCKED_AS`, `RUN_TARGET`, `WHERE_USED_AS`, `OBJECT_DIRECTORY_TYPE`, `ENTRY_ARGUMENT`, `TRANSPORT_ACTIONS`).
+- `BaseMcpServer` registers the prompts after the tools (`prompts: false` turns them off); a plain registration only through `registerAbapPrompts`.
+- `listed-prompts.json` and `prompt-texts.json`, with their writers, and test 14 (`promptCallsParse.test.ts`), which pins every generated call against its listed schema.
+
 ## Plans and Specs
 
 Plans under `docs/superpowers/plans/` and specs under `docs/superpowers/specs/` are kept in the tree only while active — i.e. not yet implemented and not cancelled. Once a plan/spec has been fully implemented OR cancelled, delete the file. History lives in git; these directories hold only work in progress.

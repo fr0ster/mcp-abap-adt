@@ -21,6 +21,7 @@ import {
   HANDLER_GET_DRAFT_TYPES,
   isArgList,
   isJsonObject,
+  isSourceless,
   type JsonValue,
   jsonAt,
   jsonOf,
@@ -244,23 +245,11 @@ export type CompactReadPart =
   | 'main_programs'
   | 'draft';
 
-/**
- * The types with a metadata document and no source: their `Get<Type>` reads
- * that document, so `part: 'source'` has nothing to answer.
- */
-const SOURCELESS: ReadonlySet<CompactObjectType> = new Set<CompactObjectType>([
-  'PACKAGE',
-  'DOMAIN',
-  'DATA_ELEMENT',
-  'FUNCTION_GROUP',
-  'TABLE_TYPE',
-]);
-
 /** Whether `part: 'source'` reads something for this type. */
 export function hasSourcePart(objectType: CompactObjectType): boolean {
   return (
     compactReadRouterMap[objectType]?.get !== undefined &&
-    !SOURCELESS.has(objectType)
+    !isSourceless(objectType)
   );
 }
 

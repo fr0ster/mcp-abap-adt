@@ -22,13 +22,11 @@ load-bearing by the named mutation (break it, watch the test go red, revert).
 - "No credential is part of a result, an `IAdtError`, or the request an error describes (`method`,
   `url`)."
 - "adt-clients sends both flags on **every abapGit write** (R2, R3, R4, R5, R10, R14, R15), on every
-  member called with `credentials`, and on `getRunLog`/`getErrorLog` — whether a credential is
-  attached or not."
-- **Owner ruling over the spec's §3 precedence and §3.4 for legacy members:** the facts-only
-  contract, `noLog`/`noResend` and structured errors live on the new members only (`getRunLog`, the
-  `credentials` form, the key-based `pullRepo` and the other new members); `getErrorLog(logLink)` and
-  the `remoteUser`/`remotePassword` call forms keep today's callbacks, behaviour and answer,
-  deprecated, pointing to the new members. The server uses only the new members.
+  new member called with `credentials`, and on `getRunLog` — whether a credential is attached or
+  not (the legacy forms of §3 keep today's options)"
+- Legacy forms: as spec §3 ("Legacy forms unchanged") — `getErrorLog(logLink)`,
+  `pull({ pullLink })` and the `remoteUser`/`remotePassword` forms keep today's behaviour,
+  deprecated; the facts exchange and the flags serve the new members.
 - "With `noLog`, a line, if any, carries method, the path without query, the integer status and
   the byte count."
 - "`noResend: true` — gates every replay of the request; the initial CSRF token fetch before a
@@ -156,7 +154,7 @@ of every `IAdtAbapGitClient` member. New exports:
   `headers` and `credentials` no longer matches the legacy branch. This stays a minor: no existing
   options type had `credentials`, so every caller that compiled before still compiles (pinned
   below); the deprecated fields keep working through the legacy overloads.
-- **Legacy members unchanged, deprecated** (owner ruling): `getErrorLog(logLink)` and the
+- **Legacy members unchanged, deprecated** (spec §3): `getErrorLog(logLink)` and the
   `remoteUser`/`remotePassword` forms of `link`, `pull`, `checkExternalRepo` keep their wire-typed
   callbacks (`IAnalyse`, `IResultStrategy`) exactly; each gains a `@deprecated` tag naming its
   replacement (`getRunLog`; the `credentials` overload; the key-based `pullRepo`). The only legacy

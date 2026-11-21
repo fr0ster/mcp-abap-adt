@@ -126,11 +126,17 @@ Contracts in `@mcp-abap-adt/interfaces-adt` (`src/adt/IAdtAbapGit.ts`), readings
 `AdtAbapGitClient` (`clients/abapGit/*`). One member per endpoint and method; each answers
 through the result strategy the client was built with (shipped default: the document as it
 arrived) and is judged by the caller's `analyse` (default strict: every non-2xx an error).
-**Precedence:** for a member called with `credentials`, and for `getRunLog` / `getErrorLog`, the
+**Precedence:** for a new member called with `credentials`, and for `getRunLog`, the
 structured contract of §5.3 takes precedence over both defaults — the shipped default result is
 the facts reading (`abapGitFacts`), not the raw document, and the error carries the status and
 the T100 key only, never SAP's text (§3.3's "error with SAP's text" applies to the other
-members). No
+members). **Legacy forms unchanged (owner's ruling, keeping the release a minor):**
+`getErrorLog(logLink)`, `pull({ pullLink })` and the `remoteUser`/`remotePassword` forms of `link`,
+`pull` and `checkExternalRepo` keep today's wire-typed callbacks, behaviour and answer, marked
+`@deprecated` with a pointer to `getRunLog`, the key-based `pullRepo` and the `credentials` form.
+Their only changes are additive and refuse only new misuse: the link validation of `getErrorLog`
+and `pull` below, and `credentials?: never` on their options; no previously compiling call breaks.
+The server uses only the new members. No
 retry, no timeout (`timeout: 0`), no lenient reading, no polling. Every member addressed by a
 repository builds its path from `key` (URL-encoded segment); no member takes a URL to send to,
 except the existing `pull`/`getErrorLog` below.
@@ -152,8 +158,8 @@ except the existing `pull`/`getErrorLog` below.
 into R13 (`xmlBuilder.js`, `buildExternalRepoInfoBody`); the transformation is
 `extensible="deep"` with optional fields, so SAP ignores them and a private repository is
 checked anonymously (Code; the effect on a private repository is unmeasured). Fixed in this
-minor. The deprecated `remoteUser`/`remotePassword` argument fields stay (minor) and map to the
-same wire fields; giving both forms is a type error.
+minor. The deprecated `remoteUser`/`remotePassword` argument fields stay (minor), map to the
+same wire fields and keep today's answer (above); giving both forms is a type error.
 
 No credential is part of a result, an `IAdtError`, or the request an error describes (`method`,
 `url`).
@@ -166,12 +172,12 @@ No credential is part of a result, an `IAdtError`, or the request an error descr
 | `link` | R2 v3 | `package`, `url`, `branchName`, `transportRequest?`, `folderLogic?` (cloud); `headers` | `linked` |
 | `unlink` | R3 | `repositoryId`; its `transportRequest` sends a `corrNr` neither handler reads (kept, documented) | `unlinked` |
 | `pullRepo` (new, key-based) | R4 | `key`, `branchName` (required; the server passes R1's), `transportRequest?`, `selection?` (with it: `pull.req.v1`; the server never sends one, §4.3); `headers` | `pulled` |
-| `pull` (existing) | R4 by `pullLink` | deprecated; the same wrapper: `pullLink` must be exactly `/sap/bc/adt/abapgit/repos/{key}/pull`, its key goes to `pullRepo`'s path builder, anything else refused | `pulled` |
+| `pull` (existing) | R4 by `pullLink` | deprecated; the same wrapper: `pullLink` must be exactly `/sap/bc/adt/abapgit/repos/{key}/pull`, its key goes to `pullRepo`'s path builder, anything else refused; an accepted link keeps today's request, callbacks and answer | `pulled` |
 | `pullRepoInDialog` | R5 | as `pullRepo` | `pulled` |
 | `getModifiedObjects` | R6 | `key` | `modifiedObjects` |
 | `getStatus` | R7 | `key` (sends Content-Type `…repos.v2+xml`) | `status` (text) |
 | `getRunLog` (new) | R8 | `key`, `appLogKey` — SAP loads the log by `appLogKey` alone (cl `RES_REPO_OBJ_LOG->get` L23 reads only `app_log_key`), so the pairing is the caller's to check (§4.1) | `errorLog` |
-| `getErrorLog` (existing) | R8 by link | a wrapper: extracts the `{key}` and `{id}` segments of a `logLink` that is exactly the path `/sap/bc/adt/abapgit/repos/{key}/log/{id}` (no scheme, host, query, fragment, `..` or empty segment), validates them as `getRunLog` does, and calls the same key-based path builder; anything else is **refused** in fixed words, nothing sent. Kept for existing callers; chosen over deprecation alone, which would leave the absolute-URL hole open. | `errorLog` |
+| `getErrorLog` (existing) | R8 by link | a wrapper: extracts the `{key}` and `{id}` segments of a `logLink` that is exactly the path `/sap/bc/adt/abapgit/repos/{key}/log/{id}` (no scheme, host, query, fragment, `..` or empty segment), validates them as `getRunLog` does, and calls the same key-based path builder; anything else is **refused** in fixed words, nothing sent. An accepted link keeps today's request, callbacks and answer (deprecated, pointing to `getRunLog`). Kept for existing callers; chosen over deprecation alone, which would leave the absolute-URL hole open. | `errorLog` |
 | `getStaging` | R9 | `key` | `staging` |
 | `push` | R10 | `key`, `staged: IAbapGitStagedObject[]`, `comment: { text; author: { name; email }; committer: { name; email } }` — all required; the library builds the `abapgitstaging` document | `pushed` (`nothing`) |
 | `checkRepo` | R11 | `key` | `checked` (`nothing`) |
@@ -229,8 +235,8 @@ R7 answers a fixed text (Code); onprem R4 ignores `branchName` (Code); R11/R15 s
   The first failure is then the caller's answer.
 
 adt-clients sends both flags on **every abapGit write** (R2, R3, R4, R5, R10, R14, R15), on every
-member called with `credentials`, and on `getRunLog`/`getErrorLog` — whether a credential is
-attached or not, since a write carries user-given content (R10's commit message, author and
+new member called with `credentials`, and on `getRunLog` — whether a credential is attached or
+not (the legacy forms of §3 keep today's options), since a write carries user-given content (R10's commit message, author and
 committer) and may already have run when a replay would start.
 
 ## 4. Server tools

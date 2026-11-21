@@ -2,7 +2,7 @@
   "name": "@mcp-abap-adt/sse",
   "mcpName": "io.github.fr0ster/mcp-abap-adt-sse",
   "version": "24.2.0",
-  "description": "The HTTP+SSE transport of the MCP ABAP ADT server: an Express app serving the ADT tools of @mcp-abap-adt/lib over the MCP HTTP+SSE transport, with DNS rebinding protection and TLS.",
+  "description": "MCP server for SAP ABAP ADT over HTTP+SSE, on premise (ECC, S/4HANA) and SAP BTP ABAP Cloud: CRUD of ABAP, DDIC, CDS and RAP objects, where-used, ATC, unit tests, transports, the ABAP and AMDP debugger, MCP prompts and access restrictions (deny lists, allowed packages, requests and tables), the data tools off by default. Credentials only from the x-sap-* headers of the request that opens each SSE connection. DNS rebinding protection and TLS.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -17,8 +17,20 @@
     "sap",
     "adt",
     "mcp",
-    "model-context-protocol",
     "mcp-server",
+    "model-context-protocol",
+    "abap-cloud",
+    "sap-btp",
+    "s4hana",
+    "on-premise",
+    "where-used",
+    "atc",
+    "abap-unit",
+    "transports",
+    "mcp-prompts",
+    "access-control",
+    "crud",
+    "debugger",
     "sse"
   ],
   "engines": {

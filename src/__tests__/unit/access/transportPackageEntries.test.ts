@@ -1,6 +1,6 @@
 /**
- * A transport entry that names a package (`R3TR DEVC <package>`, the type
- * and the program id in any case, the program id `R3TR` when left out)
+ * A transport entry of type `DEVC` (any case, whatever its program id:
+ * absent, blank, whitespace, `R3TR` or another) names a package and
  * checks that package against the allowed packages before anything is sent:
  * each `objects[]` entry of `MoveTransportObjects` and compact
  * `HandlerTransportMoveObjects`, the `object_name` of `AddTransportObject`
@@ -107,6 +107,9 @@ for (const tool of [
       { object_type: 'DEVC' },
       { object_type: 'devc', pgmid: 'r3tr' },
       { object_type: ' Devc ', pgmid: 'R3TR' },
+      { object_type: 'DEVC', pgmid: '' },
+      { object_type: 'DEVC', pgmid: '   ' },
+      { object_type: 'DEVC', pgmid: 'LIMU' },
     ]) {
       it(`refuses an outside package entry ${JSON.stringify(entry)}, nothing sent`, async () => {
         const { answer, requests } = await callOnce(tool, {
@@ -166,6 +169,9 @@ for (const tool of ['AddTransportObject', 'RemoveTransportObject'] as const) {
     for (const entry of [
       { object_type: 'DEVC' },
       { object_type: 'devc', pgmid: 'r3tr' },
+      { object_type: 'DEVC', pgmid: '' },
+      { object_type: 'DEVC', pgmid: '   ' },
+      { object_type: 'DEVC', pgmid: 'LIMU' },
     ]) {
       it(`refuses an outside package ${JSON.stringify(entry)}, nothing sent`, async () => {
         const { answer, requests } = await callOnce(tool, {

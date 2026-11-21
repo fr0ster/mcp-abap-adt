@@ -24,6 +24,11 @@ load-bearing by the named mutation (break it, watch the test go red, revert).
 - "adt-clients sends both flags on **every abapGit write** (R2, R3, R4, R5, R10, R14, R15), on every
   member called with `credentials`, and on `getRunLog`/`getErrorLog` — whether a credential is
   attached or not."
+- **Owner ruling over the spec's §3 precedence and §3.4 for legacy members:** the facts-only
+  contract, `noLog`/`noResend` and structured errors live on the new members only (`getRunLog`, the
+  `credentials` form, the key-based `pullRepo` and the other new members); `getErrorLog(logLink)` and
+  the `remoteUser`/`remotePassword` call forms keep today's callbacks, behaviour and answer,
+  deprecated, pointing to the new members. The server uses only the new members.
 - "With `noLog`, a line, if any, carries method, the path without query, the integer status and
   the byte count."
 - "`noResend: true` — gates every replay of the request; the initial CSRF token fetch before a
@@ -151,22 +156,15 @@ of every `IAdtAbapGitClient` member. New exports:
   `headers` and `credentials` no longer matches the legacy branch. This stays a minor: no existing
   options type had `credentials`, so every caller that compiled before still compiles (pinned
   below); the deprecated fields keep working through the legacy overloads.
-- **Callback types on the paths the facts exchange serves** (spec §3 precedence) — every callback
-  states what it receives:
-  - `getRunLog`: all its shapes are facts-typed (no `IAnalyse`, no `IResultStrategy`).
-  - `getErrorLog` (legacy, always the run log): both overloads keep their names and arity; `analyse`
-    narrows to `IAbapGitFactsAnalyse<TErrorLog, E>`.
-  - `link`, `pull`, `checkExternalRepo` with the deprecated fields: the legacy overloads split by
-    presence — args with `remoteUser: string` get facts-typed callbacks; args with
-    `remoteUser?: undefined` keep the wire-typed ones; the declared `IAbapGitLinkArgs` (presence
-    unknown) gets callbacks whose `answer` is `IAdtWireResponse | IAbapGitFactsResponse<F>` and whose
-    verdict is `IAdtError | AdtNoFailure` — true at run time either way.
-  - **How this stays a minor, and what narrows:** every call site that passes no callback, or an
-    analyser that reads only the verdict, compiles unchanged (pinned below). An analyser on
-    `getErrorLog` or on a deprecated-credential call that is typed to read the wire answer no longer
-    compiles — by design, since that answer would have carried SAP's echo (spec §3 precedence). Both
-    CHANGELOGs (interfaces-adt 30.2.0, adt-clients 46.2.0) name this one narrowing; the owner may
-    rule it a major instead.
+- **Legacy members unchanged, deprecated** (owner ruling): `getErrorLog(logLink)` and the
+  `remoteUser`/`remotePassword` forms of `link`, `pull`, `checkExternalRepo` keep their wire-typed
+  callbacks (`IAnalyse`, `IResultStrategy`) exactly; each gains a `@deprecated` tag naming its
+  replacement (`getRunLog`; the `credentials` overload; the key-based `pullRepo`). The only legacy
+  changes are additive and refuse only new misuse: `credentials?: never` on the legacy options, and
+  (in adt-clients, T5.1) the link validation of `getErrorLog` and `pull`.
+- **Facts-typed callbacks on the new members only:** `getRunLog`'s shapes and every `credentials`
+  shape are typed by the facts exchange; the other new members' uncredentialed shapes keep
+  `IAnalyse` / `IResultStrategy`.
 - **New members as atoms**, one exported interface each, generic only over its result `T`, each with
   the client's two overload shapes — `<E extends IAdtError>(args, options: …IAbapGitMemberOptions<E>
   & { analyse: IAnalyse<E> }): Promise<IAdtResponse<T, E>>` and `(args, options?:
@@ -194,12 +192,13 @@ of every `IAdtAbapGitClient` member. New exports:
 Tests (`src/__typechecks__/abapGit.ts`, `downstreamStillCompiles.ts`; first failure: missing
 exports): an existing caller of every old overload compiles, `pull` without `branchName` and with
 `remoteUser`/`remotePassword` included; an existing class implementing the four-parameter
-`IAdtAbapGitClient` compiles; existing call sites of `getErrorLog`, `link`, `pull` and
-`checkExternalRepo` (deprecated fields included) that pass no callback or a verdict-only analyser
-compile; a wire-reading analyser on `getErrorLog` and on a `remoteUser` call is `@ts-expect-error`
-(the named narrowing); **error-subtype inference through the member call** — `getRunLog`, `push`
-with `credentials`, `getErrorLog` and `link` with `remoteUser`, each given an analyser returning a
-subtype, type `getError()` as that subtype with no cast; `credentials` with `remoteUser` (literal and variable), **an options variable
+`IAdtAbapGitClient` compiles; **no previously compiling call breaks**
+(`src/__typechecks__/abapGitLegacyCalls.ts`): `getErrorLog`, and `link`, `pull` and
+`checkExternalRepo` with the deprecated fields, called with no callback, a verdict-only analyser, a
+wire-reading analyser (`answer?: IAdtWireResponse`) and a custom wire reader, all compile with the
+46.x types; **error-subtype inference through the member call** — `getRunLog`, `pullRepo` and
+`push` with `credentials`, each given an analyser returning a subtype, type `getError()` as that
+subtype with no cast; `credentials` with `remoteUser` (literal and variable), **an options variable
 holding `headers` and `credentials` beside args with `remoteUser`** (the legacy-branch case),
 an `IResultStrategy` given where an `IAbapGitFactsResultStrategy` is required and the reverse,
 `push` without `comment.committer`, `switchBranch` without `create`, `getFile` with
@@ -207,7 +206,9 @@ an `IResultStrategy` given where an `IAbapGitFactsResultStrategy` is required an
 returning an `IAdtError` subtype types `E` through, and an `IAbapGitFactsAnalyse` returning an
 `IAbapGitStructuredError` subtype likewise. Mutations: drop a `never` field → the both-forms case
 red; drop `credentials?: never` from the legacy options → the legacy-branch case red. Run: `npm run build && npm run test:check && npm run check:surface && npm run
-check:graph` → green. CHANGELOG 30.2.0.
+check:graph` → green. CHANGELOG 30.2.0: the new members and types; the legacy members unchanged
+and deprecated, with their replacements; `credentials?: never` on the legacy options as the one
+additive restriction.
 
 **T2.2 Review and release prep.** Whole-PR review; `npm run check`; gate G2.
 
@@ -300,8 +301,9 @@ URL-encoded segments. The existing low-level internal function `pullRepo(connect
 in `pull.ts` (not exported) becomes `postPullLink`, distinct from the new key-based member `pullRepo`
 (T5.3, through `postPullByKey`). The `pull` wrapper keeps its optional `branchName` and accepts only
 `/sap/bc/adt/abapgit/repos/{key}/pull`; `getErrorLog` accepts only
-`/sap/bc/adt/abapgit/repos/{key}/log/{id}` and calls `getRunLog`'s builder; anything else refused in
-fixed words, nothing sent. Test `src/__tests__/unit/clients/abapGit/paths.test.ts` (recording
+`/sap/bc/adt/abapgit/repos/{key}/log/{id}` and builds the path with the same key-based builder;
+anything else refused in fixed words, nothing sent. For an accepted link both keep today's request,
+callbacks and answer (no facts exchange, no new flags). Test `src/__tests__/unit/clients/abapGit/paths.test.ts` (recording
 connection): keys with `/`, `?`, `#` encoded; an absolute URL, foreign host, query, fragment, `..`,
 empty segment and another path each refused with zero requests; `pull` without `branchName` still
 sends. First failure: today's `getErrorLog` sends the absolute URL. Mutation: accept a scheme → red.
@@ -309,12 +311,16 @@ sends. First failure: today's `getErrorLog` sends the absolute URL. Mutation: ac
 **T5.2 Credentials on the wire and the R13 defect.** `xmlBuilder.ts` writes both credential forms
 exactly as spec §3.1 says (R13/R14 `abapgitexternalrepo:user` / `password`). Test
 `src/__tests__/unit/clients/abapGit/credentialWire.test.ts`: per member and both forms, the exact
-element or header carries the values; they occur in no other header, element, URL, query, result or
-`IAdtError`; the remote URLs used are of several hosts (none assumed), and no member parses a host or
+element or header carries the values and no other header, element, URL or query; for the
+`credentials` form they also occur in no result or `IAdtError` (the deprecated form keeps today's
+answer); the remote URLs used are of several hosts (none assumed), and no member parses a host or
 adds `.git`. First failure: R13 writes `remoteUser`. Mutation: also write R13 `remotePassword` → red.
 
 **T5.3 New members** (spec §3.2) implementing the T2.1 atoms; `link` gains `folderLogic`, its
-`branchName` default kept, deprecated. Test `src/__tests__/unit/clients/abapGit/members.test.ts`,
+`branchName` default kept, deprecated. The legacy members (`getErrorLog`, the deprecated-credential
+forms, `pull` by link) keep today's behaviour and answer and gain `@deprecated` pointing to
+`getRunLog`, the `credentials` form and `pullRepo`; a case per legacy member asserts its request,
+options and answer equal 46.1.0's (recorded fixtures), apart from the link validation (T5.1). Test `src/__tests__/unit/clients/abapGit/members.test.ts`,
 one case per member: method; path from `key`; query (`?create=true` only when true; `filename`,
 `version`); Content-Type and Accept (R6's exact Accept; R7 sends Content-Type `…repos.v2+xml`); body
 (R10's `abapgitstaging` from `staged` and `comment`); `timeout: 0`; stateless session, also on the
@@ -328,7 +334,8 @@ without its slot answers `abapGitDocuments`' default. Header pairs for the new r
 **T5.4 The typed facts exchange** (`src/clients/abapGit/structuredExchange.ts`).
 `answeringFactsExchange<T, F, E extends IAbapGitStructuredError>(run, reduce, read:
 IAbapGitFactsResultStrategy<T, F>, analyse?: IAbapGitFactsAnalyse<F, E>): Promise<IAdtResponse<T,
-E>>` serves every member called with `credentials` (either form) and `getRunLog` / `getErrorLog`;
+E>>` serves the new members only: every new member called with `credentials`, `getRunLog`, and
+the key-based `pullRepo` (legacy members are untouched, T5.3);
 these members never call `answeringExchange` (`src/utils/adtResponse.ts`), whose catch hands
 `error.response` to `analyse`. **Both paths reduce before either callback:** an answer is reduced
 by `abapGitFacts[route]`; a thrown value is reduced by `abapGitErrorFacts(error.response)` into a
@@ -338,8 +345,8 @@ further. **What injected strategies receive:** the reader `IAbapGitFactsResponse
 `IAbapGitResults` are typed `IAbapGitFactsResultStrategy`, so a raw reader cannot be plugged in.
 Shipped default result: `abapGitFacts`. These members and every write send `noLog: true,
 noResend: true`. Test `src/__tests__/unit/clients/abapGit/structuredBoundary.test.ts`, its member
-list the table of credentialed and log members (a new member without the boundary fails), with both
-credential forms and both log methods, on an answered failure and on a **thrown** one (the
+list the table of new credentialed members and `getRunLog` (a new member without the boundary
+fails), on an answered failure and on a **thrown** one (the
 connection throws an error whose `message` and `response` carry the canaries): a recording custom
 reader and custom analyser hold no echoed canary (body, headers, status text, `msgText`, `LONGTEXT`,
 `T100KEY-V*`, the thrown `message`); R11's error keeps `gitHttpStatus`; the recorded options carry
@@ -351,7 +358,9 @@ First failure: the analyser gets `error.response`. Mutations: pass the thrown re
 **T5.5 Docs.** `docs/usage/ERRATA.md` entries of spec §3.3 with their Code grounds; `README.md` and
 `docs/usage/CLIENT_API_REFERENCE.md` (members, credentials, boundary, flags); the `AdtAbapGitClient`
 paragraph of `CLAUDE.md` is the controller's, with the owner's approval of the text; `CHANGELOG.md`
-46.2.0 with the `checkExternalRepo` defect. Run: `npm run build && npm run lint:check && npm run
+46.2.0: the new members and the facts exchange on them; the legacy members unchanged and
+deprecated, with their replacements; the link validation of `getErrorLog` and `pull` (an absolute
+or foreign link is refused); the `checkExternalRepo` defect. Run: `npm run build && npm run lint:check && npm run
 test:check && npm run test:unit` → green.
 
 **T5.6 Live (controller runs).** `src/__tests__/helpers/test-config.yaml.template` `abapgit` cases,

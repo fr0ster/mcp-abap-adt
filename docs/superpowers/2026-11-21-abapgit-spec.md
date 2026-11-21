@@ -228,7 +228,10 @@ R7 answers a fixed text (Code); onprem R4 ignores `branchName` (Code); R11/R15 s
     write it read before the socket died.
   The first failure is then the caller's answer.
 
-adt-clients sends both flags on every credentialed member and on `getRunLog`/`getErrorLog`.
+adt-clients sends both flags on **every abapGit write** (R2, R3, R4, R5, R10, R14, R15), on every
+member called with `credentials`, and on `getRunLog`/`getErrorLog` — whether a credential is
+attached or not, since a write carries user-given content (R10's commit message, author and
+committer) and may already have run when a replay would start.
 
 ## 4. Server tools
 
@@ -417,10 +420,11 @@ No tool argument carries a credential.
   fails with SAP's structured error). Recommended over refusing, since the credential never leaves
   for an unbound host either way (§9.3).
 - **Release gate — redirects, per backend:** before the release, measure live on onprem and cloud
-  whether SAP's abapGit HTTP client forwards the credential when the remote redirects to another
-  host or path (a renamed GitHub repository redirects its old URL). If it forwards across hosts
-  on a backend, every credentialed call on that backend is refused in fixed words until that is
-  solved. Unverified until then (§10). Also unverified: whether a key's stored URL can change
+  whether SAP's abapGit HTTP client forwards the credential when the remote redirects, in two
+  cases: to **another host**, and to **another path on the same host** (a renamed GitHub
+  repository redirects its old URL to the new path). If on a backend SAP forwards the credential
+  to any URL other than the approved endpoint — another host or another path alike — every
+  credentialed call on that backend is refused in fixed words until that is solved. Unverified until then (§10). Also unverified: whether a key's stored URL can change
   after linking (no ADT route changes it; R1 is read on every call).
 
 ### 5.2 Scope per transport
@@ -556,7 +560,9 @@ elsewhere with the reason, route-specific cases gated by system kind in code:
   adt-strategies, adt-clients.
 - **Release order:** interfaces-adt-connection → interfaces-adt → connection → adt-strategies →
   adt-clients, each published to the registry before the next builds on it; then the server from
-  the registry. **Release gate:** the redirect measurement of §5.1 on both backends.
+  the registry. **Release gate:** the redirect measurement of §5.1 on both backends, host and path
+  redirects: credentialed calls ship only where SAP forwards credentials to no URL but the
+  approved endpoint.
 
 ## 9. Open decisions
 
@@ -580,7 +586,7 @@ What a decision above rests on is marked ★.
 - That an abapGit route's error document actually carries `T100KEY-ID` / `T100KEY-NO`: Code says
   it does (`CL_ADT_EXCEPTION_UTILITY` L94–97, both systems); not measured on these routes. The
   first live run asserts it.
-- ★ The redirect behaviour of §5.1, a release gate on each backend.
+- ★ The redirect behaviour of §5.1 (host and path redirects), a release gate on each backend.
 - ★ Whether the connector's CSRF path runs on RFC (§4.7).
 - Which `CL_ADT_WB_RES_APP` proxy serves a request (`get_request_proxy`, not read); both check CSRF
   first.

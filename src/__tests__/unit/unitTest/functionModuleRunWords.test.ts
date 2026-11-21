@@ -7,6 +7,8 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { TOOL_DEFINITION as HandlerUnitTestRun } from '../../../../compact-modify/src/handlers/handleHandlerUnitTestRun';
+import { TOOL_DEFINITION as RunAbapUnit } from '../../../handlers/unit_test/high/handleRunAbapUnit';
 import { TOOL_DEFINITION as RunFunctionModuleUnitTest } from '../../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
 import { RUN_TARGET_FIELD } from '../../../handlers/unit_test/shared/runTarget';
 
@@ -31,4 +33,15 @@ describe('a function module run covers its function group', () => {
     const type = RUN_TARGET_FIELD.shape.type.description ?? '';
     assert.ok(type.includes(`FUNC runs ${GROUP_WORDS}.`), type);
   });
+
+  for (const tool of [RunAbapUnit, HandlerUnitTestRun]) {
+    it(`${tool.name}'s description says so for FUNC`, () => {
+      assert.ok(
+        tool.description.includes(
+          `FUNC a function module, whose run covers ${GROUP_WORDS}`,
+        ),
+        tool.description,
+      );
+    });
+  }
 });

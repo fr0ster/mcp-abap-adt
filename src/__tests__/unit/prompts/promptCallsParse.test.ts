@@ -239,6 +239,34 @@ function readsEntries(step: PromptStep): boolean {
 }
 
 /** The arguments of `prompt` for `value` of its closed argument. */
+/** The object prompts, asked a second time with every optional argument given. */
+const OBJECT_PROMPTS: ReadonlySet<string> = new Set([
+  'create',
+  'get',
+  'update',
+  'delete',
+  'activate',
+  'check',
+]);
+
+/**
+ * The arguments of `prompt` for `value` with every optional argument it
+ * declares given too (an object prompt; `function_group` only for a function
+ * module, the type it names), so an optional value the steps send is parsed
+ * as well.
+ */
+async function everyArgumentFor(
+  prompt: AbapPrompt,
+  value: string,
+): Promise<Record<string, string>> {
+  const args = await argumentsFor(prompt, value);
+  for (const name of Object.keys(prompt.argsSchema)) {
+    if (name === 'function_group' || Object.hasOwn(args, name)) continue;
+    args[name] = `SOME_${name.toUpperCase()}`;
+  }
+  return args;
+}
+
 async function argumentsFor(
   prompt: AbapPrompt,
   value: string,
@@ -284,6 +312,13 @@ function problemsOf(
     if (tool === undefined) {
       problems.push(`${where}: the tool is not listed`);
       return;
+    }
+    // The argument list as the text renders it: `args` below keeps the last
+    // of two values under one key, so a duplicate is read here.
+    const names = step.arguments.map(([name]) => name);
+    const repeated = names.filter((name, at) => names.indexOf(name) !== at);
+    if (repeated.length > 0) {
+      problems.push(`${where}: ${repeated.join(', ')} is given twice`);
     }
     const args: Record<string, JsonValue> = {};
     let sendsEntry = false;
@@ -443,6 +478,18 @@ describe('every generated call parses against its tool’s listed schema (test 1
                 );
                 calls += instruction.steps.length;
                 problems.push(...problemsOf(source, key, instruction.steps));
+                if (OBJECT_PROMPTS.has(prompt.name)) {
+                  const given = prompt.instruction(
+                    await everyArgumentFor(prompt, value),
+                  );
+                  problems.push(
+                    ...problemsOf(
+                      source,
+                      `${key} (every argument)`,
+                      given.steps,
+                    ),
+                  );
+                }
               }
             }
             assert.deepEqual(problems, []);

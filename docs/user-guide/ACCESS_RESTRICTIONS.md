@@ -94,8 +94,14 @@ does not see it and cannot call it. No call checks a deny list.
 ## Allowed packages, allowed requests
 
 Checked once per call, at the handler's start, before anything is sent. A call that names a
-package (`package_name`, `super_package`) or a request (`transport_request`, `transport_number`,
-`target_number`) in its arguments runs only when each name matches its own list.
+package (`package_name`; with `object_type` `PACKAGE`, the `object_name` of a lock or an unlock;
+on a package create, the parent `super_package`) or a request (`transport_request`,
+`transport_number`, `target_number`) in its arguments runs only when each name matches its own
+list.
+
+- A package is checked by its own name on its lock, unlock, update and delete. A
+  `super_package` is checked only on a package create, where it is sent; a lock or a check
+  accepts it and sends nothing of it.
 
 - Only the tools a binary's `-ro` twin does not serve are checked: **reads are not checked**
   (`GetPackage`, `GetTransport`, `HandlerGet`).

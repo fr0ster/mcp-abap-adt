@@ -8,6 +8,7 @@ import type { AbapPrompt, GetPromptResult } from './types.js';
 
 export { completeFrom } from './completion.js';
 export { jsonLiteral, renderInstruction } from './instruction.js';
+export { abapPrompts } from './prompts.js';
 export {
   notServedWords,
   promptRefusal,

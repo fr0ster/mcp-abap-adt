@@ -1,0 +1,70 @@
+/**
+ * Calls of a prompt as a client makes them: its text for some arguments,
+ * its refusal, its completion of an argument, and the prompts a source
+ * lists by name.
+ */
+
+import assert from 'node:assert/strict';
+import { getCompleter } from '@modelcontextprotocol/sdk/server/completable.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import {
+  type AbapPrompt,
+  type PromptSource,
+  renderInstruction,
+} from '../../lib/prompts';
+
+/** The prompt `factory` builds from `source`, which must list it. */
+export function promptOf(
+  factory: (source: PromptSource) => AbapPrompt | undefined,
+  source: PromptSource,
+): AbapPrompt {
+  const prompt = factory(source);
+  assert.ok(prompt, 'the prompt is listed');
+  return prompt;
+}
+
+/** The text `prompt` answers for `args`. */
+export function textOf(
+  prompt: AbapPrompt,
+  args: Record<string, string | undefined>,
+): string {
+  return renderInstruction(prompt.instruction(args));
+}
+
+/**
+ * `prompt` refuses `args` as the protocol's InvalidParams, with exactly
+ * `words` — or, with `prefix`, with words starting so.
+ */
+export function assertRefused(
+  prompt: AbapPrompt,
+  args: Record<string, string | undefined>,
+  words: string,
+  prefix = false,
+): void {
+  assert.throws(
+    () => prompt.instruction(args),
+    (error: Error) => {
+      assert.ok(error instanceof McpError);
+      assert.equal(error.code, ErrorCode.InvalidParams);
+      const said = `MCP error ${ErrorCode.InvalidParams}: ${words}`;
+      if (prefix) assert.ok(error.message.startsWith(said), error.message);
+      else assert.equal(error.message, said);
+      return true;
+    },
+  );
+}
+
+/** The values `prompt` completes argument `name` with, for `typed`. */
+export async function completionOf(
+  prompt: AbapPrompt,
+  name: string,
+  typed = '',
+  context: Record<string, string> = {},
+): Promise<readonly string[]> {
+  const schema = prompt.argsSchema[name];
+  assert.ok(schema, `${prompt.name} takes ${name}`);
+  const complete = getCompleter(schema);
+  assert.ok(complete, `${prompt.name} completes ${name}`);
+  const values = await complete(typed, { arguments: context });
+  return values.map(String);
+}

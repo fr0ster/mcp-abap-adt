@@ -189,6 +189,30 @@ describe('the wire log with noLog: method, path, status and bytes only', () => {
     });
   }
 
+  it('a body whose byte length throws (a detached DataView): the line without a count, the request untouched', async () => {
+    const buffer = new ArrayBuffer(8);
+    const view = new DataView(buffer);
+    structuredClone(buffer, { transfer: [buffer] });
+    assert.throws(() => view.byteLength);
+    const detached: IAbapConnection = {
+      ...sapAnswering(false),
+      async makeAdtRequest<T = unknown, D = unknown>(): Promise<
+        IAdtWireResponse<T, D>
+      > {
+        // A recorded body; `T` is the caller's view of it.
+        return { data: view as T, status: 200, statusText: 'OK', headers: {} };
+      },
+    };
+    const answer = await withHttpWireLog(detached).makeAdtRequest(FLAGGED);
+    assert.equal(answer.status, 200);
+    assert.equal(answer.data, view);
+    assert.ok(
+      written.some((line) => line.endsWith('→ 200\n')),
+      written.join(''),
+    );
+    assert.ok(written.every((line) => !line.includes('bytes')));
+  });
+
   it('a binary answer: its byte count too', async () => {
     const bytes = new Uint8Array([1, 2, 3, 4, 5]);
     const binary: IAbapConnection = {

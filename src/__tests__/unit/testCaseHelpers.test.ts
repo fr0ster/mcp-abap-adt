@@ -79,8 +79,8 @@ describe('the test-case helpers', () => {
       'CreateProgram is not served on cloud (its ADT type table serves no operation it needs)',
     );
     assert.equal(
-      notServedReason('RuntimeGetGatewayErrorLog'),
-      'RuntimeGetGatewayErrorLog is not served on cloud (available_in: onprem)',
+      notServedReason('GetEnhancementImpl'),
+      'GetEnhancementImpl is not served on cloud (available_in: onprem)',
     );
     assert.equal(notServedReason('SearchSource'), undefined);
   });

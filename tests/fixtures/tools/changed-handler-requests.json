@@ -557,7 +557,7 @@
         }
       }
     ],
-    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"Invalid transport response XML structure - no tm:root found\"}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"parseCreatedTransport: the answer names no created transport request or task\"}"
   },
   "onprem HandlerCreate TABLE": {
     "requests": [
@@ -4786,7 +4786,7 @@
         }
       }
     ],
-    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"Invalid transport response XML structure - no tm:root found\"}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"parseCreatedTransport: the answer names no created transport request or task\"}"
   },
   "cloud HandlerCreate TABLE": {
     "requests": [

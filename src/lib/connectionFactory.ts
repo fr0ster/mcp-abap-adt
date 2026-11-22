@@ -308,13 +308,8 @@ async function quietExchange(
   );
   try {
     const answer = await send(options);
-    const body = wireValueOf(answer.data);
-    const bytes =
-      body.kind === 'text'
-        ? ` ${Buffer.byteLength(body.text)} bytes`
-        : body.kind === 'bytes'
-          ? ` ${body.bytes.byteLength} bytes`
-          : '';
+    const count = byteCountOf(answer.data);
+    const bytes = count === undefined ? '' : ` ${count} bytes`;
     process.stderr.write(
       `[WIRE ${id}] → ${integerOr(answer.status)}${bytes}\n`,
     );
@@ -338,6 +333,18 @@ function pathnameOf(url: string): string {
   } catch {
     return '?';
   }
+}
+
+/**
+ * An answer body's byte count: a text's UTF-8 length, the byte length of an
+ * `ArrayBuffer`, a `DataView` or any typed-array view; `undefined` for
+ * anything else. The body itself is read for nothing more.
+ */
+function byteCountOf(data: unknown): number | undefined {
+  if (typeof data === 'string') return Buffer.byteLength(data);
+  if (ArrayBuffer.isView(data)) return data.byteLength;
+  if (data instanceof ArrayBuffer) return data.byteLength;
+  return undefined;
 }
 
 /** A status as an integer, else `?`. */

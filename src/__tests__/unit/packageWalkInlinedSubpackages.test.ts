@@ -146,3 +146,51 @@ describe('a root that lists its subpackages inline', () => {
     assert.deepEqual(rowsOf(walked.value), EXPECTED.slice(0, 2));
   });
 });
+
+describe('what makes two rows one object', () => {
+  /** A walk of `ZPKG_KEYS`: a root listing two type nodes, each answering `nodes`. */
+  async function walkOf(first: string[], second: string[]): Promise<string[]> {
+    const documents: Record<string, string> = {
+      'ZPKG_KEYS|root': documentOf(
+        [],
+        [typeNode('PROG/P', '000001'), typeNode('CLAS/OC', '000002')],
+      ),
+      'ZPKG_KEYS|1': documentOf(first, []),
+      'ZPKG_KEYS|2': documentOf(second, []),
+    };
+    const utils: NodeStructureSource = {
+      async fetchNodeStructure(_type, name, options) {
+        return succeeded(
+          nodeLevelOf(
+            documents[keyOf(name, options?.nodeId)] ?? documentOf([], []),
+          ),
+        );
+      },
+    };
+    return rowsOf(await walkPackage(utils, 'ZPKG_KEYS'));
+  }
+
+  it('the same name under two types is two objects', async () => {
+    assert.deepEqual(
+      await walkOf(
+        [objectNode('PROG/P', 'ZPKG_SAME')],
+        [objectNode('CLAS/OC', 'ZPKG_SAME')],
+      ),
+      ['PROG/P ZPKG_SAME in ZPKG_KEYS', 'CLAS/OC ZPKG_SAME in ZPKG_KEYS'],
+    );
+  });
+
+  // Repository object names are upper case: SAP answered the same object to
+  // a lower-case and an upper-case query, upper case both times (on premise,
+  // 2026-11-22). The walk reads names as SAP's repository does, as it does
+  // for the subpackages it walks.
+  it('names that differ only in case are one object', async () => {
+    assert.deepEqual(
+      await walkOf(
+        [objectNode('PROG/P', 'ZPKG_CASE'), objectNode('PROG/P', 'zpkg_case')],
+        [],
+      ),
+      ['PROG/P ZPKG_CASE in ZPKG_KEYS'],
+    );
+  });
+});

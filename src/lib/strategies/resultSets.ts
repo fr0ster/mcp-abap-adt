@@ -167,15 +167,13 @@ export const READING_BY_SLOT = {
   addedObject: structured,
   createdTask: structured,
   actionLog: structured,
-  // `objects` is the one a call site keeps rather than stamps: the package parses the entries and, with
-  // them, the `tm:position` that `removeObject` requires. Stamped with
-  // `structured` it would hand back a parsed document and leave a caller
-  // digging a position out of it — which is the work `readObjects` exists to
-  // end. `ReadTransportObjects` therefore calls
-  // `resultsFor(transportDocuments, ['objects'])`. The table still declares
-  // the slot, because the ratchet in `resultSets.test.ts` asks for a reading
-  // per slot and a call site that forgets the keep-list should get something
-  // rather than a throw.
+  // `objects` is stamped `structured` like its neighbours, and that is what
+  // `ReadTransportObjects` reads (plain `resultsFor(transportDocuments)`): it
+  // walks the parse for each entry's `tm:position` and the task it is on,
+  // which adt-strategies' `transportObjectEntries` does not answer (no task
+  // number, and a request's `tm:all_objects` read beside its tasks' entries,
+  // every object twice). `CreateTransport` passes a reading of its own for
+  // the slot (`firstTaskOf`, over `transportTree`).
   objects: structured,
   // Arrived with adt-clients 22.0.0, on `changeTaskType`. `structured` for the
   // same reason the echoes above are: the answer is the task document read

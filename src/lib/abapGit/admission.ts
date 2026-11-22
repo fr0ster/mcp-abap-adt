@@ -6,6 +6,7 @@
  * 1. a denied compact action: refused;
  * 1a. `background` on a call whose schema does not declare it (cloud, or
  *    another action): refused;
+ * 1b. the run log on premise, whose R1 carries no `log_link`: refused;
  * 2. link and pull while an allowed-packages or allowed-requests entry is
  *    configured (the restriction signal): refused;
  * 3. a blank `package_name` on link and branch info: refused;
@@ -52,7 +53,16 @@ import { accessRefusalWords, ServerRefusal } from '../auth/serverRefusal';
 import type { ToolArgs } from '../handlers/interfaces';
 import { wireValueOf } from '../wireValue';
 import { parseXml } from '../xml/node';
-import { attr, child, elements, text } from '../xml/tree';
+import {
+  attr,
+  elements,
+  entries,
+  listOf,
+  localName,
+  text,
+  type XmlElement,
+  type XmlRead,
+} from '../xml/tree';
 import { argumentUrlFault, matchEndpoint } from './approvedEndpoints';
 import type { CallEndpoints } from './endpointSources';
 
@@ -246,6 +256,11 @@ export function rawAbapGitRefusal(
     return new ServerRefusal('abapgit_background_not_declared');
   }
   if (operation === undefined) return undefined;
+  // 1b. On premise no run log is served: its R1 carries no log_link
+  // (measured 2026-11-22, 53 entries), so R8 is cloud's alone.
+  if (operation === 'error_log' && context.kind === 'onprem') {
+    return new ServerRefusal('abapgit_run_log_not_served');
+  }
   // 2. The import refusal under any package or request restriction.
   if (
     IMPORTS.has(operation) &&
@@ -299,7 +314,7 @@ export async function admitAbapGitCall(
   if (operation === undefined) return { admitted: {} };
   // 5. The R1 pre-read, once, for a call addressed by repository_key.
   let repo: IAbapGitRepoFacts | undefined;
-  let logLinks: readonly string[] = [];
+  let logLinks: readonly LogLinkElement[] = [];
   if (KEYED.has(operation)) {
     const read = await repositoryOf(
       connection,
@@ -338,7 +353,7 @@ export async function admitAbapGitCall(
       return { refused: new ServerRefusal('abapgit_run_log_ambiguous') };
     }
     const asked = stringArg(call.args, 'app_log_key');
-    const link = logLinkParts(logLinks[0]);
+    const link = logLinkParts(logLinks[0]?.href);
     if (
       repo === undefined ||
       link === undefined ||
@@ -389,7 +404,10 @@ async function repositoryOf(
   key: string | undefined,
   logger: ILogger | undefined,
 ): Promise<
-  | { readonly entry: IAbapGitRepoFacts; readonly logLinks: readonly string[] }
+  | {
+      readonly entry: IAbapGitRepoFacts;
+      readonly logLinks: readonly LogLinkElement[];
+    }
   | undefined
 > {
   if (key === undefined || key.trim() === '') return undefined;
@@ -420,22 +438,39 @@ async function repositoryOf(
 
 const r1Parser = new XMLParser({
   ignoreAttributes: false,
-  attributeNamePrefix: '',
-  removeNSPrefix: true,
+  attributeNamePrefix: '@_',
+  removeNSPrefix: false,
   parseTagValue: false,
   parseAttributeValue: false,
   trimValues: true,
-  isArray: (name) => name === 'repository' || name === 'link',
+  // Every element a list, every attribute a string: an attribute and an
+  // element of the same name never meet.
+  isArray: (_name, _path, _leaf, isAttribute) => !isAttribute,
 });
 
+/** The Atom namespace R1's links are in (measured 2026-11-22). */
+const ATOM_NAMESPACE = 'http://www.w3.org/2005/Atom';
+
+/** One link of an R1 entry that names itself a log link, as it is written. */
+interface LogLinkElement {
+  /**
+   * Its `href`, when it is the measured shape: an Atom `link` element with
+   * an unprefixed `type="log_link"` attribute, a `rel` attribute and an
+   * `href` attribute, and no `href` or `type` child; `undefined` otherwise.
+   */
+  readonly href: string | undefined;
+}
+
 /**
- * The `href` of every `log_link` element of the R1 entry for `key`, empty
- * ones included, in document order; none when the answer cannot be read.
+ * Every link of the R1 entry for `key` that names itself a log link — by a
+ * `type` attribute of any prefix or a `type` child — read namespace-aware,
+ * attribute and element kept apart, in document order; none when the
+ * answer cannot be read.
  */
 function logLinksOf(
   answer: IAdtWireResponse | undefined,
   key: string,
-): readonly string[] {
+): readonly LogLinkElement[] {
   if (answer === undefined) return [];
   const body = wireValueOf(answer.data);
   if (body.kind !== 'text') return [];
@@ -445,64 +480,127 @@ function logLinksOf(
   } catch {
     return [];
   }
-  const entry = elements(
-    child(child(parsed, 'repositories'), 'repository'),
-  ).find((repository) => text(child(repository, 'key')) === key);
-  return elements(child(entry, 'link'))
-    .filter((link) => attr(link, 'type') === 'log_link')
-    .map((link) => attr(link, 'href') ?? '');
+  const roots = childrenNamed(parsed, 'repositories');
+  for (const root of roots) {
+    for (const entry of childrenNamed(root, 'repository')) {
+      if (!valuesNamed(entry, 'key').some((k) => text(k) === key)) continue;
+      const out: LogLinkElement[] = [];
+      for (const [name, member] of entries(entry)) {
+        if (localName(name) !== 'link') continue;
+        for (const link of elements(member)) {
+          if (!namesLogLink(link)) continue;
+          out.push({ href: measuredHref(link, name, [entry, root]) });
+        }
+      }
+      return out;
+    }
+  }
+  return [];
 }
 
-/** The repositories' path every repository link starts with. */
-const REPOS_PATH = '/sap/bc/adt/abapgit/repos/';
+/** The element children of `node` whose local name is `local`, any prefix. */
+function childrenNamed(node: XmlRead, local: string): XmlElement[] {
+  return entries(node)
+    .filter(([name]) => !name.startsWith('@_') && localName(name) === local)
+    .flatMap(([, member]) => elements(member));
+}
+
+/** The values (texts or elements) of the children of `node` named `local`, any prefix. */
+function valuesNamed(node: XmlRead, local: string): XmlRead[] {
+  return entries(node)
+    .filter(([name]) => !name.startsWith('@_') && localName(name) === local)
+    .flatMap(([, member]) => [...listOf(member)]);
+}
+
+/** Whether a link names itself a log link: a `type` attribute of any prefix, or a `type` child. */
+function namesLogLink(link: XmlElement): boolean {
+  for (const [name, member] of entries(link)) {
+    if (name.startsWith('@_')) {
+      if (localName(name.slice(2)) === 'type' && member === 'log_link') {
+        return true;
+      }
+    } else if (
+      localName(name) === 'type' &&
+      listOf(member).some((each) => text(each) === 'log_link')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** The `href` of a link of the measured shape (`LogLinkElement`), else `undefined`. */
+function measuredHref(
+  link: XmlElement,
+  name: string,
+  ancestors: readonly XmlElement[],
+): string | undefined {
+  const colon = name.indexOf(':');
+  const prefix = colon < 0 ? '' : name.slice(0, colon);
+  const declaration = prefix === '' ? '@_xmlns' : `@_xmlns:${prefix}`;
+  const namespace = [link, ...ancestors]
+    .map((scope) => attr(scope, declaration))
+    .find((value) => value !== undefined);
+  if (namespace !== ATOM_NAMESPACE) return undefined;
+  if (attr(link, '@_type') !== 'log_link') return undefined;
+  if (attr(link, '@_rel') === undefined) return undefined;
+  for (const [member] of entries(link)) {
+    if (member.startsWith('@_')) continue;
+    const local = localName(member);
+    if (local === 'href' || local === 'type') return undefined;
+  }
+  return attr(link, '@_href');
+}
 
 /**
- * The repository and the log key of `/sap/bc/adt/abapgit/repos/<key>/log/<id>`,
- * from one link: parsed (against a dummy base), its pathname alone read; a
- * link with a query or a fragment, or of any other shape, is `undefined`.
- * Each segment must be non-empty and of the key characters only
- * (`isKey`), so nothing encoded, no dot segment and no delimiter can pass.
+ * The repository and the log key of a log link's raw `href`, before any URL
+ * parsing: exactly `/sap/bc/adt/abapgit/repos/<digits>/log/<UPPER-HEX>`,
+ * compared segment by segment as strings; anything else — a host, a dot
+ * segment, an encoding, a query, a fragment, another segment — is
+ * `undefined`. The shape is the measured one: every repository key 12
+ * digits and every log key 32 uppercase hex characters (Measured
+ * 2026-11-22, onprem 53 / cloud 446 entries; onprem carries no log_link).
+ * No length rule of our own.
  */
 function logLinkParts(
-  logLink: string | undefined,
+  href: string | undefined,
 ): { readonly repository: string; readonly logKey: string } | undefined {
-  if (logLink === undefined) return undefined;
-  if (logLink.includes('?') || logLink.includes('#')) return undefined;
-  let parsed: URL;
-  try {
-    parsed = new URL(logLink, 'http://r1.invalid');
-  } catch {
+  if (href === undefined) return undefined;
+  const segments = href.split('/');
+  if (segments.length !== 9) return undefined;
+  const [empty, sap, bc, adt, abapgit, repos, repository, log, logKey] =
+    segments;
+  if (
+    empty !== '' ||
+    sap !== 'sap' ||
+    bc !== 'bc' ||
+    adt !== 'adt' ||
+    abapgit !== 'abapgit' ||
+    repos !== 'repos' ||
+    log !== 'log' ||
+    repository === undefined ||
+    logKey === undefined ||
+    !allIn(repository, isDigit) ||
+    !allIn(logKey, isUpperHex)
+  ) {
     return undefined;
   }
-  if (parsed.search !== '' || parsed.hash !== '') return undefined;
-  const pathname = parsed.pathname;
-  if (!pathname.startsWith(REPOS_PATH)) return undefined;
-  const segments = pathname.slice(REPOS_PATH.length).split('/');
-  if (segments.length !== 3 || segments[1] !== 'log') return undefined;
-  const repository = segments[0] ?? '';
-  const logKey = segments[2] ?? '';
-  if (!isKey(repository) || !isKey(logKey)) return undefined;
   return { repository, logKey };
 }
 
-/**
- * The characters a repository key and an application-log key are taken
- * from: ASCII letters, digits and `_`. Not read from a recorded R1 (none was
- * at hand; Inference, to be confirmed by the live run): a key outside it is
- * refused, never guessed at.
- */
-function isKey(segment: string): boolean {
-  if (segment === '') return false;
-  for (let i = 0; i < segment.length; i += 1) {
-    const code = segment.charCodeAt(i);
-    const letterOrDigit =
-      (code >= 48 && code <= 57) ||
-      (code >= 65 && code <= 90) ||
-      (code >= 97 && code <= 122);
-    if (!letterOrDigit && code !== 95) return false;
+/** Whether `text` is non-empty and every character passes `test`. */
+function allIn(text: string, test: (code: number) => boolean): boolean {
+  if (text === '') return false;
+  for (let i = 0; i < text.length; i += 1) {
+    if (!test(text.charCodeAt(i))) return false;
   }
   return true;
 }
+
+const isDigit = (code: number): boolean => code >= 48 && code <= 57;
+
+const isUpperHex = (code: number): boolean =>
+  isDigit(code) || (code >= 65 && code <= 70);
 
 /** A connection's session type, as its contract declares it. */
 type SessionType = Parameters<IAbapConnection['setSessionType']>[0];

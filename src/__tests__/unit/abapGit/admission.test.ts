@@ -10,6 +10,8 @@
  */
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import type {
   IAbapConnection,
@@ -29,6 +31,7 @@ import type {
 } from '../../../lib/access/accessChecks';
 import { serverRefusalOf } from '../../../lib/auth/serverRefusal';
 import type { ToolArgs } from '../../../lib/handlers/interfaces';
+import { repositoryRoot } from '../../helpers/repoRoot';
 
 const ATOM = 'xmlns:atom="http://www.w3.org/2005/Atom"';
 const REL = 'http://www.sap.com/adt/abapgit/relations';
@@ -140,7 +143,7 @@ function contextOf(
 ) {
   const counts = { connections: 0, endpointLookups: 0 };
   const context: AdmissionContext = {
-    kind: options.kind ?? 'onprem',
+    kind: options.kind ?? 'cloud',
     deniedAction: () => options.deniedAction,
     connection: async () => {
       counts.connections += 1;
@@ -379,21 +382,21 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
   });
 
   it('the run log: a matching log_link pair is admitted; a foreign or missing key, or a status_link alone, is refused before the read', async () => {
-    const paired = sapWith(r1({ logKey: 'LOG1' }));
+    const paired = sapWith(r1({ logKey: 'A1B2C3' }));
     const ok = await admit(
       'GetAbapGitErrorLog',
-      { repository_key: KEY, app_log_key: 'LOG1' },
+      { repository_key: KEY, app_log_key: 'A1B2C3' },
       contextOf(paired.connection).context,
     );
     assert.equal(codeOf(ok), 'admitted');
     for (const [label, document, appLogKey] of [
-      ['foreign key', r1({ logKey: 'LOG1' }), 'LOG2'],
-      ['no log key', r1({ logKey: 'LOG1' }), undefined],
-      ['status_link alone', r1({ statusKey: 'LOG1' }), 'LOG1'],
+      ['foreign key', r1({ logKey: 'A1B2C3' }), 'D4E5F6'],
+      ['no log key', r1({ logKey: 'A1B2C3' }), undefined],
+      ['status_link alone', r1({ statusKey: 'A1B2C3' }), 'A1B2C3'],
       [
         'log_link of another repository',
-        r1({ logKey: 'LOG1', logRepository: '000002' }),
-        'LOG1',
+        r1({ logKey: 'A1B2C3', logRepository: '000002' }),
+        'A1B2C3',
       ],
     ] as const) {
       const sap = sapWith(document);
@@ -423,8 +426,8 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
 
   it('a log_link with a query, a fragment or a dot key is never paired', async () => {
     for (const [href, asked] of [
-      [`/sap/bc/adt/abapgit/repos/${KEY}/log/LOG1?x`, 'LOG1'],
-      [`/sap/bc/adt/abapgit/repos/${KEY}/log/LOG1#x`, 'LOG1'],
+      [`/sap/bc/adt/abapgit/repos/${KEY}/log/A1B2C3?x`, 'A1B2C3'],
+      [`/sap/bc/adt/abapgit/repos/${KEY}/log/A1B2C3#x`, 'A1B2C3'],
       [`/sap/bc/adt/abapgit/repos/${KEY}/log/%2e%2e`, '..'],
       [`/sap/bc/adt/abapgit/repos/${KEY}/log/LOG%2F1`, 'LOG/1'],
       [`/sap/bc/adt/abapgit/repos/${KEY}/log/LOG%31`, 'LOG%31'],
@@ -446,12 +449,12 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
   });
 
   it('a second log_link with an empty href is ambiguous too', async () => {
-    const sap = sapWith(r1({ logKey: 'LOG1', secondHref: '' }));
+    const sap = sapWith(r1({ logKey: 'A1B2C3', secondHref: '' }));
     assert.equal(
       codeOf(
         await admit(
           'GetAbapGitErrorLog',
-          { repository_key: KEY, app_log_key: 'LOG1' },
+          { repository_key: KEY, app_log_key: 'A1B2C3' },
           contextOf(sap.connection).context,
         ),
       ),
@@ -463,24 +466,24 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
     for (const [label, document] of [
       [
         'own first, foreign second',
-        r1({ logKey: 'LOG1', secondLog: '000002/LOG1' }),
+        r1({ logKey: 'A1B2C3', secondLog: '000002/A1B2C3' }),
       ],
       [
         'foreign first, own second',
         r1({
-          logKey: 'LOG1',
+          logKey: 'A1B2C3',
           logRepository: '000002',
-          secondLog: `${KEY}/LOG1`,
+          secondLog: `${KEY}/A1B2C3`,
         }),
       ],
-      ['two own', r1({ logKey: 'LOG1', secondLog: `${KEY}/LOG2` })],
+      ['two own', r1({ logKey: 'A1B2C3', secondLog: `${KEY}/D4E5F6` })],
     ] as const) {
       const sap = sapWith(document);
       assert.equal(
         codeOf(
           await admit(
             'GetAbapGitErrorLog',
-            { repository_key: KEY, app_log_key: 'LOG1' },
+            { repository_key: KEY, app_log_key: 'A1B2C3' },
             contextOf(sap.connection).context,
           ),
         ),
@@ -520,5 +523,145 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
     );
     assert.ok('admitted' in anonymous);
     assert.equal(anonymous.admitted.credentials, null);
+  });
+});
+
+/**
+ * R1 as SAP's cloud abapGit answers it: three entries of the capture of
+ * 2026-11-22 (GETs only, every user value scrubbed), each with its
+ * `status_link` and `log_link`.
+ */
+const MEASURED = readFileSync(
+  join(
+    repositoryRoot(__dirname),
+    'src/__tests__/fixtures/abapGit/r1-cloud-measured.xml',
+  ),
+  'utf-8',
+);
+const MEASURED_KEY = '000000000007';
+const MEASURED_LOG = '067391FAB8E31FD1A7E72E6A3E129651';
+
+describe('the run-log pairing on measured links', () => {
+  const pairing = async (document: string, key: string, log: string) =>
+    codeOf(
+      await admit(
+        'GetAbapGitErrorLog',
+        { repository_key: key, app_log_key: log },
+        contextOf(sapWith(document).connection, { kind: 'cloud' }).context,
+      ),
+    );
+
+  it('a real link pairs', async () => {
+    assert.equal(
+      await pairing(MEASURED, MEASURED_KEY, MEASURED_LOG),
+      'admitted',
+    );
+  });
+
+  it('a log key in lowercase hex is refused', async () => {
+    const lower = MEASURED_LOG.toLowerCase();
+    assert.equal(
+      await pairing(
+        MEASURED.split(MEASURED_LOG).join(lower),
+        MEASURED_KEY,
+        lower,
+      ),
+      'abapgit_run_log_not_paired',
+    );
+  });
+
+  it('a log key with _ is refused', async () => {
+    const underscored = `${MEASURED_LOG.slice(0, -1)}_`;
+    assert.equal(
+      await pairing(
+        MEASURED.split(MEASURED_LOG).join(underscored),
+        MEASURED_KEY,
+        underscored,
+      ),
+      'abapgit_run_log_not_paired',
+    );
+  });
+
+  it('a letter in the repository key is refused', async () => {
+    const lettered = '00000000000A';
+    assert.equal(
+      await pairing(
+        MEASURED.split(MEASURED_KEY).join(lettered),
+        lettered,
+        MEASURED_LOG,
+      ),
+      'abapgit_run_log_not_paired',
+    );
+  });
+
+  const REAL_LINK = `<atom:link href="/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/log/${MEASURED_LOG}" rel="http://www.sap.com/adt/abapgit/relations/log" type="log_link" xmlns:atom="http://www.w3.org/2005/Atom"/>`;
+
+  /** The capture with the entry's real log_link replaced by `links`. */
+  const withLinks = (links: string): string => {
+    assert.ok(MEASURED.includes(REAL_LINK), 'the capture holds the real link');
+    return MEASURED.split(REAL_LINK).join(links);
+  };
+
+  it('a second log_link whose type is a namespaced attribute is counted: ambiguous', async () => {
+    const second = `<atom:link href="/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/log/${MEASURED_LOG}" rel="http://www.sap.com/adt/abapgit/relations/log" atom:type="log_link" xmlns:atom="http://www.w3.org/2005/Atom"/>`;
+    assert.equal(
+      await pairing(withLinks(REAL_LINK + second), MEASURED_KEY, MEASURED_LOG),
+      'abapgit_run_log_ambiguous',
+    );
+  });
+
+  it('a log_link whose href is a child element is refused', async () => {
+    const child = `<atom:link rel="http://www.sap.com/adt/abapgit/relations/log" type="log_link" xmlns:atom="http://www.w3.org/2005/Atom"><atom:href>/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/log/${MEASURED_LOG}</atom:href></atom:link>`;
+    assert.equal(
+      await pairing(withLinks(child), MEASURED_KEY, MEASURED_LOG),
+      'abapgit_run_log_not_paired',
+    );
+  });
+
+  for (const [label, path] of [
+    [
+      'a /./ segment',
+      `/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/./log/${MEASURED_LOG}`,
+    ],
+    [
+      'a /%2e/ segment',
+      `/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/%2e/log/${MEASURED_LOG}`,
+    ],
+    [
+      'an extra segment',
+      `/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/log/${MEASURED_LOG}/x`,
+    ],
+    [
+      'a host',
+      `https://elsewhere.invalid/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/log/${MEASURED_LOG}`,
+    ],
+  ] as const) {
+    it(`a log_link href with ${label} is refused`, async () => {
+      const link = REAL_LINK.replace(
+        `/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/log/${MEASURED_LOG}`,
+        path,
+      );
+      assert.equal(
+        await pairing(withLinks(link), MEASURED_KEY, MEASURED_LOG),
+        'abapgit_run_log_not_paired',
+      );
+    });
+  }
+
+  it('on premise: no run log is served (its R1 carries no log_link), refused before anything', async () => {
+    const sap = sapWith(MEASURED);
+    const { context, counts } = contextOf(sap.connection, { kind: 'onprem' });
+    assert.equal(
+      codeOf(
+        await admit(
+          'GetAbapGitErrorLog',
+          { repository_key: MEASURED_KEY, app_log_key: MEASURED_LOG },
+          context,
+        ),
+      ),
+      'abapgit_run_log_not_served',
+    );
+    assert.equal(counts.connections, 0);
+    assert.equal(sap.sent.length, 0);
   });
 });

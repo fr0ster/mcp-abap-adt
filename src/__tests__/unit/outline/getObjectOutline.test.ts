@@ -69,12 +69,37 @@ function linkOf(component: unknown, rel: string): unknown {
 }
 
 describe('GetObjectOutline', () => {
-  it('a class: one GET of its objectstructure, its components with visibility, level and source positions', async () => {
+  it('terse, by default: the components as indented rows, the source named once', async () => {
     const result = await run({
       tool: 'GetObjectOutline',
       variant: 'onprem',
       stand: 'recording',
       args: { object_type: 'CLAS/OC', object_name: 'ZMCP_D1_9E25_CL' },
+      answers: answered('read-outline-class--01-objectstructure'),
+      expected: 'none',
+    });
+    assert.equal(result.isError, false);
+    const lines = result.text.split('\n');
+    assert.equal(lines[0], '# object CLAS/OC ZMCP_D1_9E25_CL');
+    assert.equal(
+      lines[1],
+      '# source /sap/bc/adt/oo/classes/zmcp_d1_9e25_cl/source/main',
+    );
+    assert.equal(lines[2], 'name\ttype\tvisibility\tline\tsource');
+    assert.ok(lines.includes('  PUB\tCLAS/OM\tpublic\t12\t'));
+    assert.equal(result.text.includes('implementationBlock'), false);
+  });
+
+  it('a class: one GET of its objectstructure, its components with visibility, level and source positions', async () => {
+    const result = await run({
+      tool: 'GetObjectOutline',
+      variant: 'onprem',
+      stand: 'recording',
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_D1_9E25_CL',
+        detail: 'medium',
+      },
       answers: answered('read-outline-class--01-objectstructure'),
       expected: 'none',
     });
@@ -136,7 +161,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'cloud',
       stand: 'recording',
-      args: { object_type: 'CLAS/OC', object_name: 'ZMCP_D1_276D_CL' },
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_D1_276D_CL',
+        detail: 'medium',
+      },
       answers: answered('read-outline-local-class--01-objectstructure'),
       expected: 'none',
     });
@@ -169,6 +198,7 @@ describe('GetObjectOutline', () => {
         object_type: 'INTF/OI',
         object_name: 'ZMCP_D1_9E25_IF',
         version: 'inactive',
+        detail: 'medium',
       },
       answers: answered('read-outline-interface--01-objectstructure'),
       expected: 'none',
@@ -192,7 +222,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'onprem',
       stand: 'recording',
-      args: { object_type: 'PROG/P', object_name: 'ZMCP_D1_9E25_PR' },
+      args: {
+        object_type: 'PROG/P',
+        object_name: 'ZMCP_D1_9E25_PR',
+        detail: 'medium',
+      },
       answers: answered('read-outline-program--01-objectstructure'),
       expected: 'none',
     });
@@ -223,7 +257,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'cloud',
       stand: 'recording',
-      args: { object_type: 'FUGR/F', object_name: 'ZMCP_D19E25' },
+      args: {
+        object_type: 'FUGR/F',
+        object_name: 'ZMCP_D19E25',
+        detail: 'medium',
+      },
       answers: answered('read-outline-function-group--01-objectstructure'),
       expected: 'none',
     });
@@ -268,7 +306,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'onprem',
       stand: 'recording',
-      args: { object_type: 'CLAS/OC', object_name: 'ZMCP_NOT_THERE' },
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_NOT_THERE',
+        detail: 'medium',
+      },
       answers: [
         {
           status: 404,
@@ -286,7 +328,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'onprem',
       stand: 'recording',
-      args: { object_type: 'CLAS/OC', object_name: 'ZMCP_D1_9E25_CL' },
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_D1_9E25_CL',
+        detail: 'medium',
+      },
       answers: [{ status: 200, data: '' }],
       expected: 'none',
     });
@@ -299,7 +345,11 @@ describe('GetObjectOutline', () => {
       tool: 'GetObjectOutline',
       variant: 'cloud',
       stand: 'recording',
-      args: { object_type: 'PROG/P', object_name: 'ZMCP_D1_9E25_PR' },
+      args: {
+        object_type: 'PROG/P',
+        object_name: 'ZMCP_D1_9E25_PR',
+        detail: 'medium',
+      },
       expected: 'nothing-sent',
       refusal: 'thrown',
     });

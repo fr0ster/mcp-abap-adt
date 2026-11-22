@@ -27,12 +27,22 @@ import type { ServerOutlineCode } from '../../../lib/adtClientContract';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import {
+  type AnswerTable,
+  answerAt,
+  indentedTsv,
+  type TreeRow,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
@@ -163,6 +173,99 @@ function outlineOf(document: string): IObjectOutline {
   return outline;
 }
 
+/** The outline a call read: SAP's document, and its parse (none at raw). */
+interface OutlineRead {
+  document: string;
+  outline: IObjectOutline | undefined;
+}
+
+/** A component's definition: its first link with a position, else its first. */
+function definitionOf(component: AnsweredComponent): AnsweredLink | undefined {
+  return (
+    component.links.find((link) => link.start !== undefined) ??
+    component.links[0]
+  );
+}
+
+/**
+ * The outline as indented rows: name, type, visibility, the definition's
+ * line, and its source where it is not the one the `# source` line names (a
+ * local include, a module's include).
+ */
+function outlineRows(
+  component: AnsweredComponent,
+  source: string | undefined,
+  depth = 0,
+): TreeRow[] {
+  const definition = definitionOf(component);
+  const line =
+    definition?.start === undefined ? '' : String(definition.start.line);
+  const elsewhere =
+    definition === undefined || definition.source === source
+      ? ''
+      : definition.source;
+  return [
+    {
+      depth,
+      cells: [
+        component.name,
+        component.type,
+        component.visibility ?? '',
+        line,
+        elsewhere,
+      ],
+    },
+    ...component.children.flatMap((child) =>
+      outlineRows(child, source, depth + 1),
+    ),
+  ];
+}
+
+/**
+ * What GetObjectOutline answers at each `detail`, selected before the call
+ * (`src/lib/detail`): terse the components as indented
+ * `name\ttype\tvisibility\tline` rows under `# object` and `# source`
+ * (the source the lines are in, named once: the links each component
+ * carries repeat it); medium every component with its links (the former
+ * terse); full the parse; raw the document.
+ */
+function outlineAnswers(
+  objectType: string,
+  objectName: string,
+  version: string,
+): AnswerTable<OutlineRead, string | object> {
+  const components = (outline: IObjectOutline) =>
+    outline.root === undefined
+      ? undefined
+      : componentOf(outline.base, outline.root);
+  return {
+    terse: ({ document, outline }) => {
+      if (outline === undefined) return document;
+      const root = components(outline);
+      if (root === undefined) return document;
+      const source = definitionOf(root)?.source;
+      return [
+        `# object ${objectType} ${objectName}`,
+        ...(source === undefined ? [] : [`# source ${source}`]),
+        'name\ttype\tvisibility\tline\tsource',
+        indentedTsv(outlineRows(root, source)),
+      ].join('\n');
+    },
+    medium: ({ document, outline }) =>
+      outline === undefined
+        ? document
+        : {
+            success: true,
+            object_type: objectType,
+            object_name: objectName,
+            version,
+            outline: components(outline),
+          },
+    full: ({ document, outline }) => outline ?? document,
+    raw: ({ document }) => document,
+  };
+}
+
 export async function handleGetObjectOutline(
   context: HandlerContext,
   args: GetObjectOutlineArgs,
@@ -181,6 +284,10 @@ export async function handleGetObjectOutline(
   }
   const objectName = object_name.toUpperCase();
   const detail = detailOf(args);
+  const shown = answerAt(
+    outlineAnswers(object_type, objectName, version),
+    levelOf(args),
+  );
   /** The outline the call read, for the projection: parsed once. */
   const read: { outline?: IObjectOutline } = {};
 
@@ -200,19 +307,6 @@ export async function handleGetObjectOutline(
       }
       return response;
     },
-    (document) => {
-      const outline = read.outline;
-      if (detail === 'raw' || outline === undefined) return document;
-      if (detail === 'full') return outline;
-      const root = outline.root;
-      return {
-        success: true,
-        object_type,
-        object_name: objectName,
-        version,
-        outline:
-          root === undefined ? undefined : componentOf(outline.base, root),
-      };
-    },
+    (document) => shown({ document, outline: read.outline }),
   );
 }

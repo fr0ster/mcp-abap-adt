@@ -45,6 +45,7 @@ import {
   readIncludePart,
   readMainPrograms,
   readTableType,
+  readTransport,
   compactSourceRoutes as route,
 } from './compactReadRoutes';
 
@@ -73,6 +74,9 @@ export const compactMetadataRoutes: Partial<
   BEHAVIOR_DEFINITION: route.BEHAVIOR_DEFINITION,
   BEHAVIOR_IMPLEMENTATION: route.BEHAVIOR_IMPLEMENTATION,
   METADATA_EXTENSION: route.METADATA_EXTENSION,
+  // A transport request's or task's document: GetTransport's read (the
+  // source part is the entries' read, ReadTransportObjects').
+  TRANSPORT: readTransport,
 };
 
 export const compactUrlRoutes: Partial<

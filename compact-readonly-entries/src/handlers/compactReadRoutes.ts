@@ -44,6 +44,7 @@ import {
   handleGetTableSettings,
   handleGetTableType,
   handleGetTextElements,
+  handleGetTransport,
   handleGetUnitTestResultOnce,
   handleReadTransportObjects,
   READ_DEFINITIONS,
@@ -148,6 +149,12 @@ export const readIncludePart =
 export const readMainPrograms: CompactHandler = defineTool(
   D.GetMainPrograms,
   handleGetMainPrograms,
+).call;
+
+/** A transport request's or task's read (TRANSPORT, part metadata): GetTransport's. */
+export const readTransport: CompactHandler = defineTool(
+  D.GetTransport,
+  handleGetTransport,
 ).call;
 
 /** The table type's read: GetTableType's (metadata, its one part). */

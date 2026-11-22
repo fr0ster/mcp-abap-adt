@@ -1,11 +1,12 @@
 /**
- * The server's seam on the SDK's tool request handlers: `McpServer` installs
- * its `tools/list` and `tools/call` callbacks through the public
- * `server.setRequestHandler` on its first tool registration; the seam takes
- * that path over once, at the instance's construction, so the callbacks the
- * SDK installs are wrapped before any request reaches them. The SDK's
- * callbacks stay what answers: a wrapper only reads the request first and,
- * for `tools/list`, filters the SDK's own reply.
+ * The server's seam on the SDK's `tools/call` request handler: `McpServer`
+ * installs its callback through the public `server.setRequestHandler` on its
+ * first tool registration; the seam takes that path over once, at the
+ * instance's construction, so the callback the SDK installs is wrapped before
+ * any request reaches it. The SDK's callback stays what answers: the wrapper
+ * only reads the request first. `tools/list` is the SDK's own, untouched: the
+ * abapGit tools are always listed, and availability is decided at call time
+ * (spec §4.5).
  */
 
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
@@ -17,8 +18,6 @@ import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/proto
 import {
   CallToolRequestSchema,
   type CallToolResult,
-  ListToolsRequestSchema,
-  ListToolsResultSchema,
   type Notification,
   type Request,
   type Result,
@@ -39,12 +38,6 @@ export type ToolRequestAnswer = ServerResult | Result;
 /** What the seam asks of the instance. */
 export interface ToolRequestSeam {
   /**
-   * The tool names to leave out of this `tools/list` reply; empty: the
-   * SDK's reply as it is. Runs inside the request's context, with its
-   * signal.
-   */
-  unlisted(extra: ToolRequestExtra): Promise<ReadonlySet<string>>;
-  /**
    * A `tools/call`'s answer decided before the SDK validates its arguments
    * (the raw request: an undeclared argument is still there), or
    * `undefined` to hand the request to the SDK's callback as it came.
@@ -56,9 +49,9 @@ export interface ToolRequestSeam {
 }
 
 /**
- * Takes over `server.setRequestHandler` so the `tools/list` callback the SDK
- * installs answers its own reply less the names `seam.unlisted` gives. Every
- * other handler is installed as given.
+ * Takes over `server.setRequestHandler` so the `tools/call` callback the SDK
+ * installs first answers what `seam.refusedCall` decides. Every other handler
+ * is installed as given.
  */
 export function installToolRequestSeam(
   server: Server,
@@ -85,36 +78,11 @@ export function installToolRequestSeam(
       });
       return;
     }
-    if (!isSchema(schema, ListToolsRequestSchema)) {
-      install(schema, handler);
-      return;
-    }
-    install(schema, async (request, extra) => {
-      const answer = await handler(request, extra);
-      const unlisted = await seam.unlisted(extra);
-      return unlisted.size === 0 ? answer : withoutTools(answer, unlisted);
-    });
+    install(schema, handler);
   };
 }
 
 /** Whether `schema` is `expected` itself: the SDK installs each by its exported schema. */
 function isSchema(schema: object, expected: object): boolean {
   return schema === expected;
-}
-
-/**
- * The SDK's `tools/list` reply less the tools named in `unlisted`. The reply
- * is the SDK's handler's, typed only as any result: read as a listing, and
- * answered as it came when it is none.
- */
-function withoutTools(
-  answer: ToolRequestAnswer,
-  unlisted: ReadonlySet<string>,
-): ToolRequestAnswer {
-  const listing = ListToolsResultSchema.safeParse(answer);
-  if (!listing.success) return answer;
-  return {
-    ...listing.data,
-    tools: listing.data.tools.filter((tool) => !unlisted.has(tool.name)),
-  };
 }

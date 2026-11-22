@@ -1,8 +1,8 @@
 /**
- * The abapGit tools, full and compact (spec §4.1, §4.2): the names whose
- * listing and calls depend on the system serving abapGit (`availability.ts`).
- * Registration stays by system kind; this list says only which names are
- * abapGit's.
+ * The abapGit tools, full and compact (spec §4.1, §4.2): always listed, the
+ * names whose calls depend on the system serving abapGit (`availability.ts`,
+ * decided at call time). Registration stays by system kind; this list says
+ * only which names are abapGit's.
  */
 
 /** The full set's abapGit tools. */

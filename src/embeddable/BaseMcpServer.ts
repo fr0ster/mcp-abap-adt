@@ -431,8 +431,8 @@ export abstract class BaseMcpServer extends McpServer {
   private bornOnce = false;
 
   /**
-   * The abapGit tools this instance registered (spec §4.5): listed, and
-   * served, only where the system the request reaches serves abapGit.
+   * The abapGit tools this instance registered (spec §4.5): always listed,
+   * served only where the system the call reaches serves abapGit.
    */
   private readonly abapGitTools = new Set<string>();
 
@@ -771,14 +771,10 @@ export abstract class BaseMcpServer extends McpServer {
     this.abapGitEndpoints = options.abapGitEndpoints ?? [];
     this.abapGitRestrictions =
       options.abapGitRestrictions ?? NO_ABAPGIT_RESTRICTIONS;
-    // The abapGit tools are listed only where the system serves abapGit
-    // (spec §4.5): the SDK's own `tools/list` reply, filtered.
+    // The abapGit tools are always listed: `tools/list` is the SDK's own,
+    // and whether the system serves abapGit is decided at call time (spec
+    // §4.5, admission's availability step).
     installToolRequestSeam(this.server, {
-      unlisted: async (extra) =>
-        this.abapGitTools.size === 0 ||
-        (await this.abapGitServedOnListing(extra.signal))
-          ? NONE_UNLISTED
-          : this.abapGitTools,
       // The abapGit admission's raw steps on the request as it came, before
       // the SDK validates it (spec §4.4): a denied action, an undeclared
       // `background`, the import refusal, a blank package.
@@ -1190,73 +1186,10 @@ export abstract class BaseMcpServer extends McpServer {
       this.release(held);
       throw error;
     }
-    const firstBirth = !this.bornOnce;
     this.bornOnce = true;
     this.entries.set(connection, held);
     this.systemContexts.set(connection, resolved.systemContext);
-    if (firstBirth) this.connectionBorn();
     return connection;
-  }
-
-  /**
-   * The instance's connection was born by a call, the first time (not at a
-   * start): nothing by default. stdio's `--deferred-logon` tells the client
-   * its tool list may have changed (spec §9.1 a).
-   */
-  protected connectionBorn(): void {}
-
-  /**
-   * Whether a `tools/list` may take the instance's connection to read the
-   * system's discovery: yes by default. stdio's `--deferred-logon` lists
-   * before its first logon without one.
-   */
-  protected listingTakesConnection(): boolean {
-    return true;
-  }
-
-  /**
-   * Whether the system the instance's connection reaches serves abapGit, for
-   * a listing: `false` (fail closed) without a source, when the listing
-   * takes no connection, or when the connection or its discovery cannot be
-   * had. The connection's use is released when the answer is known.
-   */
-  protected async abapGitServedOnListing(
-    signal: AbortSignal,
-  ): Promise<boolean> {
-    if (this.connectionContext === null || !this.listingTakesConnection()) {
-      return false;
-    }
-    let connection: IAbapConnection;
-    try {
-      connection = await this.getConnection(signal);
-    } catch {
-      return false;
-    }
-    try {
-      return await this.abapGitServedOn(connection);
-    } finally {
-      this.connectionReleased(connection);
-    }
-  }
-
-  /**
-   * After a birth that lets a listing take the connection (stdio's
-   * `--deferred-logon`): when the instance registered abapGit tools and the
-   * system serves abapGit, the client is told once that the tool list
-   * changed (`notifications/tools/list_changed`, spec §9.1 a). One
-   * discovery read; its failure, or a system that does not serve abapGit,
-   * sends nothing. Settles without throwing.
-   */
-  protected async announceAbapGitTools(): Promise<void> {
-    if (this.abapGitTools.size === 0) return;
-    try {
-      if (await this.abapGitServedOnListing(new AbortController().signal)) {
-        await this.server.sendToolListChanged();
-      }
-    } catch {
-      // The notification is the client's hint only: a closed transport
-      // leaves the listing as the next request reads it.
-    }
   }
 
   /**
@@ -2326,8 +2259,8 @@ export abstract class BaseMcpServer extends McpServer {
               };
               // An abapGit call's one admission point (spec §4.3–§4.5,
               // §5.1), whether or not access checks are configured: its raw
-              // steps again, then availability (an unlisted tool's call
-              // meets the listing's answer), the R1 pre-read, the package
+              // steps again, then availability (decided here only: the
+              // tools are always listed), the R1 pre-read, the package
               // check, the run-log pairing and the endpoint binding —
               // before foreground or background dispatch. A refused call
               // sends nothing but what admission read.
@@ -3681,9 +3614,6 @@ interface Destination {
   /** The destination's own `SAP_RESPONSIBLE`, taken before `user`. */
   responsible: string | undefined;
 }
-
-/** A listing that leaves nothing out. */
-const NONE_UNLISTED: ReadonlySet<string> = new Set<string>();
 
 /** The target system settings point at, as a key (`adtSystemKey`). */
 function targetOf(settings: SapConfig): string {

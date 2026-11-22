@@ -239,7 +239,7 @@ function safeHeaders(headers: Readonly<Record<string, string>>): string {
  * untouched when the switch is off — no wrapper, no cost, no behaviour to
  * explain in production.
  */
-function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
+export function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   const { logWire, bodyChars } = httpWireOptions();
   if (!logWire) return connection;
   const original = connection.makeAdtRequest.bind(connection);
@@ -249,6 +249,10 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   ): Promise<IAdtWireResponse> => {
     n += 1;
     const id = n;
+    // `noLog` (spec §3.4): the method, the path without its query, the
+    // integer status and the byte count — nothing of the request or the
+    // answer beside, on either branch.
+    if (options.noLog === true) return quietExchange(id, options, original);
     process.stderr.write(
       `[WIRE ${id}] ${String(options.method ?? '?')} ${String(options.url ?? '?')}\n`,
     );
@@ -291,6 +295,42 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
     }
   };
   return connection;
+}
+
+/** A `noLog` exchange's wire lines: method and path, then the integer status and the bytes. */
+async function quietExchange(
+  id: number,
+  options: IAbapRequestOptions,
+  send: (options: IAbapRequestOptions) => Promise<IAdtWireResponse>,
+): Promise<IAdtWireResponse> {
+  const url = String(options.url ?? '?');
+  const query = url.indexOf('?');
+  const path = query < 0 ? url : url.slice(0, query);
+  process.stderr.write(
+    `[WIRE ${id}] ${String(options.method ?? '?')} ${path}\n`,
+  );
+  try {
+    const answer = await send(options);
+    const body = wireValueOf(answer.data);
+    const bytes =
+      body.kind === 'text' ? ` ${Buffer.byteLength(body.text)} bytes` : '';
+    process.stderr.write(
+      `[WIRE ${id}] → ${integerOr(answer.status)}${bytes}\n`,
+    );
+    return answer;
+  } catch (error: unknown) {
+    process.stderr.write(
+      `[WIRE ${id}] → threw ${integerOr(childAt(error, 'response', 'status'))}\n`,
+    );
+    throw error;
+  }
+}
+
+/** A status as an integer, else `?`. */
+function integerOr(status: unknown): string {
+  return typeof status === 'number' && Number.isInteger(status)
+    ? String(status)
+    : '?';
 }
 
 /** How a connection was built, so a sibling can be opened exactly like it. */

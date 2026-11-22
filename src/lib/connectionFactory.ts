@@ -338,7 +338,10 @@ function pathnameOf(url: string): string {
 /**
  * An answer body's byte count: a text's UTF-8 length, the byte length of an
  * `ArrayBuffer`, a `DataView` or any typed-array view; `undefined` for
- * anything else. The body itself is read for nothing more.
+ * anything else. The body itself is read for nothing more. A detached or
+ * out-of-bounds view and a cross-realm buffer are constructed hostile
+ * objects, out of scope by the owner's standing rule: the server's own HTTP
+ * stack never hands such a body to this wrapper.
  */
 function byteCountOf(data: unknown): number | undefined {
   if (typeof data === 'string') return Buffer.byteLength(data);

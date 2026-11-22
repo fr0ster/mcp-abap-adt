@@ -4,9 +4,22 @@ import { XMLParser } from 'fast-xml-parser';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
+import {
+  answered,
+  type DetailTable,
+  formatted,
+  rawLevel,
+  readingAt,
+  tsv,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
+import { rawOf } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { parseXml } from '../../../lib/xml/node';
 import { child, isElement, listOf } from '../../../lib/xml/tree';
@@ -15,11 +28,12 @@ export const TOOL_DEFINITION = {
   name: 'GetMainPrograms',
   available_in: ['onprem'] as const,
   description:
-    '[read-only] Reads the main programs of the ABAP include named by include_name in one request: each program that includes it, or for an include of a function group the group. Returns main_programs, a list of { name, type, uri } — type PROG/P for a program, FUGR/F for a function group.',
+    '[read-only] Reads the main programs of the ABAP include named by include_name in one request: each program that includes it, or for an include of a function group the group. Returns the type and name of each main program (PROG/P for a program, FUGR/F for a function group): by default as TSV rows; with detail full, main_programs, a list of { name, type, uri }.',
   inputSchema: z.object({
     include_name: requiredText('Include name is required').describe(
       'Include name.',
     ),
+    ...DETAIL_SHAPE,
   }),
 } as const;
 
@@ -64,6 +78,40 @@ export function mainProgramsOf(document: string): MainProgram[] {
   return programs;
 }
 
+/**
+ * What GetMainPrograms answers at each `detail`: the reading the answer is
+ * read with, selected before the call (`src/lib/detail`) — terse a
+ * `type\tname` row per main program under its include, medium every field
+ * but the uri, full the answer before `detail`, raw the document.
+ */
+function mainProgramReadings(
+  includeName: string,
+): DetailTable<string | object> {
+  const programsOf = (answer: Parameters<typeof rawOf>[0]) =>
+    mainProgramsOf(rawOf(answer));
+  return {
+    terse: formatted(programsOf, (programs) =>
+      [
+        `# include ${includeName}`,
+        tsv(
+          ['type', 'name'],
+          programs.map((program) => [program.type, program.name]),
+        ),
+      ].join('\n'),
+    ),
+    medium: formatted(programsOf, (programs) => ({
+      include_name: includeName,
+      main_programs: programs.map(({ uri: _uri, ...fields }) => fields),
+    })),
+    full: formatted(programsOf, (programs) => ({
+      success: true,
+      include_name: includeName,
+      main_programs: programs,
+    })),
+    raw: rawLevel,
+  };
+}
+
 export async function handleGetMainPrograms(
   context: HandlerContext,
   args: GetMainProgramsArgs,
@@ -74,15 +122,17 @@ export async function handleGetMainPrograms(
   logger?.info(`Fetching main programs of include: ${includeName}`);
   // One request; SAP's refusal is the method's error as it is.
   return answer(
-    { tool: 'GetMainPrograms', detail: 'terse' },
+    { tool: 'GetMainPrograms', detail: detailOf(args) },
     () =>
       createOnPremAdtClient(connection, logger)
-        .getInclude(resultsFor(includeDocuments))
+        .getInclude({
+          ...resultsFor(includeDocuments),
+          mainPrograms: readingAt(
+            mainProgramReadings(includeName),
+            levelOf(args),
+          ),
+        })
         .readMainPrograms({ includeName }, { analyse: analyseException }),
-    (programs: AdtReading<string>) => ({
-      success: true,
-      include_name: includeName,
-      main_programs: mainProgramsOf(programs.raw),
-    }),
+    answered,
   );
 }

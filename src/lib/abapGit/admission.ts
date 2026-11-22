@@ -445,9 +445,7 @@ const r1Parser = new XMLParser({
   removeNSPrefix: false,
   parseTagValue: false,
   parseAttributeValue: false,
-  // Whitespace kept, in attributes and texts alike: an href or a key
-  // padded with it is not the measured one.
-  trimValues: false,
+  trimValues: true,
   // Every element a list, every attribute a string: an attribute and an
   // element of the same name never meet.
   isArray: (_name, _path, _leaf, isAttribute) => !isAttribute,
@@ -518,6 +516,10 @@ function oneText(
 }
 
 /**
+ * R1 is SAP's answer on the caller's own connection; these checks bind the
+ * caller's arguments to it. A crafted R1 needs a hostile SAP system and is
+ * out of scope (controller ruling 2026-11-22).
+ *
  * The one R1 entry for `key`, read from the answer as it came: the
  * `repositories` root and its `repository` entries in the abapGit
  * namespace, the entry whose one `key` (in that namespace) is exactly `key`

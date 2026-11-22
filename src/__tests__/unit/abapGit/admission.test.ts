@@ -325,6 +325,21 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
     assert.ok(!headers.includes('username') && !headers.includes('password'));
   });
 
+  it('a padded approved URL in R1 still binds its credential', async () => {
+    const sap = sapWith(r1({ url: `  ${REPO_URL} ` }));
+    const verdict = await admit(
+      'PullAbapGitRepo',
+      { repository_key: KEY },
+      contextOf(sap.connection).context,
+    );
+    assert.ok('admitted' in verdict);
+    assert.equal(verdict.admitted.repo?.url, REPO_URL);
+    assert.deepEqual(verdict.admitted.credentials, {
+      user: 'git-user',
+      password: 'git-token',
+    });
+  });
+
   it('push, unlink and branch switch are checked against R1’s package', async () => {
     for (const [tool, args] of [
       ['PushAbapGitRepo', { repository_key: KEY }],
@@ -678,21 +693,6 @@ describe('the run-log pairing on measured links', () => {
       'abapgit_repository_unknown',
     );
   });
-
-  for (const [label, padded] of [
-    ['leading', ' '],
-    ['trailing', 'end'],
-  ] as const) {
-    it(`an href with ${label} whitespace is refused`, async () => {
-      const path = `/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/log/${MEASURED_LOG}`;
-      const href = padded === ' ' ? ` ${path}` : `${path} `;
-      const link = REAL_LINK.replace(`href="${path}"`, `href="${href}"`);
-      assert.equal(
-        await pairing(withLinks(link), MEASURED_KEY, MEASURED_LOG),
-        'abapgit_run_log_not_paired',
-      );
-    });
-  }
 
   it('on premise: no run log is served (its R1 carries no log_link), refused before anything', async () => {
     const sap = sapWith(MEASURED);

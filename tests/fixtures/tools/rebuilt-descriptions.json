@@ -192,7 +192,7 @@
     "inputSchema.container.description": "where_used: with object_type PROG/PX, required: whose text elements they are, program or function_group; taken by PROG/PX alone.",
     "inputSchema.container.enum": ["program", "function_group"],
     "inputSchema.maxResults.description": "search_object: maximum number of results to return (default 100).",
-    "inputSchema.detail.description": "search_object, transports, atc_findings, atc_result: How much of the answer to return: \"terse\" (default, the fields you need to act), \"medium\" (every field of the reading; currently the same as \"full\"), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.description": "search_source, search_object, where_used, package_tree, transports, atc_findings, atc_result: How much of the answer to return: \"terse\" (default, the fields you need to act), \"medium\" (every field of the reading; currently the same as \"full\"), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
     "inputSchema.detail.enum": ["terse", "medium", "full", "raw"],
     "inputSchema.objects.description": "where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.",
     "inputSchema.objects[].object_name.description": "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",

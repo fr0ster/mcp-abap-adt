@@ -49,6 +49,7 @@ export type ServerRefusalCode =
   | 'abapgit_package_required'
   | 'abapgit_repository_unknown'
   | 'abapgit_run_log_not_paired'
+  | 'abapgit_run_log_ambiguous'
   | 'abapgit_url_refused'
   | 'abapgit_endpoint_refused'
   | AccessRefusalCode;
@@ -89,6 +90,10 @@ export const ABAPGIT_REPOSITORY_UNKNOWN_WORDS =
 /** A run-log key the repository list does not show for that repository (spec §4.1). */
 export const ABAPGIT_RUN_LOG_NOT_PAIRED_WORDS =
   'app_log_key is not the run log the repository list shows for repository_key; nothing but the list was sent';
+
+/** An R1 entry carrying more than one log_link: which run it names is not known (spec §4.1). */
+export const ABAPGIT_RUN_LOG_AMBIGUOUS_WORDS =
+  'the repository list shows more than one run log for repository_key, so which one app_log_key names is not known; nothing but the list was sent';
 
 /** A `url` argument that is no URL, or carries userinfo, a query, a fragment or a dot segment (spec §5.1). */
 export const ABAPGIT_URL_REFUSED_WORDS =
@@ -424,6 +429,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   abapgit_package_required: ABAPGIT_PACKAGE_REQUIRED_WORDS,
   abapgit_repository_unknown: ABAPGIT_REPOSITORY_UNKNOWN_WORDS,
   abapgit_run_log_not_paired: ABAPGIT_RUN_LOG_NOT_PAIRED_WORDS,
+  abapgit_run_log_ambiguous: ABAPGIT_RUN_LOG_AMBIGUOUS_WORDS,
   abapgit_url_refused: ABAPGIT_URL_REFUSED_WORDS,
   abapgit_endpoint_refused: ABAPGIT_ENDPOINT_REFUSED_WORDS,
 };

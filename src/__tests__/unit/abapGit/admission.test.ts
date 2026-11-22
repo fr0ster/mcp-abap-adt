@@ -45,6 +45,8 @@ function r1(
     statusKey?: string;
     /** The repository segment of the log_link; the entry's own key by default. */
     logRepository?: string;
+    /** A second log_link after the first, as `<repository>/<log key>`. */
+    secondLog?: string;
   } = {},
 ): string {
   return (
@@ -61,6 +63,9 @@ function r1(
     (options.logKey === undefined
       ? ''
       : `<atom:link href="/sap/bc/adt/abapgit/repos/${options.logRepository ?? KEY}/log/${options.logKey}" rel="${REL}/log" type="log_link"/>`) +
+    (options.secondLog === undefined
+      ? ''
+      : `<atom:link href="/sap/bc/adt/abapgit/repos/${options.secondLog.split('/')[0]}/log/${options.secondLog.split('/')[1]}" rel="${REL}/log" type="log_link"/>`) +
     '</abapgitrepo:repository></abapgitrepo:repositories>'
   );
 }
@@ -404,6 +409,38 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
         ['/sap/bc/adt/abapgit/repos'],
         label,
       );
+    }
+  });
+
+  it('an entry with two log_links is ambiguous and refused, whichever pairs', async () => {
+    for (const [label, document] of [
+      [
+        'own first, foreign second',
+        r1({ logKey: 'LOG1', secondLog: '000002/LOG1' }),
+      ],
+      [
+        'foreign first, own second',
+        r1({
+          logKey: 'LOG1',
+          logRepository: '000002',
+          secondLog: `${KEY}/LOG1`,
+        }),
+      ],
+      ['two own', r1({ logKey: 'LOG1', secondLog: `${KEY}/LOG2` })],
+    ] as const) {
+      const sap = sapWith(document);
+      assert.equal(
+        codeOf(
+          await admit(
+            'GetAbapGitErrorLog',
+            { repository_key: KEY, app_log_key: 'LOG1' },
+            contextOf(sap.connection).context,
+          ),
+        ),
+        'abapgit_run_log_ambiguous',
+        label,
+      );
+      assert.equal(sap.sent.length, 1, label);
     }
   });
 

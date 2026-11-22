@@ -298,7 +298,7 @@ export async function admitAbapGitCall(
   if (operation === undefined) return { admitted: {} };
   // 5. The R1 pre-read, once, for a call addressed by repository_key.
   let repo: IAbapGitRepoFacts | undefined;
-  let logLink: string | undefined;
+  let logLinks: readonly string[] = [];
   if (KEYED.has(operation)) {
     const read = await repositoryOf(
       connection,
@@ -309,7 +309,7 @@ export async function admitAbapGitCall(
       return { refused: new ServerRefusal('abapgit_repository_unknown') };
     }
     repo = read.entry;
-    logLink = read.logLink;
+    logLinks = read.logLinks;
   }
   // 6. The package check, when access checks are configured.
   if (context.accessChecks !== undefined) {
@@ -329,15 +329,21 @@ export async function admitAbapGitCall(
       }
     }
   }
-  // 7. The run-log pairing: the entry's log_link key, nothing else.
+  // 7. The run-log pairing: the entry's one log_link, its repository
+  // segment and its log key read from that same link; more than one is
+  // ambiguous.
   if (operation === 'error_log') {
+    if (logLinks.length > 1) {
+      return { refused: new ServerRefusal('abapgit_run_log_ambiguous') };
+    }
     const asked = stringArg(call.args, 'app_log_key');
+    const link = logLinkParts(logLinks[0]);
     if (
       repo === undefined ||
-      repo.appLogKey === undefined ||
+      link === undefined ||
       asked === undefined ||
-      asked !== repo.appLogKey ||
-      !logLinkOfRepository(logLink, repo.key)
+      link.repository !== repo.key ||
+      link.logKey !== asked
     ) {
       return { refused: new ServerRefusal('abapgit_run_log_not_paired') };
     }
@@ -382,7 +388,7 @@ async function repositoryOf(
   key: string | undefined,
   logger: ILogger | undefined,
 ): Promise<
-  | { readonly entry: IAbapGitRepoFacts; readonly logLink: string | undefined }
+  | { readonly entry: IAbapGitRepoFacts; readonly logLinks: readonly string[] }
   | undefined
 > {
   if (key === undefined || key.trim() === '') return undefined;
@@ -405,42 +411,49 @@ async function repositoryOf(
   ) {
     return undefined;
   }
-  // The entry's own log_link, read from the same answer: R1 carries no
-  // credential (spec §5.3), and the facts keep the log key alone.
+  // The entry's every log_link, read from the same answer: R1 carries no
+  // credential (spec §5.3), and the facts keep one log key alone.
   const answer = observed.answer;
-  let logLink: string | undefined;
+  let logLinks: readonly string[] = [];
   try {
-    logLink =
+    logLinks =
       answer === undefined
-        ? undefined
-        : abapGitRepos(answer).find((each) => each.repositoryId === key)
-            ?.logLink;
+        ? []
+        : (abapGitRepos(answer)
+            .find((each) => each.repositoryId === key)
+            ?.links?.filter((each) => each.type === 'log_link')
+            .map((each) => each.href) ?? []);
   } catch {
-    logLink = undefined;
+    logLinks = [];
   }
-  return { entry, logLink };
+  return { entry, logLinks };
 }
 
 /** The repositories' path every repository link starts with. */
 const REPOS_PATH = '/sap/bc/adt/abapgit/repos/';
 
 /**
- * Whether `logLink` is `/sap/bc/adt/abapgit/repos/<key>/log/<id>` for this
- * repository's `key`: its repository segment, decoded, is the key. Plain
+ * The repository and the log key of `/sap/bc/adt/abapgit/repos/<key>/log/<id>`,
+ * each decoded, from one link; `undefined` for any other shape. Plain
  * string code.
  */
-function logLinkOfRepository(
+function logLinkParts(
   logLink: string | undefined,
-  key: string,
-): boolean {
-  if (logLink === undefined || !logLink.startsWith(REPOS_PATH)) return false;
+): { readonly repository: string; readonly logKey: string } | undefined {
+  if (logLink === undefined || !logLink.startsWith(REPOS_PATH))
+    return undefined;
   const segments = logLink.slice(REPOS_PATH.length).split('/');
-  if (segments.length !== 3 || segments[1] !== 'log') return false;
-  const segment = segments[0] ?? '';
+  if (segments.length !== 3 || segments[1] !== 'log') return undefined;
+  const repository = segments[0] ?? '';
+  const logKey = segments[2] ?? '';
+  if (repository === '' || logKey === '') return undefined;
   try {
-    return decodeURIComponent(segment) === key;
+    return {
+      repository: decodeURIComponent(repository),
+      logKey: decodeURIComponent(logKey),
+    };
   } catch {
-    return false;
+    return undefined;
   }
 }
 

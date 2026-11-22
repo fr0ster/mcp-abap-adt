@@ -68,6 +68,7 @@ export type FailureCode =
   | 'abapgit_package_required'
   | 'abapgit_repository_unknown'
   | 'abapgit_run_log_not_paired'
+  | 'abapgit_run_log_ambiguous'
   | 'abapgit_url_refused'
   | 'abapgit_endpoint_refused'
   | AccessRefusalCode;

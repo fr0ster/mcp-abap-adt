@@ -35,11 +35,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
-import {
-  analyseException,
-  type ICreatedTransport,
-  transportCreated,
-} from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
@@ -49,18 +45,34 @@ import {
   isCredentialPayload,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  type DetailTable,
+  type LevelReading,
+  readingAt,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
-import { structured } from '../../../lib/strategies/reading';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import {
+  parseStructure,
+  rawOf,
+  statusOnly,
+} from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
+import type { XmlNode } from '../../../lib/xml/node';
+import { child, childAt, type XmlRead } from '../../../lib/xml/tree';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 const TASK_TYPES = ['S', 'R', 'X'] as const;
 type TaskType = (typeof TASK_TYPES)[number];
+
+/** What typing the task came to: the type it carries now, and the refusal when there was one. */
+interface TypedTask {
+  type: TaskType;
+  error?: FailureEntry;
+}
 
 export const TOOL_DEFINITION = {
   name: 'CreateTransportTask',
@@ -92,30 +104,45 @@ export const TOOL_DEFINITION = {
 type CreateTransportTaskArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
- * The created task, as adt-strategies reads the answer (`transportCreated`:
- * the number on the root, which is where a created task carries it); none
- * when the answer is no transport document.
+ * The task number, read out of the parsed answer. It arrives the way a created
+ * request's does — on the root rather than on a `tm:request` child, which is
+ * the shape `parseCreatedTransport` learned in adt-clients 20.0.0. The root's
+ * own number is read even when a `tm:request` child names the parent:
+ * adt-strategies' `transportCreated` prefers that child, and the type change
+ * after the create would then go to the parent request.
  */
-function createdTaskOf(
-  answer: IAdtWireResponse,
-): ICreatedTransport | undefined {
-  try {
-    return transportCreated(answer);
-  } catch {
-    return undefined;
-  }
-}
+const taskNumberOf = (value: XmlRead): string => {
+  const root = child(value, 'tm:root') ?? value;
+  return String(childAt(root, '@', 'tm:number') ?? '');
+};
 
 /**
- * `createdTask` read as the table reads it (`structured`: `full` answers the
- * parse, `raw` the document), with the created task beside it — the
- * `createdReading` pattern of `CreateTransport`: the task is read only when
- * the number or the terse answer asks for it.
+ * What a task create's reading holds at every level: the task number (the
+ * type change after the create is sent to it) and the level's answer, a pure
+ * function of the type the change settles.
  */
-function createdTaskReading(answer: IAdtWireResponse) {
-  return {
-    ...structured(answer),
-    created: () => createdTaskOf(answer),
+interface CreatedTask<A> {
+  number: string;
+  answer: (typed: TypedTask) => A;
+}
+
+/** A level's reading of the create: the parse read once, the answer `shown` makes of it and the document. */
+function createdTaskAt<A>(
+  shown: (
+    number: string,
+    parsed: XmlNode | null,
+    raw: string,
+  ) => (typed: TypedTask) => A,
+): LevelReading<CreatedTask<A>> {
+  return (answer) => {
+    const raw = rawOf(answer);
+    const parsed = parseStructure(raw);
+    const number = taskNumberOf(parsed);
+    return {
+      value: { number, answer: shown(number, parsed, raw) },
+      raw,
+      status: answer.status,
+    };
   };
 }
 
@@ -147,10 +174,9 @@ export async function handleCreateTransportTask(
   // What typing the task came to: the type it carries now, and the refusal
   // when there was one. The task exists either way, so a refused typing does
   // not fail the creation — it is said in the answer instead.
-  let typed: { type: TaskType; error?: FailureEntry } = { type: 'X' };
+  let typed: TypedTask = { type: 'X' };
 
-  const terseTask = (created: ICreatedTransport | undefined) => {
-    const number = created?.transportNumber ?? '';
+  const terseTask = (number: string, typed: TypedTask) => {
     return {
       success: true,
       request: args.transport_number,
@@ -170,12 +196,25 @@ export async function handleCreateTransportTask(
     };
   };
 
+  // What the create answers at each level, selected before the call: every
+  // level reads the task number (the type change is sent to it); terse
+  // answers it with the type the change settles, full the parse, raw the
+  // document as it came.
+  const taskReadings: DetailTable<CreatedTask<TaskAnswer>> = {
+    terse: createdTaskAt((number) => (settled) => terseTask(number, settled)),
+    medium: createdTaskAt((_number, parsed, raw) => () => parsed ?? raw),
+    full: createdTaskAt((_number, parsed, raw) => () => parsed ?? raw),
+    raw: createdTaskAt((_number, _parsed, raw) => () => raw),
+  };
+  type TaskAnswer = ReturnType<typeof terseTask> | XmlNode | string;
+
   return answer(
     { tool: 'CreateTransportTask', detail },
     async () => {
       const request = createAdtClient(connection, logger).getRequest({
         ...resultsFor(transportDocuments),
-        createdTask: createdTaskReading,
+        createdTask: readingAt(taskReadings, levelOf(args)),
+        taskTypeChanged: statusOnly,
       });
       const created = await atStep('create task', () =>
         withAdtHeaders(context, 'request.createTask', (headers) =>
@@ -186,9 +225,7 @@ export async function handleCreateTransportTask(
           }),
         ),
       )();
-      const number = created.ok
-        ? (created.getResult().value.created()?.transportNumber ?? '')
-        : '';
+      const number = created.ok ? created.getResult().value.value.number : '';
       if (number && taskType !== 'X') {
         const changed = await withAdtHeaders(
           context,
@@ -237,9 +274,6 @@ export async function handleCreateTransportTask(
       }
       return created;
     },
-    (reading) =>
-      project(detail, (_value: typeof reading.value) =>
-        terseTask(reading.created()),
-      )(reading),
+    (reading) => reading.value.answer(typed),
   );
 }

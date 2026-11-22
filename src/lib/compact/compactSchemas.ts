@@ -2518,6 +2518,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
       'max_hits',
       'answer',
       'version',
+      'detail',
     ],
     search_object: ['object_name', 'object_type', 'maxResults', 'detail'],
     where_used: [
@@ -2528,6 +2529,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
       'enable_all_types',
       'enable_only_types',
       'disable_types',
+      'detail',
     ],
     package_tree: [
       'package_name',
@@ -2536,6 +2538,7 @@ export const COMPACT_SYSTEM_TAKES = takesOf<SystemProperty, SystemAction>()({
       'max_depth',
       'include_descriptions',
       'debug',
+      'detail',
     ],
     transports: ['user', 'modifiable_only', 'detail'],
     atc_findings: ['worklist_id', 'detail'],

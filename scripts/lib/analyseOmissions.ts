@@ -446,7 +446,12 @@ export function detailWiring(
     // No `answer()` at all is the emptiest way to pass: the loop below never
     // runs, so it can report nothing. A tool that declares `detail` and never
     // reaches an adapter has not wired the parameter — it has nowhere to.
-    if (declares && calls.length === 0 && debugCalls.length === 0) {
+    if (
+      declares &&
+      calls.length === 0 &&
+      debugCalls.length === 0 &&
+      !handlerSelectsAnswer(source)
+    ) {
       offenders.push(
         `${file} — tool declares detail and the handler never calls answer()`,
       );
@@ -663,6 +668,47 @@ function selectsReadingByLevel(call: ts.CallExpression): boolean {
     ts.forEachChild(node, visit);
   };
   visit(scope);
+  return found;
+}
+
+/**
+ * Whether a handler that answers without `answer()` — it builds the answer
+ * from several requests itself (a walk, a scan) — selects that answer's
+ * formatter by the level asked for: an exported `handle…` function holding
+ * `answerAt(<table>, levelOf(…))` in its own body.
+ */
+function handlerSelectsAnswer(source: ts.SourceFile): boolean {
+  let found = false;
+  for (const statement of source.statements) {
+    if (
+      ts.isFunctionDeclaration(statement) &&
+      statement.name?.text.startsWith('handle') === true &&
+      statement.modifiers?.some(
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      ) === true &&
+      statement.body !== undefined
+    ) {
+      const visit = (node: ts.Node): void => {
+        if (found) return;
+        if (
+          ts.isCallExpression(node) &&
+          node.expression.getText() === 'answerAt'
+        ) {
+          const level = node.arguments[1];
+          if (
+            level !== undefined &&
+            ts.isCallExpression(level) &&
+            level.expression.getText() === 'levelOf'
+          ) {
+            found = true;
+            return;
+          }
+        }
+        ts.forEachChild(node, visit);
+      };
+      visit(statement.body);
+    }
+  }
   return found;
 }
 

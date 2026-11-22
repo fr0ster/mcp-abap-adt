@@ -226,6 +226,8 @@ const JSON_ANSWERING: readonly string[] = [
   'GetObjectOutline',
   'GetObjectStructure',
   'GetPackage',
+  'GetPackageContents',
+  'GetPackageTree',
   'GetSqlQuery',
   'GetTableContents',
   'GetTransaction',
@@ -246,7 +248,9 @@ const JSON_ANSWERING: readonly string[] = [
   'RunFunctionModuleUnitTest',
   'RunProgramUnitTest',
   'RunUnitTest',
+  'RuntimeListProfilerTraceFiles',
   'SearchObject',
+  'SearchSource',
   'SortAndCompressTransportTask',
   'UpdateBehaviorDefinition',
   'UpdateBehaviorImplementation',
@@ -420,6 +424,16 @@ for (const [fixture, declaring] of [
     );
   });
 }
+
+it('accepts a tool without answer() whose handler selects its formatter by the level asked for', () => {
+  assert.deepStrictEqual(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-answer-selected.ts'],
+      new Set(['FixtureAnswerSelected']),
+    ),
+    [],
+  );
+});
 
 it('accepts a tool that selects its reading by the level asked for', () => {
   assert.deepStrictEqual(

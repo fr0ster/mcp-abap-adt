@@ -352,7 +352,7 @@ describe('the MCP tool surface', () => {
         'system/GetObjectInfo': ['include_descriptions'],
         // 24.0.0 (DO23): SearchSource's answer level and its hit limit,
         // both optional — without them the answer is as before.
-        'search/SearchSource': ['answer', 'max_hits'],
+        'search/SearchSource': ['answer', 'detail', 'max_hits'],
         // 19.0.0: one Get<Type> per type; a type with a source reads one
         // part per call, `part` (source | metadata, default source), optional.
         'high/GetClass': ['part', 'start_line', 'end_line'],

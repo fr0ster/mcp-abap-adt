@@ -205,7 +205,7 @@ export async function handleSearchSource(
 ) {
   const { logger } = context;
   const level = levelOf(args);
-  const shown = answerAt(SEARCH_SOURCE_ANSWERS, level);
+  const shown = answerAt(SEARCH_SOURCE_ANSWERS, levelOf(args));
   const asked = {
     ...args,
     answer: searchSourceAnswerLevel(level, args.answer),

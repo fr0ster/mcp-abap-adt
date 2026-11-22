@@ -139,7 +139,12 @@ const ONE: Repository = {
   masks: {},
 };
 const REFUSED = { refuse: { 'PROGRAM ZBAD': 500 } };
-const SEARCH = { query: 'marker', packages: ['ZONE'], background: false };
+const SEARCH = {
+  query: 'marker',
+  packages: ['ZONE'],
+  background: false,
+  detail: 'full',
+};
 
 /** A SAP-answer strategy recording each place it is asked for, answering `answer`. */
 function recordingSap(answer: SapAnswerDecision) {

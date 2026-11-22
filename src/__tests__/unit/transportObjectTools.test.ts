@@ -604,6 +604,7 @@ describe('ReadTransportActionLog', () => {
       [
         '# transport SIDK905942',
         '# count 2',
+        'entry',
         'Request created',
         'SAPUSER01 added object R3TR PROG ZP',
       ].join('\n'),

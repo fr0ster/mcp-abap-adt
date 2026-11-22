@@ -15,7 +15,7 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt, tsvRow } from '../../../lib/detail';
+import { answerAt, tsv } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -125,7 +125,10 @@ export async function handleReadTransportActionLog(
         return [
           `# transport ${args.transport_number}`,
           `# count ${entries.length}`,
-          ...entries.map((entry) => tsvRow([entry.text])),
+          tsv(
+            ['entry'],
+            entries.map((entry) => [entry.text]),
+          ),
         ].join('\n');
       },
       medium: (reading) => terseLog(reading.value),

@@ -774,7 +774,8 @@ systemsDescribe(['onprem'], SUITE, () => {
       });
 
       expectOk(logResponse, 'Step 8 ReadTransportActionLog', logger);
-      // Terse, the default: `# transport`, `# count`, then a line per entry.
+      // Terse, the default: `# transport`, `# count`, the `entry` header, then
+      // a line per entry.
       const logLines = String(
         (logResponse.content[0] as { text?: unknown } | undefined)?.text ?? '',
       ).split('\n');

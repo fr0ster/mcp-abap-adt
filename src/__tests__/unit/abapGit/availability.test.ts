@@ -1,12 +1,12 @@
 /**
- * abapGit is offered only where the system serves it (spec §4.5): a
- * `tools/list` lists the abapGit tools only when the discovery of the
- * system the request reaches lists `/sap/bc/adt/abapgit/repos`, and a call
- * of one is refused "abapGit is not served by this system" otherwise. The
- * answer is kept by system key for the process; a failed read is not kept;
- * the connection-reset hook drops it. stdio's `--deferred-logon` lists no
- * abapGit tool and logs on to no one before its first birth, then tells the
- * client once (§9.1 a).
+ * abapGit availability is decided at call time only (spec §4.5, owner
+ * 2026-11-23): `tools/list` lists the abapGit tools without any SAP request
+ * (no logon, no discovery), and a call of one on a system whose discovery
+ * does not list `/sap/bc/adt/abapgit/repos` is refused "abapGit is not
+ * served by this system", nothing else sent. The answer is kept by system
+ * key for the process; a failed read is not kept; the connection-reset hook
+ * drops it. stdio's `--deferred-logon` lists them before any logon, and its
+ * first birth sends no `tools/list_changed`.
  *
  * Against the ADT stand-in, through real servers: stdio over an in-memory
  * transport, SSE over a real stream, Streamable HTTP over real HTTP — each
@@ -72,6 +72,12 @@ const discoveryReads = (standIn: AdtStandIn): number =>
 
 const isProbe = (request: StandInRequest): boolean =>
   request.url.startsWith(PROBE_PATH);
+
+/** What the call's connection sends to set itself up (its logon, its CSRF token), not the call's own. */
+const isConnectionSetup = (url: string): boolean =>
+  url.split('?')[0] === '/sap/bc/adt/core/discovery' ||
+  url.startsWith('/sap/bc/adt/core/http/systeminformation') ||
+  url.startsWith('/sap/bc/adt/core/http/sessions');
 
 /** The stand-in abapGit tool: one probe request on its connection. */
 const abapGitEntry: HandlerEntry = {
@@ -187,13 +193,57 @@ afterEach(() => {
   notifyConnectionResetListeners();
 });
 
-describe('stdio: abapGit listed and served by the system’s discovery', () => {
-  it('lists the abapGit tool when the discovery lists /abapgit/repos', async () => {
+describe('stdio: abapGit always listed, served by the system’s discovery at call time', () => {
+  it('lists the abapGit tool without any SAP request and without taking the connection', async () => {
+    const standIn = await adtStandIn();
+    standIn.body(isDiscovery, UNSERVED_DISCOVERY);
+    const s = await stdio(standIn);
+    try {
+      const before = standIn.requests.length;
+      assert.deepEqual(await listedNames(s.client), ['ProbeAdt', ABAPGIT_TOOL]);
+      assert.equal(standIn.requests.length, before);
+      assert.equal(s.server.taken, 0);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  });
+
+  it('serves the call where the discovery lists /abapgit/repos', async () => {
     const standIn = await adtStandIn();
     standIn.body(isDiscovery, SERVED_DISCOVERY);
     const s = await stdio(standIn);
     try {
-      assert.deepEqual(await listedNames(s.client), ['ProbeAdt', ABAPGIT_TOOL]);
+      const answer = await called(s.client, ABAPGIT_TOOL);
+      assert.equal(answer.isError, false);
+      assert.equal(answer.text, 'abapgit');
+      assert.equal(discoveryReads(standIn), 1);
+      assert.equal(standIn.requests.filter(isProbe).length, 1);
+    } finally {
+      await s.close();
+      await standIn.close();
+    }
+  });
+
+  it('an unserved system answers abapgit_not_served and sends nothing else', async () => {
+    const standIn = await adtStandIn();
+    standIn.body(isDiscovery, UNSERVED_DISCOVERY);
+    const s = await stdio(standIn);
+    try {
+      await listedNames(s.client);
+      const before = standIn.requests.length;
+      const answer = await called(s.client, ABAPGIT_TOOL);
+      assert.equal(answer.isError, true);
+      assert.match(answer.text, /abapgit_not_served/);
+      assert.match(answer.text, /abapGit is not served by this system/);
+      assert.deepEqual(
+        standIn.requests
+          .slice(before)
+          .filter((request) => !isDiscovery(request))
+          .map((request) => request.url)
+          .filter((url) => !isConnectionSetup(url)),
+        [],
+      );
       assert.equal(discoveryReads(standIn), 1);
     } finally {
       await s.close();
@@ -201,35 +251,20 @@ describe('stdio: abapGit listed and served by the system’s discovery', () => {
     }
   });
 
-  it('leaves it out when the discovery does not list it, and refuses its call with nothing sent', async () => {
-    const standIn = await adtStandIn();
-    standIn.body(isDiscovery, UNSERVED_DISCOVERY);
-    const s = await stdio(standIn);
-    try {
-      assert.deepEqual(await listedNames(s.client), ['ProbeAdt']);
-      const answer = await called(s.client, ABAPGIT_TOOL);
-      assert.equal(answer.isError, true);
-      assert.match(answer.text, /abapgit_not_served/);
-      assert.match(answer.text, /abapGit is not served by this system/);
-      assert.equal(standIn.requests.filter(isProbe).length, 0);
-    } finally {
-      await s.close();
-      await standIn.close();
-    }
-  });
-
-  it('a failed discovery lists none, keeps nothing, and is read again next time', async () => {
+  it('a failed discovery refuses the call, keeps nothing, and is read again next time', async () => {
     const standIn = await adtStandIn();
     standIn.answer(isDiscoveryRead, 500);
     const s = await stdio(standIn);
     try {
-      assert.deepEqual(await listedNames(s.client), ['ProbeAdt']);
+      const refused = await called(s.client, ABAPGIT_TOOL);
+      assert.match(refused.text, /abapgit_not_served/);
       assert.equal(discoveryReads(standIn), 1);
       standIn.respond(isDiscoveryRead, () => ({
         status: 200,
         text: SERVED_DISCOVERY,
       }));
-      assert.deepEqual(await listedNames(s.client), ['ProbeAdt', ABAPGIT_TOOL]);
+      const served = await called(s.client, ABAPGIT_TOOL);
+      assert.equal(served.text, 'abapgit');
       assert.equal(discoveryReads(standIn), 2);
     } finally {
       await s.close();
@@ -244,12 +279,12 @@ describe('stdio: abapGit listed and served by the system’s discovery', () => {
     const second = await stdio(standIn);
     try {
       assert.notEqual(first.server.stateHandle, second.server.stateHandle);
-      await listedNames(first.client);
-      await listedNames(second.client);
-      await listedNames(first.client);
+      await called(first.client, ABAPGIT_TOOL);
+      await called(second.client, ABAPGIT_TOOL);
+      await called(first.client, ABAPGIT_TOOL);
       assert.equal(discoveryReads(standIn), 1);
       notifyConnectionResetListeners();
-      await listedNames(second.client);
+      await called(second.client, ABAPGIT_TOOL);
       assert.equal(discoveryReads(standIn), 2);
     } finally {
       await first.close();
@@ -257,45 +292,24 @@ describe('stdio: abapGit listed and served by the system’s discovery', () => {
       await standIn.close();
     }
   });
-
-  it('a real tools/list releases its connection use, on success and on a failed discovery', async () => {
-    const standIn = await adtStandIn();
-    standIn.body(isDiscovery, SERVED_DISCOVERY);
-    const s = await stdio(standIn);
-    try {
-      await listedNames(s.client);
-      assert.equal(s.server.taken, 1);
-      assert.equal(s.server.released, 1);
-      notifyConnectionResetListeners();
-      standIn.answer(isDiscoveryRead, 500);
-      await listedNames(s.client);
-      assert.equal(s.server.taken, 2);
-      assert.equal(s.server.released, 2);
-    } finally {
-      await s.close();
-      await standIn.close();
-    }
-  });
 });
 
-describe('stdio --deferred-logon (spec §9.1 a)', () => {
-  it('the first listing logs on to no one and lists no abapGit tool; the first birth reads once and notifies once', async () => {
+describe('stdio --deferred-logon', () => {
+  it('the first listing lists the abapGit tool and logs on to no one; the first birth sends no tools/list_changed', async () => {
     const standIn = await adtStandIn();
     standIn.body(isDiscovery, SERVED_DISCOVERY);
     const s = await stdio(standIn, true);
     try {
-      assert.deepEqual(await listedNames(s.client), ['ProbeAdt']);
+      assert.deepEqual(await listedNames(s.client), ['ProbeAdt', ABAPGIT_TOOL]);
       assert.equal(standIn.requests.length, 0);
       assert.equal(s.server.taken, 0);
       await s.client.callTool({ name: 'ProbeAdt', arguments: { id: 'one' } });
-      await until(() => s.notified() >= 1);
-      assert.equal(s.notified(), 1);
-      assert.equal(discoveryReads(standIn), 1);
-      assert.deepEqual(await listedNames(s.client), ['ProbeAdt', ABAPGIT_TOOL]);
-      await s.client.callTool({ name: 'ProbeAdt', arguments: { id: 'two' } });
+      // The abapGit call reads the discovery; a notification sent at the
+      // birth would have reached the client before this call's answer.
+      await called(s.client, ABAPGIT_TOOL);
       await listedNames(s.client);
-      assert.equal(s.notified(), 1);
       assert.equal(discoveryReads(standIn), 1);
+      assert.equal(s.notified(), 0);
     } finally {
       await s.close();
       await standIn.close();
@@ -316,24 +330,36 @@ function boundPort(server: { listeningPort(): number | undefined }): number {
   return port;
 }
 
-async function listedOver(
+/** What one client session over a transport saw: the listing, the requests it sent, a call's answer. */
+interface Session {
+  readonly listed: string[];
+  readonly sentByListing: number;
+  readonly answer: { isError: boolean; text: string };
+}
+
+async function sessionOver(
   transport: Parameters<Client['connect']>[0],
-): Promise<string[]> {
+  standIn: AdtStandIn,
+): Promise<Session> {
   const client = new Client({ name: 'abapgit-availability', version: '1' });
   await client.connect(transport);
   try {
-    return await listedNames(client);
+    const before = standIn.requests.length;
+    const listed = await listedNames(client);
+    const sentByListing = standIn.requests.length - before;
+    const answer = await called(client, ABAPGIT_TOOL);
+    return { listed, sentByListing, answer };
   } finally {
     await client.close();
   }
 }
 
-async function sseListed(standIn: AdtStandIn): Promise<string[]> {
+async function sseSession(standIn: AdtStandIn): Promise<Session> {
   const sse = new SseServer(registry(), { host: '127.0.0.1', port: 0 });
   await sse.start();
   const headers = sapHeaders(standIn.url);
   try {
-    return await listedOver(
+    return await sessionOver(
       new SSEClientTransport(
         new URL(`http://127.0.0.1:${boundPort(sse)}/sse`),
         {
@@ -347,53 +373,63 @@ async function sseListed(standIn: AdtStandIn): Promise<string[]> {
           },
         },
       ),
+      standIn,
     );
   } finally {
     await sse.stop();
   }
 }
 
-async function httpListed(standIn: AdtStandIn): Promise<string[]> {
+async function httpSession(standIn: AdtStandIn): Promise<Session> {
   const mcp = new StreamableHttpServer(registry(), {
     host: '127.0.0.1',
     port: 0,
   });
   await mcp.start();
   try {
-    return await listedOver(
+    return await sessionOver(
       clientTransport(
         new StreamableHTTPClientTransport(
           new URL(`http://127.0.0.1:${boundPort(mcp)}/mcp/stream/http`),
           { requestInit: { headers: sapHeaders(standIn.url) } },
         ),
       ),
+      standIn,
     );
   } finally {
     await mcp.stop();
   }
 }
 
-for (const [transport, listed] of [
-  ['SSE', sseListed],
-  ['Streamable HTTP', httpListed],
+for (const [transport, session] of [
+  ['SSE', sseSession],
+  ['Streamable HTTP', httpSession],
 ] as const) {
-  describe(`${transport}: the listing reads the discovery of the system the request reaches`, () => {
-    it('lists the abapGit tool where the discovery lists /abapgit/repos', async () => {
+  describe(`${transport}: listed without a request, served by the discovery of the system the call reaches`, () => {
+    it('lists the abapGit tool without any SAP request, and serves the call where the discovery lists /abapgit/repos', async () => {
       const standIn = await adtStandIn();
       standIn.body(isDiscovery, SERVED_DISCOVERY);
       try {
-        assert.deepEqual(await listed(standIn), ['ProbeAdt', ABAPGIT_TOOL]);
+        const seen = await session(standIn);
+        assert.deepEqual(seen.listed, ['ProbeAdt', ABAPGIT_TOOL]);
+        assert.equal(seen.sentByListing, 0);
+        assert.equal(seen.answer.text, 'abapgit');
         assert.equal(discoveryReads(standIn), 1);
       } finally {
         await standIn.close();
       }
     });
 
-    it('leaves it out where it does not', async () => {
+    it('lists it where the discovery does not, and refuses the call abapgit_not_served with nothing sent', async () => {
       const standIn = await adtStandIn();
       standIn.body(isDiscovery, UNSERVED_DISCOVERY);
       try {
-        assert.deepEqual(await listed(standIn), ['ProbeAdt']);
+        const seen = await session(standIn);
+        assert.deepEqual(seen.listed, ['ProbeAdt', ABAPGIT_TOOL]);
+        assert.equal(seen.sentByListing, 0);
+        assert.equal(seen.answer.isError, true);
+        assert.match(seen.answer.text, /abapgit_not_served/);
+        assert.equal(standIn.requests.filter(isProbe).length, 0);
       } finally {
         await standIn.close();
       }

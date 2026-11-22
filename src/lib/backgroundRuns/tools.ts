@@ -234,23 +234,48 @@ export function readObjectOf(args: ToolArgs): string {
   return '';
 }
 
+/** The abapGit writes that run in the background, by the argument naming their object. */
+const ABAPGIT_RUN_OBJECTS: Readonly<
+  Record<string, 'package_name' | 'repository_key'>
+> = {
+  LinkAbapGitRepo: 'package_name',
+  PullAbapGitRepo: 'repository_key',
+  PushAbapGitRepo: 'repository_key',
+};
+
+/** `HandlerAbapGit`'s background actions, by the argument naming their object. */
+const ABAPGIT_ACTION_OBJECTS: Readonly<
+  Record<string, 'package_name' | 'repository_key'>
+> = {
+  link: 'package_name',
+  pull: 'repository_key',
+  push: 'repository_key',
+};
+
 /**
- * What a run tool's call runs, upper case: its class or program; for an
- * abapGit link its `package_name`, for a pull or a push its
- * `repository_key`; `''` when none is named.
+ * What a run tool's call runs, upper case, chosen by `tool` (and its
+ * `action`): for an abapGit link its `package_name`, for a pull or a push
+ * its `repository_key` — never whichever is present; otherwise its class or
+ * program. `''` when none is named.
  */
-export function backgroundObjectOf(args: ToolArgs): string {
+export function backgroundObjectOf(tool: string, args: ToolArgs): string {
+  const action = args.action;
+  const abapGit =
+    tool === 'HandlerAbapGit'
+      ? typeof action === 'string'
+        ? ABAPGIT_ACTION_OBJECTS[action]
+        : undefined
+      : ABAPGIT_RUN_OBJECTS[tool];
   const targetType = args.target_type;
   const className = args.class_name;
   const programName = args.program_name;
   const pick =
-    targetType === 'PROGRAM'
-      ? programName
-      : targetType === 'CLASS'
-        ? className
-        : (className ??
-          programName ??
-          args.repository_key ??
-          args.package_name);
+    abapGit !== undefined
+      ? args[abapGit]
+      : targetType === 'PROGRAM'
+        ? programName
+        : targetType === 'CLASS'
+          ? className
+          : (className ?? programName);
   return typeof pick === 'string' ? pick.trim().toUpperCase() : '';
 }

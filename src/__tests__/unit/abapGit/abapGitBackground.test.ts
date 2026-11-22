@@ -131,15 +131,29 @@ describe('background on the abapGit writes: the schemas', () => {
     );
   });
 
-  it("the run's object: link's package, pull's and push's repository key", () => {
+  it("the run's object is chosen per tool and action: link's package, pull's and push's repository key", () => {
+    // Both arguments given: the one the tool and action name is taken.
+    const both = { package_name: 'zpkg_git', repository_key: REPO_KEY };
+    assert.equal(backgroundObjectOf('LinkAbapGitRepo', both), 'ZPKG_GIT');
     assert.equal(
-      backgroundObjectOf({ action: 'link', package_name: 'zpkg_git' }),
+      backgroundObjectOf('HandlerAbapGit', { action: 'link', ...both }),
       'ZPKG_GIT',
     );
+    for (const tool of ['PullAbapGitRepo', 'PushAbapGitRepo']) {
+      assert.equal(backgroundObjectOf(tool, both), REPO_KEY);
+    }
+    for (const action of ['pull', 'push']) {
+      assert.equal(
+        backgroundObjectOf('HandlerAbapGit', { action, ...both }),
+        REPO_KEY,
+      );
+    }
+    // A run tool's class or program, as before; never an abapGit argument.
     assert.equal(
-      backgroundObjectOf({ repository_key: REPO_KEY, transport_request: 'X' }),
-      REPO_KEY,
+      backgroundObjectOf('RunClass', { class_name: 'zcl_run', ...both }),
+      'ZCL_RUN',
     );
+    assert.equal(backgroundObjectOf('RunClass', both), '');
   });
 });
 
@@ -303,7 +317,7 @@ describe('background on the abapGit writes: a real dispatch', () => {
     }
   });
 
-  it("a compact background link records the package; a stdio close logs the run's connection off", async () => {
+  it("a compact background link records the package, also beside a repository key; a stdio close logs the run's connection off", async () => {
     const runs = new RecordingRuns();
     const s = await stdio(sap, runs);
     const held = sap.hold(isLink);
@@ -311,6 +325,7 @@ describe('background on the abapGit writes: a real dispatch', () => {
       const started = await s.call('HandlerAbapGit', {
         action: 'link',
         package_name: 'zpkg_git',
+        repository_key: REPO_KEY,
         url: 'https://git.example.invalid/team/repo.git',
         branch: 'refs/heads/main',
         background: true,

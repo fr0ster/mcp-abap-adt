@@ -2983,7 +2983,8 @@ export abstract class BaseMcpServer extends McpServer {
       caller,
       tool,
       kind,
-      object: kind === 'read' ? readObjectOf(args) : backgroundObjectOf(args),
+      object:
+        kind === 'read' ? readObjectOf(args) : backgroundObjectOf(tool, args),
       instance: this,
       connection: context.connection,
       logger: this.logger,

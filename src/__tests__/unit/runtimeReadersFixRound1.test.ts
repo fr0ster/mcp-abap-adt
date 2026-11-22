@@ -637,8 +637,9 @@ describe('RuntimeListFeeds', () => {
     assert.equal(result.isError, false);
     const body = JSON.parse(result.content[0].text);
     assert.equal(body.feed_type, 'variants');
-    // The feed with no variant is left out.
-    assert.equal(body.count, 1);
+    // Every feed is listed; the one with no variant has none.
+    assert.equal(body.count, 2);
+    assert.deepStrictEqual(body.entries[1].variants, []);
     assert.deepStrictEqual(body.entries[0], {
       feed: '/sap/bc/adt/runtime/dumps',
       title: 'ABAP Runtime Errors',
@@ -659,6 +660,22 @@ describe('RuntimeListFeeds', () => {
 });
 
 // ---------------------------------------------------------------------------
+
+describe('RuntimeListFeeds variants terse', () => {
+  it('a feed without variants is still a row', async () => {
+    const result: any = await handleRuntimeListFeedsOf(
+      context as any,
+      {
+        feed_type: 'variants',
+      } as any,
+    );
+    const rows = result.content[0].text.split('\n');
+    assert.ok(
+      rows.some((row: string) => row.endsWith('\t\t\t')),
+      result.content[0].text,
+    );
+  });
+});
 
 describe('GetPackageTree', () => {
   it('a refused existence check short-circuits before any walk, and answers the error of the read as it is with its step — a disabled check would proceed to walk regardless', async () => {
@@ -712,8 +729,10 @@ describe('GetPackageTree', () => {
 });
 
 describe('feedVariantsOf', () => {
-  it('reads each feed with variants from the recorded feed list', () => {
-    assert.deepStrictEqual(feedVariantsOf({ data: feedListXml }), [
+  it('reads every feed of the recorded feed list, its variants or none', () => {
+    const read = feedVariantsOf({ data: feedListXml });
+    assert.deepStrictEqual(read.at(-1)?.variants, []);
+    assert.deepStrictEqual(read.slice(0, 1), [
       {
         feed: '/sap/bc/adt/runtime/dumps',
         title: 'ABAP Runtime Errors',

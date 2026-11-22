@@ -303,13 +303,16 @@ function terseFeed(shown: FeedShown): string {
         ...head,
         tsv(
           ['feed', 'title', 'query', 'is_default'],
+          // Every feed: one without variants is a row with none.
           shown.answered.entries.flatMap((feed) =>
-            feed.variants.map((v) => [
-              feed.feed,
-              v.title,
-              v.query,
-              String(v.is_default),
-            ]),
+            feed.variants.length === 0
+              ? [[feed.feed, '', '', '']]
+              : feed.variants.map((v) => [
+                  feed.feed,
+                  v.title,
+                  v.query,
+                  String(v.is_default),
+                ]),
           ),
         ),
       ].join('\n');

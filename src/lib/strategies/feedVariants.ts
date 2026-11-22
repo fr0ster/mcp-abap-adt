@@ -27,8 +27,8 @@ import {
  * not a request of its own.
  *
  * The library's reading of that answer (`parseFeedDescriptors`) keeps the
- * feeds and drops their variants; this one keeps the variants. Feeds with
- * none are left out.
+ * feeds and drops their variants; this one keeps the variants, every feed
+ * listed, one without variants with none.
  */
 export interface FeedVariants {
   feed: string;
@@ -57,7 +57,6 @@ export function feedVariantsOf(
         query: attributeOf(visit.node, 'queryString') ?? '',
         is_default: attributeOf(visit.node, 'isDefault') === 'true',
       }));
-    if (variants.length === 0) continue;
     feeds.push({
       feed: textOf(entry.node, 'atom:id'),
       title: textOf(entry.node, 'atom:title'),

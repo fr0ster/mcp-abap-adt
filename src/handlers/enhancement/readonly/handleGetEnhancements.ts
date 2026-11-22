@@ -150,7 +150,7 @@ export const TOOL_DEFINITION = {
       .boolean()
       .optional()
       .describe(
-        '[read-only] true: every enhancement with its whole source; false (default): a short one',
+        '[read-only] true: every field of each enhancement and every object read, those without enhancements included; false (default): each enhancement by name, type and source, objects without enhancements left out',
       ),
     max_includes: z
       .number()
@@ -732,17 +732,12 @@ interface NestedEnhancements {
   includes_unread?: IncludeUnread[];
 }
 
-/** An enhancement with its source short: whole up to 500 characters, else its first 200. */
+/** An enhancement with its whole source: an answer is never cut. */
 function minimalEnhancement(enh: EnhancementImplementation) {
   return {
     name: enh.name,
     type: enh.type,
-    // Include source code only if it's short (< 500 chars) or first 200 chars
-    sourceCode: enh.sourceCode
-      ? enh.sourceCode.length <= 500
-        ? enh.sourceCode
-        : `${enh.sourceCode.substring(0, 200)}...[truncated]`
-      : undefined,
+    sourceCode: enh.sourceCode,
   };
 }
 
@@ -825,8 +820,8 @@ function terseObjectLines(response: EnhancementResponse): string[] {
  * (`src/lib/detail`): the answer is built from several requests, so each
  * level is a formatter of what they read. Terse is TSV — each object's
  * enhancements, name, type and description, no source; medium, full and raw
- * the JSON answer as before (`detailed` decides whether each source is whole
- * or short).
+ * the JSON answer, every source whole (`detailed` adds every field and the
+ * objects without enhancements).
  */
 const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
   (() => {

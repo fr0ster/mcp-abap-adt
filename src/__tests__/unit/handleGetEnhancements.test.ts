@@ -416,3 +416,43 @@ describe('GetEnhancements terse, by default', () => {
     assert.equal(text.includes('SECRET_SOURCE_LINE'), false);
   });
 });
+
+describe('GetEnhancements answers every source whole at medium, full and raw', () => {
+  const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
+  const LONG = `ENHANCEMENT 1 z_long.\n${'* a line of the source\n'.repeat(60)}ENDENHANCEMENT.`;
+  const document =
+    '<enh:enhancements xmlns:enh="http://www.sap.com/adt/abapsource/enhancements" xmlns:adtcore="http://www.sap.com/adt/core">' +
+    '<enh:enhancementImplementations adtcore:name="Z_LONG" adtcore:type="ENHO/XHH" adtcore:version="active">' +
+    `<enh:elements><enh:sourceCodePlugin enh:uri="/x"><enh:source>${b64(LONG)}</enh:source></enh:sourceCodePlugin></enh:elements>` +
+    '</enh:enhancementImplementations></enh:enhancements>';
+  const connection = {
+    async makeAdtRequest(req: { url: string }) {
+      if (
+        req.url.startsWith(
+          '/sap/bc/adt/functions/groups/zfg/source/main/enhancements/elements',
+        )
+      ) {
+        return { status: 200, data: document };
+      }
+      const error: any = new Error('Request failed with status code 404');
+      error.response = { status: 404 };
+      throw error;
+    },
+  };
+  for (const detail of ['medium', 'full', 'raw'] as const) {
+    for (const detailed of [false, true]) {
+      it(`detail ${detail}, detailed ${detailed}`, async () => {
+        const result: any = await handleGetEnhancementsOf(
+          {
+            connection,
+            logger: undefined,
+            batchAvailability: notServed,
+          } as any,
+          { object_name: 'SAPLZFG', object_type: 'program', detail, detailed },
+        );
+        const body = JSON.parse(result.content[0].text);
+        assert.equal(body.enhancements[0].sourceCode, LONG);
+      });
+    }
+  }
+});

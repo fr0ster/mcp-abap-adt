@@ -1,4 +1,7 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  readNodeStructure,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   AdtTypeCode,
   IAdtError,
@@ -286,43 +289,58 @@ export function nodeLevel(
   return nodeLevelOf(bodyTextOf(answer));
 }
 
-/** One level of a node-structure document's text, descriptions kept. */
+/**
+ * A field of a node as the document wrote it, trimmed; `''` when absent or
+ * not text. The node is adt-strategies' parse of a document, from outside the
+ * type system.
+ */
+function nodeField(
+  node: Readonly<Record<string, unknown>>,
+  key: string,
+): string {
+  const value = node[key];
+  if (typeof value === 'string') return value.trim();
+  if (typeof value === 'number') return String(value);
+  return '';
+}
+
+/**
+ * One level of a node-structure document's text, descriptions kept, as
+ * adt-strategies parses it (`readNodeStructure`, values as written).
+ * `utilNodeContents` is not used whole: it drops an object that carries no
+ * `TECH_NAME` or `OBJECT_URI`, which the walks list, and says nothing of a
+ * node SAP could not load.
+ */
 export function nodeLevelOf(xml: string): NodeLevel {
-  const data = nodeAt(parseXml(parser, xml), 'asx:abap', 'asx:values', 'DATA');
-  const entries = nodeList(
-    nodeAt(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
-  );
+  const { nodes, objectTypes } = readNodeStructure(xml);
   // An entry with no object type is SAP's message for a node it could not
   // load (on premise, 2026-11-22: a package's Views node, from SAP's stored
   // package tree `DWTREE`; `CL_SEU_ADT_RES_REPO_STRUCTURE`,
   // `create_tree_content`, message `SEU_ADT 101`), not an object.
-  const notLoaded = entries.some(
+  const notLoaded = nodes.some(
     (n) =>
-      textOf(nodeChild(n, 'OBJECT_TYPE')) === '' &&
-      textOf(nodeChild(n, 'OBJECT_NAME')) !== '',
+      nodeField(n, 'OBJECT_TYPE') === '' && nodeField(n, 'OBJECT_NAME') !== '',
   );
   return {
     ...(notLoaded ? { notLoaded: true as const } : {}),
-    objects: entries
+    objects: nodes
       .map((n) => ({
-        name: textOf(nodeChild(n, 'OBJECT_NAME')),
-        type: textOf(nodeChild(n, 'OBJECT_TYPE')),
-        description: textOf(nodeChild(n, 'DESCRIPTION')) || undefined,
-        techName: textOf(nodeChild(n, 'TECH_NAME')) || undefined,
-        uri: textOf(nodeChild(n, 'OBJECT_URI')) || undefined,
+        name: nodeField(n, 'OBJECT_NAME'),
+        type: nodeField(n, 'OBJECT_TYPE'),
+        description: nodeField(n, 'DESCRIPTION') || undefined,
+        techName: nodeField(n, 'TECH_NAME') || undefined,
+        uri: nodeField(n, 'OBJECT_URI') || undefined,
       }))
       // Every object has a type; SAP's message is not one (`notLoaded`).
       .filter((o) => o.name && o.type),
-    childNodes: nodeList(
-      nodeAt(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),
-    )
+    childNodes: objectTypes
       .map((t) => ({
-        type: textOf(nodeChild(t, 'OBJECT_TYPE')),
+        type: t.type ?? t.unknownType,
         // The document writes the id padded — `000031` — and the request the
         // corpus recorded sends `31`. The system accepts both, verified
         // live, but sending what ADT itself sends keeps the wire comparable
         // with the fixtures and with a trace.
-        nodeId: String(Number(textOf(nodeChild(t, 'NODE_ID')))),
+        nodeId: String(Number(t.nodeId)),
       }))
       .filter((c) => c.nodeId && c.nodeId !== 'NaN'),
   };

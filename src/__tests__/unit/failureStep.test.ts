@@ -14,7 +14,7 @@ import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
-import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
+import { handleGetPackageContents as handleGetPackageContentsOf } from '../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetStructuresList } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
 import { createBatchAvailability } from '../../lib/batch/availability';
@@ -41,6 +41,12 @@ import {
 } from '../helpers/fakeClient';
 import { exactPackages, listing } from '../helpers/sourceReaderFake';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleGetPackageContents at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetPackageContents = (
+  context: Parameters<typeof handleGetPackageContentsOf>[0],
+  args: Parameters<typeof handleGetPackageContentsOf>[1],
+) => handleGetPackageContentsOf(context, { detail: 'full', ...args });
 
 // The declared variant the boundary checks a type argument against.
 stateSystemKind('onprem');

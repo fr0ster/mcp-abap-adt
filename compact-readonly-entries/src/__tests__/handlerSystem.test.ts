@@ -508,6 +508,7 @@ describe('HandlerSystem', () => {
   const DETAIL_TAKERS: readonly SystemAction[] = [
     'search_object',
     'where_used',
+    'package_tree',
     'transports',
     'atc_findings',
     'atc_result',

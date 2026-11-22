@@ -19,8 +19,19 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  type AnswerTable,
+  answerAt,
+  indentedTsv,
+  type TreeRow,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withLongToolAdvice } from '../../../lib/longTools';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   assembleTree,
@@ -30,6 +41,7 @@ import {
   type NodeAnswer,
   type NodeRequest,
   nodeStructureOn,
+  type PackageNode,
   readNode,
   type WalkedItem,
   walkPackage,
@@ -78,6 +90,7 @@ const FIELDS = {
     .describe(
       'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
     ),
+  ...DETAIL_SHAPE,
 };
 
 /** Exactly one of `package_name` and a non-empty `package_names`. */
@@ -376,6 +389,64 @@ function treeOf(
   };
 }
 
+/** The tree as indented `type\tname` rows, the package first (terse). */
+function treeRows(node: PackageNode, depth = 0): TreeRow[] {
+  return [
+    { depth, cells: [node.type, node.name] },
+    ...(node.children ?? []).flatMap((child) => treeRows(child, depth + 1)),
+  ];
+}
+
+/** A tree node with every field the walk read, no derived or backup field (medium). */
+interface MediumNode {
+  name: string;
+  type: string;
+  description?: string;
+  not_loaded?: true;
+  children?: MediumNode[];
+}
+
+function mediumNode(node: PackageNode): MediumNode {
+  const children = (node.children ?? []).map(mediumNode);
+  return {
+    name: node.name,
+    type: node.type,
+    ...(node.description !== undefined
+      ? { description: node.description }
+      : {}),
+    ...(node.notLoaded === true ? { not_loaded: true as const } : {}),
+    ...(children.length > 0 ? { children } : {}),
+  };
+}
+
+/** A package's tree as one level answers it: the arguments of {@link treeOf}. */
+interface TreeAnswerRead {
+  packageName: string;
+  walked: WalkedItem[];
+  options: TreeOptions;
+}
+
+/**
+ * What GetPackageTree answers of one package at each `detail`, selected
+ * before the reads (`src/lib/detail`): terse the tree as indented
+ * `type\tname` lines; medium the tree with every field the walk read, no
+ * kind, isPackage, codeFormat, restoreStatus or empty children; full the
+ * answer before `detail`. A walk reads many documents and answers none
+ * whole, so raw is the full answer.
+ */
+type TreeAnswer = string | MediumNode | ReturnType<typeof treeOf>;
+
+const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
+  terse: ({ packageName, walked }) =>
+    indentedTsv(treeRows(assembleTree(packageName, walked))),
+  medium: ({ packageName, walked }) =>
+    mediumNode(assembleTree(packageName, walked)),
+  full: ({ packageName, walked, options }) =>
+    treeOf(packageName, walked, options),
+  raw: ({ packageName, walked, options }) =>
+    treeOf(packageName, walked, options),
+};
+
 /**
  * Main handler for GetPackageTree MCP tool
  */
@@ -384,6 +455,7 @@ export async function handleGetPackageTree(
   args: GetPackageTreeArgs,
 ) {
   const { logger } = context;
+  const shown = answerAt(TREE_ANSWERS, levelOf(args));
   try {
     // The schema holds the rule: exactly one of the two forms.
     const single = stated(args.package_name) ? args.package_name : undefined;
@@ -428,7 +500,7 @@ export async function handleGetPackageTree(
         // The method's error as it is, with the step it arose at.
         return answerFailure(
           withStep(failedMetadata.value.getError(), 'read package metadata'),
-          { tool: 'GetPackageTree', detail: 'terse' },
+          { tool: 'GetPackageTree', detail: detailOf(args) },
         );
       }
     }
@@ -437,8 +509,13 @@ export async function handleGetPackageTree(
       const walked = walkOf(reads[0], packageNames[0]);
       if (!walked.ok) throw walked.error;
       logger?.debug(`Package tree fetched successfully for ${single}`);
+      const answer = shown({
+        packageName: packageNames[0],
+        walked: walked.value,
+        options,
+      });
       return return_response({
-        data: JSON.stringify(treeOf(packageNames[0], walked.value, options)),
+        data: typeof answer === 'string' ? answer : JSON.stringify(answer),
       });
     }
 
@@ -462,14 +539,25 @@ export async function handleGetPackageTree(
       }
       const walked = walkOf(read, package_name);
       return walked.ok
-        ? treeOf(package_name, walked.value, options)
+        ? shown({ packageName: package_name, walked: walked.value, options })
         : {
             package_name,
             error: thrownEntry(walked.error, 'read package node structure'),
           };
     });
+    // At terse each package's tree is text: one text, each under its
+    // `# asked` line; at the other levels a JSON array of the entries.
     return return_response({
-      data: JSON.stringify(entries),
+      data:
+        levelOf(args) === 'terse'
+          ? entries
+              .map((entry, i) =>
+                typeof entry === 'string'
+                  ? `# asked ${packageNames[i]}\n${entry}`
+                  : `# asked ${packageNames[i]}\n# error ${JSON.stringify(entry)}`,
+              )
+              .join('\n')
+          : JSON.stringify(entries),
     });
   } catch (error) {
     logger?.error('Failed to fetch package tree', error);

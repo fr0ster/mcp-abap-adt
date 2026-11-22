@@ -178,18 +178,20 @@ describe('the MCP tool surface', () => {
       // tool that took one root object takes several, read in the same
       // envelopes: the list argument arrives beside the single one, exactly
       // one of them given (the handler checks it), so the single one stops
-      // being required. Each pair below is that move and nothing else.
+      // being required. Each pair below is that move and nothing else —
+      // and, with terse answers (24.2.0, step 3), `detail` where the tool
+      // gained it.
       const LIST_ARGUMENTS: Record<
         string,
         { relaxed: string[]; added: string[] }
       > = {
         'readonly/GetPackageContents': {
           relaxed: ['package_name'],
-          added: ['package_names'],
+          added: ['detail', 'package_names'],
         },
         'system/GetPackageTree': {
           relaxed: ['package_name'],
-          added: ['package_names'],
+          added: ['detail', 'package_names'],
         },
         'search/GetObjectsList': {
           relaxed: ['parent_name', 'parent_tech_name', 'parent_type'],
@@ -215,7 +217,7 @@ describe('the MCP tool surface', () => {
         // with PROG/PX alone, the code it arrived with).
         'system/GetWhereUsed': {
           relaxed: ['object_name', 'object_type'],
-          added: ['container', 'objects'],
+          added: ['container', 'detail', 'objects'],
         },
       };
       const listed = LIST_ARGUMENTS[tool];

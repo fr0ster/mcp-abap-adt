@@ -18,4 +18,10 @@ export {
   readingAt,
   structuredValue,
 } from './levels';
-export { groupedTsv, type TsvGroup, tsv } from './tsv';
+export {
+  groupedTsv,
+  indentedTsv,
+  type TreeRow,
+  type TsvGroup,
+  tsv,
+} from './tsv';

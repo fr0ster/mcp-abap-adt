@@ -2,7 +2,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { groupedTsv, tsv } from '../../../lib/detail';
+import { groupedTsv, indentedTsv, tsv } from '../../../lib/detail';
 
 describe('tsv', () => {
   it('writes the header, then one line per row', () => {
@@ -59,6 +59,18 @@ describe('groupedTsv', () => {
     assert.equal(
       groupedTsv(['a'], [{ field: 'f', value: 'v\nw', rows: [] }]),
       'a\n# f v\\nw',
+    );
+  });
+});
+
+describe('indentedTsv', () => {
+  it('indents each row two spaces per level, its cells escaped', () => {
+    assert.equal(
+      indentedTsv([
+        { depth: 0, cells: ['DEVC/K', 'P'] },
+        { depth: 1, cells: ['TABL/DT', 'T\t1'] },
+      ]),
+      'DEVC/K\tP\n  TABL/DT\tT\\t1',
     );
   });
 });

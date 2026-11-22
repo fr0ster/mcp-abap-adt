@@ -26,7 +26,7 @@ import { handleHandlerGet } from '../../../../compact-readonly-entries/src/handl
 import type { HandlerContext } from '../../../handlers/interfaces';
 import {
   TOOL_DEFINITION as GetPackageContents,
-  handleGetPackageContents,
+  handleGetPackageContents as handleGetPackageContentsOf,
 } from '../../../handlers/package/readonly/handleGetPackageContents';
 import {
   TOOL_DEFINITION as GetObjectsList,
@@ -34,7 +34,7 @@ import {
 } from '../../../handlers/search/readonly/handleGetObjectsList';
 import {
   TOOL_DEFINITION as GetPackageTree,
-  handleGetPackageTree,
+  handleGetPackageTree as handleGetPackageTreeOf,
 } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleGetObjectInfo } from '../../../handlers/system/readonly/handleGetObjectInfo';
 import { createBatchAvailability } from '../../../lib/batch/availability';
@@ -52,6 +52,18 @@ import {
 } from '../../helpers/batchEnvelope';
 import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
+
+/** handleGetPackageTree at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetPackageTree = (
+  context: Parameters<typeof handleGetPackageTreeOf>[0],
+  args: Parameters<typeof handleGetPackageTreeOf>[1],
+) => handleGetPackageTreeOf(context, { detail: 'full', ...args });
+
+/** handleGetPackageContents at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetPackageContents = (
+  context: Parameters<typeof handleGetPackageContentsOf>[0],
+  args: Parameters<typeof handleGetPackageContentsOf>[1],
+) => handleGetPackageContentsOf(context, { detail: 'full', ...args });
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

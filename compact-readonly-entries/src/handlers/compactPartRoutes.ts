@@ -134,7 +134,9 @@ async function packageContentsLines(
   context: HandlerContext,
   args: ToolArgs,
 ): Promise<ToolResultLike> {
-  const answered = await packageContents(context, args);
+  // The full list, which this part writes as its own lines (terse answers:
+  // compact parity is step 6).
+  const answered = await packageContents(context, { ...args, detail: 'full' });
   const text = answered.content[0]?.text;
   if (answered.isError || typeof text !== 'string') return answered;
   // Capped like a where-used list: a structure package's members are its

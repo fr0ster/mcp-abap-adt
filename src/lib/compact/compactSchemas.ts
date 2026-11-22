@@ -2329,6 +2329,7 @@ function systemProperties(
         said(actions, {
           search_object: DETAIL_WORDS,
           where_used: DETAIL_WORDS,
+          package_tree: DETAIL_WORDS,
           transports: DETAIL_WORDS,
           atc_findings: DETAIL_WORDS,
           atc_result: DETAIL_WORDS,

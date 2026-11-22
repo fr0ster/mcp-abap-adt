@@ -62,3 +62,19 @@ export function groupedTsv(
   }
   return lines.join('\n');
 }
+
+/** A row of an indented tree: its depth (0 for the root) and its cells. */
+export interface TreeRow {
+  readonly depth: number;
+  readonly cells: readonly string[];
+}
+
+/**
+ * A tree as indented TSV, no header: each row on its own line, two spaces
+ * per level of depth before its cells, the cells escaped as in {@link tsv}.
+ */
+export function indentedTsv(rows: readonly TreeRow[]): string {
+  return rows
+    .map((row) => `${'  '.repeat(row.depth)}${row.cells.map(cell).join('\t')}`)
+    .join('\n');
+}

@@ -1767,6 +1767,9 @@ whereused_readonly:
         test_class: "CL_ABAP_CHAR_UTILITIES"  # Standard SAP class for testing
         # cloud: needed — a table that exists on the cloud system.
         test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
+        # on premise: a class whose where-used list is above the stdio message
+        # limit (coverage/readToolBugs.live.test.ts); "" skips that case.
+        oversized_class: "CL_ABAP_UNIT_ASSERT"
 
 # Runtime Read-Only Handlers (Profiling + Dumps)
 # Read by readOnly/system/RuntimeProfilingAndDumpsHandlers.test.ts (all params)

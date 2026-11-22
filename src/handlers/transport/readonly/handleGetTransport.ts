@@ -30,31 +30,38 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import { XMLParser } from 'fast-xml-parser';
+import {
+  analyseException,
+  type ITransportItem,
+  type ITransportRequestItem,
+  type ITransportTaskItem,
+  rawOf,
+  readTransportItem,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  type AnswerObject,
-  type JsonValue,
-  jsonOfNode,
-} from '../../../lib/json';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
+  type DetailTable,
+  formatted,
+  fullLevel,
+  rawLevel,
+  readingAt,
+} from '../../../lib/detail';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { AnswerObject } from '../../../lib/json';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import {
+  type AdtReading,
+  parseStructure,
+} from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { failed } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
-import { parseXml } from '../../../lib/xml/node';
-import {
-  attr,
-  child,
-  isList,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../../../lib/xml/tree';
+import type { XmlNode } from '../../../lib/xml/node';
+import { child } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransport',
@@ -83,63 +90,9 @@ export const TOOL_DEFINITION = {
 
 type GetTransportArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-/** The `tm:object_type` of a task's document. */
-const TASK_DOCUMENT = 'T';
-
-/** The attribute `name` of `node`, as the reading parser groups them (`@`). */
-const attributeOf = (node: XmlRead, name: string): string | undefined =>
-  attr(child(node, '@'), name);
-
-/** The members named `name` of `node`, as a list: none, one or several. */
-function listed(node: XmlRead, name: string): readonly XmlRead[] {
-  const member = child(node, name);
-  if (member === undefined) return [];
-  return isList(member) ? member : [member];
-}
-
-/** What a transport document was read as. */
-type TransportKind = 'request' | 'task';
-
 /** A document that is not the transport asked for: fixed words, nothing of SAP's. */
 export const NOT_THE_TRANSPORT_ASKED =
   'The answer is not the transport request or task asked for: its document names another number, or none.';
-
-/** A transport number as SAP spells it: trimmed, upper case. */
-const spelled = (number: string | undefined): string =>
-  (number ?? '').trim().toUpperCase();
-
-/**
- * What `document` is, read as the answer for `number`; `undefined` when it
- * is not that transport — a blank answer, another document, another number.
- *
- * A task's document (`tm:root/@tm:object_type` `T`, or, with no type, a
- * `tm:task` directly under `tm:root`) is the task when its `tm:task` names
- * `number`; any other is the request when its `tm:request` does. A task's
- * document is never read as its parent, whatever number was asked.
- */
-export function transportKind(
-  document: XmlRead,
-  number: string,
-): TransportKind | undefined {
-  const root = child(document, 'tm:root');
-  const [task] = listed(root, 'tm:task');
-  const [request] = listed(root, 'tm:request');
-  const asked = spelled(number);
-  // A blank number names no transport: nothing is the one asked for.
-  if (asked === '') return undefined;
-  const type = attributeOf(root, 'tm:object_type');
-  const isTask =
-    type === TASK_DOCUMENT || (type === undefined && task !== undefined);
-  if (isTask) {
-    return spelled(attributeOf(task, 'tm:number')) === asked
-      ? 'task'
-      : undefined;
-  }
-  return request !== undefined &&
-    spelled(attributeOf(request, 'tm:number')) === asked
-    ? 'request'
-    : undefined;
-}
 
 /** What terse answers of a document, by its kind. */
 interface TerseOptions {
@@ -149,31 +102,29 @@ interface TerseOptions {
 }
 
 /**
- * A request's terse answer: its header from `tm:request` and its tasks as
- * rows, each with the count of its objects; no object is listed.
- * `tm:request` and `tm:task` are repeatable to the reading parser.
+ * A request's terse answer: its header and its tasks as rows, each with the
+ * count of its objects; no object is listed.
  */
-function terseRequest(document: XmlRead, options: TerseOptions) {
-  const [request] = listed(child(document, 'tm:root'), 'tm:request');
-  const of = (name: string) => attributeOf(request, name);
-  const tasks = listed(request, 'tm:task').map((task) => ({
-    number: attributeOf(task, 'tm:number'),
-    owner: attributeOf(task, 'tm:owner'),
-    status: attributeOf(task, 'tm:status'),
-    description: attributeOf(task, 'tm:desc'),
-    object_count: listed(task, 'tm:abap_object').length,
+function terseRequest(item: ITransportRequestItem, options: TerseOptions) {
+  const request = item.header;
+  const tasks = item.tasks.map((task) => ({
+    number: task.header.number,
+    owner: task.header.owner,
+    status: task.header.status,
+    description: task.header.description,
+    object_count: task.objectCount,
   }));
   return {
     success: true,
     transport_number: options.number,
     kind: 'request',
     transport: {
-      number: of('tm:number'),
-      description: of('tm:desc'),
-      type: of('tm:type'),
-      status: of('tm:status'),
-      owner: of('tm:owner'),
-      target_system: of('tm:target'),
+      number: request.number,
+      description: request.description,
+      type: request.type,
+      status: request.status,
+      owner: request.owner,
+      target_system: request.target,
     },
     tasks: options.includeTasks ? tasks : undefined,
     task_count: tasks.length,
@@ -181,193 +132,113 @@ function terseRequest(document: XmlRead, options: TerseOptions) {
 }
 
 /**
- * A task's terse answer: its header from `tm:task`, never `tm:request`
- * (the parent's), the parent's header apart, and its objects as rows of
- * pgmid, type, name and position (`LIMU` or `R3TR` decides what a move or a
- * removal addresses).
+ * A task's terse answer: its header from `tm:task`, never the parent's, the
+ * parent's header apart, and its objects as rows of pgmid, type, name and
+ * position (`LIMU` or `R3TR` decides what a move or a removal addresses).
  */
-function terseTask(document: XmlRead, options: TerseOptions) {
-  const root = child(document, 'tm:root');
-  const [task] = listed(root, 'tm:task');
-  const [parent] = listed(root, 'tm:request');
-  const of = (name: string) => attributeOf(task, name);
-  const objects = listed(task, 'tm:abap_object').map((entry) => ({
-    pgmid: attributeOf(entry, 'tm:pgmid'),
-    type: attributeOf(entry, 'tm:type'),
-    name: attributeOf(entry, 'tm:name'),
-    position: attributeOf(entry, 'tm:position'),
+function terseTask(item: ITransportTaskItem, options: TerseOptions) {
+  const task = item.header;
+  const parent = item.parent;
+  const objects = item.objects.map((entry) => ({
+    pgmid: entry.pgmid,
+    type: entry.type,
+    name: entry.name,
+    position: entry.position,
   }));
   return {
     success: true,
     transport_number: options.number,
     kind: 'task',
     task: {
-      number: of('tm:number'),
-      parent: of('tm:parent'),
-      description: of('tm:desc'),
-      type: of('tm:type'),
-      status: of('tm:status'),
-      owner: of('tm:owner'),
+      number: task.number,
+      parent: task.parent,
+      description: task.description,
+      type: task.type,
+      status: task.status,
+      owner: task.owner,
     },
     parent_request: {
-      number: attributeOf(parent, 'tm:number'),
-      type: attributeOf(parent, 'tm:type'),
-      status: attributeOf(parent, 'tm:status'),
-      target_system: attributeOf(parent, 'tm:target'),
+      number: parent?.number,
+      type: parent?.type,
+      status: parent?.status,
+      target_system: parent?.target,
     },
     objects: options.includeObjects ? objects : undefined,
     object_count: objects.length,
   };
 }
 
-/** The terse answer of a transport document read as `kind`. */
-function terseTransport(
-  kind: TransportKind,
-  document: XmlRead,
-  options: TerseOptions,
-) {
-  return kind === 'task'
-    ? terseTask(document, options)
-    : terseRequest(document, options);
+/**
+ * The transport asked for, as adt-strategies reads it by its number
+ * (`readTransportItem`: a task's document is the task, never its parent; a
+ * document naming another number, or none, is not it); `undefined` when the
+ * answer is not that transport.
+ */
+function itemOf(
+  answer: IAdtWireResponse,
+  number: string,
+): ITransportItem | undefined {
+  const asked = number.trim().toUpperCase();
+  const raw = rawOf(answer);
+  let item: ITransportItem;
+  try {
+    item = readTransportItem(raw, asked);
+  } catch {
+    return undefined;
+  }
+  // Upstream item: with no `tm:object_type`, `readTransportItem` reads a
+  // task's document asked for by its parent's number as the parent, from
+  // the parent's header alone. A `tm:task` directly under `tm:root` makes
+  // the document a task's, never its parent's.
+  if (item.kind === 'request' && rootHoldsTask(raw)) return undefined;
+  return item;
 }
 
-/** An object or a task of the request: its members as parsed, by name. */
-type TransportRow = AnswerObject;
+/** Whether `tm:root` holds a `tm:task` of its own: a task's document. */
+function rootHoldsTask(raw: string): boolean {
+  return child(child(parseStructure(raw), 'tm:root'), 'tm:task') !== undefined;
+}
+
+/** A level's reading: the transport read by its number, and what is shown. */
+interface TransportRead {
+  readonly item: ITransportItem | undefined;
+  readonly shown: AnswerObject | XmlNode | string | undefined;
+}
 
 /**
- * Parse transport request XML response
+ * What `GetTransport` answers at each `detail`: the reading passed to the
+ * call, selected before it (`src/lib/detail`). Every level reads the
+ * transport by its number first, so a document that is not it is refused at
+ * every level; terse then answers the item's rows, medium and full the
+ * parse, raw the document.
  */
-export function parseTransportXml(
-  xmlData: string,
-  includeObjects: boolean = true,
-  includeTasks: boolean = true,
-) {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    textNodeName: '_text',
-    parseAttributeValue: true,
-    isArray: (name, _jpath, _isLeafNode, _isAttribute) => {
-      // Arrays for multiple objects/tasks
-      return ['tm:object', 'tm:task', 'object', 'task'].includes(name);
-    },
+function transportReadings(options: TerseOptions): DetailTable<TransportRead> {
+  const read = (answer: IAdtWireResponse) => ({
+    item: itemOf(answer, options.number),
+    answer,
   });
-
-  const result: XmlRead = parseXml(parser, xmlData);
-  const root = child(result, 'tm:root') || child(result, 'root');
-
-  if (!root) {
-    // A helper must not return a tool result: its value is spread into a
-    // success payload at the call site. Throw, and let the handler's catch
-    // route it through return_error.
-    throw new Error('Invalid transport XML structure - no tm:root found');
-  }
-
-  // Get detailed transport info from tm:request inside tm:root
-  const request = child(root, 'tm:request') || {};
-  /** The attribute `name` of the request, else of the root, as parsed. */
-  const ofRequest = (name: string) => child(request, name);
-  const ofRoot = (name: string) => child(root, name);
-
-  // Extract basic transport information from both root attributes and request details
-  const transportInfo = {
-    number: ofRoot('adtcore:name') || ofRequest('tm:number') || ofRoot('name'),
-    description:
-      ofRequest('tm:desc') ||
-      ofRequest('description') ||
-      ofRoot('tm:description'),
-    type: ofRequest('tm:type') || ofRoot('tm:object_type') || ofRoot('type'),
-    status: ofRequest('tm:status') || ofRoot('tm:status'),
-    status_text: ofRequest('tm:status_text'),
-    owner: ofRequest('tm:owner') || ofRoot('tm:owner'),
-    target_system: ofRequest('tm:target') || ofRoot('tm:target'),
-    target_desc: ofRequest('tm:target_desc'),
-    created_at:
-      ofRoot('adtcore:createdAt') ||
-      ofRequest('tm:createdAt') ||
-      ofRoot('createdAt'),
-    created_by:
-      ofRoot('adtcore:createdBy') ||
-      ofRequest('tm:createdBy') ||
-      ofRoot('createdBy'),
-    changed_at:
-      ofRoot('adtcore:changedAt') ||
-      ofRequest('tm:changedAt') ||
-      ofRoot('changedAt'),
-    changed_by:
-      ofRoot('adtcore:changedBy') ||
-      ofRequest('tm:changedBy') ||
-      ofRoot('changedBy'),
-    release_date: ofRequest('tm:releaseDate') || ofRoot('releaseDate'),
-    client: ofRequest('tm:source_client') || ofRoot('tm:client'),
-    cts_project: ofRequest('tm:cts_project'),
-    cts_project_desc: ofRequest('tm:cts_project_desc'),
-  };
-
-  /** A member that may repeat, as a list: a list as it is, one member alone. */
-  const repeated = (value: XmlNode): XmlList =>
-    isList(value) ? value : [value];
-
-  /** A member of a parsed row, checked once: JSON, or absent. */
-  const field = (node: XmlRead, name: string): JsonValue | undefined => {
-    const member = child(node, name);
-    return member === undefined ? undefined : jsonOfNode(member);
-  };
-
-  // Extract objects if requested
-  let objects: TransportRow[] = [];
-  const allObjects = ofRequest('tm:all_objects');
-  if (includeObjects && allObjects) {
-    const objectList = child(allObjects, 'tm:abap_object');
-    objects = (objectList ? repeated(objectList) : []).map((obj) => ({
-      name: field(obj, 'tm:name'),
-      type: field(obj, 'tm:type'),
-      wbtype: field(obj, 'tm:wbtype'),
-      pgmid: field(obj, 'tm:pgmid'),
-      description: field(obj, 'tm:obj_desc'),
-      position: field(obj, 'tm:position'),
-      lock_status: field(obj, 'tm:lock_status'),
-      info: field(obj, 'tm:obj_info'),
-    }));
-  }
-
-  // Extract tasks if requested
-  let tasks: TransportRow[] = [];
-  const taskMember = ofRequest('tm:task');
-  if (includeTasks && taskMember) {
-    tasks = repeated(taskMember).map((task) => {
-      const taskObjects = child(task, 'tm:abap_object');
-      return {
-        number: field(task, 'tm:number'),
-        parent: field(task, 'tm:parent'),
-        description: field(task, 'tm:desc'),
-        type: field(task, 'tm:type'),
-        status: field(task, 'tm:status'),
-        status_text: field(task, 'tm:status_text'),
-        owner: field(task, 'tm:owner'),
-        target: field(task, 'tm:target'),
-        target_desc: field(task, 'tm:target_desc'),
-        client: field(task, 'tm:source_client'),
-        created_at: field(task, 'tm:lastchanged_timestamp'),
-        objects: taskObjects
-          ? repeated(taskObjects).map((obj) => ({
-              name: field(obj, 'tm:name'),
-              type: field(obj, 'tm:type'),
-              wbtype: field(obj, 'tm:wbtype'),
-              description: field(obj, 'tm:obj_desc'),
-              position: field(obj, 'tm:position'),
-            }))
-          : [],
-      };
-    });
-  }
-
   return {
-    transport: transportInfo,
-    objects: includeObjects ? objects : undefined,
-    tasks: includeTasks ? tasks : undefined,
-    object_count: objects.length,
-    task_count: tasks.length,
+    terse: formatted(read, ({ item }) => ({
+      item,
+      shown:
+        item === undefined
+          ? undefined
+          : item.kind === 'task'
+            ? terseTask(item, options)
+            : terseRequest(item, options),
+    })),
+    medium: formatted(read, ({ item, answer }) => ({
+      item,
+      shown: fullLevel(answer).value,
+    })),
+    full: formatted(read, ({ item, answer }) => ({
+      item,
+      shown: fullLevel(answer).value,
+    })),
+    raw: formatted(read, ({ item, answer }) => ({
+      item,
+      shown: rawLevel(answer).value,
+    })),
   };
 }
 
@@ -390,22 +261,22 @@ export async function handleGetTransport(
     includeTasks: args.include_tasks !== false,
   };
   logger?.debug(`GetTransport: ${args.transport_number}`);
-  let read: Awaited<ReturnType<typeof readTransport>>;
+  let read: IAdtResponse<AdtReading<TransportRead>, IAdtError>;
   try {
-    read = await readTransport(context, args.transport_number);
+    // The request's or task's document: adt-clients' one read of either.
+    read = await createAdtClient(context.connection, context.logger)
+      .getRequest({
+        ...resultsFor(transportDocuments),
+        objects: readingAt(transportReadings(options), levelOf(args)),
+      })
+      .readObjects(args.transport_number, { analyse: analyseException });
   } catch (thrown) {
     return answerCaught(thrown, { tool: 'GetTransport', detail });
   }
   // The document must be the transport asked for, at every detail, before
   // anything is answered as success.
-  let kind: TransportKind = 'request';
-  if (read.ok) {
-    const readAs = transportKind(
-      read.getResult().value.value,
-      args.transport_number,
-    );
-    if (readAs === undefined) return return_error(NOT_THE_TRANSPORT_ASKED);
-    kind = readAs;
+  if (read.ok && read.getResult().value.value.item === undefined) {
+    return return_error(NOT_THE_TRANSPORT_ASKED);
   }
   const answered = read;
   return answer(
@@ -414,13 +285,6 @@ export async function handleGetTransport(
       answered.ok
         ? answered
         : failed(withStep(answered.getError(), 'read transport request')),
-    project(detail, (value: XmlRead) => terseTransport(kind, value, options)),
+    (reading: AdtReading<TransportRead>) => reading.value.shown ?? '',
   );
-}
-
-/** The request's or task's document: adt-clients' one read of either. */
-function readTransport(context: HandlerContext, number: string) {
-  return createAdtClient(context.connection, context.logger)
-    .getRequest(resultsFor(transportDocuments))
-    .readObjects(number, { analyse: analyseException });
 }

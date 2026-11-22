@@ -20,8 +20,9 @@ import { handleSearchObject } from '../../../handlers/search/readonly/handleSear
 import { handleGetAdtTypes } from '../../../handlers/system/readonly/handleGetAllTypes';
 import { handleCreateTransport } from '../../../handlers/transport/high/handleCreateTransport';
 import { handleCreateTransportTask } from '../../../handlers/transport/high/handleCreateTransportTask';
+import { handleGetTransport } from '../../../handlers/transport/readonly/handleGetTransport';
 import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
-import type { AnswerDetail } from '../../../lib/strategies/projections';
+import type { DetailLevel } from '../../../lib/detail';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { corpusBody } from '../../helpers/adtCorpus';
@@ -41,7 +42,7 @@ const FIXTURE_SOURCE = path.join(
   'shipped-readings.json',
 );
 
-const DETAILS: readonly AnswerDetail[] = ['terse', 'full', 'raw'];
+const DETAILS: readonly DetailLevel[] = ['terse', 'full', 'raw'];
 
 /** What a handler answered: its error flag and its text. */
 interface Answered {
@@ -75,10 +76,13 @@ const sentRequests = (): string[] =>
     (request) => `${request.method} ${request.url}`,
   );
 
-const ctx = (answers: Array<{ data: string; status?: number }>) => {
+const ctx = (
+  answers: Array<{ data: string; status?: number }>,
+  kind: 'onprem' | 'cloud' = 'onprem',
+) => {
   const connection = recordingConnection(answers);
   last.connection = connection;
-  declareSystemKind(connection, 'onprem');
+  declareSystemKind(connection, kind);
   return { connection, logger: undefined };
 };
 
@@ -96,8 +100,20 @@ const REQUEST_WITHOUT_TASK = `${xmlHead}<tm:root tm:object_type="R" adtcore:name
 /** A created task, as `newtask` answers it: the number on the root. */
 const TASK_CREATED = `${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="tasks" tm:number="SIDK907073" tm:uri="/sap/bc/adt/cts/transportrequests/SIDK907073"/>`;
 
+/** A quickSearch hit whose description carries a numeric character reference. */
+const SEARCH_ENTITY = `${xmlHead}<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_amp" adtcore:type="CLAS/OC" adtcore:name="ZCL_AMP" adtcore:packageName="ZPKG" adtcore:description="this &#x26; that"/></adtcore:objectReferences>`;
+
+/** A type list whose names read as numbers, one item without a description. */
+const NAMED_ITEMS = `${xmlHead}<nameditem:namedItemList xmlns:nameditem="http://www.sap.com/adt/nameditem"><nameditem:totalItemCount>2</nameditem:totalItemCount><nameditem:namedItem><nameditem:name>007</nameditem:name><nameditem:description>leading zeros</nameditem:description></nameditem:namedItem><nameditem:namedItem><nameditem:name>NODESC</nameditem:name></nameditem:namedItem></nameditem:namedItemList>`;
+
+/** A created task whose root names the task and a `tm:request` child its parent. */
+const TASK_UNDER_PARENT = `${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="tasks" tm:number="SIDK907073"><tm:request tm:number="SIDK907071"/></tm:root>`;
+
+/** An answer that is no transport document, its body something no error may repeat. */
+const NOT_TRANSPORT = `${xmlHead}<html><body>BODY_MARKER_NEVER_IN_AN_ERROR</body></html>`;
+
 /** Every case: its name, and how to run it at one detail. */
-const CASES: Record<string, (detail: AnswerDetail) => Promise<Answered>> = {};
+const CASES: Record<string, (detail: DetailLevel) => Promise<Answered>> = {};
 
 for (const name of [
   'read-transport-list-structure--01-cts-transportrequests',
@@ -140,6 +156,34 @@ for (const [label, data] of [
     );
 }
 
+for (const [label, data] of [
+  [
+    'read-package-quick-search-mask',
+    corpusBody('read-package-quick-search-mask--01-quick-search'),
+  ],
+  ['two hits', SEARCH_HITS],
+  ['no hit', ''],
+  ['a numeric character reference', SEARCH_ENTITY],
+] as const) {
+  CASES[`SearchObject cloud ${label}`] = async (detail) =>
+    answeredOf(
+      await handleSearchObject(ctx([{ data }], 'cloud'), {
+        object_name: 'Z*',
+        detail,
+      }),
+    );
+}
+CASES['SearchObject a numeric character reference'] = async (detail) =>
+  answeredOf(
+    await handleSearchObject(ctx([{ data: SEARCH_ENTITY }]), {
+      object_name: 'Z*',
+      detail,
+    }),
+  );
+
+CASES['GetAdtTypes numeric names, a description absent'] = async (detail) =>
+  answeredOf(await handleGetAdtTypes(ctx([{ data: NAMED_ITEMS }]), { detail }));
+
 for (const name of [
   'system-description-s4-2025--05-objecttypes',
   'system-description-abap-cloud--05-objecttypes',
@@ -154,6 +198,24 @@ for (const [label, answers, taskType] of [
   ['with a task, typed S', [TRANSPORT_CREATED, REQUEST, ''], 'S'],
   ['with a task, left X', [TRANSPORT_CREATED, REQUEST], 'X'],
   ['without a task', [TRANSPORT_CREATED, REQUEST_WITHOUT_TASK], 'S'],
+  [
+    'read back as a bare root',
+    [
+      TRANSPORT_CREATED,
+      `${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"/>`,
+    ],
+    'S',
+  ],
+  [
+    'read back as no transport document',
+    [TRANSPORT_CREATED, NOT_TRANSPORT],
+    'S',
+  ],
+  [
+    'read back as an empty root element',
+    [TRANSPORT_CREATED, '<tm:root/>'],
+    'S',
+  ],
 ] as const) {
   CASES[`CreateTransport ${label}`] = async (detail) =>
     answeredOf(
@@ -167,6 +229,7 @@ for (const [label, answers, taskType] of [
 
 for (const [label, answers] of [
   ['typed S', [TASK_CREATED, '']],
+  ['a parent named beside the task, typed S', [TASK_UNDER_PARENT, '']],
   [
     'no number answered',
     [`${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"/>`],
@@ -177,6 +240,23 @@ for (const [label, answers] of [
       await handleCreateTransportTask(ctx(answers.map((data) => ({ data }))), {
         transport_number: PARENT,
         target_user: 'developer',
+        detail,
+      }),
+    );
+}
+
+for (const [label, data] of [
+  [
+    'a bare root',
+    `${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"/>`,
+  ],
+  ['no transport document', NOT_TRANSPORT],
+  ['an empty root element', '<tm:root/>'],
+] as const) {
+  CASES[`GetTransport ${label}`] = async (detail) =>
+    answeredOf(
+      await handleGetTransport(ctx([{ data }]), {
+        transport_number: PARENT,
         detail,
       }),
     );
@@ -232,6 +312,25 @@ describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READ
       });
     }
   }
+
+  for (const name of Object.keys(CASES)) {
+    it(`${name} @medium answers as @full`, async () => {
+      const run = CASES[name];
+      assert.ok(run);
+      assert.deepStrictEqual(await run('medium'), await run('full'));
+    });
+  }
+
+  it('no error repeats the document it was answered', () => {
+    for (const [key, recorded] of Object.entries(answered)) {
+      if (!recorded.isError) continue;
+      assert.equal(
+        recorded.text.includes('BODY_MARKER_NEVER_IN_AN_ERROR'),
+        false,
+        key,
+      );
+    }
+  });
 
   after(() => {
     if (process.env.WRITE_SHIPPED_READINGS !== '1') return;

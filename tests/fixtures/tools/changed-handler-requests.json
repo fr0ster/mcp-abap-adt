@@ -39,7 +39,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate INTERFACE": {
     "requests": [
@@ -109,7 +109,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate DDL": {
     "requests": [
@@ -193,7 +193,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate SERVICE_DEFINITION": {
     "requests": [
@@ -207,7 +207,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate SERVICE_BINDING": {
     "requests": [
@@ -221,7 +221,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate FUNCTION_MODULE": {
     "requests": [
@@ -242,7 +242,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate BEHAVIOR_IMPLEMENTATION": {
     "requests": [
@@ -270,7 +270,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate FUNCTION_GROUP_TEXT_ELEMENTS": {
     "requests": [
@@ -284,7 +284,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate CLASS_TEXT_ELEMENTS": {
     "requests": [
@@ -298,7 +298,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerCheckRun CLASS": {
     "requests": [
@@ -312,7 +312,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun PROGRAM": {
     "requests": [
@@ -326,7 +326,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun INTERFACE": {
     "requests": [
@@ -340,7 +340,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun FUNCTION_GROUP": {
     "requests": [
@@ -354,7 +354,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun FUNCTION_MODULE": {
     "requests": [
@@ -375,7 +375,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun TABLE": {
     "requests": [
@@ -389,7 +389,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun STRUCTURE": {
     "requests": [
@@ -403,7 +403,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun TABLE_TYPE": {
     "requests": [
@@ -417,7 +417,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun DDL": {
     "requests": [
@@ -431,7 +431,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun DOMAIN": {
     "requests": [
@@ -445,7 +445,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun DATA_ELEMENT": {
     "requests": [
@@ -459,7 +459,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun PACKAGE": {
     "requests": [
@@ -473,7 +473,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun BEHAVIOR_DEFINITION": {
     "requests": [
@@ -487,7 +487,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCheckRun METADATA_EXTENSION": {
     "requests": [
@@ -501,7 +501,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "onprem HandlerCreate PACKAGE": {
     "requests": [
@@ -557,7 +557,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"CreateTransport\",\n  \"detail\": \"terse\",\n  \"message\": \"Invalid transport response XML structure - no tm:root found\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"Invalid transport response XML structure - no tm:root found\"}"
   },
   "onprem HandlerCreate TABLE": {
     "requests": [
@@ -787,7 +787,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete DOMAIN": {
     "requests": [
@@ -801,7 +801,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete DATA_ELEMENT": {
     "requests": [
@@ -815,7 +815,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete TABLE": {
     "requests": [
@@ -829,7 +829,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete STRUCTURE": {
     "requests": [
@@ -843,7 +843,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete TABLE_TYPE": {
     "requests": [
@@ -857,7 +857,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete DDL": {
     "requests": [
@@ -871,7 +871,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete SERVICE_DEFINITION": {
     "requests": [
@@ -885,7 +885,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete SERVICE_BINDING": {
     "requests": [
@@ -899,7 +899,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete CLASS": {
     "requests": [
@@ -913,7 +913,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete CDS_UNIT_TEST": {
     "requests": [
@@ -927,7 +927,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete PROGRAM": {
     "requests": [
@@ -941,7 +941,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete INCLUDE": {
     "requests": [
@@ -955,7 +955,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete INTERFACE": {
     "requests": [
@@ -969,7 +969,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete FUNCTION_GROUP": {
     "requests": [
@@ -983,7 +983,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete FUNCTION_MODULE": {
     "requests": [
@@ -1004,7 +1004,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete BEHAVIOR_DEFINITION": {
     "requests": [
@@ -1018,7 +1018,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete BEHAVIOR_IMPLEMENTATION": {
     "requests": [
@@ -1032,7 +1032,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "onprem HandlerDelete METADATA_EXTENSION": {
     "requests": [
@@ -1124,7 +1124,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck DOMAIN": {
     "requests": [
@@ -1138,7 +1138,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck DATA_ELEMENT": {
     "requests": [
@@ -1152,7 +1152,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck TABLE": {
     "requests": [
@@ -1166,7 +1166,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck STRUCTURE": {
     "requests": [
@@ -1180,7 +1180,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck TABLE_TYPE": {
     "requests": [
@@ -1194,7 +1194,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck DDL": {
     "requests": [
@@ -1208,7 +1208,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck SERVICE_DEFINITION": {
     "requests": [
@@ -1222,7 +1222,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck SERVICE_BINDING": {
     "requests": [
@@ -1236,7 +1236,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck CLASS": {
     "requests": [
@@ -1250,7 +1250,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck CDS_UNIT_TEST": {
     "requests": [
@@ -1264,7 +1264,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck PROGRAM": {
     "requests": [
@@ -1278,7 +1278,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck INCLUDE": {
     "requests": [
@@ -1292,7 +1292,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck INTERFACE": {
     "requests": [
@@ -1306,7 +1306,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck FUNCTION_GROUP": {
     "requests": [
@@ -1320,7 +1320,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck FUNCTION_MODULE": {
     "requests": [
@@ -1341,7 +1341,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck BEHAVIOR_DEFINITION": {
     "requests": [
@@ -1355,7 +1355,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck BEHAVIOR_IMPLEMENTATION": {
     "requests": [
@@ -1369,7 +1369,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerDeletionCheck METADATA_EXTENSION": {
     "requests": [
@@ -1383,7 +1383,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "onprem HandlerGet PACKAGE part=source": {
     "requests": [],
@@ -1417,7 +1417,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"Invalid ADT batch response: missing multipart boundary\",\n  \"origin\": \"connection\",\n  \"step\": \"read package node structure\",\n  \"request\": {\n    \"method\": \"POST\",\n    \"url\": \"/sap/bc/adt/communication/batch\"\n  }\n}"
+    "ended": "error answer: {\"message\":\"Invalid ADT batch response: missing multipart boundary\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"request\":{\"method\":\"POST\",\"url\":\"/sap/bc/adt/communication/batch\"}}"
   },
   "onprem HandlerGet PACKAGE part=main_programs": {
     "requests": [],
@@ -2837,7 +2837,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTableSettings\",\n  \"detail\": \"terse\",\n  \"message\": \"the answer is no ts:tableSettings document\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"GetTableSettings\",\"detail\":\"terse\",\"message\":\"the answer is no ts:tableSettings document\"}"
   },
   "onprem HandlerGet TABLE_SETTINGS part=metadata": {
     "requests": [],
@@ -2883,7 +2883,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTextElements\",\n  \"detail\": \"terse\",\n  \"message\": \"text elements headings: 0 line(s), not 6\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"GetTextElements\",\"detail\":\"terse\",\"message\":\"text elements headings: 0 line(s), not 6\"}"
   },
   "onprem HandlerGet PROGRAM_TEXT_ELEMENTS part=metadata": {
     "requests": [],
@@ -2929,7 +2929,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTextElements\",\n  \"detail\": \"terse\",\n  \"message\": \"text elements headings: 0 line(s), not 6\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"GetTextElements\",\"detail\":\"terse\",\"message\":\"text elements headings: 0 line(s), not 6\"}"
   },
   "onprem HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=metadata": {
     "requests": [],
@@ -3852,19 +3852,19 @@
   },
   "onprem HandlerUpdate TABLE_SETTINGS": {
     "requests": [],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"HandlerUpdate\",\n  \"detail\": \"terse\",\n  \"message\": \"Name at least one setting to write\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"HandlerUpdate\",\"detail\":\"terse\",\"message\":\"Name at least one setting to write\"}"
   },
   "onprem HandlerUpdate PROGRAM_TEXT_ELEMENTS": {
     "requests": [],
-    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
+    "ended": "error answer: {\"message\":\"Give at least one of symbols, selections, headings\",\"origin\":\"refusal\",\"step\":\"update\"}"
   },
   "onprem HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS": {
     "requests": [],
-    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
+    "ended": "error answer: {\"message\":\"Give at least one of symbols, selections, headings\",\"origin\":\"refusal\",\"step\":\"update\"}"
   },
   "onprem HandlerUpdate CLASS_TEXT_ELEMENTS": {
     "requests": [],
-    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
+    "ended": "error answer: {\"message\":\"Give at least one of symbols, selections, headings\",\"origin\":\"refusal\",\"step\":\"update\"}"
   },
   "onprem HandlerValidate CLASS": {
     "requests": [
@@ -3876,7 +3876,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate PROGRAM": {
     "requests": [
@@ -3888,7 +3888,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate INCLUDE": {
     "requests": [
@@ -3900,7 +3900,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate INTERFACE": {
     "requests": [
@@ -3912,7 +3912,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate FUNCTION_GROUP": {
     "requests": [
@@ -3924,7 +3924,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate FUNCTION_MODULE": {
     "requests": [
@@ -3936,7 +3936,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate TABLE": {
     "requests": [
@@ -3948,7 +3948,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate STRUCTURE": {
     "requests": [
@@ -3960,7 +3960,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate TABLE_TYPE": {
     "requests": [
@@ -3972,7 +3972,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate DDL": {
     "requests": [
@@ -3984,7 +3984,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate DOMAIN": {
     "requests": [
@@ -3996,7 +3996,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate DATA_ELEMENT": {
     "requests": [
@@ -4008,7 +4008,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate PACKAGE": {
     "requests": [
@@ -4020,7 +4020,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate BEHAVIOR_DEFINITION": {
     "requests": [
@@ -4032,7 +4032,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate BEHAVIOR_IMPLEMENTATION": {
     "requests": [
@@ -4044,7 +4044,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate METADATA_EXTENSION": {
     "requests": [
@@ -4056,7 +4056,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "onprem HandlerValidate SERVICE_BINDING": {
     "requests": [
@@ -4070,7 +4070,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateServiceBinding\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateServiceBinding\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateServiceBinding\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateServiceBinding\"}"
   },
   "onprem HandlerProfileRun CLASS": {
     "requests": [
@@ -4107,7 +4107,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetObjectStructure\",\n  \"detail\": \"terse\",\n  \"message\": \"No object structure document was returned for this object — the answer carries no exception to read, so an absent projectexplorer:objectstructure root cannot be told apart from \\\"this object has no substructure\\\" here. Verify the object exists before trusting an empty answer.\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"GetObjectStructure\",\"detail\":\"terse\",\"message\":\"No object structure document was returned for this object — the answer carries no exception to read, so an absent projectexplorer:objectstructure root cannot be told apart from \\\"this object has no substructure\\\" here. Verify the object exists before trusting an empty answer.\"}"
   },
   "onprem HandlerGet part=node_structure DEVC/K": {
     "requests": [
@@ -4212,7 +4212,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerActivate object_adt_type PROG/I": {
     "requests": [
@@ -4226,7 +4226,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "onprem HandlerGetData object_name": {
     "requests": [
@@ -4338,7 +4338,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerActivate DDL": {
     "requests": [
@@ -4422,7 +4422,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerActivate SERVICE_DEFINITION": {
     "requests": [
@@ -4436,7 +4436,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerActivate SERVICE_BINDING": {
     "requests": [
@@ -4450,7 +4450,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerActivate FUNCTION_MODULE": {
     "requests": [
@@ -4471,7 +4471,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerActivate BEHAVIOR_IMPLEMENTATION": {
     "requests": [
@@ -4499,7 +4499,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerActivate FUNCTION_GROUP_TEXT_ELEMENTS": {
     "requests": [
@@ -4513,7 +4513,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerActivate CLASS_TEXT_ELEMENTS": {
     "requests": [
@@ -4527,7 +4527,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerCheckRun CLASS": {
     "requests": [
@@ -4541,7 +4541,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun PROGRAM": {
     "requests": [
@@ -4555,7 +4555,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun INTERFACE": {
     "requests": [
@@ -4569,7 +4569,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun FUNCTION_GROUP": {
     "requests": [
@@ -4583,7 +4583,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun FUNCTION_MODULE": {
     "requests": [
@@ -4604,7 +4604,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun TABLE": {
     "requests": [
@@ -4618,7 +4618,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun STRUCTURE": {
     "requests": [
@@ -4632,7 +4632,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun TABLE_TYPE": {
     "requests": [
@@ -4646,7 +4646,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun DDL": {
     "requests": [
@@ -4660,7 +4660,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun DOMAIN": {
     "requests": [
@@ -4674,7 +4674,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun DATA_ELEMENT": {
     "requests": [
@@ -4688,7 +4688,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun PACKAGE": {
     "requests": [
@@ -4702,7 +4702,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun BEHAVIOR_DEFINITION": {
     "requests": [
@@ -4716,7 +4716,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCheckRun METADATA_EXTENSION": {
     "requests": [
@@ -4730,7 +4730,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"CheckObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for CheckObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"CheckObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for CheckObjectLow\"}"
   },
   "cloud HandlerCreate PACKAGE": {
     "requests": [
@@ -4786,7 +4786,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"CreateTransport\",\n  \"detail\": \"terse\",\n  \"message\": \"Invalid transport response XML structure - no tm:root found\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"Invalid transport response XML structure - no tm:root found\"}"
   },
   "cloud HandlerCreate TABLE": {
     "requests": [
@@ -4988,7 +4988,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete DOMAIN": {
     "requests": [
@@ -5002,7 +5002,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete DATA_ELEMENT": {
     "requests": [
@@ -5016,7 +5016,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete TABLE": {
     "requests": [
@@ -5030,7 +5030,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete STRUCTURE": {
     "requests": [
@@ -5044,7 +5044,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete TABLE_TYPE": {
     "requests": [
@@ -5058,7 +5058,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete DDL": {
     "requests": [
@@ -5072,7 +5072,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete SERVICE_DEFINITION": {
     "requests": [
@@ -5086,7 +5086,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete SERVICE_BINDING": {
     "requests": [
@@ -5100,7 +5100,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete CLASS": {
     "requests": [
@@ -5114,7 +5114,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete CDS_UNIT_TEST": {
     "requests": [
@@ -5128,7 +5128,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete INTERFACE": {
     "requests": [
@@ -5142,7 +5142,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete FUNCTION_GROUP": {
     "requests": [
@@ -5156,7 +5156,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete FUNCTION_MODULE": {
     "requests": [
@@ -5177,7 +5177,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete BEHAVIOR_DEFINITION": {
     "requests": [
@@ -5191,7 +5191,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete BEHAVIOR_IMPLEMENTATION": {
     "requests": [
@@ -5205,7 +5205,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDelete\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDelete\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDelete\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDelete\"}"
   },
   "cloud HandlerDelete METADATA_EXTENSION": {
     "requests": [
@@ -5297,7 +5297,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck DOMAIN": {
     "requests": [
@@ -5311,7 +5311,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck DATA_ELEMENT": {
     "requests": [
@@ -5325,7 +5325,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck TABLE": {
     "requests": [
@@ -5339,7 +5339,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck STRUCTURE": {
     "requests": [
@@ -5353,7 +5353,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck TABLE_TYPE": {
     "requests": [
@@ -5367,7 +5367,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck DDL": {
     "requests": [
@@ -5381,7 +5381,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck SERVICE_DEFINITION": {
     "requests": [
@@ -5395,7 +5395,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck SERVICE_BINDING": {
     "requests": [
@@ -5409,7 +5409,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck CLASS": {
     "requests": [
@@ -5423,7 +5423,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck CDS_UNIT_TEST": {
     "requests": [
@@ -5437,7 +5437,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck PROGRAM": {
     "requests": [
@@ -5451,7 +5451,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck INCLUDE": {
     "requests": [
@@ -5465,7 +5465,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck INTERFACE": {
     "requests": [
@@ -5479,7 +5479,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck FUNCTION_GROUP": {
     "requests": [
@@ -5493,7 +5493,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck FUNCTION_MODULE": {
     "requests": [
@@ -5514,7 +5514,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck BEHAVIOR_DEFINITION": {
     "requests": [
@@ -5528,7 +5528,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck BEHAVIOR_IMPLEMENTATION": {
     "requests": [
@@ -5542,7 +5542,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerDeletionCheck METADATA_EXTENSION": {
     "requests": [
@@ -5556,7 +5556,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"HandlerDeletionCheck\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for HandlerDeletionCheck\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"HandlerDeletionCheck\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for HandlerDeletionCheck\"}"
   },
   "cloud HandlerGet PACKAGE part=source": {
     "requests": [],
@@ -5590,7 +5590,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"Invalid ADT batch response: missing multipart boundary\",\n  \"origin\": \"connection\",\n  \"step\": \"read package node structure\",\n  \"request\": {\n    \"method\": \"POST\",\n    \"url\": \"/sap/bc/adt/communication/batch\"\n  }\n}"
+    "ended": "error answer: {\"message\":\"Invalid ADT batch response: missing multipart boundary\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"request\":{\"method\":\"POST\",\"url\":\"/sap/bc/adt/communication/batch\"}}"
   },
   "cloud HandlerGet PACKAGE part=main_programs": {
     "requests": [],
@@ -6958,7 +6958,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTableSettings\",\n  \"detail\": \"terse\",\n  \"message\": \"the answer is no ts:tableSettings document\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"GetTableSettings\",\"detail\":\"terse\",\"message\":\"the answer is no ts:tableSettings document\"}"
   },
   "cloud HandlerGet TABLE_SETTINGS part=metadata": {
     "requests": [],
@@ -7004,7 +7004,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTextElements\",\n  \"detail\": \"terse\",\n  \"message\": \"text elements headings: 0 line(s), not 6\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"GetTextElements\",\"detail\":\"terse\",\"message\":\"text elements headings: 0 line(s), not 6\"}"
   },
   "cloud HandlerGet PROGRAM_TEXT_ELEMENTS part=metadata": {
     "requests": [],
@@ -7050,7 +7050,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetTextElements\",\n  \"detail\": \"terse\",\n  \"message\": \"text elements headings: 0 line(s), not 6\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"GetTextElements\",\"detail\":\"terse\",\"message\":\"text elements headings: 0 line(s), not 6\"}"
   },
   "cloud HandlerGet FUNCTION_GROUP_TEXT_ELEMENTS part=metadata": {
     "requests": [],
@@ -7874,15 +7874,15 @@
   },
   "cloud HandlerUpdate TABLE_SETTINGS": {
     "requests": [],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"HandlerUpdate\",\n  \"detail\": \"terse\",\n  \"message\": \"Name at least one setting to write\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"HandlerUpdate\",\"detail\":\"terse\",\"message\":\"Name at least one setting to write\"}"
   },
   "cloud HandlerUpdate FUNCTION_GROUP_TEXT_ELEMENTS": {
     "requests": [],
-    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
+    "ended": "error answer: {\"message\":\"Give at least one of symbols, selections, headings\",\"origin\":\"refusal\",\"step\":\"update\"}"
   },
   "cloud HandlerUpdate CLASS_TEXT_ELEMENTS": {
     "requests": [],
-    "ended": "error answer: {\n  \"message\": \"Give at least one of symbols, selections, headings\",\n  \"origin\": \"refusal\",\n  \"step\": \"update\"\n}"
+    "ended": "error answer: {\"message\":\"Give at least one of symbols, selections, headings\",\"origin\":\"refusal\",\"step\":\"update\"}"
   },
   "cloud HandlerValidate CLASS": {
     "requests": [
@@ -7894,7 +7894,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate INTERFACE": {
     "requests": [
@@ -7906,7 +7906,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate FUNCTION_GROUP": {
     "requests": [
@@ -7918,7 +7918,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate FUNCTION_MODULE": {
     "requests": [
@@ -7930,7 +7930,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate TABLE": {
     "requests": [
@@ -7942,7 +7942,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate STRUCTURE": {
     "requests": [
@@ -7954,7 +7954,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate TABLE_TYPE": {
     "requests": [
@@ -7966,7 +7966,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate DDL": {
     "requests": [
@@ -7978,7 +7978,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate DOMAIN": {
     "requests": [
@@ -7990,7 +7990,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate DATA_ELEMENT": {
     "requests": [
@@ -8002,7 +8002,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate PACKAGE": {
     "requests": [
@@ -8014,7 +8014,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate BEHAVIOR_DEFINITION": {
     "requests": [
@@ -8026,7 +8026,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate BEHAVIOR_IMPLEMENTATION": {
     "requests": [
@@ -8038,7 +8038,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate METADATA_EXTENSION": {
     "requests": [
@@ -8050,7 +8050,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateObjectLow\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateObjectLow\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateObjectLow\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateObjectLow\"}"
   },
   "cloud HandlerValidate SERVICE_BINDING": {
     "requests": [
@@ -8064,7 +8064,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"projection_failed\",\n  \"tool\": \"ValidateServiceBinding\",\n  \"detail\": \"terse\",\n  \"message\": \"the terse projection produced no value for ValidateServiceBinding\"\n}"
+    "ended": "error answer: {\"error\":\"projection_failed\",\"tool\":\"ValidateServiceBinding\",\"detail\":\"terse\",\"message\":\"the terse projection produced no value for ValidateServiceBinding\"}"
   },
   "cloud HandlerProfileRun CLASS": {
     "requests": [
@@ -8088,7 +8088,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"error\": \"client_threw\",\n  \"tool\": \"GetObjectStructure\",\n  \"detail\": \"terse\",\n  \"message\": \"No object structure document was returned for this object — the answer carries no exception to read, so an absent projectexplorer:objectstructure root cannot be told apart from \\\"this object has no substructure\\\" here. Verify the object exists before trusting an empty answer.\"\n}"
+    "ended": "error answer: {\"error\":\"client_threw\",\"tool\":\"GetObjectStructure\",\"detail\":\"terse\",\"message\":\"No object structure document was returned for this object — the answer carries no exception to read, so an absent projectexplorer:objectstructure root cannot be told apart from \\\"this object has no substructure\\\" here. Verify the object exists before trusting an empty answer.\"}"
   },
   "cloud HandlerGet part=node_structure DEVC/K": {
     "requests": [
@@ -8193,7 +8193,7 @@
         }
       }
     ],
-    "ended": "error answer: {\n  \"message\": \"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\n  \"origin\": \"refusal\",\n  \"step\": \"start activation run\"\n}"
+    "ended": "error answer: {\"message\":\"SAP answered the activation run start without a run id: no Location header carried one, so the run cannot be read.\",\"origin\":\"refusal\",\"step\":\"start activation run\"}"
   },
   "cloud HandlerActivate object_adt_type PROG/I": {
     "requests": [],

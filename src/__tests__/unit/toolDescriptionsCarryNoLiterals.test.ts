@@ -44,7 +44,7 @@ import { RuntimeRunHandlersGroup } from '../../lib/handlers/groups/RuntimeRunHan
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 import type { ToolDefinition } from '../../lib/handlers/interfaces';
 import { noConnectionContext } from '../../lib/handlers/registry/expositionRegistry';
-import { abapPrompts } from '../../lib/prompts';
+import { abapPrompts } from '../../lib/prompts/prompts';
 import { listedJson } from '../helpers/listedJson';
 import { toolsNamed } from '../helpers/promptArguments';
 import { promptSourceFor } from '../helpers/promptSources';

@@ -14,11 +14,6 @@ import { TOOL_DEFINITION as RunUnitTest } from '../../handlers/unit_test/high/ha
 import type { RunTargetArgs } from '../../handlers/unit_test/shared/runTarget.js';
 import type { JsonValue } from '../json.js';
 import { completeFrom } from './completion.js';
-import {
-  nameArguments,
-  type ObjectName,
-  objectNameOf,
-} from './functionModule.js';
 import { jsonLiteral } from './instruction.js';
 import { objectArguments, stepValue, userValue } from './objectPrompts.js';
 import { type FullRow, fullRow } from './objectRows.js';
@@ -119,7 +114,7 @@ interface RunRow {
   readonly type: RunType;
   readonly tools: readonly string[];
   readonly steps: (
-    named: ObjectName,
+    name: string,
     includeSubpackages: boolean | undefined,
   ) => readonly PromptStep[];
 }
@@ -134,12 +129,12 @@ function fullRunRow(source: PromptSource, type: RunType): RunRow | undefined {
   return {
     type,
     tools: result === undefined ? [runName] : [runName, 'GetUnitTestResult'],
-    steps: (named, includeSubpackages) => [
+    steps: (name, includeSubpackages) => [
       toolStep(
         run,
         perType === undefined
-          ? targetArguments(type, named.name, includeSubpackages)
-          : nameArguments(run, type, perType.name, named),
+          ? targetArguments(type, name, includeSubpackages)
+          : [[perType.name, userValue(name)]],
       ),
       ...(result === undefined
         ? []
@@ -168,14 +163,10 @@ function compactRunRow(tools: CompactRunTools, type: RunType): RunRow {
       tools.status.definition.name,
       tools.result.definition.name,
     ],
-    steps: (named, includeSubpackages) => [
-      toolStep(
-        tools.run,
-        targetArguments(type, named.name, includeSubpackages),
-        {
-          keeps: ['run_id'],
-        },
-      ),
+    steps: (name, includeSubpackages) => [
+      toolStep(tools.run, targetArguments(type, name, includeSubpackages), {
+        keeps: ['run_id'],
+      }),
       toolStep(
         tools.status,
         [
@@ -227,6 +218,13 @@ function subpackagesOf(
   throw promptRefusal('unit_test: include_subpackages is true or false.');
 }
 
+/**
+ * What SAP runs for a function module: the run names the module, and SAP
+ * runs the tests of the function group holding it.
+ */
+const FUNCTION_MODULE_RUN_WORDS =
+  "A run of a function module runs the ABAP Unit tests of the module's whole function group.";
+
 /** `unit_test`: the ABAP Unit run of an object or a package. */
 export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
   const rows = runRows(source);
@@ -241,7 +239,9 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
       ...new Set(rows.flatMap(({ tools }) => tools)),
     ].join(', ')} and read the result.`,
     argsSchema: {
-      ...objectArguments(served),
+      // A run names a function module by its own name: SAP finds its
+      // function group and runs that group's tests, so no group is declared.
+      ...objectArguments(served, []),
       include_subpackages: completable(
         z.string().optional().describe(INCLUDE_SUBPACKAGES_WORDS),
         (typed) => completeFrom(['true', 'false'], typed ?? ''),
@@ -265,7 +265,7 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
         requiredArgument(args, 'include_subpackages'),
         row.type,
       );
-      const steps = row.steps(objectNameOf(name, args), includeSubpackages);
+      const steps = row.steps(name, includeSubpackages);
       const [first, ...rest] = steps;
       const stillToFill =
         row.type === 'PACKAGE' &&
@@ -286,9 +286,13 @@ export function unitTestPrompt(source: PromptSource): AbapPrompt | undefined {
             ]
           : steps;
       return {
-        headline: `Run the unit tests of the ${row.type} ${jsonLiteral(name)}.`,
+        headline:
+          row.type === 'FUNCTION_MODULE'
+            ? `Run the ABAP Unit tests of the whole function group of the FUNCTION_MODULE ${jsonLiteral(name)}.`
+            : `Run the unit tests of the ${row.type} ${jsonLiteral(name)}.`,
         steps: stillToFill,
-        notes: [],
+        notes:
+          row.type === 'FUNCTION_MODULE' ? [FUNCTION_MODULE_RUN_WORDS] : [],
       };
     },
   };

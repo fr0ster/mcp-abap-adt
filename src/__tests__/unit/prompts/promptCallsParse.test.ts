@@ -32,7 +32,7 @@ import type {
   PromptName,
   PromptSource,
   PromptStep,
-} from '../../../lib/prompts';
+} from '../../../lib/prompts/types';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import { registryOf, type ToolSetKind } from '../../../lib/toolSet';
 import {
@@ -119,7 +119,7 @@ const SERVED_COUNTS: Readonly<
       check: 14,
       unit_test: 6,
       where_used: 18,
-      transport: 5,
+      transport: 6,
     },
     cloud: {
       create: 16,
@@ -130,12 +130,12 @@ const SERVED_COUNTS: Readonly<
       check: 14,
       unit_test: 6,
       where_used: 18,
-      transport: 5,
+      transport: 6,
     },
   },
   'compact-ro': {
-    onprem: { get: 22, check: 14, where_used: 18, transport: 2 },
-    cloud: { get: 22, check: 14, where_used: 18, transport: 2 },
+    onprem: { get: 22, check: 14, where_used: 18, transport: 3 },
+    cloud: { get: 22, check: 14, where_used: 18, transport: 3 },
   },
 };
 
@@ -280,9 +280,10 @@ async function argumentsFor(
     assert.ok(container, 'where_used completes container');
     args.container = container;
   }
-  if (value === 'function_module') {
+  if (value === 'function_module' && prompt.name !== 'unit_test') {
     // A function module is named by its bare name and its function group;
-    // each step builds the form its tool takes.
+    // each step builds the form its tool takes. A unit run names the module
+    // alone and declares no function group.
     assert.ok(
       prompt.argsSchema.function_group,
       `${prompt.name} takes function_group`,

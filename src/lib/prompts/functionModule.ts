@@ -6,12 +6,14 @@
  */
 import * as z from 'zod';
 import { jsonLiteral } from './instruction.js';
+import { functionGroupReadWords, promptRefusal } from './refusals.js';
 import { requiredArgument } from './served.js';
 import { hasProperty } from './source.js';
 import type {
   ArgumentValue,
   ListedPromptTool,
   PromptArgumentsSchema,
+  PromptName,
   RequiredArgument,
 } from './types.js';
 
@@ -30,23 +32,44 @@ const FUNCTION_GROUP: RequiredArgument = {
   description: FUNCTION_GROUP_WORDS,
 };
 
-/** The `function_group` argument, for a prompt whose served types include a function module. */
-export function functionGroupArgument(
+/**
+ * The served types (lowercase) whose steps read `function_group`: a
+ * function module, where it is served.
+ */
+export function functionGroupTakers(
   served: readonly string[],
+): readonly string[] {
+  return served.filter((type) => type === 'function_module');
+}
+
+/** The `function_group` argument, for a prompt with a served type that reads it (`takers`, lowercase). */
+export function functionGroupArgument(
+  takers: readonly string[],
 ): PromptArgumentsSchema {
-  return served.some((type) => type.toUpperCase() === 'FUNCTION_MODULE')
+  return takers.length > 0
     ? {
         function_group: z.string().optional().describe(FUNCTION_GROUP_WORDS),
       }
     : {};
 }
 
-/** The name `name` with the function group `args` give, when they give one. */
+/**
+ * The name `name` of `type` with the function group `args` give, when they
+ * give one. A function group given for a type outside `takers` (lowercase),
+ * whose steps read none, is refused: nothing given is dropped.
+ */
 export function objectNameOf(
+  prompt: PromptName,
+  type: string,
   name: string,
   args: Readonly<Record<string, string | undefined>>,
+  takers: readonly string[],
 ): ObjectName {
-  return { name, group: requiredArgument(args, 'function_group') };
+  const group = requiredArgument(args, 'function_group');
+  if (group !== undefined && !takers.includes(type.toLowerCase())) {
+    throw promptRefusal(functionGroupReadWords(prompt, takers));
+  }
+  return { name, group };
 }
 
 /** The function group as a step sends it: the user's, else what the model fills in. */

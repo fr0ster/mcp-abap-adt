@@ -99,7 +99,8 @@ The prompt module is `@mcp-abap-adt/lib/prompts` (`src/lib/prompts/`): the nine 
   registerAbapPrompts(mcpServer, registry);
   ```
 
-  `createRegistry()` returns a `CompositeHandlersRegistry`, the type the function takes. On a
+  `registerAbapPrompts` is the module's one export. `createRegistry()` returns a
+  `CompositeHandlersRegistry` (`@mcp-abap-adt/lib/handlers`), the type the function takes. On a
   legacy kind none is registered; a second call on the same server throws the SDK's
   `Prompt <name> is already registered`.
 

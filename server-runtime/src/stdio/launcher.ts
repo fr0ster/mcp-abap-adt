@@ -995,6 +995,10 @@ async function launchStdio(
       // --deferred-logon: the first tool call makes the connection
       // (--restore-session: on the destination's one leftover session).
       deferredLogon: config.deferredLogon === true,
+      // --stdio-message-limit: the client's buffer; absent, the SDK's default.
+      ...(config.stdioMessageLimit !== undefined && {
+        stdioMessageLimit: config.stdioMessageLimit,
+      }),
       restoreAtFirstBirth:
         config.deferredLogon === true && config.restoreSession === true,
       // --session-keep-alive-minutes: the held connection's keep-alive.

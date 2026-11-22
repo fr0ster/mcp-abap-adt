@@ -203,7 +203,7 @@ const CREATE_PROPERTIES = {
     .string()
     .optional()
     .describe(
-      'The package this package belongs to (PACKAGE create); a top-level package has none.',
+      'PACKAGE create. Optional: the package this package belongs to, which must exist (SAP creates the package with no super package when the named one is missing). Without one the package is top level, which SAP allows for a structure package or a package in software component LOCAL ($ or TEST names, no transport layer); in an ABAP Cloud software component the top level is a structure package (SAP answers TR 462 to any other).',
     ),
   package_type: z
     .string()
@@ -540,7 +540,7 @@ const GET_PROPERTIES = {
     .string()
     .optional()
     .describe(
-      'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own.',
+      'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own. With part metadata: the request or task itself.',
     ),
   run_id: z
     .string()

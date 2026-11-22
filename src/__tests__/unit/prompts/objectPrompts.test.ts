@@ -9,18 +9,15 @@ import { describe, it } from 'node:test';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { readOnlyToolSet as compactReadOnlyToolSet } from '../../../../compact-ro/src/launcher';
 import {
-  type AbapPrompt,
-  abapPrompts,
-  type PromptSource,
-  requiredArguments,
-} from '../../../lib/prompts';
-import {
   activatePrompt,
   checkPrompt,
   createPrompt,
   deletePrompt,
   getPrompt,
 } from '../../../lib/prompts/objectPrompts';
+import { abapPrompts } from '../../../lib/prompts/prompts';
+import { requiredArguments } from '../../../lib/prompts/source';
+import type { AbapPrompt, PromptSource } from '../../../lib/prompts/types';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import {
   fullReadOnlyToolSet,

@@ -11,12 +11,12 @@ import { join } from 'node:path';
 import { describe, it } from 'node:test';
 import { compactToolSet } from '../../../../compact/src/launcher';
 import { readOnlyToolSet as compactReadOnlyToolSet } from '../../../../compact-ro/src/launcher';
-import type { PromptSource, ReadEntryField } from '../../../lib/prompts';
 import {
   ENTRY_ARGUMENT,
   OBJECT_DIRECTORY_TYPE,
 } from '../../../lib/prompts/transportEntry';
 import { transportPrompt } from '../../../lib/prompts/transportPrompt';
+import type { PromptSource, ReadEntryField } from '../../../lib/prompts/types';
 import type { AbapSystemKind } from '../../../lib/systemKind';
 import {
   fullReadOnlyToolSet,
@@ -105,6 +105,46 @@ describe('the texts (spec §2.5)', () => {
   });
 });
 
+describe('action is accepted in any case (M9)', () => {
+  const prompt = promptOf(transportPrompt, core);
+
+  for (const given of ['CREATE', 'Create', ' create ']) {
+    it(`${JSON.stringify(given)} reads as create`, () => {
+      assert.equal(
+        textOf(prompt, { action: given, description: 'some words' }),
+        textOf(prompt, { action: 'create', description: 'some words' }),
+      );
+    });
+  }
+
+  it('an unknown action is refused naming the served ones in lower case', () => {
+    assertRefused(
+      prompt,
+      { action: 'RELEASE' },
+      'transport: action "RELEASE" is not served by this server; it serves create, create_task, list, get, objects, log, add_object, remove_object, move_objects, sort_compress.',
+    );
+  });
+
+  it('object_type is completed for an action given in upper case', async () => {
+    assert.equal(
+      (await completionOf(prompt, 'object_type', '', { action: 'ADD_OBJECT' }))
+        .length,
+      16,
+    );
+    assert.deepEqual(
+      await completionOf(prompt, 'object_type', '', { action: 'LIST' }),
+      [],
+    );
+  });
+
+  it('action completes in lower case', async () => {
+    assert.deepEqual(await completionOf(prompt, 'action', 'CREATE'), [
+      'create',
+      'create_task',
+    ]);
+  });
+});
+
 describe('the actions per binary', () => {
   for (const [family, set, actions] of [
     [
@@ -127,9 +167,9 @@ describe('the actions per binary', () => {
     [
       'compact',
       compactToolSet,
-      ['create', 'list', 'objects', 'move_objects', 'sort_compress'],
+      ['create', 'list', 'get', 'objects', 'move_objects', 'sort_compress'],
     ],
-    ['compact-ro', compactReadOnlyToolSet, ['list', 'objects']],
+    ['compact-ro', compactReadOnlyToolSet, ['list', 'get', 'objects']],
   ] as const) {
     for (const kind of ['onprem', 'cloud'] as const) {
       it(`${family} ${kind}: ${actions.length}`, async () => {
@@ -447,7 +487,7 @@ describe('the arguments declared are those a served action reads', () => {
       assert.deepEqual(await completionOf(prompt, 'action', ''), [
         ...(source === coreRo
           ? ['list', 'get', 'objects', 'log']
-          : ['list', 'objects']),
+          : ['list', 'get', 'objects']),
       ]);
     }
   });

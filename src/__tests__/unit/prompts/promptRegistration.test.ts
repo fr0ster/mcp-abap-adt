@@ -24,12 +24,9 @@ import type {
   SapEnvironment,
 } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
-import {
-  type AbapPrompt,
-  membersOn,
-  type PromptSource,
-  registerAbapPrompts,
-} from '../../../lib/prompts';
+import { registerAbapPrompts } from '../../../lib/prompts/register';
+import { membersOn } from '../../../lib/prompts/source';
+import type { AbapPrompt, PromptSource } from '../../../lib/prompts/types';
 import { registryOf, type ToolSet } from '../../../lib/toolSet';
 import { completionOf } from '../../helpers/promptCalls';
 import { promptSourceFor } from '../../helpers/promptSources';
@@ -190,7 +187,7 @@ describe('BaseMcpServer lists the prompts', () => {
       [
         'core',
         { action: 'get', number: 'SOME_TASK', description: 'unread' },
-        'Get the transport request "SOME_TASK".',
+        'Get the transport request or task "SOME_TASK".',
       ],
       [
         'core-ro',

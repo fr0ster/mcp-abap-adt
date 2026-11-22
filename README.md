@@ -222,7 +222,7 @@ Key examples of high-value workflows and tools:
 - **CDS/View development**: `CreateView`, `UpdateView`, `GetView`, `DeleteView`
 - **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`
 - **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
-- **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
+- **Transport and activation support**: `CreateTransport`, `GetTransport` (a transport request or a task, by its number: a request's header and tasks, a task's header, parent request and objects with their positions), `ActivateObject`
 - **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `ListATCResults`, `GetATCResult` (the stored ATC results — central and users' runs — listed by user, kind and age, one read by its Display ID), ABAP Unit per test carrier — `CreateUnitTest`/`UpdateUnitTest`/`DeleteUnitTest`/`RunUnitTest` for a class, `CreateCdsUnitTest`/`RunCdsUnitTest` for a CDS view, `CreateProgramUnitTest`/`RunProgramUnitTest` for a report, `CreateFunctionGroupUnitTest`/`RunFunctionGroupUnitTest`/`RunFunctionModuleUnitTest` for a function group (`runner: 'async'`, the default, starts the run; with `wait: true`, the default, the call reads the run's status at once and long-polls it while SAP answers it running, and once more when SAP answers that first read `NOT_STARTED` (the run it just started may not have begun yet), and answers the result of a run SAP answers finished, lasting as long as the run, or the `run_id` and `NOT_STARTED` when the long-polled read still answers it; `GetUnitTestResult`, given a `run_id`, answers `NOT_STARTED` at once; with `wait: false` it answers the `run_id` right after the start, which `GetUnitTestResult` reads — the way to start a long run under a client with a request time limit; `runner: 'sync'` is one request to `/abapunit/testruns` answering the finished result — for a system that has that endpoint alone; a function module's synchronous run takes `function_group_name` and covers every test of its group), and `RunAbapUnit` (with the same `wait`) for any ABAP Unit run target: an object of any type of the run registry (`CLAS/OCL`, `DDLS/DF`, …) or a package, with or without its subpackages; a CDS view's tests are assigned tests and execute with `scope.foreign_tests: true` — `CheckClass` and the rest of the `Check*` family
 
 ### Long reads run in the background
@@ -268,7 +268,10 @@ batch mode. Over Streamable HTTP, send the `state_handle` `HandlerBatch` `action
 ## Prompts
 
 Every binary lists MCP prompts beside its tools: ready-made requests an MCP client offers the
-user (Claude Code shows them as `/mcp__<server>__<prompt>`). A prompt answers with an
+user. In [Claude Code's words](https://code.claude.com/docs/en/mcp.md#use-mcp-prompts-as-commands), "Claude Code lists each MCP prompt as
+`/servername:promptname (MCP)`. Typing `/mcp__servername__promptname` also runs it." For a
+server named `abap`: `/abap:get (MCP)` in the list, `/mcp__abap__get class ZCL_DEMO` typed.
+Other clients show prompts in their own pickers. A prompt answers with an
 instruction that names the tools to call, in order, with the user's values filled in; the model
 follows it with the tools of the same binary. Nine prompts, plain names:
 
@@ -280,12 +283,14 @@ follows it with the tools of the same binary. Nine prompts, plain names:
 | `delete` | `object_type`, `name`, `transport_request` | delete the object |
 | `activate` | `object_type`, `name` | activate the object |
 | `check` | `object_type`, `name` | check the object |
-| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module, CDS view or package |
+| `unit_test` | `object_type`, `name`, `include_subpackages` | run the unit tests of a class, program, function group, function module (its whole function group's), CDS view or package |
 | `where_used` | `object_type`, `name`, `container` | list the objects that use the object |
-| `transport` | `action`, `number`, `description`, `user`, `object_type`, `name`, `target_number` | work with transport requests: create, create a task, list, get, list objects, read the log, add, remove or move an object, sort and compress |
+| `transport` | `action`, `number`, `description`, `user`, `object_type`, `name`, `target_number` | work with transport requests: create, create a task, list, get a request or a task, list objects, read the log, add, remove or move an object, sort and compress |
 
-`object_type` completes in lower case and is accepted in any case. A function module also takes
-`function_group`. Each binary lists the prompts its tools serve, with the `object_type` values
+`object_type`, `transport`'s `action` and `where_used`'s `container` complete in lower case and
+are accepted in any case. A function module also takes `function_group` (not in `unit_test`: a
+run names the module alone and covers the ABAP Unit tests of its whole function group); given
+for another type, it is refused, not dropped. Each binary lists the prompts its tools serve, with the `object_type` values
 its tools serve on the system kind: the read-only binaries list `get`, `where_used` and
 `transport` (and, compact, `check`); a denied tool or value removes its `object_type` values,
 and a prompt with none left is not listed. [PROMPTS.md](docs/user-guide/PROMPTS.md) lists the
@@ -306,10 +311,24 @@ Get the CLASS "ZCL_DEMO".
 CLASS takes CLASS(class_name*); * marks a required argument.
 ```
 
-`/update class ZCL_DEMO change="add a method that returns the current date"` on a compact
-binary answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write
-with `HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the
-user did not give is listed in the instruction as still to fill.
+A value of several words does not fit a slash command, whose arguments Claude Code splits on
+whitespace; a client that asks for the arguments in a form, or a `prompts/get`, takes it whole.
+`update` with these arguments on a compact binary:
+
+```json
+{
+  "name": "update",
+  "arguments": {
+    "object_type": "class",
+    "name": "ZCL_DEMO",
+    "change": "add a method that returns the current date"
+  }
+}
+```
+
+answers a four-step instruction: read with `HandlerGet`, lock with `HandlerLock`, write with
+`HandlerUpdate` (`lock_handle` from the lock), unlock with `HandlerUnlock`. A value the user did
+not give is listed in the instruction as still to fill.
 
 A `prompts/get` with an `object_type` the binary does not serve is refused with the protocol's
 invalid-params error and names the types it serves. `BaseMcpServer` and `EmbeddableMcpServer`
@@ -567,6 +586,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 - `--renewal=<mode>` - `refresh-then-login` (default) or `refresh-only` (never a login)
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
 - `--login-timeout=<seconds>` - Ends a browser login not finished after this many seconds, 1-86400; no default (a login ends on its answer, the IdP's refusal or the end of its session; a cancel ends nothing)
+- `--stdio-message-limit=<bytes>` - The server's assumption about the most bytes the MCP client buffers for one stdio message (`MCP_STDIO_MESSAGE_LIMIT`, YAML `stdio-message-limit`), a whole number from 2097152; not given or blank: the MCP SDK client's default, 10 MiB. Raising it changes nothing in the client: above the client's real buffer the disconnect comes back. No message longer than this less 1 MiB (one client read: verified for Node, Python MCP and the TS SDK on Bun) is written; a longer answer is answered an error naming both sizes
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` or `rfc`; required for a destination unless its `.env`, the environment or YAML states it (no default)
 - `--ashost`, `--sysnr` - RFC to an application server (`SAP_ASHOST`, `SAP_SYSNR` — see above)
 - `--mshost`, `--msserv`, `--sysid`, `--group`, `--saprouter` - RFC through a message server and a logon group (`SAP_MSHOST`, … — see above)

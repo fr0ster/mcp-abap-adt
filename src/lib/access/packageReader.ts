@@ -3,7 +3,9 @@
  * call, holding no connection. Its first read takes the call's connection
  * (`take`, the same acquisition the wrapper goes on with after an allowed
  * verdict); each read is one metadata read of one package on it, in the
- * call's signal scope. Nothing read is kept beyond the call.
+ * call's signal scope, answered only when the document names the package
+ * read (anything else throws, and the strategy refuses the call
+ * `package_tree_unreadable`). Nothing read is kept beyond the call.
  */
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -40,7 +42,13 @@ export function lazyPackageReader(
         ),
       );
       if (!read.ok) throw new Error(PACKAGE_UNREADABLE_WORDS);
-      return packageSummary(read.getResult().value.raw).super_package;
+      // A read is the package's only when its document names it: an empty
+      // 200, or another package's document, says nothing of this one.
+      const summary = packageSummary(read.getResult().value.raw);
+      if (summary.name?.toUpperCase() !== packageName.toUpperCase()) {
+        throw new Error(PACKAGE_UNREADABLE_WORDS);
+      }
+      return summary.super_package;
     },
   };
 }

@@ -88,6 +88,7 @@ browser-auth-port: 61001
 # deferred-logon: true         # start without contacting SAP; the first tool call logs on
 # restore-session: true        # with deferred-logon: the first call takes up the leftover session
 # login-timeout: 300           # seconds, 1-86400; no default (a login has no bound)
+# stdio-message-limit: 10485760  # bytes the client buffers; default the MCP SDK client's 10 MiB
 # auth-debug: true             # providers' debug lines on stderr, secrets' first and last four characters; no environment form
 # shutdown-timeout: 25         # seconds, 1-86400; no default (a shutdown waits)
 ```
@@ -118,6 +119,7 @@ Each of these ranks below the CLI, the process environment and the destination's
 | `deferred-logon` | boolean | `false` | Start without contacting the SAP system; the first tool call logs on. Below `--deferred-logon` and `MCP_DEFERRED_LOGON` |
 | `restore-session` | boolean | — | With `deferred-logon`: the first tool call takes up the destination's one leftover session. Stated (any value) without `deferred-logon`, the start is refused; the generated template leaves it unstated |
 | `login-timeout` | number | — | Seconds after which a browser login is ended, 1-86400; no default (no bound) |
+| `stdio-message-limit` | integer | `10485760` | The server's assumption about the most bytes the MCP client buffers for one stdio message, a YAML integer from 2097152 (a list, a fraction or a string of other characters stops the start); it changes nothing in the client, and a value above the client's real buffer brings the disconnect back. Blank or null counts as not given: the MCP SDK client's default read buffer (10 MiB). The server writes no message longer than this less 1048576 bytes (1 MiB, room for one read of the client: verified for Node, at most 65,536 bytes a chunk through libuv; Python MCP over AnyIO, `StreamReader.read(65536)`; the TS SDK on Bun, as Claude Code runs it, 262,144 bytes a chunk, measured on Bun 1.3.13). A client that reads larger chunks needs a correspondingly lower value. Below `--stdio-message-limit` and `MCP_STDIO_MESSAGE_LIMIT` |
 | `auth-debug` | boolean | `false` | The token providers' debug lines on stderr; a refused token request's line names the first and last four characters of each secret it sent. YAML and `--auth-debug` only: no environment variable |
 
 stdio has no idle bound: held state ends by its stop tool, the client closing stdin, the backend's

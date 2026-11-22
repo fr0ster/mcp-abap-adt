@@ -20,8 +20,8 @@ import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
 import { parseDeniedEntry } from '../../../lib/access/deniedActions';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import { EMPTIED_INCLUDE_TYPES } from '../../../lib/compact/compactSchemas';
-import { notServedWords } from '../../../lib/prompts';
 import { LOCKED_AS } from '../../../lib/prompts/objectRows';
+import { notServedWords } from '../../../lib/prompts/refusals';
 import {
   fullToolSet,
   restrictedStart,

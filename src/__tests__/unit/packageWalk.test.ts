@@ -16,6 +16,7 @@ import {
   nodeLevel,
   nodeLevelOf,
   walkPackage,
+  walkPackages,
 } from '../../lib/strategies/packageWalk';
 import { succeeded } from '../../lib/strategies/stepResponse';
 import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
@@ -246,6 +247,89 @@ describe('a node-load message is not an object', () => {
     assert.deepStrictEqual(
       nodeLevel({ data }).objects.map((o) => o.name),
       ['ZV_REAL'],
+    );
+  });
+});
+
+/**
+ * A node SAP cannot load is reported, not dropped: on premise (2026-11-22) a
+ * package's Views node (`VIEW/DV`) comes from SAP's stored package tree
+ * (`DWTREE`), whose entry SAP cannot load and answers 'Error loading node:'
+ * (`CL_SEU_ADT_RES_REPO_STRUCTURE`, `create_tree_content`, message
+ * `SEU_ADT 101`). The walk answers one row for it, in fixed words with the
+ * node's type; SAP's text is in no row.
+ */
+describe('a node SAP could not load is reported', () => {
+  const failedLevel =
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT_NEVER_IN_A_ROW</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+  const goodLevel =
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_NAME>ZT_ONE</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+  const levels: Record<string, NodeLevel> = {
+    'P|root': {
+      objects: [],
+      childNodes: [
+        { type: 'VIEW/DV', nodeId: '1' },
+        { type: 'TABL/DT', nodeId: '2' },
+      ],
+    },
+    'P|1': nodeLevelOf(failedLevel),
+    'P|2': nodeLevelOf(goodLevel),
+  };
+  const source: NodeStructureSource = {
+    async fetchNodeStructure(_t, name, options) {
+      return succeeded(
+        levels[`${name}|${options?.nodeId ?? 'root'}`] ?? {
+          objects: [],
+          childNodes: [],
+        },
+      );
+    },
+  };
+
+  it('the node reading marks a level SAP could not load, and no other', () => {
+    assert.equal(nodeLevelOf(failedLevel).notLoaded, true);
+    assert.equal(nodeLevelOf(goodLevel).notLoaded, undefined);
+  });
+
+  it('the walk answers one row for it, in fixed words with its type', async () => {
+    const walked = await walkPackage(source, 'P');
+    assert.deepStrictEqual(
+      walked.map((o) => [o.type, o.name]),
+      [
+        ['VIEW/DV', 'not loaded by SAP'],
+        ['TABL/DT', 'ZT_ONE'],
+      ],
+    );
+    assert.equal(
+      JSON.stringify(walked).includes('SAP_TEXT_NEVER_IN_A_ROW'),
+      false,
+    );
+  });
+
+  it('the level-by-level walk answers the same row', async () => {
+    const read = async (
+      requests: readonly { parentName: string; nodeId?: string }[],
+    ) =>
+      Promise.all(
+        requests.map(async (request) => ({
+          ok: true as const,
+          value: await source.fetchNodeStructure('DEVC/K', request.parentName, {
+            ...(request.nodeId === undefined ? {} : { nodeId: request.nodeId }),
+          }),
+        })),
+      );
+    const [answered] = await walkPackages(read, ['P']);
+    assert.ok(answered?.ok);
+    assert.deepStrictEqual(
+      answered.value.map((o) => [o.type, o.name]),
+      [
+        ['VIEW/DV', 'not loaded by SAP'],
+        ['TABL/DT', 'ZT_ONE'],
+      ],
     );
   });
 });

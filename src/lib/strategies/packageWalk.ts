@@ -264,7 +264,19 @@ export interface NodeLevel {
     uri?: string | undefined;
   }>;
   childNodes: Array<{ type: string; nodeId: string }>;
+  /**
+   * `true` when SAP answered the level with its message for a node it could
+   * not load — an entry with no object type ('Error loading node:', message
+   * `SEU_ADT 101`) — in place of objects.
+   */
+  notLoaded?: true;
 }
+
+/**
+ * The row a walk answers for a type node SAP could not load, beside the
+ * node's type: fixed words, nothing of SAP's message.
+ */
+export const NOT_LOADED_BY_SAP = 'not loaded by SAP';
 
 /** Our `node` strategy: one answer in, one level out, descriptions kept. */
 export function nodeLevel(
@@ -277,10 +289,21 @@ export function nodeLevel(
 /** One level of a node-structure document's text, descriptions kept. */
 export function nodeLevelOf(xml: string): NodeLevel {
   const data = nodeAt(parseXml(parser, xml), 'asx:abap', 'asx:values', 'DATA');
+  const entries = nodeList(
+    nodeAt(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
+  );
+  // An entry with no object type is SAP's message for a node it could not
+  // load (on premise, 2026-11-22: a package's Views node, from SAP's stored
+  // package tree `DWTREE`; `CL_SEU_ADT_RES_REPO_STRUCTURE`,
+  // `create_tree_content`, message `SEU_ADT 101`), not an object.
+  const notLoaded = entries.some(
+    (n) =>
+      textOf(nodeChild(n, 'OBJECT_TYPE')) === '' &&
+      textOf(nodeChild(n, 'OBJECT_NAME')) !== '',
+  );
   return {
-    objects: nodeList(
-      nodeAt(data, 'TREE_CONTENT', 'SEU_ADT_REPOSITORY_OBJ_NODE'),
-    )
+    ...(notLoaded ? { notLoaded: true as const } : {}),
+    objects: entries
       .map((n) => ({
         name: textOf(nodeChild(n, 'OBJECT_NAME')),
         type: textOf(nodeChild(n, 'OBJECT_TYPE')),
@@ -288,9 +311,7 @@ export function nodeLevelOf(xml: string): NodeLevel {
         techName: textOf(nodeChild(n, 'TECH_NAME')) || undefined,
         uri: textOf(nodeChild(n, 'OBJECT_URI')) || undefined,
       }))
-      // Every object has a type. An entry without one is SAP's message for
-      // a node it could not load ("Error loading node:", on premise 2026-09-25),
-      // not an object.
+      // Every object has a type; SAP's message is not one (`notLoaded`).
       .filter((o) => o.name && o.type),
     childNodes: nodeList(
       nodeAt(data, 'OBJECT_TYPES', 'SEU_ADT_OBJECT_TYPE_INFO'),
@@ -402,6 +423,8 @@ export interface PackageNode {
   isPackage: boolean;
   codeFormat?: CodeFormat;
   restoreStatus?: 'ok' | 'not-implemented';
+  /** A type node SAP could not load: its row (`NOT_LOADED_BY_SAP`). */
+  notLoaded?: true;
   children?: PackageNode[];
 }
 
@@ -598,6 +621,20 @@ function appendUnlisted(
   }
 }
 
+/**
+ * The row for a type node SAP could not load: the node's type, the fixed
+ * words {@link NOT_LOADED_BY_SAP}, the package; none for a level it loaded.
+ */
+function notLoadedRow(
+  level: NodeLevel,
+  type: string,
+  packageName: string,
+): WalkedItem[] {
+  return level.notLoaded === true
+    ? [{ name: NOT_LOADED_BY_SAP, type, packageName, notLoaded: true }]
+    : [];
+}
+
 function flatten(walk: PackageWalk): WalkedItem[] {
   return [...walk.found, ...walk.subs.flatMap(flatten)];
 }
@@ -730,10 +767,10 @@ export async function walkPackages(
       typeNodes.forEach(({ walk, nodeId, type }, i) => {
         const typed = settle(walk, typeAnswers[i], { id: nodeId, type });
         if (typed === undefined) return;
-        appendUnlisted(
-          walk.found,
-          typed.objects.map((o) => objectOf(o, walk.name)),
-        );
+        appendUnlisted(walk.found, [
+          ...notLoadedRow(typed, type, walk.name),
+          ...typed.objects.map((o) => objectOf(o, walk.name)),
+        ]);
       });
     }
 
@@ -829,7 +866,12 @@ export async function walkPackage(
           options.missingLevel,
         ),
     );
-    if (level !== undefined) appendUnlisted(found, level.objects.map(owned));
+    if (level !== undefined) {
+      appendUnlisted(found, [
+        ...notLoadedRow(level, child.type, pkg),
+        ...level.objects.map(owned),
+      ]);
+    }
   }
 
   if (!options.includeSubpackages) return found;
@@ -875,6 +917,8 @@ async function underBranchRule<T>(
 export type WalkedItem = {
   name: string;
   type: string;
+  /** A type node SAP could not load: its row, not an object (`NOT_LOADED_BY_SAP`). */
+  notLoaded?: true;
   description?: string | undefined;
   packageName?: string;
   techName?: string | undefined;
@@ -1015,6 +1059,7 @@ export function assembleTree(
       ...(kind ? { kind } : {}),
       ...(o.description ? { description: o.description } : {}),
       isPackage: kind === 'package',
+      ...(o.notLoaded === true ? { notLoaded: true as const } : {}),
       ...(codeFormat ? { codeFormat } : {}),
       restoreStatus:
         kind && RESTORABLE.has(kind)

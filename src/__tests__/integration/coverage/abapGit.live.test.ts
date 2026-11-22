@@ -4,12 +4,234 @@
  * run-owned interface, pull a remote change, switch branches (on premise),
  * checks and files with SAP's T100 key on a missing file, link and pull
  * refused under an allowed-packages entry, push and unlink checked against
- * the repository's package, and the cleanup. A cloud job is correlated by a
- * new log key and a terminal status before anything is cleaned up; a run
- * that cannot correlate keeps its fixtures in the ledger for the next run.
- * The flow, where it runs and why it skips: `abapGitRun.ts`.
+ * the repository's package, the unlink, and the cleanup. Each call under
+ * test is a `liveCall`, so the run records its key; the fixtures, the
+ * recovery and the cloud-job correlation: `abapGitRun.ts`. A step one
+ * system does not serve skips there, saying so.
  */
 
-import { abapGitLiveRun } from './abapGitRun';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { liveCall, liveSuite, throughServer } from '../helpers/live';
+import {
+  AbapGitRun,
+  assertT100,
+  branchNamesOf,
+  json,
+  list,
+  member,
+  PERSON,
+  pushedObjectsOf,
+} from './abapGitRun';
 
-abapGitLiveRun('full', 'abapGit, the full tools');
+const run = new AbapGitRun();
+let marker = '';
+
+liveSuite(['onprem', 'cloud'], 'abapGit, the full tools', () => {
+  run.install();
+
+  it('1. checks the external repository: the run’s branch is listed', async (t) => {
+    if (run.skipped(t)) return;
+    const answer = await liveCall('CheckAbapGitExternalRepo', {
+      url: run.url,
+      detail: 'full',
+    });
+    const names = branchNamesOf('CheckAbapGitExternalRepo', answer);
+    assert.ok(names.includes(run.branch), names.join(', '));
+  });
+
+  it('1b. on the cloud: reads the branch info of the run’s branch', async (t) => {
+    if (run.skippedUnless(t, 'cloud')) return;
+    const answer = await liveCall('GetAbapGitBranchInfo', {
+      url: run.url,
+      branch: run.branch,
+      package_name: run.packageName,
+      detail: 'full',
+    });
+    const info = json('GetAbapGitBranchInfo', answer);
+    assert.ok(list(member(info, 'branches')).length > 0);
+  });
+
+  it('2. links the package on the run’s branch; R1 lists the key with the package, URL and branch', async (t) => {
+    if (run.skipped(t)) return;
+    run.journalLink();
+    const linked = await liveCall('LinkAbapGitRepo', {
+      package_name: run.packageName,
+      url: run.url,
+      branch: run.branch,
+    });
+    json('LinkAbapGitRepo', linked);
+    const listed = await liveCall('ListAbapGitRepos', {
+      package_name: run.packageName,
+      detail: 'full',
+    });
+    run.confirmLink(listed);
+  });
+
+  it('3. pushes a run-owned interface the staging shows; the remote branch holds its file', async (t) => {
+    if (run.skipped(t)) return;
+    await run.createInterface();
+    const staged = await liveCall('GetAbapGitStaging', {
+      repository_key: run.key(),
+      detail: 'full',
+    });
+    const objects = pushedObjectsOf(
+      json('GetAbapGitStaging', staged),
+      run.interfaceName,
+    );
+    assert.equal(objects.length, 1);
+    const job = await run.openJob('PushAbapGitRepo');
+    const pushed = await liveCall('PushAbapGitRepo', {
+      repository_key: run.key(),
+      objects,
+      comment: `abapGit live run ${run.runId}`,
+      author: PERSON,
+      committer: PERSON,
+    });
+    await run.endJob('PushAbapGitRepo', job, pushed);
+    await run.assertPushed();
+    const remoteFile = await liveCall('GetAbapGitFile', {
+      repository_key: run.key(),
+      filename: run.fileName,
+      version: 'remote',
+    });
+    assert.equal(remoteFile.isError, false, remoteFile.text);
+    assert.ok(
+      remoteFile.text.toLowerCase().includes(run.interfaceName.toLowerCase()),
+    );
+  });
+
+  it('3b. on the cloud: reads the push’s run log by its new log key', async (t) => {
+    if (run.skippedUnless(t, 'cloud')) return;
+    const answer = await liveCall('GetAbapGitErrorLog', {
+      repository_key: run.key(),
+      app_log_key: run.lastLogKey(),
+      detail: 'full',
+    });
+    const log = json('GetAbapGitErrorLog', answer);
+    assert.ok(Array.isArray(member(log, 'objects')));
+  });
+
+  it('4. a change is made in the remote', async (t) => {
+    if (run.skipped(t)) return;
+    marker = await run.changeRemote();
+  });
+
+  it('4b. on the cloud: reads what a pull would overwrite', async (t) => {
+    if (run.skippedUnless(t, 'cloud')) return;
+    const answer = await liveCall('GetAbapGitModifiedObjects', {
+      repository_key: run.key(),
+      detail: 'full',
+    });
+    json('GetAbapGitModifiedObjects', answer);
+  });
+
+  it('4c. pulls the remote change; the interface’s source changed in SAP', async (t) => {
+    if (run.skipped(t)) return;
+    const job = await run.openJob('PullAbapGitRepo');
+    const pulled = await liveCall('PullAbapGitRepo', {
+      repository_key: run.key(),
+    });
+    await run.endJob('PullAbapGitRepo', job, pulled);
+    await run.assertPulled(marker);
+  });
+
+  it('5. on premise: switches to the second branch and back; R1’s branch follows', async (t) => {
+    if (run.skippedUnless(t, 'onprem')) return;
+    const away = await liveCall('SwitchAbapGitBranch', {
+      repository_key: run.key(),
+      branch: run.second,
+      create: false,
+    });
+    json('SwitchAbapGitBranch', away);
+    await run.followBranch(run.second);
+    const back = await liveCall('SwitchAbapGitBranch', {
+      repository_key: run.key(),
+      branch: run.branch,
+      create: false,
+    });
+    json('SwitchAbapGitBranch', back);
+    await run.followBranch(run.branch);
+  });
+
+  it('6. runs the checks and reads the file local; a missing file carries SAP’s T100 key', async (t) => {
+    if (run.skipped(t)) return;
+    const checks = await liveCall('CheckAbapGitRepo', {
+      repository_key: run.key(),
+    });
+    // On premise SAP answers SYNTAX_ERROR here (measured): either answer
+    // is SAP's own.
+    assert.ok(checks.text.length > 0);
+    const local = await liveCall('GetAbapGitFile', {
+      repository_key: run.key(),
+      filename: run.fileName,
+      version: 'local',
+    });
+    assert.equal(local.isError, false, local.text);
+    const missing = await liveCall('GetAbapGitFile', {
+      repository_key: run.key(),
+      filename: run.missingFileName,
+      version: 'remote',
+    });
+    assertT100(missing);
+  });
+
+  describe('7. under an allowed-packages entry naming the run’s package', () => {
+    throughServer(async () => run.ownPackageRestriction());
+    it('link and pull are refused with nothing sent', async (t) => {
+      if (run.skipped(t)) return;
+      const link = await liveCall('LinkAbapGitRepo', {
+        package_name: run.packageName,
+        url: run.url,
+        branch: run.branch,
+      });
+      assert.equal(link.isError, true);
+      assert.match(link.text, /abapgit_import_not_allowed/);
+      const pull = await liveCall('PullAbapGitRepo', {
+        repository_key: run.key(),
+      });
+      assert.equal(pull.isError, true);
+      assert.match(pull.text, /abapgit_import_not_allowed/);
+    });
+
+    it('on premise: the switch is checked against the repository’s package and runs', async (t) => {
+      if (run.skippedUnless(t, 'onprem')) return;
+      const switched = await liveCall('SwitchAbapGitBranch', {
+        repository_key: run.key(),
+        branch: run.branch,
+        create: false,
+      });
+      json('SwitchAbapGitBranch', switched);
+    });
+  });
+
+  describe('7. under an allowed-packages entry naming another package', () => {
+    throughServer(async () => run.otherPackageRestriction());
+    it('push and unlink are refused by the repository’s package', async (t) => {
+      if (run.skipped(t)) return;
+      const push = await liveCall('PushAbapGitRepo', {
+        repository_key: run.key(),
+        objects: [],
+        comment: 'refused',
+        author: PERSON,
+        committer: PERSON,
+      });
+      assert.equal(push.isError, true);
+      assert.match(push.text, /package_not_allowed/);
+      const unlink = await liveCall('UnlinkAbapGitRepo', {
+        repository_key: run.key(),
+      });
+      assert.equal(unlink.isError, true);
+      assert.match(unlink.text, /package_not_allowed/);
+    });
+  });
+
+  it('8. unlinks the run’s repository, checked against the ledger first; R1 no longer lists it', async (t) => {
+    if (run.skipped(t)) return;
+    await run.assertOwnRepo();
+    const unlinked = await liveCall('UnlinkAbapGitRepo', {
+      repository_key: run.key(),
+    });
+    await run.unlinked(unlinked);
+  });
+});

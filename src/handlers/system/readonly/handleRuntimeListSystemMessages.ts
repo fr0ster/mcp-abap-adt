@@ -1,15 +1,32 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  feedSystemMessages,
+  type ISystemMessageEntry,
+} from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import {
+  answered,
+  type DetailTable,
+  formatted,
+  rawLevel,
+  readingAt,
+  tsv,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] [runtime] List SM02 system messages. Returns each message as SAP writes it: id, messageId, title, text, createdOn, updated, createdBy and author.',
+    '[read-only] [runtime] List SM02 system messages. By default (detail terse) TSV under a # count line: id, createdOn, author, title per message; with detail medium or full each message as SAP writes it: id, messageId, title, text, createdOn, updated, createdBy and author; raw the feed as ADT sent it.',
   inputSchema: z.object({
     user: z.string().optional().describe('Filter by author username.'),
     max_results: z
@@ -24,6 +41,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe('End of time range in YYYYMMDDHHMMSS format.'),
+    ...DETAIL_SHAPE,
   }),
 } as const;
 
@@ -36,13 +54,14 @@ export async function handleRuntimeListSystemMessages(
   args: RuntimeListSystemMessagesArgs,
 ) {
   const { connection, logger } = context;
-  const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
+  // The level's reading, selected before the call and passed to it.
+  const feeds = new AdtRuntimeClient(connection, logger).getFeeds({
+    ...ourFeeds,
+    systemMessages: readingAt(SYSTEM_MESSAGE_READINGS, levelOf(args)),
+  });
 
-  // `systemMessages()` answers `IAdtResponse<ISystemMessageEntry[]>` as of
-  // adt-clients 19, not a bare array — the same parsed entries as before,
-  // reached through `.getResult().value` now instead of directly.
   return answer(
-    { tool: 'RuntimeListSystemMessages', detail: 'terse' },
+    { tool: 'RuntimeListSystemMessages', detail: detailOf(args) },
     () =>
       feeds.systemMessages({
         analyse: analyseException,
@@ -51,10 +70,42 @@ export async function handleRuntimeListSystemMessages(
         from: args?.from,
         to: args?.to,
       }),
-    (messages) => ({
+    answered,
+  );
+}
+
+/**
+ * What the messages answer at each `detail` (`src/lib/detail`): terse a TSV
+ * row per message — id, createdOn, author, title —; medium and full every
+ * field adt-strategies read (`feedSystemMessages`); raw the feed as ADT sent
+ * it.
+ */
+const SYSTEM_MESSAGE_READINGS: DetailTable<string | object> = (() => {
+  const every = formatted(
+    feedSystemMessages,
+    (messages: ISystemMessageEntry[]) => ({
       success: true,
       count: messages.length,
       messages,
     }),
   );
-}
+  return {
+    terse: formatted(feedSystemMessages, (messages: ISystemMessageEntry[]) =>
+      [
+        `# count ${messages.length}`,
+        tsv(
+          ['id', 'createdOn', 'author', 'title'],
+          messages.map((m) => [
+            m.id ?? m.messageId ?? '',
+            m.createdOn ?? '',
+            m.author ?? m.createdBy ?? '',
+            m.title ?? '',
+          ]),
+        ),
+      ].join('\n'),
+    ),
+    medium: every,
+    full: every,
+    raw: rawLevel,
+  };
+})();

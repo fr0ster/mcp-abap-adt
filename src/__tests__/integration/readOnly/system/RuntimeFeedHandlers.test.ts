@@ -251,10 +251,11 @@ describe('Runtime Feed Handlers Integration', () => {
       );
 
       expectSuccess(result, 'RuntimeListSystemMessages');
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(Array.isArray(data.messages), true);
-      logger?.info(`System messages: ${data.count} entries`);
+      // Terse, the default: `# count`, then a TSV row per message.
+      const lines = String(result.content?.[0]?.text ?? '').split('\n');
+      assert.equal(lines[0]?.startsWith('# count '), true, lines.join('\n'));
+      assert.equal(lines[1], 'id\tcreatedOn\tauthor\ttitle');
+      logger?.info(`System messages: ${lines[0]}`);
     });
   });
 

@@ -261,6 +261,7 @@ const JSON_ANSWERING: readonly string[] = [
   'RuntimeGetGatewayErrorLog',
   'RuntimeListFeeds',
   'RuntimeListProfilerTraceFiles',
+  'RuntimeListSystemMessages',
   'SearchObject',
   'SearchSource',
   'SortAndCompressTransportTask',

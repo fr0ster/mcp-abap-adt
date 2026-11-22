@@ -415,18 +415,50 @@ describe('RuntimeListSystemMessages', () => {
     assert.equal(result.isError, true);
   });
 
-  it('answers count/messages on success', async () => {
-    const msg = { id: '1', title: 't', text: 'x', severity: 'I' };
-    feeds = { systemMessages: mock.fn(async () => okResponse([msg])) };
+  const MESSAGES =
+    '<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry>' +
+    '<atom:id>MSG1</atom:id><atom:title>Maintenance tonight</atom:title><atom:updated>2026-11-22T10:00:00Z</atom:updated>' +
+    '</atom:entry></atom:feed>';
+  const readThrough = (data: string) =>
+    okResponse(
+      lastFeedResults.systemMessages({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data,
+      }),
+    );
 
+  it('terse, by default: a TSV row per message', async () => {
+    feeds = { systemMessages: async () => readThrough(MESSAGES) };
     const result: any = await handleRuntimeListSystemMessages(
       context as any,
       {},
     );
-    const body = JSON.parse(result.content[0].text);
+    const lines = result.content[0].text.split('\n');
+    assert.deepStrictEqual(lines.slice(0, 2), [
+      '# count 1',
+      'id\tcreatedOn\tauthor\ttitle',
+    ]);
+    assert.equal(lines[2]?.split('\t')[0], 'MSG1');
+  });
 
+  it('full answers count/messages', async () => {
+    feeds = { systemMessages: async () => readThrough(MESSAGES) };
+    const result: any = await handleRuntimeListSystemMessages(context as any, {
+      detail: 'full',
+    });
+    const body = JSON.parse(result.content[0].text);
     assert.equal(body.count, 1);
-    assert.deepStrictEqual(body.messages, [msg]);
+    assert.equal(body.messages[0].title, 'Maintenance tonight');
+  });
+
+  it('raw answers the feed as ADT sent it', async () => {
+    feeds = { systemMessages: async () => readThrough(MESSAGES) };
+    const result: any = await handleRuntimeListSystemMessages(context as any, {
+      detail: 'raw',
+    });
+    assert.equal(result.content[0].text, MESSAGES);
   });
 });
 

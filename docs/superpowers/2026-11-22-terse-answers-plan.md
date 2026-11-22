@@ -127,6 +127,28 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
   `tm:parent`, object counts per task (found in #376).
 - `utilNodeContents` keeps node descriptions, so the server's own `nodeLevel` can go.
 
+Readings the server does not use yet, because each answers less than the tool does (step 2).
+Each site keeps the server's parse until adt-strategies fixes the reading; then the site switches:
+
+- `utilSearchHits` does not decode a numeric character reference (`&#x26;` stays as written).
+  Site: SearchObject.
+- `utilNamedItems` reads a numeric name as a number (`007` becomes `7`) and an absent
+  description as `""`. Site: GetAdtTypes.
+- `transportCreated` (`parseCreatedTransport`) reads a nested `tm:request`'s number before the
+  root's, so for a created task whose answer names its parent there, the follow-up type change
+  goes to the parent. Site: CreateTransportTask.
+- `transportTree` puts up to 200 characters of the document into its error, and reads an empty
+  `<tm:root/>` as a tree with no requests where the server refuses it. Site: CreateTransport
+  (the task read back after the create).
+- `transportObjectEntries` gives no task number, and reads a request's `tm:all_objects` beside
+  its tasks' entries, so every object comes twice. Sites: ReadTransportObjects,
+  CreateTransport.
+- `utilWhereUsedReferences` drops the package (`DEVC/K`) entries the tool answers. Site:
+  GetWhereUsed.
+- `utilInactiveObjects` reads neither the SAP_BASIS 7.40 `adtcore:objectReferences` form nor
+  more than one object per entry, and reads a document of another kind as nothing inactive.
+  Site: GetInactiveObjects.
+
 ## Order and review
 
 One PR, `feat/terse-answers`. Steps 1–2 first, since they touch every answer and lower the risk of

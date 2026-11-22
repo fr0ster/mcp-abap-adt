@@ -30,10 +30,14 @@ import {
   BoundedStdioServerTransport,
   boundedMessage,
   droppedNotificationLine,
+  droppedResponseLine,
   frameCapOf,
+  ONE_MESSAGE_WORDS,
   oversizedAnswerWords,
   STDIO_FRAME_CAP,
   STDIO_MESSAGE_LIMIT,
+  STDIO_MIN_FRAME_CAP,
+  STDIO_MIN_MESSAGE_LIMIT,
   STDIO_READ_MARGIN,
 } from '../boundedStdioTransport.js';
 import { StdioServer } from '../StdioServer.js';
@@ -180,6 +184,95 @@ describe('the stdio frame cap', () => {
     assert.deepEqual(clientReads(bytes), [message]);
   });
 
+  it('the smallest limit leaves the smallest cap', () => {
+    assert.equal(frameCapOf(STDIO_MIN_MESSAGE_LIMIT), STDIO_MIN_FRAME_CAP);
+  });
+
+  it('the initialize answer goes as it is at the smallest cap', async () => {
+    const server = new StdioServer(
+      new CompositeHandlersRegistry([]),
+      {} as IDestinations,
+      { stdioMessageLimit: STDIO_MIN_MESSAGE_LIMIT },
+    );
+    const stdin = new PassThrough();
+    const stdout = new PassThrough();
+    const chunks: Buffer[] = [];
+    stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+    const transport = new BoundedStdioServerTransport(
+      server.stdioTransport().cap,
+      () => {},
+      stdin,
+      stdout,
+    );
+    const answered = new Promise<void>((resolve) => {
+      stdout.on('data', () => resolve());
+    });
+    await server.start(undefined, transport);
+    try {
+      stdin.write(
+        `${JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'initialize',
+          params: {
+            protocolVersion: '2025-06-18',
+            capabilities: {},
+            clientInfo: { name: 'test', version: '0' },
+          },
+        })}\n`,
+      );
+      await answered;
+      const [answer] = clientReads(Buffer.concat(chunks));
+      assert.ok(answer !== undefined && 'result' in answer, String(answer));
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('a replacement that fills the cap exactly is written', () => {
+    // The replacement's size, for an answer of `size` bytes over `cap`.
+    const replacementSize = (id: string, size: number, cap: number) =>
+      sizeOf({
+        jsonrpc: '2.0',
+        id,
+        error: {
+          code: ErrorCode.InternalError,
+          message: oversizedAnswerWords(size, cap),
+        },
+      });
+    const id = 'r';
+    let cap = 400;
+    // The cap is the replacement's own size (its digits depend on the cap).
+    for (let i = 0; i < 5; i += 1) cap = replacementSize(id, 100_000, cap);
+    const answer: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      id,
+      result: { content: [{ type: 'text', text: 'x'.repeat(100_000) }] },
+    };
+    const sent = boundedMessage(answer, cap);
+    assert.ok(sent.kind === 'send' && isJSONRPCErrorResponse(sent.message));
+    assert.equal(sizeOf(sent.message), cap);
+  });
+
+  it('a replacement over the cap is not written: one stderr line instead', async () => {
+    const id = 'i'.repeat(500);
+    const answer: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      id,
+      result: { content: [{ type: 'text', text: 'x'.repeat(1000) }] },
+    };
+    const lines: string[] = [];
+    const bytes = await written(bounded(400, lines), answer);
+    assert.equal(bytes.length, 0);
+    assert.deepEqual(lines, [droppedResponseLine(sizeOf(answer), 400)]);
+  });
+
+  it('every refusal names its size in the shared words', () => {
+    assert.ok(oversizedAnswerWords(1, 1).includes(ONE_MESSAGE_WORDS));
+    assert.ok(droppedNotificationLine(1, 1).includes(ONE_MESSAGE_WORDS));
+    assert.ok(droppedResponseLine(1, 1).includes(ONE_MESSAGE_WORDS));
+  });
+
   it('a cap from a stated limit holds the frames to it', async () => {
     const cap = frameCapOf(2 * STDIO_READ_MARGIN);
     assert.equal(cap, STDIO_READ_MARGIN);
@@ -194,9 +287,9 @@ describe('the stdio frame cap', () => {
       {
         jsonrpc: '2.0',
         id: 9,
-        error: { code: -32000, message: 'y'.repeat(200) },
+        error: { code: -32000, message: 'y'.repeat(500) },
       },
-      100,
+      400,
     );
     assert.ok(sent.kind === 'send' && isJSONRPCErrorResponse(sent.message));
     assert.equal(sent.message.id, 9);
@@ -261,8 +354,8 @@ describe("the stdio server's own transport", () => {
     const server = new StdioServer(
       new CompositeHandlersRegistry([]),
       {} as IDestinations,
-      { stdioMessageLimit: 4 * STDIO_READ_MARGIN },
+      { stdioMessageLimit: STDIO_MIN_MESSAGE_LIMIT },
     );
-    assert.equal(server.stdioTransport().cap, 3 * STDIO_READ_MARGIN);
+    assert.equal(server.stdioTransport().cap, STDIO_MIN_FRAME_CAP);
   });
 });

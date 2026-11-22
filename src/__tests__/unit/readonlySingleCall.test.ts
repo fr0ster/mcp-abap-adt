@@ -77,11 +77,7 @@ import { createBatchAvailability } from '../../lib/batch/availability';
 import * as clients from '../../lib/clients';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
-import {
-  parseStructure,
-  structured,
-  verbatim,
-} from '../../lib/strategies/reading';
+import { structured, verbatim } from '../../lib/strategies/reading';
 import { child, listOf } from '../../lib/thrownValue';
 import { corpusBody } from '../helpers/adtCorpus';
 import { assertThrows } from '../helpers/assertions';
@@ -819,10 +815,16 @@ describe('ListTransports, mapped from a real captured transport list', () => {
   const body = corpusBody(
     'read-transport-list-structure--01-cts-transportrequests',
   );
-  const listing = () =>
-    fakeClientOf({
-      list: async () => okResponse(reading(parseStructure(body), body)),
-    });
+  // The listing read through the result set the handler passes, as
+  // adt-clients reads it: the reading is the handler's choice.
+  const listing = () => ({
+    getRequest: (set: { list: (answer: unknown) => unknown }) => ({
+      list: async () =>
+        okResponse(
+          set.list({ status: 200, statusText: 'OK', headers: {}, data: body }),
+        ),
+    }),
+  });
 
   it('answers every request the captured document holds, whoever asked', async () => {
     for (const args of [

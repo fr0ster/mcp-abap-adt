@@ -32,12 +32,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
-import {
-  type AnswerContext,
-  answerCaught,
-  answerFailure,
-  return_answer,
-} from '../../../lib/answer';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -49,6 +44,7 @@ import { detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
+import { failed } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import { parseXml } from '../../../lib/xml/node';
 import {
@@ -352,22 +348,16 @@ export async function handleGetTransport(
     includeTasks: args.include_tasks !== false,
   };
   logger?.debug(`GetTransport: ${args.transport_number}`);
-  const ctx: AnswerContext = { tool: 'GetTransport', detail };
-  try {
-    const read = await createAdtClient(connection, logger)
-      .getRequest(resultsFor(transportDocuments))
-      .readObjects(args.transport_number, { analyse: analyseException });
-    if (!read.ok) {
-      return answerFailure(withStep(read.getError(), 'read transport request'));
-    }
-    return return_answer(
-      read,
-      project(detail, (value: XmlRead) => terseTransport(value, options)),
-      ctx,
-    );
-  } catch (error) {
-    // Not the request's failure (answered above): a credential refusal as the
-    // chain made it, or ours.
-    return answerCaught(error, ctx);
-  }
+  return answer(
+    { tool: 'GetTransport', detail },
+    async () => {
+      const read = await createAdtClient(connection, logger)
+        .getRequest(resultsFor(transportDocuments))
+        .readObjects(args.transport_number, { analyse: analyseException });
+      return read.ok
+        ? read
+        : failed(withStep(read.getError(), 'read transport request'));
+    },
+    project(detail, (value: XmlRead) => terseTransport(value, options)),
+  );
 }

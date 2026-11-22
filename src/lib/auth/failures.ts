@@ -62,6 +62,7 @@ export type FailureCode =
   | 'long_session_unavailable'
   | 'connection_provider_failed'
   | 'no_connection'
+  | 'abapgit_not_served'
   | AccessRefusalCode;
 
 /**

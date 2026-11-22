@@ -43,6 +43,7 @@ export type ServerRefusalCode =
   | 'long_session_unavailable'
   | 'connection_provider_failed'
   | 'no_connection'
+  | 'abapgit_not_served'
   | AccessRefusalCode;
 
 /**
@@ -54,6 +55,13 @@ export type AccessRefusalCode =
   | 'package_tree_unreadable'
   | 'request_not_allowed'
   | 'table_not_allowed';
+
+/**
+ * An abapGit call on a system whose discovery does not list
+ * `/sap/bc/adt/abapgit/repos`, or could not be read (spec §4.5).
+ */
+export const ABAPGIT_NOT_SERVED_WORDS =
+  'abapGit is not served by this system: its discovery does not list it, or could not be read; nothing was sent';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -375,6 +383,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_unsplit: BATCH_UNSPLIT_WORDS,
   long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,
   connection_provider_failed: CONNECTION_PROVIDER_FAILED_WORDS,
+  abapgit_not_served: ABAPGIT_NOT_SERVED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

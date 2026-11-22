@@ -565,6 +565,9 @@ fields only. First failure: the wrapper logs the params. Mutation: log the body 
 `src/__tests__/integration/helpers/abapGitRemote.ts` (as T5.6, ledger with backend, beside
 `tests/test-config.yaml`); run-owned fixtures per spec §7; Live commands per backend:
 
+- Onprem R1 carries no `log_link` (measured 2026-11-22, 53 entries; cloud 446, 421 with one): R8
+  is a cloud-only path, and onprem admission refuses it in fixed words (`abapgit_run_log_not_served`);
+  the live run log cases run on cloud only.
 - `src/__tests__/integration/coverage/abapGit.live.test.ts` — full tools, spec §7 steps 1–8; step 7
   under an allowed-packages entry; T100 on `GetAbapGitFile` of a missing filename; the L0 → L1
   correlation and the recovery cases.

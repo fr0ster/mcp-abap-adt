@@ -6,6 +6,7 @@
 
 export {
   answered,
+  DETAIL_LEVELS,
   type DetailLevel,
   type DetailTable,
   formatted,
@@ -13,5 +14,6 @@ export {
   type LevelReading,
   rawLevel,
   readingAt,
+  structuredValue,
 } from './levels';
 export { groupedTsv, type TsvGroup, tsv } from './tsv';

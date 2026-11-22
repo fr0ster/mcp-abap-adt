@@ -28,6 +28,7 @@ import {
 } from '../adtProjections';
 import { activationParentDescription } from '../adtTypeCode';
 import { COMPACT_BACKGROUND_FIELD } from '../backgroundRuns/tools';
+import { DETAIL_LEVELS } from '../detail/levels';
 import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import { dumpFiltersRefusal } from '../dumpFilters';
 import {
@@ -2322,7 +2323,7 @@ function systemProperties(
         }),
       ),
     detail: z
-      .enum(['terse', 'full', 'raw'])
+      .enum(DETAIL_LEVELS)
       .optional()
       .describe(
         said(actions, {

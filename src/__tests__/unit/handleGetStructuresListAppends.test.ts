@@ -27,7 +27,12 @@ import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import * as clients from '../../lib/clients';
 import { assertMatchObject } from '../helpers/assertions';
-import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
+import {
+  okResponse,
+  reading,
+  refusedResponse,
+  whereUsedAnswer,
+} from '../helpers/fakeClient';
 
 /** handleGetStructuresList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
 const handleGetStructuresList = (
@@ -60,7 +65,7 @@ function payload(result: any) {
 }
 
 /** An empty, successfully-parsed where-used result: no references. */
-const emptyWhereUsed = () => okResponse(reading({}));
+const emptyWhereUsed = () => whereUsedAnswer();
 
 describe('GetStructuresList append handling (#128)', () => {
   beforeEach(() => {

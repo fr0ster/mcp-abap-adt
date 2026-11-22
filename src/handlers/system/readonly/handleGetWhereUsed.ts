@@ -555,7 +555,7 @@ async function whereUsedFromAnswers(
   given: WhereUsedArgs,
   scope: PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>> | undefined,
   references:
-    | PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>
+    | PhaseResult<IAdtResponse<WhereUsedListRead, IAdtError>>
     | undefined,
 ) {
   const { connection, logger } = context;
@@ -688,10 +688,11 @@ async function whereUsedInEnvelopes(
   });
   const params = (entry: { asked: IAdtWhereUsedScopeParamsOf }) => entry.asked;
   type Answered = PhaseResult<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
+  type Listed = PhaseResult<IAdtResponse<WhereUsedListRead, IAdtError>>;
   const scopes = new Map<number, Answered>();
-  const references = new Map<number, Answered>();
-  const ended = (
-    answers: Map<number, Answered>,
+  const references = new Map<number, Listed>();
+  const ended = <T>(
+    answers: Map<number, PhaseResult<IAdtResponse<T, IAdtError>>>,
     step: string,
   ): number | undefined =>
     readable.find(({ i }) => refusesCredential(answers.get(i), step))?.i;
@@ -761,7 +762,7 @@ async function whereUsedInEnvelopes(
     });
   }
   if (searched.length > 0) {
-    let read: Answered[];
+    let read: Listed[];
     try {
       read = await runPhase(context, searched, (entry, batch) => {
         const { i } = entry;

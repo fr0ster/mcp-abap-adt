@@ -38,6 +38,7 @@ import {
   okResponse,
   reading,
   refusedResponse,
+  whereUsedAnswer,
 } from '../helpers/fakeClient';
 import { exactPackages, listing } from '../helpers/sourceReaderFake';
 import { stateSystemKind } from '../helpers/systemKind';
@@ -563,18 +564,8 @@ describe('a credential failure inside a batch tool ends the whole call, as it ca
 
 describe('GetStructuresList: an append candidate SAP refused to read is listed', () => {
   const whereUsedNaming = (...names: string[]) =>
-    okResponse(
-      reading({
-        'usagereferences:usageReferenceResult': {
-          'usagereferences:referencedObjects': {
-            'usagereferences:referencedObject': names.map((name) => ({
-              'usagereferences:adtObject': {
-                '@': { 'adtcore:name': name, 'adtcore:type': 'TABL/DS' },
-              },
-            })),
-          },
-        },
-      }),
+    whereUsedAnswer(
+      ...names.map((name): [string, string] => [name, 'TABL/DS']),
     );
 
   const clientWith = (candidates: Record<string, () => unknown>) =>

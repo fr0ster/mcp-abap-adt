@@ -27,7 +27,7 @@ import {
 } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import * as clients from '../../lib/clients';
-import { okResponse, reading } from '../helpers/fakeClient';
+import { okResponse, reading, whereUsedAnswer } from '../helpers/fakeClient';
 import { jsonAt, listedJson } from '../helpers/listedJson';
 import { stateSystemKind } from '../helpers/systemKind';
 
@@ -49,7 +49,7 @@ const mockModifyWhereUsedScope = mock.fn<(...args: any[]) => any>(
   () => '<scope-modified/>',
 );
 const mockGetWhereUsed = mock.fn<(...args: any[]) => any>(async () =>
-  okResponse(reading({})),
+  whereUsedAnswer(),
 );
 
 // The declared variant the boundary checks a type argument against.

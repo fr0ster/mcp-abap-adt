@@ -1,4 +1,5 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { whereUsedListReading } from '../../lib/strategies/whereUsedList';
 
 /** A success carrying whatever a result strategy would have produced. */
 export function okResponse<T>(value: T): IAdtResponse<T, IAdtError> {
@@ -277,4 +278,26 @@ export function answerThrough(set: ResultSet, slot: string, data: string) {
     throw new Error(`the result set has no slot ${slot}`);
   }
   return okResponse(read({ status: 200, statusText: 'OK', headers: {}, data }));
+}
+
+/**
+ * A where-used answer as the handler's set reads it: `references` read by
+ * the shipped slot reading (`ourUtils.whereUsed`) out of a `/usageReferences`
+ * document naming each `[name, type]`.
+ */
+export function whereUsedAnswer(...references: [string, string][]) {
+  const objects = references
+    .map(
+      ([name, type]) =>
+        `<usagereferences:referencedObject uri="/sap/bc/adt/x/${name.toLowerCase()}" usageInformation="gradeDirect"><usagereferences:adtObject adtcore:name="${name}" adtcore:type="${type}"/></usagereferences:referencedObject>`,
+    )
+    .join('');
+  return okResponse(
+    whereUsedListReading({
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: `<?xml version="1.0" encoding="utf-8"?><usagereferences:usageReferenceResult xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences" xmlns:adtcore="http://www.sap.com/adt/core" numberOfResults="${references.length}"><usagereferences:referencedObjects>${objects}</usagereferences:referencedObjects></usagereferences:usageReferenceResult>`,
+    }),
+  );
 }

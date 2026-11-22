@@ -38,6 +38,7 @@ import type { XmlNode } from '../xml/node';
 import { nodeLevel } from './packageWalk';
 import { type AdtReading, statusOnly, structured, verbatim } from './reading';
 import { sqlPreview } from './sqlPreview';
+import { whereUsedListReading } from './whereUsedList';
 
 /**
  * What a strategy of the table reads an answer into: a reading of the
@@ -398,6 +399,9 @@ export const ourUtils = {
   // `modifyWhereUsedScope` edits its text and `whereUsedScopeTypesOf` reads
   // the types out of it, so the structured parse was thrown away.
   whereUsedScope: verbatim,
+  // The where-used list as adt-strategies reads it (0.28.0), in the fields
+  // the tools answer, with its document.
+  whereUsed: whereUsedListReading,
 };
 
 /**

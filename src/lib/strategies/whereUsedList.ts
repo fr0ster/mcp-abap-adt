@@ -1,3 +1,4 @@
+import { rawOf, utilWhereUsedReferences } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
   IAdtHeaders,
@@ -5,22 +6,14 @@ import type {
   IAdtWhereUsedParamsOf,
   IAdtWhereUsedScopeParamsOf,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type AdtHeadersContext,
   withAdtHeaders,
 } from '../adtHeaders/withAdtHeaders';
-import {
-  attr,
-  child,
-  childAt,
-  listOf,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../xml/tree';
+import type { XmlRead } from '../xml/tree';
 import type { AdtReading } from './reading';
 import { atStep } from './step';
-import { succeeded } from './stepResponse';
 
 /**
  * `getWhereUsedList`'s replacement, composed — the guide's "Sequences are
@@ -49,7 +42,7 @@ export interface WhereUsedSource {
   ): string;
   getWhereUsed(
     params: IAdtWhereUsedParamsOf,
-  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
+  ): Promise<IAdtResponse<WhereUsedListRead, IAdtError>>;
 }
 
 /** What `modifyWhereUsedScope` takes: each option may be absent. */
@@ -90,7 +83,7 @@ export interface WhereUsedMembers {
   getWhereUsed(
     params: IAdtWhereUsedParamsOf,
     options: { headers: IAdtHeaders },
-  ): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>>;
+  ): Promise<IAdtResponse<WhereUsedListRead, IAdtError>>;
 }
 
 /**
@@ -142,54 +135,36 @@ export interface WhereUsedFilter {
   disableTypes?: string[] | undefined;
 }
 
-/** The attribute `name` of `node`'s attribute group (`@`). */
-function attrOf(node: XmlRead, name: string): string | undefined {
-  return attr(child(node, '@'), name);
-}
-
 /**
- * Walk `structured`'s parse of `/usageReferences`'s response document —
- * `usagereferences:usageReferenceResult` /
- * `usagereferences:referencedObjects/usagereferences:referencedObject`,
- * fields read off each entry's own attributes and its nested `adtObject`,
- * matched field-for-field against the fields the removed `getWhereUsedList`
- * answered (`name`, `type`, `uri`, `package_name`, `responsible`,
- * `usage_information`) — measured against
- * `tests/fixtures/adt/read-where-used-list-structure--01-informationsystem-
- * usagereferences.body.xml`, the one captured fixture for this endpoint.
+ * The where-used slot's reading (`ourUtils.whereUsed`): the references as
+ * adt-strategies reads `/usageReferences` (`utilWhereUsedReferences`, 0.28.0),
+ * each in the fields this tool has always answered (`name`, `type`, `uri`,
+ * `package_name`, `responsible`, `usage_information`) — package nodes kept,
+ * as before, their `kind` the reading's — with the document SAP answered
+ * (`detail: 'raw'`). A code adt-strategies does not know is answered as SAP
+ * sent it.
  */
-export function parseWhereUsedReferences(value: XmlRead): WhereUsedListResult {
-  const root = child(value, 'usagereferences:usageReferenceResult');
-  const rawRefs = childAt(
-    root,
-    'usagereferences:referencedObjects',
-    'usagereferences:referencedObject',
-  );
-
-  const references: WhereUsedReference[] = listOf(rawRefs)
-    .map((ref) => {
-      const adtObject = child(ref, 'usagereferences:adtObject');
-      const packageRef = child(adtObject, 'adtcore:packageRef');
-      return {
-        name: attrOf(adtObject, 'adtcore:name') ?? '',
-        type: attrOf(adtObject, 'adtcore:type') ?? '',
-        uri: attrOf(ref, 'uri') || undefined,
-        package_name: attrOf(packageRef, 'adtcore:name') || undefined,
-        responsible: attrOf(adtObject, 'adtcore:responsible') || undefined,
-        usage_information: attrOf(ref, 'usageInformation') || undefined,
-      };
-    })
-    .filter((r) => r.name);
-
-  const declaredTotal = Number(attrOf(root, 'numberOfResults'));
+export const whereUsedListReading = (
+  answer: IAdtWireResponse,
+): WhereUsedListRead => {
+  const read = utilWhereUsedReferences(answer);
+  const references: WhereUsedReference[] = read.references
+    .filter((reference) => reference.name !== '')
+    .map((reference) => ({
+      name: reference.name,
+      type: reference.type ?? reference.unknownType,
+      uri: reference.uri || undefined,
+      package_name: reference.packageName || undefined,
+      responsible: reference.responsible || undefined,
+      usage_information: reference.usageInformation || undefined,
+    }));
   return {
-    totalReferences: Number.isFinite(declaredTotal)
-      ? declaredTotal
-      : references.length,
-    resultDescription: attrOf(root, 'resultDescription') || undefined,
+    totalReferences: read.totalReferences,
+    resultDescription: read.resultDescription || undefined,
     references,
+    document: rawOf(answer),
   };
-}
+};
 
 function needsScope(filter: WhereUsedFilter): boolean {
   return Boolean(
@@ -197,10 +172,6 @@ function needsScope(filter: WhereUsedFilter): boolean {
       (filter.enableOnlyTypes && filter.enableOnlyTypes.length > 0) ||
       (filter.disableTypes && filter.disableTypes.length > 0),
   );
-}
-
-function noResult<T>(value: T): IAdtResponse<T, IAdtError> {
-  return succeeded(value, 'fetchWhereUsedReferences');
 }
 
 /**
@@ -270,9 +241,5 @@ export async function fetchWhereUsedReferences(
     return result;
   }
 
-  const read = result.getResult().value;
-  return noResult({
-    ...parseWhereUsedReferences(read?.value),
-    document: read?.raw ?? '',
-  });
+  return result;
 }

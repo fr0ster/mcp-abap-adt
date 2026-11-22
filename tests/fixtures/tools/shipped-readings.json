@@ -1034,5 +1034,25 @@
       "POST /sap/bc/adt/repository/nodestructure",
       "POST /sap/bc/adt/repository/nodestructure"
     ]
+  },
+  "GetPackageContents two objects SAP listed without a name @terse": {
+    "isError": false,
+    "text": "type\tname\ttech_name\n# package ZPKG\nTABL/DT\t\t/sap/bc/adt/ddic/tables/a\nTABL/DT\t\t/sap/bc/adt/ddic/tables/b",
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
+  },
+  "GetPackageContents two objects SAP listed without a name @medium": {
+    "isError": false,
+    "text": "[{\"name\":\"\",\"type\":\"TABL/DT\",\"package_name\":\"ZPKG\",\"uri\":\"/sap/bc/adt/ddic/tables/a\"},{\"name\":\"\",\"type\":\"TABL/DT\",\"package_name\":\"ZPKG\",\"uri\":\"/sap/bc/adt/ddic/tables/b\"}]",
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
+  },
+  "GetPackageContents two objects SAP listed without a name @full": {
+    "isError": false,
+    "text": "[{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/a\"},{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/b\"}]",
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
+  },
+  "GetPackageContents two objects SAP listed without a name @raw": {
+    "isError": false,
+    "text": "[{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/a\"},{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/b\"}]",
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   }
 }

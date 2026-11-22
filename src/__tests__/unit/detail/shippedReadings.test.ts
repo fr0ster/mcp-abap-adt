@@ -367,6 +367,18 @@ for (const [label, levels] of [
     );
 }
 
+// Codex P1: objects SAP lists without a name, told apart by their URI.
+const NAMELESS_LEVEL = `${xmlHead}<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/ddic/tables/a</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/ddic/tables/b</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>`;
+CASES['GetPackageContents two objects SAP listed without a name'] = async (
+  detail,
+) =>
+  answeredOf(
+    await handleGetPackageContents(sequential([NAMELESS_LEVEL]), {
+      package_name: 'ZPKG',
+      detail,
+    }),
+  );
+
 describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READINGS=1 rewrites the fixture)', () => {
   const answered: Answers = {};
   const expected: Answers =

@@ -25,6 +25,7 @@ import {
   type EnumeratedObject,
   type EnumerateInput,
   enumerateScanTargets,
+  type IncompleteTarget,
   type NotLoadedNode,
   type PackageContentsFetcher,
   SCAN_OBJECT_TYPES,
@@ -188,6 +189,8 @@ export interface OrchestratorResult {
   };
   /** Present when a scanned package has a type node SAP could not load: its objects were not scanned. */
   not_loaded?: NotLoadedNode[];
+  /** Present when SAP listed a target without a name: it was not scanned. */
+  incomplete?: IncompleteTarget[];
 }
 
 export interface OrchestratorDeps {
@@ -536,6 +539,9 @@ export async function runSearchSource(
         : { by_object_cap: truncatedByObjectCap, by_max_hits: stoppedWithMore },
     ...(enumerated.notLoaded !== undefined
       ? { not_loaded: enumerated.notLoaded }
+      : {}),
+    ...(enumerated.incomplete !== undefined
+      ? { incomplete: enumerated.incomplete }
       : {}),
   };
   return result;

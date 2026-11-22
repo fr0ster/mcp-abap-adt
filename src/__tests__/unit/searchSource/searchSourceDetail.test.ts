@@ -98,3 +98,52 @@ describe('SearchSource detail', () => {
     assert.equal(rows[4], 'ZPROG\t2');
   });
 });
+
+describe('SearchSource and an object SAP lists without a name', () => {
+  it('is never scanned, and is listed as incomplete in every answer', async () => {
+    const asked: string[] = [];
+    const result = await runSearchSource(
+      {
+        lineMatch: substringLineMatch,
+        sapAnswers: skipSapAnswers,
+        fetchPackageContents: async (name) =>
+          listing(name, [
+            {
+              name: '',
+              type: 'PROG/P',
+              packageName: 'ZPKG',
+              isPackage: false,
+              uri: '/sap/bc/adt/programs/programs/znameless',
+            },
+            {
+              name: 'ZPROG',
+              type: 'PROG/P',
+              packageName: 'ZPKG',
+              isPackage: false,
+            },
+          ]),
+        sourceReader: sourcesFrom({ 'PROG:ZPROG': 'hit' }, (read) =>
+          asked.push(JSON.stringify(read)),
+        ),
+        resolvePackages: exactPackages,
+      },
+      { query: 'hit', packages: ['ZPKG'], answer: 'lines' },
+    );
+    assert.equal(asked.length, 1);
+    assert.ok(asked[0]?.includes('ZPROG'), asked.join(', '));
+    assert.deepStrictEqual(result.incomplete, [
+      {
+        package: 'ZPKG',
+        type: 'PROG/P',
+        uri: '/sap/bc/adt/programs/programs/znameless',
+      },
+    ]);
+    assert.ok(
+      searchSourceRows(result)
+        .split('\n')
+        .includes(
+          '# incomplete ZPKG PROG/P /sap/bc/adt/programs/programs/znameless',
+        ),
+    );
+  });
+});

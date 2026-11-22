@@ -156,6 +156,11 @@ export function searchSourceRows(result: OrchestratorResult): string {
     ...(result.not_loaded ?? []).map(
       (node) => `# not loaded by SAP ${node.package} ${node.type}`,
     ),
+    // A target SAP listed without a name: never scanned, named by what tells
+    // it apart.
+    ...(result.incomplete ?? []).map((target) =>
+      `# incomplete ${target.package} ${target.type} ${target.uri ?? target.tech_name ?? ''}`.trimEnd(),
+    ),
   ];
   const first = result.results[0];
   const columns =

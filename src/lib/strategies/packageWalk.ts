@@ -398,6 +398,12 @@ export interface PackageItem {
   isPackage: boolean;
   /** A type node SAP could not load: its row (`NOT_LOADED_BY_SAP`). */
   notLoaded?: true;
+  /**
+   * An object SAP listed without a name: the technical name and URI it
+   * carries, all that tells it apart (present only then).
+   */
+  techName?: string;
+  uri?: string;
 }
 
 /** The code of a package, the root of every tree. */
@@ -583,9 +589,19 @@ function undescribed(object: NodeItem, packageName: string): WalkedItem {
   return { ...rest, packageName };
 }
 
-/** An object's identity within one package: its type and its name. */
+/**
+ * An object's identity within one package: every identity field it carries —
+ * its type, its name, its technical name and its URI — so objects SAP lists
+ * without a name stay apart; names read as SAP's repository reads them, in
+ * any case.
+ */
 function listedKeyOf(object: WalkedItem): string {
-  return `${object.type} ${object.name.toUpperCase()}`;
+  return [
+    object.type,
+    object.name.toUpperCase(),
+    (object.techName ?? '').toUpperCase(),
+    (object.uri ?? '').toLowerCase(),
+  ].join(' ');
 }
 
 /**
@@ -1028,6 +1044,10 @@ export function assembleList(
       packageName: (o.packageName ?? packageName).toUpperCase(),
       isPackage: kind === 'package',
       ...(o.notLoaded === true ? { notLoaded: true as const } : {}),
+      ...(o.name === '' && o.techName !== undefined
+        ? { techName: o.techName }
+        : {}),
+      ...(o.name === '' && o.uri !== undefined ? { uri: o.uri } : {}),
     };
   });
 }

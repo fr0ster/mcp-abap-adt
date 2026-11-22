@@ -115,6 +115,16 @@ export interface EnumeratedTargets {
   targets: EnumeratedObject[];
   /** The type nodes SAP could not load in a scanned package: what was not scanned. */
   notLoaded?: NotLoadedNode[];
+  /** The objects SAP listed without a name: what could not be read, so was not scanned. */
+  incomplete?: IncompleteTarget[];
+}
+
+/** An object SAP listed without a name, in its package: what tells it apart. */
+export interface IncompleteTarget {
+  package: string;
+  type: string;
+  tech_name?: string;
+  uri?: string;
 }
 
 /** A type node SAP could not load, in its package. */
@@ -132,6 +142,7 @@ export async function enumerateScanTargets(
   const seen = new Set<string>();
   const out: EnumeratedObject[] = [];
   const notLoaded: NotLoadedNode[] = [];
+  const incomplete: IncompleteTarget[] = [];
 
   for (const pkg of input.packages) {
     // A failed read of the walk is decided at its place (the walker's
@@ -150,6 +161,16 @@ export async function enumerateScanTargets(
       if (code === undefined) continue;
       const family = FAMILY_OF[code];
       if (!wantedFamilies.has(family)) continue;
+      // A target with no name cannot be read: it is listed, never scanned.
+      if (item.name === '') {
+        incomplete.push({
+          package: item.packageName,
+          type: item.type,
+          ...(item.techName !== undefined ? { tech_name: item.techName } : {}),
+          ...(item.uri !== undefined ? { uri: item.uri } : {}),
+        });
+        continue;
+      }
       if (filter && !globMatches(filter, item.name)) continue;
       const key = `${item.packageName} ${family} ${item.name}`;
       if (seen.has(key)) continue;
@@ -170,7 +191,11 @@ export async function enumerateScanTargets(
     return a.object_name < b.object_name ? -1 : 1;
   });
 
-  return notLoaded.length > 0 ? { targets: out, notLoaded } : { targets: out };
+  return {
+    targets: out,
+    ...(notLoaded.length > 0 ? { notLoaded } : {}),
+    ...(incomplete.length > 0 ? { incomplete } : {}),
+  };
 }
 
 /**

@@ -529,3 +529,30 @@ describe('a root or a subpackage node SAP could not load', () => {
     assert.deepStrictEqual(tree.children?.[0]?.children ?? [], []);
   });
 });
+
+/**
+ * Objects SAP lists without a name stay distinct by every identity field
+ * they carry (Codex P1): two of the same type with different technical names
+ * or URIs are two rows.
+ */
+describe('incomplete objects keep apart by every identity field', () => {
+  it('two nameless objects of one type, told apart by their URI', async () => {
+    const level =
+      '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+      '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/ddic/tables/a</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+      '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/ddic/tables/b</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+      '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+    const source: NodeStructureSource = {
+      async fetchNodeStructure(_t, _name, options) {
+        return succeeded(
+          options?.nodeId === undefined ? nodeLevelOfXml(level) : levelOf([]),
+        );
+      },
+    };
+    const walked = await walkPackage(source, 'P');
+    assert.deepStrictEqual(
+      walked.map((o) => o.uri),
+      ['/sap/bc/adt/ddic/tables/a', '/sap/bc/adt/ddic/tables/b'],
+    );
+  });
+});

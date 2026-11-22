@@ -417,6 +417,14 @@ function factoryOf(
  * exported handler — the tool's args reach the selection — and, the other
  * way round, that a tool not declaring `detail` does not hand its args to an
  * adapter that reads it.
+ *
+ * **Out of scope, as the minify scan's alias forms are.** The check reads
+ * the forms the handlers use: a selection (`readingAt` / `answerAt` with
+ * `levelOf(args)`) in the function that makes the `answer()` call, or in the
+ * exported handler that hands it on. A selector bound through a closure, a
+ * handler that scans its arguments some other way, or a delegate that
+ * ignores `args` and passes its own are contrived forms in this repository's
+ * own code: none exists, and the check does not chase them.
  */
 export function detailWiring(
   handlers: string[],

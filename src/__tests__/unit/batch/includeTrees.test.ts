@@ -20,7 +20,7 @@ import type {
   IAbapRequestOptions,
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
-import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
+import { handleGetEnhancements as handleGetEnhancementsOf } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
 import {
   TOOL_DEFINITION as GetIncludesList,
   handleGetIncludesList as handleGetIncludesListOf,
@@ -39,6 +39,12 @@ import {
 } from '../../helpers/batchEnvelope';
 import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
+
+/** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleGetEnhancements = (
+  context: Parameters<typeof handleGetEnhancementsOf>[0],
+  args: Parameters<typeof handleGetEnhancementsOf>[1],
+) => handleGetEnhancementsOf(context, { detail: 'full', ...args });
 
 /** handleGetStructuresList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
 const handleGetStructuresList = (

@@ -615,6 +615,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `detailed` (boolean, optional) - [read-only] true: every enhancement with its whole source; false (default): a short one
 - `include_nested` (boolean, optional) - [read-only] true: also the enhancements of every include of a program or function group
 - `max_includes` (integer, optional) - [read-only] With include_nested: how many includes are read (default 50)

@@ -13,7 +13,7 @@ import { AuthProviderFailure, authError } from '@mcp-abap-adt/auth-errors';
 import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
-import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
+import { handleGetEnhancements as handleGetEnhancementsOf } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetPackageContents as handleGetPackageContentsOf } from '../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetStructuresList as handleGetStructuresListOf } from '../../handlers/structure/readonly/handleGetStructuresList';
 import { handleDescribeByList as handleDescribeByListOf } from '../../handlers/system/readonly/handleDescribeByList';
@@ -42,6 +42,12 @@ import {
 } from '../helpers/fakeClient';
 import { exactPackages, listing } from '../helpers/sourceReaderFake';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleGetEnhancements = (
+  context: Parameters<typeof handleGetEnhancementsOf>[0],
+  args: Parameters<typeof handleGetEnhancementsOf>[1],
+) => handleGetEnhancementsOf(context, { detail: 'full', ...args });
 
 /** handleDescribeByList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
 const handleDescribeByList = (

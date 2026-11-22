@@ -37,7 +37,7 @@ import { resolveVersionedObject } from '../../handlers/common/readonly/resolveVe
 import { handleGetDataElement } from '../../handlers/data_element/high/handleGetDataElement';
 import { handleGetDdl } from '../../handlers/ddl/high/handleGetDdl';
 import { handleGetDomain } from '../../handlers/domain/high/handleGetDomain';
-import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
+import { handleGetEnhancements as handleGetEnhancementsOf } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetFunctionGroup } from '../../handlers/function_group/high/handleGetFunctionGroup';
 import { handleGetFunctionModule } from '../../handlers/function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../handlers/interface/high/handleGetInterface';
@@ -92,6 +92,12 @@ import {
 } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleGetEnhancements = (
+  context: Parameters<typeof handleGetEnhancementsOf>[0],
+  args: Parameters<typeof handleGetEnhancementsOf>[1],
+) => handleGetEnhancementsOf(context, { detail: 'full', ...args });
 
 // The declared variant the boundary checks a type argument against.
 stateSystemKind('onprem');

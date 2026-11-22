@@ -211,7 +211,7 @@ describe('the MCP tool surface', () => {
         },
         'readonly/GetEnhancements': {
           relaxed: ['object_name', 'object_type'],
-          added: ['objects'],
+          added: ['detail', 'objects'],
         },
         // `container` names whose text elements PROG/PX is (optional: required
         // with PROG/PX alone, the code it arrived with).

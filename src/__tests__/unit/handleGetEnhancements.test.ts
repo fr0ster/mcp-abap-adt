@@ -1,11 +1,17 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  handleGetEnhancements,
+  handleGetEnhancements as handleGetEnhancementsOf,
   parseEnhancementsFromXml,
 } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import { assertMatchObject } from '../helpers/assertions';
+
+/** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleGetEnhancements = (
+  context: Parameters<typeof handleGetEnhancementsOf>[0],
+  args: Parameters<typeof handleGetEnhancementsOf>[1],
+) => handleGetEnhancementsOf(context, { detail: 'full', ...args });
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.
@@ -368,5 +374,45 @@ describe('parseEnhancementsFromXml', () => {
   it('reads no source of a document without one', () => {
     assert.deepStrictEqual(parse(root('')), []);
     assert.deepStrictEqual(parse(''), []);
+  });
+});
+
+describe('GetEnhancements terse, by default', () => {
+  const b64 = (s: string) => Buffer.from(s, 'utf-8').toString('base64');
+  const document =
+    '<enh:enhancements xmlns:enh="http://www.sap.com/adt/abapsource/enhancements" xmlns:adtcore="http://www.sap.com/adt/core">' +
+    '<enh:enhancementImplementations adtcore:name="Z_FIRST" adtcore:type="ENHO/XHH" adtcore:version="active">' +
+    `<enh:elements><enh:sourceCodePlugin enh:uri="/x"><enh:source>${b64('ENHANCEMENT 1 z_first.\nSECRET_SOURCE_LINE.\nENDENHANCEMENT.')}</enh:source></enh:sourceCodePlugin></enh:elements>` +
+    '</enh:enhancementImplementations></enh:enhancements>';
+
+  it('answers the object, its count and a name/type row per enhancement, no source', async () => {
+    const connection = {
+      async makeAdtRequest(req: { url: string }) {
+        if (
+          req.url.startsWith(
+            '/sap/bc/adt/functions/groups/zfg/source/main/enhancements/elements',
+          )
+        ) {
+          return { status: 200, data: document };
+        }
+        const error: any = new Error('Request failed with status code 404');
+        error.response = { status: 404 };
+        throw error;
+      },
+    };
+    const result: any = await handleGetEnhancementsOf(
+      { connection, logger: undefined, batchAvailability: notServed } as any,
+      { object_name: 'SAPLZFG', object_type: 'program' },
+    );
+
+    const text: string = result.content[0].text;
+    assert.equal(result.isError, false);
+    assert.deepStrictEqual(text.split('\n').slice(-2), [
+      'name\ttype\tdescription',
+      'Z_FIRST\tENHO/XHH\t',
+    ]);
+    assert.equal(text.split('\n')[0]?.startsWith('# object '), true);
+    assert.equal(text.includes('# count 1'), true);
+    assert.equal(text.includes('SECRET_SOURCE_LINE'), false);
   });
 });

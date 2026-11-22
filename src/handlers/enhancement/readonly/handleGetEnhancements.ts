@@ -27,7 +27,6 @@ import {
   messageOf,
   thrownEntry,
 } from '../../../lib/answer';
-import type { IAnswerSerializer } from '../../../lib/answerSerializer';
 import { failureOf } from '../../../lib/auth/failures';
 import {
   type PhaseResult,
@@ -35,6 +34,7 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { ReadVersion } from '../../../lib/handlers/readVersion';
 import {
@@ -43,6 +43,7 @@ import {
   type JsonValue,
   jsonOrText,
 } from '../../../lib/json';
+import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { includeContextUriOf } from '../../../lib/strategies/metadataFields';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import {
@@ -154,6 +155,7 @@ export const TOOL_DEFINITION = {
       .describe(
         '[read-only] With include_nested: how many includes are read (default 50)',
       ),
+    ...DETAIL_SHAPE,
   }),
 } as const;
 
@@ -776,6 +778,96 @@ function filterMinimalEnhancements(response: EnhancementResponse) {
   };
 }
 
+/** What an enhancements read answered: one object, or one with its includes. */
+type EnhancementsRead =
+  | { readonly kind: 'single'; readonly response: EnhancementResponse }
+  | { readonly kind: 'nested'; readonly response: NestedEnhancements };
+
+/** A read and whether the caller asked for every source whole. */
+interface EnhancementsShown {
+  readonly read: EnhancementsRead;
+  readonly detailed: boolean;
+}
+
+/** One object's terse lines: its `# object` line, then its rows. */
+function terseObjectLines(response: EnhancementResponse): string[] {
+  const lines = [
+    `# object ${response.object_type} ${response.object_name}`,
+    ...(response.context ? [`# context ${response.context}`] : []),
+    `# count ${response.enhancements.length}`,
+  ];
+  if (response.enhancements.length > 0) {
+    lines.push(
+      tsv(
+        ['name', 'type', 'description'],
+        response.enhancements.map((enh) => [
+          enh.name,
+          enh.type,
+          (enh.description ?? '').split('\n')[0] ?? '',
+        ]),
+      ),
+    );
+  }
+  for (const entry of response.unreadable ?? []) {
+    lines.push(`# unreadable ${JSON.stringify(entry)}`);
+  }
+  return lines;
+}
+
+/**
+ * What `GetEnhancements` answers at each `detail`, selected before the reads
+ * (`src/lib/detail`): the answer is built from several requests, so each
+ * level is a formatter of what they read. Terse is TSV — each object's
+ * enhancements, name, type and description, no source; medium, full and raw
+ * the JSON answer as before (`detailed` decides whether each source is whole
+ * or short).
+ */
+const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
+  (() => {
+    const former = ({ read, detailed }: EnhancementsShown): object =>
+      read.kind === 'single'
+        ? detailed
+          ? { ...read.response, detailed: true }
+          : filterMinimalEnhancements(read.response)
+        : detailed
+          ? { ...read.response, detailed: true }
+          : filterMinimalNested(read.response);
+    return {
+      terse: ({ read }) => {
+        if (read.kind === 'single') {
+          return terseObjectLines(read.response).join('\n');
+        }
+        const nested = read.response;
+        return [
+          `# total ${nested.total_enhancements_found}`,
+          ...nested.objects.flatMap(terseObjectLines),
+          ...(nested.includes_unread ?? []).map(
+            (unread) => `# include_unread ${JSON.stringify(unread)}`,
+          ),
+        ].join('\n');
+      },
+      medium: former,
+      full: former,
+      raw: former,
+    };
+  })();
+
+/** The answer a read is shown as, at the level asked. */
+type EnhancementsAnswerOf = (shown: EnhancementsShown) => string | object;
+
+/** An answer's text: TSV as it is, JSON serialised. */
+function enhancementsResult(answer: string | object): McpResult {
+  return {
+    isError: false,
+    content: [
+      {
+        type: 'text',
+        text: typeof answer === 'string' ? answer : JSON.stringify(answer),
+      },
+    ],
+  };
+}
+
 /** The failures a throw carries as its payload's `failures`, when it carries a list. */
 function carriedFailures(error: unknown): FailureEntry[] | undefined {
   const failures = payloadCarriedBy(error)?.failures;
@@ -797,6 +889,7 @@ function carriedFailures(error: unknown): FailureEntry[] | undefined {
 async function enhancementsOf(
   context: HandlerContext,
   args: GetEnhancementsArgs,
+  shown: EnhancementsAnswerOf,
 ): Promise<McpResult> {
   const { connection, logger } = context;
   try {
@@ -830,20 +923,12 @@ async function enhancementsOf(
     if (!includeNested) {
       // Return only main object enhancements
       // Apply filtering if not detailed; add the detailed flag for consistency
-      const response = isDetailed
-        ? { ...mainEnhancementResponse, detailed: true }
-        : filterMinimalEnhancements(mainEnhancementResponse);
-
-      const result: McpResult = {
-        isError: false,
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(response),
-          },
-        ],
-      };
-      return result;
+      return enhancementsResult(
+        shown({
+          read: { kind: 'single', response: mainEnhancementResponse },
+          detailed: isDetailed,
+        }),
+      );
     }
 
     // If include_nested is true, also get enhancements from all nested includes
@@ -964,21 +1049,12 @@ async function enhancementsOf(
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
 
-    // Apply filtering if not detailed; add the detailed flag for consistency
-    const answered = isDetailed
-      ? { ...combinedResponse, detailed: true }
-      : filterMinimalNested(combinedResponse);
-
-    const result: McpResult = {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(answered),
-        },
-      ],
-    };
-    return result;
+    return enhancementsResult(
+      shown({
+        read: { kind: 'nested', response: combinedResponse },
+        detailed: isDetailed,
+      }),
+    );
   } catch (error) {
     return return_error(error);
   }
@@ -1515,26 +1591,22 @@ interface EnhancementOptions {
   includeNested: boolean;
   isDetailed: boolean;
   maxIncludes: number;
+  /** The answer at the level asked, selected by the handler. */
+  shown: EnhancementsAnswerOf;
 }
 
-function enhancementOptionsOf(args: GetEnhancementsArgs): EnhancementOptions {
+function enhancementOptionsOf(
+  args: GetEnhancementsArgs,
+  shown: EnhancementsAnswerOf,
+): EnhancementOptions {
   return {
+    shown,
     manualProgram: args.program,
     includeNested: args.include_nested === true,
     isDetailed: args.detailed === true,
     maxIncludes: args.max_includes ? args.max_includes : 50,
   };
 }
-
-/** An enhancements answer: the payload as compact JSON text. */
-const answerText: IAnswerSerializer<McpResult> = {
-  json<P>(payload: P): McpResult {
-    return {
-      isError: false,
-      content: [{ type: 'text', text: JSON.stringify(payload) }],
-    };
-  },
-};
 
 /**
  * One object's answer from the phases' answers — the sequential version's
@@ -1558,10 +1630,11 @@ function enhancementsAnswerFrom(
       resolved,
     );
     if (!options.includeNested) {
-      return answerText.json(
-        options.isDetailed
-          ? { ...mainEnhancementResponse, detailed: true }
-          : filterMinimalEnhancements(mainEnhancementResponse),
+      return enhancementsResult(
+        options.shown({
+          read: { kind: 'single', response: mainEnhancementResponse },
+          detailed: options.isDetailed,
+        }),
       );
     }
     let allEnhancementResponses: EnhancementResponse[];
@@ -1631,10 +1704,11 @@ function enhancementsAnswerFrom(
       objects: allEnhancementResponses,
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
-    return answerText.json(
-      options.isDetailed
-        ? { ...combinedResponse, detailed: true }
-        : filterMinimalNested(combinedResponse),
+    return enhancementsResult(
+      options.shown({
+        read: { kind: 'nested', response: combinedResponse },
+        detailed: options.isDetailed,
+      }),
     );
   } catch (error) {
     return return_error(error);
@@ -1766,7 +1840,21 @@ function listAnswer(
     readonly object_type: string;
   }>,
   results: readonly McpResult[],
+  terse: boolean,
 ): McpResult {
+  if (terse) {
+    // Each object's terse answer begins with its own `# object` line; a
+    // failure is named under the object asked, its payload as JSON.
+    const text = results
+      .map((result, i) => {
+        const asked = objects[i];
+        return result.isError
+          ? `# object ${asked?.object_type ?? ''} ${asked?.object_name ?? ''}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
+          : (result.content[0]?.text ?? '');
+      })
+      .join('\n');
+    return { isError: false, content: [{ type: 'text', text }] };
+  }
   const entries = results.map((result, i) => {
     const asked = objects[i];
     return result.isError
@@ -1788,11 +1876,13 @@ export async function handleGetEnhancements(
   args: GetEnhancementsArgs,
 ) {
   const listed = args?.objects;
+  const shown = answerAt(ENHANCEMENT_ANSWERS, levelOf(args));
+  const terse = levelOf(args) === 'terse';
   try {
     if (listed === undefined) {
       const objectName = args.object_name;
-      if (!objectName) return await enhancementsOf(context, args);
-      const options = enhancementOptionsOf(args);
+      if (!objectName) return await enhancementsOf(context, args, shown);
+      const options = enhancementOptionsOf(args, shown);
       const kind = String(args.object_type ?? '')
         .trim()
         .toUpperCase();
@@ -1801,7 +1891,7 @@ export async function handleGetEnhancements(
         !options.includeNested &&
         ONE_REQUEST_HOSTS.some((host) => spelledAs(kind, host))
       ) {
-        return await enhancementsOf(context, args);
+        return await enhancementsOf(context, args, shown);
       }
       return await withSequentialFallback<McpResult>(
         context,
@@ -1813,7 +1903,7 @@ export async function handleGetEnhancements(
               options,
             )
           )[0],
-        () => enhancementsOf(context, args),
+        () => enhancementsOf(context, args, shown),
       );
     }
     if (
@@ -1834,7 +1924,7 @@ export async function handleGetEnhancements(
       const { objects: _list, ...rest } = args;
       return { ...rest, ...o };
     };
-    const options = enhancementOptionsOf(args);
+    const options = enhancementOptionsOf(args, shown);
     return await withSequentialFallback<McpResult>(
       context,
       async () => {
@@ -1850,21 +1940,21 @@ export async function handleGetEnhancements(
           results.push(
             o.object_name
               ? answered[at++]
-              : await enhancementsOf(context, single(o)),
+              : await enhancementsOf(context, single(o), shown),
           );
         }
-        return listAnswer(objects, results);
+        return listAnswer(objects, results, terse);
       },
       async () => {
         // One object after another, each as the single call reads it; a
         // credential failure ends the call, and nothing after it is read.
         const results: McpResult[] = [];
         for (const o of objects) {
-          const result = await enhancementsOf(context, single(o));
+          const result = await enhancementsOf(context, single(o), shown);
           if (endsList(result)) return result;
           results.push(result);
         }
-        return listAnswer(objects, results);
+        return listAnswer(objects, results, terse);
       },
     );
   } catch (error) {

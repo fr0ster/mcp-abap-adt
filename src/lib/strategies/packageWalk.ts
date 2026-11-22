@@ -409,6 +409,8 @@ export interface PackageItem {
   description?: string | undefined;
   packageName: string;
   isPackage: boolean;
+  /** A type node SAP could not load: its row (`NOT_LOADED_BY_SAP`). */
+  notLoaded?: true;
 }
 
 /** The code of a package, the root of every tree. */
@@ -1030,6 +1032,7 @@ export function assembleList(
       ...(o.description ? { description: o.description } : {}),
       packageName: (o.packageName ?? packageName).toUpperCase(),
       isPackage: kind === 'package',
+      ...(o.notLoaded === true ? { notLoaded: true as const } : {}),
     };
   });
 }

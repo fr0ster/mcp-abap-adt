@@ -113,6 +113,14 @@ export const SCAN_OBJECT_TYPES = [
 /** The scan targets of a walk. */
 export interface EnumeratedTargets {
   targets: EnumeratedObject[];
+  /** The type nodes SAP could not load in a scanned package: what was not scanned. */
+  notLoaded?: NotLoadedNode[];
+}
+
+/** A type node SAP could not load, in its package. */
+export interface NotLoadedNode {
+  package: string;
+  type: string;
 }
 
 export async function enumerateScanTargets(
@@ -123,6 +131,7 @@ export async function enumerateScanTargets(
   const filter = input.object_filter;
   const seen = new Set<string>();
   const out: EnumeratedObject[] = [];
+  const notLoaded: NotLoadedNode[] = [];
 
   for (const pkg of input.packages) {
     // A failed read of the walk is decided at its place (the walker's
@@ -132,6 +141,10 @@ export async function enumerateScanTargets(
       includeSubpackages: input.include_subpackages,
     });
     for (const item of items) {
+      if (item.notLoaded === true) {
+        notLoaded.push({ package: item.packageName, type: item.type });
+        continue;
+      }
       if (item.isPackage) continue;
       const code = scanCodeOf(item.type);
       if (code === undefined) continue;
@@ -157,7 +170,7 @@ export async function enumerateScanTargets(
     return a.object_name < b.object_name ? -1 : 1;
   });
 
-  return { targets: out };
+  return notLoaded.length > 0 ? { targets: out, notLoaded } : { targets: out };
 }
 
 /**

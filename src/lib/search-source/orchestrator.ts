@@ -25,6 +25,7 @@ import {
   type EnumeratedObject,
   type EnumerateInput,
   enumerateScanTargets,
+  type NotLoadedNode,
   type PackageContentsFetcher,
   SCAN_OBJECT_TYPES,
   type ScanCode,
@@ -185,6 +186,8 @@ export interface OrchestratorResult {
     /** Present when `max_hits` was given: the scan stopped with anything left. */
     by_max_hits?: boolean;
   };
+  /** Present when a scanned package has a type node SAP could not load: its objects were not scanned. */
+  not_loaded?: NotLoadedNode[];
 }
 
 export interface OrchestratorDeps {
@@ -531,6 +534,9 @@ export async function runSearchSource(
       maxTotal === undefined
         ? { by_object_cap: truncatedByObjectCap }
         : { by_object_cap: truncatedByObjectCap, by_max_hits: stoppedWithMore },
+    ...(enumerated.notLoaded !== undefined
+      ? { not_loaded: enumerated.notLoaded }
+      : {}),
   };
   return result;
 }

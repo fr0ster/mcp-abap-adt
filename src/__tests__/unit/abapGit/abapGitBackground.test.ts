@@ -13,12 +13,19 @@
  * - a stdio close logs the run's connection off (it cuts SAP's dialog);
  * - `background: true` without a background-run store is refused, nothing
  *   sent.
+ *
+ * With a bound credential whose user and token are canaries, over HTTP and
+ * over RFC (the connector's real `RfcTransport` on the stand-in's RFC path,
+ * its wire log asked for): R1 carries no git credential, the pull carries it
+ * in its body alone, and the record, the stored answer and the wire log hold
+ * no canary.
  */
 
 import assert from 'node:assert/strict';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import { InMemoryBackgroundRuns } from '@mcp-abap-adt/background-runs-memory';
+import { AdtOnPremConnector, RfcTransport } from '@mcp-abap-adt/connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import type { IDestinations } from '../../../../server-runtime/src/stdio/auth/IAuthBrokerFactory';
@@ -59,8 +66,11 @@ import {
 import {
   type AdtStandIn,
   adtStandIn,
+  rfcPathTo,
   type StandInRequest,
+  type StandInRfcPath,
 } from '../../helpers/adtStandIn';
+import { connectionCreate } from '../../helpers/packageFiles';
 
 const SERVED_DISCOVERY =
   '<?xml version="1.0" encoding="utf-8"?><app:service xmlns:app="http://www.w3.org/2007/app"><app:workspace>' +
@@ -200,6 +210,7 @@ async function stdio(
   sap: AdtStandIn,
   backgroundRuns: InMemoryBackgroundRuns | undefined,
   abapGitEndpoints?: readonly ApprovedEndpoint[],
+  destinations: IDestinations = destinationsOf(sap),
 ) {
   const context = noConnectionContext();
   const server = new StdioServer(
@@ -213,7 +224,7 @@ async function stdio(
       new BackgroundRunHandlersGroup(context),
       new CompactRuns(context),
     ]),
-    destinationsOf(sap),
+    destinations,
     {
       systemType: 'onprem',
       ...(backgroundRuns !== undefined ? { backgroundRuns } : {}),
@@ -434,6 +445,134 @@ describe('background on the abapGit writes: a real dispatch', () => {
       assert.equal(answer.isError, true);
       assert.match(answer.text, /background_runs_unavailable/);
       assert.equal(sap.requests.filter(isPull).length, 0);
+    } finally {
+      await s.close();
+    }
+  });
+});
+
+/** The destination over RFC: an application server, no URL. */
+const RFC_DESTINATIONS: IDestinations = {
+  settingsFor: async () => ({
+    connectionType: 'rfc',
+    ashost: 'sap.example.invalid',
+    sysnr: '00',
+    client: '100',
+    language: 'EN',
+    authType: 'basic',
+    username: 'GIT_USER',
+  }),
+  getProvider: async () => PROVIDER,
+};
+
+describe('background on the abapGit writes over RFC: a real dispatch', () => {
+  let rfc: StandInRfcPath;
+  const wire: string[] = [];
+  const wireLogger = {
+    debug: (message: string) => wire.push(message),
+    info: (message: string) => wire.push(message),
+    warn: (message: string) => wire.push(message),
+    error: (message: string) => wire.push(message),
+  };
+  beforeEach(() => {
+    rfc = rfcPathTo(sap);
+    wire.length = 0;
+    const real = connectionCreate.createConnection;
+    // An RFC spec is built on the connector's real RfcTransport over the
+    // stand-in's RFC path, its wire log asked for; HTTP as it is.
+    mock.method(
+      connectionCreate,
+      'createConnection',
+      (spec: connectionCreate.ConnectionSpec) =>
+        spec.transport === 'rfc'
+          ? new AdtOnPremConnector(
+              spec.config,
+              spec.credential,
+              new RfcTransport(rfc.conversations, wireLogger, {
+                logWire: true,
+              }),
+              spec.logger,
+              spec.sessionId,
+            )
+          : real(spec),
+    );
+  });
+  afterEach(() => {
+    mock.restoreAll();
+  });
+
+  it('a background pull with a bound credential: R1 carries none, the pull carries it in its body alone, the record and the stored answer hold no canary', async () => {
+    const runs = new RecordingRuns();
+    // SAP echoes the canaries in the pull's object results (msgText).
+    sap.body(isPull, objectResults);
+    const s = await stdio(
+      sap,
+      runs,
+      parseApprovedEndpoints(
+        [{ url: REPO_URL, user: CANARIES.user, token: CANARIES.token }],
+        'the test',
+      ),
+      RFC_DESTINATIONS,
+    );
+    try {
+      const started = await s.call('PullAbapGitRepo', {
+        repository_key: REPO_KEY,
+        background: true,
+      });
+      assert.equal(started.isError, false, started.text);
+      const handle = handleOf(started.text);
+      let answer = await s.call('GetBackgroundRun', { run_handle: handle });
+      for (let i = 0; i < 200 && answer.all.includes('"running"'); i += 1) {
+        await new Promise((resolve) => setImmediate(resolve));
+        answer = await s.call('GetBackgroundRun', { run_handle: handle });
+      }
+      assert.ok(answer.all.includes('"result":"done"'), answer.all);
+      // Everything went over RFC: every request the stand-in saw was a
+      // call carried on a conversation, each logged on over RFC.
+      assert.ok(rfc.logons.length > 0, 'logged on over RFC');
+      assert.deepEqual(
+        sap.requests.map((request) => request.url),
+        rfc.carried,
+      );
+      const r1 = sap.requests.filter(isR1);
+      assert.equal(r1.length, 1, 'exactly one R1');
+      for (const request of r1) {
+        assert.deepEqual(
+          Object.keys(request.headers).filter((name) =>
+            name.startsWith('x-abapgit-'),
+          ),
+          [],
+        );
+      }
+      // The credential reached SAP in the pull's body and nowhere else: not
+      // R1, not another request, not the pull's URL or headers, not a logon.
+      const pull = sap.requests.find(isPull);
+      assert.ok(pull !== undefined, 'the pull was sent');
+      const carrying = sap.requests.filter((request) =>
+        ALL_CANARIES.some((canary) => JSON.stringify(request).includes(canary)),
+      );
+      assert.deepEqual(carrying, [pull]);
+      assert.equal(pull.body.includes(CANARIES.user), true);
+      assert.deepEqual(
+        ALL_CANARIES.filter((canary) =>
+          (pull.url + JSON.stringify(pull.headers)).includes(canary),
+        ),
+        [],
+      );
+      assert.deepEqual(
+        ALL_CANARIES.filter((canary) =>
+          JSON.stringify(rfc.logons).includes(canary),
+        ),
+        [],
+      );
+      const kept =
+        JSON.stringify(runs.records) +
+        answer.all +
+        started.all +
+        wire.join('\n');
+      for (const canary of ALL_CANARIES) {
+        assert.equal(kept.includes(canary), false, canary);
+      }
     } finally {
       await s.close();
     }

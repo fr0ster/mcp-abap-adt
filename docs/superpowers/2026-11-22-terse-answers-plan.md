@@ -28,6 +28,10 @@ the same answer.
   - `raw`: the document as ADT sent it, for debugging.
 
   `terse`, `full` and `raw` keep their present meaning, so existing calls stay valid.
+- **A list at `terse` answers identifiers and a short description per row.** Details of one item
+  come from that item's own tool: a request's tasks from GetTransport, a task's objects from
+  GetTransport with the task number, an object's metadata from its Get tool. A list never carries
+  an item's details at `terse`.
 - **Never cut.** Every row is returned at every level. Examples:
   - a request list gives number, owner and description, even at `terse`;
   - a task's contents are its object list.

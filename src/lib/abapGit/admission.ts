@@ -444,6 +444,9 @@ function logLinkOfRepository(
   }
 }
 
+/** A connection's session type, as its contract declares it. */
+type SessionType = Parameters<IAbapConnection['setSessionType']>[0];
+
 /**
  * The instance's connection, keeping the answer of the request it forwards
  * last: the R1 pre-read's, read for the entry's links. Nothing else is
@@ -461,7 +464,7 @@ class AnswerKeepingConnection implements IAbapConnection {
   getSessionId(): string | null {
     return this.connection.getSessionId();
   }
-  setSessionType(type: 'stateful' | 'stateless'): void {
+  setSessionType(type: SessionType): void {
     this.connection.setSessionType(type);
   }
   async makeAdtRequest(

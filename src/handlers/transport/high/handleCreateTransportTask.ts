@@ -35,7 +35,10 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  transportCreated,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
@@ -62,7 +65,6 @@ import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import type { XmlNode } from '../../../lib/xml/node';
-import { child, childAt, type XmlRead } from '../../../lib/xml/tree';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 const TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -104,17 +106,18 @@ export const TOOL_DEFINITION = {
 type CreateTransportTaskArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
- * The task number, read out of the parsed answer. It arrives the way a created
- * request's does — on the root rather than on a `tm:request` child, which is
- * the shape `parseCreatedTransport` learned in adt-clients 20.0.0. The root's
- * own number is read even when a `tm:request` child names the parent:
- * adt-strategies' `transportCreated` prefers that child, and the type change
- * after the create would then go to the parent request.
+ * The task number, as adt-strategies reads the create's answer
+ * (`transportCreated`: the root's own number since 0.28.0, a `tm:request`
+ * beside it the parent); `''` when the answer names none — the answer then
+ * says no task number came back.
  */
-const taskNumberOf = (value: XmlRead): string => {
-  const root = child(value, 'tm:root') ?? value;
-  return String(childAt(root, '@', 'tm:number') ?? '');
-};
+function taskNumberOf(answer: IAdtWireResponse): string {
+  try {
+    return transportCreated(answer).transportNumber;
+  } catch {
+    return '';
+  }
+}
 
 /**
  * What a task create's reading holds at every level: the task number (the
@@ -137,7 +140,7 @@ function createdTaskAt<A>(
   return (answer) => {
     const raw = rawOf(answer);
     const parsed = parseStructure(raw);
-    const number = taskNumberOf(parsed);
+    const number = taskNumberOf(answer);
     return {
       value: { number, answer: shown(number, parsed, raw) },
       raw,

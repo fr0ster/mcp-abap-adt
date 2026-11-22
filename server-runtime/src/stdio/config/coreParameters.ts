@@ -39,6 +39,10 @@ import {
 } from '@mcp-abap-adt/lib/config';
 import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { SYSTEM_TYPE_ROW, SYSTEM_TYPES } from '@mcp-abap-adt/responsible-rules';
+import {
+  STDIO_MESSAGE_LIMIT,
+  STDIO_READ_MARGIN,
+} from '../boundedStdioTransport';
 import { resolveEnvFilePath } from './envResolver';
 
 const DESTINATION = 'DESTINATION AND LOGIN';
@@ -277,6 +281,48 @@ export const LOGIN_TIMEOUT_ROW: Parameter = {
 };
 
 /**
+ * `--stdio-message-limit`'s value: a whole number of bytes above the pipe-read
+ * margin (`STDIO_READ_MARGIN`), read by plain code — digits only, as a string
+ * or a YAML number.
+ */
+export function parseStdioMessageLimit(
+  raw: ConfiguredValue,
+  name: string,
+): number {
+  const text = typeof raw === 'string' ? raw.trim() : String(raw);
+  const value =
+    typeof raw === 'number'
+      ? raw
+      : isDigits(text)
+        ? Number.parseInt(text, 10)
+        : Number.NaN;
+  if (!Number.isSafeInteger(value) || value <= STDIO_READ_MARGIN) {
+    throw new ParameterRefusal(
+      `Invalid ${name}: "${text}". Must be a whole number of bytes above ${STDIO_READ_MARGIN}`,
+    );
+  }
+  return value;
+}
+
+/**
+ * `--stdio-message-limit` / `MCP_STDIO_MESSAGE_LIMIT` / `stdio-message-limit`:
+ * the most bytes the stdio client buffers. Absent: the MCP SDK client's
+ * default read buffer (`STDIO_DEFAULT_MAX_BUFFER_SIZE`, 10 MiB). The server
+ * writes no frame longer than this less one pipe read.
+ */
+export const STDIO_MESSAGE_LIMIT_ROW: Parameter = {
+  key: 'stdioMessageLimit',
+  cli: '--stdio-message-limit',
+  env: 'MCP_STDIO_MESSAGE_LIMIT',
+  yaml: 'stdio-message-limit',
+  kind: 'custom',
+  parse: parseStdioMessageLimit,
+  valueHint: '=<bytes>',
+  section: 'OPTIONS',
+  help: `The most bytes the MCP client buffers for one stdio message. Default: ${STDIO_MESSAGE_LIMIT}, the MCP SDK client's default read buffer. The server writes no message longer than this less ${STDIO_READ_MARGIN} bytes (one pipe read); a longer answer is answered an error naming both sizes. A whole number of bytes above ${STDIO_READ_MARGIN}`,
+};
+
+/**
  * `--auth-debug` / `auth-debug`: the token providers' debug line names
  * a refused request's secrets by their first and last four characters. The
  * command line and the configuration file only — no environment variable
@@ -365,6 +411,7 @@ export function coreParameters(
       ENABLE_DATA_TOOLS_ROW,
       SESSION_KEEP_ALIVE_ROW,
       SHUTDOWN_TIMEOUT_ROW,
+      STDIO_MESSAGE_LIMIT_ROW,
       ...ACCESS_RESTRICTION_ROWS,
     ],
     removed: [
@@ -438,6 +485,11 @@ export interface CoreConfig extends Omit<IServerConfig, 'stateIdleMinutes'> {
   browserAuthPort?: number | undefined;
   /** `--login-timeout` in seconds: the bound on each login; absent: none. */
   loginTimeout?: number | undefined;
+  /**
+   * `--stdio-message-limit` in bytes: what the stdio client buffers at most;
+   * absent: the MCP SDK client's default.
+   */
+  stdioMessageLimit?: number | undefined;
   /**
    * The form `loginTimeout` came from: `--login-timeout`,
    * `MCP_LOGIN_TIMEOUT`, or `login-timeout (config file)`.
@@ -554,6 +606,7 @@ export function readCoreConfig(
     sessionKeepAliveMinutes: numberValue(values.sessionKeepAliveMinutes),
     accessRestrictions: readAccessRestrictions(argv, env, yaml),
     shutdownTimeout: numberValue(values.shutdownTimeout),
+    stdioMessageLimit: numberValue(values.stdioMessageLimit),
     mcpDestination,
     envDestination,
     envPath,

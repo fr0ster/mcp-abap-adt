@@ -41,58 +41,50 @@ const context = { connection: {} as any, logger: undefined };
 const body = (result: any) => JSON.parse(result.content[0].text);
 
 describe('ReadTransportObjects', () => {
-  /**
-   * A task document as `structured` parses one: entries under a task, with
-   * their attributes under `@`. Shaped after the `removeobject` echo, the one
-   * document of this media type captured whole.
-   */
-  const document = {
-    'tm:root': {
-      '@': { 'tm:number': 'SIDK905942' },
-      'tm:request': {
-        'tm:task': {
-          '@': { 'tm:number': 'SIDK905943' },
-          'tm:abap_object': [
-            {
-              '@': {
-                'tm:pgmid': 'R3TR',
-                'tm:type': 'FUGR',
-                'tm:name': 'ZMCP_BLD_FGR_H1',
-                'tm:obj_desc': 'Function Group',
-                'tm:position': '000025',
-                'tm:lock_status': '',
-              },
-            },
-            {
-              '@': {
-                'tm:pgmid': 'R3TR',
-                'tm:type': 'CLAS',
-                'tm:name': 'ZCL_X',
-                'tm:position': '000026',
-              },
-            },
-          ],
-        },
+  const xml = (inner: string) =>
+    `<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">${inner}</tm:root>`;
+  const object = (type: string, name: string, position?: string) =>
+    `<tm:abap_object tm:pgmid="R3TR" tm:type="${type}" tm:name="${name}"${position === undefined ? '' : ` tm:position="${position}"`}/>`;
+  /** A fake whose readObjects reads `document` through the handler's set. */
+  const answering = (document: string, asked?: { number?: unknown }) =>
+    fakeClientThroughSet((set) => ({
+      readObjects: (number: unknown) => {
+        if (asked) asked.number = number;
+        return answerThrough(set, 'objects', document);
       },
-    },
-  };
+    }));
+
+  /**
+   * A request document as measured: each task's entries under
+   * `tm:request/tm:task`, and beside them `tm:all_objects`, the request's
+   * aggregate list — every object once more. Read whole, every object came
+   * twice (684 rows for 342 entries).
+   */
+  const REQUEST = xml(
+    '<tm:request tm:number="SIDK900100">' +
+      `<tm:all_objects>${object('PROG', 'ZP_ONE', '000001')}${object('CLAS', 'ZCL_TWO', '000002')}${object('PROG', 'ZP_THREE', '000003')}</tm:all_objects>` +
+      `<tm:task tm:number="SIDK900101">${object('PROG', 'ZP_ONE', '000001')}${object('CLAS', 'ZCL_TWO', '000002')}</tm:task>` +
+      `<tm:task tm:number="SIDK900102">${object('PROG', 'ZP_THREE', '000001')}</tm:task>` +
+      '</tm:request>',
+  );
 
   it('answers the entries with the positions a removal needs', async () => {
-    let asked: unknown;
-    fakeClient = fakeClientOf({
-      readObjects: (number: unknown) => {
-        asked = number;
-        return okResponse(reading(document as never));
-      },
-    });
+    const asked: { number?: unknown } = {};
+    fakeClient = answering(
+      xml(
+        `<tm:task tm:number="SIDK905943">${object('FUGR', 'ZMCP_BLD_FGR_H1', '000025')}${object('CLAS', 'ZCL_X', '000026')}</tm:task>`,
+      ),
+      asked,
+    );
 
-    const result = await handleReadTransportObjects(context as any, {
-      transport_number: 'SIDK905943',
-      detail: 'medium',
-    });
+    const answered = body(
+      await handleReadTransportObjects(context as any, {
+        transport_number: 'SIDK905943',
+        detail: 'medium',
+      }),
+    );
 
-    assert.equal(asked, 'SIDK905943');
-    const answered = body(result);
+    assert.equal(asked.number, 'SIDK905943');
     assert.equal(answered.count, 2);
     assertMatchObject(answered.objects[0], {
       pgmid: 'R3TR',
@@ -102,47 +94,8 @@ describe('ReadTransportObjects', () => {
     });
   });
 
-  const object = (type: string, name: string, position: string) => ({
-    '@': {
-      'tm:pgmid': 'R3TR',
-      'tm:type': type,
-      'tm:name': name,
-      'tm:position': position,
-    },
-  });
-
-  /**
-   * A request document as measured: each task's entries under
-   * `tm:request/tm:task`, and beside them `tm:all_objects`, the request's
-   * aggregate list — every object once more. Read whole, every object came
-   * twice (684 rows for 342 entries).
-   */
   it('terse, by default: the entries under their task and pgmid, type, name and position', async () => {
-    fakeClient = fakeClientOf({
-      readObjects: () =>
-        okResponse(
-          reading({
-            'tm:root': {
-              'tm:request': {
-                '@': { 'tm:number': 'SIDK900100' },
-                'tm:task': [
-                  {
-                    '@': { 'tm:number': 'SIDK900101' },
-                    'tm:abap_object': [
-                      object('PROG', 'ZP_ONE', '000001'),
-                      object('CLAS', 'ZCL_TWO', '000002'),
-                    ],
-                  },
-                  {
-                    '@': { 'tm:number': 'SIDK900102' },
-                    'tm:abap_object': object('PROG', 'ZP_THREE', '000001'),
-                  },
-                ],
-              },
-            },
-          } as never),
-        ),
-    });
+    fakeClient = answering(REQUEST);
 
     const result: any = await handleReadTransportObjects(context as any, {
       transport_number: 'SIDK900100',
@@ -166,38 +119,7 @@ describe('ReadTransportObjects', () => {
   });
 
   it("answers a request's task entries once each, with their task numbers", async () => {
-    fakeClient = fakeClientOf({
-      readObjects: () =>
-        okResponse(
-          reading({
-            'tm:root': {
-              'tm:request': {
-                '@': { 'tm:number': 'SIDK900100' },
-                'tm:all_objects': {
-                  'tm:abap_object': [
-                    object('PROG', 'ZP_ONE', '000001'),
-                    object('CLAS', 'ZCL_TWO', '000002'),
-                    object('PROG', 'ZP_THREE', '000003'),
-                  ],
-                },
-                'tm:task': [
-                  {
-                    '@': { 'tm:number': 'SIDK900101' },
-                    'tm:abap_object': [
-                      object('PROG', 'ZP_ONE', '000001'),
-                      object('CLAS', 'ZCL_TWO', '000002'),
-                    ],
-                  },
-                  {
-                    '@': { 'tm:number': 'SIDK900102' },
-                    'tm:abap_object': object('PROG', 'ZP_THREE', '000001'),
-                  },
-                ],
-              },
-            },
-          } as never),
-        ),
-    });
+    fakeClient = answering(REQUEST);
 
     const answered = body(
       await handleReadTransportObjects(context as any, {
@@ -217,40 +139,6 @@ describe('ReadTransportObjects', () => {
     );
   });
 
-  /** A task document as measured: its entries under `tm:root/tm:task`. */
-  it('answers a task document as before: its own entries, once each', async () => {
-    fakeClient = fakeClientOf({
-      readObjects: () =>
-        okResponse(
-          reading({
-            'tm:root': {
-              'tm:request': { '@': { 'tm:number': 'SIDK900100' } },
-              'tm:task': {
-                '@': { 'tm:number': 'SIDK900101' },
-                'tm:abap_object': [
-                  object('PROG', 'ZP_ONE', '000001'),
-                  object('CLAS', 'ZCL_TWO', '000002'),
-                ],
-              },
-            },
-          } as never),
-        ),
-    });
-
-    const answered = body(
-      await handleReadTransportObjects(context as any, {
-        transport_number: 'SIDK900101',
-        detail: 'medium',
-      }),
-    );
-
-    assert.equal(answered.count, 2);
-    assert.deepStrictEqual(answered.objects, [
-      { pgmid: 'R3TR', type: 'PROG', name: 'ZP_ONE', position: '000001' },
-      { pgmid: 'R3TR', type: 'CLAS', name: 'ZCL_TWO', position: '000002' },
-    ]);
-  });
-
   /**
    * An entry the server described without a position cannot be removed, and
    * the tool must not invent one: `''` satisfies the member's required
@@ -258,22 +146,11 @@ describe('ReadTransportObjects', () => {
    * the defect these tools exist to end.
    */
   it('answers null for a position the server did not send', async () => {
-    fakeClient = fakeClientOf({
-      readObjects: () =>
-        okResponse(
-          reading({
-            'tm:root': {
-              'tm:abap_object': {
-                '@': {
-                  'tm:pgmid': 'R3TR',
-                  'tm:type': 'CLAS',
-                  'tm:name': 'ZCL_NO_POS',
-                },
-              },
-            },
-          } as never),
-        ),
-    });
+    fakeClient = answering(
+      xml(
+        `<tm:task tm:number="SIDK905943">${object('CLAS', 'ZCL_NO_POS')}</tm:task>`,
+      ),
+    );
 
     const result = await handleReadTransportObjects(context as any, {
       transport_number: 'SIDK905943',

@@ -44,6 +44,13 @@ export type ServerRefusalCode =
   | 'connection_provider_failed'
   | 'no_connection'
   | 'abapgit_not_served'
+  | 'abapgit_import_not_allowed'
+  | 'abapgit_background_not_declared'
+  | 'abapgit_package_required'
+  | 'abapgit_repository_unknown'
+  | 'abapgit_run_log_not_paired'
+  | 'abapgit_url_refused'
+  | 'abapgit_endpoint_refused'
   | AccessRefusalCode;
 
 /**
@@ -62,6 +69,34 @@ export type AccessRefusalCode =
  */
 export const ABAPGIT_NOT_SERVED_WORDS =
   'abapGit is not served by this system: its discovery does not list it, or could not be read; nothing was sent';
+
+/** Link or pull while an allowed-packages or allowed-requests entry is configured (spec §4.3). */
+export const ABAPGIT_IMPORT_NOT_ALLOWED_WORDS =
+  'linking or pulling a repository writes objects that the allowed packages and requests cannot bound, so it is refused while access restrictions are configured';
+
+/** `background` on an abapGit call whose schema does not declare it (spec §4.6). */
+export const ABAPGIT_BACKGROUND_NOT_DECLARED_WORDS =
+  'background is taken only by an on-premise link, pull or push of a repository; this call does not take it, and nothing was sent';
+
+/** A blank `package_name` on link or branch info (spec §4.4). */
+export const ABAPGIT_PACKAGE_REQUIRED_WORDS =
+  'package_name is required and may not be blank to link a repository or read its branch; nothing was sent';
+
+/** A key the repository list does not show with a package and a URL, or an unreadable list (spec §4.4). */
+export const ABAPGIT_REPOSITORY_UNKNOWN_WORDS =
+  'the repository list does not show repository_key with its package and URL, or could not be read, so the call is not checked; nothing but the list was sent';
+
+/** A run-log key the repository list does not show for that repository (spec §4.1). */
+export const ABAPGIT_RUN_LOG_NOT_PAIRED_WORDS =
+  'app_log_key is not the run log the repository list shows for repository_key; nothing but the list was sent';
+
+/** A `url` argument carrying userinfo, a query or a fragment (spec §5.1). */
+export const ABAPGIT_URL_REFUSED_WORDS =
+  'url carries a user or a password, a query or a fragment: give the remote URL alone — the credential comes from the approved endpoints; nothing was sent';
+
+/** A request whose `x-abapgit-*` headers state no endpoint that can be one (spec §5.2). */
+export const ABAPGIT_ENDPOINT_REFUSED_WORDS =
+  'the x-abapgit-remote, x-abapgit-user and x-abapgit-token headers state no approved endpoint: an https URL without a user, a password, a query or a fragment, with a user and a token; nothing was sent';
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -384,6 +419,13 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,
   connection_provider_failed: CONNECTION_PROVIDER_FAILED_WORDS,
   abapgit_not_served: ABAPGIT_NOT_SERVED_WORDS,
+  abapgit_import_not_allowed: ABAPGIT_IMPORT_NOT_ALLOWED_WORDS,
+  abapgit_background_not_declared: ABAPGIT_BACKGROUND_NOT_DECLARED_WORDS,
+  abapgit_package_required: ABAPGIT_PACKAGE_REQUIRED_WORDS,
+  abapgit_repository_unknown: ABAPGIT_REPOSITORY_UNKNOWN_WORDS,
+  abapgit_run_log_not_paired: ABAPGIT_RUN_LOG_NOT_PAIRED_WORDS,
+  abapgit_url_refused: ABAPGIT_URL_REFUSED_WORDS,
+  abapgit_endpoint_refused: ABAPGIT_ENDPOINT_REFUSED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

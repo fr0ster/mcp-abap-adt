@@ -108,7 +108,10 @@ async function entriesOn(
 ): Promise<Array<{ type: string; position: string; pgmid: string }>> {
   const read = succeeded(
     `ReadTransportObjects ${task}`,
-    await livePrepare('ReadTransportObjects', { transport_number: task }),
+    await livePrepare('ReadTransportObjects', {
+      transport_number: task,
+      detail: 'medium',
+    }),
   );
   const objects = member(payloadOf(read), 'objects');
   return (Array.isArray(objects) ? objects : []).flatMap((object) => {
@@ -260,7 +263,7 @@ liveSuite(['onprem', 'cloud'], 'Compact transports', () => {
   });
 
   it("ListTransports lists the session user's modifiable requests, the one just created among them", async () => {
-    const answered = await liveCall('ListTransports', {});
+    const answered = await liveCall('ListTransports', { detail: 'medium' });
     const listed = payloadOf(succeeded('ListTransports', answered));
     assert.equal(member(listed, 'success'), true);
     const transports = member(listed, 'transports');

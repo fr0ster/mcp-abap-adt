@@ -858,8 +858,11 @@ const entryText = (held: HeldEntry): string =>
 
 /** The entries a request (or task) holds, with their task and position. */
 async function transportObjects(transportNumber: string): Promise<HeldEntry[]> {
+  // The entries as JSON, each with its task and position: detail medium
+  // (terse answers TSV).
   const answer = await send('ReadTransportObjects', {
     transport_number: transportNumber,
+    detail: 'medium',
   });
   if (answer.isError) {
     throw new Error(`ReadTransportObjects ${transportNumber}: ${answer.text}`);
@@ -1025,9 +1028,11 @@ export interface TaskCreatePlan {
 
 /** The test user's modifiable requests: number → description. */
 async function modifiableRequests(): Promise<Map<string, string>> {
+  // The requests as JSON: detail medium (terse answers TSV).
   const answer = await send('ListTransports', {
     user: current().user,
     modifiable_only: true,
+    detail: 'medium',
   });
   if (answer.isError) throw new Error(`ListTransports: ${answer.text}`);
   const listed = member(jsonOf(answer), 'transports');

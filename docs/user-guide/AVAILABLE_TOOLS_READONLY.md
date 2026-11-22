@@ -954,7 +954,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimelistsystemmessages-read-only-system"></a>
 #### RuntimeListSystemMessages (Read-Only / System)
-**Description:** [read-only] [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.
+**Description:** [read-only] [runtime] List SM02 system messages. Returns each message as SAP writes it: id, messageId, title, text, createdOn, updated, createdBy and author.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
@@ -968,14 +968,17 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="runtimegetgatewayerrorlog-read-only-system"></a>
 #### RuntimeGetGatewayErrorLog (Read-Only / System)
-**Description:** [read-only] [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.
+**Description:** [read-only] [runtime] Lists the SAP Gateway error log (/IWFND/ERROR_LOG), or reads one error's detail. The list answers each error's opid and detail_kind (what its detail is read by), dateTime, type, shortText and username: by default as TSV rows; with detail medium or full every field (id, kind, transactionId, package, applicationComponent, userId, client, requestKind, detailUri). With opid and detail_kind, the error's detail: header, serviceInfo, errorContext, sourceCode and callStack.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
 **Parameters:**
-- `error_url` (string, optional) - Feed URL of a specific error entry (from a previous list response link field). When provided, returns detailed error info instead of listing.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail_kind` (string, optional) - The error's detail_kind, from the list: the kind its detail is read under. Required with opid.
+- `error_url` (string, optional) - An error's detailUri, from the list at detail medium or full: answers that error's detail instead of the list.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Maximum number of errors to return.
+- `opid` (string, optional) - An error's opid, from the list: with detail_kind, answers that error's detail instead of the list.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
 - `user` (string, optional) - Filter errors by SAP username.
 

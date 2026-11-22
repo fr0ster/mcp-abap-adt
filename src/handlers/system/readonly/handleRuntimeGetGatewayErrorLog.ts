@@ -81,7 +81,6 @@ export async function handleRuntimeGetGatewayErrorLog(
   // `IGatewayErrorEntry[]` and `IGatewayErrorDetail` are two different `T`s
   // for the same generic `answer<T>`, and `IGatewayErrorDetail` is not
   // exported by name from `@mcp-abap-adt/adt-clients` to write a union with.
-  const ctx = { tool: 'RuntimeGetGatewayErrorLog', detail: detailOf(args) };
   const shown = answerAt(GATEWAY_ERROR_ANSWERS, levelOf(args));
 
   const detailUri =
@@ -95,14 +94,14 @@ export async function handleRuntimeGetGatewayErrorLog(
   }
   if (detailUri !== undefined) {
     return answer(
-      ctx,
+      { tool: 'RuntimeGetGatewayErrorLog', detail: detailOf(args) },
       () => feeds.gatewayErrorDetail(detailUri, { analyse: analyseException }),
       (error) => ({ success: true, mode: 'detail', error }),
     );
   }
 
   return answer(
-    ctx,
+    { tool: 'RuntimeGetGatewayErrorLog', detail: detailOf(args) },
     () =>
       feeds.gatewayErrors({
         analyse: analyseException,

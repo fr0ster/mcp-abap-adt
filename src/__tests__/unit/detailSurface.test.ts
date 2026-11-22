@@ -257,6 +257,7 @@ const JSON_ANSWERING: readonly string[] = [
   'RunFunctionModuleUnitTest',
   'RunProgramUnitTest',
   'RunUnitTest',
+  'RuntimeGetGatewayErrorLog',
   'RuntimeListProfilerTraceFiles',
   'SearchObject',
   'SearchSource',

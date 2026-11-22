@@ -407,6 +407,7 @@ for (const [fixture, declaring] of [
   ['declares-no-answer-call', ['FixtureDeclaresNoAnswerCall']],
   ['declares-debug-fixed-level', ['FixtureDebugFixedLevel']],
   ['declares-reading-at-fixed-level', ['FixtureReadingAtFixedLevel']],
+  ['declares-uncalled-selector', ['FixtureUncalledSelector']],
   ['undeclared-debug-reads-args', []],
 ] as const) {
   it(format('reports %s rather than skipping it', fixture), () => {

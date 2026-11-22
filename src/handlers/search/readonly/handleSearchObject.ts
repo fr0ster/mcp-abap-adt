@@ -5,7 +5,6 @@ import { answer } from '../../../lib/answer';
 import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import {
   answered,
-  type DetailLevel,
   type DetailTable,
   formatted,
   fullLevel,
@@ -179,6 +178,11 @@ const SEARCH_READINGS: DetailTable<XmlNode | string> = {
   raw: rawLevel,
 };
 
+/** The utilities' result set a search is given: its `search` reading selected per level. */
+type SearchResults = typeof ourUtils & {
+  search: ReturnType<typeof readingAt<XmlNode | string>>;
+};
+
 /**
  * The search `served`'s variant sends for `query`: its filter the search name
  * `objectType` is or stands for on that variant (`searchNameOf`), read once
@@ -189,9 +193,8 @@ function searchOn(
   query: string,
   maxResults: number,
   objectType: string | undefined,
-  detail: DetailLevel,
+  results: SearchResults,
 ) {
-  const results = { ...ourUtils, search: readingAt(SEARCH_READINGS, detail) };
   if (served.variant === 'onprem') {
     const name =
       objectType === undefined ? undefined : searchNameOf('onprem', objectType);
@@ -234,12 +237,17 @@ export async function handleSearchObject(
 
   const served = adtClientOf(connection, logger);
   const detail = detailOf(args);
+  // The reading the search is given, selected by the level asked for.
+  const results: SearchResults = {
+    ...ourUtils,
+    search: readingAt(SEARCH_READINGS, levelOf(args)),
+  };
   const search = searchOn(
     served,
     object_name,
     maxResults || 100,
     object_type || undefined,
-    levelOf(args),
+    results,
   );
   if (typeof search === 'string') return return_error(search);
 

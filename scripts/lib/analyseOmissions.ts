@@ -548,7 +548,7 @@ export function detailWiring(
       // alone caught the one corpus defect this migration had only because
       // BOTH of its sites happened to be hardcoded together.
       const projection = call.arguments[2];
-      const projectionResult = selectsReadingByLevel(source)
+      const projectionResult = selectsReadingByLevel(call)
         ? 'dynamic'
         : classifyProjection(projection, bindingSymbol, checker);
       if (projectionResult === 'literal' && declares) {
@@ -618,14 +618,30 @@ export function toolNameOf(source: ts.SourceFile): string | undefined {
 
 /** Is this expression a call to `detailOf(...)`? */
 /**
- * Whether the handler selects a reading by the level asked for — a
- * `readingAt(<table>, levelOf(…))` call (`src/lib/detail`): the reading the
- * adt-clients call is given then decides the answer, so the projection is
- * the reading's value and need not name the level itself — or, where the
- * answer is built from several requests, its formatter: `answerAt(<table>,
- * levelOf(…))`.
+ * Whether the request an `answer()` call answers is given a reading selected
+ * by the level asked for — a `readingAt(<table>, levelOf(…))` call
+ * (`src/lib/detail`): the reading the adt-clients call is given then decides
+ * the answer, so the projection is the reading's value and need not name the
+ * level itself — or, where the answer is built from several requests, its
+ * formatter: `answerAt(<table>, levelOf(…))`.
+ *
+ * The selector must sit in the function that makes this `answer()` call
+ * (its body, closures within it included), so it is the one that call's
+ * request is given: a selector elsewhere in the file — an uncalled function,
+ * another tool's path — does not excuse a request read at a fixed level.
  */
-function selectsReadingByLevel(source: ts.SourceFile): boolean {
+function selectsReadingByLevel(call: ts.CallExpression): boolean {
+  let scope: ts.Node | undefined = call.parent;
+  while (
+    scope !== undefined &&
+    !ts.isFunctionDeclaration(scope) &&
+    !ts.isFunctionExpression(scope) &&
+    !ts.isArrowFunction(scope) &&
+    !ts.isMethodDeclaration(scope)
+  ) {
+    scope = scope.parent;
+  }
+  if (scope === undefined) return false;
   let found = false;
   const visit = (node: ts.Node): void => {
     if (found) return;
@@ -646,7 +662,7 @@ function selectsReadingByLevel(source: ts.SourceFile): boolean {
     }
     ts.forEachChild(node, visit);
   };
-  visit(source);
+  visit(scope);
   return found;
 }
 

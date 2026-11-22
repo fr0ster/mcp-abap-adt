@@ -46,7 +46,7 @@ const groups = {
   runtime: new RuntimeRunHandlersGroup(ctx),
   search: new SearchHandlersGroup(ctx),
   debug: new DebugHandlersGroup(ctx),
-  // abapGit: listed where the system's discovery serves it.
+  // abapGit: always listed; served where the system's discovery lists it, decided at call time.
   abapgit: new AbapGitHandlersGroup(ctx),
 };
 

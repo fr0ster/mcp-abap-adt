@@ -228,7 +228,7 @@ function page(entries, surfaces) {
             : half === 'batch'
               ? '**Half:** batch mode of `@mcp-abap-adt/lib`, in every compact binary\n\n'
               : half === 'abapgit'
-                ? "**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), listed where the system's discovery serves abapGit\n\n"
+                ? '**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), always listed; a call on a system whose discovery does not list abapGit is refused `abapgit_not_served`\n\n'
                 : half === 'readonly'
                   ? '**Half:** `@mcp-abap-adt/compact-readonly-entries`\n\n'
                   : half === 'data'

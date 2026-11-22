@@ -361,7 +361,7 @@ export const fullToolSet: ToolSet = {
     // The debugger batch beside the debugger; batch mode is the compact
     // sets' (HandlerBatch).
     new DebugBatchHandlersGroup(context),
-    // abapGit, listed where the system's discovery serves it.
+    // abapGit, always listed; served where the system's discovery lists it, decided at call time.
     new AbapGitHandlersGroup(context),
     // The long session, on Streamable HTTP alone.
     ...(servesLongSession(transport)
@@ -410,7 +410,7 @@ export const fullReadOnlyToolSet: ToolSet = {
     // The data tools, opt-in.
     ...(served.dataTools ? [new DataHandlersGroup(context)] : []),
     new SearchHandlersGroup(context),
-    // abapGit's reads, listed where the system's discovery serves it.
+    // abapGit's reads, always listed; served where the system's discovery lists it, decided at call time.
     new AbapGitHandlersGroup(context, 'reads'),
     // The background runs of the long reads: read, listed and cancelled.
     new BackgroundRunHandlersGroup(context),
@@ -489,7 +489,7 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
       ]),
       new CompactDebugHandlersGroup(context),
       new CompactDebugBatchHandlersGroup(context),
-      // abapGit, listed where the system's discovery serves it.
+      // abapGit, always listed; served where the system's discovery lists it, decided at call time.
       new CompactAbapGitHandlersGroup(context),
       // Beside the run tool (HandlerProfileRun): its background runs, read,
       // listed and discarded.
@@ -544,7 +544,7 @@ export function compactReadOnlyToolSetOf(half: CompactReadOnlyHalf): ToolSet {
         [half.readOnly, ...(served.dataTools ? [half.data] : [])],
         'CompactReadOnlyHandlers',
       ),
-      // abapGit's reads, listed where the system's discovery serves it.
+      // abapGit's reads, always listed; served where the system's discovery lists it, decided at call time.
       new CompactAbapGitHandlersGroup(context, 'reads'),
       // The background runs of the long reads: read, listed and cancelled.
       new CompactBackgroundRunHandlersGroup(context),

@@ -794,7 +794,7 @@ per request.
 
 ### HandlerAbapGitGet
 
-**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), listed where the system's discovery serves abapGit
+**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), always listed; a call on a system whose discovery does not list abapGit is refused `abapgit_not_served`
 
 **Description:** [read-only] Reads abapGit repositories, one read per action: repos(package_name, repository_key, detail) the linked repositories: key, package, branch, remote URL and on cloud the run state (status, status text, run log key); external_repo(url*, detail) the access mode and the branches of the remote repository at url; staging(repository_key*, detail) the unstaged, staged and ignored objects with their files, and the proposed author and committer; checks(repository_key*) SAP's status of the connection to the remote; a refusal with SAP's message key and on cloud the git host's HTTP status; file(repository_key*, filename*, version*) the text of one file, local or remote. Answers facts only. Each argument is described with the actions that take it.
 
@@ -812,7 +812,7 @@ per request.
 
 ### HandlerAbapGit
 
-**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), listed where the system's discovery serves abapGit
+**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), always listed; a call on a system whose discovery does not list abapGit is refused `abapgit_not_served`
 
 **Description:** Changes abapGit repositories and their remotes, one write per action: link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch; unlink(repository_key*) ends the repository's binding to its package; the objects stay; pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job and its objects are inactive; push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job; switch_branch(repository_key*, branch*, create*) switches the branch, creating it in the remote with create true. Answers facts only. Each argument is described with the actions that take it.
 

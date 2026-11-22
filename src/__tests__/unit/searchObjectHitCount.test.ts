@@ -58,11 +58,11 @@ describe('SearchObject answers every hit', () => {
   }
 
   it('the mask and maxResults go on the wire as given', async () => {
-    const { requests } = await searchAnswering(1, 100);
+    const { requests } = await searchAnswering(1, 37);
     assert.equal(requests.length, 1);
     const url = new URL(requests[0]?.url ?? '', 'https://system.invalid');
     assert.equal(url.searchParams.get('operation'), 'quickSearch');
     assert.equal(url.searchParams.get('query'), 'ZCL_HIT*');
-    assert.equal(url.searchParams.get('maxResults'), '100');
+    assert.equal(url.searchParams.get('maxResults'), '37');
   });
 });

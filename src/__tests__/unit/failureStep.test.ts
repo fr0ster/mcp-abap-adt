@@ -622,6 +622,21 @@ describe('GetStructuresList: an append candidate SAP refused to read is listed',
     );
   });
 
+  it('terse names each candidate SAP refused to read', async () => {
+    fakeClient = clientWith({
+      ZREFUSED: () => forbidden(),
+      ZAPP: () => okResponse('extend type zs with zapp { }'),
+    });
+    const result: any = await handleGetStructuresListOf(context as any, {
+      structure_name: 'ZS',
+    });
+    const lines = result.content[0].text.split('\n');
+    assert.ok(
+      lines.includes('# append_candidate_unread ZREFUSED'),
+      lines.join('\n'),
+    );
+  });
+
   it('lists nothing when every candidate is absent', async () => {
     fakeClient = clientWith({});
     const result: any = await handleGetStructuresList(context as any, {

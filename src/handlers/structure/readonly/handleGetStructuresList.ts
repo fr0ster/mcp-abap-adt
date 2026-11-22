@@ -310,7 +310,8 @@ function fullStructures(read: StructuresRead): string {
  * What GetStructuresList answers of one structure at each `detail`,
  * selected before the reads (`src/lib/detail`): terse the tree as indented
  * `structure\tkind\tattribute` rows (a node not read or cyclic marked), with
- * `# appends_unavailable` when where-used failed; medium and full the answer
+ * `# appends_unavailable` when where-used failed and a
+ * `# append_candidate_unread NAME` line per candidate SAP refused to read; medium and full the answer
  * before `detail`. A tree reads many documents, so raw is the full answer.
  */
 const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
@@ -318,9 +319,10 @@ const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
     [
       `# structure ${read.structure_name}`,
       ...(read.appends_unavailable ? ['# appends_unavailable'] : []),
-      ...(read.append_candidates_unread.length > 0
-        ? [`# append_candidates_unread ${read.append_candidates_unread.length}`]
-        : []),
+      // Each candidate SAP refused to read, by name: the one to read again.
+      ...read.append_candidates_unread.map(
+        (unread) => `# append_candidate_unread ${unread.candidate}`,
+      ),
       indentedTsv(structureRows(read.tree)),
     ].join('\n'),
   medium: fullStructures,

@@ -1501,6 +1501,16 @@ create_transported_object:
   # the cloud package accepts (measured).
   target_system: "TARGET"                        # ← CHANGE: the package's transport target, no slashes
 
+# Read a Transport Request and Task (read only)
+# Read by coverage/transportTaskRead.live.test.ts (task_number): data, no
+# switch. GetTransport and HandlerGet TRANSPORT part metadata read this task
+# and its parent request (read from the task's answer). Nothing is created,
+# changed or released. onprem, cloud: needed (absent, the cases fail naming
+# this key) — any task of the system, with or without objects: read it from a
+# request of the session user (ListTransports, then GetTransport's tasks).
+read_transport:
+  task_number: "TASK"                            # ← CHANGE: a transport task of the system
+
 # Service Definition (Service Definition - High-Level)
 # Read by high/serviceDefinition/ServiceDefinitionHighHandlers.test.ts. Object
 # name and sources. onprem, cloud.

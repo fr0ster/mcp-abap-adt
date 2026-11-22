@@ -156,8 +156,6 @@ async function packageContentsLines(
               }
             : entry;
         }),
-        null,
-        2,
       )
     : contentsLines(parsed, max);
   return {

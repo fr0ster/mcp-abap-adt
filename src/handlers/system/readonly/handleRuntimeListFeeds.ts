@@ -666,7 +666,7 @@ function listAnswer(
   );
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(entries) }],
   };
 }
 

@@ -96,7 +96,7 @@ function keptLock(
   return {
     ...answered,
     content: [
-      { type: 'text', text: JSON.stringify(body, null, 2) },
+      { type: 'text', text: JSON.stringify(body) },
       ...(answered.content ?? []).slice(1),
     ],
   };

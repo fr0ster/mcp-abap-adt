@@ -99,17 +99,13 @@ export async function handleGetObjectDraft(
     ...draftOf(etags, now, rule),
   }));
   return return_response({
-    data: JSON.stringify(
-      {
-        object_type: type,
-        object_name: name,
-        has_draft: parts.some(
-          (part) => part.draft === 'own' || part.draft === 'other',
-        ),
-        parts,
-      },
-      null,
-      2,
-    ),
+    data: JSON.stringify({
+      object_type: type,
+      object_name: name,
+      has_draft: parts.some(
+        (part) => part.draft === 'own' || part.draft === 'other',
+      ),
+      parts,
+    }),
   });
 }

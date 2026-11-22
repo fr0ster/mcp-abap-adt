@@ -33,7 +33,7 @@ export async function handleDebugStop(
       endDebugBatchAnswers(context);
       return {
         value: { state: 'stopped', ...(notes.length ? { notes } : {}) },
-        raw: JSON.stringify(notes, null, 2),
+        raw: JSON.stringify(notes),
       };
     },
     (v) => v,

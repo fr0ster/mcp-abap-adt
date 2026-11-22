@@ -438,11 +438,7 @@ export async function handleGetPackageTree(
       if (!walked.ok) throw walked.error;
       logger?.debug(`Package tree fetched successfully for ${single}`);
       return return_response({
-        data: JSON.stringify(
-          treeOf(packageNames[0], walked.value, options),
-          null,
-          2,
-        ),
+        data: JSON.stringify(treeOf(packageNames[0], walked.value, options)),
       });
     }
 
@@ -473,7 +469,7 @@ export async function handleGetPackageTree(
           };
     });
     return return_response({
-      data: JSON.stringify(entries, null, 2),
+      data: JSON.stringify(entries),
     });
   } catch (error) {
     logger?.error('Failed to fetch package tree', error);

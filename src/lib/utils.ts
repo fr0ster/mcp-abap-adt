@@ -167,7 +167,7 @@ function _safeStringifyError(error: unknown): string {
       } else {
         try {
           // Try to stringify, but catch circular reference errors
-          safeError.responseData = JSON.stringify(error.response.data, null, 2);
+          safeError.responseData = JSON.stringify(error.response.data);
         } catch (_e) {
           safeError.responseData = String(error.response.data).substring(
             0,
@@ -178,7 +178,7 @@ function _safeStringifyError(error: unknown): string {
     }
 
     try {
-      return JSON.stringify(safeError, null, 2);
+      return JSON.stringify(safeError);
     } catch (_e) {
       return `AxiosError: ${error.message} (Status: ${error.response?.status})`;
     }
@@ -186,7 +186,7 @@ function _safeStringifyError(error: unknown): string {
     return error.message;
   } else {
     try {
-      return JSON.stringify(error, null, 2);
+      return JSON.stringify(error);
     } catch (_e) {
       return String(error);
     }
@@ -383,7 +383,7 @@ export function return_error(error: unknown): FailureAnswer {
   if (payload !== undefined) {
     return {
       isError: true,
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
     };
   }
 

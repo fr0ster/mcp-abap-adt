@@ -87,16 +87,12 @@ export async function handleGetObjectVersions(
     try {
       const versions = await readVersions(resolved);
       return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            object_type,
-            object_name: object_name.toUpperCase(),
-            versions,
-          },
-          null,
-          2,
-        ),
+        data: JSON.stringify({
+          success: true,
+          object_type,
+          object_name: object_name.toUpperCase(),
+          versions,
+        }),
       });
     } catch (error) {
       return return_error(asError(error));

@@ -216,16 +216,12 @@ function buildVersionsTool(
       try {
         const versions = await readVersions(resolved);
         return return_response({
-          data: JSON.stringify(
-            {
-              success: true,
-              object_type: row.object_type,
-              object_name: String(name).toUpperCase(),
-              versions,
-            },
-            null,
-            2,
-          ),
+          data: JSON.stringify({
+            success: true,
+            object_type: row.object_type,
+            object_name: String(name).toUpperCase(),
+            versions,
+          }),
         });
       } catch (error) {
         return return_error(asError(error));
@@ -275,7 +271,7 @@ function buildVersionSourceTool(
       try {
         const source = await readVersionSource(resolved, String(content_uri));
         return return_response({
-          data: JSON.stringify({ success: true, content_uri, source }, null, 2),
+          data: JSON.stringify({ success: true, content_uri, source }),
         });
       } catch (error) {
         return return_error(asError(error));
@@ -337,19 +333,15 @@ function buildVersionDiffTool(
           String(content_uri_to),
         );
         return return_response({
-          data: JSON.stringify(
-            {
-              success: true,
-              object_type: row.object_type,
-              content_uri_from,
-              content_uri_to,
-              identical,
-              diff,
-              ...(notes ? { notes } : {}),
-            },
-            null,
-            2,
-          ),
+          data: JSON.stringify({
+            success: true,
+            object_type: row.object_type,
+            content_uri_from,
+            content_uri_to,
+            identical,
+            diff,
+            ...(notes ? { notes } : {}),
+          }),
         });
       } catch (error) {
         return return_error(asError(error));

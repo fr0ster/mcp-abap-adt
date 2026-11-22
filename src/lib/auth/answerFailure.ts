@@ -39,9 +39,7 @@ export function failurePayload(read: ReadFailure): Record<string, string> {
 export function answerFailure(read: ReadFailure): FailureAnswer {
   return {
     isError: true,
-    content: [
-      { type: 'text', text: JSON.stringify(failurePayload(read), null, 2) },
-    ],
+    content: [{ type: 'text', text: JSON.stringify(failurePayload(read)) }],
   };
 }
 

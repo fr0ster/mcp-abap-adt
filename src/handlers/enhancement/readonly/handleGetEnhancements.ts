@@ -927,25 +927,21 @@ async function enhancementsOf(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                main_object: {
-                  name: objectName,
-                  type: mainEnhancementResponse.object_type,
-                },
-                include_nested: true,
-                // A refusal: the method's error as it is, with its step; a
-                // throw of our own `client_threw` with the step.
-                error: thrownEntry(error, 'list includes'),
-                partial_result: true,
-                total_objects_analyzed: 1,
-                total_enhancements_found:
-                  mainEnhancementResponse.enhancements.length,
-                objects: [mainEnhancementResponse],
+            text: JSON.stringify({
+              main_object: {
+                name: objectName,
+                type: mainEnhancementResponse.object_type,
               },
-              null,
-              2,
-            ),
+              include_nested: true,
+              // A refusal: the method's error as it is, with its step; a
+              // throw of our own `client_threw` with the step.
+              error: thrownEntry(error, 'list includes'),
+              partial_result: true,
+              total_objects_analyzed: 1,
+              total_enhancements_found:
+                mainEnhancementResponse.enhancements.length,
+              objects: [mainEnhancementResponse],
+            }),
           },
         ],
       };
@@ -1604,23 +1600,19 @@ function enhancementsAnswerFrom(
         content: [
           {
             type: 'text',
-            text: JSON.stringify(
-              {
-                main_object: {
-                  name: objectName,
-                  type: mainEnhancementResponse.object_type,
-                },
-                include_nested: true,
-                error: thrownEntry(error, 'list includes'),
-                partial_result: true,
-                total_objects_analyzed: 1,
-                total_enhancements_found:
-                  mainEnhancementResponse.enhancements.length,
-                objects: [mainEnhancementResponse],
+            text: JSON.stringify({
+              main_object: {
+                name: objectName,
+                type: mainEnhancementResponse.object_type,
               },
-              null,
-              2,
-            ),
+              include_nested: true,
+              error: thrownEntry(error, 'list includes'),
+              partial_result: true,
+              total_objects_analyzed: 1,
+              total_enhancements_found:
+                mainEnhancementResponse.enhancements.length,
+              objects: [mainEnhancementResponse],
+            }),
           },
         ],
       };

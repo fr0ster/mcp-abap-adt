@@ -11,7 +11,7 @@ const textBlocks: IAnswerSerializer<{ type: 'text'; text: string }> = {
   json<P>(value: P) {
     return {
       type: 'text',
-      text: typeof value === 'string' ? value : JSON.stringify(value, null, 2),
+      text: typeof value === 'string' ? value : JSON.stringify(value),
     };
   },
 };

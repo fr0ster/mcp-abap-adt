@@ -91,7 +91,7 @@ function text(value: string, isError = false): McpResult {
 /** A value as an answer's JSON text. */
 const answers: IAnswerSerializer<McpResult> = {
   json<P>(payload: P, isError = false): McpResult {
-    return text(JSON.stringify(payload, null, 2), isError);
+    return text(JSON.stringify(payload), isError);
   },
 };
 
@@ -100,7 +100,7 @@ const failures: IAnswerSerializer<FailureAnswer> = {
   json<P>(payload: P): FailureAnswer {
     return {
       isError: true,
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
     };
   },
 };

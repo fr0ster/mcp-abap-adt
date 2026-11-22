@@ -28,6 +28,6 @@ export function normalizeCheckResponse(
     : data;
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(named, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(named) }],
   };
 }

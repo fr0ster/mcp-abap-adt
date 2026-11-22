@@ -165,19 +165,15 @@ export async function handleUpdatePackage(
       logger?.info(`✅ UpdatePackage completed: ${packageName}`);
 
       return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            package_name: packageName,
-            ...(super_package && {
-              super_package: super_package.toUpperCase(),
-            }),
-            updated_description,
-            message: `Package ${packageName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
+        data: JSON.stringify({
+          success: true,
+          package_name: packageName,
+          ...(super_package && {
+            super_package: super_package.toUpperCase(),
+          }),
+          updated_description,
+          message: `Package ${packageName} updated successfully. Remember to unlock using UnlockObject.`,
+        }),
       });
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never

@@ -190,15 +190,11 @@ export async function handleUpdateDomain(
       logger?.info(`✅ UpdateDomain completed: ${domainName}`);
 
       return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            domain_name: domainName,
-            message: `Domain ${domainName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
+        data: JSON.stringify({
+          success: true,
+          domain_name: domainName,
+          message: `Domain ${domainName} updated successfully. Remember to unlock using UnlockObject.`,
+        }),
       });
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never

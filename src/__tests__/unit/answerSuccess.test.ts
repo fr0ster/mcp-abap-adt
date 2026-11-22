@@ -23,10 +23,14 @@ describe('return_answer — success', () => {
     assert.equal(result.content[0].text, 'CLASS zcl_x.');
   });
 
-  it('serialises anything else as indented JSON', () => {
-    const result = return_answer(success({ a: 1 }), (v) => v, ctx);
+  it('serialises anything else as minified JSON', () => {
+    const result = return_answer(
+      success({ a: 1, b: { c: [2, 3] } }),
+      (v) => v,
+      ctx,
+    );
 
-    assert.equal(result.content[0].text, JSON.stringify({ a: 1 }, null, 2));
+    assert.equal(result.content[0].text, '{"a":1,"b":{"c":[2,3]}}');
   });
 
   it('treats an undefined projection as a failure, never as SUCCESS', () => {

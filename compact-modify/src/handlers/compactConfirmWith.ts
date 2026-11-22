@@ -29,14 +29,10 @@ export function namingHandlerGet<T extends Answer>(answer: T): T {
     }
     return {
       ...part,
-      text: JSON.stringify(
-        {
-          ...payload,
-          confirm_with: confirmWith.replaceAll(FULL_READ, COMPACT_READ),
-        },
-        null,
-        2,
-      ),
+      text: JSON.stringify({
+        ...payload,
+        confirm_with: confirmWith.replaceAll(FULL_READ, COMPACT_READ),
+      }),
     };
   });
   return { ...answer, content };

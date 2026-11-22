@@ -57,7 +57,7 @@ export async function openLongSession(
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ state_handle: state.handle }, null, 2),
+        text: JSON.stringify({ state_handle: state.handle }),
       },
     ],
   };
@@ -92,7 +92,7 @@ export async function closeLongSession(
     content: [
       {
         type: 'text',
-        text: JSON.stringify({ closed: true, held }, null, 2),
+        text: JSON.stringify({ closed: true, held }),
       },
     ],
   };

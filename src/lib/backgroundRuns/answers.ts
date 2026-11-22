@@ -20,7 +20,7 @@ export interface BackgroundAnswer {
 const answers: IAnswerSerializer<BackgroundAnswer> = {
   json<P>(payload: P): BackgroundAnswer {
     return {
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
     };
   },
 };

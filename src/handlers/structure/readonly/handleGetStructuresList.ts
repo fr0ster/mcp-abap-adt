@@ -430,9 +430,7 @@ async function structuresListOf(
       // Both endpoints failed: each failure as it is, with its step.
       return {
         isError: true,
-        content: [
-          { type: 'text', text: JSON.stringify(root.failures, null, 2) },
-        ],
+        content: [{ type: 'text', text: JSON.stringify(root.failures) }],
       };
     }
     if ('absent' in root) {
@@ -491,23 +489,19 @@ async function structuresListOf(
     };
 
     return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          structure_name: rootName,
-          // True when a where-used lookup failed, so appends could not be
-          // determined and the tree may be missing them (≠ "no appends"). #128
-          ...(includeExtensions && appendsUnavailable
-            ? { appends_unavailable: true }
-            : {}),
-          ...(unreadCandidates.length > 0
-            ? { append_candidates_unread: unreadCandidates }
-            : {}),
-          tree,
-        },
-        null,
-        2,
-      ),
+      data: JSON.stringify({
+        success: true,
+        structure_name: rootName,
+        // True when a where-used lookup failed, so appends could not be
+        // determined and the tree may be missing them (≠ "no appends"). #128
+        ...(includeExtensions && appendsUnavailable
+          ? { appends_unavailable: true }
+          : {}),
+        ...(unreadCandidates.length > 0
+          ? { append_candidates_unread: unreadCandidates }
+          : {}),
+        tree,
+      }),
     });
   } catch (error) {
     return return_error(error);
@@ -921,9 +915,7 @@ async function structureTreeFromAnswers(
     if ('failures' in root) {
       return {
         isError: true,
-        content: [
-          { type: 'text', text: JSON.stringify(root.failures, null, 2) },
-        ],
+        content: [{ type: 'text', text: JSON.stringify(root.failures) }],
       };
     }
     if ('absent' in root) {
@@ -975,21 +967,17 @@ async function structureTreeFromAnswers(
       children: await buildChildren(rootName, root.source),
     };
     return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          structure_name: rootName,
-          ...(includeExtensions && appendsUnavailable
-            ? { appends_unavailable: true }
-            : {}),
-          ...(unreadCandidates.length > 0
-            ? { append_candidates_unread: unreadCandidates }
-            : {}),
-          tree,
-        },
-        null,
-        2,
-      ),
+      data: JSON.stringify({
+        success: true,
+        structure_name: rootName,
+        ...(includeExtensions && appendsUnavailable
+          ? { appends_unavailable: true }
+          : {}),
+        ...(unreadCandidates.length > 0
+          ? { append_candidates_unread: unreadCandidates }
+          : {}),
+        tree,
+      }),
     });
   } catch (error) {
     return return_error(error);
@@ -1104,7 +1092,7 @@ function listAnswer(
   );
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(entries) }],
   };
 }
 

@@ -62,7 +62,7 @@ export async function beginBatch(context: HandlerContext): Promise<McpResult> {
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(answer, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(answer) }],
   };
 }
 
@@ -115,7 +115,7 @@ export async function beginDebugBatch(
   if (context.state !== undefined) answer.state_handle = context.state.handle;
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(answer, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(answer) }],
   };
 }
 

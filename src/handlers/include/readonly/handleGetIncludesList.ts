@@ -476,18 +476,14 @@ async function includesListOf(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              object_name: parent.name,
-              object_type: parent.kind,
-              tree,
-              // Only when there is something to say: a caller reading a tree
-              // needs to know it is short, and why.
-              ...(unreadable.length > 0 ? { unreadable } : {}),
-            },
-            null,
-            2,
-          ),
+          text: JSON.stringify({
+            object_name: parent.name,
+            object_type: parent.kind,
+            tree,
+            // Only when there is something to say: a caller reading a tree
+            // needs to know it is short, and why.
+            ...(unreadable.length > 0 ? { unreadable } : {}),
+          }),
         },
       ],
     };
@@ -847,16 +843,12 @@ async function treeFromAnswers(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(
-            {
-              object_name: parent.name,
-              object_type: parent.kind,
-              tree,
-              ...(unreadable.length > 0 ? { unreadable } : {}),
-            },
-            null,
-            2,
-          ),
+          text: JSON.stringify({
+            object_name: parent.name,
+            object_type: parent.kind,
+            tree,
+            ...(unreadable.length > 0 ? { unreadable } : {}),
+          }),
         },
       ],
     };
@@ -980,7 +972,7 @@ function listAnswer(
   });
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries, null, 2) }],
+    content: [{ type: 'text', text: JSON.stringify(entries) }],
   };
 }
 

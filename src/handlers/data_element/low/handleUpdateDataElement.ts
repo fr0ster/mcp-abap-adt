@@ -236,15 +236,11 @@ export async function handleUpdateDataElement(
       logger?.info(`✅ UpdateDataElement completed: ${dataElementName}`);
 
       return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            data_element_name: dataElementName,
-            message: `DataElement ${dataElementName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
+        data: JSON.stringify({
+          success: true,
+          data_element_name: dataElementName,
+          message: `DataElement ${dataElementName} updated successfully. Remember to unlock using UnlockObject.`,
+        }),
       });
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never

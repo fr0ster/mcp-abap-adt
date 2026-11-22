@@ -181,7 +181,7 @@ export async function handleGetPackageContents(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(answered, null, 2),
+          text: JSON.stringify(answered),
         },
       ],
     };

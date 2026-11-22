@@ -19,7 +19,7 @@ const answers: IAnswerSerializer<LeftoverAnswer> = {
   json<P>(payload: P, isError = false): LeftoverAnswer {
     return {
       isError,
-      content: [{ type: 'text', text: JSON.stringify(payload, null, 2) }],
+      content: [{ type: 'text', text: JSON.stringify(payload) }],
     };
   },
 };

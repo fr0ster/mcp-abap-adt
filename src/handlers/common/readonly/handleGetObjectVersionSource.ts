@@ -87,7 +87,7 @@ export async function handleGetObjectVersionSource(
     try {
       const source = await readVersionSource(resolved, content_uri);
       return return_response({
-        data: JSON.stringify({ success: true, content_uri, source }, null, 2),
+        data: JSON.stringify({ success: true, content_uri, source }),
       });
     } catch (error) {
       return return_error(asError(error));

@@ -1768,7 +1768,7 @@ whereused_readonly:
         # cloud: needed — a table that exists on the cloud system.
         test_table: "SCARR"                    # Standard SAP table (Flight: Airlines)
         # on premise: a class whose where-used list is above the stdio message
-        # limit (coverage/readToolBugs.live.test.ts); "" skips that case.
+        # limit (coverage/readToolBugs.live.test.ts, which needs it).
         oversized_class: "CL_ABAP_UNIT_ASSERT"
 
 # Runtime Read-Only Handlers (Profiling + Dumps)

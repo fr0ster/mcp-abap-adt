@@ -19,10 +19,13 @@ import { after, afterEach, beforeEach, describe, it } from 'node:test';
 import { enhancementTypeOf } from '../../../handlers/enhancement/readonly/enhancementAvailability';
 import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
 import { handleGetAdtTypes } from '../../../handlers/system/readonly/handleGetAllTypes';
+import { handleGetInactiveObjects } from '../../../handlers/system/readonly/handleGetInactiveObjects';
+import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { handleCreateTransport } from '../../../handlers/transport/high/handleCreateTransport';
 import { handleCreateTransportTask } from '../../../handlers/transport/high/handleCreateTransportTask';
 import { handleGetTransport } from '../../../handlers/transport/readonly/handleGetTransport';
 import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
+import { handleReadTransportObjects } from '../../../handlers/transport/readonly/handleReadTransportObjects';
 import type { DetailLevel } from '../../../lib/detail';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
@@ -278,6 +281,49 @@ for (const [label, name] of [
       ),
     ),
   });
+}
+
+// Codex 7: GetWhereUsed, GetInactiveObjects and ReadTransportObjects, pinned
+// from the code before each switched to its shipped reading.
+CASES['GetWhereUsed read-where-used-list-structure--01'] = async (detail) =>
+  answeredOf(
+    await handleGetWhereUsed(
+      ctx([
+        {
+          data: corpusBody(
+            'read-where-used-list-structure--01-informationsystem-usagereferences',
+          ),
+        },
+      ]),
+      { object_name: 'ZMCP_SHR_STRU', object_type: 'TABL/DS', detail },
+    ),
+  );
+
+const INACTIVE_IOC = `${xmlHead}<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"><ioc:entry><ioc:object ioc:user="SAPUSER01" ioc:deleted="false"><ioc:ref adtcore:uri="/sap/bc/adt/bo/behaviordefinitions/zi_root" adtcore:type="BDEF/BDO" adtcore:name="ZI_ROOT" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object><ioc:transport/></ioc:entry><ioc:entry><ioc:object ioc:user="SAPUSER01" ioc:deleted="false"><ioc:ref adtcore:uri="/sap/bc/adt/functions/groups/zfg/fmodules/z_fm" adtcore:parentUri="/sap/bc/adt/functions/groups/zfg" adtcore:type="FUGR/FF" adtcore:name="Z_FM" xmlns:adtcore="http://www.sap.com/adt/core"/></ioc:object></ioc:entry></ioc:inactiveObjects>`;
+const INACTIVE_740 = `${xmlHead}<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/functions/groups/zobj_fgrp" adtcore:type="FUGR/F" adtcore:name="ZOBJ_FGRP"/></adtcore:objectReferences>`;
+const INACTIVE_NONE = `${xmlHead}<ioc:inactiveObjects xmlns:ioc="http://www.sap.com/abapxml/inactiveCtsObjects"/>`;
+for (const [label, data] of [
+  ['two entries', INACTIVE_IOC],
+  ['the 7.40 form', INACTIVE_740],
+  ['none inactive', INACTIVE_NONE],
+] as const) {
+  CASES[`GetInactiveObjects ${label}`] = async (detail) =>
+    answeredOf(await handleGetInactiveObjects(ctx([{ data }]), { detail }));
+}
+
+const ENTRIES_REQUEST = `${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:object_type="R"><tm:request tm:number="SIDK900100"><tm:all_objects><tm:abap_object tm:pgmid="R3TR" tm:type="PROG" tm:name="ZP_ONE" tm:position="000001"/><tm:abap_object tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_TWO" tm:position="000002"/></tm:all_objects><tm:task tm:number="SIDK900101"><tm:abap_object tm:pgmid="R3TR" tm:type="PROG" tm:name="ZP_ONE" tm:position="000001"/></tm:task><tm:task tm:number="SIDK900102"><tm:abap_object tm:pgmid="LIMU" tm:type="METH" tm:name="ZCL_TWO              DO" tm:position="000001"/><tm:abap_object tm:pgmid="R3TR" tm:type="CLAS" tm:name="ZCL_TWO" tm:position="000002"/></tm:task></tm:request></tm:root>`;
+const ENTRIES_TASK = `${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:object_type="T"><tm:request tm:number="SIDK900100"/><tm:task tm:number="SIDK900101"><tm:abap_object tm:pgmid="R3TR" tm:type="PROG" tm:name="ZP_ONE" tm:position="000001"/><tm:abap_object tm:pgmid="R3TR" tm:type="TABL" tm:name="ZT_NOPOS"/></tm:task></tm:root>`;
+for (const [label, data, number] of [
+  ['a request with its aggregate list', ENTRIES_REQUEST, 'SIDK900100'],
+  ['a task, an entry without a position', ENTRIES_TASK, 'SIDK900101'],
+] as const) {
+  CASES[`ReadTransportObjects ${label}`] = async (detail) =>
+    answeredOf(
+      await handleReadTransportObjects(ctx([{ data }]), {
+        transport_number: number,
+        detail,
+      }),
+    );
 }
 
 describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READINGS=1 rewrites the fixture)', () => {

@@ -151,15 +151,23 @@ function contentsRows(
   for (const item of items) {
     const owner = (item.packageName ?? packageName).toUpperCase();
     const rows = groups.get(owner) ?? [];
+    // The technical name where it is not the name (a function group's is
+    // its main program, SAPL…): what the object's own tools may need.
+    const techName =
+      item.techName !== undefined && item.techName !== item.name
+        ? item.techName
+        : '';
     rows.push(
       descriptions
-        ? [item.type, item.name, item.description ?? '']
-        : [item.type, item.name],
+        ? [item.type, item.name, techName, item.description ?? '']
+        : [item.type, item.name, techName],
     );
     groups.set(owner, rows);
   }
   return groupedTsv(
-    descriptions ? ['type', 'name', 'description'] : ['type', 'name'],
+    descriptions
+      ? ['type', 'name', 'tech_name', 'description']
+      : ['type', 'name', 'tech_name'],
     [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
   );
 }

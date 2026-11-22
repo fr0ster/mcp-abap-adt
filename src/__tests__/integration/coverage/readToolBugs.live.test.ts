@@ -237,7 +237,7 @@ liveSuite(
       } finally {
         await server.close();
       }
-      // Terse, the default: `type\tname` rows under `# package` lines.
+      // Terse, the default: `type\tname\ttech_name` rows under `# package` lines.
       const keys: string[] = [];
       let owner = '';
       for (const line of text.split('\n')) {
@@ -245,7 +245,11 @@ liveSuite(
           owner = line.slice('# package '.length);
           continue;
         }
-        if (line === '' || line.startsWith('#') || line === 'type\tname') {
+        if (
+          line === '' ||
+          line.startsWith('#') ||
+          line.startsWith('type\tname')
+        ) {
           continue;
         }
         const [type, rowName] = line.split('\t');

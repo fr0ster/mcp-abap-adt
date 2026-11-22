@@ -85,10 +85,10 @@ async function tree(detail?: Level) {
 describe('GetPackageContents detail', () => {
   it('terse, by default: the rows under their package, the unloaded node one of them', async () => {
     const expected = [
-      'type\tname',
+      'type\tname\ttech_name',
       '# package ZPKG',
-      'VIEW/DV\tnot loaded by SAP',
-      'TABL/DT\tZT_ONE',
+      'VIEW/DV\tnot loaded by SAP\t',
+      'TABL/DT\tZT_ONE\t',
     ].join('\n');
     assert.equal(await contents(), expected);
     assert.equal(await contents('terse'), expected);
@@ -98,10 +98,10 @@ describe('GetPackageContents detail', () => {
     assert.equal(
       await contents('terse', true),
       [
-        'type\tname\tdescription',
+        'type\tname\ttech_name\tdescription',
         '# package ZPKG',
-        'VIEW/DV\tnot loaded by SAP\t',
-        'TABL/DT\tZT_ONE\tA table',
+        'VIEW/DV\tnot loaded by SAP\t\t',
+        'TABL/DT\tZT_ONE\t\tA table',
       ].join('\n'),
     );
   });
@@ -172,5 +172,32 @@ describe('GetPackageTree detail', () => {
         { name: 'ZT_ONE', type: 'TABL/DT' },
       ],
     });
+  });
+});
+
+describe('GetPackageContents terse keeps a technical name that is not the name', () => {
+  it("a function group's main program beside its name", async () => {
+    const root = level(
+      '<TREE_CONTENT/><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>FUGR/F</OBJECT_TYPE><NODE_ID>000003</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES>',
+    );
+    const groups = level(
+      '<TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>FUGR/F</OBJECT_TYPE><OBJECT_NAME>ZFG</OBJECT_NAME><TECH_NAME>SAPLZFG</TECH_NAME><OBJECT_URI>/sap/bc/adt/functions/groups/zfg</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT>',
+    );
+    const connection = recordingConnection(
+      [root, groups].map((data) => ({ data })),
+    );
+    declareSystemKind(connection, 'onprem');
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    const result = await handleGetPackageContents(
+      { connection, logger: undefined, batchAvailability },
+      { package_name: 'ZPKG' },
+    );
+    assert.equal(
+      result.content[0]?.text,
+      ['type\tname\ttech_name', '# package ZPKG', 'FUGR/F\tZFG\tSAPLZFG'].join(
+        '\n',
+      ),
+    );
   });
 });

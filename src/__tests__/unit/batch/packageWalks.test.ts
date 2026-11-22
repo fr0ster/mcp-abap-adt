@@ -642,7 +642,10 @@ describe('HandlerGet part contents', () => {
     );
     assert.equal(textOf(a), textOf(b));
     // GetPackageContents' terse answer (compact parity).
-    assert.equal(textOf(a).startsWith('type\tname\n# package '), true);
+    assert.equal(
+      textOf(a).startsWith('type\tname\ttech_name\n# package '),
+      true,
+    );
   });
 
   it("envelopes per spec §11's row (per level: roots, then type nodes)", async () => {
@@ -687,15 +690,15 @@ describe('HandlerGet part contents', () => {
       textOf(result),
       [
         '# asked ZROOT_A',
-        'type\tname',
+        'type\tname\ttech_name',
         '# package ZROOT_A',
-        'DEVC/K\tZSUB_A',
-        'CLAS/OC\tZCL_A',
+        'DEVC/K\tZSUB_A\t',
+        'CLAS/OC\tZCL_A\t',
         '# asked ZROOT_B',
-        'type\tname',
+        'type\tname\ttech_name',
         '# package ZROOT_B',
-        'DEVC/K\tZSUB_B',
-        'INTF/OI\tZIF_B',
+        'DEVC/K\tZSUB_B\t',
+        'INTF/OI\tZIF_B\t',
       ].join('\n'),
     );
   });

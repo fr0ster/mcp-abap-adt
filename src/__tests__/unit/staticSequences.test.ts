@@ -236,6 +236,34 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     );
   });
 
+  // Full carries no less than medium (Codex P2): every field medium answers
+  // is in full too.
+  it('ListFunctionModules full holds every field medium answers', async () => {
+    fakeClient = fakeFunctionGroupClient();
+    const medium = JSON.parse(
+      (
+        (await handleListFunctionModules(context as any, {
+          function_group_name: 'ZFG',
+          detail: 'medium',
+        })) as any
+      ).content[0].text,
+    );
+    fakeClient = fakeFunctionGroupClient();
+    const full = JSON.parse(
+      (
+        (await handleListFunctionModules(context as any, {
+          function_group_name: 'ZFG',
+          detail: 'full',
+        })) as any
+      ).content[0].text,
+    );
+    for (const [i, object] of medium.function_modules.entries()) {
+      for (const [key, value] of Object.entries(object)) {
+        assert.deepStrictEqual(full.objects[i][key], value, key);
+      }
+    }
+  });
+
   it('ListFunctionGroupIncludes reads the FUGR/I child, not FUGR/FF', async () => {
     fakeClient = fakeFunctionGroupClient();
     const result: any = await handleListFunctionGroupIncludes(context as any, {

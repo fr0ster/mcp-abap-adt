@@ -81,18 +81,21 @@ export async function fetchFunctionGroupChildren(
  * each `detail`, selected before the reads (`src/lib/detail`): terse the
  * group and the total, then a `name\tdescription` row per child; medium
  * every field the node structure read but the uri; full the answer before
- * `detail` under `listKey`. The answer is built from two requests, so raw is
+ * `detail` under `listKey`, with every field read under `objects`. The answer is built from two requests, so raw is
  * the full answer.
  */
 export function functionGroupListAnswers(
   functionGroupName: string,
   listKey: 'function_modules' | 'includes',
 ): AnswerTable<NodeItem[], string | object> {
+  // The answer before `detail`, and every field the node structure read
+  // beside it: full carries no less than medium.
   const full = (objects: NodeItem[]) => ({
     success: true,
     function_group_name: functionGroupName,
     total: objects.length,
     [listKey]: objects.map((o) => o.name),
+    objects,
   });
   return {
     terse: (objects) =>

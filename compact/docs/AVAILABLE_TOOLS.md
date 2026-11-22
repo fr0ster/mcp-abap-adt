@@ -3,7 +3,7 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 39
+- Tools: 41
 - Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
@@ -15,7 +15,7 @@ definitions a client receives.
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 39 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 41 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -791,6 +791,47 @@ per request.
 - `action` (required) — begin: switch into batch mode; end: send the recorded calls and leave batch mode; answers: read the last batch's answers by number (with number or numbers).
 - `number` — answers only: one batch number to read (an integer of at least 1); give this or numbers, not both.
 - `numbers` — answers only: several batch numbers to read, answered in the order given; give this or number, not both.
+
+### HandlerAbapGitGet
+
+**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), listed where the system's discovery serves abapGit
+
+**Description:** [read-only] Reads abapGit repositories, one read per action: repos(package_name, repository_key, detail) the linked repositories: key, package, branch, remote URL and on cloud the run state (status, status text, run log key); external_repo(url*, detail) the access mode and the branches of the remote repository at url; staging(repository_key*, detail) the unstaged, staged and ignored objects with their files, and the proposed author and committer; checks(repository_key*) SAP's status of the connection to the remote; a refusal with SAP's message key and on cloud the git host's HTTP status; file(repository_key*, filename*, version*) the text of one file, local or remote. Answers facts only. Each argument is described with the actions that take it.
+
+**Available in:** all
+
+**Parameters:**
+
+- `action` (required) — The read: repos (the linked repositories), external_repo (what a remote repository offers), staging (what changed), checks (the repository's connection to its remote), file (one file of the repository).
+- `repository_key` — repos: only the repository with this key. staging: required, the repository. checks: required, the repository. file: required, the repository.
+- `package_name` — repos: only the repository linked to this package.
+- `url` — external_repo: required, the remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+- `filename` — file: required, the file name.
+- `version` — file: required, local (the system's) or remote (the remote branch's).
+- `detail` — repos: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). external_repo: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). staging: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+
+### HandlerAbapGit
+
+**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), listed where the system's discovery serves abapGit
+
+**Description:** Changes abapGit repositories and their remotes, one write per action: link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch; unlink(repository_key*) ends the repository's binding to its package; the objects stay; pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job and its objects are inactive; push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job; switch_branch(repository_key*, branch*, create*) switches the branch, creating it in the remote with create true. Answers facts only. Each argument is described with the actions that take it.
+
+**Available in:** all
+
+**Parameters:**
+
+- `action` (required) — The write: link (link a package to a remote repository), unlink (end a repository's binding to its package), pull (import the remote branch), push (commit and push chosen objects), switch_branch (switch or create the repository's branch).
+- `repository_key` — unlink: required, the repository. pull: required, the repository. push: required, the repository. switch_branch: required, the repository.
+- `package_name` — link: required, the package linked.
+- `url` — link: required, the remote repository URL over HTTPS.
+- `branch` — link: required, the branch linked. switch_branch: required, the branch switched to.
+- `transport_request` — link: the transport request that records the objects written. pull: the transport request that records the objects written.
+- `objects` — push: required, the objects and files to commit, as staging with detail "medium" answers them.
+- `comment` — push: required, the commit message.
+- `author` — push: required, the commit author: name and email.
+- `committer` — push: required, the committer: name and email.
+- `create` — switch_branch: required, true creates the branch in the remote when it does not exist.
+- `background` — link: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end. pull: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end. push: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 
 ## Streamable HTTP Binaries
 

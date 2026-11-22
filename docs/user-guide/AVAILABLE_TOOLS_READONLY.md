@@ -5,11 +5,19 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. Batch mode is the compact binaries' (`HandlerBatch`, [BATCH_MODE.md](BATCH_MODE.md)): none is served here. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 75
+- Total tools: 82
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Abapgit](#read-only-abapgit)
+    - [ListAbapGitRepos](#listabapgitrepos-read-only-abapgit)
+    - [CheckAbapGitExternalRepo](#checkabapgitexternalrepo-read-only-abapgit)
+    - [GetAbapGitModifiedObjects](#getabapgitmodifiedobjects-read-only-abapgit)
+    - [GetAbapGitStaging](#getabapgitstaging-read-only-abapgit)
+    - [CheckAbapGitRepo](#checkabapgitrepo-read-only-abapgit)
+    - [GetAbapGitFile](#getabapgitfile-read-only-abapgit)
+    - [GetAbapGitErrorLog](#getabapgiterrorlog-read-only-abapgit)
   - [Atc](#read-only-atc)
     - [RunATC](#runatc-read-only-atc)
     - [GetATCRunStatus](#getatcrunstatus-read-only-atc)
@@ -123,6 +131,95 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="read-only-group"></a>
 ## Read-Only Group
+
+<a id="read-only-abapgit"></a>
+### Read-Only / Abapgit
+
+<a id="listabapgitrepos-read-only-abapgit"></a>
+#### ListAbapGitRepos (Read-Only / Abapgit)
+**Description:** [read-only] Lists the abapGit repositories linked in the system, optionally only the one of package_name or of repository_key. Answers facts only: each repository's key, package, branch and remote URL, and on cloud its run state — the status of its last pull or push (blank initial, R running, S, W, E or A ended), the status text and the key of its run log.
+
+**Source:** `src/handlers/abapgit/readonly/handleListAbapGitRepos.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `package_name` (string, optional) - Only the repository linked to this package.
+- `repository_key` (string, optional) - Only the repository with this key.
+
+---
+
+<a id="checkabapgitexternalrepo-read-only-abapgit"></a>
+#### CheckAbapGitExternalRepo (Read-Only / Abapgit)
+**Description:** [read-only] Reads what the remote repository at url offers before it is linked, as the system reaches it. Answers facts only: its access mode (public or private) and its branches, each with its name, type, whether it is the head and its commit hash.
+
+**Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitExternalRepo.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+---
+
+<a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
+#### GetAbapGitModifiedObjects (Read-Only / Abapgit)
+**Description:** [read-only] Reads the objects of the system that a pull of the repository would overwrite: those changed locally, and those held by another package. Answers facts only: each object with its type, name, package, URI and the action SAP names for it.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgitstaging-read-only-abapgit"></a>
+#### GetAbapGitStaging (Read-Only / Abapgit)
+**Description:** [read-only] Reads what changed between the system and the remote branch of the repository, to choose what a push commits. Answers facts only: the unstaged, staged and ignored objects, each with its files and their local and remote state, and the author and committer this system proposes. With detail "medium" every field of the objects a push takes is listed.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="checkabapgitrepo-read-only-abapgit"></a>
+#### CheckAbapGitRepo (Read-Only / Abapgit)
+**Description:** [read-only] Checks that the system reaches the repository's remote and is let in. Answers facts only: SAP's status; a refusal answers the status, SAP's message class and number and, on cloud, the git host's HTTP status.
+
+**Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitRepo.ts`
+
+**Parameters:**
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgitfile-read-only-abapgit"></a>
+#### GetAbapGitFile (Read-Only / Abapgit)
+**Description:** [read-only] Reads one file of the repository: the system's version (local) or the remote branch's (remote). Answers the file's text as it is.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitFile.ts`
+
+**Parameters:**
+- `filename` (string, required) - The file name, as GetAbapGitStaging lists it (for example zcl_demo.clas.abap).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+- `version` (string, required, one of: `local`, `remote`) - Which version of the file: local (the system's) or remote (the remote branch's).
+
+---
+
+<a id="getabapgiterrorlog-read-only-abapgit"></a>
+#### GetAbapGitErrorLog (Read-Only / Abapgit)
+**Description:** [read-only] Reads the log of the repository's last pull or push, by the run log key the repository list answers for it. Answers facts only: each object of the run with its type, name, package, status and SAP's message type (S, I, W, E or A).
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitErrorLog.ts`
+
+**Parameters:**
+- `app_log_key` (string, required) - The run log key ListAbapGitRepos answers for the repository's last run.
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
 
 <a id="read-only-atc"></a>
 ### Read-Only / Atc

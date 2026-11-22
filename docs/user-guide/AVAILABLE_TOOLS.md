@@ -4,9 +4,9 @@ Generated from the tool definitions the server builds (not from docs).
 
 ## Summary
 
-- Total tools: 293
-- Read-only tools: 68
-- High-level tools: 190
+- Total tools: 306
+- Read-only tools: 75
+- High-level tools: 196
 - Debug tools: 33
 - Session tools: 2
 
@@ -25,6 +25,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Abapgit](#read-only-abapgit)
+    - [CheckAbapGitExternalRepo](#checkabapgitexternalrepo-read-only-abapgit)
+    - [CheckAbapGitRepo](#checkabapgitrepo-read-only-abapgit)
+    - [GetAbapGitErrorLog](#getabapgiterrorlog-read-only-abapgit)
+    - [GetAbapGitFile](#getabapgitfile-read-only-abapgit)
+    - [GetAbapGitModifiedObjects](#getabapgitmodifiedobjects-read-only-abapgit)
+    - [GetAbapGitStaging](#getabapgitstaging-read-only-abapgit)
+    - [ListAbapGitRepos](#listabapgitrepos-read-only-abapgit)
   - [Background Run](#read-only-background-run)
     - [DiscardBackgroundRun](#discardbackgroundrun-read-only-background-run)
     - [GetBackgroundRun](#getbackgroundrun-read-only-background-run)
@@ -122,6 +130,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
   - [Unit Test](#read-only-unit-test)
     - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
 - [High-Level Group](#high-level-group)
+  - [Abapgit](#high-level-abapgit)
+    - [GetAbapGitBranchInfo](#getabapgitbranchinfo-high-level-abapgit)
+    - [LinkAbapGitRepo](#linkabapgitrepo-high-level-abapgit)
+    - [PullAbapGitRepo](#pullabapgitrepo-high-level-abapgit)
+    - [PushAbapGitRepo](#pushabapgitrepo-high-level-abapgit)
+    - [SwitchAbapGitBranch](#switchabapgitbranch-high-level-abapgit)
+    - [UnlinkAbapGitRepo](#unlinkabapgitrepo-high-level-abapgit)
   - [Atc](#high-level-atc)
     - [GetATCFindings](#getatcfindings-high-level-atc)
     - [GetATCResult](#getatcresult-high-level-atc)
@@ -387,6 +402,95 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="read-only-group"></a>
 ## Read-Only Group
+
+<a id="read-only-abapgit"></a>
+### Read-Only / Abapgit
+
+<a id="checkabapgitexternalrepo-read-only-abapgit"></a>
+#### CheckAbapGitExternalRepo (Read-Only / Abapgit)
+**Description:** [read-only] Reads what the remote repository at url offers before it is linked, as the system reaches it. Answers facts only: its access mode (public or private) and its branches, each with its name, type, whether it is the head and its commit hash.
+
+**Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitExternalRepo.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+---
+
+<a id="checkabapgitrepo-read-only-abapgit"></a>
+#### CheckAbapGitRepo (Read-Only / Abapgit)
+**Description:** [read-only] Checks that the system reaches the repository's remote and is let in. Answers facts only: SAP's status; a refusal answers the status, SAP's message class and number and, on cloud, the git host's HTTP status.
+
+**Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitRepo.ts`
+
+**Parameters:**
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgiterrorlog-read-only-abapgit"></a>
+#### GetAbapGitErrorLog (Read-Only / Abapgit)
+**Description:** [read-only] Reads the log of the repository's last pull or push, by the run log key the repository list answers for it. Answers facts only: each object of the run with its type, name, package, status and SAP's message type (S, I, W, E or A).
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitErrorLog.ts`
+
+**Parameters:**
+- `app_log_key` (string, required) - The run log key ListAbapGitRepos answers for the repository's last run.
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgitfile-read-only-abapgit"></a>
+#### GetAbapGitFile (Read-Only / Abapgit)
+**Description:** [read-only] Reads one file of the repository: the system's version (local) or the remote branch's (remote). Answers the file's text as it is.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitFile.ts`
+
+**Parameters:**
+- `filename` (string, required) - The file name, as GetAbapGitStaging lists it (for example zcl_demo.clas.abap).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+- `version` (string, required, one of: `local`, `remote`) - Which version of the file: local (the system's) or remote (the remote branch's).
+
+---
+
+<a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
+#### GetAbapGitModifiedObjects (Read-Only / Abapgit)
+**Description:** [read-only] Reads the objects of the system that a pull of the repository would overwrite: those changed locally, and those held by another package. Answers facts only: each object with its type, name, package, URI and the action SAP names for it.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgitstaging-read-only-abapgit"></a>
+#### GetAbapGitStaging (Read-Only / Abapgit)
+**Description:** [read-only] Reads what changed between the system and the remote branch of the repository, to choose what a push commits. Answers facts only: the unstaged, staged and ignored objects, each with its files and their local and remote state, and the author and committer this system proposes. With detail "medium" every field of the objects a push takes is listed.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="listabapgitrepos-read-only-abapgit"></a>
+#### ListAbapGitRepos (Read-Only / Abapgit)
+**Description:** [read-only] Lists the abapGit repositories linked in the system, optionally only the one of package_name or of repository_key. Answers facts only: each repository's key, package, branch and remote URL, and on cloud its run state — the status of its last pull or push (blank initial, R running, S, W, E or A ended), the status text and the key of its run log.
+
+**Source:** `src/handlers/abapgit/readonly/handleListAbapGitRepos.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `package_name` (string, optional) - Only the repository linked to this package.
+- `repository_key` (string, optional) - Only the repository with this key.
+
+---
 
 <a id="read-only-background-run"></a>
 ### Read-Only / Background Run
@@ -1471,6 +1575,91 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="high-level-group"></a>
 ## High-Level Group
+
+<a id="high-level-abapgit"></a>
+### High-Level / Abapgit
+
+<a id="getabapgitbranchinfo-high-level-abapgit"></a>
+#### GetAbapGitBranchInfo (High-Level / Abapgit)
+**Description:** Reads one branch of the remote repository at url for the package it would be linked to: to answer it, SAP links the repository to package_name, reads the repository's settings and removes the link again. Answers facts only: the access mode and the branch with its name, type, whether it is the head, its commit hash and its folder logic.
+
+**Source:** `src/handlers/abapgit/high/handleGetAbapGitBranchInfo.ts`
+
+**Parameters:**
+- `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `package_name` (string, required) - The ABAP package the repository is linked to.
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+---
+
+<a id="linkabapgitrepo-high-level-abapgit"></a>
+#### LinkAbapGitRepo (High-Level / Abapgit)
+**Description:** Links package_name to the remote repository at url on branch, and imports every object of the branch into the package and its subpackages, overwriting objects of the system and objects held by other packages, recorded in transport_request. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.
+
+**Source:** `src/handlers/abapgit/high/handleLinkAbapGitRepo.ts`
+
+**Parameters:**
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
+- `package_name` (string, required) - The ABAP package the repository is linked to.
+- `transport_request` (string, optional) - The transport request that records the objects written.
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+---
+
+<a id="pullabapgitrepo-high-level-abapgit"></a>
+#### PullAbapGitRepo (High-Level / Abapgit)
+**Description:** Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.
+
+**Source:** `src/handlers/abapgit/high/handlePullAbapGitRepo.ts`
+
+**Parameters:**
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+- `transport_request` (string, optional) - The transport request that records the objects written.
+
+---
+
+<a id="pushabapgitrepo-high-level-abapgit"></a>
+#### PushAbapGitRepo (High-Level / Abapgit)
+**Description:** Commits the objects and files chosen from the staging with comment, author and committer, and pushes the commit to the remote branch of the repository repository_key. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status and done.
+
+**Source:** `src/handlers/abapgit/high/handlePushAbapGitRepo.ts`
+
+**Parameters:**
+- `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
+- `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `comment` (string, required) - The commit message.
+- `committer` (object, required) - The committer: name and email (GetAbapGitStaging answers the proposal of this system).
+- `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="switchabapgitbranch-high-level-abapgit"></a>
+#### SwitchAbapGitBranch (High-Level / Abapgit)
+**Description:** Switches the repository repository_key to branch; with create true, creates branch in the remote first when the remote lacks it; with create false and a branch the remote lacks, the repository stays on its branch and SAP answers success. Answers facts only: SAP's status.
+
+**Source:** `src/handlers/abapgit/high/handleSwitchAbapGitBranch.ts`
+
+**Parameters:**
+- `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
+- `create` (boolean, required) - true creates the branch in the remote when it does not exist; false switches to an existing branch only.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="unlinkabapgitrepo-high-level-abapgit"></a>
+#### UnlinkAbapGitRepo (High-Level / Abapgit)
+**Description:** Removes the link of the repository repository_key from its package; the package's objects stay in the system, and the remote stays as it is. Answers SAP's status.
+
+**Source:** `src/handlers/abapgit/high/handleUnlinkAbapGitRepo.ts`
+
+**Parameters:**
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
 
 <a id="high-level-atc"></a>
 ### High-Level / Atc

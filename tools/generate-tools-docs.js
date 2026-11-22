@@ -153,6 +153,8 @@ const GROUP_LEVELS = {
   BackgroundRunHandlersGroup: 'readonly',
   HighLevelHandlersGroup: 'high',
   RuntimeRunHandlersGroup: 'high',
+  // abapGit's reads sit under readonly/, its writes under high/: the folder decides.
+  AbapGitHandlersGroup: 'high',
   DebugHandlersGroup: 'debug',
   DebugBatchHandlersGroup: 'debug',
   LeftoverSessionHandlersGroup: 'session',

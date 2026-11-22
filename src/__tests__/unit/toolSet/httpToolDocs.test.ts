@@ -21,6 +21,7 @@ import {
 import { compactToolSet as compactHttpSet } from '../../../../compact-http/src/launcher';
 import { readOnlyToolSet as compactHttpRoSet } from '../../../../compact-http-ro/src/launcher';
 import { compactModifyEntries } from '../../../../compact-modify/src/group';
+import { compactAbapGitEntries } from '../../../lib/compact/abapGit/group';
 import { compactBackgroundRunEntries } from '../../../lib/compact/backgroundRuns/group';
 import { compactBatchEntries } from '../../../lib/compact/batch/group';
 import {
@@ -212,6 +213,7 @@ describe('the compact tool page (compact docs:tools)', () => {
         background: { compactBackgroundRunEntries },
         session: { compactLeftoverSessionEntries },
         batch: { compactBatchEntries },
+        abapGit: { compactAbapGitEntries },
         toolSet: {
           compactToolSetOf,
           compactReadOnlyToolSetOf,

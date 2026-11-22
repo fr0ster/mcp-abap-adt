@@ -288,6 +288,46 @@ describe('canaries over HTTP: the server wire log, the answer, the error', () =>
     }
   }
 
+  for (const tool of TOOLS) {
+    it(`${tool.name}, a connection that throws with no response: no canary and no query anywhere`, async () => {
+      const sap = stubSap(() => {
+        // What a socket error carries: its message and its request config
+        // echo the canaries; there is no response.
+        throw Object.assign(new Error(`socket hang up ${ECHO}`), {
+          code: 'ECONNRESET',
+          config: {
+            url: `/sap/bc/adt/abapgit?u=${ECHO}`,
+            headers: { 'x-echo': ECHO },
+          },
+        });
+      });
+      const connection = withHttpWireLog(sap.connection);
+      const result = await tool.call(contextOn(connection, tool.admission));
+      const text = answerText(result);
+      assert.equal(result.isError, true);
+      assert.deepEqual(canariesIn(text), [], text);
+      const wire = lines.join('');
+      assert.ok(wire.includes('[WIRE'), 'the wire log is on');
+      assert.deepEqual(canariesIn(wire), [], wire);
+      // The request line names the path without its query; the thrown
+      // line has no status to name (`threw ?`).
+      const requestLines = wire
+        .split('\n')
+        .filter((line) => /^\[WIRE \d+\] [A-Z]+ \//.test(line));
+      assert.ok(requestLines.length > 0, wire);
+      for (const line of requestLines) {
+        assert.equal(line.includes('?'), false, line);
+      }
+      assert.ok(wire.includes('threw'), wire);
+      if (SENDS_CREDENTIAL.has(tool.name)) {
+        assert.ok(
+          sap.sent.some(carriesCredential),
+          'the credential reached the request',
+        );
+      }
+    });
+  }
+
   it('a refusal line holds no canary', async () => {
     const sap = stubSap();
     const result = await handlePullAbapGitRepo(

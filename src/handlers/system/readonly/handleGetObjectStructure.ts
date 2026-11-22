@@ -8,9 +8,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import { answerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
@@ -127,10 +128,11 @@ function buildNestedTree(
  * has only that. An include owner is kept in parentheses, since it is where
  * the code lives; the class as owner of its own attribute says nothing.
  */
-function labelOf(node: ObjectStructureTreeNode): string {
+function labelOf(node: ObjectStructureTreeNode, withOwner: boolean): string {
   if (node.isfolder) return `${node.objecttype} [${node.description ?? ''}]`;
   const name = node.description || node.objectname || '';
   const owner =
+    withOwner &&
     node.objectname &&
     node.description &&
     node.objectname !== node.description &&
@@ -142,13 +144,14 @@ function labelOf(node: ObjectStructureTreeNode): string {
 
 function serializeTree(
   tree: ObjectStructureTreeNode[],
+  withOwner: boolean,
   indent: string = '',
 ): string {
   let result = '';
   for (const node of tree) {
-    result += `${indent}- ${labelOf(node)}\n`;
+    result += `${indent}- ${labelOf(node, withOwner)}\n`;
     if (node.children && node.children.length > 0) {
-      result += serializeTree(node.children, `${indent}  `);
+      result += serializeTree(node.children, withOwner, `${indent}  `);
     }
   }
   return result;
@@ -190,11 +193,12 @@ export function assertObjectStructurePresent(value: XmlRead): void {
 export function treeText(
   value: XmlRead,
   root?: { objecttype: string; objectname: string },
+  withOwner = true,
 ): string {
   assertObjectStructurePresent(value);
   const nodes = flatNodesOf(value);
   if (nodes.length === 0) return 'No nodes found in object structure response.';
-  return `tree:\n${serializeTree(buildNestedTree(nodes, root))}`;
+  return `tree:\n${serializeTree(buildNestedTree(nodes, root), withOwner)}`;
 }
 
 export async function handleGetObjectStructure(
@@ -222,6 +226,21 @@ export async function handleGetObjectStructure(
 
   logger?.info(`Fetching object structure for ${objectType}/${objectName}`);
   const detail = detailOf(args);
+  const level = levelOf(args);
+  const root = { objecttype: objectType, objectname: objectName };
+  // What GetObjectStructure answers at each level, selected before the call
+  // (`src/lib/detail`): terse the tree without the include each component's
+  // code lives in; medium the tree with it (the former terse); full the
+  // parse; raw the document.
+  const shown = answerAt<AdtReading<XmlRead>, XmlRead | string>(
+    {
+      terse: (reading) => treeText(reading.value, root, false),
+      medium: (reading) => treeText(reading.value, root, true),
+      full: (reading) => reading.value ?? reading.raw,
+      raw: (reading) => reading.raw,
+    },
+    levelOf(args),
+  );
 
   // `getObjectStructure` takes `analyseException` (adt-clients 23), which
   // reads only an exception document. The presence check runs
@@ -236,13 +255,11 @@ export async function handleGetObjectStructure(
         .getObjectStructure(code, objectName, {
           analyse: analyseException,
         });
-      if (detail === 'terse' && response.ok) {
+      if ((level === 'terse' || level === 'medium') && response.ok) {
         assertObjectStructurePresent(response.getResult().value.value);
       }
       return response;
     },
-    project(detail, (value) =>
-      treeText(value, { objecttype: objectType, objectname: objectName }),
-    ),
+    shown,
   );
 }

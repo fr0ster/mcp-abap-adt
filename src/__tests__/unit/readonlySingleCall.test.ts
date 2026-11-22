@@ -309,6 +309,44 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     assert.deepStrictEqual(call?.args, ['CLAS/OC', 'ZCL_X']);
   });
 
+  it('GetObjectStructure terse leaves the include of each component out; medium keeps it', async () => {
+    const document = {
+      'projectexplorer:objectstructure': {
+        'projectexplorer:node': [
+          {
+            '@': {
+              nodeid: '000002',
+              parentid: '000001',
+              objecttype: 'CLAS/OM',
+              objectname: 'ZCL_X=========CM001',
+              description: 'RUN',
+            },
+          },
+        ],
+      },
+    };
+    fakeClient = fakeClientOf({
+      getObjectStructure: async () => okResponse(reading(document, '<x/>')),
+    });
+    const terse: any = await handleGetObjectStructure(context as any, {
+      objectname: 'ZCL_X',
+      objecttype: 'class',
+    });
+    const medium: any = await handleGetObjectStructure(context as any, {
+      objectname: 'ZCL_X',
+      objecttype: 'class',
+      detail: 'medium',
+    });
+    assert.equal(
+      terse.content[0].text,
+      'tree:\n- class: ZCL_X\n  - CLAS/OM: RUN\n',
+    );
+    assert.equal(
+      medium.content[0].text,
+      'tree:\n- class: ZCL_X\n  - CLAS/OM: RUN (ZCL_X=========CM001)\n',
+    );
+  });
+
   it('GetSqlQuery calls getSqlQuery({sql_query, row_number})', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;

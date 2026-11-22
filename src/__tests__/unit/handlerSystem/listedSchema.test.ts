@@ -260,10 +260,14 @@ describe('every compact binary serves HandlerSystem, refuses a malformed argumen
     it(format('%s over %s on %s', kind, transport, variant), async () => {
       process.env.SAP_SYSTEM_TYPE = variant;
       resetProcessLatchForTests();
-      const before = standIn.requests.length;
       const { client, close } = await binaryClient(transport, kind, standIn);
       try {
         const listed = (await client.listTools()).tools.map((t) => t.name);
+        // The listing asks the system whether it serves abapGit (its
+        // discovery, on the connection of its instance, over Streamable HTTP
+        // logged off when that request's instance ends): what follows,
+        // but that logoff, is the calls'.
+        const listedAt = standIn.requests.length;
         assert.ok(listed.includes('HandlerSystem'));
         // HandlerSearch and HandlerWhereUsed are in no compact set, and a call
         // to either answers as any unknown tool name does.
@@ -308,8 +312,12 @@ describe('every compact binary serves HandlerSystem, refuses a malformed argumen
         // Nothing reached the stand-in for a refused call.
         assert.deepStrictEqual(
           standIn.requests
-            .slice(before)
-            .filter((r) => !r.url.includes('/discovery')),
+            .slice(listedAt)
+            .filter(
+              (r) =>
+                !r.url.includes('/discovery') &&
+                r.url !== '/sap/public/bc/icf/logoff',
+            ),
           [],
         );
       } finally {

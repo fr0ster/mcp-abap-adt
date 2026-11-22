@@ -53,6 +53,7 @@ import { accessChecksFor } from './access/packageTreeAccessChecks';
 import { accessStartLine } from './access/startLine';
 import { unmatchedEntries, withoutDenied } from './access/withoutDenied';
 
+import { CompactAbapGitHandlersGroup } from './compact/abapGit/group';
 import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
 import { CompactBatchHandlersGroup } from './compact/batch/group';
 import {
@@ -75,6 +76,7 @@ import {
   type ServedTransport,
   type ToolSetKind,
 } from './config/binaries';
+import { AbapGitHandlersGroup } from './handlers/groups/AbapGitHandlersGroup.js';
 import { BackgroundRunHandlersGroup } from './handlers/groups/BackgroundRunHandlersGroup.js';
 import { DataHandlersGroup } from './handlers/groups/DataHandlersGroup.js';
 import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
@@ -359,6 +361,8 @@ export const fullToolSet: ToolSet = {
     // The debugger batch beside the debugger; batch mode is the compact
     // sets' (HandlerBatch).
     new DebugBatchHandlersGroup(context),
+    // abapGit, listed where the system's discovery serves it.
+    new AbapGitHandlersGroup(context),
     // The long session, on Streamable HTTP alone.
     ...(servesLongSession(transport)
       ? [new LongSessionHandlersGroup(context)]
@@ -406,6 +410,8 @@ export const fullReadOnlyToolSet: ToolSet = {
     // The data tools, opt-in.
     ...(served.dataTools ? [new DataHandlersGroup(context)] : []),
     new SearchHandlersGroup(context),
+    // abapGit's reads, listed where the system's discovery serves it.
+    new AbapGitHandlersGroup(context, 'reads'),
     // The background runs of the long reads: read, listed and cancelled.
     new BackgroundRunHandlersGroup(context),
     ...(servesLeftoverSessions(transport)
@@ -483,6 +489,8 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
       ]),
       new CompactDebugHandlersGroup(context),
       new CompactDebugBatchHandlersGroup(context),
+      // abapGit, listed where the system's discovery serves it.
+      new CompactAbapGitHandlersGroup(context),
       // Beside the run tool (HandlerProfileRun): its background runs, read,
       // listed and discarded.
       new CompactBackgroundRunHandlersGroup(context),
@@ -536,6 +544,8 @@ export function compactReadOnlyToolSetOf(half: CompactReadOnlyHalf): ToolSet {
         [half.readOnly, ...(served.dataTools ? [half.data] : [])],
         'CompactReadOnlyHandlers',
       ),
+      // abapGit's reads, listed where the system's discovery serves it.
+      new CompactAbapGitHandlersGroup(context, 'reads'),
       // The background runs of the long reads: read, listed and cancelled.
       new CompactBackgroundRunHandlersGroup(context),
       ...(servesLeftoverSessions(transport)

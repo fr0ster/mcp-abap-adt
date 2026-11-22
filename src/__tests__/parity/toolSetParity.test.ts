@@ -1366,7 +1366,17 @@ for (const transportName of [
             (result) => JSON.stringify(result.content),
             (error: unknown) => String(error),
           );
-        const reached = standIn.requests.length - from;
+        // The listing asks the system's discovery whether it serves abapGit,
+        // on the connection of its instance — over Streamable HTTP logged off
+        // when that request's instance ends, which may be while the call
+        // runs: a discovery read and that logoff are the listing's.
+        const reached = standIn.requests
+          .slice(from)
+          .filter(
+            (request) =>
+              !request.url.includes('/discovery') &&
+              request.url !== '/sap/public/bc/icf/logoff',
+          ).length;
         await client.close();
         await started.stop();
         return {

@@ -24,6 +24,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
+import { isAbapGitTool } from '../../../lib/abapGit/tools';
 import {
   BINARIES,
   type ServedTransport,
@@ -113,14 +114,24 @@ function readFixture(file: string): ReadonlyMap<string, readonly string[]> {
 const HTTP_FIXTURE = readFixture('http-surface.json');
 const STDIO_SSE_FIXTURE = readFixture('stdio-sse-surface.json');
 
-/** The one fixture set: each binary's tool names, captured with the flag on. */
-function fixtureNames(transport: ServedTransport, kind: ToolSetKind): string[] {
+/**
+ * The one fixture set: each binary's tool names, captured with the flag on,
+ * as a system lists them whose discovery serves no abapGit — the abapGit
+ * tools are registered with the set and listed only where it does
+ * (`abapGit/availability.test.ts`), so they are added here.
+ */
+function fixtureNames(
+  transport: ServedTransport,
+  kind: ToolSetKind,
+  set: ToolSet,
+): string[] {
   const bin = BINARIES[transport][kind].bin;
   const names = (transport === 'http' ? HTTP_FIXTURE : STDIO_SSE_FIXTURE).get(
     bin,
   );
   assert.ok(names !== undefined, `no fixture for ${bin}`);
-  return [...names];
+  const abapGit = served(set, transport, OFF).filter(isAbapGitTool);
+  return [...names, ...abapGit].sort();
 }
 
 describe('the data tools, by set and transport', () => {
@@ -144,7 +155,7 @@ describe('the data tools, by set and transport', () => {
         });
 
         it('serves the fixture with the flag on', () => {
-          const listed = new Set(fixtureNames(transport, kind));
+          const listed = new Set(fixtureNames(transport, kind, set));
           assert.deepEqual(
             [...new Set(on)].filter((name) => !listed.has(name)),
             [],
@@ -156,7 +167,7 @@ describe('the data tools, by set and transport', () => {
         });
 
         it('serves the fixture minus exactly the three names with the flag off', () => {
-          const expected = fixtureNames(transport, kind).filter(
+          const expected = fixtureNames(transport, kind, set).filter(
             (name) => !ALL_DATA.includes(name),
           );
           assert.deepEqual([...new Set(off)].sort(), expected);

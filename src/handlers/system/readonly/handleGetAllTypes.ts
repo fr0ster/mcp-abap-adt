@@ -15,6 +15,7 @@ import {
   rawLevel,
   readingAt,
   structuredValue,
+  tsv,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -70,15 +71,30 @@ function extractNamedItems(value: XmlRead): NamedItem[] {
 
 /**
  * What `GetAdtTypes` answers at each `detail`: the reading the type list is
- * read with, selected before the call (`src/lib/detail`) — terse the named
- * items read out of the structured parse, full the parse, raw the document.
+ * read with, selected before the call (`src/lib/detail`) — terse a
+ * `name\tdescription` row per type, the description's first line (a group
+ * type lists its members on the lines after it); medium the named items
+ * read out of the structured parse, each description whole; full the parse;
+ * raw the document.
  * adt-strategies' `utilNamedItems` is not used: it reads a numeric name as a
  * number (`007` answers `7`) and an absent description as `""`, where the
  * tool answers the name as sent and no description.
  */
 const TYPE_READINGS: DetailTable<NamedItem[] | XmlNode | string> = {
-  terse: formatted(structuredValue, extractNamedItems),
-  medium: fullLevel,
+  terse: formatted(structuredValue, (value) => {
+    const items = extractNamedItems(value);
+    return [
+      `# count ${items.length}`,
+      tsv(
+        ['name', 'description'],
+        items.map((item) => [
+          item.name,
+          (item.description ?? '').split('\n')[0] ?? '',
+        ]),
+      ),
+    ].join('\n');
+  }),
+  medium: formatted(structuredValue, extractNamedItems),
   full: fullLevel,
   raw: rawLevel,
 };

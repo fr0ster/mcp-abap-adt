@@ -2,7 +2,8 @@
  * The answers of the tools whose own XML walk was replaced by a typed
  * reading adt-strategies ships (terse answers, step 2): at every `detail`,
  * on recorded documents, each answer is the one the tool gave before the
- * swap. The expectation, `tests/fixtures/tools/shipped-readings.json`, was
+ * swap — but where a later step gave a level its own shape (step 4:
+ * GetAdtTypes' terse rows, its medium the former terse), rewritten then. The expectation, `tests/fixtures/tools/shipped-readings.json`, was
  * written by the code before the swap
  * (`npm test -- --env WRITE_SHIPPED_READINGS=1 <this file>`, refused under
  * CI) and reviewed in its diff; every later change must leave it equal.
@@ -42,7 +43,7 @@ const FIXTURE_SOURCE = path.join(
   'shipped-readings.json',
 );
 
-const DETAILS: readonly DetailLevel[] = ['terse', 'full', 'raw'];
+const DETAILS: readonly DetailLevel[] = ['terse', 'medium', 'full', 'raw'];
 
 /** What a handler answered: its error flag and its text. */
 interface Answered {
@@ -311,14 +312,6 @@ describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READ
         }
       });
     }
-  }
-
-  for (const name of Object.keys(CASES)) {
-    it(`${name} @medium answers as @full`, async () => {
-      const run = CASES[name];
-      assert.ok(run);
-      assert.deepStrictEqual(await run('medium'), await run('full'));
-    });
   }
 
   it('no error repeats the document it was answered', () => {

@@ -1,4 +1,4 @@
-import { analyseException, readSearchHits } from '@mcp-abap-adt/adt-strategies';
+import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import { ADT_TYPES_ONPREM } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AdtCodes } from '../../../lib/adtProjections';
@@ -44,7 +44,7 @@ export async function enhancementTypeOf(
   const objectType = ADT_TYPES_ONPREM.enhancement.codes[code].main;
   try {
     const searched = await createAdtClient(connection)
-      .getUtils(ourUtils)
+      .getUtils({ ...ourUtils, search: utilSearchHits })
       .search(
         { query: name, objectType, maxResults: 20 },
         { analyse: analyseException },
@@ -52,12 +52,13 @@ export async function enhancementTypeOf(
     // A search that fails says nothing about the type; the caller keeps the
     // failure it already has.
     if (!searched.ok) return undefined;
-    // The hits as adt-strategies reads a search answer, through the XML
-    // parser; the subtype is the code as SAP sent it, known or not.
+    // The hits as adt-strategies reads a search answer (`utilSearchHits`,
+    // the reading passed to the search); the subtype is the code as SAP
+    // sent it, known or not.
     const wanted = name.toUpperCase();
-    const hit = readSearchHits(searched.getResult().value.raw).find(
-      (each) => each.name.toUpperCase() === wanted,
-    );
+    const hit = searched
+      .getResult()
+      .value.find((each) => each.name.toUpperCase() === wanted);
     if (hit) return hit.type ?? hit.unknownType;
   } catch (error) {
     // A credential failure ends the call as it came. Any other search that

@@ -323,7 +323,7 @@ export const STDIO_MESSAGE_LIMIT_ROW: Parameter = {
   parse: parseStdioMessageLimit,
   valueHint: '=<bytes>',
   section: 'OPTIONS',
-  help: `The server's assumption about the most bytes the MCP client buffers for one stdio message; it changes nothing in the client, and a value above the client's real buffer brings the disconnect back. Default (not given or blank): ${STDIO_MESSAGE_LIMIT}, the MCP SDK client's default read buffer. The server writes no message longer than this less ${STDIO_READ_MARGIN} bytes (one read of the client); a longer answer is answered an error naming both sizes. A whole number of bytes from ${STDIO_MIN_MESSAGE_LIMIT}`,
+  help: `The server's assumption about the most bytes the MCP client buffers for one stdio message; it changes nothing in the client, and a value above the client's real buffer brings the disconnect back. Default (not given or blank): ${STDIO_MESSAGE_LIMIT}, the MCP SDK client's default read buffer. The server writes no message longer than this less ${STDIO_READ_MARGIN} bytes, room for one read of the client (verified for Node, Python MCP and the TS SDK on Bun); a client that reads larger chunks needs a correspondingly lower value. A longer answer is answered an error naming both sizes. A whole number of bytes from ${STDIO_MIN_MESSAGE_LIMIT}`,
 };
 
 /**

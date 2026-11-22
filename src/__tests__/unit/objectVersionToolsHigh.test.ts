@@ -84,7 +84,7 @@ describe('per-object high-level version tools (#30)', () => {
   it('GetClassVersions dispatches to getClass().getVersions({ className })', async () => {
     const versions = [{ versionId: '00001', contentUri: '/x;version=00001' }];
     mockClassGetVersions.mock.mockImplementation(async () =>
-      okResponse(versions),
+      okResponse({ versions, document: '<feed/>' }),
     );
 
     const result = await tool('GetClassVersions').handler(ctx, {
@@ -111,7 +111,9 @@ describe('per-object high-level version tools (#30)', () => {
   });
 
   it('GetFunctionModuleVersions threads function_group_name through', async () => {
-    mockFmGetVersions.mock.mockImplementation(async () => okResponse([]));
+    mockFmGetVersions.mock.mockImplementation(async () =>
+      okResponse({ versions: [], document: '<feed/>' }),
+    );
 
     const result = await tool('GetFunctionModuleVersions').handler(ctx, {
       function_module_name: 'z_my_fm',

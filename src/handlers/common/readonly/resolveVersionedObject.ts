@@ -37,7 +37,10 @@ import {
   type VersionedKind,
 } from '../../../lib/adtProjections';
 import { inCheckedGroupOn } from '../../../lib/strategies/functionModuleGroup';
-import { resultsFor } from '../../../lib/strategies/resultSets';
+import {
+  resultsFor,
+  type VersionFeed,
+} from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
 
 /** object_type values supported for version history (same set as LockObject). */
@@ -58,7 +61,7 @@ export const VERSIONED_OBJECT_TYPES = VERSIONED_KINDS.onprem;
 export interface ResolvedVersionedObject {
   getVersions(options: {
     analyse: IAnalyse;
-  }): Promise<IAdtResponse<IObjectVersion[]>>;
+  }): Promise<IAdtResponse<VersionFeed>>;
   getVersionSource(
     contentUri: string,
     options: { analyse: IAnalyse },
@@ -67,7 +70,7 @@ export interface ResolvedVersionedObject {
 
 /** `obj`'s version members with `config` bound to the history read. */
 function bound<C>(
-  obj: IAdtVersionable<C, IObjectVersion[], string>,
+  obj: IAdtVersionable<C, VersionFeed, string>,
   config: Partial<C>,
 ): ResolvedVersionedObject {
   return {
@@ -181,13 +184,13 @@ function thrown(error: IAdtError, step: string): Error {
 }
 
 /**
- * The version history, as `IObjectVersion[]`. A system without the resource
+ * The version history: the versions (`IObjectVersion[]`) and the document. A system without the resource
  * answers 404/406; `analyseUnsupportedStatus` names that as the unsupported
  * operation the tools report (in adt-clients 22 the member threw it itself).
  */
 export async function readVersions(
   resolved: ResolvedVersionedObject,
-): Promise<IObjectVersion[]> {
+): Promise<VersionFeed> {
   const answered = await resolved.getVersions({
     analyse: analyseUnsupportedStatus([404, 406], 'version history'),
   });

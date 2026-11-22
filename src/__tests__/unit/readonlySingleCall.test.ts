@@ -519,7 +519,10 @@ describe('resolveVersionedObject', () => {
   const versionable = (factory: string) => () => ({
     getVersions: async (config: unknown) => {
       calls.push([factory, config]);
-      return { ok: true, getResult: () => ({ value: [] }) };
+      return {
+        ok: true,
+        getResult: () => ({ value: { versions: [], document: '' } }),
+      };
     },
     getVersionSource: async () => ({
       ok: true,

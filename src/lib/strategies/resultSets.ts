@@ -35,20 +35,43 @@ import {
   utilNodeContents,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { XmlNode } from '../xml/node';
-import { type AdtReading, statusOnly, structured, verbatim } from './reading';
+import {
+  type AdtReading,
+  rawOf,
+  statusOnly,
+  structured,
+  verbatim,
+} from './reading';
 import { sqlPreview } from './sqlPreview';
 import { whereUsedListReading } from './whereUsedList';
 
 /**
+ * A version feed read: the versions as adt-strategies reads them
+ * (`objectVersions`) and the document as it came — the history at
+ * `detail: 'raw'`.
+ */
+export interface VersionFeed {
+  versions: IObjectVersion[];
+  document: string;
+}
+
+/** The `versions` slot's reading: the typed list and its document. */
+export function versionFeed(answer: IAdtWireResponse): VersionFeed {
+  return { versions: objectVersions(answer), document: rawOf(answer) };
+}
+
+/**
  * What a strategy of the table reads an answer into: a reading of the
  * document (`verbatim`, `structured`, `statusOnly`), the text as it came
- * (`asItCame`), or the version list (`objectVersions`).
+ * (`asItCame`), or the version feed (`versionFeed`: the list and its
+ * document).
  */
 type TableReading =
   | AdtReading<string | XmlNode | null | undefined>
   | string
-  | readonly IObjectVersion[];
+  | VersionFeed;
 
 /**
  * Which reading a result-set slot wants — keyed on the slot, because that is
@@ -197,11 +220,12 @@ export const READING_BY_SLOT = {
   // Arrived with adt-clients 23.0.0 in every versionable type's set. The
   // library stopped reading them (MIGRATION-23 §4): `versions` is the feed as
   // it came unless a reading is given, so the list is `objectVersions`'
-  // (`IObjectVersion[]`, what `getVersions` answered in 22.x), and a version's
+  // (`IObjectVersion[]`, what `getVersions` answered in 22.x) beside the
+  // document (`versionFeed`, for `detail: 'raw'`), and a version's
   // source is the text as it came — `asItCame`, the 22.x default. Without
   // them `resultsFor` threw for every versionable type's set, which is nearly
   // every handler here.
-  versions: objectVersions,
+  versions: versionFeed,
   versionSource: asItCame,
 
   // Arrived with adt-clients 23.0.0, when the runtime, executor, abapGit and

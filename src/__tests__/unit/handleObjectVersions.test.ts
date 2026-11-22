@@ -76,7 +76,7 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
       },
     ];
     mockClassGetVersions.mock.mockImplementation(async () =>
-      okResponse(versions),
+      okResponse({ versions, document: '<feed/>' }),
     );
 
     const result = await handleGetObjectVersions(ctx, {
@@ -117,7 +117,7 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
       },
     ];
     mockClassGetVersions.mock.mockImplementation(async () =>
-      okResponse(versions),
+      okResponse({ versions, document: '<feed/>' }),
     );
 
     const result = await handleGetObjectVersions(ctx, {
@@ -132,18 +132,33 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
     assert.equal(v.transportDescription, 'My change');
   });
 
+  it('raw answers the version feed as ADT sent it', async () => {
+    mockClassGetVersions.mock.mockImplementation(async () =>
+      okResponse({ versions: [], document: '<atom:feed>RAW</atom:feed>' }),
+    );
+    const result = await handleGetObjectVersions(ctx, {
+      object_type: 'class',
+      object_name: 'ZCL_X',
+      detail: 'raw',
+    });
+    assert.equal(result.content[0]?.text, '<atom:feed>RAW</atom:feed>');
+  });
+
   it('terse, by default: a TSV row per version, its content_uri the next read', async () => {
     mockClassGetVersions.mock.mockImplementation(async () =>
-      okResponse([
-        {
-          versionId: '00002',
-          author: 'DEV',
-          updatedAt: '2026-06-30T00:00:00Z',
-          title: 'Version List',
-          transportRequest: 'DS4K901917',
-          contentUri: '/sap/bc/adt/x;version=00002',
-        },
-      ]),
+      okResponse({
+        document: '<feed/>',
+        versions: [
+          {
+            versionId: '00002',
+            author: 'DEV',
+            updatedAt: '2026-06-30T00:00:00Z',
+            title: 'Version List',
+            transportRequest: 'DS4K901917',
+            contentUri: '/sap/bc/adt/x;version=00002',
+          },
+        ],
+      }),
     );
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'class',
@@ -160,7 +175,9 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
   });
 
   it('dispatches a table to getTable().getVersions with tableName', async () => {
-    mockTableGetVersions.mock.mockImplementation(async () => okResponse([]));
+    mockTableGetVersions.mock.mockImplementation(async () =>
+      okResponse({ versions: [], document: '<feed/>' }),
+    );
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'table',

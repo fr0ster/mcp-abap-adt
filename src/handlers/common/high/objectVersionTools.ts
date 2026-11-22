@@ -214,7 +214,7 @@ function buildVersionsTool(
       }
 
       try {
-        const versions = await readVersions(resolved);
+        const { versions } = await readVersions(resolved);
         return return_response({
           data: JSON.stringify({
             success: true,

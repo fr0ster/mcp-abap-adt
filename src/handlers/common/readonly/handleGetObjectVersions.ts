@@ -57,6 +57,8 @@ interface VersionsRead {
   object_type: string;
   object_name: string;
   versions: IObjectVersion[];
+  /** The feed as ADT sent it (`detail: 'raw'`). */
+  document: string;
 }
 
 /**
@@ -65,7 +67,7 @@ interface VersionsRead {
  * (`objectVersions`): terse a TSV row per version — versionId, author,
  * updatedAt, transport, content_uri (what GetObjectVersionSource reads) —
  * under the object; medium every field of each version; full the answer
- * before `detail`. The typed reading keeps no document, so raw is full.
+ * before `detail`; raw the feed as ADT sent it.
  */
 const VERSION_ANSWERS: AnswerTable<VersionsRead, string> = {
   terse: (read) =>
@@ -82,9 +84,10 @@ const VERSION_ANSWERS: AnswerTable<VersionsRead, string> = {
         ]),
       ),
     ].join('\n'),
-  medium: (read) => JSON.stringify(read),
-  full: (read) => JSON.stringify({ success: true, ...read }),
-  raw: (read) => JSON.stringify({ success: true, ...read }),
+  medium: ({ document: _document, ...read }) => JSON.stringify(read),
+  full: ({ document: _document, ...read }) =>
+    JSON.stringify({ success: true, ...read }),
+  raw: (read) => read.document,
 };
 
 type GetObjectVersionsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
@@ -126,12 +129,13 @@ export async function handleGetObjectVersions(
     }
 
     try {
-      const versions = await readVersions(resolved);
+      const { versions, document } = await readVersions(resolved);
       return return_response({
         data: shown({
           object_type,
           object_name: object_name.toUpperCase(),
           versions,
+          document,
         }),
       });
     } catch (error) {

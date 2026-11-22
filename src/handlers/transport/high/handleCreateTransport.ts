@@ -24,7 +24,6 @@ import {
   analyseException,
   type ICreatedTransport,
   transportCreated,
-  transportTree,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
@@ -35,14 +34,19 @@ import {
   isCredentialPayload,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  type DetailTable,
+  type LevelReading,
+  readingAt,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
-import { verbatim } from '../../../lib/strategies/reading';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import { rawOf, statusOnly } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
+import { parseTransportXml } from '../readonly/handleGetTransport';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 export const REQUEST_TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -119,7 +123,10 @@ export async function handleCreateTransport(
   // creation, it is said in the answer.
   let task: TypedTask = { number: null, type: null };
 
-  const terseCreatedTransport = (created: ICreatedTransport) => {
+  const terseCreatedTransport = (
+    created: ICreatedTransport,
+    task: TypedTask,
+  ) => {
     return {
       success: true,
       transport_number: created.transportNumber,
@@ -139,13 +146,28 @@ export async function handleCreateTransport(
     };
   };
 
+  // What the create answers at each level, selected before the call: every
+  // level reads the created request (its number is the next request's
+  // address); terse answers it with the task the following requests settle,
+  // the others the document as it came.
+  const createdReadings: DetailTable<CreatedAnswer<Terse>> = {
+    terse: createdAt(
+      (created) => (settled) => terseCreatedTransport(created, settled),
+    ),
+    medium: createdAt((_created, raw) => () => raw),
+    full: createdAt((_created, raw) => () => raw),
+    raw: createdAt((_created, raw) => () => raw),
+  };
+  type Terse = ReturnType<typeof terseCreatedTransport> | string;
+
   return answer(
     { tool: 'CreateTransport', detail },
     async () => {
       const request = createAdtClient(connection, logger).getRequest({
         ...resultsFor(transportDocuments),
-        created: createdReading,
+        created: readingAt(createdReadings, levelOf(args)),
         objects: firstTaskOf,
+        taskTypeChanged: statusOnly,
       });
       const created = await withAdtHeaders(
         context,
@@ -162,7 +184,7 @@ export async function handleCreateTransport(
           ),
       );
       if (!created.ok) return created;
-      const number = created.getResult().value.created().transportNumber;
+      const number = created.getResult().value.value.created.transportNumber;
       const read = await atStep('read request task', () =>
         request.readObjects(number, { analyse: analyseException }),
       )();
@@ -173,7 +195,9 @@ export async function handleCreateTransport(
           'read request task',
         );
       }
-      const first = read.getResult().value;
+      const taskRead = read.getResult().value;
+      if (taskRead.kind === 'threw') throw taskRead.thrown;
+      const first = taskRead.first;
       if (first === undefined) {
         task = { number: null, type: null };
         return created;
@@ -205,10 +229,7 @@ export async function handleCreateTransport(
         'change task type',
       );
     },
-    (reading) =>
-      project(detail, (_value: typeof reading.value) =>
-        terseCreatedTransport(reading.created()),
-      )(reading),
+    (reading) => reading.value.answer(task),
   );
 }
 
@@ -232,28 +253,54 @@ function refusedAfterCreate<T>(
 }
 
 /**
- * `created` read as the table reads it (`verbatim`: the body is the value),
- * with the created request beside it: adt-strategies' `transportCreated` over
- * the same answer, asked only by the terse projection — the body is parsed
- * once it is needed, as it was, and `full` and `raw` read the body alone.
+ * What a create's reading holds at every level: the created request, as
+ * adt-strategies reads the answer (`transportCreated`), and the level's
+ * answer — a pure function of the task the requests after the create settle.
  */
-function createdReading(answer: IAdtWireResponse) {
-  return {
-    ...verbatim(answer),
-    created: (): ICreatedTransport => transportCreated(answer),
+interface CreatedAnswer<A> {
+  created: ICreatedTransport;
+  answer: (task: TypedTask) => A;
+}
+
+/** A level's reading of the create: the request read, and the answer `shown` makes of it and the document. */
+function createdAt<A>(
+  shown: (created: ICreatedTransport, raw: string) => (task: TypedTask) => A,
+): LevelReading<CreatedAnswer<A>> {
+  return (answer) => {
+    const raw = rawOf(answer);
+    const created = transportCreated(answer);
+    return {
+      value: { created, answer: shown(created, raw) },
+      raw,
+      status: answer.status,
+    };
   };
 }
 
 /**
- * The task SAP created with the request, read back: the first task of the
- * request document as adt-strategies reads it (`transportTree`, which finds
- * each `tm:request` and its `tm:task`s, whatever their depth); `undefined`
- * when the request holds none. `transportObjectEntries` cannot answer it: it
- * reads object entries, and a new request's task holds none. A document with
- * no `tm:root` throws, as the read it replaced did.
+ * The request read back, as the server reads it (`parseTransportXml`, the
+ * tasks of the root's `tm:request`): its first task's number, `undefined`
+ * when it holds none; or what the read threw for a document with no
+ * `tm:root` — a bare `<tm:root/>` included — in fixed words, with nothing of
+ * the document in them. The throw is carried, not thrown, so it leaves the
+ * call where the read it replaced threw it, after the read's own verdict.
+ * adt-strategies' `transportObjectEntries` reads object entries, which a new
+ * request's task does not hold, and `transportTree` answers a bare root as no
+ * task and puts the document into its error.
  */
-function firstTaskOf(answer: IAdtWireResponse): string | undefined {
-  const number =
-    transportTree(answer).requests[0]?.tasks[0]?.attributes['tm:number'];
-  return number === undefined || number === '' ? undefined : number;
+type TaskRead =
+  | { readonly kind: 'read'; readonly first: string | undefined }
+  | { readonly kind: 'threw'; readonly thrown: unknown };
+
+function firstTaskOf(answer: IAdtWireResponse): TaskRead {
+  try {
+    const first = parseTransportXml(rawOf(answer), false, true).tasks?.[0]
+      ?.number;
+    return {
+      kind: 'read',
+      first: typeof first === 'string' && first !== '' ? first : undefined,
+    };
+  } catch (thrown) {
+    return { kind: 'threw', thrown };
+  }
 }

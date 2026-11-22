@@ -222,6 +222,18 @@ describe('a url argument: userinfo, a query or a fragment refused before sending
     assert.equal(argumentUrlFault('https://'), 'not-a-url');
   });
 
+  it('refuses every scheme but https and http before anything is sent', () => {
+    for (const url of [
+      'file:///team/repo',
+      'ftp://git.example/team/repo',
+      'ssh://git.example/team/repo',
+      'git://git.example/team/repo',
+    ]) {
+      assert.equal(argumentUrlFault(url), 'not-git-scheme', url);
+    }
+    assert.equal(argumentUrlFault('http://git.example/team/repo'), undefined);
+  });
+
   it('refuses every spelling the parser would change', () => {
     for (const url of [
       'https:///@git.example/org/repo',

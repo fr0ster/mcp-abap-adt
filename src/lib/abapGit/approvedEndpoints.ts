@@ -52,7 +52,8 @@ export type RemoteUrlFault =
   | 'query'
   | 'fragment'
   | 'dot-segment'
-  | 'not-exact';
+  | 'not-exact'
+  | 'not-git-scheme';
 
 /** A configuration that cannot be served: the server does not start. */
 export class ApprovedEndpointError extends Error {
@@ -70,6 +71,7 @@ const FAULT_WORDS: Readonly<Record<RemoteUrlFault, string>> = {
   fragment: 'carries a fragment',
   'dot-segment': 'carries a dot segment in its path',
   'not-exact': 'is not written as the URL parser writes it',
+  'not-git-scheme': 'is not an https or http URL',
 };
 
 /** The fixed words of a remote URL fault, naming the place, never the URL. */
@@ -108,6 +110,10 @@ export function exactRemote(
   }
   if (parsed.username !== '' || parsed.password !== '') {
     return { fault: 'userinfo' };
+  }
+  // Only https and http are git remotes SAP's abapGit reaches.
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return { fault: 'not-git-scheme' };
   }
   if (raw.path.split('/').some(isDotSegment)) return { fault: 'dot-segment' };
   const written = rawParts(parsed.href);

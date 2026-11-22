@@ -222,6 +222,7 @@ const JSON_ANSWERING: readonly string[] = [
   'GetATCResult',
   'GetAdtTypes',
   'GetInactiveObjects',
+  'GetIncludesList',
   'GetMainPrograms',
   'GetMessageClassMessage',
   'GetObjectOutline',

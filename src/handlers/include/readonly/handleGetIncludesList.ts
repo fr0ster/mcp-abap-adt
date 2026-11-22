@@ -36,6 +36,13 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import {
+  type AnswerTable,
+  answerAt,
+  type DetailLevel,
+  indentedTsv,
+  type TreeRow,
+} from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -49,6 +56,7 @@ import {
 } from '../../../lib/longTools';
 import { linesOf } from '../../../lib/plainText';
 import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
+import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import {
   type FunctionGroupNodeSource,
   fetchFunctionGroupChildren,
@@ -168,6 +176,7 @@ function includesListFields(variant: ProjectionVariant) {
       .describe(
         '[read-only] If true, returns structured JSON with metadata and raw XML.',
       ),
+    ...DETAIL_SHAPE,
   };
 }
 
@@ -294,9 +303,94 @@ function readSource(response: SourceAnswer): SourceRead {
   return absent ? { kind: 'absent' } : { kind: 'refused', error };
 }
 
+/** One object's tree as read: the object, its tree, and what could not be read. */
+interface IncludesRead {
+  object_name: string;
+  object_type: string;
+  tree: IncludeNode;
+  unreadable: AnswerObject[];
+}
+
+/** What a level answers of one object's tree. */
+type IncludesShown = (read: IncludesRead) => string;
+
+/** The tree as indented rows: name, and `cyclic` or `duplicate` where it is so. */
+function includeRows(node: IncludeNode, depth = 0): TreeRow[] {
+  const mark =
+    node.cyclic === true
+      ? 'cyclic'
+      : node.duplicate === true
+        ? 'duplicate'
+        : '';
+  return [
+    { depth, cells: mark === '' ? [node.name] : [node.name, mark] },
+    ...node.children.flatMap((child) => includeRows(child, depth + 1)),
+  ];
+}
+
+/** The tree without empty children: every field read, nothing implied (medium). */
+interface MediumIncludeNode {
+  name: string;
+  type?: string;
+  cyclic?: boolean;
+  duplicate?: boolean;
+  children?: MediumIncludeNode[];
+}
+
+function mediumInclude(node: IncludeNode): MediumIncludeNode {
+  const children = node.children.map(mediumInclude);
+  return {
+    name: node.name,
+    ...(node.type !== undefined ? { type: node.type } : {}),
+    ...(node.cyclic !== undefined ? { cyclic: node.cyclic } : {}),
+    ...(node.duplicate !== undefined ? { duplicate: node.duplicate } : {}),
+    ...(children.length > 0 ? { children } : {}),
+  };
+}
+
+/**
+ * What GetIncludesList answers of one object at each `detail`, selected
+ * before the reads (`src/lib/detail`): terse the tree as indented names
+ * under `# object`, a `# unreadable NAME` line per include that could not be
+ * read; medium the tree without empty children; full the answer before
+ * `detail`. A tree reads many documents, so raw is the full answer.
+ */
+const INCLUDES_ANSWERS: AnswerTable<IncludesRead, string> = {
+  terse: (read) =>
+    [
+      `# object ${read.object_type} ${read.object_name}`,
+      ...read.unreadable.map(
+        (entry) => `# unreadable ${String(entry.name ?? '')}`,
+      ),
+      indentedTsv(includeRows(read.tree)),
+    ].join('\n'),
+  medium: (read) =>
+    JSON.stringify({
+      object_name: read.object_name,
+      object_type: read.object_type,
+      tree: mediumInclude(read.tree),
+      ...(read.unreadable.length > 0 ? { unreadable: read.unreadable } : {}),
+    }),
+  full: fullIncludes,
+  raw: fullIncludes,
+};
+
+/** The answer before `detail`: the tree, and what could not be read only when there is something. */
+function fullIncludes(read: IncludesRead): string {
+  return JSON.stringify({
+    object_name: read.object_name,
+    object_type: read.object_type,
+    tree: read.tree,
+    // Only when there is something to say: a caller reading a tree needs to
+    // know it is short, and why.
+    ...(read.unreadable.length > 0 ? { unreadable: read.unreadable } : {}),
+  });
+}
+
 async function includesListOf(
   context: HandlerContext,
   args: IncludesListArgs,
+  shown: IncludesShown,
 ): Promise<McpResult> {
   const { connection, logger } = context;
   try {
@@ -476,13 +570,11 @@ async function includesListOf(
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: shown({
             object_name: parent.name,
             object_type: parent.kind,
             tree,
-            // Only when there is something to say: a caller reading a tree
-            // needs to know it is short, and why.
-            ...(unreadable.length > 0 ? { unreadable } : {}),
+            unreadable,
           }),
         },
       ],
@@ -715,6 +807,7 @@ async function treeFromAnswers(
   context: HandlerContext,
   parent: { kind: ParentKind; name: string },
   answers: IncludeAnswers,
+  shown: IncludesShown,
 ): Promise<McpResult> {
   const { logger } = context;
   try {
@@ -843,11 +936,11 @@ async function treeFromAnswers(
       content: [
         {
           type: 'text',
-          text: JSON.stringify({
+          text: shown({
             object_name: parent.name,
             object_type: parent.kind,
             tree,
-            ...(unreadable.length > 0 ? { unreadable } : {}),
+            unreadable,
           }),
         },
       ],
@@ -870,6 +963,7 @@ async function treeFromAnswers(
 async function includeTrees(
   context: HandlerContext,
   parents: ReadonlyArray<{ kind: ParentKind; name: string }>,
+  shown: IncludesShown,
 ): Promise<McpResult[]> {
   const answers = includeAnswers(context);
   await answers.phase(parents.map(firstRead));
@@ -939,7 +1033,7 @@ async function includeTrees(
   }
   const trees: McpResult[] = [];
   for (const parent of parents) {
-    trees.push(await treeFromAnswers(context, parent, answers));
+    trees.push(await treeFromAnswers(context, parent, answers, shown));
   }
   return trees;
 }
@@ -959,7 +1053,20 @@ function endsList(result: McpResult): boolean {
 function listAnswer(
   objects: ReadonlyArray<{ object_name: string; object_type: string }>,
   results: readonly McpResult[],
+  level: DetailLevel,
 ): McpResult {
+  if (level === 'terse') {
+    const text = results
+      .map((result, i) => {
+        const asked = objects[i];
+        const body = result.content[0]?.text ?? '';
+        return result.isError
+          ? `# object ${asked?.object_type ?? ''} ${asked?.object_name ?? ''}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
+          : body;
+      })
+      .join('\n');
+    return { isError: false, content: [{ type: 'text', text }] };
+  }
   const entries = results.map((result, i) => {
     const asked = objects[i];
     return result.isError
@@ -982,6 +1089,7 @@ export async function handleGetIncludesList(
 ) {
   // The schema holds the rule: one object, or a non-empty `objects`.
   const { logger } = context;
+  const shown = answerAt(INCLUDES_ANSWERS, levelOf(args));
   const listed = args?.objects;
   if (listed === undefined) {
     const parent =
@@ -992,13 +1100,13 @@ export async function handleGetIncludesList(
         : undefined;
     // A class is one metadata read: there is nothing to read together.
     if (parent === undefined || parent.kind === 'CLAS/OC') {
-      return includesListOf(context, args);
+      return includesListOf(context, args, shown);
     }
     try {
       return await withSequentialFallback<McpResult>(
         context,
-        async () => (await includeTrees(context, [parent]))[0],
-        () => includesListOf(context, args),
+        async () => (await includeTrees(context, [parent], shown))[0],
+        () => includesListOf(context, args, shown),
       );
     } catch (error) {
       logger?.error(`Error getting includes list: ${messageOf(error)}`);
@@ -1027,28 +1135,30 @@ export async function handleGetIncludesList(
         const read = parents.filter(
           (p): p is { kind: ParentKind; name: string } => p !== undefined,
         );
-        const trees = await includeTrees(context, read);
+        const trees = await includeTrees(context, read, shown);
         const results: McpResult[] = [];
         let at = 0;
         for (const [i, parent] of parents.entries()) {
           if (parent === undefined) {
-            results.push(await includesListOf(context, single(objects[i])));
+            results.push(
+              await includesListOf(context, single(objects[i]), shown),
+            );
           } else {
             results.push(trees[at++]);
           }
         }
-        return listAnswer(objects, results);
+        return listAnswer(objects, results, levelOf(args));
       },
       async () => {
         // One object after another, each as the single call reads it; a
         // credential failure ends the call, and nothing after it is read.
         const results: McpResult[] = [];
         for (const o of objects) {
-          const result = await includesListOf(context, single(o));
+          const result = await includesListOf(context, single(o), shown);
           if (endsList(result)) return result;
           results.push(result);
         }
-        return listAnswer(objects, results);
+        return listAnswer(objects, results, levelOf(args));
       },
     );
   } catch (error) {

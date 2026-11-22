@@ -4,7 +4,7 @@ import type {
   AdtObjectIdentity,
   IIncludeConfig,
 } from '@mcp-abap-adt/interfaces-adt';
-import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
+import { handleGetIncludesList as handleGetIncludesListOf } from '../../handlers/include/readonly/handleGetIncludesList';
 import * as clients from '../../lib/clients';
 import {
   fakeClientOf,
@@ -13,6 +13,12 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleGetIncludesList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetIncludesList = (
+  context: Parameters<typeof handleGetIncludesListOf>[0],
+  args: Parameters<typeof handleGetIncludesListOf>[1],
+) => handleGetIncludesListOf(context, { detail: 'full', ...args });
 
 // The declared variant the boundary checks a type argument against.
 // The declared variant: the kind stated, read by the real variantOf.
@@ -74,6 +80,30 @@ describe('GetIncludesList', () => {
     );
 
     assert.deepStrictEqual(names(answered.tree), [{ ZINC1: ['ZINC2'] }]);
+  });
+
+  it('terse, by default: the tree as indented names under its object', async () => {
+    const sources: Record<string, string> = {
+      ZINC1: 'FORM x.\n  INCLUDE zinc2.\nENDFORM.',
+      ZINC2: 'DATA a TYPE i.',
+    };
+    fakeClient = fakeClientOf({
+      readObjectSource: async () => source('REPORT zprog.\nINCLUDE zinc1.\n'),
+      read: async (config: IncludeIdentity) =>
+        source(sources[config.includeName ?? ''] ?? ''),
+      fetchNodeStructure: async () =>
+        okResponse({ objects: [], childNodes: [] }),
+    });
+
+    const result: any = await handleGetIncludesListOf(context as any, {
+      object_name: 'ZPROG',
+      object_type: 'PROG/P',
+    });
+
+    assert.equal(
+      result.content[0].text,
+      ['# object PROG/P ZPROG', 'ZPROG', '  ZINC1', '    ZINC2'].join('\n'),
+    );
   });
 
   it('treats SAPL<fg> as its function group: the direct includes are those no other include of the group includes', async () => {

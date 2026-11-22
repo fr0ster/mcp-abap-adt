@@ -23,7 +23,7 @@ import type {
 import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
 import {
   TOOL_DEFINITION as GetIncludesList,
-  handleGetIncludesList,
+  handleGetIncludesList as handleGetIncludesListOf,
 } from '../../../handlers/include/readonly/handleGetIncludesList';
 import type { HandlerContext } from '../../../handlers/interfaces';
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
@@ -39,6 +39,12 @@ import {
 } from '../../helpers/batchEnvelope';
 import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
+
+/** handleGetIncludesList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetIncludesList = (
+  context: Parameters<typeof handleGetIncludesListOf>[0],
+  args: Parameters<typeof handleGetIncludesListOf>[1],
+) => handleGetIncludesListOf(context, { detail: 'full', ...args });
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

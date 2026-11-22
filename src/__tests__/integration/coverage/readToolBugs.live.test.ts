@@ -8,9 +8,9 @@
  *   object is `whereused_readonly.test_whereused.oversized_class`; the case
  *   fails naming it when the config states none.
  * - `GetPackageContents` with subpackages, on both systems: the shared
- *   package's super package (`shared_dependencies.super_package`, which the
- *   config must state) lists each row once, and each subpackage SAP's
- *   package document names once.
+ *   package's super package (`shared_dependencies.super_package`; the case
+ *   skips naming it when the config leaves it blank) lists each row once,
+ *   and each subpackage SAP's package document names once.
  * - `SearchObject`, on both systems: for each mask, as many rows as SAP's
  *   quick search answers to the same query.
  *
@@ -29,6 +29,7 @@ import {
 } from '../helpers/configHelpers';
 import type { LaunchedServer } from '../helpers/launchedServers';
 import { liveConnection, liveSuite } from '../helpers/live';
+import { skipRunningTest } from '../helpers/runningTest';
 import {
   destinationArgs,
   getHardModeConfig,
@@ -51,15 +52,12 @@ function oversizedClass(): string {
   return named;
 }
 
-/** The shared package's super package. */
-function superPackage(): string {
+/** The shared package's super package, or undefined when the config leaves it blank. */
+function superPackage(): string | undefined {
   const named = member(getSharedDependenciesConfig(), 'super_package');
-  if (typeof named !== 'string' || named === '') {
-    throw new Error(
-      'the test config names no shared_dependencies.super_package',
-    );
-  }
-  return named.toUpperCase();
+  return typeof named === 'string' && named !== ''
+    ? named.toUpperCase()
+    : undefined;
 }
 
 /** The full set's stdio binary for the configured system, guarded. */
@@ -176,6 +174,12 @@ liveSuite(
   () => {
     it('each row once, each subpackage SAP names once', async () => {
       const pkg = superPackage();
+      if (pkg === undefined) {
+        skipRunningTest(
+          'the config leaves shared_dependencies.super_package blank: no package with a subpackage to walk',
+        );
+        return;
+      }
       const server = await launched();
       let text: string;
       try {

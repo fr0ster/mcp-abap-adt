@@ -225,7 +225,7 @@ describe('stdio: abapGit always listed, served by the system’s discovery at ca
     }
   });
 
-  it('an unserved system answers abapgit_not_served and sends nothing else', async () => {
+  it('an unserved system answers abapgit_not_served: the cold call sends the logon, the systeminformation read and the discovery, and no abapGit request or credential', async () => {
     const standIn = await adtStandIn();
     standIn.body(isDiscovery, UNSERVED_DISCOVERY);
     const s = await stdio(standIn);
@@ -236,15 +236,26 @@ describe('stdio: abapGit always listed, served by the system’s discovery at ca
       assert.equal(answer.isError, true);
       assert.match(answer.text, /abapgit_not_served/);
       assert.match(answer.text, /abapGit is not served by this system/);
+      const sent = standIn.requests.slice(before);
+      // Taking the connection logs on (its CSRF fetch) and reads
+      // systeminformation; the availability check reads the discovery.
+      // Nothing else is sent.
       assert.deepEqual(
-        standIn.requests
-          .slice(before)
-          .filter((request) => !isDiscovery(request))
-          .map((request) => request.url)
-          .filter((url) => !isConnectionSetup(url)),
-        [],
+        sent.map((request) => `${request.method} ${request.url.split('?')[0]}`),
+        [
+          'GET /sap/bc/adt/core/discovery',
+          'GET /sap/bc/adt/core/http/systeminformation',
+          'GET /sap/bc/adt/discovery',
+        ],
       );
-      assert.equal(discoveryReads(standIn), 1);
+      for (const request of sent) {
+        assert.deepEqual(
+          Object.keys(request.headers).filter((name) =>
+            name.startsWith('x-abapgit-'),
+          ),
+          [],
+        );
+      }
     } finally {
       await s.close();
       await standIn.close();

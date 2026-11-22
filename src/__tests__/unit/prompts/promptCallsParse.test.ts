@@ -119,7 +119,7 @@ const SERVED_COUNTS: Readonly<
       check: 14,
       unit_test: 6,
       where_used: 18,
-      transport: 5,
+      transport: 6,
     },
     cloud: {
       create: 16,
@@ -130,12 +130,12 @@ const SERVED_COUNTS: Readonly<
       check: 14,
       unit_test: 6,
       where_used: 18,
-      transport: 5,
+      transport: 6,
     },
   },
   'compact-ro': {
-    onprem: { get: 22, check: 14, where_used: 18, transport: 2 },
-    cloud: { get: 22, check: 14, where_used: 18, transport: 2 },
+    onprem: { get: 22, check: 14, where_used: 18, transport: 3 },
+    cloud: { get: 22, check: 14, where_used: 18, transport: 3 },
   },
 };
 

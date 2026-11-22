@@ -405,6 +405,7 @@ for (const [fixture, declaring] of [
   // report — indistinguishable from correct.
   ['declares-no-answer-call', ['FixtureDeclaresNoAnswerCall']],
   ['declares-debug-fixed-level', ['FixtureDebugFixedLevel']],
+  ['declares-reading-at-fixed-level', ['FixtureReadingAtFixedLevel']],
   ['undeclared-debug-reads-args', []],
 ] as const) {
   it(format('reports %s rather than skipping it', fixture), () => {
@@ -417,6 +418,16 @@ for (const [fixture, declaring] of [
     );
   });
 }
+
+it('accepts a tool that selects its reading by the level asked for', () => {
+  assert.deepStrictEqual(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-reading-by-level.ts'],
+      new Set(['FixtureReadingByLevel']),
+    ),
+    [],
+  );
+});
 
 it('accepts a debug tool that hands its arguments to the adapters', () => {
   assert.deepStrictEqual(

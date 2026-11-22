@@ -106,8 +106,8 @@ describe('matchEndpoint: an exact remote URL, or a trusted alias', () => {
     }
   });
 
-  it('the default port is the same endpoint as none', () => {
-    assert.notEqual(
+  it('a default port written out is a spelling the parser changes: no match', () => {
+    assert.equal(
       matchEndpoint('https://git.example:443/org/repo', configured),
       undefined,
     );
@@ -220,6 +220,22 @@ describe('a url argument: userinfo, a query or a fragment refused before sending
   it('refuses a URL the parser rejects: it is never forwarded', () => {
     assert.equal(argumentUrlFault('not a url'), 'not-a-url');
     assert.equal(argumentUrlFault('https://'), 'not-a-url');
+  });
+
+  it('refuses every spelling the parser would change', () => {
+    for (const url of [
+      'https:///@git.example/org/repo',
+      'https://git.example/org/.\t./repo',
+      'HTTPS://git.example/org/repo',
+      'https://git.example:443/org/repo',
+      'https://git.example/a b',
+      'https://git.example\\org/repo',
+      ' https://git.example/org/repo',
+    ]) {
+      assert.notEqual(argumentUrlFault(url), undefined, JSON.stringify(url));
+    }
+    assert.equal(argumentUrlFault('https://git.example'), undefined);
+    assert.equal(argumentUrlFault('https://GIT.example/org/repo'), undefined);
   });
 
   it('refuses a dot segment in the path, literal or encoded', () => {

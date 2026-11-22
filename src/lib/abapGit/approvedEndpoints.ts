@@ -51,7 +51,8 @@ export type RemoteUrlFault =
   | 'userinfo'
   | 'query'
   | 'fragment'
-  | 'dot-segment';
+  | 'dot-segment'
+  | 'not-exact';
 
 /** A configuration that cannot be served: the server does not start. */
 export class ApprovedEndpointError extends Error {
@@ -68,6 +69,7 @@ const FAULT_WORDS: Readonly<Record<RemoteUrlFault, string>> = {
   query: 'carries a query',
   fragment: 'carries a fragment',
   'dot-segment': 'carries a dot segment in its path',
+  'not-exact': 'is not written as the URL parser writes it',
 };
 
 /** The fixed words of a remote URL fault, naming the place, never the URL. */
@@ -80,21 +82,21 @@ export function remoteUrlFaultWords(
 
 /**
  * The exact form of a remote URL — `https://<host, lower-cased>[:<port>]<path>`
- * — or the fault that keeps it from being one. Read on the raw text first,
- * plain string code: a `?` or `#` anywhere is a query or a fragment (an
- * empty one included), an `@` in the authority is userinfo (an empty one
- * included), a `\` or no `<scheme>://` is no URL, a `.` or `..` segment of
- * the path — literal or percent-encoded — is a dot segment. Then the WHATWG
- * URL parser reads the host (lower-cased) and the port (a default one
- * dropped); the path is kept exactly as written, never as the parser
- * normalises it.
+ * — or the fault that keeps it from being one. A `?` or `#` anywhere is a
+ * query or a fragment, an `@` in the authority userinfo (an empty one
+ * included), a `.` or `..` path segment — literal or percent-encoded — a dot
+ * segment. Beyond those, one rule: the raw text is accepted only as the
+ * WHATWG URL parser writes it (`href`) — the same scheme, the same authority
+ * but for the host's letter case, the same path but for the `/` the parser
+ * gives an empty one. Anything the parser would change (an extra slash, a
+ * tab or a space, a `\`, the scheme's case, a default port written out) is
+ * `not-exact`. The path is kept as written.
  */
 export function exactRemote(
   text: string,
 ): { readonly exact: string } | { readonly fault: RemoteUrlFault } {
   if (text.includes('?')) return { fault: 'query' };
   if (text.includes('#')) return { fault: 'fragment' };
-  if (text.includes('\\')) return { fault: 'not-a-url' };
   const raw = rawParts(text);
   if (raw === undefined) return { fault: 'not-a-url' };
   if (raw.authority.includes('@')) return { fault: 'userinfo' };
@@ -107,24 +109,36 @@ export function exactRemote(
   if (parsed.username !== '' || parsed.password !== '') {
     return { fault: 'userinfo' };
   }
-  if (parsed.hostname === '') return { fault: 'not-a-url' };
   if (raw.path.split('/').some(isDotSegment)) return { fault: 'dot-segment' };
+  const written = rawParts(parsed.href);
+  if (
+    written === undefined ||
+    raw.scheme !== written.scheme ||
+    raw.authority.toLowerCase() !== written.authority ||
+    !(raw.path === written.path || (raw.path === '' && written.path === '/'))
+  ) {
+    return { fault: 'not-exact' };
+  }
   if (parsed.protocol !== 'https:') return { fault: 'not-https' };
-  const port = parsed.port === '' ? '' : `:${parsed.port}`;
-  return { exact: `https://${parsed.hostname}${port}${raw.path}` };
+  return { exact: `https://${written.authority}${raw.path}` };
 }
 
-/** The raw authority and path of `<scheme>://<authority><path>`, as written. */
-function rawParts(
-  text: string,
-): { readonly authority: string; readonly path: string } | undefined {
+/** The raw scheme, authority and path of `<scheme>://<authority><path>`, as written. */
+function rawParts(text: string):
+  | {
+      readonly scheme: string;
+      readonly authority: string;
+      readonly path: string;
+    }
+  | undefined {
   const start = text.indexOf('://');
   if (start <= 0) return undefined;
+  const scheme = text.slice(0, start);
   const rest = text.slice(start + 3);
   const slash = rest.indexOf('/');
   return slash < 0
-    ? { authority: rest, path: '' }
-    : { authority: rest.slice(0, slash), path: rest.slice(slash) };
+    ? { scheme, authority: rest, path: '' }
+    : { scheme, authority: rest.slice(0, slash), path: rest.slice(slash) };
 }
 
 /** Whether a path segment is `.` or `..`, any dot written as `%2e` or `%2E`. */

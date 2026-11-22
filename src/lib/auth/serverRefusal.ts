@@ -92,7 +92,7 @@ export const ABAPGIT_RUN_LOG_NOT_PAIRED_WORDS =
 
 /** A `url` argument that is no URL, or carries userinfo, a query, a fragment or a dot segment (spec §5.1). */
 export const ABAPGIT_URL_REFUSED_WORDS =
-  'url is not an absolute URL, or carries a user or a password, a query, a fragment or a dot segment: give the remote URL alone — the credential comes from the approved endpoints; nothing was sent';
+  'url is not an absolute URL written as the URL parser writes it, or carries a user or a password, a query, a fragment or a dot segment: give the remote URL alone — the credential comes from the approved endpoints; nothing was sent';
 
 /** A request whose `x-abapgit-*` headers state no endpoint that can be one (spec §5.2). */
 export const ABAPGIT_ENDPOINT_REFUSED_WORDS =

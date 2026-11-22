@@ -1,11 +1,10 @@
-import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
+import { ourServiceBindingReads } from '../../../lib/strategies/resultSets';
 import {
   parseServiceBindingPayload,
   type ServiceBindingResponseFormat,
@@ -36,7 +35,7 @@ export async function handleListServiceBindingTypes(
   const { connection, logger } = context;
   const responseFormat = args.response_format ?? 'xml';
   const obj = createAdtClient(connection, logger).getServiceBinding(
-    resultsFor(serviceDocuments),
+    ourServiceBindingReads,
   );
 
   // `getServiceBindingTypes(options?)` takes nothing but `analyse`, which

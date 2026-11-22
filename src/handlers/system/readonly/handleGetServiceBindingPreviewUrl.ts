@@ -35,7 +35,6 @@ import {
   ddlDocuments,
   getSystemInformation,
   serviceDefinitionDocuments,
-  serviceDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
@@ -62,7 +61,10 @@ import {
   feapV4Descriptor,
 } from '../../../lib/strategies/feapDescriptor';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
+import {
+  ourServiceBindingReads,
+  resultsFor,
+} from '../../../lib/strategies/resultSets';
 import {
   failedWith,
   sequence,
@@ -206,7 +208,7 @@ export async function handleGetServiceBindingPreviewUrl(
   const { service_binding_name } = args;
   const bindingName = service_binding_name.trim().toUpperCase();
   const adt = createAdtClient(connection, logger);
-  const binding = adt.getServiceBinding(resultsFor(serviceDocuments));
+  const binding = adt.getServiceBinding(ourServiceBindingReads);
   const definition = adt.getServiceDefinition(
     resultsFor(serviceDefinitionDocuments),
   );

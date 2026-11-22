@@ -5,6 +5,7 @@ import {
   feedDocuments,
   profilerDocuments,
   programExecutorDocuments,
+  serviceDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import {
@@ -399,6 +400,18 @@ export const ourUtils = {
   // `modifyWhereUsedScope` edits its text and `whereUsedScopeTypesOf` reads
   // the types out of it, so the structured parse was thrown away.
   whereUsedScope: verbatim,
+};
+
+/**
+ * The service-binding set of the reads (`ListServiceBindingTypes`,
+ * `GetServiceBindingPreviewUrl`): the binding types and the service group are
+ * read as their documents — the tools answer the types' text in the format
+ * asked, and the preview URL reads the group's category URLs out of its text.
+ */
+export const ourServiceBindingReads = {
+  ...resultsFor(serviceDocuments),
+  bindingTypes: verbatim,
+  odata: verbatim,
 };
 
 /**

@@ -393,7 +393,7 @@
   },
   "CreateTransport with a task, typed S @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":\"SIDK900012\",\"task_type\":\"S\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
+    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":\"SIDK900012\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011",
@@ -402,7 +402,7 @@
   },
   "CreateTransport with a task, typed S @medium": {
     "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":\"SIDK900012\",\"task_type\":\"S\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011",
@@ -429,7 +429,7 @@
   },
   "CreateTransport with a task, left X @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":\"SIDK900012\",\"task_type\":\"X\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
+    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":\"SIDK900012\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -437,7 +437,7 @@
   },
   "CreateTransport with a task, left X @medium": {
     "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":\"SIDK900012\",\"task_type\":\"X\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -461,7 +461,7 @@
   },
   "CreateTransport without a task @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request exists, but its read showed no task, so no task type was applied\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
+    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request exists, but its read showed no task, so no task type was applied\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -469,7 +469,7 @@
   },
   "CreateTransport without a task @medium": {
     "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request exists, but its read showed no task, so no task type was applied\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -493,7 +493,7 @@
   },
   "CreateTransport read back as a bare root @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request exists, but its read showed no task, so no task type was applied\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
+    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request exists, but its read showed no task, so no task type was applied\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -501,7 +501,7 @@
   },
   "CreateTransport read back as a bare root @medium": {
     "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request exists, but its read showed no task, so no task type was applied\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -589,7 +589,7 @@
   },
   "CreateTransportTask typed S @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"request\":\"SIDK900011\",\"task_number\":\"SIDK907073\",\"owner\":\"DEVELOPER\",\"task_type\":\"S\"}",
+    "text": "{\"task_number\":\"SIDK907073\",\"task_type\":\"S\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks",
       "PUT /sap/bc/adt/cts/transportrequests/SIDK907073"
@@ -597,7 +597,7 @@
   },
   "CreateTransportTask typed S @medium": {
     "isError": false,
-    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"tasks\",\"tm:number\":\"SIDK907073\",\"tm:uri\":\"/sap/bc/adt/cts/transportrequests/SIDK907073\"}}}",
+    "text": "{\"success\":true,\"request\":\"SIDK900011\",\"task_number\":\"SIDK907073\",\"owner\":\"DEVELOPER\",\"task_type\":\"S\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks",
       "PUT /sap/bc/adt/cts/transportrequests/SIDK907073"
@@ -621,7 +621,7 @@
   },
   "CreateTransportTask a parent named beside the task, typed S @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"request\":\"SIDK900011\",\"task_number\":\"SIDK907073\",\"owner\":\"DEVELOPER\",\"task_type\":\"S\"}",
+    "text": "{\"task_number\":\"SIDK907073\",\"task_type\":\"S\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks",
       "PUT /sap/bc/adt/cts/transportrequests/SIDK907073"
@@ -629,7 +629,7 @@
   },
   "CreateTransportTask a parent named beside the task, typed S @medium": {
     "isError": false,
-    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"@\":{\"tm:number\":\"SIDK907071\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"tasks\",\"tm:number\":\"SIDK907073\"}}}",
+    "text": "{\"success\":true,\"request\":\"SIDK900011\",\"task_number\":\"SIDK907073\",\"owner\":\"DEVELOPER\",\"task_type\":\"S\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks",
       "PUT /sap/bc/adt/cts/transportrequests/SIDK907073"
@@ -653,12 +653,12 @@
   },
   "CreateTransportTask no number answered @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"request\":\"SIDK900011\",\"task_number\":null,\"owner\":\"DEVELOPER\",\"task_type\":\"X\",\"note\":\"the answer carried no task number — read the request to see whether a task was created\"}",
+    "text": "{\"task_number\":null,\"task_type\":\"X\",\"note\":\"the answer carried no task number — read the request to see whether a task was created\"}",
     "requests": ["POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"]
   },
   "CreateTransportTask no number answered @medium": {
     "isError": false,
-    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\"}}}",
+    "text": "{\"success\":true,\"request\":\"SIDK900011\",\"task_number\":null,\"owner\":\"DEVELOPER\",\"task_type\":\"X\",\"note\":\"the answer carried no task number — read the request to see whether a task was created\"}",
     "requests": ["POST /sap/bc/adt/cts/transportrequests/SIDK900011/tasks"]
   },
   "CreateTransportTask no number answered @full": {

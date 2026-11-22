@@ -64,7 +64,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateTransport',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number, task_number and task_type.',
+    'Creates a transport request and gives the task SAP creates with it the type task_type (default S, Development/Correction). Response: JSON with transport_number and task_number (and task_type_error or a note when the task is left untyped); with detail medium, the request as created too.',
   inputSchema: createArguments('CreateTransport', {
     transport_type: z
       .enum(['workbench', 'customizing'])
@@ -150,15 +150,32 @@ export async function handleCreateTransport(
   // level reads the created request (its number is the next request's
   // address); terse answers it with the task the following requests settle,
   // the others the document as it came.
+  // Terse what the next call needs: the request's and its task's numbers,
+  // and why the task is untyped when it is; medium the request as created
+  // (the former terse).
+  const terseNumbers = (created: ICreatedTransport, settled: TypedTask) => {
+    const answered = terseCreatedTransport(created, settled);
+    return {
+      transport_number: answered.transport_number,
+      task_number: answered.task_number,
+      ...(answered.task_type_error === undefined
+        ? {}
+        : { task_type_error: answered.task_type_error }),
+      ...(answered.note === undefined ? {} : { note: answered.note }),
+    };
+  };
   const createdReadings: DetailTable<CreatedAnswer<Terse>> = {
-    terse: createdAt(
+    terse: createdAt((created) => (settled) => terseNumbers(created, settled)),
+    medium: createdAt(
       (created) => (settled) => terseCreatedTransport(created, settled),
     ),
-    medium: createdAt((_created, raw) => () => raw),
     full: createdAt((_created, raw) => () => raw),
     raw: createdAt((_created, raw) => () => raw),
   };
-  type Terse = ReturnType<typeof terseCreatedTransport> | string;
+  type Terse =
+    | ReturnType<typeof terseCreatedTransport>
+    | ReturnType<typeof terseNumbers>
+    | string;
 
   return answer(
     { tool: 'CreateTransport', detail },

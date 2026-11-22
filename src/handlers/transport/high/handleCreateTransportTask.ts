@@ -200,13 +200,32 @@ export async function handleCreateTransportTask(
   // level reads the task number (the type change is sent to it); terse
   // answers it with the type the change settles, full the parse, raw the
   // document as it came.
+  // Terse what the next call needs: the task's number and type, and why it
+  // is untyped when it is; medium the task as created (the former terse).
+  const terseNumbers = (number: string, settled: TypedTask) => {
+    const answered = terseTask(number, settled);
+    return {
+      task_number: answered.task_number,
+      task_type: answered.task_type,
+      ...(answered.task_type_error === undefined
+        ? {}
+        : { task_type_error: answered.task_type_error }),
+      ...(answered.note === undefined ? {} : { note: answered.note }),
+    };
+  };
   const taskReadings: DetailTable<CreatedTask<TaskAnswer>> = {
-    terse: createdTaskAt((number) => (settled) => terseTask(number, settled)),
-    medium: createdTaskAt((_number, parsed, raw) => () => parsed ?? raw),
+    terse: createdTaskAt(
+      (number) => (settled) => terseNumbers(number, settled),
+    ),
+    medium: createdTaskAt((number) => (settled) => terseTask(number, settled)),
     full: createdTaskAt((_number, parsed, raw) => () => parsed ?? raw),
     raw: createdTaskAt((_number, _parsed, raw) => () => raw),
   };
-  type TaskAnswer = ReturnType<typeof terseTask> | XmlNode | string;
+  type TaskAnswer =
+    | ReturnType<typeof terseTask>
+    | ReturnType<typeof terseNumbers>
+    | XmlNode
+    | string;
 
   return answer(
     { tool: 'CreateTransportTask', detail },

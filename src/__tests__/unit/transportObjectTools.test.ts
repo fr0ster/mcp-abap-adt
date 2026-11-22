@@ -419,6 +419,7 @@ describe('CreateTransportTask', () => {
       await handleCreateTransportTask(context as any, {
         transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
+        detail: 'medium',
       }),
     );
 
@@ -445,6 +446,7 @@ describe('CreateTransportTask', () => {
         transport_number: 'SIDK905941',
         target_user: ' developer ',
         task_type: 'X',
+        detail: 'medium',
       }),
     );
 

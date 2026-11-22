@@ -641,7 +641,8 @@ describe('HandlerGet part contents', () => {
       ) as Promise<unknown>,
     );
     assert.equal(textOf(a), textOf(b));
-    assert.equal(textOf(a).startsWith('name\ttype\tdescription'), true);
+    // GetPackageContents' terse answer (compact parity).
+    assert.equal(textOf(a).startsWith('type\tname\n# package '), true);
   });
 
   it("envelopes per spec §11's row (per level: roots, then type nodes)", async () => {
@@ -681,17 +682,22 @@ describe('HandlerGet part contents', () => {
       ) as Promise<unknown>,
     );
     assert.equal(fake.envelopes.length, 2);
-    const entries = payloadOf(result);
-    assert.deepStrictEqual(entries, [
-      {
-        package_name: 'ZROOT_A',
-        contents: 'name\ttype\tdescription\nZSUB_A\tDEVC/K\t\nZCL_A\tCLAS/OC\t',
-      },
-      {
-        package_name: 'ZROOT_B',
-        contents: 'name\ttype\tdescription\nZSUB_B\tDEVC/K\t\nZIF_B\tINTF/OI\t',
-      },
-    ]);
+    // GetPackageContents' terse answer for several packages (compact parity).
+    assert.equal(
+      textOf(result),
+      [
+        '# asked ZROOT_A',
+        'type\tname',
+        '# package ZROOT_A',
+        'DEVC/K\tZSUB_A',
+        'CLAS/OC\tZCL_A',
+        '# asked ZROOT_B',
+        'type\tname',
+        '# package ZROOT_B',
+        'DEVC/K\tZSUB_B',
+        'INTF/OI\tZIF_B',
+      ].join('\n'),
+    );
   });
 
   it("a part failure is that item's", async () => {
@@ -702,9 +708,10 @@ describe('HandlerGet part contents', () => {
         contents({ package_names: ['ZROOT_A', 'ZROOT_B'] }),
       ) as Promise<unknown>,
     );
-    const [a, b] = payloadOf(result);
-    assert.ok(a.contents.includes('ZCL_A'));
-    assertMatchObject(b.error, {
+    const [a = '', b = ''] = textOf(result).split('# asked ZROOT_B');
+    assert.ok(a.includes('CLAS/OC\tZCL_A'));
+    const failure = b.split('\n').find((line) => line.startsWith('# error '));
+    assertMatchObject(JSON.parse(failure?.slice('# error '.length) ?? '{}'), {
       status: 403,
       step: 'read package node structure',
     });
@@ -1413,26 +1420,21 @@ const LISTING_CALLS: Array<{
   },
   {
     tool: 'HandlerGet part contents',
+    // GetPackageContents' answer (compact parity), at full: its objects.
     call: (c) =>
       handleHandlerGet(c, {
         object_type: 'PACKAGE',
         part: 'contents',
         package_names: ['ZROOT_A', 'ZROOT_B'],
         include_descriptions: true,
+        detail: 'full',
       }) as Promise<unknown>,
     expected: [
-      {
-        package_name: 'ZROOT_A',
-        contents:
-          'name\ttype\tdescription\nZSUB_A\tDEVC/K\tSub A\nZCL_A\tCLAS/OC\tClass A',
-      },
-      {
-        package_name: 'ZROOT_B',
-        contents:
-          'name\ttype\tdescription\nZSUB_B\tDEVC/K\t\nZIF_B\tINTF/OI\tInterface B',
-      },
+      'DEVC/K ZSUB_A = Sub A',
+      'CLAS/OC ZCL_A = Class A',
+      'DEVC/K ZSUB_B = ',
+      'INTF/OI ZIF_B = Interface B',
     ],
-    pick: (payload) => payload,
   },
   {
     tool: 'GetPackageTree',

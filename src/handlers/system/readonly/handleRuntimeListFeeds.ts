@@ -575,6 +575,9 @@ export async function handleRuntimeListFeedPage(
   const base = { user: args?.user, query, from: args?.from };
   const page = { maxResults: top, to: args?.to };
   const feeds = pagedFeeds(connection, logger);
+  // The page at the level asked, as RuntimeListFeeds answers a feed (compact
+  // parity): terse its rows, medium and full the JSON.
+  const atLevel = answerAt(FEED_ANSWERS, levelOf(args));
   const shown = <T>(read: FeedPage<T>) => {
     const answered: FeedPageAnswer<T> = {
       success: true,
@@ -593,13 +596,16 @@ export async function handleRuntimeListFeedPage(
           atStep(step, () =>
             feeds.dumps({ ...base, ...page, analyse: analyseException }),
           )(),
-        (read: FeedPage<{ id: string }>) =>
-          shown({
-            ...read,
-            entries: read.entries.map((entry) => ({
-              dump_id: dumpIdOf(entry.id),
-              ...entry,
-            })),
+        (read: FeedPage<IFeedEntry>) =>
+          atLevel({
+            feed: 'dumps',
+            answered: shown({
+              ...read,
+              entries: read.entries.map((entry) => ({
+                dump_id: dumpIdOf(entry.id),
+                ...entry,
+              })),
+            }),
           }),
       );
     case 'system_messages':
@@ -613,7 +619,8 @@ export async function handleRuntimeListFeedPage(
               analyse: analyseException,
             }),
           )(),
-        shown,
+        (read: FeedPage<ISystemMessageEntry>) =>
+          atLevel({ feed: 'system_messages', answered: shown(read) }),
       );
     default:
       return answer(
@@ -626,7 +633,8 @@ export async function handleRuntimeListFeedPage(
               analyse: analyseException,
             }),
           )(),
-        shown,
+        (read: FeedPage<IGatewayErrorEntry>) =>
+          atLevel({ feed: 'gateway_errors', answered: shown(read) }),
       );
   }
 }

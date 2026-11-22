@@ -479,18 +479,23 @@ function getBackground(left: Left) {
 
 const GET_PROPERTIES = {
   part: readPartSchema,
+  // The level of a read a changed full tool answers (compact parity): a
+  // package's contents, an include's main programs, a transport's entries
+  // and its own document.
+  detail: DETAIL_SHAPE.detail,
   package_name: z.string().optional().describe('Package name.'),
   package_names: z
     .array(z.string())
     .optional()
     .describe(
-      'Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.',
+      "Several package names (part contents), read together, as GetPackageContents answers them: at detail terse each package's rows under its '# asked' line, else one entry per package, in the order given.",
     ),
   max_results: z
     .number()
-    .default(100)
     .optional()
-    .describe('Maximum number of members listed per package (part contents).'),
+    .describe(
+      'Accepted for compatibility (part contents): every member is answered.',
+    ),
   include_descriptions: z
     .boolean()
     .default(false)
@@ -687,6 +692,7 @@ export const COMPACT_READ_TAKES = takesOf<
       'max_results',
       'include_descriptions',
       'version',
+      'detail',
     ],
     DOMAIN: ['domain_name', 'version'],
     DATA_ELEMENT: ['data_element_name', 'version'],
@@ -702,7 +708,7 @@ export const COMPACT_READ_TAKES = takesOf<
     LOCAL_DEFINITIONS: ['class_name', 'version'],
     LOCAL_MACROS: ['class_name', 'version'],
     PROGRAM: ['program_name', 'version'],
-    INCLUDE: ['include_name', 'version'],
+    INCLUDE: ['include_name', 'version', 'detail'],
     INTERFACE: ['interface_name', 'version'],
     FUNCTION_GROUP: ['function_group_name', 'version'],
     FUNCTION_MODULE: ['function_module_name', 'function_group_name', 'version'],
@@ -711,7 +717,7 @@ export const COMPACT_READ_TAKES = takesOf<
     METADATA_EXTENSION: ['metadata_extension_name', 'version'],
     UNIT_TEST: ['run_id'],
     CDS_UNIT_TEST: ['run_id'],
-    TRANSPORT: ['transport_number'],
+    TRANSPORT: ['transport_number', 'detail'],
     TABLE_SETTINGS: ['table_name', 'version'],
     PROGRAM_TEXT_ELEMENTS: ['program_name', 'version'],
     FUNCTION_GROUP_TEXT_ELEMENTS: ['function_group_name', 'version'],
@@ -1432,7 +1438,7 @@ export const compactProfileRunSchema = compactProfileRunSchemaFor(
   COMPACT_PROFILE.onprem,
 );
 
-export const compactProfileListSchema = z.object({});
+export const compactProfileListSchema = z.object({ ...DETAIL_SHAPE });
 
 export const compactProfileViewSchema = z.object({
   background: COMPACT_LONG_BACKGROUND_FIELD,
@@ -1469,6 +1475,7 @@ export const compactProfileViewSchema = z.object({
 
 /** `HandlerDumpList`'s arguments but `background`. */
 const DUMP_LIST_FIELDS = {
+  ...DETAIL_SHAPE,
   feed_type: z
     .enum(['dumps', 'system_messages', 'gateway_errors'])
     .default('dumps')
@@ -1604,6 +1611,7 @@ export const compactTransportCreateSchema = z.object({
     .describe(
       "Type given to the request's task: S Development/Correction (default), R Repair, X Unclassified.",
     ),
+  ...DETAIL_SHAPE,
 });
 
 export const compactTransportSortAndCompressSchema = z.object({

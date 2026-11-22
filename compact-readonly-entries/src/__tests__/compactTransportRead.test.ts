@@ -9,6 +9,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import {
   handleGetTransport,
   handleReadTransportObjects,
@@ -196,6 +197,46 @@ describe('HandlerGet with object_type TRANSPORT and part metadata', () => {
           '{}',
       );
       assert.equal(body.kind, kind);
+    });
+  }
+});
+
+/** HandlerGet through its entry, as a client calls it. */
+const compactGetEntry = defineTool(CompactGet, handleHandlerGet).call;
+
+describe('HandlerGet TRANSPORT answers what the full reads answer at every detail', () => {
+  for (const detail of ['terse', 'medium', 'full', 'raw'] as const) {
+    it(`the entries (ReadTransportObjects) at detail ${detail}`, async () => {
+      const compact = recording(WITH_AGGREGATE);
+      const full = recording(WITH_AGGREGATE);
+      // Through its entry: the compact schema is what lets `detail` through.
+      const compactAnswer = await compactGetEntry(compact.context, {
+        object_type: 'TRANSPORT',
+        transport_number: NUMBER,
+        detail,
+      });
+      const fullAnswer = await handleReadTransportObjects(full.context, {
+        transport_number: NUMBER,
+        detail,
+      });
+      assert.deepStrictEqual(compactAnswer, fullAnswer);
+    });
+
+    it(`the document (GetTransport) at detail ${detail}`, async () => {
+      const compact = recording(TASK_WITH_OBJECTS);
+      const full = recording(TASK_WITH_OBJECTS);
+      // Through its entry: the compact schema is what lets `detail` through.
+      const compactAnswer = await compactGetEntry(compact.context, {
+        object_type: 'TRANSPORT',
+        part: 'metadata',
+        transport_number: TASK,
+        detail,
+      });
+      const fullAnswer = await handleGetTransport(full.context, {
+        transport_number: TASK,
+        detail,
+      });
+      assert.deepStrictEqual(compactAnswer, fullAnswer);
     });
   }
 });

@@ -9,7 +9,12 @@ import {
   type RegisteredPrompt,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { ApprovedEndpoint } from '../lib/abapGit/approvedEndpoints.js';
 import { abapGitServed } from '../lib/abapGit/availability.js';
+import {
+  type CallEndpoints,
+  endpointsOfCall,
+} from '../lib/abapGit/endpointSources.js';
 import { installToolRequestSeam } from '../lib/abapGit/toolRequestSeam.js';
 import { isAbapGitTool } from '../lib/abapGit/tools.js';
 import type { IAccessChecks } from '../lib/access/accessChecks.js';
@@ -421,6 +426,13 @@ export abstract class BaseMcpServer extends McpServer {
   private readonly abapGitTools = new Set<string>();
 
   /**
+   * The approved git endpoints the host configured (stdio: the
+   * destination's endpoints file, spec §5.2); none by default. A request
+   * that states its own (`x-abapgit-*` headers) uses those instead.
+   */
+  private readonly abapGitEndpoints: readonly ApprovedEndpoint[];
+
+  /**
    * Where background runs and their answers are kept — the host's strategy
    * (`backgroundRuns` option); absent, `background: true` and the
    * background-run tools answer "not available here".
@@ -666,6 +678,13 @@ export abstract class BaseMcpServer extends McpServer {
      * connection is the host's and is never pinged.
      */
     sessionKeepAliveMs?: number | undefined;
+    /**
+     * The approved git endpoints the host configured, checked
+     * (`parseApprovedEndpoints`): stdio's endpoints file beside the
+     * destination's `.env`. Absent: none — a request may still state its
+     * own in its `x-abapgit-*` headers (Streamable HTTP, SSE).
+     */
+    abapGitEndpoints?: readonly ApprovedEndpoint[] | undefined;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     const keepAliveMs =
@@ -722,6 +741,7 @@ export abstract class BaseMcpServer extends McpServer {
     this.instanceSystemContext = destinationContextOf(options.systemContext);
     this.systemContextResolver = options.systemContextResolver ?? null;
     this.systemContextRules = options.systemContextRules ?? null;
+    this.abapGitEndpoints = options.abapGitEndpoints ?? [];
     // The abapGit tools are listed only where the system serves abapGit
     // (spec §4.5): the SDK's own `tools/list` reply, filtered.
     installToolRequestSeam(this.server, {
@@ -1196,6 +1216,15 @@ export abstract class BaseMcpServer extends McpServer {
       // The notification is the client's hint only: a closed transport
       // leaves the listing as the next request reads it.
     }
+  }
+
+  /**
+   * The approved git endpoints of the call in progress (spec §5.2): the
+   * request's own `x-abapgit-*` headers when it states them, else the
+   * host's configured ones.
+   */
+  protected abapGitEndpointsOfCall(): CallEndpoints {
+    return endpointsOfCall(this.abapGitEndpoints);
   }
 
   /** Whether the system `connection` reaches serves abapGit (`abapGitServed`), by its system key. */

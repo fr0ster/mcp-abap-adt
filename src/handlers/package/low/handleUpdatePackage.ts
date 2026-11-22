@@ -43,6 +43,8 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
@@ -132,7 +134,7 @@ export async function handleUpdatePackage(
           ),
         atStep('update metadata', (document) =>
           withAdtHeaders(context, 'package.updateMetadata', (headers) =>
-            client.getPackage(packageDocuments).updateMetadata(
+            client.getPackage(resultsFor(packageDocuments)).updateMetadata(
               {
                 packageName,
                 ...(transport_request && {
@@ -164,10 +166,13 @@ export async function handleUpdatePackage(
 
       logger?.info(`✅ UpdatePackage completed: ${packageName}`);
 
-      // A write with nothing to report answers SUCCESS, as every other
-      // low update does (`terseWrite`): the name and the prose echoed
-      // nothing the caller did not send.
-      return return_response({ data: 'SUCCESS' });
+      // A write with nothing to report answers as every other low update
+      // does: `terseWrite` over the write's reading (SAP's status).
+      return answer(
+        { tool: 'UpdatePackageLow', detail: 'terse' },
+        async () => written,
+        project('terse', terseWrite),
+      );
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is

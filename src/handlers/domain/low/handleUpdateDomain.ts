@@ -31,6 +31,7 @@ import * as z from 'zod';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import {
+  answer,
   answerFailure,
   answerThrown,
   messageCarriedBy,
@@ -52,6 +53,8 @@ import {
   domainChanges,
 } from '../../../lib/strategies/documentChanges';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error, return_response } from '../../../lib/utils';
@@ -161,7 +164,7 @@ export async function handleUpdateDomain(
           ),
         atStep('update metadata', (document) =>
           withAdtHeaders(context, 'domain.updateMetadata', (headers) =>
-            client.getDomain(domainDocuments).updateMetadata(
+            client.getDomain(resultsFor(domainDocuments)).updateMetadata(
               {
                 domainName,
                 transportRequest,
@@ -189,10 +192,13 @@ export async function handleUpdateDomain(
 
       logger?.info(`✅ UpdateDomain completed: ${domainName}`);
 
-      // A write with nothing to report answers SUCCESS, as every other
-      // low update does (`terseWrite`): the name and the prose echoed
-      // nothing the caller did not send.
-      return return_response({ data: 'SUCCESS' });
+      // A write with nothing to report answers as every other low update
+      // does: `terseWrite` over the write's reading (SAP's status).
+      return answer(
+        { tool: 'UpdateDomainLow', detail: 'terse' },
+        async () => written,
+        project('terse', terseWrite),
+      );
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is

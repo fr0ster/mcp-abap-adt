@@ -1008,7 +1008,7 @@ describe('data_element', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
-        return okResponse(undefined);
+        return okResponse(readingOf(''));
       },
     });
     fakeClient = double.client;
@@ -1049,7 +1049,7 @@ describe('data_element', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (_config: any, options: any) => {
         patched = options.source;
-        return okResponse(undefined);
+        return okResponse(readingOf(''));
       },
     });
 
@@ -1074,7 +1074,7 @@ describe('data_element', () => {
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (_config: unknown, options: { source: string }) => {
         patched = options.source;
-        return okResponse(undefined);
+        return okResponse(readingOf(''));
       },
     });
 
@@ -1480,7 +1480,7 @@ describe('package — no Activate tool (a package is a container, no activation)
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
-        return okResponse(undefined);
+        return okResponse(readingOf(''));
       },
     });
     fakeClient = double.client;

@@ -75,7 +75,7 @@ function wire(document: string, high: boolean) {
     updateMetadata: async (_config: unknown, options: { source: string }) => {
       sent.source = options.source;
       sent.updates += 1;
-      return okResponse(high ? reading(undefined, '', 200) : undefined);
+      return okResponse(reading(undefined, '', 200));
     },
     unlock: async () => {
       sent.unlocks += 1;

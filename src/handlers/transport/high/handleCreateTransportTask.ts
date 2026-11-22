@@ -274,6 +274,9 @@ export async function handleCreateTransportTask(
       }
       return created;
     },
+    // The answer composes the typed facts of several requests — the create,
+    // and the reads and the type change after it — through the level's
+    // reading of the create; it does not reshape one reading.
     (reading) => reading.value.answer(typed),
   );
 }

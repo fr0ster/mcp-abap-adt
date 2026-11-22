@@ -395,6 +395,10 @@ export const ourUtils = {
   // `GetTableContents` reads the same `/datapreview/freestyle` document
   // through a different slot, and carried the same regular expression.
   contents: sqlPreview,
+  // The where-used scope is a document to edit, not a parse to read:
+  // `modifyWhereUsedScope` edits its text and `whereUsedScopeTypesOf` reads
+  // the types out of it, so the structured parse was thrown away.
+  whereUsedScope: verbatim,
 };
 
 /**

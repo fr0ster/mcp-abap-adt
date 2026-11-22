@@ -41,6 +41,7 @@ import { fullToolSet, type ToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { SYSTEM_TYPE_ROW, SYSTEM_TYPES } from '@mcp-abap-adt/responsible-rules';
 import {
   STDIO_MESSAGE_LIMIT,
+  STDIO_MIN_MESSAGE_LIMIT,
   STDIO_READ_MARGIN,
 } from '../boundedStdioTransport';
 import { resolveEnvFilePath } from './envResolver';
@@ -280,35 +281,38 @@ export const LOGIN_TIMEOUT_ROW: Parameter = {
   help: `Ends a browser login that has not finished after this many seconds (1-${MAX_LOGIN_TIMEOUT_SECONDS}). Default: none — a login ends when it finishes, the user refuses it, or its request ends`,
 };
 
+/** The refusal of a `--stdio-message-limit` value, in fixed words: the value is never echoed. */
+export function stdioMessageLimitRefusal(name: string): string {
+  return `Invalid ${name}: must be a whole number of bytes from ${STDIO_MIN_MESSAGE_LIMIT}`;
+}
+
 /**
- * `--stdio-message-limit`'s value: a whole number of bytes above the pipe-read
- * margin (`STDIO_READ_MARGIN`), read by plain code — digits only, as a string
- * or a YAML number.
+ * `--stdio-message-limit`'s value: a whole number of bytes from
+ * `STDIO_MIN_MESSAGE_LIMIT`, read by plain code — ASCII digits as a string,
+ * or a YAML integer; a list, a mapping, a boolean or a fraction is refused.
  */
 export function parseStdioMessageLimit(
   raw: ConfiguredValue,
   name: string,
 ): number {
-  const text = typeof raw === 'string' ? raw.trim() : String(raw);
   const value =
     typeof raw === 'number'
       ? raw
-      : isDigits(text)
-        ? Number.parseInt(text, 10)
+      : typeof raw === 'string' && isDigits(raw.trim())
+        ? Number.parseInt(raw.trim(), 10)
         : Number.NaN;
-  if (!Number.isSafeInteger(value) || value <= STDIO_READ_MARGIN) {
-    throw new ParameterRefusal(
-      `Invalid ${name}: "${text}". Must be a whole number of bytes above ${STDIO_READ_MARGIN}`,
-    );
+  if (!Number.isSafeInteger(value) || value < STDIO_MIN_MESSAGE_LIMIT) {
+    throw new ParameterRefusal(stdioMessageLimitRefusal(name));
   }
   return value;
 }
 
 /**
  * `--stdio-message-limit` / `MCP_STDIO_MESSAGE_LIMIT` / `stdio-message-limit`:
- * the most bytes the stdio client buffers. Absent: the MCP SDK client's
- * default read buffer (`STDIO_DEFAULT_MAX_BUFFER_SIZE`, 10 MiB). The server
- * writes no frame longer than this less one pipe read.
+ * the server's assumption about the most bytes the stdio client buffers.
+ * Absent (or blank): the MCP SDK client's default read buffer
+ * (`STDIO_DEFAULT_MAX_BUFFER_SIZE`, 10 MiB). The server writes no frame
+ * longer than this less one read (`STDIO_READ_MARGIN`).
  */
 export const STDIO_MESSAGE_LIMIT_ROW: Parameter = {
   key: 'stdioMessageLimit',
@@ -319,7 +323,7 @@ export const STDIO_MESSAGE_LIMIT_ROW: Parameter = {
   parse: parseStdioMessageLimit,
   valueHint: '=<bytes>',
   section: 'OPTIONS',
-  help: `The most bytes the MCP client buffers for one stdio message. Default: ${STDIO_MESSAGE_LIMIT}, the MCP SDK client's default read buffer. The server writes no message longer than this less ${STDIO_READ_MARGIN} bytes (one pipe read); a longer answer is answered an error naming both sizes. A whole number of bytes above ${STDIO_READ_MARGIN}`,
+  help: `The server's assumption about the most bytes the MCP client buffers for one stdio message; it changes nothing in the client, and a value above the client's real buffer brings the disconnect back. Default (not given or blank): ${STDIO_MESSAGE_LIMIT}, the MCP SDK client's default read buffer. The server writes no message longer than this less ${STDIO_READ_MARGIN} bytes (one read of the client); a longer answer is answered an error naming both sizes. A whole number of bytes from ${STDIO_MIN_MESSAGE_LIMIT}`,
 };
 
 /**

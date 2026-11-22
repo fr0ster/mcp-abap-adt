@@ -23,8 +23,15 @@ import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
 import { STDIO_DEFAULT_MAX_BUFFER_SIZE } from '@modelcontextprotocol/sdk/shared/stdio.js';
 import { load } from 'js-yaml';
 import { assertThrows } from '../../../../../src/__tests__/helpers/assertions';
-import { STDIO_READ_MARGIN } from '../../boundedStdioTransport';
-import { CORE_PARAMETERS, readCoreConfig } from '../../config/coreParameters';
+import {
+  STDIO_MIN_MESSAGE_LIMIT,
+  STDIO_READ_MARGIN,
+} from '../../boundedStdioTransport';
+import {
+  CORE_PARAMETERS,
+  readCoreConfig,
+  stdioMessageLimitRefusal,
+} from '../../config/coreParameters';
 import { coreHelp, main } from '../../launcher';
 import { StdioServer } from '../../StdioServer';
 
@@ -246,22 +253,57 @@ describe('--stdio-message-limit is a row of core', () => {
     assert.equal(server.stdioTransport().cap, 4194304 - STDIO_READ_MARGIN);
   });
 
-  for (const value of ['0', '-5', '1.5', 'abc', String(STDIO_READ_MARGIN)]) {
-    it(format('%s stops the start', value), async () => {
+  for (const value of [
+    '0',
+    '-5',
+    '1.5',
+    'abc',
+    'secret-looking-value',
+    String(STDIO_MIN_MESSAGE_LIMIT - 1),
+  ]) {
+    it(format('%s stops the start, the value not echoed', value), async () => {
       const { stderr, exits, served } = await start([
         '--system-type=onprem',
         `--stdio-message-limit=${value}`,
       ]);
       assert.ok(
-        stderr.includes(
-          `Invalid --stdio-message-limit: "${value}". Must be a whole number of bytes above ${STDIO_READ_MARGIN}`,
-        ),
+        stderr.includes(stdioMessageLimitRefusal('--stdio-message-limit')),
         stderr,
       );
+      assert.ok(!stderr.includes(`"${value}"`), stderr);
       assert.deepStrictEqual(exits, [1]);
       assert.equal(served, 0);
     });
   }
+
+  it('the smallest limit is accepted', () => {
+    assert.equal(
+      readCoreConfig([`--stdio-message-limit=${STDIO_MIN_MESSAGE_LIMIT}`], {})
+        .stdioMessageLimit,
+      STDIO_MIN_MESSAGE_LIMIT,
+    );
+  });
+
+  const shapes: ReadonlyArray<readonly [string, YamlConfig[string]]> = [
+    ['a list', [STDIO_MIN_MESSAGE_LIMIT]],
+    ['a fraction', STDIO_MIN_MESSAGE_LIMIT + 0.5],
+    ['a boolean', true],
+  ];
+  for (const [shape, value] of shapes) {
+    it(format('YAML %s is refused, never coerced', shape), () => {
+      assertThrows(
+        () => readCoreConfig([], {}, { 'stdio-message-limit': value }),
+        stdioMessageLimitRefusal('stdio-message-limit (config file)'),
+      );
+    });
+  }
+
+  it('a blank value counts as not given: the default', () => {
+    assert.equal(
+      readCoreConfig([], { MCP_STDIO_MESSAGE_LIMIT: '' }).stdioMessageLimit,
+      undefined,
+    );
+  });
 });
 
 // stdio has no idle bound (20.1.1): the parameter is gone from core's table.

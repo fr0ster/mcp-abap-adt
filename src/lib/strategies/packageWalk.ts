@@ -732,10 +732,12 @@ export async function walkPackages(
     level.forEach((walk, i) => {
       const root = settle(walk, rootAnswers[i]);
       if (root === undefined) return;
-      appendUnlisted(
-        walk.found,
-        nodeItemsOf(root).map((o) => objectOf(o, walk.name)),
-      );
+      // A package's own level SAP could not load is a row, never an empty
+      // package.
+      appendUnlisted(walk.found, [
+        ...notLoadedRow(root, 'DEVC/K', walk.name),
+        ...nodeItemsOf(root).map((o) => objectOf(o, walk.name)),
+      ]);
       for (const child of childNodesOf(root)) {
         typeNodes.push({ walk, nodeId: child.nodeId, type: child.type });
       }
@@ -765,7 +767,10 @@ export async function walkPackages(
     for (const walk of level) {
       if (!alive(walk) || walk.depth >= limit) continue;
       for (const item of walk.found) {
-        if (kindOf(item.type) !== 'package') continue;
+        // A not-loaded row is reported, never walked into.
+        if (item.notLoaded === true || kindOf(item.type) !== 'package') {
+          continue;
+        }
         const name = item.name.toUpperCase();
         const own = seen[walk.root];
         if (own.has(name)) continue;
@@ -834,7 +839,12 @@ export async function walkPackage(
       : { ...rest, packageName: pkg };
   };
   const found: WalkedItem[] = [];
-  appendUnlisted(found, nodeItemsOf(root).map(owned));
+  // A package's own level SAP could not load is a row, never an empty
+  // package.
+  appendUnlisted(found, [
+    ...notLoadedRow(root, 'DEVC/K', pkg),
+    ...nodeItemsOf(root).map(owned),
+  ]);
   for (const child of childNodesOf(root)) {
     const level = await underBranchRule(
       options,
@@ -865,7 +875,8 @@ export async function walkPackage(
   const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
   const out = [...found];
   for (const item of found) {
-    if (kindOf(item.type) !== 'package') continue;
+    // A not-loaded row is reported, never walked into.
+    if (item.notLoaded === true || kindOf(item.type) !== 'package') continue;
     if (depth >= limit) continue;
     appendAll(
       out,
@@ -1058,7 +1069,9 @@ export function assembleTree(
       // what was found in it; `seen` keeps a package that lists itself from
       // recursing.
       children:
-        kind === 'package' && !seen.has(o.name.toUpperCase())
+        kind === 'package' &&
+        o.notLoaded !== true &&
+        !seen.has(o.name.toUpperCase())
           ? (seen.add(o.name.toUpperCase()), childrenOf(o.name.toUpperCase()))
           : [],
     };

@@ -17,7 +17,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { after, afterEach, beforeEach, describe, it } from 'node:test';
 import { enhancementTypeOf } from '../../../handlers/enhancement/readonly/enhancementAvailability';
+import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
+import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleGetAdtTypes } from '../../../handlers/system/readonly/handleGetAllTypes';
 import { handleGetInactiveObjects } from '../../../handlers/system/readonly/handleGetInactiveObjects';
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
@@ -26,6 +28,10 @@ import { handleCreateTransportTask } from '../../../handlers/transport/high/hand
 import { handleGetTransport } from '../../../handlers/transport/readonly/handleGetTransport';
 import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import { handleReadTransportObjects } from '../../../handlers/transport/readonly/handleReadTransportObjects';
+import {
+  createBatchAvailability,
+  NO_BATCH_ENDPOINT_STATUS,
+} from '../../../lib/batch/availability';
 import type { DetailLevel } from '../../../lib/detail';
 import { resetSystemContextCache } from '../../../lib/systemContext';
 import { declareSystemKind } from '../../../lib/systemKind';
@@ -321,6 +327,41 @@ for (const [label, data, number] of [
     answeredOf(
       await handleReadTransportObjects(ctx([{ data }]), {
         transport_number: number,
+        detail,
+      }),
+    );
+}
+
+// Codex P1: a package root SAP could not load, and a subpackage node it could
+// not load, at every level of the package reads (no communication batch).
+const NOT_LOADED_LEVEL = `${xmlHead}<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>`;
+const SUBPACKAGES_ROOT = `${xmlHead}<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT/><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><NODE_ID>000001</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES></DATA></asx:values></asx:abap>`;
+const PACKAGE_METADATA = `${xmlHead}<pak:package xmlns:pak="http://www.sap.com/adt/packages" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZPKG" adtcore:type="DEVC/K" adtcore:description="A package"/>`;
+const sequential = (answers: string[]) => {
+  const context = ctx(answers.map((data) => ({ data })));
+  const batchAvailability = createBatchAvailability();
+  batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+  return { ...context, batchAvailability };
+};
+for (const [label, levels] of [
+  ['a root SAP could not load', [NOT_LOADED_LEVEL]],
+  [
+    'a subpackage node SAP could not load',
+    [SUBPACKAGES_ROOT, NOT_LOADED_LEVEL],
+  ],
+] as const) {
+  CASES[`GetPackageContents ${label}`] = async (detail) =>
+    answeredOf(
+      await handleGetPackageContents(sequential([...levels]), {
+        package_name: 'ZPKG',
+        include_subpackages: true,
+        detail,
+      }),
+    );
+  CASES[`GetPackageTree ${label}`] = async (detail) =>
+    answeredOf(
+      await handleGetPackageTree(sequential([PACKAGE_METADATA, ...levels]), {
+        package_name: 'ZPKG',
         detail,
       }),
     );

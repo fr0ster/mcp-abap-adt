@@ -914,5 +914,125 @@
     "isError": false,
     "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:object_type=\"T\"><tm:request tm:number=\"SIDK900100\"/><tm:task tm:number=\"SIDK900101\"><tm:abap_object tm:pgmid=\"R3TR\" tm:type=\"PROG\" tm:name=\"ZP_ONE\" tm:position=\"000001\"/><tm:abap_object tm:pgmid=\"R3TR\" tm:type=\"TABL\" tm:name=\"ZT_NOPOS\"/></tm:task></tm:root>",
     "requests": ["GET /sap/bc/adt/cts/transportrequests/SIDK900101"]
+  },
+  "GetPackageContents a root SAP could not load @terse": {
+    "isError": false,
+    "text": "type\tname\ttech_name\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t",
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
+  },
+  "GetPackageContents a root SAP could not load @medium": {
+    "isError": false,
+    "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"not_loaded\":true}]",
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
+  },
+  "GetPackageContents a root SAP could not load @full": {
+    "isError": false,
+    "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true}]",
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
+  },
+  "GetPackageContents a root SAP could not load @raw": {
+    "isError": false,
+    "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true}]",
+    "requests": ["POST /sap/bc/adt/repository/nodestructure"]
+  },
+  "GetPackageTree a root SAP could not load @terse": {
+    "isError": false,
+    "text": "DEVC/K\tZPKG\n  DEVC/K\tnot loaded by SAP",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a root SAP could not load @medium": {
+    "isError": false,
+    "text": "{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"not_loaded\":true}]}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a root SAP could not load @full": {
+    "isError": false,
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a root SAP could not load @raw": {
+    "isError": false,
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageContents a subpackage node SAP could not load @terse": {
+    "isError": false,
+    "text": "type\tname\ttech_name\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t",
+    "requests": [
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageContents a subpackage node SAP could not load @medium": {
+    "isError": false,
+    "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"not_loaded\":true}]",
+    "requests": [
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageContents a subpackage node SAP could not load @full": {
+    "isError": false,
+    "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true}]",
+    "requests": [
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageContents a subpackage node SAP could not load @raw": {
+    "isError": false,
+    "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true}]",
+    "requests": [
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a subpackage node SAP could not load @terse": {
+    "isError": false,
+    "text": "DEVC/K\tZPKG\n  DEVC/K\tnot loaded by SAP",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a subpackage node SAP could not load @medium": {
+    "isError": false,
+    "text": "{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"not_loaded\":true}]}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a subpackage node SAP could not load @full": {
+    "isError": false,
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a subpackage node SAP could not load @raw": {
+    "isError": false,
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
   }
 }

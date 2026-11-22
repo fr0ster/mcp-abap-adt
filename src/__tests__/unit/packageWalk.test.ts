@@ -454,3 +454,78 @@ describe('an object SAP lists incomplete is listed', () => {
     );
   });
 });
+
+/**
+ * A package's own level SAP could not load is reported, never answered as an
+ * empty package; and a not-loaded row is never walked into, a `DEVC/K` one
+ * included (Codex P1).
+ */
+describe('a root or a subpackage node SAP could not load', () => {
+  const failed =
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+  const fetched: string[] = [];
+  const levels: Record<string, NodeLevel> = {
+    'ROOTLESS|root': nodeLevelOfXml(failed),
+    'P|root': levelOf([], [{ type: 'DEVC/K', nodeId: '1' }]),
+    'P|1': nodeLevelOfXml(failed),
+  };
+  const source: NodeStructureSource = {
+    async fetchNodeStructure(_t, name, options) {
+      fetched.push(`${name}|${options?.nodeId ?? 'root'}`);
+      return succeeded(
+        levels[`${name}|${options?.nodeId ?? 'root'}`] ?? levelOf([], []),
+      );
+    },
+  };
+  const read = async (
+    requests: readonly { parentName: string; nodeId?: string }[],
+  ) =>
+    Promise.all(
+      requests.map(async (request) => ({
+        ok: true as const,
+        value: await source.fetchNodeStructure('DEVC/K', request.parentName, {
+          ...(request.nodeId === undefined ? {} : { nodeId: request.nodeId }),
+        }),
+      })),
+    );
+
+  it('a root SAP could not load is a row, package by package and level by level', async () => {
+    const rows = [['DEVC/K', 'not loaded by SAP']];
+    assert.deepStrictEqual(
+      (await walkPackage(source, 'ROOTLESS')).map((o) => [o.type, o.name]),
+      rows,
+    );
+    const [answered] = await walkPackages(read, ['ROOTLESS']);
+    assert.ok(answered?.ok);
+    assert.deepStrictEqual(
+      answered.value.map((o) => [o.type, o.name]),
+      rows,
+    );
+  });
+
+  it('a DEVC/K node not loaded is reported, and never read as a package of that name', async () => {
+    fetched.length = 0;
+    const walked = await walkPackage(source, 'P', { includeSubpackages: true });
+    assert.deepStrictEqual(
+      walked.map((o) => [o.type, o.name]),
+      [['DEVC/K', 'not loaded by SAP']],
+    );
+    const [answered] = await walkPackages(read, ['P'], {
+      includeSubpackages: true,
+    });
+    assert.ok(answered?.ok);
+    assert.deepStrictEqual(
+      answered.value.map((o) => [o.type, o.name]),
+      [['DEVC/K', 'not loaded by SAP']],
+    );
+    assert.equal(
+      fetched.some((key) => key.startsWith('NOT LOADED BY SAP')),
+      false,
+      fetched.join(', '),
+    );
+    const tree = assembleTree('P', walked);
+    assert.deepStrictEqual(tree.children?.[0]?.children ?? [], []);
+  });
+});

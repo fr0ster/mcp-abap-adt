@@ -6,7 +6,9 @@
  *
  * The list is exactly the code-running tools whose run may write and run
  * long: `RuntimeRunClass`, `RuntimeRunProgram` and compact's
- * `HandlerProfileRun` — `background` without a default. The listed long
+ * `HandlerProfileRun`, and on premise abapGit's link, pull and push
+ * (`LinkAbapGitRepo`, `PullAbapGitRepo`, `PushAbapGitRepo`, compact's
+ * `HandlerAbapGit`) — `background` without a default. The listed long
  * tools (`longTools.ts`) declare their own `background`, defaulting to
  * `true`. A source test keeps every tool's schema equal to the two lists: a
  * listed tool without the parameter, or a tool outside both with it, fails.
@@ -27,6 +29,15 @@ export const BACKGROUND_TOOLS: Readonly<
     discard: 'DiscardBackgroundRun',
   },
   HandlerProfileRun: {
+    get: 'HandlerBackgroundRunGet',
+    discard: 'HandlerBackgroundRunDiscard',
+  },
+  // On premise, SAP's link, pull and push are synchronous imports and
+  // commits (spec §4.6): their on-premise schemas alone declare it.
+  LinkAbapGitRepo: { get: 'GetBackgroundRun', discard: 'DiscardBackgroundRun' },
+  PullAbapGitRepo: { get: 'GetBackgroundRun', discard: 'DiscardBackgroundRun' },
+  PushAbapGitRepo: { get: 'GetBackgroundRun', discard: 'DiscardBackgroundRun' },
+  HandlerAbapGit: {
     get: 'HandlerBackgroundRunGet',
     discard: 'HandlerBackgroundRunDiscard',
   },
@@ -223,7 +234,11 @@ export function readObjectOf(args: ToolArgs): string {
   return '';
 }
 
-/** What a run tool's call runs: its class or program, upper case; `''` when none is named. */
+/**
+ * What a run tool's call runs, upper case: its class or program; for an
+ * abapGit link its `package_name`, for a pull or a push its
+ * `repository_key`; `''` when none is named.
+ */
 export function backgroundObjectOf(args: ToolArgs): string {
   const targetType = args.target_type;
   const className = args.class_name;
@@ -233,6 +248,9 @@ export function backgroundObjectOf(args: ToolArgs): string {
       ? programName
       : targetType === 'CLASS'
         ? className
-        : (className ?? programName);
+        : (className ??
+          programName ??
+          args.repository_key ??
+          args.package_name);
   return typeof pick === 'string' ? pick.trim().toUpperCase() : '';
 }

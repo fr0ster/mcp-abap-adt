@@ -4619,5 +4619,240 @@
       "class"
     ],
     "semantic": "Change the text elements of an ABAP program, function group or class: write, edit or delete its text symbols, selection texts and headings."
+  },
+  "ListAbapGitRepos": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "list",
+      "linked repositories",
+      "online repository",
+      "repository key",
+      "run status",
+      "show repos"
+    ],
+    "semantic": "List the abapGit repositories linked in the system, with their package, branch, remote URL and run state."
+  },
+  "CheckAbapGitExternalRepo": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "remote",
+      "external repository",
+      "branches",
+      "access mode",
+      "check remote",
+      "reachable",
+      "public",
+      "private"
+    ],
+    "semantic": "Check a remote git repository before linking it: whether it is public or private, and which branches it has."
+  },
+  "GetAbapGitBranchInfo": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "branch",
+      "branch info",
+      "folder logic",
+      "remote branch",
+      "before linking"
+    ],
+    "semantic": "Read one branch of a remote git repository for a package: its head and the folder logic it uses."
+  },
+  "LinkAbapGitRepo": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "link",
+      "clone",
+      "connect",
+      "new online repository",
+      "package",
+      "import",
+      "branch",
+      "remote URL"
+    ],
+    "semantic": "Link an ABAP package to a remote git repository on a branch, so its objects can be pulled and pushed."
+  },
+  "UnlinkAbapGitRepo": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "unlink",
+      "disconnect",
+      "remove link",
+      "delete repository link"
+    ],
+    "semantic": "Remove the link between a package and its git repository; the package and its objects stay."
+  },
+  "PullAbapGitRepo": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "pull",
+      "import",
+      "fetch",
+      "update from remote",
+      "deserialize",
+      "sync",
+      "bring changes in"
+    ],
+    "semantic": "Pull a linked repository: import the objects of its branch from the remote into the system."
+  },
+  "GetAbapGitModifiedObjects": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "modified objects",
+      "changed objects",
+      "local changes",
+      "what changed",
+      "before pull"
+    ],
+    "semantic": "List the objects of a linked repository that changed locally, before a pull decides what to import."
+  },
+  "GetAbapGitStaging": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "staging",
+      "stage",
+      "unstaged",
+      "changes to commit",
+      "diff",
+      "local state",
+      "remote state"
+    ],
+    "semantic": "Show what changed between the system and the remote for a linked repository: the objects and files to commit."
+  },
+  "PushAbapGitRepo": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "push",
+      "commit",
+      "export",
+      "serialize",
+      "author",
+      "committer",
+      "commit message",
+      "send changes"
+    ],
+    "semantic": "Commit changed objects of a linked repository to its remote branch with a message, author and committer."
+  },
+  "CheckAbapGitRepo": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "check",
+      "consistency",
+      "repository checks",
+      "problems",
+      "validate"
+    ],
+    "semantic": "Run abapGit's checks on a linked repository and report the problems it finds."
+  },
+  "GetAbapGitFile": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "file",
+      "read file",
+      "serialized",
+      "local version",
+      "remote version",
+      "compare",
+      "XML"
+    ],
+    "semantic": "Read one file of a linked repository, as the system serializes it or as the remote holds it."
+  },
+  "SwitchAbapGitBranch": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "switch branch",
+      "checkout",
+      "change branch",
+      "create branch",
+      "branch"
+    ],
+    "semantic": "Switch a linked repository to another branch, optionally creating it."
+  },
+  "GetAbapGitErrorLog": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "error log",
+      "run log",
+      "job log",
+      "application log",
+      "import result",
+      "what failed"
+    ],
+    "semantic": "Read the log of a repository run: each object's result and message type."
+  },
+  "HandlerAbapGitGet": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "list",
+      "read",
+      "staging",
+      "file",
+      "checks",
+      "external repository",
+      "branches",
+      "modified objects",
+      "error log",
+      "status"
+    ],
+    "semantic": "Read abapGit repositories: the linked list, a remote's branches, staging, files, checks and run logs."
+  },
+  "HandlerAbapGit": {
+    "keywords": [
+      "abapGit",
+      "git",
+      "repository",
+      "repo",
+      "link",
+      "unlink",
+      "pull",
+      "push",
+      "commit",
+      "switch branch",
+      "import",
+      "export",
+      "branch info"
+    ],
+    "semantic": "Change abapGit repositories: link and unlink, pull from and push to the remote, and switch branches."
   }
 }

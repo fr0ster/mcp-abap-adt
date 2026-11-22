@@ -28,7 +28,11 @@ import {
 } from '../../../lib/longTools';
 import { getRequestContext } from '../../../lib/requestContext';
 import { statedUserOf } from '../../../lib/requestSystemResolution';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { succeeded } from '../../../lib/strategies/stepResponse';
@@ -167,6 +171,7 @@ function listReadings(
       };
       return listedAnswer;
     }),
+    medium: fullLevel,
     full: fullLevel,
     raw: rawLevel,
   };
@@ -239,7 +244,7 @@ export async function handleListTransports(
         createAdtClient(connection, logger)
           .getRequest({
             ...resultsFor(transportDocuments),
-            list: readingAt(listReadings(logger), detail),
+            list: readingAt(listReadings(logger), levelOf(args)),
           })
           .list({
             analyse: analyseException,

@@ -66,6 +66,10 @@ describe('readingAt and answered', () => {
       () => 'T',
       (value) => value,
     ),
+    medium: formatted(
+      () => 'M',
+      (value) => value,
+    ),
     full: formatted(
       () => 'F',
       (value) => value,
@@ -75,6 +79,7 @@ describe('readingAt and answered', () => {
 
   it('picks the level asked for, and answers its value as it is', () => {
     assert.equal(answered(readingAt(table, 'terse')(wire(DOCUMENT))), 'T');
+    assert.equal(answered(readingAt(table, 'medium')(wire(DOCUMENT))), 'M');
     assert.equal(answered(readingAt(table, 'full')(wire(DOCUMENT))), 'F');
     assert.equal(answered(readingAt(table, 'raw')(wire(DOCUMENT))), DOCUMENT);
   });

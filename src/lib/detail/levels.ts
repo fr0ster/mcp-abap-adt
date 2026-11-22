@@ -13,20 +13,29 @@
  * - {@link rawLevel} — the document as ADT sent it, answered as text;
  * - {@link fullLevel} — the whole parse (`structured`), the document itself
  *   when it does not parse: what `full` has always answered;
- * - {@link formatted} — a typed reading shipped by adt-strategies, and a pure
- *   formatter of its value (a terse JSON answer, or a TSV list from `./tsv`).
+ * - {@link formatted} — a typed reading (one adt-strategies ships, or
+ *   {@link structuredValue} where the shipped one answers less than the tool),
+ *   and a pure formatter of its value (a terse JSON answer, or a TSV list from
+ *   `./tsv`).
  *
  * Every entry keeps the reading's `raw` and `status` beside its value, so a
  * failure path that reads them keeps working whatever the level.
  */
 
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { AnswerDetail } from '../strategies/projections';
 import { type AdtReading, parseStructure, rawOf } from '../strategies/reading';
 import type { XmlNode } from '../xml/node';
 
-/** The levels of `detail`. */
-export type DetailLevel = AnswerDetail;
+/**
+ * The levels of `detail`: `terse` (the default: what the next call needs),
+ * `medium` (every field of the typed reading, without XML leftovers — for now
+ * the same reading as `full` in every table), `full` (the whole parse), `raw`
+ * (the document as ADT sent it).
+ */
+export type DetailLevel = 'terse' | 'medium' | 'full' | 'raw';
+
+/** The levels, in order: what the `detail` schema accepts. */
+export const DETAIL_LEVELS = ['terse', 'medium', 'full', 'raw'] as const;
 
 /** A level's reading: the slot's result strategy, its value the answer. */
 export type LevelReading<P> = (answer: IAdtWireResponse) => AdtReading<P>;
@@ -45,6 +54,11 @@ export const fullLevel: LevelReading<XmlNode | string> = (answer) => {
   const raw = rawOf(answer);
   return { value: parseStructure(raw) ?? raw, raw, status: answer.status };
 };
+
+/** The structured parse of the answer: the value a server-side walk reads. */
+export function structuredValue(answer: IAdtWireResponse): XmlNode | null {
+  return parseStructure(rawOf(answer));
+}
 
 /**
  * A typed reading and a pure formatter of what it read: the value is the

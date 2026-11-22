@@ -11,6 +11,7 @@
  */
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
+import type { DetailLevel } from '../../../lib/detail/levels';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { atStep } from '../../../lib/strategies/step';
@@ -21,7 +22,7 @@ export interface ResultOnceArgs {
   run_id?: string | undefined;
   with_navigation_uris?: boolean | undefined;
   format?: 'abapunit' | 'junit' | undefined;
-  detail?: 'terse' | 'full' | 'raw' | undefined;
+  detail?: DetailLevel | undefined;
 }
 
 /**

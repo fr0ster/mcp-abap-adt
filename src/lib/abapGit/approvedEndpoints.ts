@@ -50,7 +50,8 @@ export type RemoteUrlFault =
   | 'not-https'
   | 'userinfo'
   | 'query'
-  | 'fragment';
+  | 'fragment'
+  | 'dot-segment';
 
 /** A configuration that cannot be served: the server does not start. */
 export class ApprovedEndpointError extends Error {
@@ -66,6 +67,7 @@ const FAULT_WORDS: Readonly<Record<RemoteUrlFault, string>> = {
   userinfo: 'carries a user or a password in the URL',
   query: 'carries a query',
   fragment: 'carries a fragment',
+  'dot-segment': 'carries a dot segment in its path',
 };
 
 /** The fixed words of a remote URL fault, naming the place, never the URL. */
@@ -78,14 +80,24 @@ export function remoteUrlFaultWords(
 
 /**
  * The exact form of a remote URL — `https://<host, lower-cased>[:<port>]<path>`
- * — or the fault that keeps it from being one. The WHATWG URL parser reads
- * it (the host lower-cased, a default port dropped); the path is compared as
- * the parser leaves it. A `?` or `#` anywhere is a query or a fragment, an
- * empty one included.
+ * — or the fault that keeps it from being one. Read on the raw text first,
+ * plain string code: a `?` or `#` anywhere is a query or a fragment (an
+ * empty one included), an `@` in the authority is userinfo (an empty one
+ * included), a `\` or no `<scheme>://` is no URL, a `.` or `..` segment of
+ * the path — literal or percent-encoded — is a dot segment. Then the WHATWG
+ * URL parser reads the host (lower-cased) and the port (a default one
+ * dropped); the path is kept exactly as written, never as the parser
+ * normalises it.
  */
 export function exactRemote(
   text: string,
 ): { readonly exact: string } | { readonly fault: RemoteUrlFault } {
+  if (text.includes('?')) return { fault: 'query' };
+  if (text.includes('#')) return { fault: 'fragment' };
+  if (text.includes('\\')) return { fault: 'not-a-url' };
+  const raw = rawParts(text);
+  if (raw === undefined) return { fault: 'not-a-url' };
+  if (raw.authority.includes('@')) return { fault: 'userinfo' };
   let parsed: URL;
   try {
     parsed = new URL(text);
@@ -95,11 +107,37 @@ export function exactRemote(
   if (parsed.username !== '' || parsed.password !== '') {
     return { fault: 'userinfo' };
   }
-  if (parsed.search !== '' || text.includes('?')) return { fault: 'query' };
-  if (parsed.hash !== '' || text.includes('#')) return { fault: 'fragment' };
+  if (parsed.hostname === '') return { fault: 'not-a-url' };
+  if (raw.path.split('/').some(isDotSegment)) return { fault: 'dot-segment' };
   if (parsed.protocol !== 'https:') return { fault: 'not-https' };
   const port = parsed.port === '' ? '' : `:${parsed.port}`;
-  return { exact: `https://${parsed.hostname}${port}${parsed.pathname}` };
+  return { exact: `https://${parsed.hostname}${port}${raw.path}` };
+}
+
+/** The raw authority and path of `<scheme>://<authority><path>`, as written. */
+function rawParts(
+  text: string,
+): { readonly authority: string; readonly path: string } | undefined {
+  const start = text.indexOf('://');
+  if (start <= 0) return undefined;
+  const rest = text.slice(start + 3);
+  const slash = rest.indexOf('/');
+  return slash < 0
+    ? { authority: rest, path: '' }
+    : { authority: rest.slice(0, slash), path: rest.slice(slash) };
+}
+
+/** Whether a path segment is `.` or `..`, any dot written as `%2e` or `%2E`. */
+function isDotSegment(segment: string): boolean {
+  const lower = segment.toLowerCase();
+  return (
+    lower === '.' ||
+    lower === '..' ||
+    lower === '%2e' ||
+    lower === '.%2e' ||
+    lower === '%2e.' ||
+    lower === '%2e%2e'
+  );
 }
 
 /**
@@ -176,16 +214,12 @@ export function matchEndpoint(
 }
 
 /**
- * Whether a `url` argument is refused before anything is sent: it carries
- * userinfo, a query or a fragment. Any other URL — `http`, or one the
- * parser does not read — is SAP's to answer, without a credential.
+ * Whether a `url` argument is refused before anything is sent: it is no
+ * URL, or carries userinfo, a query, a fragment or a dot segment. An `http`
+ * URL is SAP's to answer, without a credential.
  */
 export function argumentUrlFault(url: string): RemoteUrlFault | undefined {
   const read = exactRemote(url);
   if (!('fault' in read)) return undefined;
-  return read.fault === 'userinfo' ||
-    read.fault === 'query' ||
-    read.fault === 'fragment'
-    ? read.fault
-    : undefined;
+  return read.fault === 'not-https' ? undefined : read.fault;
 }

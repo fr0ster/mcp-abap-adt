@@ -90,9 +90,9 @@ export const ABAPGIT_REPOSITORY_UNKNOWN_WORDS =
 export const ABAPGIT_RUN_LOG_NOT_PAIRED_WORDS =
   'app_log_key is not the run log the repository list shows for repository_key; nothing but the list was sent';
 
-/** A `url` argument carrying userinfo, a query or a fragment (spec §5.1). */
+/** A `url` argument that is no URL, or carries userinfo, a query, a fragment or a dot segment (spec §5.1). */
 export const ABAPGIT_URL_REFUSED_WORDS =
-  'url carries a user or a password, a query or a fragment: give the remote URL alone — the credential comes from the approved endpoints; nothing was sent';
+  'url is not an absolute URL, or carries a user or a password, a query, a fragment or a dot segment: give the remote URL alone — the credential comes from the approved endpoints; nothing was sent';
 
 /** A request whose `x-abapgit-*` headers state no endpoint that can be one (spec §5.2). */
 export const ABAPGIT_ENDPOINT_REFUSED_WORDS =

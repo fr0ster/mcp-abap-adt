@@ -203,10 +203,86 @@ describe('a url argument: userinfo, a query or a fragment refused before sending
     assert.equal(argumentUrlFault('https://git.example/org/repo#'), 'fragment');
   });
 
-  it('leaves any other URL to SAP', () => {
+  it('refuses an empty userinfo', () => {
+    assert.equal(argumentUrlFault('https://@git.example/org/repo'), 'userinfo');
+    assert.equal(
+      argumentUrlFault('https://:@git.example/org/repo'),
+      'userinfo',
+    );
+  });
+
+  it('finds a query or a fragment in the raw text, whatever the parser makes of it', () => {
+    assert.equal(argumentUrlFault('https://git.example/org/repo?x'), 'query');
+    assert.equal(argumentUrlFault('https://git.example?/org'), 'query');
+    assert.equal(argumentUrlFault('https://git.example#/org'), 'fragment');
+  });
+
+  it('refuses a URL the parser rejects: it is never forwarded', () => {
+    assert.equal(argumentUrlFault('not a url'), 'not-a-url');
+    assert.equal(argumentUrlFault('https://'), 'not-a-url');
+  });
+
+  it('refuses a dot segment in the path, literal or encoded', () => {
+    for (const url of [
+      'https://git.example/org/../repo',
+      'https://git.example/org/%2e%2e/repo',
+      'https://git.example/org/%2E%2E/repo',
+      'https://git.example/org/.%2e/repo',
+      'https://git.example/org/./repo',
+      'https://git.example/org/%2e/repo',
+      'https://git.example/org/repo/..',
+    ]) {
+      assert.equal(argumentUrlFault(url), 'dot-segment', url);
+    }
+  });
+
+  it('leaves an https or http URL without those to SAP', () => {
     assert.equal(argumentUrlFault(REPO), undefined);
     assert.equal(argumentUrlFault('http://git.example/org/repo'), undefined);
-    assert.equal(argumentUrlFault('not a url'), undefined);
+    assert.equal(argumentUrlFault('https://git.example/org/.repo'), undefined);
+  });
+});
+
+describe('the path is compared as written', () => {
+  const approved = endpoints({
+    url: 'https://git.example/b',
+    user: 'git-user',
+    token: 'git-token',
+  });
+
+  it('a path that normalises to an approved one never binds', () => {
+    for (const url of [
+      'https://git.example/a/../b',
+      'https://git.example/a/%2e%2e/b',
+      'https://git.example/./b',
+      'https://git.example/%62',
+    ]) {
+      assert.equal(matchEndpoint(url, approved), undefined, url);
+    }
+  });
+
+  it('a path the parser would encode is not the encoded one', () => {
+    const encoded = endpoints({
+      url: 'https://git.example/a%20b',
+      user: 'git-user',
+      token: 'git-token',
+    });
+    assert.equal(matchEndpoint('https://git.example/a b', encoded), undefined);
+    assert.notEqual(
+      matchEndpoint('https://git.example/a%20b', encoded),
+      undefined,
+    );
+  });
+
+  it('a configured URL with a dot segment is a start error', () => {
+    assert.throws(
+      () =>
+        endpoints({ url: 'https://git.example/a/../b', user: 'u', token: 't' }),
+      (error) =>
+        error instanceof ApprovedEndpointError &&
+        error.words ===
+          'test: endpoint 1 url carries a dot segment in its path',
+    );
   });
 });
 

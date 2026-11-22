@@ -16,7 +16,7 @@ import { handleActivateObject } from '../../handlers/common/low/handleActivateOb
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleGetPackageContents as handleGetPackageContentsOf } from '../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetStructuresList as handleGetStructuresListOf } from '../../handlers/structure/readonly/handleGetStructuresList';
-import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
+import { handleDescribeByList as handleDescribeByListOf } from '../../handlers/system/readonly/handleDescribeByList';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import * as clients from '../../lib/clients';
 import { substringLineMatch } from '../../lib/search-source/lineScanner';
@@ -41,6 +41,12 @@ import {
 } from '../helpers/fakeClient';
 import { exactPackages, listing } from '../helpers/sourceReaderFake';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleDescribeByList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleDescribeByList = (
+  context: Parameters<typeof handleDescribeByListOf>[0],
+  args: Parameters<typeof handleDescribeByListOf>[1],
+) => handleDescribeByListOf(context, { detail: 'full', ...args });
 
 /** handleGetStructuresList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
 const handleGetStructuresList = (

@@ -218,6 +218,7 @@ const JSON_ANSWERING: readonly string[] = [
   'DeleteTable',
   'DeleteTableType',
   'DeleteUnitTest',
+  'DescribeByList',
   'GetATCFindings',
   'GetATCResult',
   'GetAdtTypes',

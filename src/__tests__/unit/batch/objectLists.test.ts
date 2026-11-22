@@ -22,7 +22,7 @@ import type {
 import type { HandlerContext } from '../../../handlers/interfaces';
 import {
   TOOL_DEFINITION as DESCRIBE_BY_LIST,
-  handleDescribeByList,
+  handleDescribeByList as handleDescribeByListOf,
 } from '../../../handlers/system/readonly/handleDescribeByList';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { assertMatchObject } from '../../helpers/assertions';
@@ -36,6 +36,12 @@ import {
 } from '../../helpers/batchEnvelope';
 import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
+
+/** handleDescribeByList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleDescribeByList = (
+  context: Parameters<typeof handleDescribeByListOf>[0],
+  args: Parameters<typeof handleDescribeByListOf>[1],
+) => handleDescribeByListOf(context, { detail: 'full', ...args });
 
 // The process declares its system type, as every launcher requires: the ADT
 // client is the declared variant's (`variantOf`), never a default.

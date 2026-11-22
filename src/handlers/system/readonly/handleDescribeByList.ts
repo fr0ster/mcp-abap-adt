@@ -4,6 +4,7 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 
 /** The refusal of a call without objects. */
 const OBJECTS_REQUIRED =
@@ -32,6 +33,7 @@ export const TOOL_DEFINITION = {
       .refine((objects) => objects.length > 0, {
         message: OBJECTS_REQUIRED,
       }),
+    ...DETAIL_SHAPE,
   }),
 } as const;
 
@@ -48,6 +50,7 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
+import { type AnswerTable, answerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AnswerValue,
@@ -55,6 +58,7 @@ import {
   isAnswerObject,
   parseJson,
 } from '../../../lib/json';
+import { levelOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 
@@ -100,7 +104,63 @@ function endsDescribe(res: McpResult): boolean {
  */
 type Described =
   | { ends: McpResult }
-  | { ends?: undefined; entry: ContentEntry | undefined };
+  | {
+      ends?: undefined;
+      entry: ContentEntry | undefined;
+      /** The search's own answer text, its TSV rows: what terse answers. */
+      hits?: string;
+      /** The object's failure, when its search was refused. */
+      failure?: FailureEntry;
+    };
+
+/** One object asked, and what its searches came to. */
+interface DescribedItem {
+  obj: DescribedObject;
+  described: Described & { ends?: undefined };
+}
+
+/**
+ * What DescribeByList answers at each `detail`, selected before the
+ * searches (`src/lib/detail`): terse one TSV — one header, each object's
+ * rows (name, type, description, package), `NAME\t-` for an object no
+ * search found, `# error NAME` and its failure for a refused one; medium and
+ * full the answer before `detail`, one content entry per object found. The
+ * answer is built from several searches, so raw is the full answer.
+ */
+const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
+  terse: (items) => {
+    const lines = ['name\ttype\tdescription\tpackage'];
+    for (const { obj, described } of items) {
+      if (described.failure !== undefined) {
+        lines.push(`# error ${obj.name} ${JSON.stringify(described.failure)}`);
+        continue;
+      }
+      const rows = (described.hits ?? '')
+        .split('\n')
+        .slice(1)
+        .filter((row) => row !== '');
+      if (rows.length === 0) lines.push(`${obj.name}\t-\t\t`);
+      else lines.push(...rows);
+    }
+    return {
+      isError: false,
+      content: [{ type: 'text', text: lines.join('\n') }],
+    };
+  },
+  medium: fullDescribed,
+  full: fullDescribed,
+  raw: fullDescribed,
+};
+
+/** The answer before `detail`: one content entry per object found, in order. */
+function fullDescribed(items: readonly DescribedItem[]): McpResult {
+  return {
+    isError: false,
+    content: items.flatMap(({ described }) =>
+      described.entry === undefined ? [] : [described.entry],
+    ),
+  };
+}
 
 /**
  * One object's entry from its first search's answer and, when that was
@@ -130,6 +190,7 @@ function describedBy(
           type: 'text',
           text: JSON.stringify({ name: obj.name, error: failure }),
         },
+        failure,
       };
     }
   }
@@ -155,6 +216,7 @@ function describedBy(
       type: 'text',
       text: JSON.stringify({ name: obj.name, results: allResults }),
     },
+    hits: res.content.map((item) => item.text).join('\n'),
   };
 }
 
@@ -166,12 +228,13 @@ function describedBy(
 async function describeOneByOne(
   context: HandlerContext,
   args: DescribeArgs | undefined,
+  shown: (items: readonly DescribedItem[]) => McpResult,
 ): Promise<McpResult> {
   const { logger } = context;
   // The schema holds the rule: a non-empty `objects`.
   const objects = args?.objects ?? [];
   logger?.info(`Describing ${objects.length} objects via search`);
-  const results: ContentEntry[] = [];
+  const items: DescribedItem[] = [];
   try {
     for (const obj of objects) {
       const first = await handleSearchObject(context, {
@@ -195,10 +258,10 @@ async function describeOneByOne(
       }
       const described = describedBy(obj, first, second);
       if (described.ends !== undefined) return described.ends;
-      if (described.entry !== undefined) results.push(described.entry);
+      items.push({ obj, described });
     }
     // Return isError: false even when nothing matched
-    return { isError: false, content: results };
+    return shown(items);
   } catch (e) {
     logger?.error('Failed to describe objects list', e);
     return return_error(e);
@@ -216,6 +279,7 @@ async function describeOneByOne(
 async function describeInEnvelopes(
   context: HandlerContext,
   args: DescribeArgs,
+  shown: (items: readonly DescribedItem[]) => McpResult,
 ): Promise<McpResult> {
   const { logger } = context;
   const objects = args.objects;
@@ -263,24 +327,30 @@ async function describeInEnvelopes(
     return result.value;
   };
 
-  const results: ContentEntry[] = [];
+  const items: DescribedItem[] = [];
   try {
     for (const [i, obj] of objects.entries()) {
       const res = typedAnswer(i);
       const refused = notAcceptable(res);
       if (refused !== undefined) {
-        results.push({
-          type: 'text',
-          text: JSON.stringify({ name: obj.name, error: refused }),
+        items.push({
+          obj,
+          described: {
+            entry: {
+              type: 'text',
+              text: JSON.stringify({ name: obj.name, error: refused }),
+            },
+            failure: refused,
+          },
         });
         continue;
       }
       const second = emptyOrFailed(res) ? untypedAnswer(i) : undefined;
       const described = describedBy(obj, res, second);
       if (described.ends !== undefined) return described.ends;
-      if (described.entry !== undefined) results.push(described.entry);
+      items.push({ obj, described });
     }
-    return { isError: false, content: results };
+    return shown(items);
   } catch (e) {
     logger?.error('Failed to describe objects list', e);
     return return_error(e);
@@ -297,9 +367,10 @@ export async function handleDescribeByList(
   args: DescribeArgs,
 ) {
   // The schema holds the rule: a non-empty `objects`.
+  const shown = answerAt(DESCRIBE_ANSWERS, levelOf(args));
   return withSequentialFallback<McpResult>(
     context,
-    () => describeInEnvelopes(context, args),
-    () => describeOneByOne(context, args),
+    () => describeInEnvelopes(context, args, shown),
+    () => describeOneByOne(context, args, shown),
   );
 }

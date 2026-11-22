@@ -21,7 +21,7 @@ import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handl
 import { handleGetInclude } from '../../handlers/include/readonly/handleGetInclude';
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents';
-import { handleDescribeByList } from '../../handlers/system/readonly/handleDescribeByList';
+import { handleDescribeByList as handleDescribeByListOf } from '../../handlers/system/readonly/handleDescribeByList';
 import { handleGetObjectInfo } from '../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetTypeInfo } from '../../handlers/system/readonly/handleGetTypeInfo';
@@ -38,6 +38,12 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleDescribeByList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleDescribeByList = (
+  context: Parameters<typeof handleDescribeByListOf>[0],
+  args: Parameters<typeof handleDescribeByListOf>[1],
+) => handleDescribeByListOf(context, { detail: 'full', ...args });
 
 // The declared variant the boundary checks a type argument against.
 // The declared variant: the kind stated, read by the real variantOf.

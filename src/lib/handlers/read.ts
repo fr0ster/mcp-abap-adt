@@ -92,6 +92,7 @@ export { handleGetTableContents } from '../../handlers/table/readonly/handleGetT
 export { handleGetTableSettings } from '../../handlers/table/readonly/handleGetTableSettings.js';
 export { handleGetTableType } from '../../handlers/table_type/high/handleGetTableType.js';
 export { handleGetTextElements } from '../../handlers/text_elements/readonly/handleGetTextElements.js';
+export { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport.js';
 export { handleListTransports } from '../../handlers/transport/readonly/handleListTransports.js';
 export { handleReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects.js';
 export { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest.js';

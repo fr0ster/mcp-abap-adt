@@ -167,9 +167,9 @@ describe('the actions per binary', () => {
     [
       'compact',
       compactToolSet,
-      ['create', 'list', 'objects', 'move_objects', 'sort_compress'],
+      ['create', 'list', 'get', 'objects', 'move_objects', 'sort_compress'],
     ],
-    ['compact-ro', compactReadOnlyToolSet, ['list', 'objects']],
+    ['compact-ro', compactReadOnlyToolSet, ['list', 'get', 'objects']],
   ] as const) {
     for (const kind of ['onprem', 'cloud'] as const) {
       it(`${family} ${kind}: ${actions.length}`, async () => {
@@ -487,7 +487,7 @@ describe('the arguments declared are those a served action reads', () => {
       assert.deepEqual(await completionOf(prompt, 'action', ''), [
         ...(source === coreRo
           ? ['list', 'get', 'objects', 'log']
-          : ['list', 'objects']),
+          : ['list', 'get', 'objects']),
       ]);
     }
   });

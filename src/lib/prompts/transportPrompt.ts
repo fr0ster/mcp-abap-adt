@@ -347,8 +347,21 @@ export const TRANSPORT_ACTIONS = {
     rows: [
       oneCall(
         'GetTransport',
-        (given) => `Get the transport request ${jsonLiteral(given.number)}.`,
+        (given) =>
+          `Get the transport request or task ${jsonLiteral(given.number)}.`,
         numberArgument,
+      ),
+      memberCall(
+        'HandlerGet',
+        'TRANSPORT',
+        [
+          ['object_type', userValue('TRANSPORT')],
+          ['part', userValue('metadata')],
+        ],
+        (given) =>
+          `Get the transport request or task ${jsonLiteral(given.number)}.`,
+        numberArgument,
+        true,
       ),
     ],
   },

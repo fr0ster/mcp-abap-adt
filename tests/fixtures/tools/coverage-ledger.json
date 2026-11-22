@@ -673,6 +673,13 @@
       "cloud": "src/__tests__/integration/coverage/reads.live.test.ts"
     }
   },
+  "GetTransport": {
+    "unit": "src/__tests__/unit/pins/getTransport.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportTaskRead.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportTaskRead.live.test.ts"
+    }
+  },
   "GetUnitTestResult": {
     "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
     "live": {
@@ -916,6 +923,13 @@
     "live": {
       "onprem": "src/__tests__/integration/high/draft/ObjectDraft.test.ts",
       "cloud": "src/__tests__/integration/high/draft/ObjectDraft.test.ts"
+    }
+  },
+  "HandlerGet#TRANSPORT#metadata": {
+    "unit": "src/__tests__/unit/pins/getTransport.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/transportTaskRead.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/transportTaskRead.live.test.ts"
     }
   },
   "HandlerGetData": {

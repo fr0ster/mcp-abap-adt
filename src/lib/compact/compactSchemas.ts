@@ -540,7 +540,7 @@ const GET_PROPERTIES = {
     .string()
     .optional()
     .describe(
-      'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own.',
+      'Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own. With part metadata: the request or task itself.',
     ),
   run_id: z
     .string()

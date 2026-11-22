@@ -9,12 +9,21 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { handleReadTransportObjects } from '@mcp-abap-adt/lib/handlers/read';
+import {
+  handleGetTransport,
+  handleReadTransportObjects,
+} from '@mcp-abap-adt/lib/handlers/read';
 import {
   assertMatchObject,
   assertRejects,
 } from '../../../src/__tests__/helpers/assertions';
 import { listedJson } from '../../../src/__tests__/helpers/listedJson';
+import {
+  PARENT,
+  REQUEST,
+  TASK,
+  TASK_WITH_OBJECTS,
+} from '../../../src/__tests__/helpers/transportTaskDocuments';
 import { TOOL_DEFINITION as FullRead } from '../../../src/handlers/transport/readonly/handleReadTransportObjects';
 import { compactReadOnlyEntries } from '../group';
 import { compactReadRouterMap } from '../handlers/compactReadRoutes';
@@ -161,15 +170,45 @@ describe('HandlerGet with object_type TRANSPORT', () => {
     assert.deepStrictEqual(compact.sent, []);
   });
 
-  it('offers no other part: a metadata or urls read is refused naming source', async () => {
+  it('offers source and metadata: a urls read is refused naming them', async () => {
     const compact = recording();
     const refused = (await handleHandlerGet(compact.context, {
       object_type: 'TRANSPORT',
-      part: 'metadata',
+      part: 'urls',
       transport_number: NUMBER,
     })) as { isError: boolean };
     assert.equal(refused.isError, true);
-    assert.match(JSON.stringify(refused), /offers: source/);
+    assert.match(JSON.stringify(refused), /offers: source, metadata/);
     assert.deepStrictEqual(compact.sent, []);
   });
+});
+
+describe('HandlerGet with object_type TRANSPORT and part metadata', () => {
+  for (const [label, document, number, kind] of [
+    ['request', REQUEST, PARENT, 'request'],
+    ['task', TASK_WITH_OBJECTS, TASK, 'task'],
+  ] as const) {
+    it(`answers what the full set's GetTransport answers for a ${label}`, async () => {
+      const compact = recording(document);
+      const full = recording(document);
+
+      const compactAnswer = await handleHandlerGet(compact.context, {
+        object_type: 'TRANSPORT',
+        part: 'metadata',
+        transport_number: number,
+      });
+      const fullAnswer = await handleGetTransport(full.context, {
+        transport_number: number,
+      });
+
+      assert.equal(compact.sent.length, 1);
+      assert.deepStrictEqual(compact.sent, full.sent);
+      assert.deepStrictEqual(compactAnswer, fullAnswer);
+      const body = JSON.parse(
+        (compactAnswer as { content: { text: string }[] }).content[0]?.text ??
+          '{}',
+      );
+      assert.equal(body.kind, kind);
+    });
+  }
 });

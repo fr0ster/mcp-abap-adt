@@ -145,6 +145,7 @@ export const testConfigSchema = z.looseObject({
   shared_objects: absent(z.record(z.string(), caseParamsSchema)),
   params_groups: absent(z.record(z.string(), caseParamsSchema)),
   create_transported_object: absent(z.looseObject({ target_system: text })),
+  read_transport: absent(z.looseObject({ task_number: text })),
 });
 
 export type TestConfig = z.output<typeof testConfigSchema>;

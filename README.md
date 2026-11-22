@@ -238,6 +238,26 @@ alone). A server without background runs (an embedder without a store) lists a l
 `background` and answers its read in the call.
 See [MIGRATION-24.0](docs/MIGRATION-24.0.md#callers-of-the-long-tools-background-by-default-no-timeout).
 
+### Answers
+
+A tool answers what the next call needs. What it answers is the reading the tool hands to its
+adt-clients call, chosen by `detail` before the request is sent; the answer is never cut — every
+row SAP answered is answered. `detail` has four levels:
+
+- `terse` (the default): compact, what the next call needs. A list answers TSV: one header line,
+  one row per item, and a `# <field> <value>` line where a value would repeat on every row (a
+  package, a task, an object). An item's details come from that item's own tool.
+- `medium`: every field the reading read, without the document's leftovers (URIs, namespaces).
+- `full`: the whole parse, the answer as it was before `detail` where a tool did not take it.
+- `raw`: the document as ADT sent it, for debugging.
+
+JSON answers are minified. A compact tool answers as the full tool it reads through, at every
+level.
+
+**Migration (24.2.0):** a caller that parsed a tool's default JSON asks for `detail: 'full'`,
+which gives the former shape where the tool had no `detail` before; where it had one, the former
+terse JSON is `detail: 'medium'`. See the [CHANGELOG](CHANGELOG.md).
+
 ### Batch mode
 
 Calls none of whose requests depends on another's answer can be recorded and sent together, in

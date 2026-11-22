@@ -9,6 +9,15 @@ import {
   type RegisteredPrompt,
 } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import {
+  type AbapGitAdmission,
+  type AbapGitCall,
+  type AbapGitRestrictionSignal,
+  admitAbapGitCall,
+  NO_ABAPGIT_RESTRICTIONS,
+  type RawAdmissionContext,
+  rawAbapGitRefusal,
+} from '../lib/abapGit/admission.js';
 import type { ApprovedEndpoint } from '../lib/abapGit/approvedEndpoints.js';
 import { abapGitServed } from '../lib/abapGit/availability.js';
 import {
@@ -111,12 +120,14 @@ import {
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
-import type {
-  HandlerEntry,
-  IHandlerGroup,
-  IHandlersRegistry,
-  SapEnvironment,
-  ToolArgs,
+import {
+  type HandlerEntry,
+  type IHandlerGroup,
+  type IHandlersRegistry,
+  invalidArgumentsWords,
+  type SapEnvironment,
+  schemaOn,
+  type ToolArgs,
 } from '../lib/handlers/interfaces.js';
 import { noConnection } from '../lib/handlers/noConnection.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
@@ -432,6 +443,15 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private readonly abapGitEndpoints: readonly ApprovedEndpoint[];
 
+  /** Which access restrictions the host configured, for the abapGit admission. */
+  private readonly abapGitRestrictions: AbapGitRestrictionSignal;
+
+  /** Each registered abapGit tool's schema on the instance's kind: what a denied compact action is read from. */
+  private readonly abapGitSchemas = new Map<
+    string,
+    ReturnType<typeof schemaOn>
+  >();
+
   /**
    * Where background runs and their answers are kept — the host's strategy
    * (`backgroundRuns` option); absent, `background: true` and the
@@ -685,6 +705,13 @@ export abstract class BaseMcpServer extends McpServer {
      * own in its `x-abapgit-*` headers (Streamable HTTP, SSE).
      */
     abapGitEndpoints?: readonly ApprovedEndpoint[] | undefined;
+    /**
+     * Which access restrictions the host's configuration holds
+     * (`restrictedStart`): while an allowed-packages or allowed-requests
+     * entry is configured, link and pull are refused (spec §4.3). Absent:
+     * none.
+     */
+    abapGitRestrictions?: AbapGitRestrictionSignal | undefined;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     const keepAliveMs =
@@ -742,6 +769,8 @@ export abstract class BaseMcpServer extends McpServer {
     this.systemContextResolver = options.systemContextResolver ?? null;
     this.systemContextRules = options.systemContextRules ?? null;
     this.abapGitEndpoints = options.abapGitEndpoints ?? [];
+    this.abapGitRestrictions =
+      options.abapGitRestrictions ?? NO_ABAPGIT_RESTRICTIONS;
     // The abapGit tools are listed only where the system serves abapGit
     // (spec §4.5): the SDK's own `tools/list` reply, filtered.
     installToolRequestSeam(this.server, {
@@ -750,6 +779,18 @@ export abstract class BaseMcpServer extends McpServer {
         (await this.abapGitServedOnListing(extra.signal))
           ? NONE_UNLISTED
           : this.abapGitTools,
+      // The abapGit admission's raw steps on the request as it came, before
+      // the SDK validates it (spec §4.4): batch, a denied action, an
+      // undeclared `background`, the import refusal, a blank package.
+      refusedCall: (tool, args) => {
+        if (!this.abapGitTools.has(tool)) return undefined;
+        const refused = rawAbapGitRefusal(
+          { tool, args },
+          this.abapGitRestrictions,
+          this.rawAdmissionContext(tool),
+        );
+        return refused === undefined ? undefined : this.refusalAnswer(refused);
+      },
     });
     // The session's end: the transport closed (the SDK calls the protocol's
     // `onclose` once per transport). It is the instance's close
@@ -1225,6 +1266,40 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected abapGitEndpointsOfCall(): CallEndpoints {
     return endpointsOfCall(this.abapGitEndpoints);
+  }
+
+  /** What the abapGit admission's raw steps read of the instance for a call of `tool`. */
+  private rawAdmissionContext(tool: string): RawAdmissionContext {
+    const environment = statedEnvironment(this.statedSystemType());
+    return {
+      kind:
+        environment === 'cloud'
+          ? 'cloud'
+          : environment === 'onprem'
+            ? 'onprem'
+            : undefined,
+      batchOpen: this.batchOpenFor(tool),
+      deniedAction: (call) => this.deniedAbapGitAction(call),
+    };
+  }
+
+  /**
+   * A compact abapGit call's denied action: the tool's registered schema
+   * (narrowed by the denied actions) refusing its `action`, in the words a
+   * narrowed call answers; `undefined` otherwise.
+   */
+  private deniedAbapGitAction(call: AbapGitCall): string | undefined {
+    if (!('action' in call.args)) return undefined;
+    const schema = this.abapGitSchemas.get(call.tool);
+    if (schema === undefined) return undefined;
+    const parsed = schema.safeParse(call.args);
+    if (parsed.success) return undefined;
+    const issues = parsed.error.issues.filter(
+      (issue) => issue.path[0] === 'action',
+    );
+    return issues.length === 0
+      ? undefined
+      : invalidArgumentsWords(call.tool, issues);
   }
 
   /** Whether the system `connection` reaches serves abapGit (`abapGitServed`), by its system key. */
@@ -2250,25 +2325,48 @@ export abstract class BaseMcpServer extends McpServer {
                 taken ??= acquire();
                 return taken;
               };
-              // An abapGit call on a system that does not serve abapGit is
-              // refused before anything else is sent (spec §4.5): an
-              // unlisted tool's call meets the listing's answer.
-              if (isAbapGitTool(entry.toolDefinition.name)) {
-                const served = await this.abapGitServedOn(
-                  (await take()).connection,
+              // An abapGit call's one admission point (spec §4.3–§4.5,
+              // §5.1), whether or not access checks are configured: its raw
+              // steps again, then availability (an unlisted tool's call
+              // meets the listing's answer), the R1 pre-read, the package
+              // check, the run-log pairing and the endpoint binding —
+              // before foreground or background dispatch. A refused call
+              // sends nothing but what admission read.
+              const abapGitTool = isAbapGitTool(entry.toolDefinition.name);
+              let abapGitAdmission: AbapGitAdmission | undefined;
+              if (abapGitTool) {
+                const verdict = await admitAbapGitCall(
+                  { tool: entry.toolDefinition.name, args },
+                  this.abapGitRestrictions,
+                  {
+                    ...this.rawAdmissionContext(entry.toolDefinition.name),
+                    connection: async () => (await take()).connection,
+                    served: (connection) => this.abapGitServedOn(connection),
+                    endpoints: () => this.abapGitEndpointsOfCall(),
+                    accessChecks: this.accessChecks,
+                    packageReader: () =>
+                      lazyPackageReader(
+                        async () => (await take()).connection,
+                        this.logger,
+                        signal,
+                      ),
+                    logger: this.logger,
+                  },
                 );
-                if (!served) {
-                  return this.refusalAnswer(
-                    new ServerRefusal('abapgit_not_served'),
-                  );
+                if ('refused' in verdict) {
+                  return this.refusalAnswer(verdict.refused);
                 }
+                abapGitAdmission = verdict.admitted;
               }
               // The access checks (spec §3.2): once, before the call takes
               // its connection; a refused call takes none, sends nothing and
               // takes no batch number. A strategy that reads takes the call's
               // connection through the reader, and the call goes on with it.
+              // An abapGit call was checked by its admission.
               const accessCall =
-                this.accessChecks === undefined || checked === undefined
+                this.accessChecks === undefined ||
+                checked === undefined ||
+                abapGitTool
                   ? undefined
                   : accessCallOf(entry.toolDefinition.name, checked, args);
               if (this.accessChecks !== undefined && accessCall !== undefined) {
@@ -2298,6 +2396,7 @@ export abstract class BaseMcpServer extends McpServer {
                   : {}),
                 ...this.searchStrategies(),
                 heldLocks: this.heldLocks,
+                ...(abapGitAdmission !== undefined ? { abapGitAdmission } : {}),
                 ...(this.longSessionPort !== undefined
                   ? { longSession: this.longSessionPort }
                   : {}),
@@ -2471,6 +2570,17 @@ export abstract class BaseMcpServer extends McpServer {
             );
           if (isAbapGitTool(entry.toolDefinition.name)) {
             this.abapGitTools.add(entry.toolDefinition.name);
+            this.abapGitSchemas.set(
+              entry.toolDefinition.name,
+              schemaOn(
+                definition,
+                environment === 'cloud'
+                  ? 'cloud'
+                  : environment === 'onprem'
+                    ? 'onprem'
+                    : undefined,
+              ),
+            );
           }
           // Register wrapped handler via SDK registerTool, with the
           // description the declared variant serves beside its schema.

@@ -15,6 +15,8 @@ import type {
 } from '@modelcontextprotocol/sdk/server/zod-compat.js';
 import type { RequestHandlerExtra } from '@modelcontextprotocol/sdk/shared/protocol.js';
 import {
+  CallToolRequestSchema,
+  type CallToolResult,
   ListToolsRequestSchema,
   ListToolsResultSchema,
   type Notification,
@@ -42,6 +44,15 @@ export interface ToolRequestSeam {
    * signal.
    */
   unlisted(extra: ToolRequestExtra): Promise<ReadonlySet<string>>;
+  /**
+   * A `tools/call`'s answer decided before the SDK validates its arguments
+   * (the raw request: an undeclared argument is still there), or
+   * `undefined` to hand the request to the SDK's callback as it came.
+   */
+  refusedCall(
+    tool: string,
+    args: Readonly<Record<string, unknown>>,
+  ): CallToolResult | undefined;
 }
 
 /**
@@ -61,6 +72,19 @@ export function installToolRequestSeam(
       extra: ToolRequestExtra,
     ) => ToolRequestAnswer | Promise<ToolRequestAnswer>,
   ): void => {
+    if (isSchema(schema, CallToolRequestSchema)) {
+      install(schema, (request, extra) => {
+        const call = CallToolRequestSchema.safeParse(request);
+        const refused = call.success
+          ? seam.refusedCall(
+              call.data.params.name,
+              call.data.params.arguments ?? {},
+            )
+          : undefined;
+        return refused ?? handler(request, extra);
+      });
+      return;
+    }
     if (!isSchema(schema, ListToolsRequestSchema)) {
       install(schema, handler);
       return;

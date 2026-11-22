@@ -227,6 +227,7 @@ const JSON_ANSWERING: readonly string[] = [
   'GetObjectOutline',
   'GetObjectStructure',
   'GetObjectVersions',
+  'GetObjectsList',
   'GetPackage',
   'GetPackageContents',
   'GetPackageTree',

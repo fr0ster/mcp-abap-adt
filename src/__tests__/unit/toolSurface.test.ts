@@ -195,7 +195,7 @@ describe('the MCP tool surface', () => {
         },
         'search/GetObjectsList': {
           relaxed: ['parent_name', 'parent_tech_name', 'parent_type'],
-          added: ['objects'],
+          added: ['detail', 'objects'],
         },
         'system/GetObjectInfo': {
           relaxed: ['parent_type', 'parent_name'],

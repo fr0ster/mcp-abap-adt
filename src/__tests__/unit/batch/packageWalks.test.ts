@@ -30,7 +30,7 @@ import {
 } from '../../../handlers/package/readonly/handleGetPackageContents';
 import {
   TOOL_DEFINITION as GetObjectsList,
-  handleGetObjectsList,
+  handleGetObjectsList as handleGetObjectsListOf,
 } from '../../../handlers/search/readonly/handleGetObjectsList';
 import {
   TOOL_DEFINITION as GetPackageTree,
@@ -52,6 +52,12 @@ import {
 } from '../../helpers/batchEnvelope';
 import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
+
+/** handleGetObjectsList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetObjectsList = (
+  context: Parameters<typeof handleGetObjectsListOf>[0],
+  args: Parameters<typeof handleGetObjectsListOf>[1],
+) => handleGetObjectsListOf(context, { detail: 'full', ...args });
 
 /** handleGetPackageTree at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
 const handleGetPackageTree = (

@@ -1,5 +1,6 @@
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
+import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
 import {
   onEveryVariant,
   type RuleVariant,
@@ -10,6 +11,11 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { succeeded } from '../../../lib/strategies/stepResponse';
 
 /** GetObjectsList's arguments but `background`. */
@@ -45,6 +51,7 @@ const FIELDS = {
     .boolean()
     .optional()
     .describe('[read-only] Include short descriptions (default: true)'),
+  ...DETAIL_SHAPE,
 };
 
 type ObjectsListFields = z.output<z.ZodObject<typeof FIELDS>>;
@@ -430,6 +437,63 @@ function failureOfWalk(walk: IAdtFailure | Thrown): FailureEntry {
     : failureEntry(walk.getError(), 'read node structure');
 }
 
+/** One parent's list as read: the parent asked, and its objects. */
+interface ParentList {
+  parent_name: string | undefined;
+  parent_tech_name?: string | undefined;
+  parent_type: string | undefined;
+  objects: FlatObject[];
+}
+
+/** One parent's objects as TSV: type, name, and the technical name where it differs. */
+function parentRows(list: ParentList): string {
+  return [
+    `# parent ${list.parent_type ?? ''} ${list.parent_name ?? ''}`,
+    `# total ${list.objects.length}`,
+    tsv(
+      ['type', 'name', 'tech_name'],
+      list.objects.map((o) => [
+        o.OBJECT_TYPE,
+        o.OBJECT_NAME,
+        o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
+          ? o.TECH_NAME
+          : '',
+      ]),
+    ),
+  ].join('\n');
+}
+
+/**
+ * What GetObjectsList answers of one parent at each `detail`, selected
+ * before the walk (`src/lib/detail`): terse its objects as TSV (type, name,
+ * the technical name only where it differs); medium every field read but
+ * the uri; full the answer before `detail`. A walk reads many documents, so
+ * raw is the full answer.
+ */
+const OBJECTS_LIST_ANSWERS: AnswerTable<ParentList, string | object> = {
+  terse: parentRows,
+  medium: (list) => ({
+    parent_name: list.parent_name,
+    parent_type: list.parent_type,
+    total_objects: list.objects.length,
+    objects: list.objects.map((o) => ({
+      type: o.OBJECT_TYPE,
+      name: o.OBJECT_NAME,
+      ...(o.TECH_NAME !== undefined ? { tech_name: o.TECH_NAME } : {}),
+    })),
+  }),
+  full: (list) => ({
+    parent_name: list.parent_name,
+    ...('parent_tech_name' in list
+      ? { parent_tech_name: list.parent_tech_name }
+      : {}),
+    parent_type: list.parent_type,
+    total_objects: list.objects.length,
+    objects: list.objects,
+  }),
+  raw: (list) => OBJECTS_LIST_ANSWERS.full(list),
+};
+
 export async function handleGetObjectsList(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
@@ -447,6 +511,8 @@ export async function handleGetObjectsList(
     with_short_descriptions !== undefined
       ? Boolean(with_short_descriptions)
       : true;
+  const level = levelOf(args);
+  const shown = answerAt(OBJECTS_LIST_ANSWERS, levelOf(args));
 
   if (listed !== undefined && listed.length > 0) {
     const parents: Parent[] = [];
@@ -464,7 +530,7 @@ export async function handleGetObjectsList(
     }
     let read: ParentWalks = { walks: [] };
     return answer(
-      { tool: 'GetObjectsList', detail: 'terse' },
+      { tool: 'GetObjectsList', detail: detailOf(args) },
       async () => {
         read = await withSequentialFallback(
           context,
@@ -477,20 +543,28 @@ export async function handleGetObjectsList(
         }
         return ok([]);
       },
-      () =>
-        read.walks.map((walk, i) => {
+      () => {
+        const entries = read.walks.map((walk, i) => {
           const asked = {
             parent_name: listed[i]?.parent_name,
             parent_type: listed[i]?.parent_type,
           };
           return walk.ok
-            ? {
-                ...asked,
-                total_objects: walk.getResult().value.length,
-                objects: walk.getResult().value,
-              }
+            ? shown({ ...asked, objects: walk.getResult().value })
             : { ...asked, error: failureOfWalk(walk) };
-        }),
+        });
+        // At terse each parent's list is text: one text, a failed walk as
+        // its parent line and `# error`; at the other levels the entries.
+        return level === 'terse'
+          ? entries
+              .map((entry) =>
+                typeof entry === 'string'
+                  ? entry
+                  : `# parent ${JSON.stringify(entry)}`,
+              )
+              .join('\n')
+          : entries;
+      },
     );
   }
 
@@ -514,7 +588,7 @@ export async function handleGetObjectsList(
   // this tool's own answer besides is a composite assembled from a
   // recursive walk over many such calls, not one reading.
   return answer(
-    { tool: 'GetObjectsList', detail: 'terse' },
+    { tool: 'GetObjectsList', detail: detailOf(args) },
     () =>
       withSequentialFallback(
         context,
@@ -547,8 +621,9 @@ export async function handleGetObjectsList(
         total_objects: objects.length,
         objects,
       };
+      // The cache keeps the full answer, whatever the level answered.
       objectsListCache.setCache(result);
-      return result;
+      return shown({ parent_name, parent_tech_name, parent_type, objects });
     },
   );
 }

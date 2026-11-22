@@ -72,6 +72,7 @@ export type FailureCode =
   | 'abapgit_run_log_not_served'
   | 'abapgit_url_refused'
   | 'abapgit_endpoint_refused'
+  | 'abapgit_not_admitted'
   | AccessRefusalCode;
 
 /**

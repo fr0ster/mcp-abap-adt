@@ -53,6 +53,7 @@ export type ServerRefusalCode =
   | 'abapgit_run_log_not_served'
   | 'abapgit_url_refused'
   | 'abapgit_endpoint_refused'
+  | 'abapgit_not_admitted'
   | AccessRefusalCode;
 
 /**
@@ -107,6 +108,10 @@ export const ABAPGIT_URL_REFUSED_WORDS =
 /** A request whose `x-abapgit-*` headers state no endpoint that can be one (spec §5.2). */
 export const ABAPGIT_ENDPOINT_REFUSED_WORDS =
   'the x-abapgit-remote, x-abapgit-user and x-abapgit-token headers state no approved endpoint: an https URL without a user, a password, a query or a fragment, with a user and a token; nothing was sent';
+
+/** An abapGit tool reached without the server's admission (a registry path that bypasses its dispatch). */
+export const ABAPGIT_NOT_ADMITTED_WORDS =
+  "the abapGit call reached its tool without the server's admission (the repository list read, the endpoint binding), so it is not sent; nothing was sent";
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -438,6 +443,7 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   abapgit_run_log_not_served: ABAPGIT_RUN_LOG_NOT_SERVED_WORDS,
   abapgit_url_refused: ABAPGIT_URL_REFUSED_WORDS,
   abapgit_endpoint_refused: ABAPGIT_ENDPOINT_REFUSED_WORDS,
+  abapgit_not_admitted: ABAPGIT_NOT_ADMITTED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

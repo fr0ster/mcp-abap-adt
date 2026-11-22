@@ -9,7 +9,10 @@ import {
   readGuarded,
   ServerRefusal,
 } from '@mcp-abap-adt/lib/auth';
-import type { ApprovedEndpoint } from '@mcp-abap-adt/lib/config';
+import type {
+  AbapGitRestrictionSignal,
+  ApprovedEndpoint,
+} from '@mcp-abap-adt/lib/config';
 import {
   BaseMcpServer,
   type IBackgroundRuns,
@@ -121,6 +124,8 @@ export interface StdioServerOptions {
    * its `.env`, read at the start; spec §5.2). Absent: none.
    */
   abapGitEndpoints?: readonly ApprovedEndpoint[] | undefined;
+  /** Which access restrictions the start configured (`restrictedStart`). Absent: none. */
+  abapGitRestrictions?: AbapGitRestrictionSignal | undefined;
 }
 
 /**
@@ -187,6 +192,9 @@ export class StdioServer extends BaseMcpServer {
       }),
       ...(opts?.abapGitEndpoints !== undefined && {
         abapGitEndpoints: opts.abapGitEndpoints,
+      }),
+      ...(opts?.abapGitRestrictions !== undefined && {
+        abapGitRestrictions: opts.abapGitRestrictions,
       }),
       // The locks the instance took: a write, a delete or an unlock under a
       // lock_handle is sent only under one it holds.

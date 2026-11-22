@@ -6,6 +6,7 @@
 
 import '../instance.js';
 
+export type { AbapGitRestrictionSignal } from '../abapGit/admission.js';
 export {
   type ApprovedEndpoint,
   ApprovedEndpointError,

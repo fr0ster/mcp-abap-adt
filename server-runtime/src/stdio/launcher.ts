@@ -1024,6 +1024,7 @@ async function launchStdio(
       restoreAtFirstBirth:
         config.deferredLogon === true && config.restoreSession === true,
       abapGitEndpoints,
+      abapGitRestrictions: restricted.abapGitRestrictions,
       // --session-keep-alive-minutes: the held connection's keep-alive.
       sessionKeepAliveMs:
         config.sessionKeepAliveMinutes === undefined

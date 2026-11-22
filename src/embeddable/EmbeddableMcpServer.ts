@@ -1,6 +1,7 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { AbapGitRestrictionSignal } from '../lib/abapGit/admission.js';
 import type { IAccessChecks } from '../lib/access/accessChecks.js';
 import type { AdtHeaderPairs } from '../lib/adtHeaders/AdtHeaderPairs.js';
 import type { IBackgroundRuns } from '../lib/backgroundRuns/contract.js';
@@ -86,6 +87,13 @@ export interface EmbeddableMcpServerBaseOptions {
    * §3.2); one strategy for every instance it makes. Absent: none.
    */
   accessChecks?: IAccessChecks | undefined;
+  /**
+   * Which access restrictions the host configured, for the abapGit
+   * admission: while allowed packages or requests are configured, link and
+   * pull are refused (spec §4.3). `IAccessChecks` exposes only `check`, so
+   * the host states it. Absent: none.
+   */
+  abapGitRestrictions?: AbapGitRestrictionSignal | undefined;
 
   /**
    * The system the injected connection reaches, as a key of your choosing,
@@ -326,6 +334,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       prompts: options.prompts,
       ...(options.transportCloseEndsSession !== undefined && {
         transportCloseEndsSession: options.transportCloseEndsSession,
+      }),
+      ...(options.abapGitRestrictions !== undefined && {
+        abapGitRestrictions: options.abapGitRestrictions,
       }),
       ...(options.accessChecks !== undefined && {
         accessChecks: options.accessChecks,

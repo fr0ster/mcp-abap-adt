@@ -43,6 +43,7 @@
  * parameter, naming the binary its words asked for.
  */
 
+import type { AbapGitRestrictionSignal } from './abapGit/admission.js';
 import './instance.js';
 import type { IAccessChecks } from './access/accessChecks';
 import type { AccessRestrictions } from './access/accessLists';
@@ -588,6 +589,11 @@ export interface RestrictedStart {
   readonly accessChecks: IAccessChecks | undefined;
   /** The start line (`accessStartLine`), written once per process. */
   readonly startLine: string;
+  /**
+   * Which lists are configured, for the abapGit admission (spec §4.3): the
+   * lists themselves stay here.
+   */
+  readonly abapGitRestrictions: AbapGitRestrictionSignal;
 }
 
 /**
@@ -617,5 +623,9 @@ export function restrictedStart(
     ),
     accessChecks: accessChecksFor(restrictions.lists),
     startLine: accessStartLine(restrictions, unmatched, tree),
+    abapGitRestrictions: {
+      packages: (restrictions.lists.allowedPackages?.length ?? 0) > 0,
+      requests: (restrictions.lists.allowedRequests?.length ?? 0) > 0,
+    },
   };
 }

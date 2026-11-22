@@ -2,7 +2,10 @@ import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
 import type { IAccessChecks } from '@mcp-abap-adt/lib';
 import { errorClassOf } from '@mcp-abap-adt/lib/auth';
-import type { TlsConfig } from '@mcp-abap-adt/lib/config';
+import type {
+  AbapGitRestrictionSignal,
+  TlsConfig,
+} from '@mcp-abap-adt/lib/config';
 import type {
   ConnectionContext,
   IHttpApplication,
@@ -153,6 +156,8 @@ export interface StreamableHttpServerOptions {
    * §3.2); one strategy for every instance it makes. Absent: none.
    */
   accessChecks?: IAccessChecks | undefined;
+  /** Which access restrictions the start configured (`restrictedStart`), for every instance. Absent: none. */
+  abapGitRestrictions?: AbapGitRestrictionSignal | undefined;
   /**
    * `SearchSource`'s SAP-answer strategy, handed to every instance (the
    * launcher's: the shipped `skipSapAnswers`). Absent: the handler's default.
@@ -254,6 +259,9 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly stateLogger: StateLogger;
   private readonly backgroundRunsStore: IBackgroundRuns | undefined;
   private readonly instanceAccessChecks: IAccessChecks | undefined;
+  private readonly instanceAbapGitRestrictions:
+    | AbapGitRestrictionSignal
+    | undefined;
   private readonly sapAnswerStrategy: SapAnswerStrategy | undefined;
   private readonly lineMatchStrategy: LineMatchStrategy | undefined;
   private readonly batchSettings: { keepRawParts: boolean } | undefined;
@@ -287,6 +295,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.stateLogger = stateLoggerOf(opts ?? {});
     this.backgroundRunsStore = opts?.backgroundRuns;
     this.instanceAccessChecks = opts?.accessChecks;
+    this.instanceAbapGitRestrictions = opts?.abapGitRestrictions;
     this.sapAnswerStrategy = opts?.sapAnswerStrategy;
     this.lineMatchStrategy = opts?.lineMatchStrategy;
     this.batchSettings =
@@ -630,6 +639,7 @@ export class StreamableHttpServer extends BaseMcpServer {
           isStateHandleTaken?: (handle: string) => boolean;
           backgroundRuns?: IBackgroundRuns;
           accessChecks?: IAccessChecks;
+          abapGitRestrictions?: AbapGitRestrictionSignal;
           backgroundRunOwner?: BackgroundRunOwner;
           sapAnswerStrategy?: SapAnswerStrategy;
           lineMatchStrategy?: LineMatchStrategy;
@@ -704,6 +714,9 @@ export class StreamableHttpServer extends BaseMcpServer {
         }),
         ...(this.instanceAccessChecks !== undefined && {
           accessChecks: this.instanceAccessChecks,
+        }),
+        ...(this.instanceAbapGitRestrictions !== undefined && {
+          abapGitRestrictions: this.instanceAbapGitRestrictions,
         }),
         ...(this.backgroundRunsStore !== undefined && {
           backgroundRuns: this.backgroundRunsStore,

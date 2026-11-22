@@ -106,12 +106,10 @@ function expectDomainUsed(answer: LiveAnswer): void {
 liveSuite(['onprem', 'cloud'], 'Repository reads', () => {
   it('GetTransaction reads SE80', async () => {
     const read = await liveCall('GetTransaction', { transaction_name: 'SE80' });
-    const object = member(
-      payloadOf(succeeded('GetTransaction', read)),
-      'object',
-    );
-    assert.equal(member(object, 'name'), 'SE80');
-    assert.equal(member(object, 'type'), 'TRAN/T');
+    // Terse, the default: the transaction named, then its facets as TSV.
+    const lines = succeeded('GetTransaction', read).text.split('\n');
+    assert.equal(lines[0], '# transaction SE80', read.text);
+    assert.ok(lines.includes('facet\tname\ttext'), read.text);
   });
 
   it('GetObjectStructure reads the shared class', async () => {

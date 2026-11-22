@@ -152,10 +152,12 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
     }
     const server = await launched();
     try {
+      // The whole answer (detail full): terse fits the limit, below.
       await assert.rejects(
         server.call('GetWhereUsed', {
           object_name: name,
           object_type: 'CLAS/OC',
+          detail: 'full',
           background: false,
         }),
         (error: unknown) =>
@@ -163,6 +165,34 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
       );
       const next = await searchRows(server, name);
       assert.equal(next.rows, 1, next.text);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('terse, the default, answers every usage within the limit', async () => {
+    const name = oversizedClass();
+    if (name === undefined) {
+      skipRunningTest(
+        'the config names no whereused_readonly.test_whereused.oversized_class',
+      );
+      return;
+    }
+    const server = await launched();
+    try {
+      const text = textOf(
+        'GetWhereUsed',
+        await server.call('GetWhereUsed', {
+          object_name: name,
+          object_type: 'CLAS/OC',
+          background: false,
+        }),
+      );
+      const total = text.split('\n')[0] ?? '';
+      assert.ok(total.startsWith('# total '), text.slice(0, 2000));
+      console.log(
+        `[readToolBugs] GetWhereUsed ${name} terse: ${text.length} characters, ${total}`,
+      );
     } finally {
       await server.close();
     }
@@ -195,12 +225,21 @@ liveSuite(
       } finally {
         await server.close();
       }
-      const rows: unknown = JSON.parse(text);
-      assert.ok(Array.isArray(rows), text.slice(0, 2000));
-      const keys = rows.map(
-        (row) =>
-          `${String(member(row, 'type'))} ${String(member(row, 'name'))} in ${String(member(row, 'packageName'))}`,
-      );
+      // Terse, the default: `type\tname` rows under `# package` lines.
+      const keys: string[] = [];
+      let owner = '';
+      for (const line of text.split('\n')) {
+        if (line.startsWith('# package ')) {
+          owner = line.slice('# package '.length);
+          continue;
+        }
+        if (line === '' || line.startsWith('#') || line === 'type\tname') {
+          continue;
+        }
+        const [type, rowName] = line.split('\t');
+        keys.push(`${type} ${rowName} in ${owner}`);
+      }
+      assert.ok(keys.length > 0, text.slice(0, 2000));
       assert.deepEqual(
         keys.filter((key, i) => keys.indexOf(key) !== i),
         [],

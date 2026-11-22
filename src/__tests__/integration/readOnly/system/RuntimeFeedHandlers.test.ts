@@ -36,6 +36,30 @@ function parseTextPayload(result: any): any {
   return JSON.parse(textContent.text);
 }
 
+/**
+ * A feed's terse answer (RuntimeListFeeds' default) read back: its
+ * `# feed` and `# count` lines, the TSV header and one cell list per row.
+ */
+function terseFeed(result: any): {
+  feed: string;
+  count: number;
+  header: string;
+  rows: string[][];
+} {
+  const lines = String(result?.content?.[0]?.text ?? '').split('\n');
+  const feed = lines[0]?.startsWith('# feed ') ? lines[0].slice(7) : '';
+  const count = Number(
+    lines.find((line) => line.startsWith('# count '))?.slice(8) ?? NaN,
+  );
+  const body = lines.filter((line) => line !== '' && !line.startsWith('#'));
+  return {
+    feed,
+    count,
+    header: body[0] ?? '',
+    rows: body.slice(1).map((line) => line.split('\t')),
+  };
+}
+
 function extractErrorText(result: any): string {
   try {
     const textContent = result?.content?.find((c: any) => c.type === 'text');
@@ -104,14 +128,14 @@ describe('Runtime Feed Handlers Integration', () => {
       );
 
       expectSuccess(result, 'RuntimeListFeeds(descriptors)');
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'descriptors');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'descriptors');
+      assert.equal(data.header, 'id\ttitle\tcategory');
+      assert.equal(data.rows.length, data.count);
 
       // Store available feeds for subsequent tests
-      availableFeedTitles = (data.entries as any[]).map((e: any) =>
-        String(e.title ?? e.id ?? '').toLowerCase(),
+      availableFeedTitles = data.rows.map(([id, title]) =>
+        String(title || id || '').toLowerCase(),
       );
       logger?.info(
         `Feed descriptors: ${data.count} entries (${availableFeedTitles.join(', ')})`,
@@ -144,10 +168,9 @@ describe('Runtime Feed Handlers Integration', () => {
         );
       }
 
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'variants');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'variants');
+      assert.equal(data.header, 'feed\ttitle\tquery\tis_default');
       logger?.info(`Feed variants: ${data.count} entries`);
     });
   });
@@ -197,10 +220,9 @@ describe('Runtime Feed Handlers Integration', () => {
         );
       }
 
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'dumps');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'dumps');
+      assert.equal(data.header, 'dump_id\tupdated\ttitle');
       logger?.info(`Dumps feed: ${data.count} entries`);
     });
   });
@@ -261,10 +283,9 @@ describe('Runtime Feed Handlers Integration', () => {
       );
 
       expectSuccess(result, 'RuntimeListFeeds(system_messages)');
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'system_messages');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'system_messages');
+      assert.equal(data.header, 'id\tcreatedOn\tauthor\ttitle');
       logger?.info(`System messages via feeds: ${data.count} entries`);
     });
   });
@@ -371,10 +392,12 @@ describe('Runtime Feed Handlers Integration', () => {
       );
 
       expectSuccess(result, 'RuntimeListFeeds(gateway_errors)');
-      const data = parseTextPayload(result);
-      assert.equal(data.success, true);
-      assert.equal(data.feed_type, 'gateway_errors');
-      assert.equal(Array.isArray(data.entries), true);
+      const data = terseFeed(result);
+      assert.equal(data.feed, 'gateway_errors');
+      assert.equal(
+        data.header,
+        'opid\tdetail_kind\tdateTime\ttype\tshortText\tusername',
+      );
       logger?.info(`Gateway errors via feeds: ${data.count} entries`);
     });
   });

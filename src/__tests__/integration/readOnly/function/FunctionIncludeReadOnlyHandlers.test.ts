@@ -77,6 +77,33 @@ const describe = servedSuite([
   'ListFunctionModules',
 ]);
 
+/**
+ * A function group list's terse answer (the default) read back: its
+ * `# function_group` and `# total` lines, then `name\tdescription` rows.
+ */
+function terseGroupList(response: { content: Array<{ text?: string }> }): {
+  group: string;
+  total: number;
+  names: string[];
+} {
+  const lines = (response.content[0]?.text ?? '').split('\n');
+  const group = lines[0]?.startsWith('# function_group ')
+    ? lines[0].slice('# function_group '.length)
+    : '';
+  const total = Number(
+    lines.find((line) => line.startsWith('# total '))?.slice(8) ?? NaN,
+  );
+  const header = lines.indexOf('name\tdescription');
+  const names =
+    header < 0
+      ? []
+      : lines
+          .slice(header + 1)
+          .filter((line) => line !== '')
+          .map((line) => (line.split('\t')[0] ?? '').toUpperCase());
+  return { group, total, names };
+}
+
 describe('FunctionInclude ReadOnly Handlers Integration', () => {
   let connection: IAbapConnection | null = null;
   let session: SessionInfo | null = null;
@@ -268,22 +295,11 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       throw new Error(`ListFunctionGroupIncludes failed: ${errorMsg}`);
     }
 
-    const data = handlerAnswer(
-      response,
-      z.looseObject({
-        function_group_name: z.unknown(),
-        includes: z.unknown(),
-        success: z.unknown(),
-        total: z.unknown(),
-      }),
-    );
-    assert.equal(data.success, true);
-    assert.equal(data.function_group_name, functionGroupName.toUpperCase());
-    assert.equal(Array.isArray(data.includes), true);
+    const data = terseGroupList(response);
+    assert.equal(data.group.toUpperCase(), functionGroupName.toUpperCase());
+    assert.equal(data.total, data.names.length);
 
-    const includeNames = (data.includes as any[]).map((inc) =>
-      String(typeof inc === 'string' ? inc : (inc?.name ?? inc)).toUpperCase(),
-    );
+    const includeNames = data.names;
     const topInclude = `L${functionGroupName.toUpperCase()}TOP`;
 
     // The TOP include must be present. ListFunctionGroupIncludes returns ALL
@@ -353,22 +369,11 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
       throw new Error(`ListFunctionModules failed: ${errorMsg}`);
     }
 
-    const data = handlerAnswer(
-      response,
-      z.looseObject({
-        function_group_name: z.unknown(),
-        function_modules: z.unknown(),
-        success: z.unknown(),
-        total: z.unknown(),
-      }),
-    );
-    assert.equal(data.success, true);
-    assert.equal(data.function_group_name, functionGroupName.toUpperCase());
-    assert.equal(Array.isArray(data.function_modules), true);
+    const data = terseGroupList(response);
+    assert.equal(data.group.toUpperCase(), functionGroupName.toUpperCase());
+    assert.equal(data.total, data.names.length);
 
-    const moduleNames = (data.function_modules as any[]).map((fm) =>
-      String(typeof fm === 'string' ? fm : (fm?.name ?? fm)).toUpperCase(),
-    );
+    const moduleNames = data.names;
     assert.ok(moduleNames.includes(expectedFm.toUpperCase()));
 
     testLogger?.info(

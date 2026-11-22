@@ -232,6 +232,8 @@ liveSuite(['onprem', 'cloud'], 'GetObjectOutline states components', () => {
     );
 
     const answered = await liveCall('GetObjectOutline', {
+      // The outline's links are read: medium, the former default.
+      detail: 'medium',
       object_type: 'CLAS/OC',
       object_name: CLASS,
     });
@@ -290,6 +292,8 @@ liveSuite(['onprem', 'cloud'], 'GetObjectOutline states components', () => {
     );
 
     const answered = await liveCall('GetObjectOutline', {
+      // The outline's links are read: medium, the former default.
+      detail: 'medium',
       object_type: 'INTF/OI',
       object_name: INTERFACE,
     });
@@ -342,6 +346,8 @@ liveSuite(['onprem', 'cloud'], 'GetObjectOutline states components', () => {
     );
 
     const answered = await liveCall('GetObjectOutline', {
+      // The outline's links are read: medium, the former default.
+      detail: 'medium',
       object_type: 'FUGR/F',
       object_name: GROUP,
     });
@@ -396,6 +402,8 @@ liveSuite(['onprem'], 'GetObjectOutline states a program', () => {
     );
 
     const answered = await liveCall('GetObjectOutline', {
+      // The outline's links are read: medium, the former default.
+      detail: 'medium',
       object_type: 'PROG/P',
       object_name: PROGRAM,
     });

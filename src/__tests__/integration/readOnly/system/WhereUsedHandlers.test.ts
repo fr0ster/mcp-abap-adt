@@ -31,6 +31,19 @@ const WhereUsedParams = z.looseObject({
   test_table: z.string().optional(),
 });
 
+/**
+ * The reference total of GetWhereUsed's terse answer (the default): its
+ * first line, `# total N`.
+ */
+function terseTotal(result: any): number {
+  const text = String(
+    (result.content.find((c: any) => c.type === 'text') as any)?.text ?? '',
+  );
+  const first = text.split('\n')[0] ?? '';
+  assert.ok(first.startsWith('# total '), text.slice(0, 2000));
+  return Number(first.slice('# total '.length));
+}
+
 function extractResultData(result: any): any {
   const jsonContent = result.content.find((c: any) => c.type === 'json') as any;
   if (jsonContent?.json) {
@@ -112,15 +125,10 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const data = extractResultData(result);
-      assert.equal(data.object_name, testClass);
-      assert.equal(data.object_type, 'class');
-      assert.equal(data.enable_all_types, false);
-      assert.ok(data.total_references >= 0);
+      const total = terseTotal(result);
+      assert.ok(total >= 0);
 
-      logger?.info(
-        `✅ Found ${data.total_references} references with default scope`,
-      );
+      logger?.info(`✅ Found ${total} references with default scope`);
     });
   });
 
@@ -158,15 +166,10 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const data = extractResultData(result);
-      assert.equal(data.object_name, testClass);
-      assert.equal(data.object_type, 'class');
-      assert.equal(data.enable_all_types, true);
-      assert.ok(data.total_references >= 0);
+      const total = terseTotal(result);
+      assert.ok(total >= 0);
 
-      logger?.info(
-        `✅ Found ${data.total_references} references with all types enabled`,
-      );
+      logger?.info(`✅ Found ${total} references with all types enabled`);
     });
   });
 
@@ -204,12 +207,10 @@ describe('WhereUsed Handler Integration', () => {
       assert.ok(result.content !== undefined);
       assert.ok(result.content.length > 0);
 
-      const data = extractResultData(result);
-      assert.equal(data.object_name, testTable);
-      assert.equal(data.object_type, 'table');
-      assert.ok(data.total_references >= 0);
+      const total = terseTotal(result);
+      assert.ok(total >= 0);
 
-      logger?.info(`✅ Found ${data.total_references} references for table`);
+      logger?.info(`✅ Found ${total} references for table`);
     });
   });
 
@@ -313,7 +314,7 @@ describe('WhereUsed Handler Integration', () => {
           });
         },
       );
-      const defaultData = extractResultData(defaultResult);
+      const defaultData = { total_references: terseTotal(defaultResult) };
 
       // Get results with all types enabled
       const allTypesResult = await tester.invokeToolOrHandler(
@@ -332,7 +333,7 @@ describe('WhereUsed Handler Integration', () => {
           });
         },
       );
-      const allTypesData = extractResultData(allTypesResult);
+      const allTypesData = { total_references: terseTotal(allTypesResult) };
 
       // Compare results
       logger?.info(
@@ -366,7 +367,13 @@ describe('WhereUsed Handler Integration', () => {
       const invoke = async (extra: Record<string, unknown>) =>
         tester.invokeToolOrHandler(
           'GetWhereUsed',
-          { object_name: testClass, object_type: 'class', ...extra },
+          // The references' types and the filter echoed: the full answer.
+          {
+            object_name: testClass,
+            object_type: 'class',
+            detail: 'full',
+            ...extra,
+          },
           async () => {
             const handlerContext = createHandlerContext({
               connection,
@@ -375,6 +382,7 @@ describe('WhereUsed Handler Integration', () => {
             return handleGetWhereUsed(handlerContext, {
               object_name: testClass,
               object_type: 'class',
+              detail: 'full',
               ...extra,
             } as any);
           },

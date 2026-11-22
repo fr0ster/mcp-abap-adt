@@ -28,23 +28,30 @@ import { createHandlerContext } from '../../helpers/testHelpers';
 
 const logger = createTestLogger('include-main-programs');
 
-/** The text of a tool's answer, parsed: data from outside the type system. */
-function payloadOf(answer: unknown): unknown {
-  if (typeof answer !== 'object' || answer === null) return undefined;
+/** The text of a tool's answer: data from outside the type system. */
+function textOf(answer: unknown): string {
+  if (typeof answer !== 'object' || answer === null) return '';
   const content: unknown = Reflect.get(answer, 'content');
-  if (!Array.isArray(content)) return undefined;
+  if (!Array.isArray(content)) return '';
   const first: unknown = content[0];
-  if (typeof first !== 'object' || first === null) return undefined;
+  if (typeof first !== 'object' || first === null) return '';
   const text: unknown = Reflect.get(first, 'text');
-  return typeof text === 'string' ? JSON.parse(text) : undefined;
+  return typeof text === 'string' ? text : '';
 }
 
-/** The `main_programs` list of an answer's payload. */
-function mainProgramsOf(answer: unknown): unknown[] {
-  const payload = payloadOf(answer);
-  if (typeof payload !== 'object' || payload === null) return [];
-  const listed: unknown = Reflect.get(payload, 'main_programs');
-  return Array.isArray(listed) ? listed : [];
+/**
+ * The main programs of a terse answer (the default): `type\tname` rows
+ * under the `# include` line and the header.
+ */
+function mainProgramsOf(answer: unknown): string[][] {
+  const lines = textOf(answer).split('\n');
+  const header = lines.indexOf('type\tname');
+  return header < 0
+    ? []
+    : lines
+        .slice(header + 1)
+        .filter((line) => line !== '')
+        .map((line) => line.split('\t'));
 }
 
 systemsDescribe(['onprem'], "An include's main programs", () => {
@@ -72,16 +79,15 @@ systemsDescribe(['onprem'], "An include's main programs", () => {
       const includeName = String(params?.include_name ?? '');
       const handlerContext = createHandlerContext({ connection, logger });
 
-      const full = await handleGetMainPrograms(handlerContext, {
+      const listed = await handleGetMainPrograms(handlerContext, {
         include_name: includeName,
       });
-      assert.equal(Reflect.get(full, 'isError'), false);
-      const programs = mainProgramsOf(full);
-      assert.ok(programs.length > 0);
-      for (const program of programs) {
-        assert.equal(typeof Reflect.get(Object(program), 'name'), 'string');
-        assert.equal(typeof Reflect.get(Object(program), 'type'), 'string');
-        assert.equal(typeof Reflect.get(Object(program), 'uri'), 'string');
+      assert.equal(Reflect.get(listed, 'isError'), false);
+      const programs = mainProgramsOf(listed);
+      assert.ok(programs.length > 0, textOf(listed));
+      for (const [type, name] of programs) {
+        assert.ok(type, textOf(listed));
+        assert.ok(name, textOf(listed));
       }
 
       const compact = await handleHandlerGet(handlerContext, {

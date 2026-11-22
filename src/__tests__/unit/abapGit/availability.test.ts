@@ -17,7 +17,11 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
@@ -28,6 +32,7 @@ import { StreamableHttpServer } from '../../../../server-runtime/src/http/Stream
 import { SseServer } from '../../../../server-runtime/src/sse/SseServer';
 import type { IDestinations } from '../../../../server-runtime/src/stdio/auth/IAuthBrokerFactory';
 import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
+import { abapGitServed } from '../../../lib/abapGit/availability';
 import { notifyConnectionResetListeners } from '../../../lib/connectionEvents';
 import type { HandlerEntry } from '../../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
@@ -395,3 +400,67 @@ for (const [transport, listed] of [
     });
   });
 }
+
+/** A connection whose discovery reads wait until `release()`, counted. */
+function heldDiscovery() {
+  let reads = 0;
+  const waiting: Array<() => void> = [];
+  const connection: IAbapConnection = {
+    async connect() {},
+    async getBaseUrl() {
+      return 'https://sap.example.invalid';
+    },
+    getSessionId() {
+      return null;
+    },
+    setSessionType() {},
+    async makeAdtRequest<T = unknown, D = unknown>(
+      _options: IAbapRequestOptions,
+    ): Promise<IAdtWireResponse<T, D>> {
+      reads += 1;
+      await new Promise<void>((resolve) => waiting.push(resolve));
+      // A recorded body is text; `T` is the caller's view of it.
+      return {
+        data: SERVED_DISCOVERY as T,
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+      };
+    },
+  };
+  return {
+    connection,
+    reads: () => reads,
+    release: () => {
+      for (const resolve of waiting.splice(0)) resolve();
+    },
+  };
+}
+
+describe('one discovery read in flight per system key', () => {
+  const SYSTEM = JSON.stringify(['http', 'https://sap.example.invalid', '100']);
+
+  it('two concurrent cold lookups share one request', async () => {
+    const sap = heldDiscovery();
+    const first = abapGitServed(sap.connection, SYSTEM);
+    const second = abapGitServed(sap.connection, SYSTEM);
+    await until(() => sap.reads() >= 1);
+    sap.release();
+    assert.deepEqual(await Promise.all([first, second]), [true, true]);
+    assert.equal(sap.reads(), 1);
+  });
+
+  it('a reset while a read is in flight: that read fills nothing, the next lookup reads again', async () => {
+    const sap = heldDiscovery();
+    const before = abapGitServed(sap.connection, SYSTEM);
+    await until(() => sap.reads() === 1);
+    notifyConnectionResetListeners();
+    sap.release();
+    assert.equal(await before, true);
+    const after = abapGitServed(sap.connection, SYSTEM);
+    await until(() => sap.reads() === 2);
+    sap.release();
+    assert.equal(await after, true);
+    assert.equal(sap.reads(), 2);
+  });
+});

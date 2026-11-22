@@ -1,11 +1,13 @@
 /**
- * The stdio transport writes no message longer than a stdio client reads as
- * one (`BoundedStdioServerTransport`): the MCP SDK's client closes the
- * transport on a longer line — the server's stdin ends and the server shuts
- * down — so a response over the limit is answered `InternalError` naming
- * both sizes, and every other message goes as it is. The client side is the
- * SDK's own `ReadBuffer` at its default limit, as `StdioClientTransport`
- * builds it.
+ * The stdio transport writes no frame longer than a stdio client can buffer
+ * (`BoundedStdioServerTransport`): the MCP SDK's client closes the
+ * transport once its buffer — the unparsed rest of a frame plus the next
+ * chunk — passes its limit, and the server's stdin ends. The cap is that
+ * limit less one pipe read. A response over the cap is answered
+ * `InternalError` naming both sizes, a notification over it is dropped with
+ * a stderr line, a request over it fails on the server's side, and every
+ * other message goes as it is. The client side is the SDK's own
+ * `ReadBuffer` at its default limit, as `StdioClientTransport` builds it.
  */
 
 import assert from 'node:assert/strict';
@@ -27,43 +29,73 @@ import type { IDestinations } from '../auth/IAuthBrokerFactory.js';
 import {
   BoundedStdioServerTransport,
   boundedMessage,
+  droppedNotificationLine,
+  frameCapOf,
   oversizedAnswerWords,
+  STDIO_FRAME_CAP,
   STDIO_MESSAGE_LIMIT,
+  STDIO_READ_MARGIN,
 } from '../boundedStdioTransport.js';
 import { StdioServer } from '../StdioServer.js';
 
-/** A tool call's answer of `chars` characters, as response `id`. */
-function answerOf(id: number, chars: number): JSONRPCMessage {
+/** A tool call's answer whose text is `text`, as response `id`. */
+function answerWith(id: number, text: string): JSONRPCMessage {
   return {
     jsonrpc: '2.0',
     id,
-    result: { content: [{ type: 'text', text: 'x'.repeat(chars) }] },
+    result: { content: [{ type: 'text', text }] },
   };
 }
 
-/** What `transport` wrote for `message`, as the bytes on stdout. */
-async function written(
+/** The bytes of `message` on the wire. */
+const sizeOf = (message: JSONRPCMessage) =>
+  Buffer.byteLength(serializeMessage(message), 'utf8');
+
+/** An answer of exactly `bytes` bytes on the wire, as response `id`. */
+function answerOfSize(id: number, bytes: number): JSONRPCMessage {
+  const empty = sizeOf(answerWith(id, ''));
+  return answerWith(id, 'x'.repeat(bytes - empty));
+}
+
+/** A transport on fresh streams, its stdout's bytes and stderr lines recorded. */
+function recorded(
   make: (stdin: PassThrough, stdout: PassThrough) => StdioServerTransport,
-  message: JSONRPCMessage,
-): Promise<Buffer> {
+) {
   const stdin = new PassThrough();
   const stdout = new PassThrough();
   const chunks: Buffer[] = [];
   stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
-  const transport = make(stdin, stdout);
-  await transport.start();
-  await transport.send(message);
-  await transport.close();
-  return Buffer.concat(chunks);
+  return { transport: make(stdin, stdout), bytes: () => Buffer.concat(chunks) };
 }
 
-/** The messages the SDK client's buffer reads out of `bytes`, at its default limit. */
-function clientReads(bytes: Buffer): JSONRPCMessage[] {
+/** What `make`'s transport wrote for `messages`, sent together. */
+async function written(
+  make: (stdin: PassThrough, stdout: PassThrough) => StdioServerTransport,
+  ...messages: JSONRPCMessage[]
+): Promise<Buffer> {
+  const { transport, bytes } = recorded(make);
+  await transport.start();
+  await Promise.all(messages.map((message) => transport.send(message)));
+  await transport.close();
+  return bytes();
+}
+
+/**
+ * The messages the SDK client's buffer reads out of `bytes`, fed `chunk`
+ * bytes at a time after a first chunk of `first` bytes (a pipe's reads do
+ * not line up with the frames).
+ */
+function clientReads(
+  bytes: Buffer,
+  chunk = 65536,
+  first = chunk,
+): JSONRPCMessage[] {
   const buffer = new ReadBuffer();
   const read: JSONRPCMessage[] = [];
-  // A client takes a pipe's chunks one at a time.
-  for (let at = 0; at < bytes.length; at += 65536) {
-    buffer.append(bytes.subarray(at, at + 65536));
+  for (let at = 0; at < bytes.length; ) {
+    const size = at === 0 ? first : chunk;
+    buffer.append(bytes.subarray(at, at + size));
+    at += size;
     for (let m = buffer.readMessage(); m !== null; m = buffer.readMessage()) {
       read.push(m);
     }
@@ -71,26 +103,56 @@ function clientReads(bytes: Buffer): JSONRPCMessage[] {
   return read;
 }
 
-const bounded = (stdin: PassThrough, stdout: PassThrough) =>
-  new BoundedStdioServerTransport(STDIO_MESSAGE_LIMIT, stdin, stdout);
+/** A bounded transport at `cap`, its stderr lines into `lines`. */
+const bounded =
+  (cap = STDIO_FRAME_CAP, lines: string[] = []) =>
+  (stdin: PassThrough, stdout: PassThrough) =>
+    new BoundedStdioServerTransport(
+      cap,
+      (line) => lines.push(line),
+      stdin,
+      stdout,
+    );
 
-describe('the stdio message limit', () => {
-  it("is the SDK client's buffer", () => {
+describe('the stdio frame cap', () => {
+  it("is the MCP SDK client's default buffer less one pipe read", () => {
     assert.equal(STDIO_MESSAGE_LIMIT, STDIO_DEFAULT_MAX_BUFFER_SIZE);
+    assert.equal(STDIO_FRAME_CAP, STDIO_MESSAGE_LIMIT - STDIO_READ_MARGIN);
+    assert.equal(new BoundedStdioServerTransport().cap, STDIO_FRAME_CAP);
   });
 
-  it("an answer over it closes the SDK client's buffer when sent as it is", async () => {
+  it("an answer over the limit closes the SDK client's buffer when sent as it is", async () => {
     const bytes = await written(
       (stdin, stdout) => new StdioServerTransport(stdin, stdout),
-      answerOf(7, STDIO_MESSAGE_LIMIT + 1024),
+      answerOfSize(7, STDIO_MESSAGE_LIMIT + 1024),
     );
     assert.throws(() => clientReads(bytes), /ReadBuffer exceeded maximum size/);
   });
 
-  it('an answer over it is answered InternalError naming both sizes, which the client reads', async () => {
-    const message = answerOf(7, STDIO_MESSAGE_LIMIT + 1024);
-    const size = Buffer.byteLength(serializeMessage(message), 'utf8');
-    const read = clientReads(await written(bounded, message));
+  it('two frames at the cap, sent together and read in chunks of the margin, are both read', async () => {
+    const first = answerOfSize(1, STDIO_FRAME_CAP);
+    const second = answerOfSize(2, STDIO_FRAME_CAP);
+    assert.equal(sizeOf(first), STDIO_FRAME_CAP);
+    // Chunks of the margin, out of step with the frames by half a chunk:
+    // the rest of a frame is in the buffer when the next chunk arrives.
+    const read = clientReads(
+      await written(bounded(), first, second),
+      STDIO_READ_MARGIN,
+      STDIO_READ_MARGIN / 2,
+    );
+    assert.deepEqual(
+      read.map((m) => ('id' in m ? m.id : undefined)),
+      [1, 2],
+    );
+    assert.equal(
+      read.some((m) => isJSONRPCErrorResponse(m)),
+      false,
+    );
+  });
+
+  it('an answer over the cap is answered InternalError naming both sizes, which the client reads', async () => {
+    const message = answerOfSize(7, STDIO_FRAME_CAP + 1);
+    const read = clientReads(await written(bounded(), message));
     assert.equal(read.length, 1);
     const [answer] = read;
     assert.ok(isJSONRPCErrorResponse(answer), JSON.stringify(answer));
@@ -98,51 +160,109 @@ describe('the stdio message limit', () => {
     assert.equal(answer.error.code, ErrorCode.InternalError);
     assert.equal(
       answer.error.message,
-      oversizedAnswerWords(size, STDIO_MESSAGE_LIMIT),
+      oversizedAnswerWords(STDIO_FRAME_CAP + 1, STDIO_FRAME_CAP),
     );
-    assert.ok(answer.error.message.includes(String(size)));
   });
 
-  it('an answer within it is written as it is', async () => {
-    const message = answerOf(8, 4096);
-    const bytes = await written(bounded, message);
+  it('the cap counts bytes, not characters', () => {
+    // Three bytes a character: under the cap in characters, over it in bytes.
+    const message = answerWith(3, '€'.repeat(400));
+    assert.ok(serializeMessage(message).length < 1000);
+    assert.ok(sizeOf(message) > 1000);
+    const sent = boundedMessage(message, 1000);
+    assert.ok(sent.kind === 'send' && isJSONRPCErrorResponse(sent.message));
+  });
+
+  it('an answer within the cap is written as it is', async () => {
+    const message = answerOfSize(8, 4096);
+    const bytes = await written(bounded(), message);
     assert.equal(bytes.toString('utf8'), serializeMessage(message));
     assert.deepEqual(clientReads(bytes), [message]);
   });
 
-  it('an error answer over it is answered InternalError too', () => {
-    const message: JSONRPCMessage = {
-      jsonrpc: '2.0',
-      id: 9,
-      error: { code: -32000, message: 'y'.repeat(200) },
-    };
-    const answer = boundedMessage(message, 100);
-    assert.ok(isJSONRPCErrorResponse(answer));
-    assert.equal(answer.id, 9);
-    assert.equal(answer.error.code, ErrorCode.InternalError);
+  it('a cap from a stated limit holds the frames to it', async () => {
+    const cap = frameCapOf(2 * STDIO_READ_MARGIN);
+    assert.equal(cap, STDIO_READ_MARGIN);
+    const read = clientReads(
+      await written(bounded(cap), answerOfSize(4, cap + 1)),
+    );
+    assert.ok(isJSONRPCErrorResponse(read[0]));
   });
 
-  it('a notification is written as it is, whatever its size', () => {
+  it('an error answer over the cap is answered InternalError too', () => {
+    const sent = boundedMessage(
+      {
+        jsonrpc: '2.0',
+        id: 9,
+        error: { code: -32000, message: 'y'.repeat(200) },
+      },
+      100,
+    );
+    assert.ok(sent.kind === 'send' && isJSONRPCErrorResponse(sent.message));
+    assert.equal(sent.message.id, 9);
+    assert.equal(sent.message.error.code, ErrorCode.InternalError);
+  });
+
+  it('a notification over the cap is not written: one stderr line instead', async () => {
     const message: JSONRPCMessage = {
       jsonrpc: '2.0',
       method: 'notifications/message',
       params: { level: 'info', data: 'z'.repeat(200) },
     };
-    assert.equal(boundedMessage(message, 100), message);
+    const lines: string[] = [];
+    const bytes = await written(bounded(100, lines), message);
+    assert.equal(bytes.length, 0);
+    assert.deepEqual(lines, [droppedNotificationLine(sizeOf(message), 100)]);
+  });
+
+  it('a request over the cap is not written: its send fails', async () => {
+    const { transport, bytes } = recorded(bounded(100));
+    await transport.start();
+    await assert.rejects(
+      transport.send({
+        jsonrpc: '2.0',
+        id: 11,
+        method: 'sampling/createMessage',
+        params: { text: 'w'.repeat(200) },
+      }),
+      /a stdio client is sent as one message, was not sent/,
+    );
+    await transport.close();
+    assert.equal(bytes().length, 0);
+  });
+
+  it('a notification within the cap is written as it is', () => {
+    const message: JSONRPCMessage = {
+      jsonrpc: '2.0',
+      method: 'notifications/message',
+      params: { level: 'info', data: 'z' },
+    };
+    assert.deepEqual(boundedMessage(message, 1000), { kind: 'send', message });
   });
 });
 
 describe("the stdio server's own transport", () => {
-  it('is the bounded one', async () => {
+  it('is the bounded one, at the default cap', async () => {
     const server = new StdioServer(
       new CompositeHandlersRegistry([]),
       {} as IDestinations,
     );
     await server.start(undefined);
     try {
-      assert.ok(server.server.transport instanceof BoundedStdioServerTransport);
+      const transport = server.server.transport;
+      assert.ok(transport instanceof BoundedStdioServerTransport);
+      assert.equal(transport.cap, STDIO_FRAME_CAP);
     } finally {
       await server.close();
     }
+  });
+
+  it('takes its cap from stdioMessageLimit, less one pipe read', () => {
+    const server = new StdioServer(
+      new CompositeHandlersRegistry([]),
+      {} as IDestinations,
+      { stdioMessageLimit: 4 * STDIO_READ_MARGIN },
+    );
+    assert.equal(server.stdioTransport().cap, 3 * STDIO_READ_MARGIN);
   });
 });

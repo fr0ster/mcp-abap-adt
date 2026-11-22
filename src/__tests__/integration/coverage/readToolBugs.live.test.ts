@@ -1,56 +1,87 @@
 /**
- * Three read tools, live, read only, each against what SAP itself answers.
+ * Three read tools, live, read only, through the stdio binary a user runs
+ * (each case launches its own, guarded, `launchStdio`), each against what
+ * SAP itself answers to a raw read-only GET on the suite's connection.
  *
- * - `GetWhereUsed` over stdio, on premise: a where-used list above the
- *   stdio message limit is answered an error, and the server stays up — the
- *   next call answers. The suite launches its own stdio server (the limit is
- *   the stdio transport's); the object is
- *   `whereused_readonly.test_whereused.oversized_class`, and the case skips
- *   naming it when the config states none.
+ * - `GetWhereUsed`, on premise: a where-used list above the stdio message
+ *   limit is answered an error, and the server answers the next call. The
+ *   object is `whereused_readonly.test_whereused.oversized_class`; the case
+ *   fails naming it when the config states none.
  * - `GetPackageContents` with subpackages, on both systems: the shared
- *   package's super package (`shared_dependencies.super_package`; skipped
- *   when the config states none) lists each row once, and each subpackage
- *   SAP's package document names (a raw GET of the package) once.
+ *   package's super package (`shared_dependencies.super_package`, which the
+ *   config must state) lists each row once, and each subpackage SAP's
+ *   package document names once.
  * - `SearchObject`, on both systems: for each mask, as many rows as SAP's
- *   quick search answers to a raw GET of the same query.
+ *   quick search answers to the same query.
  *
- * Nothing is created, changed or deleted.
+ * The tools are called on the launched server, not through `liveCall`: what
+ * is under test includes the stdio transport. Nothing is created, changed
+ * or deleted.
  */
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
+import type { McpResult } from '../../../lib/answer';
 import {
   configuredSystemKind,
   getSharedDependenciesConfig,
   getTestCase,
   loadTestConfig,
 } from '../helpers/configHelpers';
-import { liveCall, liveConnection, liveSuite } from '../helpers/live';
+import type { LaunchedServer } from '../helpers/launchedServers';
+import { liveConnection, liveSuite } from '../helpers/live';
 import {
   destinationArgs,
   getHardModeConfig,
   launchStdio,
   testConnectionLogOn,
 } from '../helpers/testers/hardMode';
-import { member, payloadOf, succeeded } from './ownObjects';
+import { member } from './ownObjects';
 
-/** The class the config names for an answer above the stdio limit, or undefined. */
-function oversizedClass(): string | undefined {
+/** The class the config names for an answer above the stdio limit. */
+function oversizedClass(): string {
   const named = member(
     getTestCase('whereused_readonly', 'test_whereused')?.params,
     'oversized_class',
   );
-  return typeof named === 'string' && named !== '' ? named : undefined;
+  if (typeof named !== 'string' || named === '') {
+    throw new Error(
+      'the test config names no whereused_readonly.test_whereused.oversized_class',
+    );
+  }
+  return named;
 }
 
-/** The shared package's super package, or undefined. */
-function superPackage(): string | undefined {
+/** The shared package's super package. */
+function superPackage(): string {
   const named = member(getSharedDependenciesConfig(), 'super_package');
-  return typeof named === 'string' && named !== ''
-    ? named.toUpperCase()
-    : undefined;
+  if (typeof named !== 'string' || named === '') {
+    throw new Error(
+      'the test config names no shared_dependencies.super_package',
+    );
+  }
+  return named.toUpperCase();
 }
 
-/** The body of a raw read-only GET on the live connection. */
+/** The full set's stdio binary for the configured system, guarded. */
+function launched(): Promise<LaunchedServer> {
+  const kind = configuredSystemKind();
+  if (kind === undefined) throw new Error('the test config states no kind');
+  return launchStdio({
+    set: 'full',
+    kind,
+    args: destinationArgs(getHardModeConfig(), loadTestConfig()),
+    logOn: testConnectionLogOn,
+  });
+}
+
+/** An answer's text, or the case fails naming the tool and what was answered. */
+function textOf(tool: string, answer: McpResult): string {
+  const text = answer.content.map((item) => item.text).join('\n');
+  if (answer.isError) throw new Error(`${tool}: ${text.slice(0, 2000)}`);
+  return text;
+}
+
+/** The body of a raw read-only GET on the suite's connection. */
 async function rawGet(url: string, accept: string): Promise<string> {
   const response = await liveConnection().makeAdtRequest({
     url,
@@ -89,23 +120,37 @@ function subpackagesOf(document: string): string[] {
   return names;
 }
 
+/** SAP's quick search hits for `mask`, `maxResults` 100. */
+async function quickSearchHits(mask: string): Promise<number> {
+  const raw = await rawGet(
+    `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodeURIComponent(mask)}&maxResults=100`,
+    'application/xml',
+  );
+  return occurrences(raw, '<adtcore:objectReference ');
+}
+
+/** SearchObject's rows for `mask`, `maxResults` 100, its header left out. */
+async function searchRows(server: LaunchedServer, mask: string) {
+  const text = textOf(
+    'SearchObject',
+    await server.call('SearchObject', {
+      object_name: mask,
+      maxResults: 100,
+      background: false,
+    }),
+  );
+  return {
+    text,
+    rows: text
+      .split('\n')
+      .filter((line) => line !== '' && !line.startsWith('name\t')).length,
+  };
+}
+
 liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
-  it('is answered an error, and the server answers the next call', async (t) => {
+  it('is answered an error, and the server answers the next call', async () => {
     const name = oversizedClass();
-    if (name === undefined) {
-      t.skip(
-        'the config names no whereused_readonly.test_whereused.oversized_class',
-      );
-      return;
-    }
-    const kind = configuredSystemKind();
-    assert.ok(kind !== undefined, 'the config states no system kind');
-    const server = await launchStdio({
-      set: 'full',
-      kind,
-      args: destinationArgs(getHardModeConfig(), loadTestConfig()),
-      logOn: testConnectionLogOn,
-    });
+    const server = await launched();
     try {
       await assert.rejects(
         server.call('GetWhereUsed', {
@@ -117,11 +162,8 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
           error instanceof Error &&
           error.message.includes('bytes a stdio client reads as one message'),
       );
-      const next = await server.call('SearchObject', {
-        object_name: name,
-        maxResults: 1,
-      });
-      assert.equal(next.isError, false, JSON.stringify(next).slice(0, 2000));
+      const next = await searchRows(server, name);
+      assert.equal(next.rows, 1, next.text);
     } finally {
       await server.close();
     }
@@ -132,19 +174,24 @@ liveSuite(
   ['onprem', 'cloud'],
   'GetPackageContents with subpackages lists each once',
   () => {
-    it('each row once, each subpackage SAP names once', async (t) => {
+    it('each row once, each subpackage SAP names once', async () => {
       const pkg = superPackage();
-      if (pkg === undefined) {
-        t.skip('the config names no shared_dependencies.super_package');
-        return;
+      const server = await launched();
+      let text: string;
+      try {
+        text = textOf(
+          'GetPackageContents',
+          await server.call('GetPackageContents', {
+            package_name: pkg,
+            include_subpackages: true,
+            background: false,
+          }),
+        );
+      } finally {
+        await server.close();
       }
-      const answer = await liveCall('GetPackageContents', {
-        package_name: pkg,
-        include_subpackages: true,
-        background: false,
-      });
-      const rows = payloadOf(succeeded('GetPackageContents', answer));
-      assert.ok(Array.isArray(rows), answer.text.slice(0, 2000));
+      const rows: unknown = JSON.parse(text);
+      assert.ok(Array.isArray(rows), text.slice(0, 2000));
       const keys = rows.map(
         (row) =>
           `${String(member(row, 'type'))} ${String(member(row, 'name'))} in ${String(member(row, 'packageName'))}`,
@@ -170,23 +217,16 @@ liveSuite(
 );
 
 liveSuite(['onprem', 'cloud'], 'SearchObject answers every hit', () => {
-  for (const mask of ['CL_ABAP_UNIT*', 'CL_ABAP_U*']) {
-    it(`${mask}: as many rows as SAP's quick search answers`, async () => {
-      const raw = await rawGet(
-        `/sap/bc/adt/repository/informationsystem/search?operation=quickSearch&query=${encodeURIComponent(mask)}&maxResults=100`,
-        'application/xml',
-      );
-      const answered = occurrences(raw, '<adtcore:objectReference ');
-      const answer = await liveCall('SearchObject', {
-        object_name: mask,
-        maxResults: 100,
-        background: false,
-      });
-      succeeded('SearchObject', answer);
-      const rows = answer.text
-        .split('\n')
-        .filter((line) => line !== '' && !line.startsWith('name\t'));
-      assert.equal(rows.length, answered, answer.text.slice(0, 2000));
-    });
-  }
+  it("each mask: as many rows as SAP's quick search", async () => {
+    const server = await launched();
+    try {
+      for (const mask of ['CL_ABAP_UNIT*', 'CL_ABAP_U*']) {
+        const answered = await quickSearchHits(mask);
+        const { rows, text } = await searchRows(server, mask);
+        assert.equal(rows, answered, `${mask}: ${text.slice(0, 2000)}`);
+      }
+    } finally {
+      await server.close();
+    }
+  });
 });

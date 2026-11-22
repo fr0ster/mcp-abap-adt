@@ -139,7 +139,13 @@ function addressReadOf(part: string, args: ToolArgs): AddressRead {
   // GetObjectStructure's own arguments: `objecttype`, `objectname`.
   return {
     target: 'object_structure',
-    args: { objecttype: args.object_adt_type, objectname: args.object_name },
+    // `detail` too: the part answers as GetObjectStructure answers, at the
+    // level asked.
+    args: {
+      objecttype: args.object_adt_type,
+      objectname: args.object_name,
+      detail: args.detail,
+    },
   };
 }
 

@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { defineTool } from '@mcp-abap-adt/lib/handlers';
 import {
+  handleGetObjectStructure,
   handleGetTransport,
   handleReadTransportObjects,
 } from '@mcp-abap-adt/lib/handlers/read';
@@ -234,6 +235,29 @@ describe('HandlerGet TRANSPORT answers what the full reads answer at every detai
       });
       const fullAnswer = await handleGetTransport(full.context, {
         transport_number: TASK,
+        detail,
+      });
+      assert.deepStrictEqual(compactAnswer, fullAnswer);
+    });
+  }
+});
+
+describe('HandlerGet part object_structure answers what GetObjectStructure answers at every detail', () => {
+  const STRUCTURE = `<?xml version="1.0" encoding="UTF-8"?><projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/projectexplorer"><projectexplorer:node projectexplorer:nodeid="000002" projectexplorer:parentid="000001" projectexplorer:objecttype="CLAS/OM" projectexplorer:objectname="RUN" projectexplorer:description="A method"/></projectexplorer:objectstructure>`;
+  for (const detail of ['terse', 'medium', 'full', 'raw'] as const) {
+    it(`detail ${detail}`, async () => {
+      const compact = recording(STRUCTURE);
+      const full = recording(STRUCTURE);
+      const compactAnswer = await compactGetEntry(compact.context, {
+        object_type: 'CLASS',
+        part: 'object_structure',
+        object_adt_type: 'CLAS/OC',
+        object_name: 'ZCL_A',
+        detail,
+      });
+      const fullAnswer = await handleGetObjectStructure(full.context, {
+        objecttype: 'CLAS/OC',
+        objectname: 'ZCL_A',
         detail,
       });
       assert.deepStrictEqual(compactAnswer, fullAnswer);

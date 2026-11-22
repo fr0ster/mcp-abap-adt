@@ -481,7 +481,7 @@ const GET_PROPERTIES = {
   part: readPartSchema,
   // The level of a read a changed full tool answers (compact parity): a
   // package's contents, an include's main programs, a transport's entries
-  // and its own document.
+  // and its own document, an object's structure.
   detail: DETAIL_SHAPE.detail,
   package_name: z.string().optional().describe('Package name.'),
   package_names: z
@@ -684,6 +684,7 @@ export const COMPACT_READ_TAKES = takesOf<
     'facet_order',
     'with_versions',
     'ignore_short_descriptions',
+    'detail',
   ],
   members: {
     PACKAGE: [
@@ -692,7 +693,6 @@ export const COMPACT_READ_TAKES = takesOf<
       'max_results',
       'include_descriptions',
       'version',
-      'detail',
     ],
     DOMAIN: ['domain_name', 'version'],
     DATA_ELEMENT: ['data_element_name', 'version'],
@@ -708,7 +708,7 @@ export const COMPACT_READ_TAKES = takesOf<
     LOCAL_DEFINITIONS: ['class_name', 'version'],
     LOCAL_MACROS: ['class_name', 'version'],
     PROGRAM: ['program_name', 'version'],
-    INCLUDE: ['include_name', 'version', 'detail'],
+    INCLUDE: ['include_name', 'version'],
     INTERFACE: ['interface_name', 'version'],
     FUNCTION_GROUP: ['function_group_name', 'version'],
     FUNCTION_MODULE: ['function_module_name', 'function_group_name', 'version'],
@@ -717,7 +717,7 @@ export const COMPACT_READ_TAKES = takesOf<
     METADATA_EXTENSION: ['metadata_extension_name', 'version'],
     UNIT_TEST: ['run_id'],
     CDS_UNIT_TEST: ['run_id'],
-    TRANSPORT: ['transport_number', 'detail'],
+    TRANSPORT: ['transport_number'],
     TABLE_SETTINGS: ['table_name', 'version'],
     PROGRAM_TEXT_ELEMENTS: ['program_name', 'version'],
     FUNCTION_GROUP_TEXT_ELEMENTS: ['function_group_name', 'version'],

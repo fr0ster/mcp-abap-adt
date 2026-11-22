@@ -6,7 +6,7 @@
  * - `GetWhereUsed`, on premise: a where-used list above the stdio message
  *   limit is answered an error, and the server answers the next call. The
  *   object is `whereused_readonly.test_whereused.oversized_class`; the case
- *   fails naming it when the config states none.
+ *   skips naming it when the config states none.
  * - `GetPackageContents` with subpackages, on both systems: the shared
  *   package's super package (`shared_dependencies.super_package`; the case
  *   skips naming it when the config leaves it blank) lists each row once,
@@ -20,6 +20,7 @@
  */
 import assert from 'node:assert/strict';
 import { it } from 'node:test';
+import { ONE_MESSAGE_WORDS } from '../../../../server-runtime/src/stdio/boundedStdioTransport';
 import type { McpResult } from '../../../lib/answer';
 import {
   configuredSystemKind,
@@ -38,18 +39,13 @@ import {
 } from '../helpers/testers/hardMode';
 import { member } from './ownObjects';
 
-/** The class the config names for an answer above the stdio limit. */
-function oversizedClass(): string {
+/** The class the config names for an answer above the stdio limit, or undefined. */
+function oversizedClass(): string | undefined {
   const named = member(
     getTestCase('whereused_readonly', 'test_whereused')?.params,
     'oversized_class',
   );
-  if (typeof named !== 'string' || named === '') {
-    throw new Error(
-      'the test config names no whereused_readonly.test_whereused.oversized_class',
-    );
-  }
-  return named;
+  return typeof named === 'string' && named !== '' ? named : undefined;
 }
 
 /** The shared package's super package, or undefined when the config leaves it blank. */
@@ -148,6 +144,12 @@ async function searchRows(server: LaunchedServer, mask: string) {
 liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
   it('is answered an error, and the server answers the next call', async () => {
     const name = oversizedClass();
+    if (name === undefined) {
+      skipRunningTest(
+        'the config names no whereused_readonly.test_whereused.oversized_class',
+      );
+      return;
+    }
     const server = await launched();
     try {
       await assert.rejects(
@@ -157,8 +159,7 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
           background: false,
         }),
         (error: unknown) =>
-          error instanceof Error &&
-          error.message.includes('bytes a stdio client reads as one message'),
+          error instanceof Error && error.message.includes(ONE_MESSAGE_WORDS),
       );
       const next = await searchRows(server, name);
       assert.equal(next.rows, 1, next.text);

@@ -515,10 +515,10 @@ never in the record). Test `admission.test.ts`: a denied compact action carrying
 request-only restriction (`requests: true`, `packages: false`) with no transport argument → link and
 pull refused; blank `package_name` refused for link and branch info; the import matrix full and
 compact × cloud and onprem × each signal: refused with zero requests and zero credential lookups,
-served with none set; an admitted call reads exactly one credential-free R1 (a background run
-included); push, unlink, switch checked against R1's package; unknown key, blank package or URL,
+served with none set; an admitted call reads exactly one credential-free R1 (through a real
+dispatch too; the background run's case is T6.7's); push, unlink, switch checked against R1's package; unknown key, blank package or URL,
 unreadable R1 refused; R8 matching pair reads the log, foreign or missing key refused before it.
-First failure: with no `IAccessChecks` the step does not run. Mutations: a second R1 in the background run → red; accept
+First failure: with no `IAccessChecks` the step does not run. Mutations: a second R1 at dispatch → red; accept
 `status_link` for R8 → red. **Real `tools/call` tests** (`admissionSeam.test.ts`, through the MCP
 server, not the function): a denied compact action → refused, nothing run; cloud `PullAbapGitRepo` with `background: true` → refused, nothing sent; an SSE and a
 Streamable HTTP instance under a request-only signal refuse link; an admitted call with an
@@ -550,10 +550,13 @@ it; `background` on another action refused; `background: true` refused without a
 connection; the record's `object` for full and compact; the caller's cancel and
 `DiscardBackgroundRun` do not cut a running run; a Streamable HTTP disconnect leaves it going, an
 SSE or stdio close logs its connection off; the record holds tool, object, start only. First failure:
-`background` not declared. Mutations: record the args → red; blank `object` → red.
+`background` not declared. An admitted background run reads exactly one credential-free R1 (the
+admission's, handed on in memory) through a real dispatch. Mutations: record the args → red; blank
+`object` → red; a second R1 in the background run → red.
 
 **T6.8 Structure and facts at the server.** `withHttpWireLog` (`src/lib/connectionFactory.ts`)
-honours `noLog`. Test `abapGitCanaries.test.ts` over HTTP and RFC stubs with request-side and echoed
+honours `noLog` — built in T6.4's review (`wireLogNoLog.test.ts`); T6.8 adds the RFC side and the
+rest below. Test `abapGitCanaries.test.ts` over HTTP and RFC stubs with request-side and echoed
 canaries: the wrapper's success and thrown-error branches, the request-URL line and the refusal
 lines, each separately, hold no canary and no query; answer, error and run record hold the kept
 fields only. First failure: the wrapper logs the params. Mutation: log the body on success → red.

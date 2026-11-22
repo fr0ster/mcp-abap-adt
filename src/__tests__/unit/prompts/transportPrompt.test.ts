@@ -487,7 +487,7 @@ describe('the arguments declared are those a served action reads', () => {
       assert.deepEqual(await completionOf(prompt, 'action', ''), [
         ...(source === coreRo
           ? ['list', 'get', 'objects', 'log']
-          : ['list', 'objects']),
+          : ['list', 'get', 'objects']),
       ]);
     }
   });

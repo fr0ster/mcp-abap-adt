@@ -342,21 +342,23 @@
         "ActivateObjects": "Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.",
         "GetIncludesList": "[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.",
         "GetObjectVersionDiff": "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
-        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, the transport request that produced it when available, and the opaque content_uri that names the version's source (by default as TSV rows; with detail medium or full, the title and the transport description too).",
         "GetObjectVersionSource": "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
         "GetWhereUsed": "[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call."
       },
       "properties": {
         "ActivateObjects": [
           "objects",
-          "preaudit"
+          "preaudit",
+          "detail"
         ],
         "GetIncludesList": [
           "background",
           "object_name",
           "object_type",
           "objects",
-          "detailed"
+          "detailed",
+          "detail"
         ],
         "GetObjectVersionDiff": [
           "object_type",
@@ -366,7 +368,8 @@
         "GetObjectVersions": [
           "object_type",
           "object_name",
-          "function_group_name"
+          "function_group_name",
+          "detail"
         ],
         "GetObjectVersionSource": [
           "object_type",
@@ -526,7 +529,7 @@
       "descriptions": {
         "GetIncludesList": "[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.",
         "GetObjectVersionDiff": "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
-        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, the transport request that produced it when available, and the opaque content_uri that names the version's source (by default as TSV rows; with detail medium or full, the title and the transport description too).",
         "GetObjectVersionSource": "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
         "GetWhereUsed": "[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call."
       },
@@ -536,7 +539,8 @@
           "object_name",
           "object_type",
           "objects",
-          "detailed"
+          "detailed",
+          "detail"
         ],
         "GetObjectVersionDiff": [
           "object_type",
@@ -546,7 +550,8 @@
         "GetObjectVersions": [
           "object_type",
           "object_name",
-          "function_group_name"
+          "function_group_name",
+          "detail"
         ],
         "GetObjectVersionSource": [
           "object_type",
@@ -1598,21 +1603,23 @@
         "ActivateObjects": "Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.",
         "GetIncludesList": "[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.",
         "GetObjectVersionDiff": "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
-        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, the transport request that produced it when available, and the opaque content_uri that names the version's source (by default as TSV rows; with detail medium or full, the title and the transport description too).",
         "GetObjectVersionSource": "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
         "GetWhereUsed": "[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call."
       },
       "properties": {
         "ActivateObjects": [
           "objects",
-          "preaudit"
+          "preaudit",
+          "detail"
         ],
         "GetIncludesList": [
           "background",
           "object_name",
           "object_type",
           "objects",
-          "detailed"
+          "detailed",
+          "detail"
         ],
         "GetObjectVersionDiff": [
           "object_type",
@@ -1622,7 +1629,8 @@
         "GetObjectVersions": [
           "object_type",
           "object_name",
-          "function_group_name"
+          "function_group_name",
+          "detail"
         ],
         "GetObjectVersionSource": [
           "object_type",
@@ -1779,7 +1787,7 @@
       "descriptions": {
         "GetIncludesList": "[read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.",
         "GetObjectVersionDiff": "[read-only] Compares the two object versions named by content_uri_from and content_uri_to, entries of an object's version history, for the object type named by object_type: returns the unified diff (jsdiff) of their sources.",
-        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.",
+        "GetObjectVersions": "[read-only] Lists the version history of the class, program, interface, function module, table, structure, table type, CDS view, behavior definition or metadata extension named by object_name and object_type. Returns each version with its versionId, author, updatedAt, the transport request that produced it when available, and the opaque content_uri that names the version's source (by default as TSV rows; with detail medium or full, the title and the transport description too).",
         "GetObjectVersionSource": "[read-only] Reads the source code of the object version named by content_uri, an entry of an object's version history, for the object type named by object_type.",
         "GetWhereUsed": "[read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call."
       },
@@ -1789,7 +1797,8 @@
           "object_name",
           "object_type",
           "objects",
-          "detailed"
+          "detailed",
+          "detail"
         ],
         "GetObjectVersionDiff": [
           "object_type",
@@ -1799,7 +1808,8 @@
         "GetObjectVersions": [
           "object_type",
           "object_name",
-          "function_group_name"
+          "function_group_name",
+          "detail"
         ],
         "GetObjectVersionSource": [
           "object_type",

@@ -39,7 +39,7 @@ import {
 import {
   dumpIdOf,
   dumpQueryOf,
-  handleRuntimeListFeeds,
+  handleRuntimeListFeeds as handleRuntimeListFeedsOf,
 } from '../../handlers/system/readonly/handleRuntimeListFeeds';
 import {
   FEED_ENTRIES_CEILING,
@@ -51,6 +51,12 @@ import {
 } from '../../lib/strategies/feedPages';
 import { assertMatchObject, assertThrows } from '../helpers/assertions';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+
+/** handleRuntimeListFeeds at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleRuntimeListFeeds = (
+  context: Parameters<typeof handleRuntimeListFeedsOf>[0],
+  args: Parameters<typeof handleRuntimeListFeedsOf>[1],
+) => handleRuntimeListFeedsOf(context, { detail: 'full', ...args });
 
 const context = { connection: {} as any, logger: undefined };
 

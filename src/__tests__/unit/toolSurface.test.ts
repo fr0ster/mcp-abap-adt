@@ -318,6 +318,7 @@ describe('the MCP tool surface', () => {
         // 19.0.0, several feeds per call (spec §11): `feed_types` beside
         // `feed_type`, which was never required.
         'system/RuntimeListFeeds': [
+          'detail',
           'runtime_error',
           'exception',
           'object_name',

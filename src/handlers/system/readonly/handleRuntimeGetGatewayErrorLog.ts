@@ -119,7 +119,7 @@ export async function handleRuntimeGetGatewayErrorLog(
  * after `/errorlog/` (adt-strategies builds it from the entry's own id: on
  * premise the id's kind, on the cloud the Type cell).
  */
-function detailKindOf(entry: IGatewayErrorEntry): string {
+export function detailKindOf(entry: IGatewayErrorEntry): string {
   const uri = entry.detailUri;
   if (uri === undefined) return '';
   const marker = '/errorlog/';

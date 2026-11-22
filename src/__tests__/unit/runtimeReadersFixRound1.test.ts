@@ -54,13 +54,19 @@ import { handleRuntimeAnalyzeProfilerTrace } from '../../handlers/system/readonl
 import { handleRuntimeGetDumpById } from '../../handlers/system/readonly/handleRuntimeGetDumpById';
 import { handleRuntimeGetGatewayErrorLog } from '../../handlers/system/readonly/handleRuntimeGetGatewayErrorLog';
 import { handleRuntimeGetProfilerTraceData } from '../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
-import { handleRuntimeListFeeds } from '../../handlers/system/readonly/handleRuntimeListFeeds';
+import { handleRuntimeListFeeds as handleRuntimeListFeedsOf } from '../../handlers/system/readonly/handleRuntimeListFeeds';
 import { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { handleRuntimeListSystemMessages } from '../../handlers/system/readonly/handleRuntimeListSystemMessages';
 import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import * as clients from '../../lib/clients';
 import { feedVariantsOf } from '../../lib/strategies/feedVariants';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+
+/** handleRuntimeListFeeds at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleRuntimeListFeeds = (
+  context: Parameters<typeof handleRuntimeListFeedsOf>[0],
+  args: Parameters<typeof handleRuntimeListFeedsOf>[1],
+) => handleRuntimeListFeedsOf(context, { detail: 'full', ...args });
 
 mock.method(clients, 'createAdtClient', () => packageClient);
 
@@ -555,6 +561,40 @@ describe('RuntimeListFeeds', () => {
       assert.equal(body.count, 1);
     });
   }
+
+  it('terse, by default: the dumps as dump_id, updated and title rows, next_to as a # line', async () => {
+    const entries = [
+      {
+        id: '/sap/bc/adt/vit/runtime/dumps/20261122%20ABC',
+        title: 'MESSAGE_TYPE_X in ZPROG',
+        updated: '2026-11-22T10:00:00Z',
+        link: '/sap/bc/adt/vit/runtime/dumps/20261122%20ABC',
+        content: 'LONG_DUMP_CONTENT_NEVER_TERSE',
+      },
+    ];
+    feeds = {
+      dumps: mock.fn(async () =>
+        okResponse({ entries, next: '/feed?to=20261122095959' }),
+      ),
+    };
+
+    const result: any = await handleRuntimeListFeedsOf(
+      context as any,
+      {
+        feed_type: 'dumps',
+        max_results: 1,
+      } as any,
+    );
+    const text: string = result.content[0].text;
+
+    assert.equal(text.split('\n')[0], '# feed dumps');
+    assert.equal(text.split('\n')[1], '# count 1');
+    assert.deepStrictEqual(text.split('\n').slice(-2), [
+      'dump_id\tupdated\ttitle',
+      '20261122%20ABC\t2026-11-22T10:00:00Z\tMESSAGE_TYPE_X in ZPROG',
+    ]);
+    assert.equal(text.includes('LONG_DUMP_CONTENT_NEVER_TERSE'), false);
+  });
 
   it("feed_type variants reads each feed's query variants out of the feed list", async () => {
     const result: any = await handleRuntimeListFeeds(

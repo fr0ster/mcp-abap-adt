@@ -1,5 +1,7 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import type {
+  IFeedDescriptor,
+  IFeedEntry,
   IGatewayErrorEntry,
   ISystemMessageEntry,
 } from '@mcp-abap-adt/adt-strategies';
@@ -28,6 +30,7 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { withSystemKindOf } from '../../../lib/connectionFactory';
+import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
 import {
   DUMP_FILTERS,
   dumpFiltersRefusal,
@@ -42,6 +45,11 @@ import {
 } from '../../../lib/longTools';
 import { afterLast } from '../../../lib/plainText';
 import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
+import {
   FEED_ENTRIES_CEILING,
   FEED_PAGE_DEFAULT,
   FEED_PAGE_MAX,
@@ -49,10 +57,14 @@ import {
   feedPage,
   feedPages,
 } from '../../../lib/strategies/feedPages';
-import { feedVariantsOf } from '../../../lib/strategies/feedVariants';
+import {
+  type FeedVariants,
+  feedVariantsOf,
+} from '../../../lib/strategies/feedVariants';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
+import { detailKindOf } from './handleRuntimeGetGatewayErrorLog';
 
 /** A page of a feed as answered, in this order. */
 type FeedPageAnswer<T> = {
@@ -136,6 +148,7 @@ const FIELDS = {
     .describe(
       'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
     ),
+  ...DETAIL_SHAPE,
 };
 
 /**
@@ -176,7 +189,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
   description: withLongToolAdvice(
-    '[read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }).',
+    '[read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }). By default (detail terse) TSV under "# feed" and "# count" lines, next_to and incomplete_second as "#" lines: descriptors id, title, category; variants feed, title, query, is_default; dumps dump_id, updated, title; system messages id, createdOn, author, title; gateway errors opid, detail_kind, dateTime, type, shortText, username. With detail medium or full every field as JSON.',
   ),
   inputSchema: withInCallSchema(
     z
@@ -233,15 +246,135 @@ function pagedFeeds(
   });
 }
 
+/** What a feed read answered, by feed: the payload each level formats. */
+type FeedShown =
+  | {
+      readonly feed: 'descriptors';
+      readonly answered: { count: number; entries: readonly IFeedDescriptor[] };
+    }
+  | {
+      readonly feed: 'variants';
+      readonly answered: { count: number; entries: readonly FeedVariants[] };
+    }
+  | {
+      readonly feed: 'dumps';
+      readonly answered: FeedPageAnswer<{
+        dump_id: string;
+        updated: string;
+        title: string;
+      }>;
+    }
+  | {
+      readonly feed: 'system_messages';
+      readonly answered: FeedPageAnswer<ISystemMessageEntry>;
+    }
+  | {
+      readonly feed: 'gateway_errors';
+      readonly answered: FeedPageAnswer<IGatewayErrorEntry>;
+    };
+
+/** A page's `#` lines: where to read on, and a second SAP answered in part. */
+function pageLines(answered: {
+  next_to?: string;
+  incomplete_second?: string;
+}): string[] {
+  return [
+    ...(answered.next_to ? [`# next_to ${answered.next_to}`] : []),
+    ...(answered.incomplete_second
+      ? [`# incomplete_second ${answered.incomplete_second}`]
+      : []),
+  ];
+}
+
+/** A feed's terse answer: TSV under its `# feed` and `# count` lines. */
+function terseFeed(shown: FeedShown): string {
+  const head = [`# feed ${shown.feed}`, `# count ${shown.answered.count}`];
+  switch (shown.feed) {
+    case 'descriptors':
+      return [
+        ...head,
+        tsv(
+          ['id', 'title', 'category'],
+          shown.answered.entries.map((e) => [e.id, e.title, e.category ?? '']),
+        ),
+      ].join('\n');
+    case 'variants':
+      return [
+        ...head,
+        tsv(
+          ['feed', 'title', 'query', 'is_default'],
+          shown.answered.entries.flatMap((feed) =>
+            feed.variants.map((v) => [
+              feed.feed,
+              v.title,
+              v.query,
+              String(v.is_default),
+            ]),
+          ),
+        ),
+      ].join('\n');
+    case 'dumps':
+      return [
+        ...head,
+        ...pageLines(shown.answered),
+        tsv(
+          ['dump_id', 'updated', 'title'],
+          shown.answered.entries.map((e) => [e.dump_id, e.updated, e.title]),
+        ),
+      ].join('\n');
+    case 'system_messages':
+      return [
+        ...head,
+        ...pageLines(shown.answered),
+        tsv(
+          ['id', 'createdOn', 'author', 'title'],
+          shown.answered.entries.map((e) => [
+            e.id ?? e.messageId ?? '',
+            e.createdOn ?? '',
+            e.author ?? e.createdBy ?? '',
+            e.title ?? '',
+          ]),
+        ),
+      ].join('\n');
+    case 'gateway_errors':
+      return [
+        ...head,
+        ...pageLines(shown.answered),
+        tsv(
+          ['opid', 'detail_kind', 'dateTime', 'type', 'shortText', 'username'],
+          shown.answered.entries.map((e) => [
+            e.opid ?? '',
+            detailKindOf(e),
+            e.dateTime ?? '',
+            e.type ?? '',
+            e.shortText ?? '',
+            e.username ?? '',
+          ]),
+        ),
+      ].join('\n');
+  }
+}
+
+/**
+ * What `RuntimeListFeeds` answers at each `detail`, selected by the handler
+ * before the reads (`src/lib/detail`): terse a feed's rows as TSV, medium,
+ * full and raw the former JSON, every field.
+ */
+const FEED_ANSWERS: AnswerTable<FeedShown, string | object> = {
+  terse: terseFeed,
+  medium: (shown) => shown.answered,
+  full: (shown) => shown.answered,
+  raw: (shown) => shown.answered,
+};
+
 async function feedsOf(
   context: HandlerContext,
   args: RuntimeListFeedsArgs,
+  shown: (feed: FeedShown) => string | object,
 ): Promise<McpResult> {
   const { connection, logger } = context;
   const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
   const feedType = args?.feed_type ?? 'descriptors';
-
-  const ctx = { tool: 'RuntimeListFeeds', detail: 'terse' as const };
 
   // A feed of a `feed_types` list answers the refusal as its own entry.
   const refused = dumpFiltersRefusal(feedType, args);
@@ -285,7 +418,7 @@ async function feedsOf(
   // reason as the profiler handlers (see `handleRuntimeGetProfilerTraceData.
   // ts`'s header). The projection is identical across all five, so it is
   // shared; only the call differs.
-  const project = (entries: { length: number }) => ({
+  const project = <E>(entries: readonly E[]) => ({
     success: true,
     feed_type: feedType,
     count: entries.length,
@@ -295,9 +428,9 @@ async function feedsOf(
   switch (feedType) {
     case 'descriptors':
       return answer(
-        ctx,
+        { tool: 'RuntimeListFeeds', detail: detailOf(args) },
         () => feeds.list({ analyse: analyseException }),
-        project,
+        (entries) => shown({ feed: 'descriptors', answered: project(entries) }),
       );
     case 'variants':
       // On premise each feed's query variants come inside the feed list —
@@ -309,20 +442,20 @@ async function feedsOf(
       // (feedVariantsOf) in place of the library's, which keeps the feeds and
       // drops their variants. No category is needed, and none is invented.
       return answer(
-        ctx,
+        { tool: 'RuntimeListFeeds', detail: detailOf(args) },
         () =>
           new AdtRuntimeClient(connection, logger)
             .getFeeds({ ...ourFeeds, feeds: feedVariantsOf })
             .list({ analyse: analyseException }),
-        project,
+        (entries) => shown({ feed: 'variants', answered: project(entries) }),
       );
     case 'dumps': {
       // Each page read by the entries reading with its next link kept.
       const dumps = pagedFeeds(connection, logger);
       return answer(
-        ctx,
+        { tool: 'RuntimeListFeeds', detail: detailOf(args) },
         () =>
-          feedPages<{ id: string; updated: string }>(
+          feedPages<IFeedEntry>(
             (page) =>
               dumps.dumps({
                 ...base,
@@ -333,19 +466,22 @@ async function feedsOf(
             { keyOf: (entry) => entry.id, stampOf: (entry) => entry.updated },
           ),
         (page) =>
-          pageOf({
-            ...page,
-            entries: page.entries.map((entry) => ({
-              dump_id: dumpIdOf(entry.id),
-              ...entry,
-            })),
+          shown({
+            feed: 'dumps',
+            answered: pageOf({
+              ...page,
+              entries: page.entries.map((entry) => ({
+                dump_id: dumpIdOf(entry.id),
+                ...entry,
+              })),
+            }),
           }),
       );
     }
     case 'system_messages': {
       const messages = pagedFeeds(connection, logger);
       return answer(
-        ctx,
+        { tool: 'RuntimeListFeeds', detail: detailOf(args) },
         () =>
           feedPages<ISystemMessageEntry>(
             (page) =>
@@ -363,13 +499,13 @@ async function feedsOf(
               stampOf: (entry) => entry.updated,
             },
           ),
-        pageOf,
+        (page) => shown({ feed: 'system_messages', answered: pageOf(page) }),
       );
     }
     case 'gateway_errors': {
       const errors = pagedFeeds(connection, logger);
       return answer(
-        ctx,
+        { tool: 'RuntimeListFeeds', detail: detailOf(args) },
         () =>
           feedPages<IGatewayErrorEntry>(
             (page) =>
@@ -389,7 +525,7 @@ async function feedsOf(
               stampOf: (entry) => entry.dateTime,
             },
           ),
-        pageOf,
+        (page) => shown({ feed: 'gateway_errors', answered: pageOf(page) }),
       );
     }
     default: {
@@ -439,7 +575,6 @@ export async function handleRuntimeListFeedPage(
   const base = { user: args?.user, query, from: args?.from };
   const page = { maxResults: top, to: args?.to };
   const feeds = pagedFeeds(connection, logger);
-  const ctx = { tool, detail: 'terse' as const };
   const shown = <T>(read: FeedPage<T>) => {
     const answered: FeedPageAnswer<T> = {
       success: true,
@@ -453,7 +588,7 @@ export async function handleRuntimeListFeedPage(
   switch (feedType) {
     case 'dumps':
       return answer(
-        ctx,
+        { tool, detail: detailOf(args) },
         () =>
           atStep(step, () =>
             feeds.dumps({ ...base, ...page, analyse: analyseException }),
@@ -469,7 +604,7 @@ export async function handleRuntimeListFeedPage(
       );
     case 'system_messages':
       return answer(
-        ctx,
+        { tool, detail: detailOf(args) },
         () =>
           atStep(step, () =>
             feeds.systemMessages({
@@ -482,7 +617,7 @@ export async function handleRuntimeListFeedPage(
       );
     default:
       return answer(
-        ctx,
+        { tool, detail: detailOf(args) },
         () =>
           atStep(step, () =>
             feeds.gatewayErrors({
@@ -670,7 +805,20 @@ function endsList(result: McpResult): boolean {
 function listAnswer(
   feedTypes: readonly string[],
   results: readonly McpResult[],
+  terse: boolean,
 ): McpResult {
+  if (terse) {
+    // Each feed's terse answer begins with its own `# feed` line; a failure
+    // is named under the feed asked, its payload as JSON.
+    const text = results
+      .map((result, i) =>
+        result.isError
+          ? `# feed ${feedTypes[i] ?? ''}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
+          : (result.content[0]?.text ?? ''),
+      )
+      .join('\n');
+    return { isError: false, content: [{ type: 'text', text }] };
+  }
   const entries = results.map((result, i) =>
     result.isError
       ? { feed_type: feedTypes[i], error: payloadOfAnswer(result) }
@@ -695,18 +843,20 @@ export async function handleRuntimeListFeeds(
   context: HandlerContext,
   args: RuntimeListFeedsArgs,
 ) {
-  const ctx = { tool: 'RuntimeListFeeds', detail: 'terse' as const };
+  const ctx = { tool: 'RuntimeListFeeds', detail: detailOf(args) };
+  const shown = answerAt(FEED_ANSWERS, levelOf(args));
+  const terse = levelOf(args) === 'terse';
   const listed = args?.feed_types;
   if (listed === undefined) {
     if (!PAGED_FEEDS.has(String(args?.feed_type))) {
-      return feedsOf(context, args);
+      return feedsOf(context, args, shown);
     }
     return withSequentialFallback<McpResult>(
       context,
       async () => {
         try {
           const outcome = await feedsInRounds(context, 1, (_i, connection) =>
-            feedsOf({ ...context, connection }, args),
+            feedsOf({ ...context, connection }, args, shown),
           );
           return 'ended' in outcome ? outcome.ended : outcome.answers[0];
         } catch (error) {
@@ -716,7 +866,7 @@ export async function handleRuntimeListFeeds(
           return answerThrown(error, ctx);
         }
       },
-      () => feedsOf(context, args),
+      () => feedsOf(context, args, shown),
     );
   }
   // The schema holds the rule: one feed, or a non-empty `feed_types`.
@@ -735,11 +885,11 @@ export async function handleRuntimeListFeeds(
           context,
           listed.length,
           (i, connection) =>
-            feedsOf({ ...context, connection }, single(listed[i])),
+            feedsOf({ ...context, connection }, single(listed[i]), shown),
         );
         return 'ended' in outcome
           ? outcome.ended
-          : listAnswer(listed, outcome.answers);
+          : listAnswer(listed, outcome.answers, terse);
       } catch (error) {
         if (failureOf(error) === undefined) throw error;
         return answerThrown(error, ctx);
@@ -750,11 +900,11 @@ export async function handleRuntimeListFeeds(
       // credential failure ends the call, and nothing after it is read.
       const results: McpResult[] = [];
       for (const feedType of listed) {
-        const result = await feedsOf(context, single(feedType));
+        const result = await feedsOf(context, single(feedType), shown);
         if (endsList(result)) return result;
         results.push(result);
       }
-      return listAnswer(listed, results);
+      return listAnswer(listed, results, terse);
     },
   );
 }

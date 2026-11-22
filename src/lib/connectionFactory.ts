@@ -303,17 +303,18 @@ async function quietExchange(
   options: IAbapRequestOptions,
   send: (options: IAbapRequestOptions) => Promise<IAdtWireResponse>,
 ): Promise<IAdtWireResponse> {
-  const url = String(options.url ?? '?');
-  const query = url.indexOf('?');
-  const path = query < 0 ? url : url.slice(0, query);
   process.stderr.write(
-    `[WIRE ${id}] ${String(options.method ?? '?')} ${path}\n`,
+    `[WIRE ${id}] ${String(options.method ?? '?')} ${pathnameOf(String(options.url ?? ''))}\n`,
   );
   try {
     const answer = await send(options);
     const body = wireValueOf(answer.data);
     const bytes =
-      body.kind === 'text' ? ` ${Buffer.byteLength(body.text)} bytes` : '';
+      body.kind === 'text'
+        ? ` ${Buffer.byteLength(body.text)} bytes`
+        : body.kind === 'bytes'
+          ? ` ${body.bytes.byteLength} bytes`
+          : '';
     process.stderr.write(
       `[WIRE ${id}] → ${integerOr(answer.status)}${bytes}\n`,
     );
@@ -323,6 +324,19 @@ async function quietExchange(
       `[WIRE ${id}] → threw ${integerOr(childAt(error, 'response', 'status'))}\n`,
     );
     throw error;
+  }
+}
+
+/**
+ * The pathname of a request URL, parsed (a relative one against a dummy
+ * base): never its authority, userinfo, query or fragment; `?` when it is
+ * no URL.
+ */
+function pathnameOf(url: string): string {
+  try {
+    return new URL(url, 'http://wire.invalid').pathname;
+  } catch {
+    return '?';
   }
 }
 

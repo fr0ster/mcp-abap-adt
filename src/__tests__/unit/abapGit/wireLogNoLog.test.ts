@@ -135,6 +135,50 @@ describe('the wire log with noLog: method, path, status and bytes only', () => {
     assert.ok(written.some((line) => line.includes('threw 500')));
   });
 
+  it('an absolute URL: only its pathname, never userinfo, query or fragment', async () => {
+    await withHttpWireLog(sapAnswering(false)).makeAdtRequest({
+      ...FLAGGED,
+      url: `https://u-${CANARY}:p-${CANARY}@sap.example.invalid/sap/bc/adt/abapgit/repos?q=${CANARY}#f-${CANARY}`,
+    });
+    assert.ok(
+      written.every((line) => !line.includes(CANARY)),
+      written.join(''),
+    );
+    assert.ok(written.every((line) => !line.includes('sap.example.invalid')));
+    assert.ok(
+      written.some((line) => line.includes('POST /sap/bc/adt/abapgit/repos\n')),
+    );
+  });
+
+  it('a relative path with a fragment: its pathname alone', async () => {
+    await withHttpWireLog(sapAnswering(false)).makeAdtRequest({
+      ...FLAGGED,
+      url: `/sap/bc/adt/abapgit/repos#${CANARY}`,
+    });
+    assert.ok(
+      written.every((line) => !line.includes(CANARY)),
+      written.join(''),
+    );
+  });
+
+  it('a binary answer: its byte count too', async () => {
+    const bytes = new Uint8Array([1, 2, 3, 4, 5]);
+    const binary: IAbapConnection = {
+      ...sapAnswering(false),
+      async makeAdtRequest<T = unknown, D = unknown>(): Promise<
+        IAdtWireResponse<T, D>
+      > {
+        // A recorded body; `T` is the caller's view of it.
+        return { data: bytes as T, status: 200, statusText: 'OK', headers: {} };
+      },
+    };
+    await withHttpWireLog(binary).makeAdtRequest(FLAGGED);
+    assert.ok(
+      written.some((line) => line.includes('200 5 bytes')),
+      written.join(''),
+    );
+  });
+
   it('a request without noLog is logged as before', async () => {
     await withHttpWireLog(sapAnswering(false)).makeAdtRequest({
       method: 'GET',

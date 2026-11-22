@@ -15,7 +15,24 @@ the same answer.
 **Out of scope:** the data tools (GetTableContents, GetSqlQuery, off by default); abapGit tools
 (#374 builds them terse from the start); readings missing upstream (see "Upstream items").
 
-## Decisions for the owner
+## Architecture (owner, 2026-11-22)
+
+- **The reading decides the answer.** What a tool answers is decided by the result strategy
+  (the reading) that the handler passes into the adt-clients method. The handler does not trim or
+  reshape after it.
+- **`detail` only selects the reading.** Each tool keeps one small table from level to reading,
+  or to a reading plus a pure formatter of its typed value. There are four levels:
+  - `terse`, the default: compact, carrying what the next call needs; TSV for lists.
+  - `medium`: every field of the typed reading, without XML leftovers (uri, namespaces).
+  - `full`: the whole parse.
+  - `raw`: the document as ADT sent it, for debugging.
+
+  `terse`, `full` and `raw` keep their present meaning, so existing calls stay valid.
+- **Never cut.** Every row is returned at every level. Examples:
+  - a request list gives number, owner and description, even at `terse`;
+  - a task's contents are its object list.
+
+## Decisions (approved)
 
 1. **Terse list format.** A terse list answers as TSV: one header line, one row per item, and a
    `# <field> <value>` group line when a value would repeat on every row (package, task, object).

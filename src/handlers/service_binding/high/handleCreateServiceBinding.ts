@@ -31,7 +31,6 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * the caller can activate it, delete it, or leave it.
  */
 
-import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
@@ -49,7 +48,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { resultsFor } from '../../../lib/strategies/resultSets';
+import { ourServiceBindingWrites } from '../../../lib/strategies/resultSets';
 import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 import type { XmlRead } from '../../../lib/xml/tree';
@@ -157,7 +156,7 @@ export async function handleCreateServiceBinding(
     { tool: 'CreateServiceBinding', detail },
     async (): Promise<IAdtResponse<AdtReading<XmlRead>, IAdtError>> => {
       const obj = createAdtClient(connection, logger).getServiceBinding(
-        resultsFor(serviceDocuments),
+        ourServiceBindingWrites,
       );
 
       const created = await atStep('create', () =>

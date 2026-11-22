@@ -415,6 +415,16 @@ export const ourServiceBindingReads = {
 };
 
 /**
+ * The service-binding set of `CreateServiceBinding`: the service group read
+ * after the activation is a check — a refusal is answered, a success only
+ * says it was readable, and the answer is the create's own.
+ */
+export const ourServiceBindingWrites = {
+  ...resultsFor(serviceDocuments),
+  odata: statusOnly,
+};
+
+/**
  * The unit-test set, kept as shipped. `run` is kept as shipped because
  * `runId` reads the `Location` header a started run answers with, which is
  * not a question any of `verbatim`, `structured` or `statusOnly` can see —

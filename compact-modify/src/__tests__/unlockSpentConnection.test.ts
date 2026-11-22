@@ -68,7 +68,10 @@ for (const code of ['ADT_SESSION_REPLACED', 'ADT_NOT_CONNECTED']) {
       );
       const answered = await unlock(context);
       assert.ok(!answered.isError);
-      assert.ok(textOf(answered).includes(LOCK_WENT_WITH_SESSION_WORDS));
+      assert.deepStrictEqual(JSON.parse(textOf(answered)), {
+        unlocked: false,
+        reason: LOCK_WENT_WITH_SESSION_WORDS,
+      });
       assert.equal(heldLocks.holds(HANDLE), false);
     },
   );

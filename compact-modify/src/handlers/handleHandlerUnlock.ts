@@ -53,11 +53,8 @@ export async function handleHandlerUnlock(
         {
           type: 'text' as const,
           text: JSON.stringify({
-            success: true,
-            object_name: String(args.object_name ?? '').toUpperCase(),
-            object_type: 'service_binding',
             unlocked: false,
-            message:
+            reason:
               'Nothing to unlock: the service binding holds no lock handle.',
           }),
         },
@@ -91,11 +88,8 @@ export async function handleHandlerUnlock(
         {
           type: 'text' as const,
           text: JSON.stringify({
-            success: true,
-            object_name: String(args.object_name ?? '').toUpperCase(),
-            object_type: COMPACT_LOCK_KINDS[member],
             unlocked: false,
-            message: LOCK_WENT_WITH_SESSION_WORDS,
+            reason: LOCK_WENT_WITH_SESSION_WORDS,
           }),
         },
       ],

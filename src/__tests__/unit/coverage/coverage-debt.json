@@ -171,7 +171,6 @@
   "GetTable#source",
   "GetTableContents",
   "GetTableType",
-  "GetTransport",
   "GetTypeInfo",
   "GetWhereUsed",
   "HandlerActivate#BEHAVIOR_DEFINITION",

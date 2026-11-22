@@ -28,7 +28,9 @@ import { skipSapAnswers } from '../../lib/search-source/readFailure';
 import { createSourceReaderDeps } from '../../lib/search-source/sourceReader';
 import { assertMatchObject, rejectionOf } from '../helpers/assertions';
 import {
+  answerThrough,
   fakeClientOf,
+  fakeClientThroughSet,
   okResponse,
   reading,
   refusedResponse,
@@ -368,11 +370,15 @@ describe("a 401 SAP answered to a cleanup step is the call's credential failure"
   });
 
   it('CreateTransportTask: the task type change answered 401: its error with its step, not a cleanup note', async () => {
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: async () =>
-        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
+        answerThrough(
+          set,
+          'createdTask',
+          '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="SIDK907073"/>',
+        ),
       changeTaskType: async () => unauthorized(),
-    });
+    }));
     const result: any = await handleCreateTransportTask(context as any, {
       transport_number: 'SIDK907072',
       target_user: 'DEVELOPER',

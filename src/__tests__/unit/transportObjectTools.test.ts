@@ -9,7 +9,9 @@ import { handleReadTransportObjects } from '../../handlers/transport/readonly/ha
 import * as clients from '../../lib/clients';
 import { assertMatchObject } from '../helpers/assertions';
 import {
+  answerThrough,
   fakeClientOf,
+  fakeClientThroughSet,
   okResponse,
   reading,
   refusedResponse,
@@ -343,6 +345,10 @@ describe('AddTransportObject', () => {
   });
 });
 
+/** A created task's document, as `newtask` answers it: the number on the root. */
+const taskCreated = (number?: string) =>
+  `<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="tasks"${number === undefined ? '' : ` tm:number="${number}"`}/>`;
+
 describe('CreateTransportTask', () => {
   /**
    * `targetUser` is required and measured: without `tm:targetuser` the server
@@ -350,14 +356,12 @@ describe('CreateTransportTask', () => {
    */
   it('names the owner the caller gave, because the server will not choose', async () => {
     let options: any;
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: (_number: unknown, given: unknown) => {
         options = given;
-        return okResponse(
-          reading({ '@': { 'tm:number': 'SIDK907073' } } as never),
-        );
+        return answerThrough(set, 'createdTask', taskCreated('SIDK907073'));
       },
-    });
+    }));
 
     const answered = body(
       await handleCreateTransportTask(context as any, {
@@ -377,14 +381,12 @@ describe('CreateTransportTask', () => {
    */
   it('sends target_user upper-cased and trimmed', async () => {
     let options: any;
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: (_number: unknown, given: unknown) => {
         options = given;
-        return okResponse(
-          reading({ '@': { 'tm:number': 'SIDK907073' } } as never),
-        );
+        return answerThrough(set, 'createdTask', taskCreated('SIDK907073'));
       },
-    });
+    }));
 
     const answered = body(
       await handleCreateTransportTask(context as any, {
@@ -404,9 +406,9 @@ describe('CreateTransportTask', () => {
    * comes back, the answer says so rather than handing back a blank.
    */
   it('says so when the answer carried no task number', async () => {
-    fakeClient = fakeClientOf({
-      createTask: () => okResponse(reading({ '@': {} } as never)),
-    });
+    fakeClient = fakeClientThroughSet((set) => ({
+      createTask: () => answerThrough(set, 'createdTask', taskCreated()),
+    }));
 
     const answered = body(
       await handleCreateTransportTask(context as any, {
@@ -428,14 +430,14 @@ describe('CreateTransportTask', () => {
    */
   it('types the new task Development/Correction, so objects can be attached to it', async () => {
     const typed: unknown[][] = [];
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: () =>
-        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
+        answerThrough(set, 'createdTask', taskCreated('SIDK907073')),
       changeTaskType: (...given: unknown[]) => {
         typed.push(given);
         return okResponse(reading('<tm:root/>'));
       },
-    });
+    }));
 
     const answered = body(
       await handleCreateTransportTask(context as any, {
@@ -458,14 +460,14 @@ describe('CreateTransportTask', () => {
    */
   it('says the task is still Unclassified at every detail, not only terse', async () => {
     const refused = () =>
-      fakeClientOf({
+      fakeClientThroughSet((set) => ({
         createTask: () =>
-          okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
+          answerThrough(set, 'createdTask', taskCreated('SIDK907073')),
         changeTaskType: () =>
           refusedResponse(
             'You can only change the type of tasks in workbench requests',
           ),
-      });
+      }));
 
     fakeClient = refused();
     const terse = body(
@@ -519,14 +521,14 @@ describe('CreateTransportTask', () => {
 
   it('types the task as asked, and leaves it alone when asked for X', async () => {
     const typed: unknown[][] = [];
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: () =>
-        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
+        answerThrough(set, 'createdTask', taskCreated('SIDK907073')),
       changeTaskType: (...given: unknown[]) => {
         typed.push(given);
         return okResponse(reading('<tm:root/>'));
       },
-    });
+    }));
 
     const repair = body(
       await handleCreateTransportTask(context as any, {
@@ -557,11 +559,11 @@ describe('CreateTransportTask', () => {
    * next AddTransportObject will be refused for exactly that reason.
    */
   it('still answers the task when typing it is refused, and says it is unclassified', async () => {
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: () =>
-        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
+        answerThrough(set, 'createdTask', taskCreated('SIDK907073')),
       changeTaskType: () => refusedResponse('Specified task type is unknown'),
-    });
+    }));
 
     const result = await handleCreateTransportTask(context as any, {
       transport_number: 'SIDK905941',
@@ -579,14 +581,12 @@ describe('CreateTransportTask', () => {
 
   it('refuses a task type that is not S, R or X before calling the server', async () => {
     let created = false;
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: () => {
         created = true;
-        return okResponse(
-          reading({ '@': { 'tm:number': 'SIDK907073' } } as never),
-        );
+        return answerThrough(set, 'createdTask', taskCreated('SIDK907073'));
       },
-    });
+    }));
 
     const result = await handleCreateTransportTask(
       context as any,
@@ -602,9 +602,9 @@ describe('CreateTransportTask', () => {
   });
 
   it('refuses to call the server without a target user', async () => {
-    fakeClient = fakeClientOf({
+    fakeClient = fakeClientThroughSet((set) => ({
       createTask: () => okResponse(reading('<tm:root/>')),
-    });
+    }));
 
     const result = await handleCreateTransportTask(
       context as any,

@@ -246,3 +246,35 @@ export function recordAnalyse(answers: Record<string, () => unknown> = {}) {
       calls.filter((c) => c.member === member).length,
   };
 }
+
+/** A result set as a factory receives it: a reading per slot. */
+export type ResultSet = Record<string, (answer: unknown) => unknown>;
+
+/**
+ * {@link fakeClientOf}, with the member table built from the result set the
+ * handler passed to the factory: a member answers what that set reads out of
+ * a wire answer ({@link answerThrough}), so the handler's choice of reading
+ * is exercised, not bypassed.
+ */
+export function fakeClientThroughSet(members: (set: ResultSet) => Members) {
+  return new Proxy({} as Record<string, unknown>, {
+    get:
+      () =>
+      (set: ResultSet = {}) => {
+        const table = members(set);
+        return new Proxy(table, {
+          get: (target, name: string) =>
+            target[name] ?? (async () => defaultAnswer(name)),
+        });
+      },
+  });
+}
+
+/** A success: the wire answer `data` read by the set's reading of `slot`. */
+export function answerThrough(set: ResultSet, slot: string, data: string) {
+  const read = set[slot];
+  if (read === undefined) {
+    throw new Error(`the result set has no slot ${slot}`);
+  }
+  return okResponse(read({ status: 200, statusText: 'OK', headers: {}, data }));
+}

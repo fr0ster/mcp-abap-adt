@@ -1,4 +1,8 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type ISearchResult,
+  utilSearchHits,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtSearchObjectsParamsOf } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
@@ -36,13 +40,6 @@ import {
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import type { XmlNode } from '../../../lib/xml/node';
-import {
-  attr,
-  child,
-  isList,
-  type XmlList,
-  type XmlRead,
-} from '../../../lib/xml/tree';
 
 /** SearchObject's arguments but `background`. */
 const FIELDS = {
@@ -107,58 +104,17 @@ export const TOOL_DEFINITION = {
   ),
 } as const;
 
-export interface SearchHit {
-  name: string;
-  type: string;
-  description: string;
-  packageName?: string | undefined;
-  /** The object's address (`adtcore:uri`), when the hit names one. */
-  uri?: string;
-}
-
 /**
- * `adtcore:objectReferences/adtcore:objectReference`, attributes only — the
- * same field set `@mcp-abap-adt/adt-clients`' own (unexported)
- * `parseSearchResults` reads out of the identical document (see
- * `core/shared/search.js`). `search`'s injected reading here is the generic
- * `structured` parse (`resultSets.ts`'s `READING_BY_SLOT`), so this walks that
- * tree directly rather than re-running a parser of its own.
+ * The hits as the tab-separated lines this tool answered before the
+ * migration: a header and one line per hit, the code as SAP sent it, known
+ * or not; no hit answers nothing.
  */
-export function parseSearchHits(value: XmlRead): SearchHit[] {
-  const root =
-    child(value, 'adtcore:objectReferences') ??
-    child(value, 'objectReferences');
-  if (!root) return [];
-  const refsRaw =
-    child(root, 'adtcore:objectReference') ?? child(root, 'objectReference');
-  const refs = isList(refsRaw) ? refsRaw : refsRaw ? [refsRaw] : [];
-  const hits: SearchHit[] = [];
-  for (const ref of refs) {
-    const a = child(ref, '@');
-    const name = attr(a, 'adtcore:name') ?? attr(a, 'name');
-    const type = attr(a, 'adtcore:type') ?? attr(a, 'type');
-    if (!name || !type) continue;
-    const uri = attr(a, 'adtcore:uri') ?? attr(a, 'uri');
-    hits.push({
-      name,
-      type,
-      description:
-        attr(a, 'adtcore:description') ?? attr(a, 'description') ?? '',
-      packageName: attr(a, 'adtcore:packageName') ?? attr(a, 'packageName'),
-      ...(uri === undefined ? {} : { uri }),
-    });
-  }
-  return hits;
-}
-
-/** The same tab-separated shape this tool answered before the migration. */
-function objectReferenceLines(value: XmlRead): string {
-  const hits = parseSearchHits(value);
+function hitLines(hits: readonly ISearchResult[]): string {
   if (hits.length === 0) return '';
   const lines = ['name\ttype\tdescription\tpackage'];
   for (const h of hits) {
     lines.push(
-      `${h.name}\t${h.type}\t${h.description}\t${h.packageName ?? ''}`,
+      `${h.name}\t${h.type ?? h.unknownType}\t${h.description}\t${h.packageName ?? ''}`,
     );
   }
   return lines.join('\n');
@@ -167,12 +123,11 @@ function objectReferenceLines(value: XmlRead): string {
 /**
  * What `SearchObject` answers at each `detail`: the reading the search is
  * read with, selected before the call (`src/lib/detail`) — terse the hits
- * read out of the structured parse, written as lines. adt-strategies'
- * `utilSearchHits` is not used: it does not decode a numeric character
- * reference (`&#x26;` stays as written), where the parse answers `&`.
+ * as adt-strategies reads them (`utilSearchHits`, which decodes character
+ * references since 0.28.0), written as lines.
  */
 const SEARCH_READINGS: DetailTable<XmlNode | string> = {
-  terse: formatted(structuredValue, objectReferenceLines),
+  terse: formatted(utilSearchHits, hitLines),
   medium: fullLevel,
   full: fullLevel,
   raw: rawLevel,

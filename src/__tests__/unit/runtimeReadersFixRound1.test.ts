@@ -101,12 +101,42 @@ describe('RuntimeListProfilerTraceFiles', () => {
 
     const result: any = await handleRuntimeListProfilerTraceFiles(
       context as any,
+      { detail: 'full' },
     );
     const body = JSON.parse(result.content[0].text);
 
     assert.equal(result.isError, false);
     assert.equal(body.count, 1);
     assert.deepStrictEqual(body.entries, [entry]);
+  });
+
+  it('terse, by default: one TSV row per trace — id, recordedAt, objectName, state, runtime', async () => {
+    const entry = {
+      id: 'trace-1',
+      uri: '/sap/bc/adt/runtime/traces/abaptraces/trace-1',
+      recordedAt: '2026-01-01T00:00:00Z',
+      user: 'SAPUSER01',
+      objectName: 'ZCL_X=====CP',
+      state: { value: 'R', text: 'Finished' },
+      runtime: 42,
+      host: 'HOST',
+    };
+    profiler = { list: mock.fn(async () => okResponse([entry])) };
+
+    const terse: any = await handleRuntimeListProfilerTraceFiles(
+      context as any,
+    );
+    assert.equal(
+      terse.content[0].text,
+      '# count 1\nid\trecordedAt\tobjectName\tstate\truntime\ntrace-1\t2026-01-01T00:00:00Z\tZCL_X=====CP\tFinished\t42',
+    );
+    const medium: any = await handleRuntimeListProfilerTraceFiles(
+      context as any,
+      { detail: 'medium' },
+    );
+    const body = JSON.parse(medium.content[0].text);
+    assert.equal('uri' in body.entries[0], false);
+    assert.equal(body.entries[0].host, 'HOST');
   });
 });
 

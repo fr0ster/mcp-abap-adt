@@ -11,7 +11,10 @@
 import assert from 'node:assert/strict';
 import { describe, it, mock } from 'node:test';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { handleGetTransport } from '../../handlers/transport/readonly/handleGetTransport';
+import {
+  handleGetTransport,
+  NOT_THE_TRANSPORT_ASKED,
+} from '../../handlers/transport/readonly/handleGetTransport';
 import { assertMatchObject } from '../helpers/assertions';
 import {
   EMPTY_TASK,
@@ -157,8 +160,9 @@ describe('GetTransport', () => {
         target_system: '/SIDTOQAS/',
       },
       objects: [
-        { type: 'CLAS', name: 'ZCL_ONE', position: '000001' },
+        { pgmid: 'R3TR', type: 'CLAS', name: 'ZCL_ONE', position: '000001' },
         {
+          pgmid: 'LIMU',
           type: 'METH',
           name: 'ZCL_ONE                       RUN',
           position: '000002',
@@ -227,4 +231,71 @@ describe('GetTransport', () => {
       assert.equal(result.content[0].text, document);
     });
   }
+
+  it('reads a task whose document lacks the task marker, by the number tm:task carries', async () => {
+    const unmarked = TASK_WITH_OBJECTS.replace('tm:object_type="T" ', '');
+    assert.notEqual(unmarked, TASK_WITH_OBJECTS);
+    const { connection } = connectionAnswering(unmarked);
+    const payload = payloadOf(
+      await handleGetTransport({ connection, logger: undefined } as any, {
+        transport_number: TASK,
+      }),
+    );
+    assert.equal(payload.kind, 'task');
+    assert.equal(payload.task.number, TASK);
+    assert.equal(payload.parent_request.number, PARENT);
+  });
+
+  it('matches the number given trimmed and in any case', async () => {
+    const { connection } = connectionAnswering(TASK_WITH_OBJECTS);
+    const payload = payloadOf(
+      await handleGetTransport({ connection, logger: undefined } as any, {
+        transport_number: ` ${TASK.toLowerCase()} `,
+      }),
+    );
+    assert.equal(payload.kind, 'task');
+  });
+
+  for (const [label, document, number] of [
+    ['a blank 200', '', TASK],
+    [
+      'an unrelated document',
+      '<?xml version="1.0" encoding="utf-8"?><other:root xmlns:other="urn:other"><other:item number="X"/></other:root>',
+      TASK,
+    ],
+    [
+      "a task document for another task's number",
+      TASK_WITH_OBJECTS,
+      'SIDK900099',
+    ],
+    [
+      "a request document for another request's number",
+      RECORDED_REQUEST,
+      'SIDK900098',
+    ],
+    [
+      'a task document, marker removed, read by its parent number',
+      TASK_WITH_OBJECTS.replace('tm:object_type="T" ', ''),
+      PARENT,
+    ],
+  ] as const) {
+    for (const detail of ['terse', 'full', 'raw'] as const) {
+      it(`refuses ${label} in fixed words, never as success (detail ${detail})`, async () => {
+        const { connection } = connectionAnswering(document);
+        const result: any = await handleGetTransport(
+          { connection, logger: undefined } as any,
+          { transport_number: number, detail },
+        );
+        assert.equal(result.isError, true);
+        assert.equal(result.content[0].text, NOT_THE_TRANSPORT_ASKED);
+      });
+    }
+  }
+
+  it('the refusal of a wrong document is fixed words', () => {
+    assert.equal(
+      NOT_THE_TRANSPORT_ASKED,
+      'The answer is not the transport request or task asked for: its document names another number, or none.',
+    );
+  });
 });

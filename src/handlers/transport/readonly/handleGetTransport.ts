@@ -32,7 +32,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
-import { answer } from '../../../lib/answer';
+import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -60,7 +60,7 @@ export const TOOL_DEFINITION = {
   name: 'GetTransport',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] Reads the transport request or transport task named by transport_number; kind says which: 'request' or 'task'. A transport request answers its header (number, description, type, status, owner, target system) and its tasks, each with number, owner, status, description and object count. A transport task answers its header (number, parent request, description, type, status, owner), its parent request (number, type, status, target system), and its objects, each with type, name and position, with their count.",
+    "[read-only] Reads the transport request or transport task named by transport_number; kind says which: 'request' or 'task'. A transport request answers its header (number, description, type, status, owner, target system) and its tasks, each with number, owner, status, description and object count. A transport task answers its header (number, parent request, description, type, status, owner), its parent request (number, type, status, target system), and its objects, each with pgmid, type, name and position, with their count.",
   inputSchema: z.object({
     transport_number: z.string().describe('Transport request or task number'),
     include_objects: z
@@ -97,12 +97,46 @@ function listed(node: XmlRead, name: string): readonly XmlRead[] {
   return isList(member) ? member : [member];
 }
 
-/** What was read, by the document's `tm:root/@tm:object_type`. */
-export function transportKind(document: XmlRead): 'request' | 'task' {
+/** What a transport document was read as. */
+type TransportKind = 'request' | 'task';
+
+/** A document that is not the transport asked for: fixed words, nothing of SAP's. */
+export const NOT_THE_TRANSPORT_ASKED =
+  'The answer is not the transport request or task asked for: its document names another number, or none.';
+
+/** A transport number as SAP spells it: trimmed, upper case. */
+const spelled = (number: string | undefined): string =>
+  (number ?? '').trim().toUpperCase();
+
+/**
+ * What `document` is, read as the answer for `number`; `undefined` when it
+ * is not that transport — a blank answer, another document, another number.
+ *
+ * A task's document (`tm:root/@tm:object_type` `T`, or, with no type, a
+ * `tm:task` directly under `tm:root`) is the task when its `tm:task` names
+ * `number`; any other is the request when its `tm:request` does. A task's
+ * document is never read as its parent, whatever number was asked.
+ */
+export function transportKind(
+  document: XmlRead,
+  number: string,
+): TransportKind | undefined {
   const root = child(document, 'tm:root');
-  return attributeOf(root, 'tm:object_type') === TASK_DOCUMENT
-    ? 'task'
-    : 'request';
+  const [task] = listed(root, 'tm:task');
+  const [request] = listed(root, 'tm:request');
+  const asked = spelled(number);
+  const type = attributeOf(root, 'tm:object_type');
+  const isTask =
+    type === TASK_DOCUMENT || (type === undefined && task !== undefined);
+  if (isTask) {
+    return spelled(attributeOf(task, 'tm:number')) === asked
+      ? 'task'
+      : undefined;
+  }
+  return request !== undefined &&
+    spelled(attributeOf(request, 'tm:number')) === asked
+    ? 'request'
+    : undefined;
 }
 
 /** What terse answers of a document, by its kind. */
@@ -147,7 +181,8 @@ function terseRequest(document: XmlRead, options: TerseOptions) {
 /**
  * A task's terse answer: its header from `tm:task`, never `tm:request`
  * (the parent's), the parent's header apart, and its objects as rows of
- * type, name and position.
+ * pgmid, type, name and position (`LIMU` or `R3TR` decides what a move or a
+ * removal addresses).
  */
 function terseTask(document: XmlRead, options: TerseOptions) {
   const root = child(document, 'tm:root');
@@ -155,6 +190,7 @@ function terseTask(document: XmlRead, options: TerseOptions) {
   const [parent] = listed(root, 'tm:request');
   const of = (name: string) => attributeOf(task, name);
   const objects = listed(task, 'tm:abap_object').map((entry) => ({
+    pgmid: attributeOf(entry, 'tm:pgmid'),
     type: attributeOf(entry, 'tm:type'),
     name: attributeOf(entry, 'tm:name'),
     position: attributeOf(entry, 'tm:position'),
@@ -182,9 +218,13 @@ function terseTask(document: XmlRead, options: TerseOptions) {
   };
 }
 
-/** The terse answer of a transport document: a request's or a task's. */
-export function terseTransport(document: XmlRead, options: TerseOptions) {
-  return transportKind(document) === 'task'
+/** The terse answer of a transport document read as `kind`. */
+function terseTransport(
+  kind: TransportKind,
+  document: XmlRead,
+  options: TerseOptions,
+) {
+  return kind === 'task'
     ? terseTask(document, options)
     : terseRequest(document, options);
 }
@@ -336,7 +376,7 @@ export async function handleGetTransport(
   context: HandlerContext,
   args: GetTransportArgs,
 ) {
-  const { connection, logger } = context;
+  const { logger } = context;
   // A blank number is refused before any request.
   if (!args?.transport_number) {
     return return_error('Transport number is required');
@@ -348,16 +388,37 @@ export async function handleGetTransport(
     includeTasks: args.include_tasks !== false,
   };
   logger?.debug(`GetTransport: ${args.transport_number}`);
+  let read: Awaited<ReturnType<typeof readTransport>>;
+  try {
+    read = await readTransport(context, args.transport_number);
+  } catch (thrown) {
+    return answerCaught(thrown, { tool: 'GetTransport', detail });
+  }
+  // The document must be the transport asked for, at every detail, before
+  // anything is answered as success.
+  let kind: TransportKind = 'request';
+  if (read.ok) {
+    const readAs = transportKind(
+      read.getResult().value.value,
+      args.transport_number,
+    );
+    if (readAs === undefined) return return_error(NOT_THE_TRANSPORT_ASKED);
+    kind = readAs;
+  }
+  const answered = read;
   return answer(
     { tool: 'GetTransport', detail },
-    async () => {
-      const read = await createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
-        .readObjects(args.transport_number, { analyse: analyseException });
-      return read.ok
-        ? read
-        : failed(withStep(read.getError(), 'read transport request'));
-    },
-    project(detail, (value: XmlRead) => terseTransport(value, options)),
+    async () =>
+      answered.ok
+        ? answered
+        : failed(withStep(answered.getError(), 'read transport request')),
+    project(detail, (value: XmlRead) => terseTransport(kind, value, options)),
   );
+}
+
+/** The request's or task's document: adt-clients' one read of either. */
+function readTransport(context: HandlerContext, number: string) {
+  return createAdtClient(context.connection, context.logger)
+    .getRequest(resultsFor(transportDocuments))
+    .readObjects(number, { analyse: analyseException });
 }

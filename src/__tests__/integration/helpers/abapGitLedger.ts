@@ -214,19 +214,6 @@ export class RunWaitCancelled extends Error {
   }
 }
 
-function pause(ms: number, signal: AbortSignal): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal.aborted) return resolve();
-    const done = () => {
-      clearTimeout(timer);
-      signal.removeEventListener('abort', done);
-      resolve();
-    };
-    const timer = setTimeout(done, ms);
-    signal.addEventListener('abort', done, { once: true });
-  });
-}
-
 /**
  * Poll R1 (through `readRow`) until the run is terminal under a new log key.
  * Answers that row; rejects with {@link RunWaitCancelled} when `signal`
@@ -236,7 +223,6 @@ export async function waitForRun(
   readRow: () => Promise<IRunRow | undefined>,
   pending: IPendingRun,
   signal: AbortSignal,
-  intervalMs = 3000,
 ): Promise<IRunRow & { readonly appLogKey: string }> {
   let last: IRunRow | undefined;
   for (;;) {
@@ -250,7 +236,6 @@ export async function waitForRun(
       throw new Error(
         `the repository left the repository list while waiting for ${pending.what}`,
       );
-    await pause(intervalMs, signal);
   }
 }
 
@@ -340,18 +325,12 @@ export async function cleanUpEntry(
   runId: string,
   steps: ICleanupSteps,
   signal: AbortSignal,
-  intervalMs?: number,
 ): Promise<void> {
   let entry = ledger.find(runId);
   if (!entry) return;
   const { repoKey } = entry;
   if (entry.pending && repoKey) {
-    await waitForRun(
-      () => steps.readRow(repoKey),
-      entry.pending,
-      signal,
-      intervalMs,
-    );
+    await waitForRun(() => steps.readRow(repoKey), entry.pending, signal);
     entry = ledger.amend(runId, (e) => ({ ...e, pending: undefined }));
   }
   if (repoKey) {

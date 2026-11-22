@@ -76,10 +76,11 @@ import {
   withRestriction,
 } from '../helpers/live';
 
-/** How long the run waits for one cloud job: the test's own cancel. */
-const CLOUD_RUN_WAIT_MS = Number(
-  process.env.ABAPGIT_RUN_WAIT_MS ?? 15 * 60_000,
-);
+/**
+ * A wait no clock ends: a cloud job's wait ends on SAP's answer, or the
+ * person ends the run with the runner's interrupt (no bound on a live test).
+ */
+const unbounded = (): AbortSignal => new AbortController().signal;
 
 /** Which tools a suite calls: the full ones, or the two compact ones. */
 export type AbapGitSet = 'full' | 'compact';
@@ -271,7 +272,7 @@ export function abapGitLiveRun(set: AbapGitSet, title: string): void {
       const ended = await waitForRun(
         steps.readRow.bind(null, repoKey),
         pending,
-        AbortSignal.timeout(CLOUD_RUN_WAIT_MS),
+        unbounded(),
       );
       ledger.amend(RUN, (entry) => ({ ...entry, pending: undefined }));
       return ended.appLogKey;
@@ -304,12 +305,7 @@ export function abapGitLiveRun(set: AbapGitSet, title: string): void {
       // The ledger first: what an earlier run of this backend and system
       // left, cleaned up exactly as its entry names it.
       for (const entry of ledger.entriesOf(backend, systemKey)) {
-        await cleanUpEntry(
-          ledger,
-          entry.runId,
-          steps,
-          AbortSignal.timeout(CLOUD_RUN_WAIT_MS),
-        );
+        await cleanUpEntry(ledger, entry.runId, steps, unbounded());
       }
       const fresh: ILedgerEntry = {
         runId: RUN,
@@ -362,12 +358,7 @@ export function abapGitLiveRun(set: AbapGitSet, title: string): void {
             `${kept}; its fixtures stay in ${JSON.stringify(ledger.find(RUN))} for the next run`,
           );
         }
-        await cleanUpEntry(
-          ledger,
-          RUN,
-          steps,
-          AbortSignal.timeout(CLOUD_RUN_WAIT_MS),
-        );
+        await cleanUpEntry(ledger, RUN, steps, unbounded());
         assert.equal(ledger.find(RUN), undefined);
         if (key !== undefined) assert.equal(await readRepo(key), undefined);
         assert.equal(await github().branchExists(BRANCH), false);

@@ -71,7 +71,7 @@ describe('the cloud-run correlation', () => {
       row('R', 'L1'),
       row('W', 'L1'),
     ]);
-    const ended = await waitForRun(r1.read, { what: 'pull', l0 }, live(), 0);
+    const ended = await waitForRun(r1.read, { what: 'pull', l0 }, live());
     assert.deepEqual(ended, { runStatus: 'W', appLogKey: 'L1' });
     assert.equal(r1.reads.length, 5);
   });
@@ -90,13 +90,12 @@ describe('the cloud-run correlation', () => {
       r1.read,
       { what: 'pull', l0: 'L0' },
       cancelled.signal,
-      5,
     );
     const rejected = assert.rejects(waiting, RunWaitCancelled);
     cancelled.abort();
     await rejected;
     await assert.rejects(
-      waitForRun(r1.read, { what: 'pull', l0: 'L0' }, cancelled.signal, 5),
+      waitForRun(r1.read, { what: 'pull', l0: 'L0' }, cancelled.signal),
       /other than L0/,
     );
   });
@@ -155,7 +154,7 @@ describe('the recovery ledger', () => {
     ledger.put(entry);
     const { done, steps } = recordingSteps([row('R', 'L0')]);
     const cancelled = new AbortController();
-    const cleaning = cleanUpEntry(ledger, 'RUN1', steps, cancelled.signal, 5);
+    const cleaning = cleanUpEntry(ledger, 'RUN1', steps, cancelled.signal);
     const rejected = assert.rejects(cleaning, RunWaitCancelled);
     cancelled.abort();
     await rejected;
@@ -174,7 +173,7 @@ describe('the recovery ledger', () => {
       row('R', 'L1'),
       row('S', 'L1'),
     ]);
-    await cleanUpEntry(restarted, 'RUN1', steps, live(), 0);
+    await cleanUpEntry(restarted, 'RUN1', steps, live());
     // Nothing was cleaned up while R1 showed terminal/L0 or R/L1.
     assert.deepEqual(r1.reads.slice(0, 3), [
       row('S', 'L0'),
@@ -204,7 +203,7 @@ describe('the recovery ledger', () => {
       },
     };
     await assert.rejects(
-      cleanUpEntry(ledger, 'RUN1', failing, live(), 0),
+      cleanUpEntry(ledger, 'RUN1', failing, live()),
       /refused/,
     );
     const left = new AbapGitLedger(file).find('RUN1');
@@ -220,7 +219,7 @@ describe('the recovery ledger', () => {
     const { steps } = recordingSteps([row('S', 'L1')]);
     const ignored: ICleanupSteps = { ...steps, unlink: async () => {} };
     await assert.rejects(
-      cleanUpEntry(ledger, 'RUN1', ignored, live(), 0),
+      cleanUpEntry(ledger, 'RUN1', ignored, live()),
       /still listed after unlink/,
     );
     assert.equal(new AbapGitLedger(file).find('RUN1')?.repoKey, 'K1');

@@ -183,7 +183,7 @@
     "inputSchema.exclude_comments.description": "search_source: skip col-1 '*' and full-line '\"' comment lines (default false).",
     "inputSchema.max_hits_per_object.description": "search_source: the most hits answered per object; absent, every hit.",
     "inputSchema.max_hits.description": "search_source: the most hits of the whole answer; reached, the scan stops reading. Absent, every hit.",
-    "inputSchema.answer.description": "search_source: what each hit is answered as: snippets (the default), lines or objects.",
+    "inputSchema.answer.description": "search_source: what each hit is answered as: lines (the default at detail terse), snippets (the default at medium and full) or objects.",
     "inputSchema.answer.enum": ["objects", "lines", "snippets"],
     "inputSchema.version.description": "search_source: the version every source is read at (default active).",
     "inputSchema.version.enum": ["active", "inactive", "workingArea"],

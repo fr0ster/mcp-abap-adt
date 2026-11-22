@@ -78,7 +78,10 @@ Common to every route (Code, both):
 - Run state on cloud lives in R1: `status` (`' '` initial, `R` running, `S`, `W`, `E`, `A`;
   `IF_ABAPGIT_APP_LOG=>c_run_status`), `statusText`, and the `status_link`/`log_link` that R1
   writes once a run has an application log (`cl: RES_REPOS->get_links`). Onprem R1 has no
-  status and no log link (its `get_links` has them commented out).
+  status and no log link (its `get_links` has them commented out). Measured 2026-11-22 (GETs
+  only): onprem 53 entries, none with a `log_link`, so R8 is cloud-only; cloud 446 entries, 421
+  with a `log_link` and a `status_link` ending in the same id; every repository key 12 digits,
+  every log key 32 uppercase hex characters, at the end of `/repos/{key}/log/{id}`.
 
 Measured beyond discovery: R1 with Accept v2 → 200 on both (onprem 53 repositories, cloud 446);
 with `Accept: */*` → onprem 200, cloud 400 (git-integration research, 2026-11-21).

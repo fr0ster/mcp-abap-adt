@@ -7,8 +7,9 @@ load-bearing by the named mutation (break it, watch the test go red, revert).
 
 **§9 open decisions — the spec's recommendation is taken; the owner may overrule each:**
 
-- §9.1 stdio `--deferred-logon`: (a) no abapGit tool listed until the logon, then
-  `notifications/tools/list_changed`.
+- §9.1 stdio `--deferred-logon`: superseded by the owner's decision (2026-11-23): the abapGit
+  tools are always listed, with no SAP request, and availability is decided at call time; no
+  `list_changed`.
 - §9.2 "read one repository": (a) `package_name` / `repository_key` filters on `ListAbapGitRepos`,
   a result strategy over the one R1 answer.
 - §9.3 no approved endpoint matches: (a) sent without credentials.
@@ -456,20 +457,21 @@ handleHandlerAbapGitGet.ts, handleHandlerAbapGit.ts}`; shared logic `src/lib/aba
 **T6.1 Floors.** The root `package.json` (`@mcp-abap-adt/lib`): all five ranges (floors table); `npm install --ignore-scripts`; no `"link": true`,
 every entry from the registry; `npm run build && npm test` green before new code.
 
-**T6.2 Availability.** `src/lib/abapGit/availability.ts`: `abapGitServed(connection): Promise<boolean>`
-reads discovery on the request's connection, cached by `adtSystemKey`, dropped by
-`registerConnectionResetHook`; a failed read not cached. A `tools/list` hook installed after
-`BaseMcpServer.registerHandlers` filters the abapGit tools; an unlisted tool's call is refused.
-**Deferred stdio** (§9.1 a): `server-runtime/src/stdio/StdioServer.ts` — the first `tools/list`
-lists no abapGit tool and performs no logon; the first connection birth (where the deferred logon
-creates the connection, ~L91) triggers one discovery read and exactly one `list_changed`. Test
-`availability.test.ts`: listed with `/abapgit/repos`, absent without; absent on a failed read, read
-again next time; one read per system key across two `state_handle`s; the reset hook drops it; per
-transport (stdio, SSE, Streamable HTTP under `runWithRequestContext`); a real `tools/list` releases
-its connection use on success and on a failed discovery; deferred stdio: no logon on the first
-listing, one notification after birth. First failure: tools listed without discovery. Mutations:
-cache a failed read → red; skip the release on failure → red; send the notification per listing →
-red.
+**T6.2 Availability.** Owner decision (2026-11-23): the abapGit tools are always listed;
+availability is decided at call time only. `src/lib/abapGit/availability.ts`:
+`abapGitServed(connection): Promise<boolean>` reads discovery on the call's connection, cached by
+`adtSystemKey`, dropped by `registerConnectionResetHook`, one read in flight per system key; a
+failed read not cached. `tools/list` is the SDK's own reply: no filter, no SAP request, no logon,
+no discovery. Admission step 4 refuses a call on an unserved system `abapgit_not_served`, nothing
+else sent. **Deferred stdio:** the first `tools/list` lists the abapGit tools and logs on to no
+one; the first birth sends no `list_changed`. The plain registration (`HandlerExporter`) registers
+no abapGit tool: abapGit tools are served by the MCP server only. Test `availability.test.ts`: per
+transport (stdio, SSE, Streamable HTTP), the listing lists the abapGit tool with zero requests and
+no connection taken; a served call goes through; an unserved system answers `abapgit_not_served`
+and sends nothing else; a failed read refuses the call, is not kept, and is read again next call;
+one read per system key across two `state_handle`s; the reset hook drops it; deferred stdio: no
+logon on the first listing, no notification after birth. Mutations: the listing filter back →
+red; a `list_changed` at birth → red; skip the call-time refusal → red.
 
 **T6.3 Endpoint binding.** `src/lib/abapGit/approvedEndpoints.ts`: `parseApprovedEndpoints(config)`
 (start error for userinfo, query, fragment, non-https); `matchEndpoint(url, endpoints): { sendUrl;
@@ -601,5 +603,5 @@ again from the server's T6.9 runs; a skipped or failed gate blocks.
 | A credential leaks through a resend, an SAP-endpoint redirect, a log line, or the raw response handed to a reader or analyser | T3.1, T3.2, T5.4, T6.8 |
 | Access checks: link or pull reaching SAP under any restriction signal; R1 read twice, after `background` was stripped, or after dispatch | T6.4 |
 | Endpoint binding: a near-miss or carried-over header binds; an argument URL on a key route; the legacy wrapper sends a foreign or rebuilt-elsewhere link | T5.1, T6.3 |
-| abapGit listed or callable where discovery lacks it; a failed discovery cached; deferred stdio logging on to list | T6.2 |
+| abapGit callable where discovery lacks it; a listing that sends a request; a failed discovery cached; deferred stdio logging on to list | T6.2 |
 | A cloud run misread: L0 taken for L1, a foreign R8 pairing, cleanup before a terminal state | T5.6, T6.4, T6.9 |

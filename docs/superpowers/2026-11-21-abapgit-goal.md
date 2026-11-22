@@ -28,9 +28,10 @@ commit and push it, and read what went wrong.
   measured route sets differ: cloud is SAP's own `CL_ABAPGIT_RES_*`; onprem is the
   open-source abapGit ADT backend installed as Z objects. Nothing is offered that the
   system does not serve, and nothing it serves is left out.
-- **Availability comes from the system.** abapGit is offered only when the system's
-  discovery lists `/sap/bc/adt/abapgit/repos`. A system without the backend, for example an
-  onprem system without the open-source abapGit ADT backend, lists no abapGit tool.
+- **Availability comes from the system.** abapGit is served only when the system's
+  discovery lists `/sap/bc/adt/abapgit/repos`. The abapGit tools are always listed, with no
+  request to SAP; a call on a system without the backend, for example an onprem system
+  without the open-source abapGit ADT backend, is refused as not served.
 - **Full and compact.** The full set has a tool per operation. The compact set exposes the
   same operations in its own shape. Both follow the existing tool rules: functional
   descriptions, typed schemas, result strategies.

@@ -370,32 +370,28 @@ Push, unlink, branch switch, cloud branch info and the reads stay under restrict
 
 ### 4.5 Discovery and listing
 
-Required by the goal: a system whose discovery does not list `/sap/bc/adt/abapgit/repos` lists
-no abapGit tool and no abapGit compact tool.
+Owner decision (2026-11-23): the abapGit tools are always listed; whether the system serves
+abapGit is decided at call time only.
 
 - **Registration** stays by system kind at instance creation (`BaseMcpServer.registerHandlers`,
   `available_in`): cloud-only `GetAbapGitBranchInfo`, `GetAbapGitModifiedObjects`,
   `GetAbapGitErrorLog`; onprem-only `SwitchAbapGitBranch`; compact enums per variant.
-- **Listing hook:** after registration, the server installs its own async `tools/list` request
-  handler. It keeps the schemas registration built (the SDK's list, untouched) and filters each
-  reply: the abapGit tools (full) or `HandlerAbapGitGet` / `HandlerAbapGit` (compact) are left out
-  unless discovery of the system the request reaches lists `/abapgit/repos`. It runs inside the
-  request's context, so it works where handlers were registered before any request existed
-  (Streamable HTTP: a pooled instance per `state_handle`, `StreamableHttpServer.ts`, dispatched
-  under `runWithRequestContext`). Its connection use is released when the reply is built, as a
-  call's is.
-- **Calls:** an abapGit call checks the same availability first and is refused "abapGit is not
-  served by this system" in fixed words, nothing else sent — a client that calls an unlisted tool
-  meets the same answer.
-- **Reading and caching:** discovery is read on the request's own connection
+- **Listing:** `tools/list` is the SDK's own reply, untouched: it lists the abapGit tools (full)
+  and `HandlerAbapGitGet` / `HandlerAbapGit` (compact) without any SAP request — no logon, no
+  discovery — on every transport, stdio's `--deferred-logon` included (its first listing logs on
+  to no one, and its first birth sends no `notifications/tools/list_changed`).
+- **Calls:** an abapGit call checks availability (admission step 4, §4.4) and, on a system whose
+  discovery does not list `/sap/bc/adt/abapgit/repos`, is refused `abapgit_not_served` ("abapGit
+  is not served by this system") in fixed words, nothing else sent.
+- **Reading and caching:** discovery is read on the call's own connection
   (`GET /sap/bc/adt/discovery`) and cached **by the system that connection actually reaches**
   (its system key, `adtSystemKey`), never by `state_handle` or instance; kept for the process; no clock expires
-  it (no timeouts). A failed or unreadable discovery is not cached: that request lists no abapGit
-  tool (fail closed) and the next request reads again. The kept answer is dropped by the
-  connection-reset hook (`registerConnectionResetHook`).
-- Per transport: stdio reads at its first `tools/list` with its connection; SSE on the opening
-  GET's instance; Streamable HTTP per request as above. **stdio `--deferred-logon`** has no
-  connection at its first listing: §9.1.
+  it (no timeouts); one read in flight per system key. A failed or unreadable discovery is not
+  cached: that call is refused (fail closed) and the next call reads again. The kept answer is
+  dropped by the connection-reset hook (`registerConnectionResetHook`).
+- **The plain registration** (`HandlerExporter`, an embedder's `McpServer` without
+  `BaseMcpServer`) has no admission, so it registers no abapGit tool: abapGit tools are served by
+  the MCP server only.
 
 ### 4.6 Long runs, pinned
 
@@ -558,8 +554,8 @@ No host decides anything else:
   membership, deny entries, the R1 pre-read and fail-closed cases,
   the import refusal under each restriction kind, the run-log pairing, approved-endpoint matching
   (exact, alias sending the configured URL, `.git` / trailing `/` / port / case near-misses, no
-  match sent anonymously), userinfo/query/fragment refusal, `tools/list` filtering and call
-  refusal per transport and on a failed discovery, stateless session type on every abapGit
+  match sent anonymously), userinfo/query/fragment refusal, `tools/list` listing without a request
+  and call refusal per transport and on a failed discovery, stateless session type on every abapGit
   request including after an error;
 - **canaries** for the user, the raw token and the base64 password, over HTTP and RFC: a stubbed
   SAP echoes each value in every **dropped** place (body text, headers, status text, `msgText`,
@@ -641,10 +637,9 @@ elsewhere with the reason, route-specific cases gated by system kind in code:
 
 ## 9. Open decisions
 
-1. **stdio `--deferred-logon`** (no connection at the first listing). (a) list no abapGit tool
-   until the logon, then send `notifications/tools/list_changed`; (b) list none for the process (a
-   goal change). **Recommend (a)**; whether the supported clients reload on that notification is
-   unverified.
+1. **stdio `--deferred-logon`** (no connection at the first listing). Decided by the owner
+   (2026-11-23), superseding (a) and (b): the abapGit tools are always listed, with no SAP
+   request, and availability is decided at call time (§4.5); no `list_changed` is sent.
 2. **"Read one repository".** (a) `package_name` / `repository_key` filters on `ListAbapGitRepos`,
    applied by a result strategy over the one R1 answer; (b) list only. **Recommend (a)** (cloud's
    list: 446 entries, 1 MB).
@@ -667,7 +662,6 @@ What a decision above rests on is marked ★.
 - Whether a key's stored URL can change after linking (§5.1).
 - ★ Whether a cloud run always writes a new log key to R1 (live correlation, §7).
 - ★ Whether the test token may create and delete branches (live fixtures, §7).
-- ★ Whether clients reload on `tools/list_changed` (§9.1).
 - R15 with a branch name holding `/` — needs a POST; measured in the first live run.
 - R10's object reference fields (`sadt_object_reference` include, not read); the live push verifies
   the builder.

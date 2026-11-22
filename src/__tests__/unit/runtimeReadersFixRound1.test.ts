@@ -19,8 +19,11 @@ const AdtRuntimeClientMock = mock.fn<(...args: any[]) => any>(
   function AdtRuntimeClient() {
     return {
       getProfiler: () => profiler,
-      getFeeds: (results?: any) =>
-        results?.feeds === feedVariantsOf
+      getFeeds: (results?: any) => {
+        // The set the handler passes, kept: a gateway case reads its document
+        // through the handler's own reading.
+        lastFeedResults = results;
+        return results?.feeds === feedVariantsOf
           ? {
               list: async () => ({
                 ok: true,
@@ -29,7 +32,8 @@ const AdtRuntimeClientMock = mock.fn<(...args: any[]) => any>(
                 }),
               }),
             }
-          : feeds,
+          : feeds;
+      },
       getDumps: () => dumps,
     };
   },
@@ -75,6 +79,7 @@ const context = { connection: {} as any, logger: undefined };
 
 let profiler: Record<string, unknown>;
 let feeds: Record<string, unknown>;
+let lastFeedResults: any;
 let dumps: Record<string, unknown>;
 let classExecutor: Record<string, unknown>;
 let packageClient: Record<string, unknown>;
@@ -428,23 +433,46 @@ describe('RuntimeListSystemMessages', () => {
 // ---------------------------------------------------------------------------
 
 describe('RuntimeGetGatewayErrorLog', () => {
-  it('error_url branch answers the actual detail document — the fixed masking bug (used to serialise the raw envelope)', async () => {
-    const detail = { type: 'E', shortText: 'boom' };
-    feeds = { gatewayErrorDetail: mock.fn(async () => okResponse(detail)) };
+  /** A wire answer read by the handler's own reading of `slot`. */
+  const readThrough = (slot: string, data: string) =>
+    okResponse(
+      lastFeedResults[slot]({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        data,
+      }),
+    );
+  /** A gateway error feed of one entry, as the cloud writes its id. */
+  const FEED =
+    '<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry>' +
+    '<atom:id>Backend Error/ABC123/20261122101010</atom:id><atom:title>Backend Error: boom</atom:title>' +
+    '<atom:updated>20261122101010</atom:updated><atom:author><atom:name>SAPUSER01</atom:name></atom:author>' +
+    '</atom:entry></atom:feed>';
+  const HTML = '<html><body>RAW_DETAIL_MARKER</body></html>';
+
+  it('error_url reads that document; raw answers it as ADT sent it', async () => {
+    const asked: string[] = [];
+    feeds = {
+      gatewayErrorDetail: async (uri: string) => {
+        asked.push(uri);
+        return readThrough('gatewayErrorDetail', HTML);
+      },
+    };
 
     const result: any = await handleRuntimeGetGatewayErrorLog(context as any, {
-      error_url: 'https://example/feed/1',
+      error_url: '/sap/bc/adt/gw/errorlog/Backend%20Error/ABC123',
+      detail: 'raw',
     });
-    const body = JSON.parse(result.content[0].text);
 
-    assert.equal(body.mode, 'detail');
-    assert.deepStrictEqual(body.error, detail);
-    assert.equal(body.error.ok, undefined);
+    assert.deepStrictEqual(asked, [
+      '/sap/bc/adt/gw/errorlog/Backend%20Error/ABC123',
+    ]);
+    assert.equal(result.content[0].text, HTML);
   });
 
-  it('list branch answers count/errors', async () => {
-    const err = { type: 'E', shortText: 'x' };
-    feeds = { gatewayErrors: mock.fn(async () => okResponse([err])) };
+  it('list branch answers count/errors at full', async () => {
+    feeds = { gatewayErrors: async () => readThrough('gatewayErrors', FEED) };
 
     const result: any = await handleRuntimeGetGatewayErrorLog(context as any, {
       detail: 'full',
@@ -453,34 +481,35 @@ describe('RuntimeGetGatewayErrorLog', () => {
 
     assert.equal(body.mode, 'list');
     assert.equal(body.count, 1);
+    assert.equal(body.errors[0].opid, 'ABC123');
   });
 
   it('terse, by default: a row per error, its opid and the kind its detail is read under', async () => {
-    const err = {
-      id: 'Backend Error/ABC123/20261122101010',
-      opid: 'ABC123',
-      kind: 'Backend Error',
-      type: 'Backend Error',
-      shortText: 'boom',
-      dateTime: '20261122101010',
-      username: 'SAPUSER01',
-      detailUri: '/sap/bc/adt/gw/errorlog/Backend%20Error/ABC123',
-    };
-    feeds = { gatewayErrors: mock.fn(async () => okResponse([err])) };
+    feeds = { gatewayErrors: async () => readThrough('gatewayErrors', FEED) };
 
     const result: any = await handleRuntimeGetGatewayErrorLog(
       context as any,
       {},
     );
 
-    assert.equal(
-      result.content[0].text,
-      [
-        '# count 1',
-        'opid\tdetail_kind\tdateTime\ttype\tshortText\tusername',
-        'ABC123\tBackend Error\t20261122101010\tBackend Error\tboom\tSAPUSER01',
-      ].join('\n'),
+    const lines = result.content[0].text.split('\n');
+    assert.deepStrictEqual(lines.slice(0, 2), [
+      '# count 1',
+      'opid\tdetail_kind\tdateTime\ttype\tshortText\tusername',
+    ]);
+    const [opid, kind, dateTime, , shortText, username] = lines[2].split('\t');
+    assert.deepStrictEqual(
+      [opid, kind, dateTime, shortText, username],
+      ['ABC123', 'Backend Error', '20261122101010', 'boom', 'SAPUSER01'],
     );
+  });
+
+  it('raw answers the list as the Atom document ADT sent', async () => {
+    feeds = { gatewayErrors: async () => readThrough('gatewayErrors', FEED) };
+    const result: any = await handleRuntimeGetGatewayErrorLog(context as any, {
+      detail: 'raw',
+    });
+    assert.equal(result.content[0].text, FEED);
   });
 
   it('reads the detail by opid under its kind', async () => {
@@ -488,16 +517,16 @@ describe('RuntimeGetGatewayErrorLog', () => {
     feeds = {
       gatewayErrorDetail: async (uri: string) => {
         asked.push(uri);
-        return okResponse({ header: {} });
+        return readThrough('gatewayErrorDetail', HTML);
       },
     };
 
-    const result: any = await handleRuntimeGetGatewayErrorLog(context as any, {
+    await handleRuntimeGetGatewayErrorLog(context as any, {
       opid: 'ABC123',
       detail_kind: 'Backend Error',
+      detail: 'raw',
     });
 
-    assert.equal(JSON.parse(result.content[0].text).mode, 'detail');
     assert.deepStrictEqual(asked, [
       '/sap/bc/adt/gw/errorlog/Backend%20Error/ABC123',
     ]);

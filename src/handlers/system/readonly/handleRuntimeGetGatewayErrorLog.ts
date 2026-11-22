@@ -1,11 +1,20 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
+  feedGatewayErrorDetail,
+  feedGatewayErrors,
   type IGatewayErrorEntry,
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
+import {
+  answered,
+  type DetailTable,
+  formatted,
+  rawLevel,
+  readingAt,
+  tsv,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   DETAIL_SHAPE,
@@ -19,7 +28,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeGetGatewayErrorLog',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] [runtime] Lists the SAP Gateway error log (/IWFND/ERROR_LOG), or reads one error's detail. The list answers each error's opid and detail_kind (what its detail is read by), dateTime, type, shortText and username: by default as TSV rows; with detail medium or full every field (id, kind, transactionId, package, applicationComponent, userId, client, requestKind, detailUri). With opid and detail_kind, the error's detail: header, serviceInfo, errorContext, sourceCode and callStack.",
+    "[read-only] [runtime] Lists the SAP Gateway error log (/IWFND/ERROR_LOG), or reads one error's detail. The list answers each error's opid and detail_kind (what its detail is read by), dateTime, type, shortText and username: by default as TSV rows; with detail medium or full every field (id, kind, transactionId, package, applicationComponent, userId, client, requestKind, detailUri). With opid and detail_kind, the error's detail under error: the list's fields of the error, then serviceInfo, errorContext, sourceCode and callStack. With detail raw the document as ADT sent it: the Atom feed for the list, the HTML for a detail.",
   inputSchema: z.object({
     opid: z
       .string()
@@ -65,7 +74,12 @@ export async function handleRuntimeGetGatewayErrorLog(
   args: RuntimeGetGatewayErrorLogArgs,
 ) {
   const { connection, logger } = context;
-  const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
+  // Each level's reading is passed to the call, selected before it.
+  const feeds = new AdtRuntimeClient(connection, logger).getFeeds({
+    ...ourFeeds,
+    gatewayErrors: readingAt(GATEWAY_ERROR_READINGS, levelOf(args)),
+    gatewayErrorDetail: readingAt(GATEWAY_DETAIL_READINGS, levelOf(args)),
+  });
   const errorUrl = args?.error_url;
 
   // `gatewayErrorDetail()`/`gatewayErrors()` both answer `IAdtResponse<T>`
@@ -81,8 +95,6 @@ export async function handleRuntimeGetGatewayErrorLog(
   // `IGatewayErrorEntry[]` and `IGatewayErrorDetail` are two different `T`s
   // for the same generic `answer<T>`, and `IGatewayErrorDetail` is not
   // exported by name from `@mcp-abap-adt/adt-clients` to write a union with.
-  const shown = answerAt(GATEWAY_ERROR_ANSWERS, levelOf(args));
-
   const detailUri =
     args?.opid !== undefined && args.detail_kind !== undefined
       ? `/sap/bc/adt/gw/errorlog/${encodeURIComponent(args.detail_kind)}/${encodeURIComponent(args.opid)}`
@@ -96,7 +108,7 @@ export async function handleRuntimeGetGatewayErrorLog(
     return answer(
       { tool: 'RuntimeGetGatewayErrorLog', detail: detailOf(args) },
       () => feeds.gatewayErrorDetail(detailUri, { analyse: analyseException }),
-      (error) => ({ success: true, mode: 'detail', error }),
+      answered,
     );
   }
 
@@ -110,7 +122,7 @@ export async function handleRuntimeGetGatewayErrorLog(
         from: args?.from,
         to: args?.to,
       }),
-    shown,
+    answered,
   );
 }
 
@@ -135,44 +147,57 @@ export function detailKindOf(entry: IGatewayErrorEntry): string {
   }
 }
 
+/** The list at terse: a TSV row per error. */
+function terseErrors(errors: readonly IGatewayErrorEntry[]): string {
+  return [
+    `# count ${errors.length}`,
+    tsv(
+      ['opid', 'detail_kind', 'dateTime', 'type', 'shortText', 'username'],
+      errors.map((error) => [
+        error.opid ?? '',
+        detailKindOf(error),
+        error.dateTime ?? '',
+        error.type ?? '',
+        error.shortText ?? '',
+        error.username ?? '',
+      ]),
+    ),
+  ].join('\n');
+}
+
 /**
- * What the list answers at each `detail`, selected before the call
- * (`src/lib/detail`), over adt-strategies' reading of the feed
- * (`feedGatewayErrors`): terse a TSV row per error — opid and detail_kind
- * (what its detail is read by), dateTime, type, shortText, username; medium
- * and full every field the reading read. The typed reading keeps no
- * document, so raw is full.
+ * What the list answers at each `detail`: the reading passed to the call
+ * (`src/lib/detail`) — terse, medium and full over adt-strategies' reading of
+ * the feed (`feedGatewayErrors`): terse a TSV row per error, opid and
+ * detail_kind (what its detail is read by), dateTime, type, shortText,
+ * username; medium and full every field the reading read; raw the Atom
+ * document as ADT sent it.
  */
-const GATEWAY_ERROR_ANSWERS: AnswerTable<
-  IGatewayErrorEntry[],
-  string | object
-> = {
-  terse: (errors) =>
-    [
-      `# count ${errors.length}`,
-      tsv(
-        ['opid', 'detail_kind', 'dateTime', 'type', 'shortText', 'username'],
-        errors.map((error) => [
-          error.opid ?? '',
-          detailKindOf(error),
-          error.dateTime ?? '',
-          error.type ?? '',
-          error.shortText ?? '',
-          error.username ?? '',
-        ]),
-      ),
-    ].join('\n'),
-  medium: (errors) => ({ count: errors.length, errors }),
-  full: (errors) => ({
+const GATEWAY_ERROR_READINGS: DetailTable<string | object> = {
+  terse: formatted(feedGatewayErrors, terseErrors),
+  medium: formatted(feedGatewayErrors, (errors) => ({
+    count: errors.length,
+    errors,
+  })),
+  full: formatted(feedGatewayErrors, (errors) => ({
     success: true,
     mode: 'list',
     count: errors.length,
     errors,
-  }),
-  raw: (errors) => ({
-    success: true,
-    mode: 'list',
-    count: errors.length,
-    errors,
-  }),
+  })),
+  raw: rawLevel,
 };
+
+/**
+ * What an error's detail answers at each `detail`: adt-strategies' reading of
+ * SAP's HTML (`feedGatewayErrorDetail`) — every field it read, at terse,
+ * medium and full — or, raw, the HTML as ADT sent it.
+ */
+const GATEWAY_DETAIL_READINGS: DetailTable<string | object> = (() => {
+  const read = formatted(feedGatewayErrorDetail, (error) => ({
+    success: true,
+    mode: 'detail',
+    error,
+  }));
+  return { terse: read, medium: read, full: read, raw: rawLevel };
+})();

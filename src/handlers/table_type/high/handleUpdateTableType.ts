@@ -36,7 +36,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import { tableTypeChanges } from '../../../lib/strategies/documentChanges';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -47,6 +47,7 @@ import { atStep } from '../../../lib/strategies/step';
 import {
   readStoredDefinition,
   type StoredDefinitionAnswer,
+  storedAt,
 } from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
@@ -62,7 +63,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateTableType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.",
+    "Changes the definition of the ABAP table type named by table_type_name: locks it, writes the given properties (description, row type, access type, primary key) into the document it holds, checks it, unlocks, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the version the stored definition was read at (stored_version), the definition itself with detail full: the active version, read after a successful activation; with activate false or a refused activation, the inactive version, read after the unlock. The write is checked under the lock, before that read: a refused check is answered alone. A definition whose read failed is answered with SAP's answer to that read.",
   inputSchema: z.object({
     table_type_name: z
       .string()
@@ -107,7 +108,11 @@ export async function handleUpdateTableType(
   return answer(
     // The definition SAP stored rides along a success and a failure after
     // the wait alike; a chain that ended before the wait has none.
-    { tool: 'UpdateTableType', detail, beside: () => stored },
+    {
+      tool: 'UpdateTableType',
+      detail,
+      beside: () => storedAt(levelOf(args), stored),
+    },
     async () => {
       const obj = createAdtClient(connection, logger).getTableType(
         resultsFor(tableTypeDocuments),

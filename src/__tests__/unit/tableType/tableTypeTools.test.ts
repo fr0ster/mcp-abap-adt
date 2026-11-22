@@ -736,10 +736,17 @@ describe('the definition SAP stored, read at a stated version', () => {
           `POST ${ACTIVATE_URL}`,
           `GET ${ACTIVE_URL}`,
         ]);
-        assertMatchObject(answerOf(result), {
-          stored_definition: STORED_HASHED_DEFINITION,
-          stored_version: 'active',
-        });
+        // The definition SAP stored at full; at the other levels the
+        // version it was read at alone (terse answers, step 5).
+        if (detail === 'full') {
+          assertMatchObject(answerOf(result), {
+            stored_definition: STORED_HASHED_DEFINITION,
+            stored_version: 'active',
+          });
+        } else {
+          assertMatchObject(answerOf(result), { stored_version: 'active' });
+          assert.equal('stored_definition' in Object(answerOf(result)), false);
+        }
       },
     );
   }
@@ -748,13 +755,16 @@ describe('the definition SAP stored, read at a stated version', () => {
     const connection = created({ data: STORED_HASHED });
     const result = await handleCreateTableType(
       { connection, logger: undefined },
-      { table_type_name: 'ZTT_X', package_name: 'ZP', activate: false },
+      {
+        table_type_name: 'ZTT_X',
+        package_name: 'ZP',
+        activate: false,
+      },
     );
     assert.equal(connection.requests.length, 8);
     assert.equal(connection.requests[6]?.url, WAIT_URL);
     assert.deepStrictEqual(answerOf(result), {
       result: 'SUCCESS',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -782,10 +792,17 @@ describe('the definition SAP stored, read at a stated version', () => {
           `POST ${ACTIVATE_URL}`,
           `GET ${ACTIVE_URL}`,
         ]);
-        assertMatchObject(answerOf(result), {
-          stored_definition: STORED_HASHED_DEFINITION,
-          stored_version: 'active',
-        });
+        // The definition SAP stored at full; at the other levels the
+        // version it was read at alone (terse answers, step 5).
+        if (detail === 'full') {
+          assertMatchObject(answerOf(result), {
+            stored_definition: STORED_HASHED_DEFINITION,
+            stored_version: 'active',
+          });
+        } else {
+          assertMatchObject(answerOf(result), { stored_version: 'active' });
+          assert.equal('stored_definition' in Object(answerOf(result)), false);
+        }
       },
     );
   }
@@ -800,7 +817,6 @@ describe('the definition SAP stored, read at a stated version', () => {
     assert.equal(connection.requests[5]?.url, WAIT_URL);
     assert.deepStrictEqual(answerOf(result), {
       result: 'SUCCESS',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -817,7 +833,6 @@ describe('the definition SAP stored, read at a stated version', () => {
       status: 403,
       raw_body: REFUSED.data,
       step: 'activate',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -843,7 +858,6 @@ describe('the definition SAP stored, read at a stated version', () => {
       status: 403,
       raw_body: REFUSED.data,
       step: 'check',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });
@@ -860,7 +874,6 @@ describe('the definition SAP stored, read at a stated version', () => {
       status: 403,
       raw_body: REFUSED.data,
       step: 'activate',
-      stored_definition: STORED_HASHED_DEFINITION,
       stored_version: 'inactive',
     });
   });

@@ -24,6 +24,7 @@ import {
   isCredentialFailure,
   thrownEntry,
 } from '../answer';
+import type { DetailLevel } from '../detail/levels';
 import type { ReadVersion } from '../handlers/readVersion';
 import {
   child,
@@ -158,4 +159,24 @@ export async function readStoredDefinition<T>(
     };
   }
   return { stored_version: version, stored_definition: stored };
+}
+
+/**
+ * What a table-type write answers of the stored definition at each `detail`
+ * (terse answers, step 5): at full the definition SAP stored; at the other
+ * levels the version it was read at alone — the definition is a read of its
+ * own (`GetTableType`). A read that failed is answered at every level: the
+ * caller must know the definition was not read.
+ */
+export function storedAt(
+  level: DetailLevel,
+  stored: StoredDefinitionAnswer | undefined,
+):
+  | StoredDefinitionAnswer
+  | { readonly stored_version: ReadVersion }
+  | undefined {
+  if (stored === undefined || level === 'full') return stored;
+  return 'stored_definition' in stored
+    ? { stored_version: stored.stored_version }
+    : stored;
 }

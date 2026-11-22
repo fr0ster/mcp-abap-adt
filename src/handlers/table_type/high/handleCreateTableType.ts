@@ -38,7 +38,7 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import { tableTypeChanges } from '../../../lib/strategies/documentChanges';
 import { patchedDocument } from '../../../lib/strategies/documentPatch';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
@@ -49,6 +49,7 @@ import { atStep } from '../../../lib/strategies/step';
 import {
   readStoredDefinition,
   type StoredDefinitionAnswer,
+  storedAt,
 } from '../../../lib/strategies/tableTypeStored';
 import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
@@ -145,7 +146,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateTableType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the definition SAP stored, with the version it was read at (stored_version): the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.",
+    "Creates the ABAP table type named by table_type_name in package_name, writes the given definition properties (row type, access type, primary key) into the document SAP created, checks it, and activates it when activate is true (the default). Every property left out keeps SAP's value. Returns SAP's answer to each step and the version the stored definition was read at (stored_version), the definition itself with detail full: the active version, read after a successful activation; with activate false, a refused check or a refused activation, the inactive version, read after the write. A definition whose read failed is answered with SAP's answer to that read.",
   inputSchema: createArguments('CreateTableType', {
     table_type_name: z.string().describe('Table type name.'),
     package_name: z.string().describe('Package the table type is created in.'),
@@ -199,7 +200,11 @@ export async function handleCreateTableType(
   return answer(
     // The definition SAP stored rides along a success and a failure after
     // the wait alike; a chain that ended before the wait has none.
-    { tool: 'CreateTableType', detail, beside: () => stored },
+    {
+      tool: 'CreateTableType',
+      detail,
+      beside: () => storedAt(levelOf(args), stored),
+    },
     async () => {
       const obj = createAdtClient(connection, logger).getTableType(
         resultsFor(tableTypeDocuments),

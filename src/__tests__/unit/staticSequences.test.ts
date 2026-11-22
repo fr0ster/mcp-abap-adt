@@ -218,6 +218,7 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     fakeClient = fakeFunctionGroupClient();
     const result: any = await handleListFunctionModules(context as any, {
       function_group_name: 'ZFG',
+      detail: 'full',
     });
     assert.deepStrictEqual(
       JSON.parse(result.content[0].text).function_modules,
@@ -225,14 +226,37 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     );
   });
 
+  it('ListFunctionModules terse, by default: the group and total, then one name per row', async () => {
+    fakeClient = fakeFunctionGroupClient();
+    const result: any = await handleListFunctionModules(context as any, {
+      function_group_name: 'ZFG',
+    });
+    assert.equal(
+      result.content[0].text,
+      '# function_group ZFG\n# total 1\nname\tdescription\nZ_FM_ONLY\t',
+    );
+  });
+
   it('ListFunctionGroupIncludes reads the FUGR/I child, not FUGR/FF', async () => {
     fakeClient = fakeFunctionGroupClient();
     const result: any = await handleListFunctionGroupIncludes(context as any, {
       function_group_name: 'ZFG',
+      detail: 'full',
     });
     assert.deepStrictEqual(JSON.parse(result.content[0].text).includes, [
       'LFGTOP',
     ]);
+  });
+
+  it('ListFunctionGroupIncludes terse, by default: one name per row', async () => {
+    fakeClient = fakeFunctionGroupClient();
+    const result: any = await handleListFunctionGroupIncludes(context as any, {
+      function_group_name: 'ZFG',
+    });
+    assert.equal(
+      result.content[0].text,
+      '# function_group ZFG\n# total 1\nname\tdescription\nLFGTOP\t',
+    );
   });
 
   for (const [_n, handler] of [

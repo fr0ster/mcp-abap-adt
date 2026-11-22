@@ -27,8 +27,17 @@ import * as z from 'zod';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { answerAt } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
+import {
+  fetchFunctionGroupChildren,
+  functionGroupListAnswers,
+} from '../../../lib/strategies/functionGroupChildren';
 import { nodeStructureOn } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
@@ -42,6 +51,7 @@ export const TOOL_DEFINITION = {
     '[read-only] List the function modules of an ABAP function group, read at its active version.',
   inputSchema: z.object({
     function_group_name: z.string().describe('Function group name.'),
+    ...DETAIL_SHAPE,
   }),
 } as const;
 
@@ -60,7 +70,7 @@ export async function handleListFunctionModules(
   const utils = client.getUtils(ourUtils);
 
   return answer(
-    { tool: 'ListFunctionModules', detail: 'terse' },
+    { tool: 'ListFunctionModules', detail: detailOf(args) },
     () =>
       sequence(
         atStep('read metadata', () =>
@@ -79,11 +89,9 @@ export async function handleListFunctionModules(
           ),
         ),
       ),
-    (objects) => ({
-      success: true,
-      function_group_name: functionGroupName,
-      total: objects.length,
-      function_modules: objects.map((o) => o.name),
-    }),
+    answerAt(
+      functionGroupListAnswers(functionGroupName, 'function_modules'),
+      levelOf(args),
+    ),
   );
 }

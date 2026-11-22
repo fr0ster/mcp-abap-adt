@@ -3,7 +3,9 @@ import type {
   IAdtError,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+
 import type { AdtCodes } from '../adtProjections';
+import { type AnswerTable, tsv } from '../detail';
 import type { NodeLevel } from './packageWalk';
 import { succeeded } from './stepResponse';
 
@@ -69,4 +71,42 @@ export async function fetchFunctionGroupChildren(
   }
 
   return okObjects(level.getResult().value.objects);
+}
+
+/**
+ * What a function group's list (its modules, or its includes) answers at
+ * each `detail`, selected before the reads (`src/lib/detail`): terse the
+ * group and the total, then a `name\tdescription` row per child; medium
+ * every field the node structure read but the uri; full the answer before
+ * `detail` under `listKey`. The answer is built from two requests, so raw is
+ * the full answer.
+ */
+export function functionGroupListAnswers(
+  functionGroupName: string,
+  listKey: 'function_modules' | 'includes',
+): AnswerTable<NodeLevel['objects'], string | object> {
+  const full = (objects: NodeLevel['objects']) => ({
+    success: true,
+    function_group_name: functionGroupName,
+    total: objects.length,
+    [listKey]: objects.map((o) => o.name),
+  });
+  return {
+    terse: (objects) =>
+      [
+        `# function_group ${functionGroupName}`,
+        `# total ${objects.length}`,
+        tsv(
+          ['name', 'description'],
+          objects.map((o) => [o.name, o.description ?? '']),
+        ),
+      ].join('\n'),
+    medium: (objects) => ({
+      function_group_name: functionGroupName,
+      total: objects.length,
+      [listKey]: objects.map(({ uri: _uri, ...fields }) => fields),
+    }),
+    full,
+    raw: full,
+  };
 }

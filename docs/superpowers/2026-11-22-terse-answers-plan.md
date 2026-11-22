@@ -125,7 +125,14 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
 
 - A typed reading of the transport request/task document: `object_type`, both headers,
   `tm:parent`, object counts per task (found in #376).
-- `utilNodeContents` keeps node descriptions, so the server's own `nodeLevel` can go.
+- `utilNodeContents` keeps node descriptions, so the server's own `nodeLevel` can go. Sites
+  whose step-3 terse reads `nodeLevel` (switch after adt-strategies 0.28.0): GetPackageContents,
+  GetPackageTree, SearchSource's walk, GetObjectsList, ListFunctionModules,
+  ListFunctionGroupIncludes. `nodeLevel` also reads the level SAP could not load (`notLoaded`),
+  which the shipped reading must keep.
+- The step 3–5 terse shapes of GetWhereUsed, SearchObject, GetAdtTypes, CreateTransport,
+  CreateTransportTask, ReadTransportObjects and GetInactiveObjects read the server's parse (the
+  list below); each switches to its shipped reading once 0.28.0 is published.
 
 Readings the server does not use yet, because each answers less than the tool does (step 2).
 Each site keeps the server's parse until adt-strategies fixes the reading; then the site switches:

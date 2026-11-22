@@ -119,6 +119,8 @@ describe('UpdateDomainLow', () => {
     });
 
     assert.equal(result.isError, false);
+    // A write with nothing to report answers SUCCESS, as every low update.
+    assert.equal(result.content[0].text, 'SUCCESS');
 
     // The request the member actually builds from this: options carries the
     // whole patched document beside the lock handle and the strategy; config

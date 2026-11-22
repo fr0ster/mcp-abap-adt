@@ -189,13 +189,10 @@ export async function handleUpdateDomain(
 
       logger?.info(`✅ UpdateDomain completed: ${domainName}`);
 
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          domain_name: domainName,
-          message: `Domain ${domainName} updated successfully. Remember to unlock using UnlockObject.`,
-        }),
-      });
+      // A write with nothing to report answers SUCCESS, as every other
+      // low update does (`terseWrite`): the name and the prose echoed
+      // nothing the caller did not send.
+      return return_response({ data: 'SUCCESS' });
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is

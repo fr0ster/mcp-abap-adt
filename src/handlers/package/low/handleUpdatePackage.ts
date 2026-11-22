@@ -164,17 +164,10 @@ export async function handleUpdatePackage(
 
       logger?.info(`✅ UpdatePackage completed: ${packageName}`);
 
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          package_name: packageName,
-          ...(super_package && {
-            super_package: super_package.toUpperCase(),
-          }),
-          updated_description,
-          message: `Package ${packageName} updated successfully. Remember to unlock using UnlockObject.`,
-        }),
-      });
+      // A write with nothing to report answers SUCCESS, as every other
+      // low update does (`terseWrite`): the name and the prose echoed
+      // nothing the caller did not send.
+      return return_response({ data: 'SUCCESS' });
     } catch (error) {
       // `sequence()`'s two calls each carry their own `analyse` and never
       // throw for a refusal — `written.ok`/`written.getError()` above is

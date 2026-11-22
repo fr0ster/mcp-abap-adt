@@ -27,6 +27,8 @@ import {
   NO_ABAPGIT_RESTRICTIONS,
   rawAbapGitRefusal,
 } from '../../../lib/abapGit/admission';
+import type { ApprovedEndpoint } from '../../../lib/abapGit/approvedEndpoints';
+import { parseApprovedEndpoints } from '../../../lib/abapGit/approvedEndpoints';
 import { serverRefusalOf } from '../../../lib/auth/serverRefusal';
 import {
   BACKGROUND_TOOLS,
@@ -45,9 +47,13 @@ import {
 import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import { noConnectionContext } from '../../../lib/handlers/registry/expositionRegistry';
 import {
+  ALL_CANARIES,
+  CANARIES,
   noObjects,
+  objectResults,
   pathOf,
   REPO_KEY,
+  REPO_URL,
   reposDocument,
 } from '../../helpers/abapGitSap';
 import {
@@ -193,6 +199,7 @@ class CompactRuns extends BaseHandlerGroup {
 async function stdio(
   sap: AdtStandIn,
   backgroundRuns: InMemoryBackgroundRuns | undefined,
+  abapGitEndpoints?: readonly ApprovedEndpoint[],
 ) {
   const context = noConnectionContext();
   const server = new StdioServer(
@@ -210,6 +217,7 @@ async function stdio(
     {
       systemType: 'onprem',
       ...(backgroundRuns !== undefined ? { backgroundRuns } : {}),
+      ...(abapGitEndpoints !== undefined ? { abapGitEndpoints } : {}),
     },
   );
   const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
@@ -313,6 +321,57 @@ describe('background on the abapGit writes: a real dispatch', () => {
       assert.equal(sap.requests.filter(isR1).length, 1, 'no second R1');
     } finally {
       held.release();
+      await s.close();
+    }
+  });
+
+  it('a background pull with a bound credential: R1 carries no git header; the record and the stored answer hold no canary', async () => {
+    const runs = new RecordingRuns();
+    // SAP echoes the canaries in the pull's object results (msgText).
+    sap.body(isPull, objectResults);
+    const s = await stdio(
+      sap,
+      runs,
+      parseApprovedEndpoints(
+        [{ url: REPO_URL, user: CANARIES.user, token: CANARIES.token }],
+        'the test',
+      ),
+    );
+    try {
+      const started = await s.call('PullAbapGitRepo', {
+        repository_key: REPO_KEY,
+        background: true,
+      });
+      assert.equal(started.isError, false, started.text);
+      const handle = handleOf(started.text);
+      let answer = await s.call('GetBackgroundRun', { run_handle: handle });
+      for (let i = 0; i < 200 && answer.all.includes('"running"'); i += 1) {
+        await new Promise((resolve) => setImmediate(resolve));
+        answer = await s.call('GetBackgroundRun', { run_handle: handle });
+      }
+      assert.ok(answer.all.includes('"result":"done"'), answer.all);
+      const r1 = sap.requests.filter(isR1);
+      assert.equal(r1.length, 1);
+      for (const request of r1) {
+        assert.deepEqual(
+          Object.keys(request.headers).filter((name) =>
+            name.startsWith('x-abapgit-'),
+          ),
+          [],
+        );
+      }
+      // The credential did reach the pull (in its body): its absence
+      // elsewhere is the server's dropping it.
+      const pull = sap.requests.find(isPull);
+      assert.equal(pull?.body.includes(CANARIES.user), true);
+      for (const request of r1) {
+        assert.equal(JSON.stringify(request).includes(CANARIES.user), false);
+      }
+      const kept = JSON.stringify(runs.records) + answer.all + started.all;
+      for (const canary of ALL_CANARIES) {
+        assert.equal(kept.includes(canary), false, canary);
+      }
+    } finally {
       await s.close();
     }
   });

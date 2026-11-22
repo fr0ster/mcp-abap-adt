@@ -834,7 +834,10 @@ describe('ListTransports, mapped from a real captured transport list', () => {
     ]) {
       fakeClient = listing();
 
-      const result: any = await handleListTransports(context as any, args);
+      const result: any = await handleListTransports(context as any, {
+        ...args,
+        detail: 'medium',
+      });
 
       assert.equal(result.isError, false);
       const payload = JSON.parse(result.content[0].text);

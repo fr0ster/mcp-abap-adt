@@ -20,6 +20,7 @@ import {
   fullLevel,
   rawLevel,
   readingAt,
+  tsv,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -150,20 +151,43 @@ interface ListedAnswer {
   transports: TransportEntry[];
 }
 
-/** What `ListTransports` answers: the terse listing, the parse, or the document. */
+/** What `ListTransports` answers: the terse rows, the medium listing, the parse, or the document. */
 type ListAnswer = ListedAnswer | XmlNode | string;
 
 /**
  * What `ListTransports` answers at each `detail`: the reading the listing is
- * read with, selected before the call (`src/lib/detail`).
+ * read with, selected before the call (`src/lib/detail`): terse a TSV row per
+ * request (number, type, status, owner, target, description); medium the
+ * requests as JSON; full the parse; raw the document.
  */
 function listReadings(
   logger: HandlerContext['logger'],
 ): DetailTable<ListAnswer> {
+  const listed = (tree: ITransportTree) => {
+    const transports = listedTransports(tree);
+    logger?.info(`ListTransports: found ${transports.length} transport(s)`);
+    return transports;
+  };
   return {
     terse: formatted(listingOf, (tree) => {
-      const transports = listedTransports(tree);
-      logger?.info(`ListTransports: found ${transports.length} transport(s)`);
+      const transports = listed(tree);
+      return [
+        `# count ${transports.length}`,
+        tsv(
+          ['number', 'type', 'status', 'owner', 'target', 'description'],
+          transports.map((t) => [
+            t.number,
+            t.type ?? '',
+            t.status ?? '',
+            t.owner ?? '',
+            t.target ?? '',
+            t.description ?? '',
+          ]),
+        ),
+      ].join('\n');
+    }),
+    medium: formatted(listingOf, (tree) => {
+      const transports = listed(tree);
       const listedAnswer: ListedAnswer = {
         success: true,
         count: transports.length,
@@ -171,7 +195,6 @@ function listReadings(
       };
       return listedAnswer;
     }),
-    medium: fullLevel,
     full: fullLevel,
     raw: rawLevel,
   };

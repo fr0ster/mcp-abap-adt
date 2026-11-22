@@ -1,21 +1,43 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IGatewayErrorEntry,
+} from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetGatewayErrorLog',
-  available_in: ['onprem'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] [runtime] List SAP Gateway error log (/IWFND/ERROR_LOG) or get error detail. Returns structured entries with type, shortText, transactionId, dateTime, username. With error_url returns full detail including serviceInfo, errorContext, sourceCode, callStack.',
+    "[read-only] [runtime] Lists the SAP Gateway error log (/IWFND/ERROR_LOG), or reads one error's detail. The list answers each error's opid and detail_kind (what its detail is read by), dateTime, type, shortText and username: by default as TSV rows; with detail medium or full every field (id, kind, transactionId, package, applicationComponent, userId, client, requestKind, detailUri). With opid and detail_kind, the error's detail: header, serviceInfo, errorContext, sourceCode and callStack.",
   inputSchema: z.object({
+    opid: z
+      .string()
+      .optional()
+      .describe(
+        "An error's opid, from the list: with detail_kind, answers that error's detail instead of the list.",
+      ),
+    detail_kind: z
+      .string()
+      .optional()
+      .describe(
+        "The error's detail_kind, from the list: the kind its detail is read under. Required with opid.",
+      ),
     error_url: z
       .string()
       .optional()
       .describe(
-        'Feed URL of a specific error entry (from a previous list response link field). When provided, returns detailed error info instead of listing.',
+        "An error's detailUri, from the list at detail medium or full: answers that error's detail instead of the list.",
       ),
     user: z.string().optional().describe('Filter errors by SAP username.'),
     max_results: z
@@ -30,6 +52,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe('End of time range in YYYYMMDDHHMMSS format.'),
+    ...DETAIL_SHAPE,
   }),
 } as const;
 
@@ -58,12 +81,22 @@ export async function handleRuntimeGetGatewayErrorLog(
   // `IGatewayErrorEntry[]` and `IGatewayErrorDetail` are two different `T`s
   // for the same generic `answer<T>`, and `IGatewayErrorDetail` is not
   // exported by name from `@mcp-abap-adt/adt-clients` to write a union with.
-  const ctx = { tool: 'RuntimeGetGatewayErrorLog', detail: 'terse' as const };
+  const ctx = { tool: 'RuntimeGetGatewayErrorLog', detail: detailOf(args) };
+  const shown = answerAt(GATEWAY_ERROR_ANSWERS, levelOf(args));
 
-  if (errorUrl) {
+  const detailUri =
+    args?.opid !== undefined && args.detail_kind !== undefined
+      ? `/sap/bc/adt/gw/errorlog/${encodeURIComponent(args.detail_kind)}/${encodeURIComponent(args.opid)}`
+      : errorUrl;
+  if (args?.opid !== undefined && args.detail_kind === undefined) {
+    return return_error(
+      new Error('detail_kind is required with opid: the list answers both'),
+    );
+  }
+  if (detailUri !== undefined) {
     return answer(
       ctx,
-      () => feeds.gatewayErrorDetail(errorUrl, { analyse: analyseException }),
+      () => feeds.gatewayErrorDetail(detailUri, { analyse: analyseException }),
       (error) => ({ success: true, mode: 'detail', error }),
     );
   }
@@ -78,6 +111,69 @@ export async function handleRuntimeGetGatewayErrorLog(
         from: args?.from,
         to: args?.to,
       }),
-    (errors) => ({ success: true, mode: 'list', count: errors.length, errors }),
+    shown,
   );
 }
+
+/**
+ * The kind an error's detail is read under: the segment of its `detailUri`
+ * after `/errorlog/` (adt-strategies builds it from the entry's own id: on
+ * premise the id's kind, on the cloud the Type cell).
+ */
+function detailKindOf(entry: IGatewayErrorEntry): string {
+  const uri = entry.detailUri;
+  if (uri === undefined) return '';
+  const marker = '/errorlog/';
+  const at = uri.indexOf(marker);
+  if (at < 0) return '';
+  const rest = uri.slice(at + marker.length);
+  const end = rest.indexOf('/');
+  const segment = end < 0 ? rest : rest.slice(0, end);
+  try {
+    return decodeURIComponent(segment);
+  } catch {
+    return segment;
+  }
+}
+
+/**
+ * What the list answers at each `detail`, selected before the call
+ * (`src/lib/detail`), over adt-strategies' reading of the feed
+ * (`feedGatewayErrors`): terse a TSV row per error — opid and detail_kind
+ * (what its detail is read by), dateTime, type, shortText, username; medium
+ * and full every field the reading read. The typed reading keeps no
+ * document, so raw is full.
+ */
+const GATEWAY_ERROR_ANSWERS: AnswerTable<
+  IGatewayErrorEntry[],
+  string | object
+> = {
+  terse: (errors) =>
+    [
+      `# count ${errors.length}`,
+      tsv(
+        ['opid', 'detail_kind', 'dateTime', 'type', 'shortText', 'username'],
+        errors.map((error) => [
+          error.opid ?? '',
+          detailKindOf(error),
+          error.dateTime ?? '',
+          error.type ?? '',
+          error.shortText ?? '',
+          error.username ?? '',
+        ]),
+      ),
+    ].join('\n'),
+  medium: (errors) => ({ count: errors.length, errors }),
+  full: (errors) => ({
+    success: true,
+    mode: 'list',
+    count: errors.length,
+    errors,
+  }),
+  raw: (errors) => ({
+    success: true,
+    mode: 'list',
+    count: errors.length,
+    errors,
+  }),
+};

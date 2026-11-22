@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] [runtime] List SM02 system messages. Returns structured entries with id, title, text, severity, validity period, and author.',
+    '[read-only] [runtime] List SM02 system messages. Returns each message as SAP writes it: id, messageId, title, text, createdOn, updated, createdBy and author.',
   inputSchema: z.object({
     user: z.string().optional().describe('Filter by author username.'),
     max_results: z

@@ -439,14 +439,61 @@ describe('RuntimeGetGatewayErrorLog', () => {
     const err = { type: 'E', shortText: 'x' };
     feeds = { gatewayErrors: mock.fn(async () => okResponse([err])) };
 
-    const result: any = await handleRuntimeGetGatewayErrorLog(
-      context as any,
-      {},
-    );
+    const result: any = await handleRuntimeGetGatewayErrorLog(context as any, {
+      detail: 'full',
+    });
     const body = JSON.parse(result.content[0].text);
 
     assert.equal(body.mode, 'list');
     assert.equal(body.count, 1);
+  });
+
+  it('terse, by default: a row per error, its opid and the kind its detail is read under', async () => {
+    const err = {
+      id: 'Backend Error/ABC123/20261122101010',
+      opid: 'ABC123',
+      kind: 'Backend Error',
+      type: 'Backend Error',
+      shortText: 'boom',
+      dateTime: '20261122101010',
+      username: 'SAPUSER01',
+      detailUri: '/sap/bc/adt/gw/errorlog/Backend%20Error/ABC123',
+    };
+    feeds = { gatewayErrors: mock.fn(async () => okResponse([err])) };
+
+    const result: any = await handleRuntimeGetGatewayErrorLog(
+      context as any,
+      {},
+    );
+
+    assert.equal(
+      result.content[0].text,
+      [
+        '# count 1',
+        'opid\tdetail_kind\tdateTime\ttype\tshortText\tusername',
+        'ABC123\tBackend Error\t20261122101010\tBackend Error\tboom\tSAPUSER01',
+      ].join('\n'),
+    );
+  });
+
+  it('reads the detail by opid under its kind', async () => {
+    const asked: string[] = [];
+    feeds = {
+      gatewayErrorDetail: async (uri: string) => {
+        asked.push(uri);
+        return okResponse({ header: {} });
+      },
+    };
+
+    const result: any = await handleRuntimeGetGatewayErrorLog(context as any, {
+      opid: 'ABC123',
+      detail_kind: 'Backend Error',
+    });
+
+    assert.equal(JSON.parse(result.content[0].text).mode, 'detail');
+    assert.deepStrictEqual(asked, [
+      '/sap/bc/adt/gw/errorlog/Backend%20Error/ABC123',
+    ]);
   });
 });
 

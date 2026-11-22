@@ -34,10 +34,7 @@
  */
 
 import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients/abapgit';
-import {
-  abapGitRepos,
-  type IAbapGitRepoFacts,
-} from '@mcp-abap-adt/adt-strategies';
+import type { IAbapGitRepoFacts } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapGitCredentials } from '@mcp-abap-adt/interfaces-adt';
 import type {
   IAbapConnection,
@@ -45,6 +42,7 @@ import type {
   IAdtWireResponse,
 } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { XMLParser } from 'fast-xml-parser';
 import type {
   AccessCall,
   IAccessChecks,
@@ -52,6 +50,9 @@ import type {
 } from '../access/accessChecks';
 import { accessRefusalWords, ServerRefusal } from '../auth/serverRefusal';
 import type { ToolArgs } from '../handlers/interfaces';
+import { wireValueOf } from '../wireValue';
+import { parseXml } from '../xml/node';
+import { attr, child, elements, text } from '../xml/tree';
 import { argumentUrlFault, matchEndpoint } from './approvedEndpoints';
 import type { CallEndpoints } from './endpointSources';
 
@@ -411,22 +412,45 @@ async function repositoryOf(
   ) {
     return undefined;
   }
-  // The entry's every log_link, read from the same answer: R1 carries no
-  // credential (spec §5.3), and the facts keep one log key alone.
-  const answer = observed.answer;
-  let logLinks: readonly string[] = [];
+  // The entry's every log_link element, read from the same answer as it
+  // came (R1 carries no credential, spec §5.3): the facts keep one log key
+  // alone, and a reader drops a link with an empty href.
+  return { entry, logLinks: logLinksOf(observed.answer, key) };
+}
+
+const r1Parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '',
+  removeNSPrefix: true,
+  parseTagValue: false,
+  parseAttributeValue: false,
+  trimValues: true,
+  isArray: (name) => name === 'repository' || name === 'link',
+});
+
+/**
+ * The `href` of every `log_link` element of the R1 entry for `key`, empty
+ * ones included, in document order; none when the answer cannot be read.
+ */
+function logLinksOf(
+  answer: IAdtWireResponse | undefined,
+  key: string,
+): readonly string[] {
+  if (answer === undefined) return [];
+  const body = wireValueOf(answer.data);
+  if (body.kind !== 'text') return [];
+  let parsed: ReturnType<typeof parseXml>;
   try {
-    logLinks =
-      answer === undefined
-        ? []
-        : (abapGitRepos(answer)
-            .find((each) => each.repositoryId === key)
-            ?.links?.filter((each) => each.type === 'log_link')
-            .map((each) => each.href) ?? []);
+    parsed = parseXml(r1Parser, body.text);
   } catch {
-    logLinks = [];
+    return [];
   }
-  return { entry, logLinks };
+  const entry = elements(
+    child(child(parsed, 'repositories'), 'repository'),
+  ).find((repository) => text(child(repository, 'key')) === key);
+  return elements(child(entry, 'link'))
+    .filter((link) => attr(link, 'type') === 'log_link')
+    .map((link) => attr(link, 'href') ?? '');
 }
 
 /** The repositories' path every repository link starts with. */
@@ -434,27 +458,50 @@ const REPOS_PATH = '/sap/bc/adt/abapgit/repos/';
 
 /**
  * The repository and the log key of `/sap/bc/adt/abapgit/repos/<key>/log/<id>`,
- * each decoded, from one link; `undefined` for any other shape. Plain
- * string code.
+ * from one link: parsed (against a dummy base), its pathname alone read; a
+ * link with a query or a fragment, or of any other shape, is `undefined`.
+ * Each segment must be non-empty and of the key characters only
+ * (`isKey`), so nothing encoded, no dot segment and no delimiter can pass.
  */
 function logLinkParts(
   logLink: string | undefined,
 ): { readonly repository: string; readonly logKey: string } | undefined {
-  if (logLink === undefined || !logLink.startsWith(REPOS_PATH))
-    return undefined;
-  const segments = logLink.slice(REPOS_PATH.length).split('/');
-  if (segments.length !== 3 || segments[1] !== 'log') return undefined;
-  const repository = segments[0] ?? '';
-  const logKey = segments[2] ?? '';
-  if (repository === '' || logKey === '') return undefined;
+  if (logLink === undefined) return undefined;
+  if (logLink.includes('?') || logLink.includes('#')) return undefined;
+  let parsed: URL;
   try {
-    return {
-      repository: decodeURIComponent(repository),
-      logKey: decodeURIComponent(logKey),
-    };
+    parsed = new URL(logLink, 'http://r1.invalid');
   } catch {
     return undefined;
   }
+  if (parsed.search !== '' || parsed.hash !== '') return undefined;
+  const pathname = parsed.pathname;
+  if (!pathname.startsWith(REPOS_PATH)) return undefined;
+  const segments = pathname.slice(REPOS_PATH.length).split('/');
+  if (segments.length !== 3 || segments[1] !== 'log') return undefined;
+  const repository = segments[0] ?? '';
+  const logKey = segments[2] ?? '';
+  if (!isKey(repository) || !isKey(logKey)) return undefined;
+  return { repository, logKey };
+}
+
+/**
+ * The characters a repository key and an application-log key are taken
+ * from: ASCII letters, digits and `_`. Not read from a recorded R1 (none was
+ * at hand; Inference, to be confirmed by the live run): a key outside it is
+ * refused, never guessed at.
+ */
+function isKey(segment: string): boolean {
+  if (segment === '') return false;
+  for (let i = 0; i < segment.length; i += 1) {
+    const code = segment.charCodeAt(i);
+    const letterOrDigit =
+      (code >= 48 && code <= 57) ||
+      (code >= 65 && code <= 90) ||
+      (code >= 97 && code <= 122);
+    if (!letterOrDigit && code !== 95) return false;
+  }
+  return true;
 }
 
 /** A connection's session type, as its contract declares it. */

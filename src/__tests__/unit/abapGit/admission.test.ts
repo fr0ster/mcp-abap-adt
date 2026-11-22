@@ -47,6 +47,10 @@ function r1(
     logRepository?: string;
     /** A second log_link after the first, as `<repository>/<log key>`. */
     secondLog?: string;
+    /** The first log_link's href as written, replacing the one built from `logKey`. */
+    logHref?: string;
+    /** A second log_link's href as written (empty included). */
+    secondHref?: string;
   } = {},
 ): string {
   return (
@@ -60,9 +64,14 @@ function r1(
     (options.statusKey === undefined
       ? ''
       : `<atom:link href="/sap/bc/adt/abapgit/repos/${KEY}/status/${options.statusKey}" rel="${REL}/status" type="status_link"/>`) +
-    (options.logKey === undefined
+    (options.logHref !== undefined
+      ? `<atom:link href="${options.logHref}" rel="${REL}/log" type="log_link"/>`
+      : options.logKey === undefined
+        ? ''
+        : `<atom:link href="/sap/bc/adt/abapgit/repos/${options.logRepository ?? KEY}/log/${options.logKey}" rel="${REL}/log" type="log_link"/>`) +
+    (options.secondHref === undefined
       ? ''
-      : `<atom:link href="/sap/bc/adt/abapgit/repos/${options.logRepository ?? KEY}/log/${options.logKey}" rel="${REL}/log" type="log_link"/>`) +
+      : `<atom:link href="${options.secondHref}" rel="${REL}/log" type="log_link"/>`) +
     (options.secondLog === undefined
       ? ''
       : `<atom:link href="/sap/bc/adt/abapgit/repos/${options.secondLog.split('/')[0]}/log/${options.secondLog.split('/')[1]}" rel="${REL}/log" type="log_link"/>`) +
@@ -410,6 +419,44 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
         label,
       );
     }
+  });
+
+  it('a log_link with a query, a fragment or a dot key is never paired', async () => {
+    for (const [href, asked] of [
+      [`/sap/bc/adt/abapgit/repos/${KEY}/log/LOG1?x`, 'LOG1'],
+      [`/sap/bc/adt/abapgit/repos/${KEY}/log/LOG1#x`, 'LOG1'],
+      [`/sap/bc/adt/abapgit/repos/${KEY}/log/%2e%2e`, '..'],
+      [`/sap/bc/adt/abapgit/repos/${KEY}/log/LOG%2F1`, 'LOG/1'],
+      [`/sap/bc/adt/abapgit/repos/${KEY}/log/LOG%31`, 'LOG%31'],
+      [`/sap/bc/adt/abapgit/repos/${KEY}/log/`, ''],
+    ] as const) {
+      const sap = sapWith(r1({ logHref: href }));
+      assert.equal(
+        codeOf(
+          await admit(
+            'GetAbapGitErrorLog',
+            { repository_key: KEY, app_log_key: asked },
+            contextOf(sap.connection).context,
+          ),
+        ),
+        'abapgit_run_log_not_paired',
+        href,
+      );
+    }
+  });
+
+  it('a second log_link with an empty href is ambiguous too', async () => {
+    const sap = sapWith(r1({ logKey: 'LOG1', secondHref: '' }));
+    assert.equal(
+      codeOf(
+        await admit(
+          'GetAbapGitErrorLog',
+          { repository_key: KEY, app_log_key: 'LOG1' },
+          contextOf(sap.connection).context,
+        ),
+      ),
+      'abapgit_run_log_ambiguous',
+    );
   });
 
   it('an entry with two log_links is ambiguous and refused, whichever pairs', async () => {

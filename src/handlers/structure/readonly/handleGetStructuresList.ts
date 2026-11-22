@@ -18,6 +18,13 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  type AnswerTable,
+  answerAt,
+  type DetailLevel,
+  indentedTsv,
+  type TreeRow,
+} from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -39,6 +46,7 @@ import {
   linesOf,
   wordAt,
 } from '../../../lib/plainText';
+import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
@@ -71,6 +79,7 @@ const FIELDS = {
     .describe(
       '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
     ),
+  ...DETAIL_SHAPE,
 };
 
 /**
@@ -254,6 +263,71 @@ function extractSource(result: IAdtResponse<string, IAdtError>): string | null {
   return result.ok ? result.getResult().value : null;
 }
 
+/** One structure's tree as read, and what of its appends could not be read. */
+interface StructuresRead {
+  structure_name: string;
+  appends_unavailable: boolean;
+  append_candidates_unread: ReadonlyArray<{
+    candidate: string;
+    step: 'read append candidate';
+    failures: FailureEntry[];
+  }>;
+  tree: StructureNode;
+}
+
+/** What a level answers of one structure's tree. */
+type StructuresShown = (read: StructuresRead) => string;
+
+/** The tree as indented rows: structure, kind, the component it is under. */
+function structureRows(node: StructureNode, depth = 0): TreeRow[] {
+  const marks = [
+    ...(node.cyclic === true ? ['cyclic'] : []),
+    ...(node.error !== undefined ? ['not read'] : []),
+  ];
+  return [
+    {
+      depth,
+      cells: [node.structure, node.kind, node.attribute ?? '', ...marks],
+    },
+    ...node.children.flatMap((child) => structureRows(child, depth + 1)),
+  ];
+}
+
+/** The answer before `detail` (full). */
+function fullStructures(read: StructuresRead): string {
+  return JSON.stringify({
+    success: true,
+    structure_name: read.structure_name,
+    ...(read.appends_unavailable ? { appends_unavailable: true } : {}),
+    ...(read.append_candidates_unread.length > 0
+      ? { append_candidates_unread: read.append_candidates_unread }
+      : {}),
+    tree: read.tree,
+  });
+}
+
+/**
+ * What GetStructuresList answers of one structure at each `detail`,
+ * selected before the reads (`src/lib/detail`): terse the tree as indented
+ * `structure\tkind\tattribute` rows (a node not read or cyclic marked), with
+ * `# appends_unavailable` when where-used failed; medium and full the answer
+ * before `detail`. A tree reads many documents, so raw is the full answer.
+ */
+const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
+  terse: (read) =>
+    [
+      `# structure ${read.structure_name}`,
+      ...(read.appends_unavailable ? ['# appends_unavailable'] : []),
+      ...(read.append_candidates_unread.length > 0
+        ? [`# append_candidates_unread ${read.append_candidates_unread.length}`]
+        : []),
+      indentedTsv(structureRows(read.tree)),
+    ].join('\n'),
+  medium: fullStructures,
+  full: fullStructures,
+  raw: fullStructures,
+};
+
 async function structuresListOf(
   context: HandlerContext,
   args: {
@@ -261,6 +335,7 @@ async function structuresListOf(
     version?: ReadVersion | undefined;
     include_extensions?: boolean | undefined;
   },
+  shown: StructuresShown,
 ): Promise<McpResult> {
   const { connection, logger } = context;
   try {
@@ -489,17 +564,12 @@ async function structuresListOf(
     };
 
     return return_response({
-      data: JSON.stringify({
-        success: true,
+      data: shown({
         structure_name: rootName,
         // True when a where-used lookup failed, so appends could not be
         // determined and the tree may be missing them (≠ "no appends"). #128
-        ...(includeExtensions && appendsUnavailable
-          ? { appends_unavailable: true }
-          : {}),
-        ...(unreadCandidates.length > 0
-          ? { append_candidates_unread: unreadCandidates }
-          : {}),
+        appends_unavailable: includeExtensions && appendsUnavailable,
+        append_candidates_unread: unreadCandidates,
         tree,
       }),
     });
@@ -874,6 +944,7 @@ async function structureTreeFromAnswers(
   rootName: string,
   includeExtensions: boolean,
   reads: StructureReads,
+  shown: StructuresShown,
 ): Promise<McpResult> {
   const { logger } = context;
   try {
@@ -967,15 +1038,12 @@ async function structureTreeFromAnswers(
       children: await buildChildren(rootName, root.source),
     };
     return return_response({
-      data: JSON.stringify({
-        success: true,
+      data: shown({
         structure_name: rootName,
-        ...(includeExtensions && appendsUnavailable
-          ? { appends_unavailable: true }
-          : {}),
-        ...(unreadCandidates.length > 0
-          ? { append_candidates_unread: unreadCandidates }
-          : {}),
+        // True when a where-used lookup failed, so appends could not be
+        // determined and the tree may be missing them (≠ "no appends"). #128
+        appends_unavailable: includeExtensions && appendsUnavailable,
+        append_candidates_unread: unreadCandidates,
         tree,
       }),
     });
@@ -1001,6 +1069,7 @@ async function structureTrees(
   rootNames: readonly string[],
   version: ReadVersion,
   includeExtensions: boolean,
+  shown: StructuresShown,
 ) {
   const reads = structureReads(context, version);
   const walks = rootNames.map((name) => ({
@@ -1063,6 +1132,7 @@ async function structureTrees(
         rootName,
         includeExtensions,
         reads,
+        shown,
       ),
     );
   }
@@ -1084,7 +1154,18 @@ function endsList(result: McpResult): boolean {
 function listAnswer(
   names: readonly string[],
   results: readonly McpResult[],
+  level: DetailLevel,
 ): McpResult {
+  if (level === 'terse') {
+    const text = results
+      .map((result, i) =>
+        result.isError
+          ? `# structure ${names[i] ?? ''}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
+          : (result.content[0]?.text ?? ''),
+      )
+      .join('\n');
+    return { isError: false, content: [{ type: 'text', text }] };
+  }
   const entries = results.map((result, i) =>
     result.isError
       ? { structure_name: names[i], error: payloadOfAnswer(result) }
@@ -1105,9 +1186,11 @@ export async function handleGetStructuresList(
   const listed = args?.structure_names;
   const version = args?.version ?? 'active';
   const includeExtensions = args?.include_extensions !== false;
+  const level = levelOf(args);
+  const shown = answerAt(STRUCTURES_ANSWERS, levelOf(args));
   const sequential = (structure_name: string) => {
     const { structure_names: _list, ...rest } = args;
-    return structuresListOf(context, { ...rest, structure_name });
+    return structuresListOf(context, { ...rest, structure_name }, shown);
   };
   try {
     if (listed === undefined) {
@@ -1121,6 +1204,7 @@ export async function handleGetStructuresList(
               [structure_name.toUpperCase()],
               version,
               includeExtensions,
+              shown,
             )
           )[0],
         () => sequential(structure_name),
@@ -1132,7 +1216,14 @@ export async function handleGetStructuresList(
       async () =>
         listAnswer(
           names,
-          await structureTrees(context, names, version, includeExtensions),
+          await structureTrees(
+            context,
+            names,
+            version,
+            includeExtensions,
+            shown,
+          ),
+          level,
         ),
       async () => {
         // One structure after another, each as the single call reads it; a
@@ -1143,7 +1234,7 @@ export async function handleGetStructuresList(
           if (endsList(result)) return result;
           results.push(result);
         }
-        return listAnswer(names, results);
+        return listAnswer(names, results, level);
       },
     );
   } catch (error) {

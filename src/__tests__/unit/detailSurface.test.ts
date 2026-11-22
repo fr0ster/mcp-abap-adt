@@ -233,6 +233,7 @@ const JSON_ANSWERING: readonly string[] = [
   'GetPackageContents',
   'GetPackageTree',
   'GetSqlQuery',
+  'GetStructuresList',
   'GetTableContents',
   'GetTransaction',
   'GetTransport',

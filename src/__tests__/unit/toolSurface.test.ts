@@ -207,7 +207,7 @@ describe('the MCP tool surface', () => {
         },
         'readonly/GetStructuresList': {
           relaxed: ['structure_name'],
-          added: ['structure_names'],
+          added: ['detail', 'structure_names'],
         },
         'readonly/GetEnhancements': {
           relaxed: ['object_name', 'object_type'],

@@ -26,7 +26,7 @@ import {
   handleGetIncludesList as handleGetIncludesListOf,
 } from '../../../handlers/include/readonly/handleGetIncludesList';
 import type { HandlerContext } from '../../../handlers/interfaces';
-import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
+import { handleGetStructuresList as handleGetStructuresListOf } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { createBatchAvailability } from '../../../lib/batch/availability';
 import { assertMatchObject } from '../../helpers/assertions';
 import {
@@ -39,6 +39,12 @@ import {
 } from '../../helpers/batchEnvelope';
 import { schemaWords } from '../../helpers/schemaWords';
 import { withinTurns } from '../../helpers/withinTurns';
+
+/** handleGetStructuresList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
+const handleGetStructuresList = (
+  context: Parameters<typeof handleGetStructuresListOf>[0],
+  args: Parameters<typeof handleGetStructuresListOf>[1],
+) => handleGetStructuresListOf(context, { detail: 'full', ...args });
 
 /** handleGetIncludesList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
 const handleGetIncludesList = (

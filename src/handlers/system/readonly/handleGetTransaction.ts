@@ -2,9 +2,14 @@ import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { answerAt, tsv } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import type { AnswerDetail } from '../../../lib/strategies/projections';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
@@ -91,17 +96,41 @@ export async function handleGetTransaction(
         .getObjectProperties(transactionUri(name), {
           analyse: analyseObjectProperties,
         }),
-    (reading) => {
-      if (detail === 'raw') return reading.raw;
-      const answered = {
-        success: true,
-        transaction_name: name,
-        ...transactionPropertiesOf(reading.value),
-      };
-      // `full` adds the document's own parse, so nothing it carries is lost.
-      return detail === 'full'
-        ? { ...answered, document: reading.value }
-        : answered;
-    },
+    answerAt<AdtReading<XmlRead>, string | object>(
+      {
+        terse: (reading) => {
+          const { object, properties } = transactionPropertiesOf(reading.value);
+          return [
+            `# transaction ${name}`,
+            ...(object?.text === undefined ? [] : [`# text ${object.text}`]),
+            ...(object?.package === undefined
+              ? []
+              : [`# package ${object.package}`]),
+            tsv(
+              ['facet', 'name', 'text'],
+              properties.map((property) => [
+                property.facet ?? '',
+                property.name ?? '',
+                property.text ?? '',
+              ]),
+            ),
+          ].join('\n');
+        },
+        medium: (reading) => ({
+          success: true,
+          transaction_name: name,
+          ...transactionPropertiesOf(reading.value),
+        }),
+        // `full` adds the document's own parse, so nothing it carries is lost.
+        full: (reading) => ({
+          success: true,
+          transaction_name: name,
+          ...transactionPropertiesOf(reading.value),
+          document: reading.value,
+        }),
+        raw: (reading) => reading.raw,
+      },
+      levelOf(args),
+    ),
   );
 }

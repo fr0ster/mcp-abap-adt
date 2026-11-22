@@ -519,7 +519,7 @@ describe('ActivateObjectLow', () => {
 });
 
 describe('LockObjectLow', () => {
-  it('answers the lock handle in the envelope the tool already returned', async () => {
+  it('answers the lock handle, and nothing the caller sent', async () => {
     const handle = 'B92E65858E83454C783181344F429D4BFD8E395D';
     fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
 
@@ -529,10 +529,9 @@ describe('LockObjectLow', () => {
     });
 
     assert.equal(result.isError, false);
-    const payload = JSON.parse(result.content[0].text);
-    assert.equal(payload.success, true);
-    assert.equal(payload.object_name, 'ZCL_X');
-    assert.equal(payload.lock_handle, handle);
+    assert.deepStrictEqual(JSON.parse(result.content[0].text), {
+      lock_handle: handle,
+    });
   });
 
   it('LockObject passes analyseLock', async () => {

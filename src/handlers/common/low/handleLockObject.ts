@@ -274,12 +274,9 @@ export async function lockObject(
           return lockSubResource(context, objectType, objectName);
       }
     },
-    (lockHandle: string) => ({
-      success: true,
-      object_name: objectName,
-      object_type: objectType,
-      lock_handle: lockHandle,
-      message: `Object ${objectName} locked successfully. Use this lock_handle for the update and the unlock.`,
-    }),
+    // What the update and the unlock need, and nothing sent back: the name
+    // and the type are the caller's own, and the prose said what a handle
+    // is for.
+    (lockHandle: string) => ({ lock_handle: lockHandle }),
   );
 }

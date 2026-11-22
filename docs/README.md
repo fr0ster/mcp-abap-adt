@@ -18,7 +18,7 @@ Complete installation instructions for different platforms and environments.
 Documentation for end users: configuration, usage, and available tools.
 
 - `CLIENT_CONFIGURATION.md` - How to configure MCP clients to connect to the server
-- `AUTHENTICATION.md` - The three stdio authentications, destinations, service key locations, the HTTP/SSE headers, and what a client sees when a call fails
+- `AUTHENTICATION.md` - The three stdio authentications, destinations, service key locations, the HTTP/SSE headers, what a client sees when a call fails, and the abapGit remotes' credentials (approved endpoints, any git host over HTTPS)
 - Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
@@ -26,6 +26,7 @@ Documentation for end users: configuration, usage, and available tools.
 - `PROMPTS.md` - The MCP prompts (`create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) per binary and kind, their `object_type` values, how a client shows them, the refusal (generated)
 - `TOOL_SEARCH.md` - Tool search: the three texts per tool (`description`, `keywords` for BM25, `semantic` for vectors), where a client reads them
 - `DEBUGGER.md` - The debugger (the write binaries; no `-ro` one): debug sessions and their handle, the SAP ids, transports, what ends a session
+- abapGit - the git loop on a package (link, pull, stage, push, branches, checks, the run log), full and compact, per system: the tools in the [README](../README.md#abapgit-the-git-loop-on-a-package), the git credentials and approved endpoints per transport in `AUTHENTICATION.md` and `CLI_OPTIONS.md`, the link and pull refusal under restrictions in `ACCESS_RESTRICTIONS.md`
 
 ### [configuration/](configuration/) - Configuration Guides
 Documentation for server configuration options.

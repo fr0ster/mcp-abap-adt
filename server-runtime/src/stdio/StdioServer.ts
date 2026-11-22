@@ -34,11 +34,11 @@ import {
 } from '@mcp-abap-adt/lib/state';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { responsibleRules } from '@mcp-abap-adt/responsible-rules';
-import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import { RUNTIME_VERSION } from '../runtimeVersion.js';
 import { destinationFailureOf } from './auth/destinationFailure';
 import type { IDestinations } from './auth/IAuthBrokerFactory.js';
+import { BoundedStdioServerTransport } from './boundedStdioTransport.js';
 import { destinationSource } from './destinationSource.js';
 
 export interface StdioServerOptions {
@@ -207,11 +207,12 @@ export class StdioServer extends BaseMcpServer {
    * Serves `destination` (none: inspection-only mode) over `transport` —
    * stdio unless a host passes its own. Its connection is the one
    * `connectAtStart` made, when the launcher called it; otherwise the first
-   * tool call makes it.
+   * tool call makes it. The stdio transport writes no message longer than a
+   * stdio client reads (`BoundedStdioServerTransport`).
    */
   async start(
     destination: string | undefined,
-    transport: Transport = new StdioServerTransport(),
+    transport: Transport = new BoundedStdioServerTransport(),
   ): Promise<void> {
     if (destination !== undefined && this.destinations) {
       this.serve(destination);

@@ -5,8 +5,7 @@
  * value before any callback of ours, so those refusals must come first.
  * Through real MCP servers, not the function:
  *
- * - batch mode with a denied compact action answers the batch refusal, not
- *   a schema error;
+ * - a denied compact action is refused, nothing run;
  * - cloud `PullAbapGitRepo` with `background: true` is refused, nothing sent;
  * - with no `IAccessChecks` configured, the import refusal still runs;
  * - an SSE and a Streamable HTTP instance under a request-only signal refuse
@@ -31,8 +30,6 @@ import { SseServer } from '../../../../server-runtime/src/sse/SseServer';
 import type { IDestinations } from '../../../../server-runtime/src/stdio/auth/IAuthBrokerFactory';
 import { StdioServer } from '../../../../server-runtime/src/stdio/StdioServer';
 import type { AbapGitRestrictionSignal } from '../../../lib/abapGit/admission';
-import { InstanceBatch } from '../../../lib/batch/InstanceBatch';
-import { communicationBatch } from '../../../lib/batch/tools';
 import { notifyConnectionResetListeners } from '../../../lib/connectionEvents';
 import type {
   HandlerEntry,
@@ -127,7 +124,6 @@ async function stdio(
   runs: string[],
   options: {
     systemType: 'onprem' | 'cloud';
-    batch?: InstanceBatch;
     abapGitRestrictions?: AbapGitRestrictionSignal;
   },
 ) {
@@ -136,7 +132,6 @@ async function stdio(
     destinationsOf(sap),
     {
       systemType: options.systemType,
-      ...(options.batch !== undefined ? { batch: options.batch } : {}),
       ...(options.abapGitRestrictions !== undefined
         ? { abapGitRestrictions: options.abapGitRestrictions }
         : {}),
@@ -182,28 +177,7 @@ afterEach(async () => {
 });
 
 describe('the seam: the raw steps before the SDK validates', () => {
-  it('batch mode with a denied compact action answers the batch refusal, not a schema error', async () => {
-    const runs: string[] = [];
-    const batch = new InstanceBatch({ keepRawParts: false });
-    const s = await stdio(sap, runs, { systemType: 'onprem', batch });
-    try {
-      batch.begin('communication', communicationBatch());
-      const answer = await s.call('HandlerAbapGit', {
-        action: 'push',
-        repository_key: '000001',
-        background: true,
-      });
-      assert.equal(answer.isError, true);
-      assert.match(textOf(answer), /batch_not_recordable/);
-      assert.doesNotMatch(textOf(answer), /Input validation error/);
-      assert.deepEqual(runs, []);
-      assert.equal(sap.requests.length, 0);
-    } finally {
-      await s.close();
-    }
-  });
-
-  it('without a batch, the denied compact action is refused in the narrowed words, nothing run', async () => {
+  it('a denied compact action is refused in the narrowed words, nothing run', async () => {
     const runs: string[] = [];
     const s = await stdio(sap, runs, { systemType: 'onprem' });
     try {

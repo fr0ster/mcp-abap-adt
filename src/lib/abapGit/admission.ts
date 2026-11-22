@@ -3,28 +3,30 @@
  * alike (spec §4.3, §4.4, §4.5, §5.1), whether or not an `IAccessChecks` is
  * configured. In order:
  *
- * 1. batch mode: refused before anything (no connection, no discovery, no
- *    batch entry or number);
- * 2. a denied compact action: refused;
- * 2a. `background` on a call whose schema does not declare it (cloud, or
+ * 1. a denied compact action: refused;
+ * 1a. `background` on a call whose schema does not declare it (cloud, or
  *    another action): refused;
- * 3. link and pull while an allowed-packages or allowed-requests entry is
+ * 2. link and pull while an allowed-packages or allowed-requests entry is
  *    configured (the restriction signal): refused;
- * 4. a blank `package_name` on link and branch info: refused;
- * 5. availability: the system's discovery lists `/abapgit/repos`;
- * 6. the R1 pre-read (`listReposQuiet`), once, for a call addressed by
+ * 3. a blank `package_name` on link and branch info: refused;
+ * 4. availability: the system's discovery lists `/abapgit/repos`;
+ * 5. the R1 pre-read (`listReposQuiet`), once, for a call addressed by
  *    `repository_key`; a key it does not list, an entry with a blank package
  *    or URL, or an unreadable list refuses the call (fail closed);
- * 7. the package check through `IAccessChecks`, when configured: the
+ * 6. the package check through `IAccessChecks`, when configured: the
  *    `package_name` argument for branch info, the R1 entry's package for
  *    push, unlink and branch switch;
- * 8. the run-log pairing: `app_log_key` must be the key of the entry's
+ * 7. the run-log pairing: `app_log_key` must be the key of the entry's
  *    `log_link` (a matching `status_link` alone does not authorise);
- * 9. endpoint binding: the `url` argument (refused with userinfo, a query or
+ * 8. endpoint binding: the `url` argument (refused with userinfo, a query or
  *    a fragment) or the R1 entry's URL, matched against the call's approved
  *    endpoints.
  *
- * Steps 1–4 read only the raw arguments (`rawAbapGitRefusal`): the server
+ * Batch: no abapGit-specific handling; the consumer decides what goes into
+ * a batch (owner, 2026-11-22). An abapGit call in a batch goes the batch
+ * path, and what the batch connection answers reaches the consumer as it is.
+ *
+ * Steps 1–3 read only the raw arguments (`rawAbapGitRefusal`): the server
  * runs them on the request as it came, before the SDK validates it, and
  * again at dispatch. What is admitted is handed on (`AbapGitAdmission`) to
  * the full handler and the compact action alike, and in memory to a
@@ -41,11 +43,7 @@ import type {
   IAccessChecks,
   IPackageReader,
 } from '../access/accessChecks';
-import {
-  accessRefusalWords,
-  batchNotServedWords,
-  ServerRefusal,
-} from '../auth/serverRefusal';
+import { accessRefusalWords, ServerRefusal } from '../auth/serverRefusal';
 import type { ToolArgs } from '../handlers/interfaces';
 import { argumentUrlFault, matchEndpoint } from './approvedEndpoints';
 import type { CallEndpoints } from './endpointSources';
@@ -208,8 +206,6 @@ function stringArg(args: ToolArgs, name: string): string | undefined {
 export interface RawAdmissionContext {
   /** The system kind the instance serves; `undefined` when none is stated. */
   readonly kind: 'onprem' | 'cloud' | undefined;
-  /** A batch is open for this call. */
-  readonly batchOpen: boolean;
   /**
    * The refusal of a denied compact action (the tool's registered schema
    * refusing the `action`), else `undefined`.
@@ -218,7 +214,7 @@ export interface RawAdmissionContext {
 }
 
 /**
- * Steps 1–4 on the raw arguments: the refusal, or `undefined` to go on.
+ * Steps 1–3 on the raw arguments: the refusal, or `undefined` to go on.
  * Nothing is sent, no connection taken, no credential resolved.
  */
 export function rawAbapGitRefusal(
@@ -226,18 +222,11 @@ export function rawAbapGitRefusal(
   restrictions: AbapGitRestrictionSignal,
   context: RawAdmissionContext,
 ): ServerRefusal | Error | undefined {
-  // 1. Batch mode: before anything else.
-  if (context.batchOpen) {
-    return new ServerRefusal(
-      'batch_not_recordable',
-      batchNotServedWords(call.tool),
-    );
-  }
-  // 2. A denied compact action.
+  // 1. A denied compact action.
   const denied = context.deniedAction(call);
   if (denied !== undefined) return new Error(denied);
   const operation = operationOf(call);
-  // 2a. `background` where the schema does not declare it.
+  // 1a. `background` where the schema does not declare it.
   if (
     'background' in call.args &&
     !(
@@ -249,14 +238,14 @@ export function rawAbapGitRefusal(
     return new ServerRefusal('abapgit_background_not_declared');
   }
   if (operation === undefined) return undefined;
-  // 3. The import refusal under any package or request restriction.
+  // 2. The import refusal under any package or request restriction.
   if (
     IMPORTS.has(operation) &&
     (restrictions.packages || restrictions.requests)
   ) {
     return new ServerRefusal('abapgit_import_not_allowed');
   }
-  // 4. A blank package on link and branch info.
+  // 3. A blank package on link and branch info.
   if (operation === 'link' || operation === 'branch_info') {
     const packageName = stringArg(call.args, 'package_name');
     if (packageName === undefined || packageName.trim() === '') {
@@ -270,11 +259,11 @@ export function rawAbapGitRefusal(
 export interface AdmissionContext extends RawAdmissionContext {
   /** The call's connection (taken once, on first need). */
   readonly connection: () => Promise<IAbapConnection>;
-  /** Whether the system the connection reaches serves abapGit (step 5). */
+  /** Whether the system the connection reaches serves abapGit (step 4). */
   readonly served: (connection: IAbapConnection) => Promise<boolean>;
-  /** The call's approved endpoints (step 9). */
+  /** The call's approved endpoints (step 8). */
   readonly endpoints: () => CallEndpoints;
-  /** The configured access checks and their package reader (step 7). */
+  /** The configured access checks and their package reader (step 6). */
   readonly accessChecks: IAccessChecks | undefined;
   readonly packageReader: () => IPackageReader;
   readonly logger?: ILogger | undefined;
@@ -293,14 +282,14 @@ export async function admitAbapGitCall(
 ): Promise<AbapGitAdmissionVerdict> {
   const raw = rawAbapGitRefusal(call, restrictions, context);
   if (raw !== undefined) return { refused: raw };
-  // 5. Availability, on the call's connection.
+  // 4. Availability, on the call's connection.
   const connection = await context.connection();
   if (!(await context.served(connection))) {
     return { refused: new ServerRefusal('abapgit_not_served') };
   }
   const operation = operationOf(call);
   if (operation === undefined) return { admitted: {} };
-  // 6. The R1 pre-read, once, for a call addressed by repository_key.
+  // 5. The R1 pre-read, once, for a call addressed by repository_key.
   let repo: IAbapGitRepoFacts | undefined;
   if (KEYED.has(operation)) {
     repo = await repositoryOf(
@@ -312,7 +301,7 @@ export async function admitAbapGitCall(
       return { refused: new ServerRefusal('abapgit_repository_unknown') };
     }
   }
-  // 7. The package check, when access checks are configured.
+  // 6. The package check, when access checks are configured.
   if (context.accessChecks !== undefined) {
     const checked = packageChecked(call, operation, repo);
     if (checked !== undefined) {
@@ -330,7 +319,7 @@ export async function admitAbapGitCall(
       }
     }
   }
-  // 8. The run-log pairing: the entry's log_link key, nothing else.
+  // 7. The run-log pairing: the entry's log_link key, nothing else.
   if (operation === 'error_log') {
     const asked = stringArg(call.args, 'app_log_key');
     if (
@@ -343,7 +332,7 @@ export async function admitAbapGitCall(
     }
     return { admitted: { repo } };
   }
-  // 9. Endpoint binding.
+  // 8. Endpoint binding.
   if (URL_ROUTES.has(operation)) {
     const url = stringArg(call.args, 'url') ?? '';
     if (argumentUrlFault(url) !== undefined) {
@@ -404,7 +393,7 @@ async function repositoryOf(
   return entry;
 }
 
-/** The access call of step 7, or `undefined` when the operation's package is not checked. */
+/** The access call of step 6, or `undefined` when the operation's package is not checked. */
 function packageChecked(
   call: AbapGitCall,
   operation: AbapGitOperation,

@@ -1,8 +1,8 @@
 /**
  * The one admission point of every abapGit call (spec §4.3, §4.4, §5.1),
  * driven as a function over a connection that answers R1 as SAP writes it
- * (sanitised documents, the shapes of `ABAPGIT_ST_REPOS_V2`): batch first,
- * a denied action, an undeclared `background`, the import refusal under
+ * (sanitised documents, the shapes of `ABAPGIT_ST_REPOS_V2`): a denied
+ * action, an undeclared `background`, the import refusal under
  * either restriction signal, a blank package — none of them taking a
  * connection, reading a credential or sending anything; then availability,
  * one credential-free R1 pre-read, the package check against R1's package,
@@ -117,7 +117,6 @@ function contextOf(
   connection: IAbapConnection,
   options: {
     kind?: 'onprem' | 'cloud';
-    batchOpen?: boolean;
     deniedAction?: string;
     served?: boolean;
     accessChecks?: IAccessChecks;
@@ -126,7 +125,6 @@ function contextOf(
   const counts = { connections: 0, endpointLookups: 0 };
   const context: AdmissionContext = {
     kind: options.kind ?? 'onprem',
-    batchOpen: options.batchOpen ?? false,
     deniedAction: () => options.deniedAction,
     connection: async () => {
       counts.connections += 1;
@@ -168,19 +166,6 @@ const LINK_ARGS = {
 };
 
 describe('the raw steps: nothing taken, nothing sent', () => {
-  it('batch mode with background: true answers the batch refusal — no run, no connection', async () => {
-    const sap = sapWith(r1());
-    const { context, counts } = contextOf(sap.connection, { batchOpen: true });
-    const verdict = await admit(
-      'PullAbapGitRepo',
-      { repository_key: KEY, background: true },
-      context,
-    );
-    assert.equal(codeOf(verdict), 'batch_not_recordable');
-    assert.equal(counts.connections, 0);
-    assert.equal(sap.sent.length, 0);
-  });
-
   it('a denied compact action carrying background is refused in the narrowed words — no run', async () => {
     const sap = sapWith(r1());
     const { context, counts } = contextOf(sap.connection, {

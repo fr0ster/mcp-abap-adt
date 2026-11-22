@@ -780,14 +780,14 @@ export abstract class BaseMcpServer extends McpServer {
           ? NONE_UNLISTED
           : this.abapGitTools,
       // The abapGit admission's raw steps on the request as it came, before
-      // the SDK validates it (spec §4.4): batch, a denied action, an
-      // undeclared `background`, the import refusal, a blank package.
+      // the SDK validates it (spec §4.4): a denied action, an undeclared
+      // `background`, the import refusal, a blank package.
       refusedCall: (tool, args) => {
         if (!this.abapGitTools.has(tool)) return undefined;
         const refused = rawAbapGitRefusal(
           { tool, args },
           this.abapGitRestrictions,
-          this.rawAdmissionContext(tool),
+          this.rawAdmissionContext(),
         );
         return refused === undefined ? undefined : this.refusalAnswer(refused);
       },
@@ -1268,8 +1268,8 @@ export abstract class BaseMcpServer extends McpServer {
     return endpointsOfCall(this.abapGitEndpoints);
   }
 
-  /** What the abapGit admission's raw steps read of the instance for a call of `tool`. */
-  private rawAdmissionContext(tool: string): RawAdmissionContext {
+  /** What the abapGit admission's raw steps read of the instance. */
+  private rawAdmissionContext(): RawAdmissionContext {
     const environment = statedEnvironment(this.statedSystemType());
     return {
       kind:
@@ -1278,7 +1278,6 @@ export abstract class BaseMcpServer extends McpServer {
           : environment === 'onprem'
             ? 'onprem'
             : undefined,
-      batchOpen: this.batchOpenFor(tool),
       deniedAction: (call) => this.deniedAbapGitAction(call),
     };
   }
@@ -2339,7 +2338,7 @@ export abstract class BaseMcpServer extends McpServer {
                   { tool: entry.toolDefinition.name, args },
                   this.abapGitRestrictions,
                   {
-                    ...this.rawAdmissionContext(entry.toolDefinition.name),
+                    ...this.rawAdmissionContext(),
                     connection: async () => (await take()).connection,
                     served: (connection) => this.abapGitServedOn(connection),
                     endpoints: () => this.abapGitEndpointsOfCall(),

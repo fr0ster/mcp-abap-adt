@@ -4,7 +4,11 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * Handler for retrieving all valid ADT object types.
  */
 
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type INamedItem,
+  utilNamedItems,
+} from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
@@ -14,20 +18,12 @@ import {
   fullLevel,
   rawLevel,
   readingAt,
-  structuredValue,
   tsv,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import type { XmlNode } from '../../../lib/xml/node';
-import {
-  child,
-  childAt,
-  isList,
-  text,
-  type XmlRead,
-} from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
@@ -43,46 +39,17 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
-interface NamedItem {
-  name: string;
-  description: string | undefined;
-}
-
-/**
- * `nameditem:namedItemList/nameditem:namedItem` — the same document
- * `@mcp-abap-adt/adt-clients`' own (shipped, but overridden here by the
- * generic `structured` reading — see `resultSets.ts`) `namedItems` strategy
- * reads; field names verified against `core/shared/allTypes.js`'s
- * `parseNamedItems`. Not forced into an array by the shared `structured`
- * reading's `REPEATABLE` set — `namedItem` isn't a member of it — so a system
- * with exactly one type would hand back a bare object; normalised here the
- * same way the pre-migration handler already did.
- */
-function extractNamedItems(value: XmlRead): NamedItem[] {
-  const raw = childAt(value, 'nameditem:namedItemList', 'nameditem:namedItem');
-  const items = raw ? (isList(raw) ? raw : [raw]) : [];
-  return items.flatMap((item) => {
-    const name = text(child(item, 'nameditem:name'));
-    return name === undefined || name === ''
-      ? []
-      : [{ name, description: text(child(item, 'nameditem:description')) }];
-  });
-}
-
 /**
  * What `GetAdtTypes` answers at each `detail`: the reading the type list is
  * read with, selected before the call (`src/lib/detail`) — terse a
  * `name\tdescription` row per type, the description's first line (a group
  * type lists its members on the lines after it); medium the named items
- * read out of the structured parse, each description whole; full the parse;
- * raw the document.
- * adt-strategies' `utilNamedItems` is not used: it reads a numeric name as a
- * number (`007` answers `7`) and an absent description as `""`, where the
- * tool answers the name as sent and no description.
+ * as adt-strategies reads them, each description whole; full the parse;
+ * raw the document. The items are adt-strategies' `utilNamedItems` (since
+ * 0.28.0 a name as written, an absent description absent).
  */
-const TYPE_READINGS: DetailTable<NamedItem[] | XmlNode | string> = {
-  terse: formatted(structuredValue, (value) => {
-    const items = extractNamedItems(value);
+const TYPE_READINGS: DetailTable<INamedItem[] | XmlNode | string> = {
+  terse: formatted(utilNamedItems, (items) => {
     return [
       `# count ${items.length}`,
       tsv(
@@ -94,7 +61,7 @@ const TYPE_READINGS: DetailTable<NamedItem[] | XmlNode | string> = {
       ),
     ].join('\n');
   }),
-  medium: formatted(structuredValue, extractNamedItems),
+  medium: formatted(utilNamedItems, (items) => items),
   full: fullLevel,
   raw: rawLevel,
 };

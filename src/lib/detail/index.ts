@@ -5,6 +5,8 @@
  */
 
 export {
+  type AnswerTable,
+  answerAt,
   answered,
   DETAIL_LEVELS,
   type DetailLevel,

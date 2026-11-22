@@ -87,3 +87,20 @@ export function readingAt<P>(
 export function answered<P>(reading: AdtReading<P>): P {
   return reading.value;
 }
+
+/**
+ * A tool's table of answers, where the answer is built from several requests
+ * (a walk, a sequence): for each level, a pure formatter of the typed value
+ * the requests read, selected before the first of them.
+ */
+export type AnswerTable<V, A> = {
+  readonly [L in DetailLevel]: (value: V) => A;
+};
+
+/** The formatter of the level asked for. */
+export function answerAt<V, A>(
+  table: AnswerTable<V, A>,
+  detail: DetailLevel,
+): (value: V) => A {
+  return table[detail];
+}

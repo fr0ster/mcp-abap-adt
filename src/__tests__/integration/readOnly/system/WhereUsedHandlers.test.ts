@@ -39,9 +39,22 @@ function terseTotal(result: any): number {
   const text = String(
     (result.content.find((c: any) => c.type === 'text') as any)?.text ?? '',
   );
-  const first = text.split('\n')[0] ?? '';
+  const lines = text.split('\n');
+  const first = lines[0] ?? '';
   assert.ok(first.startsWith('# total '), text.slice(0, 2000));
-  return Number(first.slice('# total '.length));
+  const total = Number(first.slice('# total '.length));
+  // The usages SAP answered, as rows under their package: a total above
+  // zero has rows, each a type and a name.
+  assert.equal(lines[1], 'type\tname\tusage', text.slice(0, 2000));
+  const rows = lines
+    .slice(2)
+    .filter((line) => line !== '' && !line.startsWith('#'));
+  if (total > 0) assert.ok(rows.length > 0, text.slice(0, 2000));
+  for (const row of rows.slice(0, 50)) {
+    const [type, name] = row.split('\t');
+    assert.ok(type && name, row);
+  }
+  return total;
 }
 
 function extractResultData(result: any): any {

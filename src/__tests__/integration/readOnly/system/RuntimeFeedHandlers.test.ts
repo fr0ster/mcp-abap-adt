@@ -350,10 +350,14 @@ describe('Runtime Feed Handlers Integration', () => {
         lines[1],
         'opid\tdetail_kind\tdateTime\ttype\tshortText\tusername',
       );
-      const [opid, detailKind] = (lines[2] ?? '').split('\t');
-      if (!opid || !detailKind) {
+      if (lines[2] === undefined || lines[2] === '') {
         throw new Error('SKIP: the gateway error log holds no error to read');
       }
+      // A row SAP answered names what its detail is read by: an opid and the
+      // kind, or the case fails.
+      const [opid, detailKind] = lines[2].split('\t');
+      assert.ok(opid, `a row without an opid: ${lines[2]}`);
+      assert.ok(detailKind, `a row without a detail_kind: ${lines[2]}`);
 
       const detail = await handleRuntimeGetGatewayErrorLog(handlerContext, {
         opid,

@@ -110,6 +110,17 @@ liveSuite(['onprem', 'cloud'], 'Repository reads', () => {
     const lines = succeeded('GetTransaction', read).text.split('\n');
     assert.equal(lines[0], '# transaction SE80', read.text);
     assert.ok(lines.includes('facet\tname\ttext'), read.text);
+    // SAP's object, at full: the transaction SE80, of type TRAN/T.
+    const full = await liveCall('GetTransaction', {
+      transaction_name: 'SE80',
+      detail: 'full',
+    });
+    const object = member(
+      payloadOf(succeeded('GetTransaction full', full)),
+      'object',
+    );
+    assert.equal(member(object, 'name'), 'SE80');
+    assert.equal(member(object, 'type'), 'TRAN/T');
   });
 
   it('GetObjectStructure reads the shared class', async () => {

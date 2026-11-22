@@ -188,8 +188,20 @@ liveSuite(['onprem'], 'GetWhereUsed over stdio above the message limit', () => {
           background: false,
         }),
       );
-      const total = text.split('\n')[0] ?? '';
+      const lines = text.split('\n');
+      const total = lines[0] ?? '';
       assert.ok(total.startsWith('# total '), text.slice(0, 2000));
+      // The usages SAP answered, as rows: type, name and usage under their
+      // package.
+      assert.equal(lines[1], 'type\tname\tusage', text.slice(0, 2000));
+      const rows = lines.filter(
+        (line) => line !== '' && !line.startsWith('#') && line !== lines[1],
+      );
+      assert.ok(rows.length > 0, text.slice(0, 2000));
+      for (const row of rows.slice(0, 50)) {
+        const [type, rowName] = row.split('\t');
+        assert.ok(type && rowName, row);
+      }
       console.log(
         `[readToolBugs] GetWhereUsed ${name} terse: ${text.length} characters, ${total}`,
       );

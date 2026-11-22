@@ -396,9 +396,9 @@ function whereUsedRows(result: WhereUsedListResult): string {
  * What GetWhereUsed answers at each `detail`, selected before the requests
  * (`src/lib/detail`): terse the usages ({@link whereUsedRows}); medium every
  * reference with every field read, without its uri; full the answer before
- * `detail`; raw SAP's document. The list is the server's own parse of the
- * document: adt-strategies' `utilWhereUsedReferences` drops the package
- * entries full answers (the plan's "Upstream items").
+ * `detail`; raw SAP's document. The list is adt-strategies'
+ * `utilWhereUsedReferences` (the util set's where-used slot), package nodes
+ * kept.
  */
 const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, JsonValue> = {
   terse: ({ result }) => whereUsedRows(result),

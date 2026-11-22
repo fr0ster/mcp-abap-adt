@@ -2282,7 +2282,7 @@ function systemProperties(
       .describe(
         said(actions, {
           search_source:
-            'what each hit is answered as: snippets (the default), lines or objects.',
+            'what each hit is answered as: lines (the default at detail terse), snippets (the default at medium and full) or objects.',
         }),
       ),
     version: z

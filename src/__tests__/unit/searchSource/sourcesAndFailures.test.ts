@@ -900,7 +900,7 @@ describe('SearchSource: the description is functional', () => {
       '`answer`',
       '`objects`',
       '`lines`',
-      '`snippets` (the default)',
+      '`lines` with the line only (the default at detail terse)',
       '`max_hits`',
       '`truncated.by_max_hits`',
       'the sources of the last batch read, those read past the stop included',

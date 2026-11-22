@@ -61,6 +61,7 @@ import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import * as clients from '../../lib/clients';
 import { feedVariantsOf } from '../../lib/strategies/feedVariants';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+import { levelOf } from '../helpers/nodeLevels';
 
 /** handleRuntimeListFeeds at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
 const handleRuntimeListFeeds = (
@@ -658,9 +659,7 @@ describe('GetPackageTree', () => {
 
   it('an existing package walks the tree', async () => {
     const readMetadata = mock.fn(async () => okResponse('<pak:package/>'));
-    const fetchNodeStructure = mock.fn(async () =>
-      okResponse({ objects: [], childNodes: [] }),
-    );
+    const fetchNodeStructure = mock.fn(async () => okResponse(levelOf([], [])));
     packageClient = {
       getUtils: () => ({ fetchNodeStructure }),
       getPackage: () => ({ readMetadata }),

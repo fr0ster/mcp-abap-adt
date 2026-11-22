@@ -164,8 +164,10 @@ import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   batchReader,
+  childNodesOf,
   endsTheCall,
   type NodeLevel,
+  nodeItemsOf,
   nodeStructureOn,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -182,9 +184,8 @@ type NodeSource = ReturnType<typeof utilsOf>;
  * scope, untouched) matches on — `OBJECT_TYPE`/`OBJECT_NAME`/`TECH_NAME`,
  * uppercase, the same spelling `handleGetObjectsByType.ts` already writes,
  * `OBJECT_URI` included so that handler's own follow-up-request feature
- * keeps working. `ourUtils.node` (`nodeLevel`, `packageWalk.ts`) carries
- * both `techName` and `uri` — see that file's own doc for why they were
- * ever thought absent, and corrected.
+ * keeps working. `ourUtils.node` (adt-strategies' `utilNodeContents`)
+ * carries both `techName` and `uri` where the node does.
  */
 interface FlatObject {
   OBJECT_TYPE: string;
@@ -198,7 +199,7 @@ function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
 }
 
 function flatObjects(level: NodeLevel): FlatObject[] {
-  return level.objects.map((o) => ({
+  return nodeItemsOf(level).map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
     ...(o.techName ? { TECH_NAME: o.techName } : {}),
@@ -209,7 +210,7 @@ function flatObjects(level: NodeLevel): FlatObject[] {
 /**
  * Walk the node structure recursively, one `fetchNodeStructure` call per
  * node — the same recursion this tool ran before the migration, over
- * `ourUtils.node` (`nodeLevel`) instead of a hand-rolled XML regex. Every
+ * `ourUtils.node` (`utilNodeContents`) instead of a hand-rolled XML regex. Every
  * step keeps IAdtResponse's `ok`/`getResult`/`getError` shape rather than
  * throwing, so the FIRST refusal anywhere in the tree — not just at the
  * root — reaches `answer()` and is formatted the same way every other
@@ -241,14 +242,9 @@ async function collectValidObjects(
   if (!response.ok) return response;
 
   const level = response.getResult().value;
-  let objects: FlatObject[] = level.objects.map((o) => ({
-    OBJECT_TYPE: o.type,
-    OBJECT_NAME: o.name,
-    ...(o.techName ? { TECH_NAME: o.techName } : {}),
-    ...(o.uri ? { OBJECT_URI: o.uri } : {}),
-  }));
+  let objects: FlatObject[] = flatObjects(level);
 
-  for (const child of level.childNodes) {
+  for (const child of childNodesOf(level)) {
     const childResult = await collectValidObjects(
       context,
       utils,
@@ -371,7 +367,7 @@ async function walkParentsBatched(
       const found = response.getResult().value;
       node.objects = flatObjects(found);
       const seen = visited[node.root];
-      for (const child of found.childNodes) {
+      for (const child of childNodesOf(found)) {
         if (seen.has(child.nodeId)) continue;
         seen.add(child.nodeId);
         const sub: ListNode = {
@@ -580,12 +576,10 @@ export async function handleGetObjectsList(
   }
 
   // Task 28: why this tool carries no `detail`. The node-level family's
-  // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
-  // a real ADT document is fetched per node, but `nodeLevel` parses
-  // `answer.data` and returns only the reduced `NodeLevel` it builds —
-  // never keeping the wire text beside it. There is no `.raw` for
-  // `detail: 'raw'` to answer without changing that shared strategy, and
-  // this tool's own answer besides is a composite assembled from a
+  // shape (`ourUtils.node`, adt-strategies' `utilNodeContents`): a real ADT
+  // document is fetched per node, and the reading keeps no wire text beside
+  // the level. There is no `.raw` for `detail: 'raw'` to answer, and this
+  // tool's own answer besides is a composite assembled from a
   // recursive walk over many such calls, not one reading.
   return answer(
     { tool: 'GetObjectsList', detail: detailOf(args) },

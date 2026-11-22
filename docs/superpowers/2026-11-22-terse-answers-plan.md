@@ -123,15 +123,7 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
 
 ## Upstream items (adt-strategies, separate)
 
-The sites that kept the server's parse switched to the 0.28.0 readings. What the shipped readings
-still answer less than the tools do:
-
-- `readTransportItem` reads a task's document that carries no `tm:object_type`, asked for by
-  its parent's number, as the parent (from the parent's header alone). Site: GetTransport keeps
-  a guard (a `tm:task` directly under `tm:root` is a task's document).
-- `utilNodeContents` drops an object without `TECH_NAME` or `OBJECT_URI`, which the walks list,
-  and says nothing of a node SAP could not load. Sites: every package walk reads
-  `readNodeStructure` and keeps the not-loaded row (`nodeLevelOf`).
+None left: every site reads with its shipped reading (adt-strategies 0.28.1).
 
 ## Order and review
 

@@ -76,7 +76,6 @@ import { DEFAULT_ADT_HEADERS } from '../../lib/adtHeaders/defaultPairs';
 import { createBatchAvailability } from '../../lib/batch/availability';
 import * as clients from '../../lib/clients';
 import { objectsListCache } from '../../lib/getObjectsListCache';
-import { nodeLevel } from '../../lib/strategies/packageWalk';
 import { structured, verbatim } from '../../lib/strategies/reading';
 import { child, listOf } from '../../lib/thrownValue';
 import { corpusBody } from '../helpers/adtCorpus';
@@ -91,6 +90,7 @@ import {
   refusingClient,
 } from '../helpers/fakeClient';
 import { readsModuleIn } from '../helpers/functionModuleMetadata';
+import { nodeLevelOfXml } from '../helpers/nodeLevels';
 import { stateSystemKind } from '../helpers/systemKind';
 
 /** handleGetEnhancements at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
@@ -686,7 +686,7 @@ describe('GetObjectsByType, mapped from a real captured node-structure document'
   // produces rather than a hand-built `NodeLevel` that might not match it.
   it('answers a real object under the requested node', async () => {
     const body = corpusBody('read-object-tree-structure--02-nodestructure');
-    const level = nodeLevel({ data: body });
+    const level = nodeLevelOfXml(body);
     fakeClient = fakeClientOf({
       fetchNodeStructure: async () => okResponse(level),
     });
@@ -716,9 +716,9 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
   // fixture where the technical name genuinely differs from the object name
   // — `ZMCP_SHR_FGRP` / `SAPLZMCP_SHR_FGRP` — the exact case a fabricated or
   // absent `TECH_NAME` cannot round-trip.
-  const level = nodeLevel({
-    data: corpusBody('read-object-tree-structure--05-nodestructure'),
-  });
+  const level = nodeLevelOfXml(
+    corpusBody('read-object-tree-structure--05-nodestructure'),
+  );
   // Read straight from the fixture body, NOT off `level.objects` — deriving
   // the expected URI from the same `nodeLevel()` call under test would make
   // a regression that drops `uri` invisible (both sides go `undefined`
@@ -804,13 +804,13 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
     fakeClient = fakeClientOf({
       fetchNodeStructure: async (...args: any[]) => {
         const options = args[2] as { nodeId?: string } | undefined;
-        if (!options?.nodeId) return okResponse(nodeLevel({ data: rootBody }));
+        if (!options?.nodeId) return okResponse(nodeLevelOfXml(rootBody));
         if (options.nodeId === '31') {
-          return okResponse(nodeLevel({ data: bdefBody }));
+          return okResponse(nodeLevelOfXml(bdefBody));
         }
         // The other six type folders fixture 01 lists have no captured
         // response — answered empty rather than invented.
-        return okResponse(nodeLevel({ data: '' }));
+        return okResponse(nodeLevelOfXml(''));
       },
     });
 

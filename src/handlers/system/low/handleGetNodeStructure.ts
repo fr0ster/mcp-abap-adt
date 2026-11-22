@@ -60,6 +60,7 @@ import { succeeded } from '../../../lib/strategies/stepResponse';
 import {
   analyseException,
   isIndeterminateWalkAnswer,
+  utilNodeContents,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -70,8 +71,11 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
+  childNodesOf,
+  isNotLoaded,
+  type NodeItem,
   type NodeLevel,
-  nodeLevelOf,
+  nodeItemsOf,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
@@ -109,21 +113,42 @@ export const TOOL_DEFINITION = {
 type GetNodeStructureArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
- * The raw body, nothing parsed — this handler needs to see whether it was
- * blank before `nodeLevel` collapses either a blank body or a genuinely
- * empty one into the identical `{objects: [], childNodes: []}`.
+ * The node slot's reading here: the raw body — this handler needs to see
+ * whether it was blank before a reading collapses either a blank body or a
+ * genuinely empty one into the identical empty level — and the level as
+ * adt-strategies reads it (`utilNodeContents`, 0.28.1).
  */
-function rawNodeStructureXml(wire: IAdtWireResponse): string {
-  return bodyTextOf(wire);
+function nodeStructureRead(wire: IAdtWireResponse): {
+  raw: string;
+  level: NodeLevel;
+} {
+  return { raw: bodyTextOf(wire), level: utilNodeContents(wire) };
+}
+
+/** A level as this tool answers it: its objects, child nodes, and a node SAP could not load. */
+interface LevelAnswer {
+  objects: NodeItem[];
+  childNodes: Array<{ type: string; nodeId: string }>;
+  notLoaded?: true;
+  blank?: string;
+}
+
+/** The level answered: every object listed, complete or not. */
+function levelAnswer(level: NodeLevel): LevelAnswer {
+  return {
+    ...(isNotLoaded(level) ? { notLoaded: true as const } : {}),
+    objects: nodeItemsOf(level),
+    childNodes: childNodesOf(level),
+  };
 }
 
 /**
- * A success carrying a `NodeLevel` — the shape `sequence()`'s steps answer
+ * A success carrying a level answer — the shape `sequence()`'s steps answer
  * with — and, for a package's blank body read once, `blank`.
  */
 function succeededLevel(
-  level: NodeLevel & { blank?: string },
-): IAdtResponse<NodeLevel, IAdtError> {
+  level: LevelAnswer,
+): IAdtResponse<LevelAnswer, IAdtError> {
   return succeeded(level);
 }
 
@@ -176,14 +201,8 @@ async function nodeStructure(
     );
   }
 
-  // Task 28: why this tool carries no `detail`. The node-level family's
-  // shape: `nodeLevel` (`lib/strategies/packageWalk.ts`) parses
-  // `answer.data` and returns only the reduced `NodeLevel` it builds,
-  // never keeping the wire text beside it — there is no `.raw` for
-  // `detail: 'raw'` to answer without changing that shared strategy. The
-  // final projection below is the identity function for exactly that
-  // reason: there is nothing beyond the `NodeLevel` `nodeLevel` already
-  // produced to project three ways.
+  // Task 28: why this tool carries no `detail`: it answers the level as
+  // read, one shape; the projection below is the identity.
   return answer(
     { tool: 'GetNodeStructureLow', detail: 'terse' },
     () => {
@@ -192,7 +211,7 @@ async function nodeStructure(
         atStep('read node structure', () =>
           withAdtHeaders(context, 'utils.fetchNodeStructure', (headers) =>
             client
-              .getUtils({ ...ourUtils, node: rawNodeStructureXml })
+              .getUtils({ ...ourUtils, node: nodeStructureRead })
               .fetchNodeStructure(parentType, parent_name, {
                 headers,
                 analyse: analyseException,
@@ -201,9 +220,9 @@ async function nodeStructure(
               }),
           ),
         ),
-        async (rawXml) => {
-          if (!isIndeterminateWalkAnswer(rawXml)) {
-            return succeededLevel(nodeLevelOf(rawXml));
+        async (read) => {
+          if (!isIndeterminateWalkAnswer(read.raw)) {
+            return succeededLevel(levelAnswer(read.level));
           }
 
           if (parentType !== 'DEVC/K') {

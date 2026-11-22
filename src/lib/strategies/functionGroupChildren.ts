@@ -6,7 +6,12 @@ import type {
 
 import type { AdtCodes } from '../adtProjections';
 import { type AnswerTable, tsv } from '../detail';
-import type { NodeLevel } from './packageWalk';
+import {
+  childNodesOf,
+  type NodeItem,
+  type NodeLevel,
+  nodeItemsOf,
+} from './packageWalk';
 import { succeeded } from './stepResponse';
 
 /**
@@ -29,9 +34,7 @@ export interface FunctionGroupNodeSource {
   ): Promise<IAdtResponse<NodeLevel, IAdtError>>;
 }
 
-function okObjects(
-  objects: NodeLevel['objects'],
-): IAdtResponse<NodeLevel['objects'], IAdtError> {
+function okObjects(objects: NodeItem[]): IAdtResponse<NodeItem[], IAdtError> {
   return succeeded(objects, 'fetchFunctionGroupChildren');
 }
 
@@ -47,7 +50,7 @@ export async function fetchFunctionGroupChildren(
   utils: FunctionGroupNodeSource,
   functionGroupName: string,
   childType: AdtCodes<'FUGR/FF' | 'FUGR/I'>,
-): Promise<IAdtResponse<NodeLevel['objects'], IAdtError>> {
+): Promise<IAdtResponse<NodeItem[], IAdtError>> {
   const root = await utils.fetchNodeStructure('FUGR/F', functionGroupName, {
     withShortDescriptions: true,
   });
@@ -55,9 +58,9 @@ export async function fetchFunctionGroupChildren(
     return root;
   }
 
-  const child = root
-    .getResult()
-    .value.childNodes.find((c) => c.type === childType);
+  const child = childNodesOf(root.getResult().value).find(
+    (c) => c.type === childType,
+  );
   if (!child) {
     return okObjects([]);
   }
@@ -70,7 +73,7 @@ export async function fetchFunctionGroupChildren(
     return level;
   }
 
-  return okObjects(level.getResult().value.objects);
+  return okObjects(nodeItemsOf(level.getResult().value));
 }
 
 /**
@@ -84,8 +87,8 @@ export async function fetchFunctionGroupChildren(
 export function functionGroupListAnswers(
   functionGroupName: string,
   listKey: 'function_modules' | 'includes',
-): AnswerTable<NodeLevel['objects'], string | object> {
-  const full = (objects: NodeLevel['objects']) => ({
+): AnswerTable<NodeItem[], string | object> {
+  const full = (objects: NodeItem[]) => ({
     success: true,
     function_group_name: functionGroupName,
     total: objects.length,

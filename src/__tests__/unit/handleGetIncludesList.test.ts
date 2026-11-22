@@ -12,6 +12,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { levelOf } from '../helpers/nodeLevels';
 import { stateSystemKind } from '../helpers/systemKind';
 
 /** handleGetIncludesList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
@@ -68,8 +69,7 @@ describe('GetIncludesList', () => {
         ),
       read: async (config: IncludeIdentity) =>
         source(sources[config.includeName ?? ''] ?? ''),
-      fetchNodeStructure: async () =>
-        okResponse({ objects: [], childNodes: [] }),
+      fetchNodeStructure: async () => okResponse(levelOf([], [])),
     });
 
     const answered = body(
@@ -91,8 +91,7 @@ describe('GetIncludesList', () => {
       readObjectSource: async () => source('REPORT zprog.\nINCLUDE zinc1.\n'),
       read: async (config: IncludeIdentity) =>
         source(sources[config.includeName ?? ''] ?? ''),
-      fetchNodeStructure: async () =>
-        okResponse({ objects: [], childNodes: [] }),
+      fetchNodeStructure: async () => okResponse(levelOf([], [])),
     });
 
     const result: any = await handleGetIncludesListOf(context as any, {
@@ -115,18 +114,17 @@ describe('GetIncludesList', () => {
     fakeClient = fakeClientOf({
       fetchNodeStructure: async (_type: unknown, _name: unknown, opts: any) =>
         opts?.nodeId
-          ? okResponse({
-              objects: [
-                { name: 'LZFGTOP', type: 'FUGR/I' },
-                { name: 'LZFGUXX', type: 'FUGR/I' },
-                { name: 'LZFGU01', type: 'FUGR/I' },
-              ],
-              childNodes: [],
-            })
-          : okResponse({
-              objects: [],
-              childNodes: [{ type: 'FUGR/I', nodeId: '420' }],
-            }),
+          ? okResponse(
+              levelOf(
+                [
+                  { name: 'LZFGTOP', type: 'FUGR/I' },
+                  { name: 'LZFGUXX', type: 'FUGR/I' },
+                  { name: 'LZFGU01', type: 'FUGR/I' },
+                ],
+                [],
+              ),
+            )
+          : okResponse(levelOf([], [{ type: 'FUGR/I', nodeId: '420' }])),
       read: async (config: IncludeIdentity) =>
         source(sources[config.includeName ?? ''] ?? ''),
     });
@@ -188,8 +186,7 @@ describe('GetIncludesList', () => {
               adtType: 'ExceptionResourceNoAccess',
             })
           : source('DATA a TYPE i.'),
-      fetchNodeStructure: async () =>
-        okResponse({ objects: [], childNodes: [] }),
+      fetchNodeStructure: async () => okResponse(levelOf([], [])),
     });
 
     const answered = body(
@@ -221,8 +218,7 @@ describe('GetIncludesList', () => {
         refusedResponse('Resource does not exist', {
           adtType: 'ExceptionResourceNotFound',
         }),
-      fetchNodeStructure: async () =>
-        okResponse({ objects: [], childNodes: [] }),
+      fetchNodeStructure: async () => okResponse(levelOf([], [])),
     });
 
     const answered = body(
@@ -259,8 +255,7 @@ describe('GetIncludesList', () => {
         source('REPORT zprog.\nINCLUDE za.\nINCLUDE zb.\nINCLUDE zloop.\n'),
       read: async (config: IncludeIdentity) =>
         source(sources[config.includeName ?? ''] ?? ''),
-      fetchNodeStructure: async () =>
-        okResponse({ objects: [], childNodes: [] }),
+      fetchNodeStructure: async () => okResponse(levelOf([], [])),
     });
 
     const answered = body(

@@ -63,8 +63,10 @@ import {
 } from '../../../lib/strategies/functionGroupChildren';
 import { classIncludeTypesOf } from '../../../lib/strategies/metadataFields';
 import {
+  childNodesOf,
   endsTheCall,
   type NodeLevel,
+  nodeItemsOf,
   nodeStructureOn,
 } from '../../../lib/strategies/packageWalk';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -792,9 +794,9 @@ function includesNodeOf(result: PhaseResult<NodeAnswer>): string | undefined {
   if (!result.ok) return undefined;
   const response = result.value;
   if (!response.ok) return undefined;
-  return response
-    .getResult()
-    .value.childNodes.find((c) => tableCodeOf(c.type) === 'FUGR/I')?.nodeId;
+  return childNodesOf(response.getResult().value).find(
+    (c) => tableCodeOf(c.type) === 'FUGR/I',
+  )?.nodeId;
 }
 
 /**
@@ -997,9 +999,9 @@ async function includeTrees(
         if (response?.ok) {
           level = [
             ...new Set(
-              response
-                .getResult()
-                .value.objects.map((o) => o.name.toUpperCase()),
+              nodeItemsOf(response.getResult().value).map((o) =>
+                o.name.toUpperCase(),
+              ),
             ),
           ];
         }

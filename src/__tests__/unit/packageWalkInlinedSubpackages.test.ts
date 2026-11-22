@@ -19,11 +19,11 @@ import {
   type NodeAnswer,
   type NodeRequest,
   type NodeStructureSource,
-  nodeLevelOf,
   walkPackage,
   walkPackages,
 } from '../../lib/strategies/packageWalk';
 import { succeeded } from '../../lib/strategies/stepResponse';
+import { nodeLevelOfXml } from '../helpers/nodeLevels';
 
 /** One `SEU_ADT_REPOSITORY_OBJ_NODE`. */
 function objectNode(type: string, name: string): string {
@@ -59,7 +59,7 @@ const DOCUMENTS: Record<string, string> = {
 const keyOf = (name: string, nodeId?: string) => `${name}|${nodeId ?? 'root'}`;
 
 function answerOf(key: string): NodeAnswer {
-  return succeeded(nodeLevelOf(DOCUMENTS[key] ?? documentOf([], [])));
+  return succeeded(nodeLevelOfXml(DOCUMENTS[key] ?? documentOf([], [])));
 }
 
 function source(): { utils: NodeStructureSource; asked: string[] } {
@@ -161,7 +161,7 @@ describe('what makes two rows one object', () => {
     const utils: NodeStructureSource = {
       async fetchNodeStructure(_type, name, options) {
         return succeeded(
-          nodeLevelOf(
+          nodeLevelOfXml(
             documents[keyOf(name, options?.nodeId)] ?? documentOf([], []),
           ),
         );

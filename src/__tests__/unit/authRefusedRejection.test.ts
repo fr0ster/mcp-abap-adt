@@ -35,6 +35,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { levelOf } from '../helpers/nodeLevels';
 import { listing } from '../helpers/sourceReaderFake';
 
 mock.method(clients, 'createAdtClient', () => fakeClient);
@@ -86,14 +87,14 @@ describe('GetEnhancements include_nested: an include whose elements read rejects
     fakeClient = fakeClientOf({
       fetchNodeStructure: async (...args: unknown[]) =>
         (args[2] as { nodeId: string }).nodeId === '000000'
-          ? okResponse({ childNodes: [{ type: 'PROG/I', nodeId: 'N1' }] })
-          : okResponse({
-              objects: [
-                { name: 'ZINC1' },
-                { name: 'ZINC2' },
-                { name: 'ZINC3' },
-              ],
-            }),
+          ? okResponse(levelOf([], [{ type: 'PROG/I', nodeId: '10' }]))
+          : okResponse(
+              levelOf([
+                { name: 'ZINC1', type: 'PROG/I' },
+                { name: 'ZINC2', type: 'PROG/I' },
+                { name: 'ZINC3', type: 'PROG/I' },
+              ]),
+            ),
       readEnhancementElements: async (...args: unknown[]) => {
         const config = args[0] as {
           programName?: string;

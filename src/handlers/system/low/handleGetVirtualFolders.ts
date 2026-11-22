@@ -8,8 +8,8 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
  * takes `analyseException` since adt-clients 23.
  *
  * `folders` is one of the 300-odd slots `resultSets.ts` maps to `structured`
- * (unlike `node`, which `ourUtils` overrides with the tree-flattening
- * `nodeLevel` reading), so this answers an `AdtReading` the same shape every
+ * (unlike `node`, which `ourUtils` reads with adt-strategies'
+ * `utilNodeContents`), so this answers an `AdtReading` the same shape every
  * write handler in this cluster does — `detail: 'raw'` and `'full'` both
  * work. No corpus fixture for this endpoint exists yet (the README's
  * endpoint table has no `/virtualfolders/contents` row at all), so `terse`

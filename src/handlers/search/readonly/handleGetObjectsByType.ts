@@ -15,7 +15,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.",
+        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on the node reading below.",
       ),
     with_short_descriptions: z
       .boolean()
@@ -32,25 +32,20 @@ import {
   objectsListCache,
 } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { NodeLevel } from '../../../lib/strategies/packageWalk';
+import {
+  type NodeLevel,
+  nodeItemsOf,
+} from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 /**
  * Grouped, human-readable text — the same shape this tool answered before the
- * migration, built off `ourUtils.node` (`nodeLevel`) instead of a hand-rolled
- * regex over the raw node-structure XML.
- *
- * `ourUtils` deliberately keeps its OWN `node` reading (`resultSets.ts`:
- * "ourUtils... keeps our own node reading") — `nodeLevel` in
- * `packageWalk.ts` — rather than the shipped `nodeContents`, but that
- * reading carries `techName`/`uri` too (added the description; never traded
- * either away — see that file's own doc), so the cached rows below carry
- * `TECH_NAME`/`OBJECT_URI` from it, matching `IRepositoryObjectNode`'s field
- * set. `format: 'raw'` stays unserved: there is no raw XML behind
- * `NodeLevel`, only `objects`/`childNodes`, and restoring it needs a reading
- * that carries the document itself, not more fields — deferred, not
- * attempted here.
+ * migration, built off `ourUtils.node` (adt-strategies' `utilNodeContents`,
+ * 0.28.1: complete and incomplete objects, each listed) instead of a
+ * hand-rolled regex over the raw node-structure XML. The cached rows carry
+ * `TECH_NAME`/`OBJECT_URI` where the node does. `format: 'raw'` stays
+ * unserved: the reading keeps no document.
  */
 function formatObjects(
   level: NodeLevel,
@@ -58,7 +53,7 @@ function formatObjects(
   parentType: string,
   parentName: string,
 ): { text: string; cached: CachedObject[] } {
-  const objects = level.objects;
+  const objects = nodeItemsOf(level);
   const cached = objects.map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
@@ -159,11 +154,9 @@ export async function handleGetObjectsByType(
   // `analyseException` in its options since adt-clients 23.
   //
   // Task 28: why this tool carries no `detail`. The node-level family's
-  // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
-  // `nodeLevel` parses `answer.data` and returns only the reduced
-  // `NodeLevel` it builds, never keeping the wire text beside it — there is
-  // no `.raw` for `detail: 'raw'` to answer without changing that shared
-  // strategy.
+  // shape (`ourUtils.node`, adt-strategies' `utilNodeContents`): the
+  // reading keeps no wire text beside the level — there is no `.raw` for
+  // `detail: 'raw'` to answer.
   const variant = variantOf(connection);
   const parentType = tableTypeOf(parent_type, variant);
   if (parentType === undefined) {

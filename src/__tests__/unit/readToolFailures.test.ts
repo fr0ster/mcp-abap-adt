@@ -37,6 +37,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { levelOf } from '../helpers/nodeLevels';
 import { stateSystemKind } from '../helpers/systemKind';
 
 /** handleDescribeByList at `detail: 'full'`, the answer before `detail` these cases compare (terse answers, step 3). */
@@ -318,7 +319,7 @@ describe('GetObjectNodeFromCache: the OBJECT_URI read SAP refused', () => {
 describe('GetEnhancements include_nested: the nested walk threw', () => {
   it('the partial answer carries the throw as client_threw with its step, not a bare message', async () => {
     fakeClient = fakeClientOf({
-      fetchNodeStructure: async () => okResponse({ childNodes: [] }),
+      fetchNodeStructure: async () => okResponse(levelOf([], [])),
     });
     const connection = {
       async makeAdtRequest() {
@@ -439,7 +440,7 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
       },
       fetchNodeStructure: async () => {
         calls.push('tree');
-        return okResponse({ objects: [], childNodes: [] });
+        return okResponse(levelOf([], []));
       },
     });
     const result: any = await handleGetObjectInfo(
@@ -460,7 +461,7 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
       },
       fetchNodeStructure: async () => {
         calls.push('tree');
-        return okResponse({ objects: [], childNodes: [] });
+        return okResponse(levelOf([], []));
       },
     });
     const result: any = await handleGetObjectInfo(
@@ -475,8 +476,7 @@ describe('GetObjectInfo: the enrichment search was a credential failure', () => 
   it('any other search refusal stays best effort: the tree answers', async () => {
     fakeClient = fakeClientOf({
       search: async () => forbidden(),
-      fetchNodeStructure: async () =>
-        okResponse({ objects: [], childNodes: [] }),
+      fetchNodeStructure: async () => okResponse(levelOf([], [])),
     });
     const result: any = await handleGetObjectInfo(
       { connection: {} as any, logger: undefined } as any,

@@ -898,7 +898,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
 **Parameters:**
-- `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.
+- `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on the node reading below.
 - `node_id` (string, required) - [read-only] Node ID
 - `parent_name` (string, required) - [read-only] Parent object name
 - `parent_tech_name` (string, required) - [read-only] Parent technical name

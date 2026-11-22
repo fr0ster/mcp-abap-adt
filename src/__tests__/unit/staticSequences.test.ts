@@ -58,6 +58,7 @@ import {
   reading,
   refusedResponse,
 } from '../helpers/fakeClient';
+import { levelOf } from '../helpers/nodeLevels';
 
 // The declared variant the boundary checks a type argument against.
 mock.method(clients, 'createAdtClient', () => fakeClient);
@@ -192,24 +193,22 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
         // `AdtReading`-wrapped one; `nodeLevel` is a bare `IResultStrategy`,
         // never passed through `reading.ts`'s `reading()` helper.
         if (!options?.nodeId) {
-          return okResponse({
-            objects: [],
-            childNodes: [
-              { type: 'FUGR/FF', nodeId: '1' },
-              { type: 'FUGR/I', nodeId: '2' },
-            ],
-          });
+          return okResponse(
+            levelOf(
+              [],
+              [
+                { type: 'FUGR/FF', nodeId: '1' },
+                { type: 'FUGR/I', nodeId: '2' },
+              ],
+            ),
+          );
         }
         if (options.nodeId === '1') {
-          return okResponse({
-            objects: [{ name: 'Z_FM_ONLY', type: 'FUGR/FF' }],
-            childNodes: [],
-          });
+          return okResponse(
+            levelOf([{ name: 'Z_FM_ONLY', type: 'FUGR/FF' }], []),
+          );
         }
-        return okResponse({
-          objects: [{ name: 'LFGTOP', type: 'FUGR/I' }],
-          childNodes: [],
-        });
+        return okResponse(levelOf([{ name: 'LFGTOP', type: 'FUGR/I' }], []));
       },
     });
   }
@@ -297,7 +296,7 @@ describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () =
         walked.push(String(name));
         // Plain `NodeLevel`, not `AdtReading`-wrapped — see the comment in
         // the FUGR/FF-vs-FUGR/I describe block above for why.
-        return okResponse({ objects: [], childNodes: [] });
+        return okResponse(levelOf([], []));
       },
       // If the handler still named `getPackageContentsList` this would be
       // reached instead of the walk above, and the assertion below would

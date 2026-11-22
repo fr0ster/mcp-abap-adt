@@ -32,10 +32,10 @@ import {
   traceSchedulingTypes,
   unitTestRunId,
   utilActivationRunId,
+  utilNodeContents,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import type { XmlNode } from '../xml/node';
-import { nodeLevel } from './packageWalk';
 import { type AdtReading, statusOnly, structured, verbatim } from './reading';
 import { sqlPreview } from './sqlPreview';
 import { whereUsedListReading } from './whereUsedList';
@@ -369,9 +369,9 @@ export function resultsFor(
 }
 
 /**
- * The util set, with our own node reading — `nodeLevel` keeps the descriptions
- * the shipped `nodeContents` drops, and a tree without them is a tree a caller
- * has to walk again. `activation` is kept as shipped: `activationRunId` reads
+ * The util set, its node reading adt-strategies' `utilNodeContents` (0.28.1:
+ * descriptions, incomplete objects and the nodes SAP could not load kept).
+ * `activation` is kept as shipped: `activationRunId` reads
  * the `Location` header a started activation run answers with, which is not a
  * question `structured` (the table's default for the slot name `activation`)
  * can even see.
@@ -382,7 +382,9 @@ export const ourUtils = {
   // reading now, and `utilActivationRunId` is the one that looks at the
   // `Location` header (MIGRATION-23 §4).
   activation: utilActivationRunId,
-  node: nodeLevel,
+  // One level of the repository tree as adt-strategies reads it (0.28.1):
+  // complete and incomplete objects, the nodes SAP could not load.
+  node: utilNodeContents,
   // `query` for the same reason as `node`: the generic `structured` parse has
   // never carried `dataPreview:columns` or `dataPreview:data` in its
   // repeatable list, so a preview read through it collapses a column's cells

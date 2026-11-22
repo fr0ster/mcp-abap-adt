@@ -45,7 +45,11 @@ import {
 } from '../../../lib/json';
 import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { includeContextUriOf } from '../../../lib/strategies/metadataFields';
-import { endsTheCall } from '../../../lib/strategies/packageWalk';
+import {
+  childNodesOf,
+  endsTheCall,
+  nodeItemsOf,
+} from '../../../lib/strategies/packageWalk';
 import {
   attributeOf,
   parseStructure,
@@ -542,8 +546,8 @@ async function getIncludesListInternal(
     // Create AdtClient and get utilities. `ourUtils` — not `resultsFor`'s
     // generic `structured` reading — because the shape this function needs
     // (objects at a level, and the type→nodeId pairs to descend into) is
-    // exactly `nodeLevel`'s `NodeLevel`, the one reading every node-structure
-    // caller in this migration reuses rather than re-derives.
+    // exactly the node reading's level (`utilNodeContents`), the one reading
+    // every node-structure caller reuses rather than re-derives.
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils(ourUtils);
 
@@ -571,11 +575,11 @@ async function getIncludesListInternal(
     }
 
     // Step 2: Find the includes (PROG/I) node id among the type folders.
-    const includesNode = rootResponse
-      .getResult()
-      // The includes node is `PROG/I` or `FUGR/I` (SAPMV45A's is FUGR/I,
-      // with PROG/I objects under it — on premise, 2026-09-25).
-      .value.childNodes.find((info) => isIncludesFolder(info.type));
+    // The includes node is `PROG/I` or `FUGR/I` (SAPMV45A's is FUGR/I,
+    // with PROG/I objects under it — on premise, 2026-09-25).
+    const includesNode = childNodesOf(rootResponse.getResult().value).find(
+      (info) => isIncludesFolder(info.type),
+    );
 
     if (!includesNode) {
       logger?.info(`No includes node found for ${objectType} '${objectName}'`);
@@ -606,7 +610,9 @@ async function getIncludesListInternal(
     // Step 4: Names of the objects under that node — de-duplicated, matching
     // the pre-migration parser's `[...new Set(...)]`.
     const includeNames = [
-      ...new Set(includesResponse.getResult().value.objects.map((o) => o.name)),
+      ...new Set(
+        nodeItemsOf(includesResponse.getResult().value).map((o) => o.name),
+      ),
     ];
 
     logger?.info(
@@ -1469,9 +1475,9 @@ function includesNodeRead(
   if (!root.ok) return undefined;
   const response = root.value;
   if (!response.ok) return undefined;
-  const node = response
-    .getResult()
-    .value.childNodes.find((info) => isIncludesFolder(info.type));
+  const node = childNodesOf(response.getResult().value).find((info) =>
+    isIncludesFolder(info.type),
+  );
   return node === undefined
     ? undefined
     : { kind: 'node', ...parent, nodeId: node.nodeId };
@@ -1525,7 +1531,9 @@ function includesFromAnswers(
       );
     }
     const includeNames = [
-      ...new Set(includesResponse.getResult().value.objects.map((o) => o.name)),
+      ...new Set(
+        nodeItemsOf(includesResponse.getResult().value).map((o) => o.name),
+      ),
     ];
     logger?.info(
       `Found ${includeNames.length} includes for ${objectType} '${objectName}' using SAP ADT API`,

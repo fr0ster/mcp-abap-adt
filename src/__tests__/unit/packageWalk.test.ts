@@ -9,18 +9,19 @@ import {
   assembleTree,
   codeFormatOf,
   concurrentReader,
+  isNotLoaded,
   kindOf,
   NODE_READ_CONCURRENCY,
   type NodeLevel,
   type NodeStructureSource,
-  nodeLevel,
-  nodeLevelOf,
+  nodeItemsOf,
   walkPackage,
   walkPackages,
 } from '../../lib/strategies/packageWalk';
 import { succeeded } from '../../lib/strategies/stepResponse';
 import { corpusBody, corpusSidecar } from '../helpers/adtCorpus';
 import { rejectionOf } from '../helpers/assertions';
+import { levelOf, nodeLevelOfXml } from '../helpers/nodeLevels';
 
 /**
  * The walk, offline, over the levels the corpus recorded.
@@ -59,7 +60,7 @@ function replaying(): NodeStructureSource & { calls: number } {
       const nodeId = options?.nodeId;
       const data = nodeId ? (byNodeId.get(nodeId) ?? '') : root;
       // The document as our `node` reading answers it.
-      return succeeded(nodeLevelOf(data));
+      return succeeded(nodeLevelOfXml(data));
     },
   };
   return source;
@@ -156,28 +157,25 @@ describe('the derived fields', () => {
 
 describe('the node reading', () => {
   it('reads one level into objects and what is below it', () => {
-    const level = nodeLevel({
-      data: corpusBody('read-object-tree-structure--01-nodestructure'),
-    });
+    const level = nodeLevelOfXml(
+      corpusBody('read-object-tree-structure--01-nodestructure'),
+    );
     // the root level lists types, not objects
     assert.equal(level.objects.length, 0);
     assert.ok(level.childNodes.length > 0);
-    assert.ok(level.childNodes[0].nodeId);
+    assert.ok(level.childNodes[0]?.nodeId);
   });
 
   it('reads objects out of a type level', () => {
-    const level = nodeLevel({
-      data: corpusBody('read-object-tree-structure--04-nodestructure'),
-    });
-    assert.ok(level.objects.length > 0);
-    assert.ok(level.objects[0].name);
+    const level = nodeLevelOfXml(
+      corpusBody('read-object-tree-structure--04-nodestructure'),
+    );
+    assert.ok(nodeItemsOf(level).length > 0);
+    assert.ok(nodeItemsOf(level)[0]?.name);
   });
 
   it('answers an empty level for an empty body rather than throwing', () => {
-    assert.deepStrictEqual(nodeLevel({ data: '' }), {
-      objects: [],
-      childNodes: [],
-    });
+    assert.deepStrictEqual(nodeLevelOfXml(''), levelOf([], []));
   });
 });
 
@@ -191,25 +189,22 @@ describe('the node reading', () => {
 describe('subpackages keep their own objects', () => {
   const ok = (value: NodeLevel) => succeeded(value);
   const levels: Record<string, NodeLevel> = {
-    'P|root': {
-      objects: [],
-      childNodes: [
+    'P|root': levelOf(
+      [],
+      [
         { type: 'DEVC/K', nodeId: '1' },
         { type: 'TABL/DT', nodeId: '2' },
       ],
-    },
-    'P|1': { objects: [{ name: 'SUB', type: 'DEVC/K' }], childNodes: [] },
-    'P|2': { objects: [{ name: 'T1', type: 'TABL/DT' }], childNodes: [] },
-    'SUB|root': { objects: [], childNodes: [{ type: 'TABL/DT', nodeId: '2' }] },
-    'SUB|2': { objects: [{ name: 'T2', type: 'TABL/DT' }], childNodes: [] },
+    ),
+    'P|1': levelOf([{ name: 'SUB', type: 'DEVC/K' }], []),
+    'P|2': levelOf([{ name: 'T1', type: 'TABL/DT' }], []),
+    'SUB|root': levelOf([], [{ type: 'TABL/DT', nodeId: '2' }]),
+    'SUB|2': levelOf([{ name: 'T2', type: 'TABL/DT' }], []),
   };
   const source: NodeStructureSource = {
     async fetchNodeStructure(_t, name, options) {
       return ok(
-        levels[`${name}|${options?.nodeId ?? 'root'}`] ?? {
-          objects: [],
-          childNodes: [],
-        },
+        levels[`${name}|${options?.nodeId ?? 'root'}`] ?? levelOf([], []),
       );
     },
   };
@@ -245,7 +240,7 @@ describe('a node-load message is not an object', () => {
       '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>The API state can be edited...</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
       '</TREE_CONTENT></DATA></asx:values></asx:abap>';
     assert.deepStrictEqual(
-      nodeLevel({ data }).objects.map((o) => o.name),
+      nodeItemsOf(nodeLevelOfXml(data)).map((o) => o.name),
       ['ZV_REAL'],
     );
   });
@@ -269,30 +264,27 @@ describe('a node SAP could not load is reported', () => {
     '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_NAME>ZT_ONE</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
     '</TREE_CONTENT></DATA></asx:values></asx:abap>';
   const levels: Record<string, NodeLevel> = {
-    'P|root': {
-      objects: [],
-      childNodes: [
+    'P|root': levelOf(
+      [],
+      [
         { type: 'VIEW/DV', nodeId: '1' },
         { type: 'TABL/DT', nodeId: '2' },
       ],
-    },
-    'P|1': nodeLevelOf(failedLevel),
-    'P|2': nodeLevelOf(goodLevel),
+    ),
+    'P|1': nodeLevelOfXml(failedLevel),
+    'P|2': nodeLevelOfXml(goodLevel),
   };
   const source: NodeStructureSource = {
     async fetchNodeStructure(_t, name, options) {
       return succeeded(
-        levels[`${name}|${options?.nodeId ?? 'root'}`] ?? {
-          objects: [],
-          childNodes: [],
-        },
+        levels[`${name}|${options?.nodeId ?? 'root'}`] ?? levelOf([], []),
       );
     },
   };
 
   it('the node reading marks a level SAP could not load, and no other', () => {
-    assert.equal(nodeLevelOf(failedLevel).notLoaded, true);
-    assert.equal(nodeLevelOf(goodLevel).notLoaded, undefined);
+    assert.equal(isNotLoaded(nodeLevelOfXml(failedLevel)), true);
+    assert.equal(isNotLoaded(nodeLevelOfXml(goodLevel)), false);
   });
 
   it('the walk answers one row for it, in fixed words with its type', async () => {
@@ -433,5 +425,32 @@ describe('concurrentReader', () => {
         value: `read ${i + 1}`,
       })),
     ]);
+  });
+});
+
+/**
+ * An object node SAP lists without its technical name or URI is listed, never
+ * dropped (adt-strategies 0.28.1 reads it as `incompleteObjects`).
+ */
+describe('an object SAP lists incomplete is listed', () => {
+  const level =
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_NAME>ZT_FULL</OBJECT_NAME><TECH_NAME>ZT_FULL</TECH_NAME><OBJECT_URI>/sap/bc/adt/ddic/tables/zt_full</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_NAME>ZT_BARE</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+
+  it('the walk answers both objects', async () => {
+    const source: NodeStructureSource = {
+      async fetchNodeStructure(_t, _name, options) {
+        return succeeded(
+          options?.nodeId === undefined ? nodeLevelOfXml(level) : levelOf([]),
+        );
+      },
+    };
+    const walked = await walkPackage(source, 'P');
+    assert.deepStrictEqual(
+      walked.map((o) => o.name),
+      ['ZT_FULL', 'ZT_BARE'],
+    );
   });
 });

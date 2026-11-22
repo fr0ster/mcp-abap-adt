@@ -24,6 +24,7 @@ import {
   analyseException,
   type ICreatedTransport,
   transportCreated,
+  transportTree,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
@@ -42,7 +43,6 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
-import { parseTransportXml } from '../readonly/handleGetTransport';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 export const REQUEST_TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -145,6 +145,7 @@ export async function handleCreateTransport(
       const request = createAdtClient(connection, logger).getRequest({
         ...resultsFor(transportDocuments),
         created: createdReading,
+        objects: firstTaskOf,
       });
       const created = await withAdtHeaders(
         context,
@@ -172,13 +173,8 @@ export async function handleCreateTransport(
           'read request task',
         );
       }
-      const tasks = parseTransportXml(
-        read.getResult().value.raw,
-        false,
-        true,
-      ).tasks;
-      const first = tasks?.[0]?.number;
-      if (typeof first !== 'string' || first === '') {
+      const first = read.getResult().value;
+      if (first === undefined) {
         task = { number: null, type: null };
         return created;
       }
@@ -246,4 +242,18 @@ function createdReading(answer: IAdtWireResponse) {
     ...verbatim(answer),
     created: (): ICreatedTransport => transportCreated(answer),
   };
+}
+
+/**
+ * The task SAP created with the request, read back: the first task of the
+ * request document as adt-strategies reads it (`transportTree`, which finds
+ * each `tm:request` and its `tm:task`s, whatever their depth); `undefined`
+ * when the request holds none. `transportObjectEntries` cannot answer it: it
+ * reads object entries, and a new request's task holds none. A document with
+ * no `tm:root` throws, as the read it replaced did.
+ */
+function firstTaskOf(answer: IAdtWireResponse): string | undefined {
+  const number =
+    transportTree(answer).requests[0]?.tasks[0]?.attributes['tm:number'];
+  return number === undefined || number === '' ? undefined : number;
 }

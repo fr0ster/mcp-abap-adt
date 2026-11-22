@@ -83,7 +83,9 @@ const PINNED: Readonly<Record<string, Readonly<Record<string, number>>>> = {
     'bornAtStart(': 1,
   },
   'src/embeddable/BaseMcpServer.ts': {
-    '.getConnection(': 5,
+    // The sixth: a listing's abapGit availability read (spec §4.5), through
+    // getConnection itself, so the kind is checked before it is handed on.
+    '.getConnection(': 6,
     '.source.resolve(': 3,
     'birthEntry(': 3,
     'bornAtStart(': 1,

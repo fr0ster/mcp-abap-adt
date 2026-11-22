@@ -138,6 +138,8 @@ export class StdioServer extends BaseMcpServer {
   private readonly deferredLogon: boolean;
   /** `--stdio-message-limit`: what the stdio client buffers at most, in bytes. */
   private readonly stdioMessageLimit: number;
+  /** `--deferred-logon`: the instance's connection was born by a call. */
+  private born = false;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -241,6 +243,25 @@ export class StdioServer extends BaseMcpServer {
     }
     this.registerHandlers(this.handlersRegistry);
     await this.connect(transport);
+  }
+
+  /**
+   * `--deferred-logon`: no listing logs on (spec §9.1 a). Before the first
+   * birth a `tools/list` takes no connection and lists no abapGit tool;
+   * after it, a listing reads the system's discovery as any other.
+   */
+  protected override listingTakesConnection(): boolean {
+    return !this.deferredLogon || this.born;
+  }
+
+  /**
+   * `--deferred-logon`: the first birth, made by a tool call, tells the
+   * client once that the abapGit tools may now be listed.
+   */
+  protected override connectionBorn(): void {
+    if (!this.deferredLogon) return;
+    this.born = true;
+    void this.announceAbapGitTools();
   }
 
   /** The destination's source, set once. */

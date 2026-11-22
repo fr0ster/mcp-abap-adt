@@ -2,7 +2,6 @@ import assert from 'node:assert/strict';
 import { after, afterEach, beforeEach, describe, it } from 'node:test';
 import { format } from 'node:util';
 import * as z from 'zod';
-import { isAbapGitTool } from '../../../lib/abapGit/tools';
 import { assertThrows } from '../../helpers/assertions';
 /**
  * A plain registration (`registry.registerAllTools(mcpServer)` on an SDK
@@ -114,16 +113,6 @@ async function plainListing(registry: IHandlersRegistry): Promise<Listed> {
   return listedOn(server);
 }
 
-/**
- * A listing without the abapGit tools: a BaseMcpServer lists them only where
- * the system's discovery serves abapGit (here it reaches none); a plain
- * registration has no discovery to read and lists them, and there a call of
- * one is refused without the server's admission.
- */
-function withoutAbapGit(listed: Listed): Listed {
-  return listed.filter((tool) => !isAbapGitTool(tool.name));
-}
-
 /** A case's registry and the definitions its groups hold. */
 interface Registered {
   readonly registry: IHandlersRegistry;
@@ -193,7 +182,7 @@ for (const [label, registeredFor] of Object.entries(REGISTRIES)) {
             new StatedServer(registryFor(systemType), systemType),
             exported,
           );
-          assert.deepStrictEqual(withoutAbapGit(plain), stated);
+          assert.deepStrictEqual(plain, stated);
         },
       );
     }
@@ -211,7 +200,7 @@ for (const [label, registeredFor] of Object.entries(REGISTRIES)) {
 
     it('stating none lists the definitions as they are', async () => {
       const { registry, definitions } = registeredFor();
-      const plain = withoutAbapGit(await plainListing(registry));
+      const plain = await plainListing(registry);
       assert.deepStrictEqual(
         plain,
         await servedListing(new StatedServer(registryFor()), exported),
@@ -221,7 +210,7 @@ for (const [label, registeredFor] of Object.entries(REGISTRIES)) {
         plain.map((tool) => tool.name),
         definitions
           .map((definition) => definition.name)
-          .filter((name) => !isBackgroundRunTool(name) && !isAbapGitTool(name))
+          .filter((name) => !isBackgroundRunTool(name))
           .sort((a, b) => a.localeCompare(b)),
       );
       // A listed long tool as a plain registration hands it out: without

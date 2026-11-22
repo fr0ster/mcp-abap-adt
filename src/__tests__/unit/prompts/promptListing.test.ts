@@ -257,20 +257,7 @@ describe('the prompts each binary lists and answers (WRITE_LISTED_PROMPTS=1, WRI
   });
 
   it('test 6: no prompts/get and no completion/complete sends a request', () => {
-    // The tool listings read beside the prompts ask the system's discovery
-    // whether it serves abapGit, on a connection of their instance: its
-    // logon, its system lookup, the discovery read and its logoff are the
-    // listings', not the prompts'.
-    assert.deepEqual(
-      standIn.requests.filter(
-        (request) =>
-          !request.url.includes('/discovery') &&
-          !request.url.startsWith('/sap/bc/adt/core/http/systeminformation') &&
-          !request.url.startsWith('/sap/bc/adt/core/http/sessions') &&
-          request.url !== '/sap/public/bc/icf/logoff',
-      ),
-      [],
-    );
+    assert.deepEqual(standIn.requests, []);
   });
 
   it('review focus 4: still to fill is the listed required less the filled arguments', async () => {

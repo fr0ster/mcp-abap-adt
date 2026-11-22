@@ -51,6 +51,12 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
+import {
+  type AnswerTable,
+  answerAt,
+  type DetailLevel,
+  groupedTsv,
+} from '../../../lib/detail';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import {
   type RuleVariant,
@@ -60,6 +66,11 @@ import {
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type JsonValue, jsonFields, jsonOrText } from '../../../lib/json';
 import { withLongToolAdvice } from '../../../lib/longTools';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
 import { whereUsedScopeTypesOf } from '../../../lib/strategies/metadataFields';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -68,6 +79,7 @@ import { withStep } from '../../../lib/strategies/step';
 import {
   fetchWhereUsedReferences,
   presentScopeOptions,
+  type WhereUsedListRead,
   type WhereUsedListResult,
   type WhereUsedSource,
   whereUsedOn,
@@ -283,6 +295,7 @@ function whereUsedFields(variant: ProjectionVariant) {
       .describe(
         "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
       ),
+    ...DETAIL_SHAPE,
   };
 }
 
@@ -322,6 +335,84 @@ function notWhereUsedOn(variant: ProjectionVariant, text: string): string {
     WHERE_USED_CODES[variant],
   );
 }
+
+/** The usage most usages carry: its cell is left empty at terse. */
+const COMMON_USAGE = 'gradeDirect,includeProductive';
+
+/** What a level formats: the list read, and the arguments it was read for. */
+interface WhereUsedRead {
+  result: WhereUsedListRead;
+  args: WhereUsedArgs;
+}
+
+/** The answer GetWhereUsed gave before `detail`: `full`. */
+function fullWhereUsed(
+  result: WhereUsedListResult,
+  args: WhereUsedArgs,
+): JsonValue {
+  return jsonFields({
+    object_name: args.object_name,
+    object_type: args.object_type,
+    container: args.container,
+    enable_all_types: args.enable_all_types || false,
+    enable_only_types: args.enable_only_types,
+    disable_types: args.disable_types,
+    total_references: result.totalReferences,
+    result_description: result.resultDescription,
+    references: result.references.map(jsonFields),
+  });
+}
+
+/**
+ * The usages as TSV, grouped by package (terse). A reference is a usage when
+ * SAP gave it `usageInformation`; the package and container nodes of its
+ * tree carry none, and leave — each usage names its package on the group
+ * line. Every usage is answered: nothing is cut.
+ */
+function whereUsedRows(result: WhereUsedListResult): string {
+  const groups = new Map<string, string[][]>();
+  for (const reference of result.references) {
+    const usage = reference.usage_information;
+    if (usage === undefined) continue;
+    const pkg = reference.package_name ?? '';
+    const rows = groups.get(pkg) ?? [];
+    rows.push([
+      reference.type,
+      reference.name,
+      usage === COMMON_USAGE ? '' : usage,
+    ]);
+    groups.set(pkg, rows);
+  }
+  return [
+    `# total ${result.totalReferences}`,
+    groupedTsv(
+      ['type', 'name', 'usage'],
+      [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
+    ),
+  ].join('\n');
+}
+
+/**
+ * What GetWhereUsed answers at each `detail`, selected before the requests
+ * (`src/lib/detail`): terse the usages ({@link whereUsedRows}); medium every
+ * reference with every field read, without its uri; full the answer before
+ * `detail`; raw SAP's document. The list is the server's own parse of the
+ * document: adt-strategies' `utilWhereUsedReferences` drops the package
+ * entries full answers (the plan's "Upstream items").
+ */
+const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, JsonValue> = {
+  terse: ({ result }) => whereUsedRows(result),
+  medium: ({ result }) =>
+    jsonFields({
+      total_references: result.totalReferences,
+      result_description: result.resultDescription,
+      references: result.references.map(({ uri: _uri, ...fields }) =>
+        jsonFields(fields),
+      ),
+    }),
+  full: ({ result, args }) => fullWhereUsed(result, args),
+  raw: ({ result }) => result.document,
+};
 
 /**
  * Returns where-used references for ABAP objects using AdtClient utilities.
@@ -380,7 +471,7 @@ async function whereUsedOf(
     if (!scopeResponse.ok) {
       return answerFailure(
         withStep(scopeResponse.getError(), 'read where-used scope'),
-        { tool: 'GetWhereUsed', detail: 'terse' },
+        { tool: 'GetWhereUsed', detail: detailOf(args) },
       );
     }
     const scopeXml = scopeResponse.getResult().value?.raw ?? '';
@@ -396,8 +487,9 @@ async function whereUsedOf(
     }
   }
 
+  const shown = answerAt(WHERE_USED_ANSWERS, levelOf(args));
   return answer(
-    { tool: 'GetWhereUsed', detail: 'terse' },
+    { tool: 'GetWhereUsed', detail: detailOf(args) },
     () =>
       fetchWhereUsedReferences(whereUsedOn(context, utils), {
         ...target,
@@ -405,23 +497,13 @@ async function whereUsedOf(
         enableOnlyTypes: typedArgs.enable_only_types,
         disableTypes: typedArgs.disable_types,
       }),
-    (result: WhereUsedListResult) => {
-      const formattedResponse = jsonFields({
-        object_name: typedArgs.object_name,
-        object_type: typedArgs.object_type,
-        container: typedArgs.container,
-        enable_all_types: typedArgs.enable_all_types || false,
-        enable_only_types: typedArgs.enable_only_types,
-        disable_types: typedArgs.disable_types,
-        total_references: result.totalReferences,
-        result_description: result.resultDescription,
-        references: result.references.map(jsonFields),
-      });
+    (result: WhereUsedListRead) => {
+      // The cache keeps the full answer, whatever the level answered.
       objectsListCache.setCache({
         isError: false,
-        content: [{ type: 'json', json: formattedResponse }],
+        content: [{ type: 'json', json: fullWhereUsed(result, typedArgs) }],
       });
-      return formattedResponse;
+      return shown({ result, args: typedArgs });
     },
   );
 }
@@ -508,14 +590,15 @@ async function whereUsedFromAnswers(
     if (!scopeResponse.ok) {
       return answerFailure(
         withStep(scopeResponse.getError(), 'read where-used scope'),
-        { tool: 'GetWhereUsed', detail: 'terse' },
+        { tool: 'GetWhereUsed', detail: detailOf(given) },
       );
     }
     const unknown = unsearchable(typedArgs, scopeResponse);
     if (unknown !== undefined) return return_error(unknown);
   }
+  const shown = answerAt(WHERE_USED_ANSWERS, levelOf(given));
   return answer(
-    { tool: 'GetWhereUsed', detail: 'terse' },
+    { tool: 'GetWhereUsed', detail: detailOf(given) },
     () =>
       fetchWhereUsedReferences(
         {
@@ -531,23 +614,13 @@ async function whereUsedFromAnswers(
           disableTypes: typedArgs.disable_types,
         },
       ),
-    (result: WhereUsedListResult) => {
-      const formattedResponse = jsonFields({
-        object_name: typedArgs.object_name,
-        object_type: typedArgs.object_type,
-        container: typedArgs.container,
-        enable_all_types: typedArgs.enable_all_types || false,
-        enable_only_types: typedArgs.enable_only_types,
-        disable_types: typedArgs.disable_types,
-        total_references: result.totalReferences,
-        result_description: result.resultDescription,
-        references: result.references.map(jsonFields),
-      });
+    (result: WhereUsedListRead) => {
+      // The cache keeps the full answer, whatever the level answered.
       objectsListCache.setCache({
         isError: false,
-        content: [{ type: 'json', json: formattedResponse }],
+        content: [{ type: 'json', json: fullWhereUsed(result, typedArgs) }],
       });
-      return formattedResponse;
+      return shown({ result, args: typedArgs });
     },
   );
 }
@@ -751,14 +824,32 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
-/** A list call's answer: one entry per object, in the order asked. */
+/**
+ * A list call's answer: one entry per object, in the order asked — at terse
+ * one text, each object's answer under its `# object TYPE NAME` line (a
+ * failure as `# error` and its payload), at the other levels a JSON array.
+ */
 function listAnswer(
   objects: ReadonlyArray<{
     readonly object_name: string;
     readonly object_type: string;
   }>,
   results: readonly McpResult[],
+  level: DetailLevel,
 ): McpResult {
+  if (level === 'terse') {
+    const text = results
+      .map((result, i) => {
+        const asked = objects[i];
+        const head = `# object ${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`;
+        const body = result.content[0]?.text ?? '';
+        return result.isError
+          ? `${head}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
+          : `${head}\n${body}`;
+      })
+      .join('\n');
+    return { isError: false, content: [{ type: 'text', text }] };
+  }
   const entries = results.map((result, i) => {
     const asked = objects[i];
     return result.isError
@@ -844,7 +935,7 @@ export async function handleGetWhereUsed(
       const outcome = await whereUsedInEnvelopes(context, targets, args);
       return 'ended' in outcome
         ? outcome.ended
-        : listAnswer(objects, outcome.answers);
+        : listAnswer(objects, outcome.answers, levelOf(args));
     },
     async () => {
       // One object after another, each as the single call reads it; a
@@ -855,7 +946,7 @@ export async function handleGetWhereUsed(
         if (endsList(result)) return result;
         results.push(result);
       }
-      return listAnswer(objects, results);
+      return listAnswer(objects, results, levelOf(args));
     },
   );
 }

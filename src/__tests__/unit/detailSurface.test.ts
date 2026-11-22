@@ -231,6 +231,7 @@ const JSON_ANSWERING: readonly string[] = [
   'GetTransaction',
   'GetTransport',
   'GetUnitTestResult',
+  'GetWhereUsed',
   'ListTransports',
   'MemorySnapshotDelta',
   'MemorySnapshotGet',

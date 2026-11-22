@@ -31,6 +31,15 @@ import { okResponse, reading } from '../helpers/fakeClient';
 import { jsonAt, listedJson } from '../helpers/listedJson';
 import { stateSystemKind } from '../helpers/systemKind';
 
+/**
+ * The where-used answer these cases assert is the one before `detail`:
+ * `detail: 'full'` (terse answers, step 3), unless a case states its own.
+ */
+const whereUsedFull = (
+  context: Parameters<typeof handleGetWhereUsed>[0],
+  args: Parameters<typeof handleGetWhereUsed>[1],
+) => handleGetWhereUsed(context, { detail: 'full', ...args });
+
 const SCOPE_XML = `<?xml version="1.0"?><usagereferences:usageScopeResult xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:objectTypes><usagereferences:type isDefault="true" isSelected="true" name="CLAS/OC"/><usagereferences:type isDefault="true" isSelected="true" name="INTF/OI"/><usagereferences:type isDefault="false" isSelected="false" name="TABL/DS"/><usagereferences:type isDefault="false" isSelected="false" name="TABL/DT"/></usagereferences:objectTypes></usagereferences:usageScopeResult>`;
 
 const mockGetWhereUsedScope = mock.fn<(...args: any[]) => any>(async () =>
@@ -72,7 +81,7 @@ describe('GetWhereUsed type-filter params', () => {
   });
 
   it('forwards in-scope enable_only_types/disable_types to getWhereUsed, scoped', async () => {
-    const result = await handleGetWhereUsed(ctx, {
+    const result = await whereUsedFull(ctx, {
       object_name: 'ZT',
       object_type: 'table',
       enable_only_types: ['TABL/DS', 'TABL/DT'],
@@ -104,7 +113,7 @@ describe('GetWhereUsed type-filter params', () => {
   });
 
   it('returns an error and does NOT search when a type is not in the scope', async () => {
-    const result = await handleGetWhereUsed(ctx, {
+    const result = await whereUsedFull(ctx, {
       object_name: 'ZT',
       object_type: 'table',
       enable_only_types: ['TABL/DS', 'BOGUS/XX'],
@@ -119,7 +128,7 @@ describe('GetWhereUsed type-filter params', () => {
   });
 
   it('skips scope validation and the scope round trip when no enable_only_types given', async () => {
-    await handleGetWhereUsed(ctx, {
+    await whereUsedFull(ctx, {
       object_name: 'ZT',
       object_type: 'table',
     } as any);

@@ -1,0 +1,166 @@
+/**
+ * GetWhereUsed at each `detail` (terse answers, step 3).
+ *
+ * - **terse** (default): the usages as TSV, grouped by package — `# total N`,
+ *   the header `type\tname\tusage`, a `# package P` group line, one row per
+ *   usage. A row is a usage when SAP gave it `usageInformation`; the package
+ *   and container nodes of SAP's tree carry none and leave. The usage cell is
+ *   empty for the common `gradeDirect,includeProductive`. No uri.
+ * - **medium**: every reference with every field the reading has, no uri.
+ * - **full**: the answer as it was before `detail`.
+ * - **raw**: SAP's document.
+ *
+ * Several objects at terse are one text, each object's answer under its
+ * `# object TYPE NAME` line.
+ *
+ * Replayed over a recording connection: real adt-clients code, no SAP.
+ */
+
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
+import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
+import {
+  createBatchAvailability,
+  NO_BATCH_ENDPOINT_STATUS,
+} from '../../../lib/batch/availability';
+import { declareSystemKind } from '../../../lib/systemKind';
+import { recordingConnection } from '../../helpers/recordingConnection';
+
+const ref = (
+  uri: string,
+  type: string,
+  name: string,
+  pkg: string,
+  usage?: string,
+) =>
+  `<usagereferences:referencedObject uri="${uri}" isResult="false" canHaveChildren="true"${usage === undefined ? '' : ` usageInformation="${usage}"`}><usagereferences:adtObject adtcore:responsible="SAPUSER01" adtcore:name="${name}" adtcore:type="${type}" xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/${pkg.toLowerCase()}" adtcore:type="DEVC/K" adtcore:name="${pkg}"/></usagereferences:adtObject></usagereferences:referencedObject>`;
+
+/** SAP's tree: two package nodes, a container, three usages in two packages. */
+const DOCUMENT = `<?xml version="1.0" encoding="utf-8"?><usagereferences:usageReferenceResult numberOfResults="3" resultDescription="Where-Used List: ZCL_X (Class)" xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:referencedObjects>${[
+  ref('/sap/bc/adt/packages/ztop', 'DEVC/K', 'ZTOP', 'ZTOP'),
+  ref('/sap/bc/adt/packages/zpkg', 'DEVC/K', 'ZPKG', 'ZPKG'),
+  ref('/sap/bc/adt/oo/classes/zcl_box', 'CLAS/OC', 'ZCL_BOX', 'ZPKG'),
+  ref(
+    '/sap/bc/adt/oo/classes/zcl_user',
+    'CLAS/OC',
+    'ZCL_USER',
+    'ZPKG',
+    'gradeDirect,includeProductive',
+  ),
+  ref(
+    '/sap/bc/adt/programs/programs/zprog',
+    'PROG/P',
+    'ZPROG',
+    'ZPKG',
+    'gradeDirect,includeTest',
+  ),
+  ref(
+    '/sap/bc/adt/oo/interfaces/zif_x',
+    'INTF/OI',
+    'ZIF_X',
+    'ZOTHER',
+    'gradeDirect,includeProductive',
+  ),
+].join(
+  '',
+)}</usagereferences:referencedObjects></usagereferences:usageReferenceResult>`;
+
+/** A destination whose communication batch answered it is not served. */
+function noBatch() {
+  const availability = createBatchAvailability();
+  availability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+  return availability;
+}
+
+async function whereUsed(
+  detail: 'terse' | 'medium' | 'full' | 'raw' | undefined,
+  documents: string[] = [DOCUMENT],
+  objects?: Array<{ object_name: string; object_type: string }>,
+) {
+  const connection = recordingConnection(documents.map((data) => ({ data })));
+  declareSystemKind(connection, 'onprem');
+  // No communication batch: several objects are read one after another.
+  const result = await handleGetWhereUsed(
+    {
+      connection,
+      logger: undefined,
+      batchAvailability: noBatch(),
+    },
+    {
+      ...(objects === undefined
+        ? { object_name: 'ZCL_X', object_type: 'CLAS/OC' }
+        : { objects }),
+      ...(detail === undefined ? {} : { detail }),
+    },
+  );
+  assert.equal(result.isError, false, result.content[0]?.text);
+  return result.content[0]?.text ?? '';
+}
+
+describe('GetWhereUsed detail', () => {
+  it('terse, by default: the usages grouped by package, no node and no uri', async () => {
+    const expected = [
+      '# total 3',
+      'type\tname\tusage',
+      '# package ZPKG',
+      'CLAS/OC\tZCL_USER\t',
+      'PROG/P\tZPROG\tgradeDirect,includeTest',
+      '# package ZOTHER',
+      'INTF/OI\tZIF_X\t',
+    ].join('\n');
+    assert.equal(await whereUsed(undefined), expected);
+    assert.equal(await whereUsed('terse'), expected);
+  });
+
+  it('medium: every reference with every field, no uri', async () => {
+    const answer = JSON.parse(await whereUsed('medium'));
+    assert.equal(answer.total_references, 3);
+    assert.equal(answer.result_description, 'Where-Used List: ZCL_X (Class)');
+    assert.equal(answer.references.length, 6);
+    assert.deepStrictEqual(answer.references[3], {
+      name: 'ZCL_USER',
+      type: 'CLAS/OC',
+      package_name: 'ZPKG',
+      responsible: 'SAPUSER01',
+      usage_information: 'gradeDirect,includeProductive',
+    });
+    assert.equal(
+      answer.references.some((r: object) => 'uri' in r),
+      false,
+    );
+  });
+
+  it('full: the answer as it was before detail, uri included', async () => {
+    const answer = JSON.parse(await whereUsed('full'));
+    assert.deepStrictEqual(Object.keys(answer), [
+      'object_name',
+      'object_type',
+      'enable_all_types',
+      'total_references',
+      'result_description',
+      'references',
+    ]);
+    assert.equal(answer.references.length, 6);
+    assert.equal(answer.references[3].uri, '/sap/bc/adt/oo/classes/zcl_user');
+  });
+
+  it('raw: the document as SAP sent it', async () => {
+    assert.equal(await whereUsed('raw'), DOCUMENT);
+  });
+
+  it('several objects at terse: one text, each under its object line', async () => {
+    const text = await whereUsed(
+      'terse',
+      [DOCUMENT, DOCUMENT],
+      [
+        { object_name: 'ZCL_X', object_type: 'CLAS/OC' },
+        { object_name: 'ZCL_Y', object_type: 'CLAS/OC' },
+      ],
+    );
+    const lines = text.split('\n');
+    assert.equal(lines[0], '# object CLAS/OC ZCL_X');
+    assert.equal(lines[1], '# total 3');
+    assert.equal(lines.filter((line) => line.startsWith('# object')).length, 2);
+    assert.ok(lines.includes('# object CLAS/OC ZCL_Y'));
+  });
+});

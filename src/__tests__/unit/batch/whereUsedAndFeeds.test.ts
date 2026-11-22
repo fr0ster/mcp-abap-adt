@@ -335,8 +335,13 @@ const TURNS = 20000;
 
 type Handler = (context: HandlerContext, args: any) => Promise<unknown>;
 
-/** The handlers, taking any arguments: a case may give a malformed call. */
-const handleGetWhereUsed = getWhereUsed as Handler;
+/**
+ * The handlers, taking any arguments: a case may give a malformed call.
+ * Where-used is asked at `detail: 'full'`, the answer before `detail` that
+ * these cases compare (terse answers, step 3), unless a case states its own.
+ */
+const handleGetWhereUsed: Handler = (context, args) =>
+  getWhereUsed(context, { detail: 'full', ...args });
 const handleRuntimeListFeeds = runtimeListFeeds as Handler;
 
 /** The batched answer and the sequential one, of the same call on the same model. */

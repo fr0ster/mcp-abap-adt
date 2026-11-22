@@ -131,6 +131,11 @@ export interface WhereUsedListResult {
   references: WhereUsedReference[];
 }
 
+/** A where-used list as read, with the document SAP answered (`detail: 'raw'`). */
+export interface WhereUsedListRead extends WhereUsedListResult {
+  document: string;
+}
+
 export interface WhereUsedFilter {
   enableAllTypes?: boolean | undefined;
   enableOnlyTypes?: string[] | undefined;
@@ -237,7 +242,7 @@ export function whereUsedTarget(
 export async function fetchWhereUsedReferences(
   utils: WhereUsedSource,
   params: IAdtWhereUsedScopeParamsOf & WhereUsedFilter,
-): Promise<IAdtResponse<WhereUsedListResult, IAdtError>> {
+): Promise<IAdtResponse<WhereUsedListRead, IAdtError>> {
   let scopeXml: string | undefined;
 
   if (needsScope(params)) {
@@ -265,5 +270,9 @@ export async function fetchWhereUsedReferences(
     return result;
   }
 
-  return noResult(parseWhereUsedReferences(result.getResult().value?.value));
+  const read = result.getResult().value;
+  return noResult({
+    ...parseWhereUsedReferences(read?.value),
+    document: read?.raw ?? '',
+  });
 }

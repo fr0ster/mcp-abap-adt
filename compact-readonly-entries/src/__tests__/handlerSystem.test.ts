@@ -507,13 +507,14 @@ describe('HandlerSystem', () => {
 
   const DETAIL_TAKERS: readonly SystemAction[] = [
     'search_object',
+    'where_used',
     'transports',
     'atc_findings',
     'atc_result',
   ];
 
   for (const [action, detail] of DETAIL_TAKERS.flatMap((action) =>
-    (['terse', 'full', 'raw'] as const).map(
+    (['terse', 'medium', 'full', 'raw'] as const).map(
       (detail) => [action, detail] as const,
     ),
   )) {

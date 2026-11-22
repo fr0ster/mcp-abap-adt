@@ -621,7 +621,9 @@ export function toolNameOf(source: ts.SourceFile): string | undefined {
  * Whether the handler selects a reading by the level asked for — a
  * `readingAt(<table>, levelOf(…))` call (`src/lib/detail`): the reading the
  * adt-clients call is given then decides the answer, so the projection is
- * the reading's value and need not name the level itself.
+ * the reading's value and need not name the level itself — or, where the
+ * answer is built from several requests, its formatter: `answerAt(<table>,
+ * levelOf(…))`.
  */
 function selectsReadingByLevel(source: ts.SourceFile): boolean {
   let found = false;
@@ -629,7 +631,8 @@ function selectsReadingByLevel(source: ts.SourceFile): boolean {
     if (found) return;
     if (
       ts.isCallExpression(node) &&
-      node.expression.getText() === 'readingAt'
+      (node.expression.getText() === 'readingAt' ||
+        node.expression.getText() === 'answerAt')
     ) {
       const level = node.arguments[1];
       if (

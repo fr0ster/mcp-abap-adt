@@ -1,4 +1,8 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import type {
+  IGatewayErrorEntry,
+  ISystemMessageEntry,
+} from '@mcp-abap-adt/adt-strategies';
 import {
   analyseException,
   feedEntries,
@@ -343,7 +347,7 @@ async function feedsOf(
       return answer(
         ctx,
         () =>
-          feedPages<{ id: string; validFrom: string }>(
+          feedPages<ISystemMessageEntry>(
             (page) =>
               messages.systemMessages({
                 ...base,
@@ -351,9 +355,12 @@ async function feedsOf(
                 analyse: analyseException,
               }),
             paging,
+            // A message is identified by its entry id, and the feed is
+            // ordered by its `atom:updated` (adt-strategies 0.28.0: SAP
+            // writes no validity; `validFrom` read the creation time).
             {
-              keyOf: (entry) => entry.id,
-              stampOf: (entry) => entry.validFrom,
+              keyOf: (entry) => entry.id ?? entry.messageId ?? '',
+              stampOf: (entry) => entry.updated,
             },
           ),
         pageOf,
@@ -364,7 +371,7 @@ async function feedsOf(
       return answer(
         ctx,
         () =>
-          feedPages<{ transactionId: string; dateTime: string }>(
+          feedPages<IGatewayErrorEntry>(
             (page) =>
               errors.gatewayErrors({
                 ...base,
@@ -372,8 +379,13 @@ async function feedsOf(
                 analyse: analyseException,
               }),
             paging,
+            // An error is identified by its entry id (adt-strategies 0.28.0:
+            // `transactionId` is the summary's cell now, the `atom:id` is
+            // `id`), and the feed is ordered by its date and time.
             {
-              keyOf: (entry) => `${entry.transactionId}|${entry.dateTime}`,
+              keyOf: (entry) =>
+                entry.id ??
+                `${entry.transactionId ?? ''}|${entry.dateTime ?? ''}`,
               stampOf: (entry) => entry.dateTime,
             },
           ),

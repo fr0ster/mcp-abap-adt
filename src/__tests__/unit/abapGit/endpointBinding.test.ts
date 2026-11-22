@@ -460,25 +460,38 @@ afterEach(() => {
   notifyConnectionResetListeners();
 });
 
+/**
+ * An SSE client: `opening` on the stream's opening GET only, `posts` on
+ * every POST of a message (each with the SAP headers).
+ */
 async function sseClient(
   port: number,
-  headers: Record<string, string>,
+  sap: Record<string, string>,
+  opening: Record<string, string> = {},
+  posts: Record<string, string> = {},
 ): Promise<Client> {
   const client = new Client({ name: 'abapgit-binding', version: '1' });
   await client.connect(
     new SSEClientTransport(new URL(`http://127.0.0.1:${port}/sse`), {
-      requestInit: { headers },
+      requestInit: { headers: { ...sap, ...posts } },
       eventSourceInit: {
         fetch: (url, init) =>
           fetch(url, {
             ...init,
-            headers: { ...(init?.headers ?? {}), ...headers },
+            headers: { ...(init?.headers ?? {}), ...sap, ...opening },
           }),
       },
     }),
   );
   return client;
 }
+
+/** Other git headers, as a POST might carry them. */
+const otherGitHeaders: Record<string, string> = {
+  'x-abapgit-remote': REPO,
+  'x-abapgit-user': 'post-user',
+  'x-abapgit-token': 'post-token',
+};
 
 describe('real dispatch: where a call’s endpoint comes from', () => {
   let standIn: AdtStandIn;
@@ -490,15 +503,23 @@ describe('real dispatch: where a call’s endpoint comes from', () => {
     await standIn.close();
   });
 
-  it('SSE: the opening GET’s headers are held by that stream’s instance, for every call, and by no other stream', async () => {
+  it('SSE: the opening GET’s headers are held by that stream’s instance, for every call, and by no other stream; a POST’s headers change nothing', async () => {
     const sse = new SseServer(registry(), { host: '127.0.0.1', port: 0 });
     await sse.start();
     const port = boundPort(sse);
     try {
-      const stated = await sseClient(port, {
-        ...sapHeaders(standIn.url),
-        ...gitHeaders,
-      });
+      const stated = await sseClient(
+        port,
+        sapHeaders(standIn.url),
+        gitHeaders,
+        otherGitHeaders,
+      );
+      const postOnly = await sseClient(
+        port,
+        sapHeaders(standIn.url),
+        {},
+        otherGitHeaders,
+      );
       const plain = await sseClient(port, sapHeaders(standIn.url));
       try {
         const call = (client: Client) =>
@@ -506,9 +527,13 @@ describe('real dispatch: where a call’s endpoint comes from', () => {
         assert.equal(textOf(await call(stated)), 'header-user');
         assert.equal(textOf(await call(stated)), 'header-user');
         assert.equal(textOf(await call(plain)), 'none');
+        // A POST's own git headers change nothing: the stream's are the
+        // opening GET's, and a stream that stated none has none.
+        assert.equal(textOf(await call(postOnly)), 'none');
       } finally {
         await stated.close();
         await plain.close();
+        await postOnly.close();
       }
       // A stream opened after the first closed starts with none.
       const after = await sseClient(port, sapHeaders(standIn.url));

@@ -62,9 +62,14 @@ function standIn(
 ): HandlerEntry {
   return {
     toolDefinition: { name, description: 'a stand-in', inputSchema: schema },
-    call: async () => {
+    call: async (context) => {
       runs.push(name);
-      return { content: [{ type: 'text', text: 'ran' }] };
+      const key = context.abapGitAdmission?.repo?.key;
+      return {
+        content: [
+          { type: 'text', text: key === undefined ? 'ran' : `ran ${key}` },
+        ],
+      };
     },
   };
 }
@@ -276,6 +281,38 @@ const LINK = {
     branch: 'main',
   },
 };
+
+const R1 =
+  '<?xml version="1.0" encoding="utf-8"?><abapgitrepo:repositories xmlns:abapgitrepo="http://www.sap.com/adt/abapgit/repositories">' +
+  '<abapgitrepo:repository><abapgitrepo:key>000001</abapgitrepo:key>' +
+  '<abapgitrepo:package>ZPKG</abapgitrepo:package>' +
+  '<abapgitrepo:url>https://git.example.invalid/x</abapgitrepo:url>' +
+  '<abapgitrepo:branchName>refs/heads/main</abapgitrepo:branchName>' +
+  '</abapgitrepo:repository></abapgitrepo:repositories>';
+
+describe('a real dispatch of an admitted keyed call', () => {
+  it('reads R1 exactly once, credential-free, and hands the entry to the handler', async () => {
+    const runs: string[] = [];
+    sap.body((r) => r.url.split('?')[0] === '/sap/bc/adt/abapgit/repos', R1);
+    const s = await stdio(sap, runs, { systemType: 'onprem' });
+    try {
+      const answer = await s.call('PullAbapGitRepo', {
+        repository_key: '000001',
+      });
+      assert.equal(textOf(answer), 'ran 000001');
+      const reads = sap.requests.filter(
+        (r) =>
+          r.method === 'GET' &&
+          r.url.split('?')[0] === '/sap/bc/adt/abapgit/repos',
+      );
+      assert.equal(reads.length, 1);
+      assert.equal(reads[0]?.headers.username, undefined);
+      assert.equal(reads[0]?.headers.password, undefined);
+    } finally {
+      await s.close();
+    }
+  });
+});
 
 describe('every instance factory carries the restriction signal', () => {
   let previousType: string | undefined;

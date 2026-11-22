@@ -35,8 +35,7 @@ import {
   type ITransportItem,
   type ITransportRequestItem,
   type ITransportTaskItem,
-  rawOf,
-  readTransportItem,
+  transportItem,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -52,16 +51,12 @@ import {
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AnswerObject } from '../../../lib/json';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
-import {
-  type AdtReading,
-  parseStructure,
-} from '../../../lib/strategies/reading';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withStep } from '../../../lib/strategies/step';
 import { failed } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
 import type { XmlNode } from '../../../lib/xml/node';
-import { child } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'GetTransport',
@@ -170,33 +165,20 @@ function terseTask(item: ITransportTaskItem, options: TerseOptions) {
 
 /**
  * The transport asked for, as adt-strategies reads it by its number
- * (`readTransportItem`: a task's document is the task, never its parent; a
- * document naming another number, or none, is not it); `undefined` when the
- * answer is not that transport.
+ * (`transportItem`, 0.28.1: a task's document is the task, never its parent,
+ * marked or not; a document naming another number, none, or more than one
+ * element of it is not it); `undefined` when the answer is not that
+ * transport.
  */
 function itemOf(
   answer: IAdtWireResponse,
   number: string,
 ): ITransportItem | undefined {
-  const asked = number.trim().toUpperCase();
-  const raw = rawOf(answer);
-  let item: ITransportItem;
   try {
-    item = readTransportItem(raw, asked);
+    return transportItem(number.trim().toUpperCase())(answer);
   } catch {
     return undefined;
   }
-  // Upstream item: with no `tm:object_type`, `readTransportItem` reads a
-  // task's document asked for by its parent's number as the parent, from
-  // the parent's header alone. A `tm:task` directly under `tm:root` makes
-  // the document a task's, never its parent's.
-  if (item.kind === 'request' && rootHoldsTask(raw)) return undefined;
-  return item;
-}
-
-/** Whether `tm:root` holds a `tm:task` of its own: a task's document. */
-function rootHoldsTask(raw: string): boolean {
-  return child(child(parseStructure(raw), 'tm:root'), 'tm:task') !== undefined;
 }
 
 /** A level's reading: the transport read by its number, and what is shown. */

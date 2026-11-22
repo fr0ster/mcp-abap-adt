@@ -34,9 +34,16 @@
  */
 
 import { AdtAbapGitClient } from '@mcp-abap-adt/adt-clients/abapgit';
-import type { IAbapGitRepoFacts } from '@mcp-abap-adt/adt-strategies';
+import {
+  abapGitRepos,
+  type IAbapGitRepoFacts,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapGitCredentials } from '@mcp-abap-adt/interfaces-adt';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type {
+  IAbapConnection,
+  IAbapRequestOptions,
+  IAdtWireResponse,
+} from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import type {
   AccessCall,
@@ -291,15 +298,18 @@ export async function admitAbapGitCall(
   if (operation === undefined) return { admitted: {} };
   // 5. The R1 pre-read, once, for a call addressed by repository_key.
   let repo: IAbapGitRepoFacts | undefined;
+  let logLink: string | undefined;
   if (KEYED.has(operation)) {
-    repo = await repositoryOf(
+    const read = await repositoryOf(
       connection,
       stringArg(call.args, 'repository_key'),
       context.logger,
     );
-    if (repo === undefined) {
+    if (read === undefined) {
       return { refused: new ServerRefusal('abapgit_repository_unknown') };
     }
+    repo = read.entry;
+    logLink = read.logLink;
   }
   // 6. The package check, when access checks are configured.
   if (context.accessChecks !== undefined) {
@@ -326,7 +336,8 @@ export async function admitAbapGitCall(
       repo === undefined ||
       repo.appLogKey === undefined ||
       asked === undefined ||
-      asked !== repo.appLogKey
+      asked !== repo.appLogKey ||
+      !logLinkOfRepository(logLink, repo.key)
     ) {
       return { refused: new ServerRefusal('abapgit_run_log_not_paired') };
     }
@@ -370,11 +381,15 @@ async function repositoryOf(
   connection: IAbapConnection,
   key: string | undefined,
   logger: ILogger | undefined,
-): Promise<IAbapGitRepoFacts | undefined> {
+): Promise<
+  | { readonly entry: IAbapGitRepoFacts; readonly logLink: string | undefined }
+  | undefined
+> {
   if (key === undefined || key.trim() === '') return undefined;
+  const observed = new AnswerKeepingConnection(connection);
   let repos: readonly IAbapGitRepoFacts[];
   try {
-    const read = await AdtAbapGitClient.create(connection, {
+    const read = await AdtAbapGitClient.create(observed, {
       ...(logger !== undefined ? { logger } : {}),
     }).listReposQuiet();
     if (!read.ok) return undefined;
@@ -390,7 +405,72 @@ async function repositoryOf(
   ) {
     return undefined;
   }
-  return entry;
+  // The entry's own log_link, read from the same answer: R1 carries no
+  // credential (spec §5.3), and the facts keep the log key alone.
+  const answer = observed.answer;
+  let logLink: string | undefined;
+  try {
+    logLink =
+      answer === undefined
+        ? undefined
+        : abapGitRepos(answer).find((each) => each.repositoryId === key)
+            ?.logLink;
+  } catch {
+    logLink = undefined;
+  }
+  return { entry, logLink };
+}
+
+/** The repositories' path every repository link starts with. */
+const REPOS_PATH = '/sap/bc/adt/abapgit/repos/';
+
+/**
+ * Whether `logLink` is `/sap/bc/adt/abapgit/repos/<key>/log/<id>` for this
+ * repository's `key`: its repository segment, decoded, is the key. Plain
+ * string code.
+ */
+function logLinkOfRepository(
+  logLink: string | undefined,
+  key: string,
+): boolean {
+  if (logLink === undefined || !logLink.startsWith(REPOS_PATH)) return false;
+  const segments = logLink.slice(REPOS_PATH.length).split('/');
+  if (segments.length !== 3 || segments[1] !== 'log') return false;
+  const segment = segments[0] ?? '';
+  try {
+    return decodeURIComponent(segment) === key;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The instance's connection, keeping the answer of the request it forwards
+ * last: the R1 pre-read's, read for the entry's links. Nothing else is
+ * changed or kept.
+ */
+class AnswerKeepingConnection implements IAbapConnection {
+  answer: IAdtWireResponse | undefined;
+  constructor(private readonly connection: IAbapConnection) {}
+  connect(): Promise<void> {
+    return this.connection.connect();
+  }
+  getBaseUrl(): Promise<string | undefined> {
+    return this.connection.getBaseUrl();
+  }
+  getSessionId(): string | null {
+    return this.connection.getSessionId();
+  }
+  setSessionType(type: 'stateful' | 'stateless'): void {
+    this.connection.setSessionType(type);
+  }
+  async makeAdtRequest(
+    options: IAbapRequestOptions,
+  ): Promise<IAdtWireResponse> {
+    const answer = await this.connection.makeAdtRequest(options);
+    this.answer = answer;
+    return answer;
+  }
 }
 
 /** The access call of step 6, or `undefined` when the operation's package is not checked. */

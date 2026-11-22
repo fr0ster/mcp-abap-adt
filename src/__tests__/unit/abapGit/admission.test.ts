@@ -43,6 +43,8 @@ function r1(
     url?: string;
     logKey?: string;
     statusKey?: string;
+    /** The repository segment of the log_link; the entry's own key by default. */
+    logRepository?: string;
   } = {},
 ): string {
   return (
@@ -58,7 +60,7 @@ function r1(
       : `<atom:link href="/sap/bc/adt/abapgit/repos/${KEY}/status/${options.statusKey}" rel="${REL}/status" type="status_link"/>`) +
     (options.logKey === undefined
       ? ''
-      : `<atom:link href="/sap/bc/adt/abapgit/repos/${KEY}/log/${options.logKey}" rel="${REL}/log" type="log_link"/>`) +
+      : `<atom:link href="/sap/bc/adt/abapgit/repos/${options.logRepository ?? KEY}/log/${options.logKey}" rel="${REL}/log" type="log_link"/>`) +
     '</abapgitrepo:repository></abapgitrepo:repositories>'
   );
 }
@@ -374,6 +376,11 @@ describe('the steps after: availability, one R1, the package, the pairing, the b
       ['foreign key', r1({ logKey: 'LOG1' }), 'LOG2'],
       ['no log key', r1({ logKey: 'LOG1' }), undefined],
       ['status_link alone', r1({ statusKey: 'LOG1' }), 'LOG1'],
+      [
+        'log_link of another repository',
+        r1({ logKey: 'LOG1', logRepository: '000002' }),
+        'LOG1',
+      ],
     ] as const) {
       const sap = sapWith(document);
       const args: ToolArgs =

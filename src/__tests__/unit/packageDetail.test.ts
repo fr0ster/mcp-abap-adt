@@ -151,6 +151,15 @@ describe('GetPackageTree detail', () => {
     assert.equal(await tree('terse'), expected);
   });
 
+  it('terse with include_descriptions: each row with its description', async () => {
+    const result = await handleGetPackageTree(context([METADATA]), {
+      package_name: 'ZPKG',
+      include_descriptions: true,
+    });
+    const rows = (result.content[0]?.text ?? '').split('\n');
+    assert.equal(rows.at(-1), '  TABL/DT\tZT_ONE\tA table');
+  });
+
   it('full: the tree before detail', async () => {
     const full = JSON.parse(await tree('full'));
     assert.equal(full.package_name, 'ZPKG');

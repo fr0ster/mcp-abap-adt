@@ -390,10 +390,21 @@ function treeOf(
 }
 
 /** The tree as indented `type\tname` rows, the package first (terse). */
-function treeRows(node: PackageNode, depth = 0): TreeRow[] {
+function treeRows(
+  node: PackageNode,
+  descriptions: boolean,
+  depth = 0,
+): TreeRow[] {
   return [
-    { depth, cells: [node.type, node.name] },
-    ...(node.children ?? []).flatMap((child) => treeRows(child, depth + 1)),
+    {
+      depth,
+      cells: descriptions
+        ? [node.type, node.name, node.description ?? '']
+        : [node.type, node.name],
+    },
+    ...(node.children ?? []).flatMap((child) =>
+      treeRows(child, descriptions, depth + 1),
+    ),
   ];
 }
 
@@ -437,8 +448,12 @@ interface TreeAnswerRead {
 type TreeAnswer = string | MediumNode | ReturnType<typeof treeOf>;
 
 const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
-  terse: ({ packageName, walked }) =>
-    indentedTsv(treeRows(assembleTree(packageName, walked))),
+  // With include_descriptions, each row's description beside its type and
+  // name.
+  terse: ({ packageName, walked, options }) =>
+    indentedTsv(
+      treeRows(assembleTree(packageName, walked), options.includeDescriptions),
+    ),
   medium: ({ packageName, walked }) =>
     mediumNode(assembleTree(packageName, walked)),
   full: ({ packageName, walked, options }) =>

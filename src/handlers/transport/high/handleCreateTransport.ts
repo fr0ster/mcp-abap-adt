@@ -63,16 +63,26 @@ interface TypedTask {
   /** `null`: no task was found, so no type was applied. */
   type: TaskType | null;
   error?: FailureEntry;
-  /** The created request could not be read back: refused, or not it. */
-  readBackFailed?: true;
+  /**
+   * The created request could not be read back, and why: SAP refused the
+   * credentials, refused otherwise, or answered what is not the request.
+   */
+  readBackFailed?: ReadBackFailure;
 }
+
+/** Why a created request's read-back failed. */
+type ReadBackFailure = 'authentication' | 'server' | 'malformed';
 
 /**
  * The note of a created request whose read-back failed, in fixed words with
- * the number SAP answered: the request exists, and this is how to read it.
+ * the number SAP answered and the kind of failure: the request exists, and
+ * this is how to read it.
  */
-export function readBackFailedNote(number: string): string {
-  return `the request ${number} was created, but reading it back failed: read it with GetTransport, transport_number ${number}`;
+export function readBackFailedNote(
+  number: string,
+  failure: ReadBackFailure,
+): string {
+  return `the request ${number} was created, but reading it back failed (${failure}): read it with GetTransport, transport_number ${number}`;
 }
 
 export const TOOL_DEFINITION = {
@@ -152,8 +162,13 @@ export async function handleCreateTransport(
       task_number: task.number,
       task_type: task.type,
       ...(task.error ? { task_type_error: task.error } : {}),
-      ...(task.readBackFailed === true
-        ? { note: readBackFailedNote(created.transportNumber) }
+      ...(task.readBackFailed !== undefined
+        ? {
+            note: readBackFailedNote(
+              created.transportNumber,
+              task.readBackFailed,
+            ),
+          }
         : task.number === null
           ? {
               note: 'the request exists, but its read showed no task, so no task type was applied',
@@ -230,26 +245,23 @@ export async function handleCreateTransport(
           .readObjects(number, { analyse: analyseException }),
       )();
       // Once SAP has created the request its number is never lost: a
-      // read-back that fails — refused (but for the credential, which ends
-      // the call) or not the request — is the created request, with a note
-      // naming how to read it again.
+      // read-back that fails — its credentials refused, refused otherwise,
+      // or not the request — is the created request, with a note naming the
+      // failure and how to read it again.
       if (!read.ok) {
-        if (
-          isCredentialPayload(
-            failureEntry(read.getError(), 'read request task'),
-          )
-        ) {
-          return failed(
-            withStep(read.getError(), 'read request task'),
-            'CreateTransport',
-          );
-        }
-        task = { number: null, type: null, readBackFailed: true };
+        const refusal = failureEntry(read.getError(), 'read request task');
+        task = {
+          number: null,
+          type: null,
+          readBackFailed: isCredentialPayload(refusal)
+            ? 'authentication'
+            : 'server',
+        };
         return created;
       }
       const taskRead = read.getResult().value;
       if (taskRead.kind === 'threw') {
-        task = { number: null, type: null, readBackFailed: true };
+        task = { number: null, type: null, readBackFailed: 'malformed' };
         return created;
       }
       const first = taskRead.first;

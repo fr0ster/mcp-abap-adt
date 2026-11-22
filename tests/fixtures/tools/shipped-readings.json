@@ -493,7 +493,7 @@
   },
   "CreateTransport read back as a bare root @terse": {
     "isError": false,
-    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed: read it with GetTransport, transport_number SIDK900011\"}",
+    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -501,7 +501,7 @@
   },
   "CreateTransport read back as a bare root @medium": {
     "isError": false,
-    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed: read it with GetTransport, transport_number SIDK900011\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
+    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -525,7 +525,7 @@
   },
   "CreateTransport read back as no transport document @terse": {
     "isError": false,
-    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed: read it with GetTransport, transport_number SIDK900011\"}",
+    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -533,7 +533,7 @@
   },
   "CreateTransport read back as no transport document @medium": {
     "isError": false,
-    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed: read it with GetTransport, transport_number SIDK900011\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
+    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -557,7 +557,7 @@
   },
   "CreateTransport read back as an empty root element @terse": {
     "isError": false,
-    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed: read it with GetTransport, transport_number SIDK900011\"}",
+    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -565,7 +565,7 @@
   },
   "CreateTransport read back as an empty root element @medium": {
     "isError": false,
-    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed: read it with GetTransport, transport_number SIDK900011\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
+    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"

@@ -17,7 +17,8 @@ import { recordingConnection } from '../helpers/recordingConnection';
 const head = '<?xml version="1.0" encoding="utf-8"?>';
 const NUMBER = 'SIDK900011';
 const CREATED = `${head}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest"><tm:request tm:number="${NUMBER}" tm:desc="x" tm:type="K" tm:target="LOCAL"><tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>`;
-const READ_BACK_WORDS = `the request ${NUMBER} was created, but reading it back failed: read it with GetTransport, transport_number ${NUMBER}`;
+const READ_BACK_WORDS = (kind: string) =>
+  `the request ${NUMBER} was created, but reading it back failed (${kind}): read it with GetTransport, transport_number ${NUMBER}`;
 
 const run = async (
   readBack: { data: string; status?: number },
@@ -40,13 +41,23 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
   );
   afterEach(() => resetSystemContextCache());
 
-  for (const [label, readBack] of [
+  for (const [label, readBack, kind] of [
     [
       'a read-back that is not the request',
       { data: `${head}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"/>` },
+      'malformed',
     ],
-    ['a read-back that is no transport document', { data: `${head}<html/>` }],
-    ['a refused read-back', { data: 'boom', status: 500 }],
+    [
+      'a read-back that is no transport document',
+      { data: `${head}<html/>` },
+      'malformed',
+    ],
+    ['a refused read-back', { data: 'boom', status: 500 }, 'server'],
+    [
+      'a read-back refused for its credentials',
+      { data: 'no', status: 401 },
+      'authentication',
+    ],
   ] as const) {
     it(`${label}: terse answers the number and how to read it again`, async () => {
       const answered = await run(readBack, 'terse');
@@ -54,7 +65,7 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
       const body = JSON.parse(answered.content[0]?.text ?? '{}');
       assert.equal(body.transport_number, NUMBER);
       assert.equal(body.task_number, null);
-      assert.equal(body.note, READ_BACK_WORDS);
+      assert.equal(body.note, READ_BACK_WORDS(kind));
     });
 
     for (const detail of ['medium', 'full', 'raw'] as const) {

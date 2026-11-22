@@ -52,6 +52,7 @@ export const TOOL_DEFINITION: KindToolDefinition<
 > = {
   name: 'LinkAbapGitRepo',
   description: ONPREM_DESCRIPTION,
+  inputSchema: ONPREM_SCHEMA,
   onprem: {
     description: ONPREM_DESCRIPTION,
     inputSchema: ONPREM_SCHEMA,

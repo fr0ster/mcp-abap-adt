@@ -31,6 +31,8 @@ export interface KindToolDefinition<
   readonly name: string;
   /** Where no kind is stated: the on-premise description. */
   readonly description: string;
+  /** Where no kind is stated: the on-premise schema. */
+  readonly inputSchema: O;
   readonly available_in?: readonly SapEnvironment[];
   readonly onprem: KindDefinition<O>;
   readonly cloud: KindDefinition<C>;
@@ -44,7 +46,7 @@ export function kindToolDefinition<
   return {
     name: definition.name,
     description: definition.description,
-    inputSchema: definition.onprem.inputSchema,
+    inputSchema: definition.inputSchema,
     ...(definition.available_in !== undefined
       ? { available_in: definition.available_in }
       : {}),

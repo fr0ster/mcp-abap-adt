@@ -48,6 +48,7 @@ export const TOOL_DEFINITION: KindToolDefinition<
 > = {
   name: 'PushAbapGitRepo',
   description: ONPREM_DESCRIPTION,
+  inputSchema: ONPREM_SCHEMA,
   onprem: {
     description: ONPREM_DESCRIPTION,
     inputSchema: ONPREM_SCHEMA,

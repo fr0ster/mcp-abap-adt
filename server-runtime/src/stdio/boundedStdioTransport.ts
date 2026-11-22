@@ -15,7 +15,7 @@
  * `ReadBuffer.append` checks the bytes it holds — the unparsed rest of the
  * frame being read — plus the new chunk, before it splits lines. The rest is
  * less than one frame and the chunk is one read of the client's stdio
- * stream, so a frame of at most `limit − margin` bytes never makes the sum
+ * stream (at most the margin, for the clients `STDIO_READ_MARGIN` names), so a frame of at most `limit − margin` bytes never makes the sum
  * pass `limit`, whatever frames are written back to back.
  *
  * Every frame is measured as written, a replacement included:
@@ -51,16 +51,21 @@ import {
 export const STDIO_MESSAGE_LIMIT = STDIO_DEFAULT_MAX_BUFFER_SIZE;
 
 /**
- * The most one read of the client's stdio stream delivers, kept free below
- * the limit: 64 KiB. A Node client — the SDK's `StdioClientTransport` —
- * reads the child's stdout through libuv, which hands every read a 64 KiB
- * buffer (`uv__read`'s `alloc_cb(…, 64 * 1024, …)` on Unix, where a child's
- * stdio is a socket, not a pipe; the same 65,536-byte suggested size on
- * Windows), so a `data` chunk is never longer. Measured on Linux
- * (2026-11-22, Node 26): 8 MiB written to a child's stdout arrived in 129
- * chunks of at most 65,536 bytes.
+ * Room kept free below the limit for one read of the client's stdio stream:
+ * 1 MiB. Verified per client, each reading less:
+ * - Node (the SDK's `StdioClientTransport`): at most 65,536 bytes a chunk —
+ *   libuv hands every read a 64 KiB buffer (`uv__read`, `src/unix/stream.c`;
+ *   on Unix a child's stdio is a socket; Windows `src/win/pipe.c`, source
+ *   only). Measured on Linux (2026-11-22, Node 26): 8 MiB from a child's
+ *   stdout arrived in chunks of at most 65,536 bytes.
+ * - Python MCP over AnyIO: `StreamReader.read(65536)`.
+ * - The TS SDK hosted on Bun (Claude Code ships as a Bun binary): 262,144
+ *   bytes a chunk, measured on Linux (2026-11-22, Bun 1.3.13), 8 MiB from a
+ *   child's stdout read through `node:child_process`.
+ * A client that reads larger chunks needs a correspondingly lower
+ * `--stdio-message-limit`.
  */
-export const STDIO_READ_MARGIN = 64 * 1024;
+export const STDIO_READ_MARGIN = 1024 * 1024;
 
 /**
  * The smallest frame cap a stated limit may leave: 1 MiB. Every frame the
@@ -72,7 +77,7 @@ export const STDIO_READ_MARGIN = 64 * 1024;
  */
 export const STDIO_MIN_FRAME_CAP = 1024 * 1024;
 
-/** The smallest `--stdio-message-limit`: the smallest cap plus the margin. */
+/** The smallest `--stdio-message-limit`: the smallest cap plus the margin (2 MiB). */
 export const STDIO_MIN_MESSAGE_LIMIT = STDIO_MIN_FRAME_CAP + STDIO_READ_MARGIN;
 
 /** The longest frame the server writes to a client that buffers `limit` bytes. */

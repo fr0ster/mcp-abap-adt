@@ -133,26 +133,29 @@ describe('the stdio frame cap', () => {
     assert.throws(() => clientReads(bytes), /ReadBuffer exceeded maximum size/);
   });
 
-  it('two frames at the cap, sent together and read in chunks of the margin, are both read', async () => {
-    const first = answerOfSize(1, STDIO_FRAME_CAP);
-    const second = answerOfSize(2, STDIO_FRAME_CAP);
-    assert.equal(sizeOf(first), STDIO_FRAME_CAP);
-    // Chunks of the margin, out of step with the frames by half a chunk:
-    // the rest of a frame is in the buffer when the next chunk arrives.
-    const read = clientReads(
-      await written(bounded(), first, second),
-      STDIO_READ_MARGIN,
-      STDIO_READ_MARGIN / 2,
-    );
-    assert.deepEqual(
-      read.map((m) => ('id' in m ? m.id : undefined)),
-      [1, 2],
-    );
-    assert.equal(
-      read.some((m) => isJSONRPCErrorResponse(m)),
-      false,
-    );
-  });
+  // The largest chunks measured per client: 256 KiB (the TS SDK on Bun), and
+  // the margin itself. Each is fed out of step with the frames by half a
+  // chunk, so the rest of a frame is in the buffer when the next arrives.
+  for (const chunk of [256 * 1024, STDIO_READ_MARGIN]) {
+    it(`two frames at the cap, read in chunks of ${chunk} bytes, are both read`, async () => {
+      const first = answerOfSize(1, STDIO_FRAME_CAP);
+      const second = answerOfSize(2, STDIO_FRAME_CAP);
+      assert.equal(sizeOf(first), STDIO_FRAME_CAP);
+      const read = clientReads(
+        await written(bounded(), first, second),
+        chunk,
+        chunk / 2,
+      );
+      assert.deepEqual(
+        read.map((m) => ('id' in m ? m.id : undefined)),
+        [1, 2],
+      );
+      assert.equal(
+        read.some((m) => isJSONRPCErrorResponse(m)),
+        false,
+      );
+    });
+  }
 
   it('an answer over the cap is answered InternalError naming both sizes, which the client reads', async () => {
     const message = answerOfSize(7, STDIO_FRAME_CAP + 1);

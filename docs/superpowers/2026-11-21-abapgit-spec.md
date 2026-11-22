@@ -277,9 +277,8 @@ Common to all:
 - **Stateless** (§2.5): every call goes through a new form; `ListAbapGitRepos` reads R1 through
   `listReposQuiet` like the pre-read, never through the existing `listRepos`. The one exception is
   `unlink`, unchanged by the owner's ruling: it carries no `stateless` flag and goes stateless only
-  as the connection's session mode does (§2.5). **Batch:** every abapGit tool and action is refused in batch mode before
-  anything is sent and before any credential is resolved; no batch entry and no number is taken
-  (`batch_not_recordable`, the existing refusal for calls that cannot be recorded).
+  as the connection's session mode does (§2.5). **Batch:** no abapGit-specific handling; the consumer decides what goes into
+  a batch (owner, 2026-11-22), and what the batch connection answers reaches the consumer as it is.
 - **Arguments** never carry a credential. A repository is addressed by `repository_key`.
 - **Client forms:** every call goes through a new form of `AdtAbapGitClient` (anonymous ones with
   `credentials: null`) or the existing `listRepos` / `unlink`; never a legacy form (§3).
@@ -541,7 +540,7 @@ No host decides anything else:
 - Server refusals before sending, fixed words: access codes; `abapgit_import_not_allowed`
   (§4.3); unknown key, blank package or URL, unreadable R1 (§4.4); a run-log key R1 does not show
   for that repository (§4.1); URL with userinfo, query or fragment; abapGit not served (§4.5);
-  batch mode; `background` where it is not declared or cannot run (§4.6).
+  `background` where it is not declared or cannot run (§4.6).
 
 ## 7. Tests
 
@@ -553,7 +552,7 @@ No host decides anything else:
   test;
 - readings and the §5.3 structured contract over sanitised captured documents;
 - server: schemas per variant and set (`background` only where §4.6 declares it), `-ro`
-  membership, deny entries, batch refusal with no entry, the R1 pre-read and fail-closed cases,
+  membership, deny entries, the R1 pre-read and fail-closed cases,
   the import refusal under each restriction kind, the run-log pairing, approved-endpoint matching
   (exact, alias sending the configured URL, `.git` / trailing `/` / port / case near-misses, no
   match sent anonymously), userinfo/query/fragment refusal, `tools/list` filtering and call

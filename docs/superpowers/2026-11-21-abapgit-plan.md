@@ -32,8 +32,8 @@ load-bearing by the named mutation (break it, watch the test go red, revert).
   the byte count."
 - "`noResend: true` — gates every replay of the request; the initial CSRF token fetch before a
   mutation still happens."
-- "every abapGit tool and action is refused in batch mode before anything is sent and before any
-  credential is resolved; no batch entry and no number is taken (`batch_not_recordable`)."
+- Batch: no abapGit-specific handling; the consumer decides what goes into a batch (owner,
+  2026-11-22).
 - "**While any `allowed-packages` or `allowed-requests` entry is configured, link and pull are
   refused on both systems** (full tools and compact actions), in fixed words
   (`abapgit_import_not_allowed`: "linking or pulling a repository writes objects that the allowed
@@ -496,49 +496,36 @@ private) and handed to `BaseMcpServer` as an option, since `IAccessChecks` expos
 The signal passes through every instance factory — stdio's launcher, `SseServer.ts` (~L503) and
 `StreamableHttpServer.ts` (~L705) — not only through `accessChecks`. **A pre-validation seam:** the
 SDK validates `request.params.arguments` against the schema before our callback (an undeclared
-`background` vanishes; a denied compact enum value fails validation before the batch refusal), so
+`background` vanishes; a denied compact enum value fails validation before our refusal), so
 during registration (~L2311) `BaseMcpServer` captures the `tools/call` callback the SDK's `McpServer`
 installed (its handler map, reached through the public `server.setRequestHandler` path the SDK uses,
 `mcp.js` ~L140, `protocol.js` ~L909) and installs through `setRequestHandler(CallToolRequestSchema,
 …)` a wrapper that runs admission's raw-params steps on the **unvalidated** `request.params`, then
 delegates to the captured callback with the original `request` and `extra`; the rest runs before any connection, for every abapGit tool and compact
-action, whether or not an `IAccessChecks` is configured. Order: (1) batch refusal (no connection, no discovery, no entry or number); (2) a denied compact
-action; (2a) `background` on a call whose schema does not declare it (cloud, or another action),
-refused in fixed words; (3) import refusal of link and pull
-when either signal is set; (4) blank `package_name` refused for link and branch info; (5)
-availability; (6) the R1 pre-read through `listReposQuiet`, once, and the fail-closed refusals; (7)
-the package check through `IAccessChecks` when configured; (8) the R8 pairing (`app_log_key` from
-R1's `log_link` only; a matching `status_link` alone does not authorise); (9) endpoint binding.
+action, whether or not an `IAccessChecks` is configured. Order: (1) a denied compact
+action; (1a) `background` on a call whose schema does not declare it (cloud, or another action),
+refused in fixed words; (2) import refusal of link and pull
+when either signal is set; (3) blank `package_name` refused for link and branch info; (4)
+availability; (5) the R1 pre-read through `listReposQuiet`, once, and the fail-closed refusals; (6)
+the package check through `IAccessChecks` when configured; (7) the R8 pairing (`app_log_key` from
+R1's `log_link` only; a matching `status_link` alone does not authorise); (8) endpoint binding.
 The handoff `AbapGitAdmission { repo?; sendUrl?; credentials? }` goes to the full handler and the
 compact action alike, and in memory to a background run on its fresh connection (no second R1;
-never in the record). Test `admission.test.ts`: batch with `background: true` → batch refusal, no
-run, no connection; a denied compact action carrying `background` → refused, no run; a
+never in the record). Test `admission.test.ts`: a denied compact action carrying `background` → refused, no run; a
 request-only restriction (`requests: true`, `packages: false`) with no transport argument → link and
 pull refused; blank `package_name` refused for link and branch info; the import matrix full and
 compact × cloud and onprem × each signal: refused with zero requests and zero credential lookups,
 served with none set; an admitted call reads exactly one credential-free R1 (a background run
 included); push, unlink, switch checked against R1's package; unknown key, blank package or URL,
 unreadable R1 refused; R8 matching pair reads the log, foreign or missing key refused before it.
-First failure: with no `IAccessChecks` the step does not run. Mutations: call it after `background`
-is stripped → the batch-with-background case red; a second R1 in the background run → red; accept
+First failure: with no `IAccessChecks` the step does not run. Mutations: a second R1 in the background run → red; accept
 `status_link` for R8 → red. **Real `tools/call` tests** (`admissionSeam.test.ts`, through the MCP
-server, not the function): batch with a denied compact action → the batch refusal, not a schema
-error; cloud `PullAbapGitRepo` with `background: true` → refused, nothing sent; an SSE and a
+server, not the function): a denied compact action → refused, nothing run; cloud `PullAbapGitRepo` with `background: true` → refused, nothing sent; an SSE and a
 Streamable HTTP instance under a request-only signal refuse link; an admitted call with an
 argument of the wrong type still gets the SDK's own validation error (delegation intact). Mutations:
-run admission after the SDK's validation → both seam cases red; skip the delegation → the
-validation case red. **Batch (owner's ruling: an invariant at the connection, not ordering).**
-Ordering cannot be made airtight: `HandlerBatch` begin, `DebugBatchBegin` / `HandlerDebugBatch` and
-background calls bypass the main flow (`handleHandlerBatch.ts` ~L105, `ownConnectionTools.ts` ~L19).
-The early raw batch check and a dispatch-time re-check (before connection acquisition, discovery,
-R1 or credential resolution) stay for precedence and the clear `batch_not_recordable` message; what
-guarantees the outcome is T5.4a: a batch connection refuses every request carrying `noLog` or
-`noResend` before recording it. Server overlap test (`admissionSeam.test.ts`), driving the **real**
-`AdtBatchConnection` (adt-clients 46.2.0) through the real `createRecorder`, no stand-in: a batch
-opens after the dispatch re-check; the abapGit call is still refused, with zero server batch entries
-(the count `BaseMcpServer.ts` ~L2547 keeps) and no credential in any record (batch envelope, run
-record, log line). Mutation (in a local patch of the installed copy, reverted): make the refusal a
-rejected promise → an entry appears and the test goes red.
+run admission after the SDK's validation → the cloud `background` case red; skip the delegation →
+the validation case red. Batch: no abapGit-specific handling; the consumer decides what goes into a
+batch (owner, 2026-11-22).
 
 **T6.5 Full tools** (spec §4.1): handlers over `AdtAbapGitClient` taking the handoff; snake_case
 arguments, no credential argument, functional descriptions; `ListAbapGitRepos` with §9.2 (a)
@@ -606,7 +593,7 @@ again from the server's T6.9 runs; a skipped or failed gate blocks.
 | Failure mode most likely to bite | Pinned by |
 |---|---|
 | A credential leaks through a resend, an SAP-endpoint redirect, a log line, or the raw response handed to a reader or analyser | T3.1, T3.2, T5.4, T6.8 |
-| Access checks: a flagged request recorded into a batch (T5.4a); batch not first; link or pull reaching SAP under any restriction signal; R1 read twice, after `background` was stripped, or after dispatch | T5.4a, T6.4 |
+| Access checks: link or pull reaching SAP under any restriction signal; R1 read twice, after `background` was stripped, or after dispatch | T6.4 |
 | Endpoint binding: a near-miss or carried-over header binds; an argument URL on a key route; the legacy wrapper sends a foreign or rebuilt-elsewhere link | T5.1, T6.3 |
 | abapGit listed or callable where discovery lacks it; a failed discovery cached; deferred stdio logging on to list | T6.2 |
 | A cloud run misread: L0 taken for L1, a foreign R8 pairing, cleanup before a terminal state | T5.6, T6.4, T6.9 |

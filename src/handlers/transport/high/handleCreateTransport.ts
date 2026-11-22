@@ -42,11 +42,16 @@ import {
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
-import { rawOf, statusOnly } from '../../../lib/strategies/reading';
+import {
+  parseStructure,
+  rawOf,
+  statusOnly,
+} from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
+import type { XmlNode } from '../../../lib/xml/node';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 export const REQUEST_TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -58,6 +63,16 @@ interface TypedTask {
   /** `null`: no task was found, so no type was applied. */
   type: TaskType | null;
   error?: FailureEntry;
+  /** The created request could not be read back: refused, or not it. */
+  readBackFailed?: true;
+}
+
+/**
+ * The note of a created request whose read-back failed, in fixed words with
+ * the number SAP answered: the request exists, and this is how to read it.
+ */
+export function readBackFailedNote(number: string): string {
+  return `the request ${number} was created, but reading it back failed: read it with GetTransport, transport_number ${number}`;
 }
 
 export const TOOL_DEFINITION = {
@@ -137,11 +152,13 @@ export async function handleCreateTransport(
       task_number: task.number,
       task_type: task.type,
       ...(task.error ? { task_type_error: task.error } : {}),
-      ...(task.number === null
-        ? {
-            note: 'the request exists, but its read showed no task, so no task type was applied',
-          }
-        : {}),
+      ...(task.readBackFailed === true
+        ? { note: readBackFailedNote(created.transportNumber) }
+        : task.number === null
+          ? {
+              note: 'the request exists, but its read showed no task, so no task type was applied',
+            }
+          : {}),
       message: `Transport request ${created.transportNumber} created successfully.`,
     };
   };
@@ -169,12 +186,13 @@ export async function handleCreateTransport(
     medium: createdAt(
       (created) => (settled) => terseCreatedTransport(created, settled),
     ),
-    full: createdAt((_created, raw) => () => raw),
+    full: createdAt((_created, raw) => () => parseStructure(raw) ?? raw),
     raw: createdAt((_created, raw) => () => raw),
   };
   type Terse =
     | ReturnType<typeof terseCreatedTransport>
     | ReturnType<typeof terseNumbers>
+    | XmlNode
     | string;
 
   return answer(
@@ -211,15 +229,29 @@ export async function handleCreateTransport(
           })
           .readObjects(number, { analyse: analyseException }),
       )();
+      // Once SAP has created the request its number is never lost: a
+      // read-back that fails — refused (but for the credential, which ends
+      // the call) or not the request — is the created request, with a note
+      // naming how to read it again.
       if (!read.ok) {
-        return refusedAfterCreate(
-          created.getResult().value,
-          read.getError(),
-          'read request task',
-        );
+        if (
+          isCredentialPayload(
+            failureEntry(read.getError(), 'read request task'),
+          )
+        ) {
+          return failed(
+            withStep(read.getError(), 'read request task'),
+            'CreateTransport',
+          );
+        }
+        task = { number: null, type: null, readBackFailed: true };
+        return created;
       }
       const taskRead = read.getResult().value;
-      if (taskRead.kind === 'threw') throw taskRead.thrown;
+      if (taskRead.kind === 'threw') {
+        task = { number: null, type: null, readBackFailed: true };
+        return created;
+      }
       const first = taskRead.first;
       if (first === undefined) {
         task = { number: null, type: null };

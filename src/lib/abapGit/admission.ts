@@ -57,6 +57,7 @@ import {
   attr,
   elements,
   entries,
+  isElement,
   listOf,
   localName,
   text,
@@ -422,18 +423,20 @@ async function repositoryOf(
   } catch {
     return undefined;
   }
-  const entry = repos.find((repo) => repo.key === key);
+  // The one entry, selected once from the answer as it came (R1 carries no
+  // credential, spec §5.3): the abapGit namespace and the exact key. Its
+  // package, URL, branch, run state and log links are read from that same
+  // element; the facts reader's list only says the read succeeded.
+  if (repos.length === 0) return undefined;
+  const read = r1EntryOf(observed.answer, key);
   if (
-    entry === undefined ||
-    entry.package.trim() === '' ||
-    entry.url.trim() === ''
+    read === undefined ||
+    read.entry.package.trim() === '' ||
+    read.entry.url.trim() === ''
   ) {
     return undefined;
   }
-  // The entry's every log_link element, read from the same answer as it
-  // came (R1 carries no credential, spec §5.3): the facts keep one log key
-  // alone, and a reader drops a link with an empty href.
-  return { entry, logLinks: logLinksOf(observed.answer, key) };
+  return read;
 }
 
 const r1Parser = new XMLParser({
@@ -442,7 +445,9 @@ const r1Parser = new XMLParser({
   removeNSPrefix: false,
   parseTagValue: false,
   parseAttributeValue: false,
-  trimValues: true,
+  // Whitespace kept, in attributes and texts alike: an href or a key
+  // padded with it is not the measured one.
+  trimValues: false,
   // Every element a list, every attribute a string: an attribute and an
   // element of the same name never meet.
   isArray: (_name, _path, _leaf, isAttribute) => !isAttribute,
@@ -461,55 +466,120 @@ interface LogLinkElement {
   readonly href: string | undefined;
 }
 
+/** The namespace R1's own elements are in (measured 2026-11-22). */
+const ABAPGIT_REPOS_NAMESPACE = 'http://www.sap.com/adt/abapgit/repositories';
+
 /**
- * Every link of the R1 entry for `key` that names itself a log link — by a
- * `type` attribute of any prefix or a `type` child — read namespace-aware,
- * attribute and element kept apart, in document order; none when the
- * answer cannot be read.
+ * The namespace a qualified `name` is in, resolved through `scopes`
+ * (innermost first): its prefix's `xmlns:` declaration, or `xmlns` for none.
  */
-function logLinksOf(
+function namespaceOf(
+  name: string,
+  scopes: readonly XmlElement[],
+): string | undefined {
+  const colon = name.indexOf(':');
+  const declaration = colon < 0 ? '@_xmlns' : `@_xmlns:${name.slice(0, colon)}`;
+  return scopes
+    .map((scope) => attr(scope, declaration))
+    .find((value) => value !== undefined);
+}
+
+/**
+ * The children of `parent` named `local` in the abapGit namespace, each with
+ * the scopes its own namespace resolves through; any other namespace is not
+ * one of them.
+ */
+function abapGitChildren(
+  parent: XmlRead,
+  local: string,
+  scopes: readonly XmlElement[],
+): { readonly value: XmlRead; readonly scopes: readonly XmlElement[] }[] {
+  const out: { value: XmlRead; scopes: readonly XmlElement[] }[] = [];
+  for (const [name, member] of entries(parent)) {
+    if (name.startsWith('@_') || localName(name) !== local) continue;
+    for (const value of listOf(member)) {
+      const own = isElement(value) ? [value, ...scopes] : scopes;
+      if (namespaceOf(name, own) === ABAPGIT_REPOS_NAMESPACE) {
+        out.push({ value, scopes: own });
+      }
+    }
+  }
+  return out;
+}
+
+/** The text of the one abapGit child `local` of an entry; `undefined` when none or several. */
+function oneText(
+  entry: XmlElement,
+  local: string,
+  scopes: readonly XmlElement[],
+): string | undefined {
+  const found = abapGitChildren(entry, local, scopes);
+  return found.length === 1 ? text(found[0]?.value) : undefined;
+}
+
+/**
+ * The one R1 entry for `key`, read from the answer as it came: the
+ * `repositories` root and its `repository` entries in the abapGit
+ * namespace, the entry whose one `key` (in that namespace) is exactly `key`
+ * — none, or more than one, is `undefined`. Its facts and its log links come
+ * from that same element.
+ */
+function r1EntryOf(
   answer: IAdtWireResponse | undefined,
   key: string,
-): readonly LogLinkElement[] {
-  if (answer === undefined) return [];
+):
+  | {
+      readonly entry: IAbapGitRepoFacts;
+      readonly logLinks: readonly LogLinkElement[];
+    }
+  | undefined {
+  if (answer === undefined) return undefined;
   const body = wireValueOf(answer.data);
-  if (body.kind !== 'text') return [];
+  if (body.kind !== 'text') return undefined;
   let parsed: ReturnType<typeof parseXml>;
   try {
     parsed = parseXml(r1Parser, body.text);
   } catch {
-    return [];
+    return undefined;
   }
-  const roots = childrenNamed(parsed, 'repositories');
-  for (const root of roots) {
-    for (const entry of childrenNamed(root, 'repository')) {
-      if (!valuesNamed(entry, 'key').some((k) => text(k) === key)) continue;
-      const out: LogLinkElement[] = [];
-      for (const [name, member] of entries(entry)) {
-        if (localName(name) !== 'link') continue;
-        for (const link of elements(member)) {
-          if (!namesLogLink(link)) continue;
-          out.push({ href: measuredHref(link, name, [entry, root]) });
-        }
+  const matching: { entry: XmlElement; scopes: readonly XmlElement[] }[] = [];
+  for (const root of abapGitChildren(parsed, 'repositories', [])) {
+    if (!isElement(root.value)) continue;
+    for (const repository of abapGitChildren(
+      root.value,
+      'repository',
+      root.scopes,
+    )) {
+      if (!isElement(repository.value)) continue;
+      if (oneText(repository.value, 'key', repository.scopes) === key) {
+        matching.push({ entry: repository.value, scopes: repository.scopes });
       }
-      return out;
     }
   }
-  return [];
-}
-
-/** The element children of `node` whose local name is `local`, any prefix. */
-function childrenNamed(node: XmlRead, local: string): XmlElement[] {
-  return entries(node)
-    .filter(([name]) => !name.startsWith('@_') && localName(name) === local)
-    .flatMap(([, member]) => elements(member));
-}
-
-/** The values (texts or elements) of the children of `node` named `local`, any prefix. */
-function valuesNamed(node: XmlRead, local: string): XmlRead[] {
-  return entries(node)
-    .filter(([name]) => !name.startsWith('@_') && localName(name) === local)
-    .flatMap(([, member]) => [...listOf(member)]);
+  const [only] = matching;
+  if (matching.length !== 1 || only === undefined) return undefined;
+  const logLinks: LogLinkElement[] = [];
+  for (const [name, member] of entries(only.entry)) {
+    if (name.startsWith('@_') || localName(name) !== 'link') continue;
+    for (const link of elements(member)) {
+      if (!namesLogLink(link)) continue;
+      logLinks.push({ href: measuredHref(link, name, only.scopes) });
+    }
+  }
+  const single =
+    logLinks.length === 1 ? logLinkParts(logLinks[0]?.href) : undefined;
+  return {
+    entry: {
+      key,
+      package: oneText(only.entry, 'package', only.scopes) ?? '',
+      url: oneText(only.entry, 'url', only.scopes) ?? '',
+      branchName: oneText(only.entry, 'branchName', only.scopes) ?? '',
+      runStatus: oneText(only.entry, 'status', only.scopes),
+      statusText: oneText(only.entry, 'statusText', only.scopes),
+      appLogKey: single?.logKey,
+    },
+    logLinks,
+  };
 }
 
 /** Whether a link names itself a log link: a `type` attribute of any prefix, or a `type` child. */

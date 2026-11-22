@@ -648,6 +648,52 @@ describe('the run-log pairing on measured links', () => {
     });
   }
 
+  it('a foreign-namespace key on an earlier entry lends nothing to the real one', async () => {
+    const NS = 'http://www.sap.com/adt/abapgit/repositories';
+    const document =
+      `<?xml version="1.0" encoding="utf-8"?><abapgitrepo:repositories xmlns:abapgitrepo="${NS}">` +
+      // An earlier entry whose key is in a foreign namespace, with a log link.
+      `<abapgitrepo:repository><f:key xmlns:f="urn:foreign">${MEASURED_KEY}</f:key>` +
+      '<abapgitrepo:package>SCRUBBED</abapgitrepo:package><abapgitrepo:url>SCRUBBED</abapgitrepo:url>' +
+      '<abapgitrepo:branchName>SCRUBBED</abapgitrepo:branchName>' +
+      `${REAL_LINK}</abapgitrepo:repository>` +
+      // The real entry: no log link.
+      `<abapgitrepo:repository><abapgitrepo:key>${MEASURED_KEY}</abapgitrepo:key>` +
+      '<abapgitrepo:package>SCRUBBED</abapgitrepo:package><abapgitrepo:url>SCRUBBED</abapgitrepo:url>' +
+      '<abapgitrepo:branchName>SCRUBBED</abapgitrepo:branchName>' +
+      '</abapgitrepo:repository></abapgitrepo:repositories>';
+    assert.equal(
+      await pairing(document, MEASURED_KEY, MEASURED_LOG),
+      'abapgit_run_log_not_paired',
+    );
+  });
+
+  it('an entry in a foreign namespace is not the repository', async () => {
+    const foreign = MEASURED.split('<abapgitrepo:repository>')
+      .join('<x:repository xmlns:x="urn:foreign">')
+      .split('</abapgitrepo:repository>')
+      .join('</x:repository>');
+    assert.equal(
+      await pairing(foreign, MEASURED_KEY, MEASURED_LOG),
+      'abapgit_repository_unknown',
+    );
+  });
+
+  for (const [label, padded] of [
+    ['leading', ' '],
+    ['trailing', 'end'],
+  ] as const) {
+    it(`an href with ${label} whitespace is refused`, async () => {
+      const path = `/sap/bc/adt/abapgit/repos/${MEASURED_KEY}/log/${MEASURED_LOG}`;
+      const href = padded === ' ' ? ` ${path}` : `${path} `;
+      const link = REAL_LINK.replace(`href="${path}"`, `href="${href}"`);
+      assert.equal(
+        await pairing(withLinks(link), MEASURED_KEY, MEASURED_LOG),
+        'abapgit_run_log_not_paired',
+      );
+    });
+  }
+
   it('on premise: no run log is served (its R1 carries no log_link), refused before anything', async () => {
     const sap = sapWith(MEASURED);
     const { context, counts } = contextOf(sap.connection, { kind: 'onprem' });

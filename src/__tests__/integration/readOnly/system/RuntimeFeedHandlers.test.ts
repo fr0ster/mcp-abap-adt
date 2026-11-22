@@ -269,7 +269,7 @@ describe('Runtime Feed Handlers Integration', () => {
     });
   });
 
-  it('should list gateway errors via RuntimeGetGatewayErrorLog (on-prem)', async () => {
+  it('should list gateway errors via RuntimeGetGatewayErrorLog (on premise and cloud)', async () => {
     await tester.run(async (context: LambdaTesterContext) => {
       if (skipUnlessServed('RuntimeGetGatewayErrorLog')) return;
 
@@ -288,7 +288,7 @@ describe('Runtime Feed Handlers Integration', () => {
 
       const result = await tester.invokeToolOrHandler(
         'RuntimeGetGatewayErrorLog',
-        { max_results: maxResults, user },
+        { max_results: maxResults, user, detail: 'full' },
         async () => {
           const handlerContext = createHandlerContext({
             connection: context.connection,
@@ -297,6 +297,7 @@ describe('Runtime Feed Handlers Integration', () => {
           return handleRuntimeGetGatewayErrorLog(handlerContext, {
             max_results: maxResults,
             user,
+            detail: 'full',
           });
         },
       );
@@ -310,14 +311,43 @@ describe('Runtime Feed Handlers Integration', () => {
     });
   });
 
-  it('should read gateway errors feed via RuntimeListFeeds (on-prem)', async () => {
+  it("reads a gateway error's detail by the opid and detail_kind its terse row names (on premise and cloud)", async () => {
     await tester.run(async (context: LambdaTesterContext) => {
-      if (context.isCloudSystem) {
-        throw new Error(
-          'SKIP: gateway error log is not available on cloud systems',
-        );
+      if (skipUnlessServed('RuntimeGetGatewayErrorLog')) return;
+
+      const handlerContext = createHandlerContext({
+        connection: context.connection,
+        logger,
+      });
+      const listed = await handleRuntimeGetGatewayErrorLog(handlerContext, {
+        max_results: 1,
+      });
+      expectSuccess(listed, 'RuntimeGetGatewayErrorLog');
+      const lines = String(listed.content[0]?.text ?? '').split('\n');
+      assert.equal(lines[0]?.startsWith('# count '), true);
+      assert.equal(
+        lines[1],
+        'opid\tdetail_kind\tdateTime\ttype\tshortText\tusername',
+      );
+      const [opid, detailKind] = (lines[2] ?? '').split('\t');
+      if (!opid || !detailKind) {
+        throw new Error('SKIP: the gateway error log holds no error to read');
       }
 
+      const detail = await handleRuntimeGetGatewayErrorLog(handlerContext, {
+        opid,
+        detail_kind: detailKind,
+        detail: 'full',
+      });
+      expectSuccess(detail, 'RuntimeGetGatewayErrorLog(detail)');
+      const data = parseTextPayload(detail);
+      assert.equal(data.mode, 'detail');
+      assert.equal(typeof data.error, 'object');
+    });
+  });
+
+  it('should read gateway errors feed via RuntimeListFeeds (on premise and cloud)', async () => {
+    await tester.run(async (context: LambdaTesterContext) => {
       const maxResults =
         readCaseParams(
           context.params,

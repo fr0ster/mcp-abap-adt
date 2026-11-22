@@ -229,6 +229,7 @@ const JSON_ANSWERING: readonly string[] = [
   'GetSqlQuery',
   'GetTableContents',
   'GetTransaction',
+  'GetTransport',
   'GetUnitTestResult',
   'ListTransports',
   'MemorySnapshotDelta',

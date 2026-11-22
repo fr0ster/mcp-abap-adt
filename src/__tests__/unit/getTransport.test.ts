@@ -14,7 +14,9 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   handleGetTransport,
   NOT_THE_TRANSPORT_ASKED,
+  transportKind,
 } from '../../handlers/transport/readonly/handleGetTransport';
+import { parseStructure } from '../../lib/strategies/reading';
 import { assertMatchObject } from '../helpers/assertions';
 import {
   EMPTY_TASK,
@@ -297,5 +299,52 @@ describe('GetTransport', () => {
       NOT_THE_TRANSPORT_ASKED,
       'The answer is not the transport request or task asked for: its document names another number, or none.',
     );
+  });
+
+  it('refuses a whitespace-only number before any request', async () => {
+    const { connection, sent } = connectionAnswering(REQUEST);
+    const result: any = await handleGetTransport(
+      { connection, logger: undefined } as any,
+      { transport_number: '   ' },
+    );
+    assert.equal(result.isError, true);
+    assert.equal(result.content[0].text, 'Transport number is required');
+    assert.deepStrictEqual(sent, []);
+  });
+
+  for (const [label, document] of [
+    [
+      'a numberless tm:request',
+      '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:request/></tm:root>',
+    ],
+    [
+      'a root marked as a task with no tm:task',
+      '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:object_type="T"><tm:request tm:number="SIDK900011"/></tm:root>',
+    ],
+  ] as const) {
+    for (const detail of ['terse', 'full', 'raw'] as const) {
+      it(`refuses ${label}, whatever number was asked (detail ${detail})`, async () => {
+        const { connection } = connectionAnswering(document);
+        const result: any = await handleGetTransport(
+          { connection, logger: undefined } as any,
+          { transport_number: TASK, detail },
+        );
+        assert.equal(result.isError, true);
+        assert.equal(result.content[0].text, NOT_THE_TRANSPORT_ASKED);
+      });
+    }
+  }
+
+  it('reads no blank number as any transport, numberless elements included', () => {
+    const numberless = parseStructure(
+      '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:request/></tm:root>',
+    );
+    const taskWithoutTask = parseStructure(
+      '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:object_type="T"><tm:request/></tm:root>',
+    );
+    for (const blank of ['', '   ']) {
+      assert.equal(transportKind(numberless, blank), undefined);
+      assert.equal(transportKind(taskWithoutTask, blank), undefined);
+    }
   });
 });

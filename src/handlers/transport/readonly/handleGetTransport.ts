@@ -125,6 +125,8 @@ export function transportKind(
   const [task] = listed(root, 'tm:task');
   const [request] = listed(root, 'tm:request');
   const asked = spelled(number);
+  // A blank number names no transport: nothing is the one asked for.
+  if (asked === '') return undefined;
   const type = attributeOf(root, 'tm:object_type');
   const isTask =
     type === TASK_DOCUMENT || (type === undefined && task !== undefined);
@@ -378,7 +380,7 @@ export async function handleGetTransport(
 ) {
   const { logger } = context;
   // A blank number is refused before any request.
-  if (!args?.transport_number) {
+  if (!args?.transport_number?.trim()) {
     return return_error('Transport number is required');
   }
   const detail = detailOf(args);

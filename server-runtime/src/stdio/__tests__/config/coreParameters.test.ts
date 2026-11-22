@@ -20,9 +20,18 @@ import {
 } from '@mcp-abap-adt/lib/config';
 import { NO_IDLE_BOUND } from '@mcp-abap-adt/lib/state';
 import { fullToolSet } from '@mcp-abap-adt/lib/tool-set';
+import { STDIO_DEFAULT_MAX_BUFFER_SIZE } from '@modelcontextprotocol/sdk/shared/stdio.js';
 import { load } from 'js-yaml';
 import { assertThrows } from '../../../../../src/__tests__/helpers/assertions';
-import { CORE_PARAMETERS, readCoreConfig } from '../../config/coreParameters';
+import {
+  STDIO_MIN_MESSAGE_LIMIT,
+  STDIO_READ_MARGIN,
+} from '../../boundedStdioTransport';
+import {
+  CORE_PARAMETERS,
+  readCoreConfig,
+  stdioMessageLimitRefusal,
+} from '../../config/coreParameters';
 import { coreHelp, main } from '../../launcher';
 import { StdioServer } from '../../StdioServer';
 
@@ -194,6 +203,107 @@ describe('--shutdown-timeout is a row of core', () => {
       assert.equal(served, 0);
     });
   }
+});
+
+describe('--stdio-message-limit is a row of core', () => {
+  it("absent: the MCP SDK client's default read buffer reaches the transport", async () => {
+    assert.equal(readCoreConfig([], {}).stdioMessageLimit, undefined);
+    const { servers } = await start(['--system-type=onprem']);
+    const [server] = servers;
+    assert.ok(server !== undefined, 'no server was started');
+    assert.equal(
+      server.stdioTransport().cap,
+      STDIO_DEFAULT_MAX_BUFFER_SIZE - STDIO_READ_MARGIN,
+    );
+  });
+
+  it('CLI, env and YAML reach the config, in bytes', () => {
+    assert.equal(
+      readCoreConfig(['--stdio-message-limit=4194304'], {}).stdioMessageLimit,
+      4194304,
+    );
+    assert.equal(
+      readCoreConfig([], { MCP_STDIO_MESSAGE_LIMIT: '5242880' })
+        .stdioMessageLimit,
+      5242880,
+    );
+    assert.equal(
+      readCoreConfig([], {}, { 'stdio-message-limit': 6291456 })
+        .stdioMessageLimit,
+      6291456,
+    );
+  });
+
+  it('the CLI wins over the environment', () => {
+    assert.equal(
+      readCoreConfig(['--stdio-message-limit=4194304'], {
+        MCP_STDIO_MESSAGE_LIMIT: '5242880',
+      }).stdioMessageLimit,
+      4194304,
+    );
+  });
+
+  it("the stated limit reaches the started server's transport, less one pipe read", async () => {
+    const { servers } = await start([
+      '--system-type=onprem',
+      '--stdio-message-limit=4194304',
+    ]);
+    const [server] = servers;
+    assert.ok(server !== undefined, 'no server was started');
+    assert.equal(server.stdioTransport().cap, 4194304 - STDIO_READ_MARGIN);
+  });
+
+  for (const value of [
+    '0',
+    '-5',
+    '1.5',
+    'abc',
+    'secret-looking-value',
+    String(STDIO_MIN_MESSAGE_LIMIT - 1),
+  ]) {
+    it(format('%s stops the start, the value not echoed', value), async () => {
+      const { stderr, exits, served } = await start([
+        '--system-type=onprem',
+        `--stdio-message-limit=${value}`,
+      ]);
+      assert.ok(
+        stderr.includes(stdioMessageLimitRefusal('--stdio-message-limit')),
+        stderr,
+      );
+      assert.ok(!stderr.includes(`"${value}"`), stderr);
+      assert.deepStrictEqual(exits, [1]);
+      assert.equal(served, 0);
+    });
+  }
+
+  it('the smallest limit is accepted', () => {
+    assert.equal(
+      readCoreConfig([`--stdio-message-limit=${STDIO_MIN_MESSAGE_LIMIT}`], {})
+        .stdioMessageLimit,
+      STDIO_MIN_MESSAGE_LIMIT,
+    );
+  });
+
+  const shapes: ReadonlyArray<readonly [string, YamlConfig[string]]> = [
+    ['a list', [STDIO_MIN_MESSAGE_LIMIT]],
+    ['a fraction', STDIO_MIN_MESSAGE_LIMIT + 0.5],
+    ['a boolean', true],
+  ];
+  for (const [shape, value] of shapes) {
+    it(format('YAML %s is refused, never coerced', shape), () => {
+      assertThrows(
+        () => readCoreConfig([], {}, { 'stdio-message-limit': value }),
+        stdioMessageLimitRefusal('stdio-message-limit (config file)'),
+      );
+    });
+  }
+
+  it('a blank value counts as not given: the default', () => {
+    assert.equal(
+      readCoreConfig([], { MCP_STDIO_MESSAGE_LIMIT: '' }).stdioMessageLimit,
+      undefined,
+    );
+  });
 });
 
 // stdio has no idle bound (20.1.1): the parameter is gone from core's table.
@@ -474,6 +584,7 @@ describe('the YAML template and validation come from the table', () => {
         'saprouter',
         'session-keep-alive-minutes',
         'shutdown-timeout',
+        'stdio-message-limit',
         'sysid',
         'sysnr',
         'system-type',

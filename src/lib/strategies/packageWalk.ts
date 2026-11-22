@@ -574,6 +574,30 @@ function undescribed(
   return { ...rest, packageName };
 }
 
+/** An object's identity within one package: its type and its name. */
+function listedKeyOf(object: WalkedItem): string {
+  return `${object.type} ${object.name.toUpperCase()}`;
+}
+
+/**
+ * `objects` appended to `found`, each one `found` does not list yet (the same
+ * type and name). A package root that has subpackages answers them in its own
+ * `TREE_CONTENT`, and the subpackages type node it lists answers them again
+ * (measured on premise, 2026-11-22, BASIS 816): each is listed once.
+ */
+function appendUnlisted(
+  found: WalkedItem[],
+  objects: readonly WalkedItem[],
+): void {
+  const listed = new Set(found.map(listedKeyOf));
+  for (const object of objects) {
+    const key = listedKeyOf(object);
+    if (listed.has(key)) continue;
+    listed.add(key);
+    found.push(object);
+  }
+}
+
 function flatten(walk: PackageWalk): WalkedItem[] {
   return [...walk.found, ...walk.subs.flatMap(flatten)];
 }
@@ -685,7 +709,7 @@ export async function walkPackages(
     level.forEach((walk, i) => {
       const root = settle(walk, rootAnswers[i]);
       if (root === undefined) return;
-      appendAll(
+      appendUnlisted(
         walk.found,
         root.objects.map((o) => objectOf(o, walk.name)),
       );
@@ -706,7 +730,7 @@ export async function walkPackages(
       typeNodes.forEach(({ walk, nodeId, type }, i) => {
         const typed = settle(walk, typeAnswers[i], { id: nodeId, type });
         if (typed === undefined) return;
-        appendAll(
+        appendUnlisted(
           walk.found,
           typed.objects.map((o) => objectOf(o, walk.name)),
         );
@@ -786,7 +810,8 @@ export async function walkPackage(
       ? { ...rest, description, packageName: pkg }
       : { ...rest, packageName: pkg };
   };
-  const found: WalkedItem[] = root.objects.map(owned);
+  const found: WalkedItem[] = [];
+  appendUnlisted(found, root.objects.map(owned));
   for (const child of root.childNodes) {
     const level = await underBranchRule(
       options,
@@ -804,7 +829,7 @@ export async function walkPackage(
           options.missingLevel,
         ),
     );
-    if (level !== undefined) appendAll(found, level.objects.map(owned));
+    if (level !== undefined) appendUnlisted(found, level.objects.map(owned));
   }
 
   if (!options.includeSubpackages) return found;

@@ -15,9 +15,10 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { answerAt, tsvRow } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
@@ -76,6 +77,16 @@ const entriesOf = (value: XmlRead): { text: string }[] => {
     .filter((entry) => entry.text !== '');
 };
 
+/** A line of the log made of `=` or `-` alone: a separator, nothing to read. */
+function isSeparator(text: string): boolean {
+  const trimmed = text.trim();
+  if (trimmed === '') return false;
+  for (const character of trimmed) {
+    if (character !== '=' && character !== '-') return false;
+  }
+  return true;
+}
+
 export async function handleReadTransportActionLog(
   context: HandlerContext,
   args: ReadTransportActionLogArgs,
@@ -98,12 +109,38 @@ export async function handleReadTransportActionLog(
     };
   };
 
+  // What the log answers at each level, selected before the call
+  // (`src/lib/detail`): terse its lines as text, one entry per line, the
+  // separator lines (only `=` or `-`) left out — they carry nothing; medium
+  // the former terse JSON; full the parse; raw the document.
+  const shown = answerAt<
+    AdtReading<XmlRead>,
+    string | XmlRead | ReturnType<typeof terseLog>
+  >(
+    {
+      terse: (reading) => {
+        const entries = entriesOf(reading.value).filter(
+          (entry) => !isSeparator(entry.text),
+        );
+        return [
+          `# transport ${args.transport_number}`,
+          `# count ${entries.length}`,
+          ...entries.map((entry) => tsvRow([entry.text])),
+        ].join('\n');
+      },
+      medium: (reading) => terseLog(reading.value),
+      full: (reading) => reading.value ?? reading.raw,
+      raw: (reading) => reading.raw,
+    },
+    levelOf(args),
+  );
+
   return answer(
     { tool: 'ReadTransportActionLog', detail },
     () =>
       createAdtClient(connection, logger)
         .getRequest(resultsFor(transportDocuments))
         .readActionLog(args.transport_number, { analyse: analyseException }),
-    project(detail, terseLog),
+    shown,
   );
 }

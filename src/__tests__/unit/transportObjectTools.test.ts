@@ -692,11 +692,43 @@ describe('ReadTransportActionLog', () => {
     const answered = body(
       await handleReadTransportActionLog(context as any, {
         transport_number: 'SIDK905942',
+        detail: 'medium',
       }),
     );
 
     assert.equal(answered.count, 1);
     assert.match(answered.entries[0], /deleted following object/);
+  });
+
+  it('terse, by default: the lines as text, a separator line left out', async () => {
+    fakeClient = fakeClientOf({
+      readActionLog: () =>
+        okResponse(
+          reading({
+            'log:log': {
+              'log:entry': [
+                { '@': { 'log:text': 'Request created' } },
+                { '@': { 'log:text': '=========' } },
+                { '@': { 'log:text': 'SAPUSER01 added object R3TR PROG ZP' } },
+              ],
+            },
+          } as never),
+        ),
+    });
+
+    const result: any = await handleReadTransportActionLog(context as any, {
+      transport_number: 'SIDK905942',
+    });
+
+    assert.equal(
+      result.content[0].text,
+      [
+        '# transport SIDK905942',
+        '# count 2',
+        'Request created',
+        'SAPUSER01 added object R3TR PROG ZP',
+      ].join('\n'),
+    );
   });
 
   /**
@@ -743,6 +775,7 @@ describe('ReadTransportActionLog', () => {
     const answered = body(
       await handleReadTransportActionLog(context as any, {
         transport_number: 'SIDK907299',
+        detail: 'medium',
       }),
     );
 

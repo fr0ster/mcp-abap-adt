@@ -116,20 +116,11 @@ describe('HandlerGet with object_type TRANSPORT', () => {
     assert.deepStrictEqual(compact.sent, full.sent);
     assert.deepStrictEqual(compactAnswer, fullAnswer);
     assert.equal(compactAnswer.isError, false);
-    const body = JSON.parse(compactAnswer.content[0]?.text ?? '{}');
-    assert.equal(body.count, 2);
-    assertMatchObject(body.objects, [
-      {
-        type: 'CLAS',
-        name: 'ZCL_A',
-        position: '000001',
-      },
-      {
-        type: 'TABL',
-        name: 'ZTAB',
-        position: '000002',
-      },
-    ]);
+    // Terse (the default): the entries as TSV, each with its position.
+    const lines = (compactAnswer.content[0]?.text ?? '').split('\n');
+    assert.ok(lines.includes('# count 2'));
+    assert.ok(lines.includes('CLAS\tZCL_A\t000001'));
+    assert.ok(lines.includes('TABL\tZTAB\t000002'));
   });
 
   it('a request answers each task entry once, with its task, as the full read does', async () => {
@@ -146,19 +137,15 @@ describe('HandlerGet with object_type TRANSPORT', () => {
 
     assert.equal(compact.sent.length, 1);
     assert.deepStrictEqual(compactAnswer, fullAnswer);
-    const body = JSON.parse(compactAnswer.content[0]?.text ?? '{}');
-    assert.equal(body.count, 3);
-    assert.deepStrictEqual(
-      body.objects.map(
-        (o: { task?: string; name: string; position: string }) =>
-          `${o.task}|${o.name}|${o.position}`,
+    // Terse (the default): each task's entries under its task line, once.
+    const text = compactAnswer.content[0]?.text ?? '';
+    assert.ok(text.includes('# count 3'));
+    assert.ok(
+      text.includes(
+        '# task SIDK900102\n# pgmid R3TR\nCLAS\tZCL_A\t000001\nTABL\tZTAB\t000002\n# task SIDK900103',
       ),
-      [
-        'SIDK900102|ZCL_A|000001',
-        'SIDK900102|ZTAB|000002',
-        'SIDK900103|ZPROG|000001',
-      ],
     );
+    assert.ok(text.includes('PROG\tZPROG\t000001'));
   });
 
   it('refuses a missing transport_number by the full read’s schema, sending nothing', async () => {

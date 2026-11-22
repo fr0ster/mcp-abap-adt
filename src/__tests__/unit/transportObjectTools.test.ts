@@ -88,6 +88,7 @@ describe('ReadTransportObjects', () => {
 
     const result = await handleReadTransportObjects(context as any, {
       transport_number: 'SIDK905943',
+      detail: 'medium',
     });
 
     assert.equal(asked, 'SIDK905943');
@@ -116,6 +117,54 @@ describe('ReadTransportObjects', () => {
    * aggregate list — every object once more. Read whole, every object came
    * twice (684 rows for 342 entries).
    */
+  it('terse, by default: the entries under their task and pgmid, type, name and position', async () => {
+    fakeClient = fakeClientOf({
+      readObjects: () =>
+        okResponse(
+          reading({
+            'tm:root': {
+              'tm:request': {
+                '@': { 'tm:number': 'SIDK900100' },
+                'tm:task': [
+                  {
+                    '@': { 'tm:number': 'SIDK900101' },
+                    'tm:abap_object': [
+                      object('PROG', 'ZP_ONE', '000001'),
+                      object('CLAS', 'ZCL_TWO', '000002'),
+                    ],
+                  },
+                  {
+                    '@': { 'tm:number': 'SIDK900102' },
+                    'tm:abap_object': object('PROG', 'ZP_THREE', '000001'),
+                  },
+                ],
+              },
+            },
+          } as never),
+        ),
+    });
+
+    const result: any = await handleReadTransportObjects(context as any, {
+      transport_number: 'SIDK900100',
+    });
+
+    assert.equal(
+      result.content[0].text,
+      [
+        '# transport SIDK900100',
+        '# count 3',
+        'type\tname\tposition',
+        '# task SIDK900101',
+        '# pgmid R3TR',
+        'PROG\tZP_ONE\t000001',
+        'CLAS\tZCL_TWO\t000002',
+        '# task SIDK900102',
+        '# pgmid R3TR',
+        'PROG\tZP_THREE\t000001',
+      ].join('\n'),
+    );
+  });
+
   it("answers a request's task entries once each, with their task numbers", async () => {
     fakeClient = fakeClientOf({
       readObjects: () =>
@@ -153,6 +202,7 @@ describe('ReadTransportObjects', () => {
     const answered = body(
       await handleReadTransportObjects(context as any, {
         transport_number: 'SIDK900100',
+        detail: 'medium',
       }),
     );
 
@@ -190,6 +240,7 @@ describe('ReadTransportObjects', () => {
     const answered = body(
       await handleReadTransportObjects(context as any, {
         transport_number: 'SIDK900101',
+        detail: 'medium',
       }),
     );
 
@@ -226,6 +277,7 @@ describe('ReadTransportObjects', () => {
 
     const result = await handleReadTransportObjects(context as any, {
       transport_number: 'SIDK905943',
+      detail: 'medium',
     });
 
     assert.equal(body(result).objects[0].position, null);

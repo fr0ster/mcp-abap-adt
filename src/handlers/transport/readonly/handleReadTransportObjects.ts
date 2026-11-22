@@ -1,6 +1,10 @@
 import * as z from 'zod';
 import { requiredText } from '../../../lib/handlers/argumentRules';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 /**
  * ReadTransportObjects — what a transport request or task holds.
  *
@@ -31,9 +35,9 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { answerAt, tsv, tsvRow } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { detailOf } from '../../../lib/strategies/detail';
-import { project } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import {
   attr,
@@ -156,6 +160,37 @@ function entriesOf(value: XmlRead): Entry[] {
   return read;
 }
 
+/**
+ * The entries as TSV (terse): `# transport N` and `# count`, the header
+ * `type\tname\tposition`, then `# task T` and `# pgmid P` group lines before
+ * the rows they hold — a removal names the task, the pgmid, the type, the
+ * name and the position. Every entry is answered.
+ */
+function transportRows(transportNumber: string, entries: Entry[]): string {
+  const lines = [
+    `# transport ${transportNumber}`,
+    `# count ${entries.length}`,
+    tsv(['type', 'name', 'position'], []),
+  ];
+  let task: string | undefined;
+  let pgmid: string | undefined;
+  for (const entry of entries) {
+    const entryTask = entry.task ?? '';
+    const entryPgmid = entry.pgmid ?? 'R3TR';
+    if (entryTask !== task) {
+      task = entryTask;
+      pgmid = undefined;
+      if (entryTask !== '') lines.push(`# task ${entryTask}`);
+    }
+    if (entryPgmid !== pgmid) {
+      pgmid = entryPgmid;
+      lines.push(`# pgmid ${entryPgmid}`);
+    }
+    lines.push(tsvRow([entry.type, entry.name, entry.position ?? '']));
+  }
+  return lines.join('\n');
+}
+
 export async function handleReadTransportObjects(
   context: HandlerContext,
   args: ReadTransportObjectsArgs,
@@ -193,6 +228,18 @@ export async function handleReadTransportObjects(
       createAdtClient(connection, logger)
         .getRequest(resultsFor(transportDocuments))
         .readObjects(args.transport_number, { analyse: analyseException }),
-    project(detail, terseObjects),
+    answerAt<
+      AdtReading<XmlRead>,
+      string | XmlRead | ReturnType<typeof terseObjects>
+    >(
+      {
+        terse: (reading: AdtReading<XmlRead>) =>
+          transportRows(args.transport_number, entriesOf(reading.value)),
+        medium: (reading: AdtReading<XmlRead>) => terseObjects(reading.value),
+        full: (reading: AdtReading<XmlRead>) => reading.value ?? reading.raw,
+        raw: (reading: AdtReading<XmlRead>) => reading.raw,
+      },
+      levelOf(args),
+    ),
   );
 }

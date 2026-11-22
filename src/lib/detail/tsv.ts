@@ -33,6 +33,11 @@ function line(row: readonly string[]): string {
   return cells.join('\t');
 }
 
+/** One row as its line, escaped as in {@link tsv}: for a writer that interleaves its own group lines. */
+export function tsvRow(row: readonly string[]): string {
+  return line(row);
+}
+
 /** The header line, then one line per row. */
 export function tsv(
   columns: readonly string[],

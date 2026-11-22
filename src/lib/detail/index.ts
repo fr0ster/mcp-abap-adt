@@ -24,4 +24,5 @@ export {
   type TreeRow,
   type TsvGroup,
   tsv,
+  tsvRow,
 } from './tsv';

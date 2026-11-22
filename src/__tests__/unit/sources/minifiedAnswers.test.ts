@@ -2,7 +2,7 @@
  * Every answer is minified JSON (terse answers, decision 2): no production
  * source calls `JSON.stringify` with an indent, except the sites named in
  * `INDENT_KEPT` — a log line or console listing, or a file written to disk,
- * each with its reason. The scan (`helpers/indentedStringifyScan.ts`) reads
+ * each call named on its own (`file#function#n`) with its reason. The scan (`helpers/indentedStringifyScan.ts`) reads
  * the syntax tree of every production source (`productionSources`: `src`,
  * `scripts`, `tools` and every package's sources, outside tests and
  * fixtures). Each fixture under `__fixtures__/indentedStringify/refused` is
@@ -20,11 +20,13 @@ import { productionSources } from './helpers/regexScan';
 
 /** The sites that keep an indent: none of them builds an answer. */
 const INDENT_KEPT: Readonly<Record<string, string>> = {
-  'scripts/list-tools.ts#<top>':
+  'scripts/list-tools.ts#<top>#1':
     'a developer script printing the tool listing to the console',
-  'tools/debug-runtime-explorer.js#compact':
+  'scripts/list-tools.ts#<top>#2':
+    'the same script printing the visibility by set to stderr',
+  'tools/debug-runtime-explorer.js#compact#1':
     'a hand-run explorer clipping a value for its console log',
-  'tools/runtime-profiling-dumps-explorer.js#compact':
+  'tools/runtime-profiling-dumps-explorer.js#compact#1':
     'a hand-run explorer clipping a value for its console log',
 };
 
@@ -76,6 +78,15 @@ describe('fixtures', () => {
       assert.equal(indentedStringifiesIn([file], root).length, 1);
     });
   }
+
+  it('names each indenting call of a function by its own position', () => {
+    assert.deepStrictEqual(
+      indentedStringifiesIn(['positions/twoInOne.ts'], root).map(
+        (found) => found.site,
+      ),
+      ['positions/twoInOne.ts#answer#1', 'positions/twoInOne.ts#answer#2'],
+    );
+  });
 
   for (const file of listed('clean')) {
     it(format('accepts %s', file), () => {

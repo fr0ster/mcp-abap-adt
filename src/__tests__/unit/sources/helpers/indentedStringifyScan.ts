@@ -6,8 +6,15 @@
  *
  * An answer is minified: its indent alone is a quarter of a JSON answer, and
  * the model gains nothing from it. A log line or a file written to disk may
- * keep its indent; those sites are named in the test's allowlist, each by
- * its file and enclosing function.
+ * keep its indent; those calls are named in the test's allowlist one by one,
+ * each by its file, its enclosing function and its position among that
+ * function's indenting calls (`file#function#n`, `n` from 1 in source order),
+ * so a second indenting call added beside an allowed one is refused.
+ *
+ * Out of scope, by decision: a `JSON` or `stringify` reached under another
+ * name — `const J = JSON`, `const { stringify } = JSON`, a spread or computed
+ * argument list. Those are contrived forms in our own code, not ways an
+ * answer builder is written; the scan reads the two forms the code uses.
  */
 
 import * as fs from 'node:fs';
@@ -15,7 +22,11 @@ import * as path from 'node:path';
 import * as ts from 'typescript';
 
 export interface IndentedStringify {
-  /** `file#function`, the file relative to the scanned root; `<top>` outside any function. */
+  /**
+   * `file#function#n`: the file relative to the scanned root, the enclosing
+   * function (`<top>` outside any), and the call's position among that
+   * function's indenting calls, from 1.
+   */
   readonly site: string;
   /** `file:line`. */
   readonly where: string;
@@ -76,6 +87,7 @@ export function indentedStringifiesIn(
       ts.ScriptTarget.Latest,
       true,
     );
+    const seen = new Map<string, number>();
     const visit = (node: ts.Node): void => {
       if (
         ts.isCallExpression(node) &&
@@ -85,8 +97,11 @@ export function indentedStringifiesIn(
         const { line } = source.getLineAndCharacterOfPosition(
           node.getStart(source),
         );
+        const scope = `${file}#${enclosingFunction(node)}`;
+        const position = (seen.get(scope) ?? 0) + 1;
+        seen.set(scope, position);
         found.push({
-          site: `${file}#${enclosingFunction(node)}`,
+          site: `${scope}#${position}`,
           where: `${file}:${line + 1}`,
         });
       }

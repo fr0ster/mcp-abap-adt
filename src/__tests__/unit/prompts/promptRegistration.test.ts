@@ -187,7 +187,7 @@ describe('BaseMcpServer lists the prompts', () => {
       [
         'core',
         { action: 'get', number: 'SOME_TASK', description: 'unread' },
-        'Get the transport request "SOME_TASK".',
+        'Get the transport request or task "SOME_TASK".',
       ],
       [
         'core-ro',

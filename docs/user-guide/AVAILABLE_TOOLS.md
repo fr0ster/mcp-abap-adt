@@ -1392,16 +1392,17 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettransport-read-only-transport"></a>
 #### GetTransport (Read-Only / Transport)
-**Description:** [read-only] Retrieve ABAP transport request information including metadata, included objects, and status from SAP system.
+**Description:** [read-only] Reads the transport request or transport task named by transport_number; kind says which: 'request' or 'task'. A transport request answers its header (number, description, type, status, owner, target system) and its tasks, each with number, owner, status, description and object count. A transport task answers its header (number, parent request, description, type, status, owner), its parent request (number, type, status, target system), and its objects, each with pgmid, type, name and position, with their count.
 
 **Source:** `src/handlers/transport/readonly/handleGetTransport.ts`
 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `include_objects` (boolean, optional (default: true)) - Include list of objects in transport (default: true)
-- `include_tasks` (boolean, optional (default: true)) - Include list of tasks in transport (default: true)
-- `transport_number` (string, required) - Transport request number, not a task
+- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `include_objects` (boolean, optional (default: true)) - With detail terse: list a task's objects (default: true); their count is answered either way.
+- `include_tasks` (boolean, optional (default: true)) - With detail terse: list a request's tasks (default: true); their count is answered either way.
+- `transport_number` (string, required) - Transport request or task number
 
 ---
 
@@ -5037,4 +5038,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-21*
+*Last updated: 2026-11-22*

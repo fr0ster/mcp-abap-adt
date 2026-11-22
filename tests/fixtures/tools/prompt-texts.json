@@ -403,7 +403,8 @@
     {"listedBy":["onprem mcp-abap-adt","cloud mcp-abap-adt","none mcp-abap-adt"],"value":"Create a task in the request \"SOME_NUMBER\".\n1. Call CreateTransportTask with transport_number: \"SOME_NUMBER\", target_user: \"SOME_USER\"."}
   ],
   "transport get": [
-    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Get the transport request \"SOME_NUMBER\".\n1. Call GetTransport with transport_number: \"SOME_NUMBER\"."}
+    {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"Get the transport request or task \"SOME_NUMBER\".\n1. Call GetTransport with transport_number: \"SOME_NUMBER\"."},
+    {"listedBy":["onprem mcp-abap-adt-compact","onprem mcp-abap-adt-compact-ro","cloud mcp-abap-adt-compact","cloud mcp-abap-adt-compact-ro","none mcp-abap-adt-compact","none mcp-abap-adt-compact-ro"],"value":"Get the transport request or task \"SOME_NUMBER\".\n1. Call HandlerGet with object_type: \"TRANSPORT\", part: \"metadata\", transport_number: \"SOME_NUMBER\", background: false."}
   ],
   "transport list": [
     {"listedBy":["onprem mcp-abap-adt","onprem mcp-abap-adt-ro","cloud mcp-abap-adt","cloud mcp-abap-adt-ro","none mcp-abap-adt","none mcp-abap-adt-ro"],"value":"List transport requests.\n1. Call ListTransports with background: false."},

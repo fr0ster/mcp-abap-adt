@@ -58,7 +58,7 @@ const NAME_FREE = corpusBody(
   'validation-name-free-class--01-validation-objectname',
 );
 const TRANSPORT_DOCUMENT =
-  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"/>';
+  '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:number="XXXK900001"><tm:request tm:number="XXXK900001"/></tm:root>';
 
 /** A message class document holding message `001`, the shape ADT answers. */
 const MESSAGE_CLASS_DOCUMENT =

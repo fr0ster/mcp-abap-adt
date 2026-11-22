@@ -2759,15 +2759,18 @@
   "GetTransport": {
     "keywords": [
       "transport request",
+      "transport task",
       "transport",
       "TR",
       "request status",
+      "task status",
       "tasks",
       "transport objects",
+      "parent request",
       "SE09",
       "SE10"
     ],
-    "semantic": "Show a transport request: its description, owner, status, tasks and the objects it contains."
+    "semantic": "Show a transport request or a transport task: its description, owner and status; a request's tasks, a task's parent request and the objects it holds."
   },
   "GetTypeInfo": {
     "keywords": [

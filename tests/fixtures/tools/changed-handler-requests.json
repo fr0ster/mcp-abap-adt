@@ -2800,24 +2800,32 @@
     "ended": "answered"
   },
   "onprem HandlerGet TRANSPORT part=metadata": {
-    "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=TRANSPORT. It offers: source. at part"
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/cts/transportrequests/XXXK900001",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.transportorganizer.v1+xml"
+        }
+      }
+    ],
+    "ended": "error answer: The answer is not the transport request or task asked for: its document names another number, or none."
   },
   "onprem HandlerGet TRANSPORT part=urls": {
     "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TRANSPORT. It offers: source. at part"
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TRANSPORT. It offers: source, metadata. at part"
   },
   "onprem HandlerGet TRANSPORT part=contents": {
     "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TRANSPORT. It offers: source. at part"
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TRANSPORT. It offers: source, metadata. at part"
   },
   "onprem HandlerGet TRANSPORT part=main_programs": {
     "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=TRANSPORT. It offers: source. at part"
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=main_programs is not available for object_type=TRANSPORT. It offers: source, metadata. at part"
   },
   "onprem HandlerGet TRANSPORT part=draft": {
     "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TRANSPORT. It offers: source. at part"
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TRANSPORT. It offers: source, metadata. at part"
   },
   "onprem HandlerGet TABLE_SETTINGS part=source": {
     "requests": [
@@ -6913,16 +6921,24 @@
     "ended": "answered"
   },
   "cloud HandlerGet TRANSPORT part=metadata": {
-    "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=metadata is not available for object_type=TRANSPORT. It offers: source. at part"
+    "requests": [
+      {
+        "method": "GET",
+        "url": "/sap/bc/adt/cts/transportrequests/XXXK900001",
+        "headers": {
+          "Accept": "application/vnd.sap.adt.transportorganizer.v1+xml"
+        }
+      }
+    ],
+    "ended": "error answer: The answer is not the transport request or task asked for: its document names another number, or none."
   },
   "cloud HandlerGet TRANSPORT part=urls": {
     "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TRANSPORT. It offers: source. at part"
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=urls is not available for object_type=TRANSPORT. It offers: source, metadata. at part"
   },
   "cloud HandlerGet TRANSPORT part=contents": {
     "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TRANSPORT. It offers: source. at part"
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=contents is not available for object_type=TRANSPORT. It offers: source, metadata. at part"
   },
   "cloud HandlerGet TRANSPORT part=main_programs": {
     "requests": [],
@@ -6930,7 +6946,7 @@
   },
   "cloud HandlerGet TRANSPORT part=draft": {
     "requests": [],
-    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TRANSPORT. It offers: source. at part"
+    "ended": "threw: Input validation error: Invalid arguments for tool HandlerGet: part=draft is not available for object_type=TRANSPORT. It offers: source, metadata. at part"
   },
   "cloud HandlerGet TABLE_SETTINGS part=source": {
     "requests": [

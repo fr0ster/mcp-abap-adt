@@ -125,7 +125,9 @@ describe("lib's read and write handler barrels", () => {
     // `DeleteInclude` (97); and table types: `CreateTableType` (98),
     // `UpdateTableType` (99), `DeleteTableType` (100). A table's technical
     // settings and the text elements: their writes (102).
-    assert.equal(write.length, 102);
+    // 24.2.0: a lock answered from its typed handle, for compact's
+    // `HandlerLock` (`lockObjectAnswering`, 103).
+    assert.equal(write.length, 103);
   });
 
   it('share not one symbol', () => {

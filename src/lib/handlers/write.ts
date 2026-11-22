@@ -43,6 +43,7 @@ export { handleDeleteOnly } from '../../handlers/common/low/handleDeleteOnly.js'
 export {
   handleLockObject,
   lockObject,
+  lockObjectAnswering,
 } from '../../handlers/common/low/handleLockObject.js';
 export {
   handleUnlockObject,

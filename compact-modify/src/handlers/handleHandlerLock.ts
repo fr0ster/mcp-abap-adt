@@ -6,13 +6,11 @@ import {
   COMPACT_LOCK_KINDS,
   compactLockDescription,
   compactLockSchemaFor,
-  isJsonObject,
-  jsonOf,
   subResourceRefusal,
   supported,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
-import { lockObject } from '@mcp-abap-adt/lib/handlers/write';
+import { lockObjectAnswering } from '@mcp-abap-adt/lib/handlers/write';
 import { return_error } from '@mcp-abap-adt/lib/utils';
 import type * as z from 'zod';
 
@@ -55,49 +53,23 @@ export async function handleHandlerLock(
     return return_error(new Error(LOCKS_NOT_KEPT_WORDS));
   }
 
-  const answered = await lockObject(context, {
-    object_name: args.object_name,
-    object_type: COMPACT_LOCK_KINDS[member],
-  });
-  // A package lock over RFC lives in a session of its own.
-  return keptLock(context, answered, member === 'PACKAGE' ? 'own' : 'main');
-}
-
-type LockAnswer = {
-  isError?: boolean;
-  content?: Array<{ type: string; text?: string }>;
-};
-
-/**
- * The handle a lock answered is kept as the instance's state (every
- * transport's instance has its held locks), and the answer names the
- * instance's `state_handle`. An empty handle (a service binding open in an
- * editing session) holds nothing.
- */
-function keptLock(
-  context: HandlerContext,
-  answered: LockAnswer,
-  session: 'main' | 'own',
-): LockAnswer {
+  // The lock answered from its typed handle: kept as the instance's state
+  // (every transport's instance has its held locks; a package lock over RFC
+  // lives in a session of its own), and named beside the instance's
+  // `state_handle`. An empty handle (a service binding open in an editing
+  // session) holds nothing.
   const locks = context.heldLocks;
-  const text = answered?.content?.[0]?.text;
-  if (locks === undefined || answered?.isError || text === undefined) {
-    return answered;
-  }
-  const read = jsonOf(text);
-  if (read === undefined || !isJsonObject(read)) return answered;
-  const handle = read.lock_handle;
-  if (typeof handle !== 'string' || handle === '') return answered;
-  locks.hold(handle, session);
-  const body =
-    context.state === undefined
-      ? read
-      : { ...read, state_handle: context.state.handle };
-  return {
-    ...answered,
-    content: [
-      { type: 'text', text: JSON.stringify(body) },
-      ...(answered.content ?? []).slice(1),
-    ],
-  };
+  const session = member === 'PACKAGE' ? 'own' : 'main';
+  return lockObjectAnswering(
+    context,
+    { object_name: args.object_name, object_type: COMPACT_LOCK_KINDS[member] },
+    'HandlerLock',
+    (lockHandle) =>
+      lockHandle !== '' && context.state !== undefined
+        ? { lock_handle: lockHandle, state_handle: context.state.handle }
+        : { lock_handle: lockHandle },
+    (lockHandle) => {
+      if (lockHandle !== '') locks.hold(lockHandle, session);
+    },
+  );
 }

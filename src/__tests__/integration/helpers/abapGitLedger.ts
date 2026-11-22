@@ -8,13 +8,20 @@
  * status under `L0` is the previous run's. The wait ends on SAP's answer or
  * the caller's own cancel; nothing here picks a deadline.
  *
- * **Recovery.** Every fixture is recorded here before it is relied on and as
- * soon as it exists — the branches, the package, each object, the repository
- * key, and a submitted cloud run with its `L0`. A run that is cancelled, or
- * that cannot correlate its job, keeps its fixtures and its entry; the next
- * run works the ledger first: for each entry of its own backend and system it
- * waits as above, then cleans up exactly what the entry names, and removes
- * the entry. Nothing the entry does not name is ever deleted.
+ * **Recovery.** Every create is journaled before its write and settled
+ * after it (`createFixture`): `intent`, then `confirmed`, `uncertain` (no
+ * answer) or retired (a definite refusal — never deleted). A link is
+ * journaled with its package and remote before it is sent and reconciled
+ * against R1 by both. A submitted cloud job is opened with its `L0`, one at a
+ * time (`openPending`), and closed only once seen terminal or on its route's
+ * definite refusal (`isRouteRefusal`). A run that is cancelled, or that
+ * cannot correlate its job, keeps its fixtures and its entry; the next run
+ * works the ledger first: for each entry of its own backend and system
+ * (`systemIdentityOf`) it reconciles the link, waits as above, checks R1's
+ * entry against the ledger before the unlink, then deletes what the entry
+ * names — an unconfirmed fixture only once it is seen to exist — and removes
+ * the entry. Nothing the entry does not name is ever deleted. The waits end
+ * on SAP's answer or the runner's stop request (`stopSignalOf`).
  *
  * **One run at a time.** Recovery takes every entry of its system for
  * abandoned, and the file is written whole on every change; both hold only
@@ -40,6 +47,7 @@ import {
   readFileSync,
   renameSync,
   unlinkSync,
+  watch,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -159,31 +167,107 @@ export interface IPendingRun {
   readonly l0: string | null;
 }
 
+/** What a run creates: a remote branch, a package, an interface. */
+export type FixtureKind = 'branch' | 'package' | 'interface';
+
+/**
+ * Where a fixture's create stands: `intent`, journaled before the write;
+ * `confirmed`, after the system's success; `uncertain`, when the write got
+ * no answer. A definite refusal (the name exists, SAP refused) retires the
+ * fixture: it is struck from the entry and never deleted.
+ */
+export type FixtureState = 'intent' | 'confirmed' | 'uncertain';
+
+export interface IFixture {
+  readonly kind: FixtureKind;
+  readonly name: string;
+  readonly state: FixtureState;
+}
+
+/** What a create's write ended with. */
+export type WriteOutcome = 'confirmed' | 'refused';
+
+/**
+ * A link, journaled with its package and remote before it is sent; its key
+ * once R1 lists exactly one repository of that package and remote, and the
+ * branch it is on (a switch follows it).
+ */
+export interface ILinkRecord {
+  readonly package: string;
+  readonly url: string;
+  readonly branch: string;
+  readonly state: 'intent' | 'confirmed';
+  readonly repoKey?: string | undefined;
+}
+
 export interface ILedgerEntry {
   readonly runId: string;
   readonly backend: AbapGitBackend;
-  /** The system the run reached: its address and client, no credential. */
+  /** The system the run reached, by its effective identity (`systemIdentityOf`), no credential. */
   readonly systemKey: string;
   /** The remote URL SAP was given. */
   readonly url: string;
-  /** Branches this run created in the remote. */
-  readonly branches: readonly string[];
-  /** The package this run created, once created. */
-  readonly package?: string | undefined;
+  /** What this run creates, each with where its create stands. */
+  readonly fixtures: readonly IFixture[];
   /** The request the package and objects were recorded in (onprem). */
   readonly transportRequest?: string | undefined;
-  /** Interfaces this run created, once created. */
-  readonly interfaces: readonly string[];
-  /** The repository key, once linked. */
-  readonly repoKey?: string | undefined;
+  /** The link, from its intent on. */
+  readonly link?: ILinkRecord | undefined;
   /** A cloud run whose end has not been seen. */
   readonly pending?: IPendingRun | undefined;
+}
+
+/** The configured destination as the ledger names its system. */
+export interface ISystemSettings {
+  readonly connectionType?: string | undefined;
+  readonly url?: string | undefined;
+  readonly client?: string | undefined;
+  readonly ashost?: string | undefined;
+  readonly sysnr?: string | undefined;
+  readonly mshost?: string | undefined;
+  readonly msserv?: string | undefined;
+  readonly sysid?: string | undefined;
+  readonly group?: string | undefined;
+}
+
+/**
+ * The system a run reaches, by its effective identity: over RFC the
+ * destination's name with its application or message server, system number
+ * and client; over HTTP its URL and client. Two systems never share a key,
+ * so a run never works another system's entries.
+ */
+export function systemIdentityOf(
+  destination: string,
+  settings: ISystemSettings,
+): string {
+  if (settings.connectionType === 'rfc') {
+    return JSON.stringify([
+      'rfc',
+      destination,
+      settings.ashost ?? '',
+      settings.sysnr ?? '',
+      settings.mshost ?? '',
+      settings.msserv ?? '',
+      settings.sysid ?? '',
+      settings.group ?? '',
+      settings.client ?? '',
+    ]);
+  }
+  return JSON.stringify(['http', settings.url ?? '', settings.client ?? '']);
 }
 
 /** One repository's run state in R1. */
 export interface IRunRow {
   readonly runStatus: string | undefined;
   readonly appLogKey: string | undefined;
+}
+
+/** One R1 entry: what it is bound to, and its run state. */
+export interface IRepoRow extends IRunRow {
+  readonly key: string;
+  readonly package: string;
+  readonly url: string;
+  readonly branchName: string;
 }
 
 export type RunState = 'waiting' | 'terminal' | 'gone';
@@ -282,6 +366,89 @@ export class AbapGitLedger {
     return next;
   }
 
+  /** Journal a fixture's create before its write: `intent`. */
+  journal(runId: string, kind: FixtureKind, name: string): void {
+    this.amend(runId, (entry) => ({
+      ...entry,
+      fixtures: [...entry.fixtures, { kind, name, state: 'intent' }],
+    }));
+  }
+
+  /**
+   * Settle a journaled create: `confirmed` or `uncertain` keep it with that
+   * state; `refused` (a definite refusal) retires it — it is never deleted.
+   */
+  settle(
+    runId: string,
+    kind: FixtureKind,
+    name: string,
+    outcome: WriteOutcome | 'uncertain',
+  ): void {
+    this.amend(runId, (entry) => ({
+      ...entry,
+      fixtures:
+        outcome === 'refused'
+          ? entry.fixtures.filter((f) => f.kind !== kind || f.name !== name)
+          : entry.fixtures.map((f) =>
+              f.kind === kind && f.name === name ? { ...f, state: outcome } : f,
+            ),
+    }));
+  }
+
+  /** Journal a link with its package, remote and branch before it is sent. */
+  journalLink(
+    runId: string,
+    link: { package: string; url: string; branch: string },
+  ): void {
+    this.amend(runId, (entry) => ({
+      ...entry,
+      link: { ...link, state: 'intent' },
+    }));
+  }
+
+  /** The link is R1's entry `repoKey`. */
+  confirmLink(runId: string, repoKey: string): void {
+    this.amend(runId, (entry) => {
+      if (entry.link === undefined) {
+        throw new Error(`run ${runId}: no link was journaled`);
+      }
+      return {
+        ...entry,
+        link: { ...entry.link, state: 'confirmed', repoKey },
+      };
+    });
+  }
+
+  /** The linked repository is on `branch` now (a switch). */
+  followBranch(runId: string, branch: string): void {
+    this.amend(runId, (entry) => {
+      if (entry.link === undefined) {
+        throw new Error(`run ${runId}: no link was journaled`);
+      }
+      return { ...entry, link: { ...entry.link, branch } };
+    });
+  }
+
+  /**
+   * Open a cloud job before its submit; refused while one is open, so an
+   * unresolved job is never overwritten by a later one.
+   */
+  openPending(runId: string, pending: IPendingRun): void {
+    this.amend(runId, (entry) => {
+      if (entry.pending !== undefined) {
+        throw new Error(
+          `run ${runId}: ${entry.pending.what} is still unresolved; ${pending.what} is not submitted`,
+        );
+      }
+      return { ...entry, pending };
+    });
+  }
+
+  /** The open cloud job is resolved: seen terminal, or refused by its route. */
+  closePending(runId: string): void {
+    this.amend(runId, (entry) => ({ ...entry, pending: undefined }));
+  }
+
   remove(runId: string): void {
     this.write(this.entries().filter((entry) => entry.runId !== runId));
   }
@@ -296,11 +463,117 @@ export class AbapGitLedger {
   }
 }
 
+/**
+ * Run a fixture's create journaled: `intent` before `write`, then what it
+ * ended with — `confirmed`, or `refused` (retired); a write that throws (no
+ * answer) leaves it `uncertain`, and the error goes on.
+ */
+export async function createFixture(
+  ledger: AbapGitLedger,
+  runId: string,
+  kind: FixtureKind,
+  name: string,
+  write: () => Promise<WriteOutcome>,
+): Promise<WriteOutcome> {
+  ledger.journal(runId, kind, name);
+  let outcome: WriteOutcome;
+  try {
+    outcome = await write();
+  } catch (error) {
+    ledger.settle(runId, kind, name, 'uncertain');
+    throw error;
+  }
+  ledger.settle(runId, kind, name, outcome);
+  return outcome;
+}
+
+/** SAP's fixed words for an abapGit route's refusal with a T100 key. */
+const REFUSED_WITH_MESSAGE =
+  'SAP refused the abapGit request with a T100 message.';
+
+/**
+ * Whether a submit's tool answer is a definite refusal of its abapGit route:
+ * the structured error SAP's handler writes (`cx_adt_rest_abapgit=>
+ * raise_with_error`) — the T100 message words, a failing status and its T100
+ * key. A bare status, an unreadable answer or no answer is not: the job may
+ * exist. As adt-clients' live suite reads it (`settleRefusedSubmit`); a
+ * submit is a key route, so its path is the repository's by construction.
+ */
+export function isRouteRefusal(answer: {
+  readonly isError: boolean;
+  readonly text: string;
+}): boolean {
+  if (!answer.isError) return false;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(answer.text);
+  } catch {
+    return false;
+  }
+  const message: unknown =
+    typeof parsed === 'object' && parsed !== null
+      ? Reflect.get(parsed, 'message')
+      : undefined;
+  const facts: unknown =
+    typeof parsed === 'object' && parsed !== null
+      ? Reflect.get(parsed, 'facts')
+      : undefined;
+  const read = (key: string): unknown =>
+    typeof facts === 'object' && facts !== null
+      ? Reflect.get(facts, key)
+      : undefined;
+  const status = read('status');
+  const messageClass = read('messageClass');
+  const messageNumber = read('messageNumber');
+  return (
+    message === REFUSED_WITH_MESSAGE &&
+    typeof status === 'number' &&
+    status >= 400 &&
+    typeof messageClass === 'string' &&
+    messageClass !== '' &&
+    typeof messageNumber === 'string' &&
+    messageNumber !== ''
+  );
+}
+
+/**
+ * A signal the runner's stop request aborts (its stop file, `file`, written
+ * on the first interrupt): aborted at once when the file is there, else when
+ * it appears in its directory (`fs.watch`, no timer). `close` stops
+ * watching. Without a stop file the signal never aborts.
+ */
+export function stopSignalOf(file: string | undefined): {
+  readonly signal: AbortSignal;
+  close(): void;
+} {
+  const controller = new AbortController();
+  if (file === undefined || file === '') {
+    return { signal: controller.signal, close: () => {} };
+  }
+  if (existsSync(file)) {
+    controller.abort();
+    return { signal: controller.signal, close: () => {} };
+  }
+  const watcher = watch(dirname(file), () => {
+    if (existsSync(file)) {
+      controller.abort();
+      watcher.close();
+    }
+  });
+  return { signal: controller.signal, close: () => watcher.close() };
+}
+
 /** What cleaning up one ledger entry needs, injected by the suite. */
 export interface ICleanupSteps {
-  /** R1's row for the key, or `undefined` when R1 does not list it. */
-  readonly readRow: (repoKey: string) => Promise<IRunRow | undefined>;
+  /** R1, whole; it throws when R1 cannot be read. */
+  readonly listRepos: () => Promise<readonly IRepoRow[]>;
   readonly unlink: (repoKey: string) => Promise<void>;
+  /** Whether the fixture exists: an `intent` or `uncertain` one is deleted only when it does. */
+  readonly exists: (
+    kind: FixtureKind,
+    name: string,
+    remoteUrl: string,
+  ) => Promise<boolean>;
   readonly deleteInterface: (
     name: string,
     transportRequest: string | undefined,
@@ -313,12 +586,33 @@ export interface ICleanupSteps {
   readonly deleteBranch: (name: string, remoteUrl: string) => Promise<void>;
 }
 
+/** R1's entry `key`, or `undefined` when R1 does not list it. */
+export async function repoRowOf(
+  steps: Pick<ICleanupSteps, 'listRepos'>,
+  key: string,
+): Promise<IRepoRow | undefined> {
+  return (await steps.listRepos()).find((row) => row.key === key);
+}
+
+/** The order fixtures are deleted in: objects, then the package, then the branches. */
+const DELETE_ORDER: readonly FixtureKind[] = ['interface', 'package', 'branch'];
+
 /**
- * Clean up exactly what `entry` names, in the spec's order: wait for a
- * pending cloud run, unlink (asserting R1 no longer lists the key), delete
- * the objects, the package, the branches; then remove the entry. Each step
- * that succeeds is struck from the entry first, so a cleanup cut short
- * resumes where it stopped. The wait is bounded by `signal` alone.
+ * Clean up exactly what `entry` names, in the spec's order:
+ *
+ * 1. A link intent is reconciled against R1 by its package and remote: one
+ *    entry is the link (confirmed), none means it never happened; R1
+ *    unreadable or two entries refuse, and nothing is deleted while a link
+ *    intent stands unreconciled.
+ * 2. A pending cloud job is waited for (bounded by `signal` alone).
+ * 3. Before the unlink, R1's entry is checked against the ledger — its
+ *    package, remote and branch; any mismatch refuses and keeps the entry.
+ *    The unlink is asserted by R1 no longer listing the key.
+ * 4. The objects, the package, the branches: a `confirmed` one is deleted;
+ *    an `intent` or `uncertain` one only when it exists, else retired.
+ *
+ * Each step that succeeds is struck from the entry first, so a cleanup cut
+ * short resumes where it stopped.
  */
 export async function cleanUpEntry(
   ledger: AbapGitLedger,
@@ -328,35 +622,70 @@ export async function cleanUpEntry(
 ): Promise<void> {
   let entry = ledger.find(runId);
   if (!entry) return;
-  const { repoKey } = entry;
-  if (entry.pending && repoKey) {
-    await waitForRun(() => steps.readRow(repoKey), entry.pending, signal);
-    entry = ledger.amend(runId, (e) => ({ ...e, pending: undefined }));
+  const intent = entry.link;
+  if (intent !== undefined && intent.state === 'intent') {
+    const matching = (await steps.listRepos()).filter(
+      (row) => row.package === intent.package && row.url === intent.url,
+    );
+    const [only] = matching;
+    if (matching.length > 1) {
+      throw new Error(
+        `run ${runId}: R1 lists ${matching.length} repositories of package ${intent.package} and its remote; the link intent stays unreconciled and nothing is deleted`,
+      );
+    }
+    if (only === undefined) {
+      entry = ledger.amend(runId, (e) => ({ ...e, link: undefined }));
+    } else {
+      ledger.confirmLink(runId, only.key);
+      entry = ledger.amend(runId, (e) => e);
+    }
   }
-  if (repoKey) {
-    if ((await steps.readRow(repoKey)) !== undefined)
+  const link = entry.link;
+  const repoKey = link?.repoKey;
+  if (link !== undefined && repoKey !== undefined) {
+    const pending = entry.pending;
+    if (pending !== undefined) {
+      await waitForRun(async () => repoRowOf(steps, repoKey), pending, signal);
+      entry = ledger.amend(runId, (e) => ({ ...e, pending: undefined }));
+    }
+    const row = await repoRowOf(steps, repoKey);
+    if (row !== undefined) {
+      const mismatch = [
+        row.package !== link.package && 'package',
+        row.url !== link.url && 'remote',
+        row.branchName !== link.branch && 'branch',
+      ].filter((field) => field !== false);
+      if (mismatch.length > 0) {
+        throw new Error(
+          `run ${runId}: R1's repository ${repoKey} differs from the ledger in its ${mismatch.join(', ')}; it is not unlinked and the entry stays`,
+        );
+      }
       await steps.unlink(repoKey);
-    if ((await steps.readRow(repoKey)) !== undefined)
-      throw new Error(`repository ${repoKey} is still listed after unlink`);
-    entry = ledger.amend(runId, (e) => ({ ...e, repoKey: undefined }));
+      if ((await repoRowOf(steps, repoKey)) !== undefined)
+        throw new Error(`repository ${repoKey} is still listed after unlink`);
+    }
+    entry = ledger.amend(runId, (e) => ({ ...e, link: undefined }));
   }
-  for (const name of entry.interfaces) {
-    await steps.deleteInterface(name, entry.transportRequest);
-    entry = ledger.amend(runId, (e) => ({
-      ...e,
-      interfaces: e.interfaces.filter((n) => n !== name),
-    }));
-  }
-  if (entry.package) {
-    await steps.deletePackage(entry.package, entry.transportRequest);
-    entry = ledger.amend(runId, (e) => ({ ...e, package: undefined }));
-  }
-  for (const name of entry.branches) {
-    await steps.deleteBranch(name, entry.url);
-    entry = ledger.amend(runId, (e) => ({
-      ...e,
-      branches: e.branches.filter((n) => n !== name),
-    }));
+  for (const kind of DELETE_ORDER) {
+    for (const fixture of entry.fixtures.filter((f) => f.kind === kind)) {
+      const present =
+        fixture.state === 'confirmed' ||
+        (await steps.exists(kind, fixture.name, entry.url));
+      if (present) {
+        if (kind === 'interface')
+          await steps.deleteInterface(fixture.name, entry.transportRequest);
+        if (kind === 'package')
+          await steps.deletePackage(fixture.name, entry.transportRequest);
+        if (kind === 'branch')
+          await steps.deleteBranch(fixture.name, entry.url);
+      }
+      entry = ledger.amend(runId, (e) => ({
+        ...e,
+        fixtures: e.fixtures.filter(
+          (f) => f.kind !== kind || f.name !== fixture.name,
+        ),
+      }));
+    }
   }
   ledger.remove(runId);
 }

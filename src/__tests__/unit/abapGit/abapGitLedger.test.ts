@@ -12,6 +12,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { once } from 'node:events';
 import {
   existsSync,
   mkdtempSync,
@@ -26,14 +27,20 @@ import {
   AbapGitLedger,
   acquireRunLock,
   cleanUpEntry,
+  createFixture,
+  type FixtureKind,
   type ICleanupSteps,
   type ILedgerEntry,
+  type IRepoRow,
   type IRunRow,
+  isRouteRefusal,
   RunLockHeld,
   RunWaitCancelled,
   readRunLock,
   releasingRunLock,
   runState,
+  stopSignalOf,
+  systemIdentityOf,
   waitForRun,
 } from '../../integration/helpers/abapGitLedger';
 
@@ -112,29 +119,66 @@ describe('the recovery ledger', () => {
 
   afterEach(() => rmSync(dir, { recursive: true, force: true }));
 
+  const URL = 'https://git.example.invalid/r.git';
+  const LINK = {
+    package: 'ZAGL_RUN1',
+    url: URL,
+    branch: 'refs/heads/b1',
+    state: 'confirmed',
+    repoKey: 'K1',
+  } as const;
+  const confirmed = (kind: FixtureKind, name: string) =>
+    ({ kind, name, state: 'confirmed' }) as const;
   const entry: ILedgerEntry = {
     runId: 'RUN1',
     backend: 'cloud',
     systemKey: 'https://system client=100',
-    url: 'https://git.example.invalid/r.git',
-    branches: ['b1', 'b2'],
-    package: 'ZAGL_RUN1',
-    interfaces: ['ZIF_AGL_RUN1'],
-    repoKey: 'K1',
+    url: URL,
+    fixtures: [
+      confirmed('branch', 'b1'),
+      confirmed('branch', 'b2'),
+      confirmed('package', 'ZAGL_RUN1'),
+      confirmed('interface', 'ZIF_AGL_RUN1'),
+    ],
+    link: LINK,
     pending: { what: 'pullRepo', l0: 'L0' },
   };
 
-  function recordingSteps(rows: (IRunRow | undefined)[]) {
+  const repo = (
+    over: Partial<IRepoRow> & Pick<IRepoRow, 'runStatus' | 'appLogKey'>,
+  ): IRepoRow => ({
+    key: 'K1',
+    package: LINK.package,
+    url: URL,
+    branchName: LINK.branch,
+    ...over,
+  });
+
+  /** R1 answering `runs` for K1 in turn, the last for good, until unlinked. */
+  function recordingSteps(
+    runs: (IRunRow | undefined)[],
+    options: {
+      others?: readonly IRepoRow[];
+      exists?: (kind: FixtureKind, name: string) => boolean;
+    } = {},
+  ) {
     const done: string[] = [];
     const remotes: string[] = [];
-    const r1 = scriptedR1(rows);
+    const r1 = scriptedR1(runs);
     let linked = true;
     const steps: ICleanupSteps = {
-      readRow: async () => (linked ? r1.read() : undefined),
+      listRepos: async () => {
+        const run = linked ? await r1.read() : undefined;
+        return [
+          ...(run === undefined ? [] : [repo(run)]),
+          ...(options.others ?? []),
+        ];
+      },
       unlink: async (key) => {
         done.push(`unlink ${key}`);
         linked = false;
       },
+      exists: async (kind, name) => options.exists?.(kind, name) ?? false,
       deleteInterface: async (name) => {
         done.push(`interface ${name}`);
       },
@@ -207,10 +251,12 @@ describe('the recovery ledger', () => {
       /refused/,
     );
     const left = new AbapGitLedger(file).find('RUN1');
-    assert.equal(left?.repoKey, undefined);
-    assert.deepEqual(left?.interfaces, []);
-    assert.equal(left?.package, 'ZAGL_RUN1');
-    assert.deepEqual(left?.branches, ['b1', 'b2']);
+    assert.equal(left?.link, undefined);
+    assert.deepEqual(left?.fixtures, [
+      confirmed('branch', 'b1'),
+      confirmed('branch', 'b2'),
+      confirmed('package', 'ZAGL_RUN1'),
+    ]);
   });
 
   it('refuses to report an unlink R1 still lists', async () => {
@@ -222,7 +268,320 @@ describe('the recovery ledger', () => {
       cleanUpEntry(ledger, 'RUN1', ignored, live()),
       /still listed after unlink/,
     );
-    assert.equal(new AbapGitLedger(file).find('RUN1')?.repoKey, 'K1');
+    assert.equal(new AbapGitLedger(file).find('RUN1')?.link?.repoKey, 'K1');
+  });
+
+  for (const [field, differs] of [
+    ['package', { package: 'ZOTHER' }],
+    ['remote', { url: 'https://git.example.invalid/other.git' }],
+    ['branch', { branchName: 'refs/heads/other' }],
+  ] as const) {
+    it(`refuses the unlink when R1's entry differs in its ${field}, and keeps the entry`, async () => {
+      const ledger = new AbapGitLedger(file);
+      ledger.put({ ...entry, pending: undefined });
+      const kept = ledger.find('RUN1');
+      const { done, steps } = recordingSteps([row('S', 'L1')]);
+      const foreign: ICleanupSteps = {
+        ...steps,
+        listRepos: async () => [{ ...repo(row('S', 'L1')), ...differs }],
+      };
+      await assert.rejects(
+        cleanUpEntry(ledger, 'RUN1', foreign, live()),
+        new RegExp(`differs from the ledger in its ${field}`),
+      );
+      assert.deepEqual(done, []);
+      assert.deepEqual(new AbapGitLedger(file).find('RUN1'), kept);
+    });
+  }
+
+  it('a switch the ledger followed is unlinked on its new branch', async () => {
+    const ledger = new AbapGitLedger(file);
+    ledger.put({ ...entry, pending: undefined, fixtures: [] });
+    ledger.followBranch('RUN1', 'refs/heads/b2');
+    const { done, steps } = recordingSteps([row('S', 'L1')]);
+    const switched: ICleanupSteps = {
+      ...steps,
+      listRepos: async () =>
+        done.length === 0
+          ? [{ ...repo(row('S', 'L1')), branchName: 'refs/heads/b2' }]
+          : [],
+    };
+    await cleanUpEntry(ledger, 'RUN1', switched, live());
+    assert.deepEqual(done, ['unlink K1']);
+  });
+
+  describe('a link intent', () => {
+    const intent: ILedgerEntry = {
+      ...entry,
+      pending: undefined,
+      link: {
+        package: LINK.package,
+        url: URL,
+        branch: LINK.branch,
+        state: 'intent',
+      },
+    };
+
+    it('is reconciled against R1 by package and remote: the one entry is the link, unlinked', async () => {
+      const ledger = new AbapGitLedger(file);
+      ledger.put(intent);
+      const { done, steps } = recordingSteps([row('S', 'L1')], {
+        others: [
+          repo({ ...row('S', 'L9'), key: 'K9', package: 'ZOTHER' }),
+          repo({
+            ...row('S', 'L8'),
+            key: 'K8',
+            url: 'https://git.example.invalid/other.git',
+          }),
+        ],
+      });
+      await cleanUpEntry(ledger, 'RUN1', steps, live());
+      assert.equal(done[0], 'unlink K1');
+    });
+
+    it('R1 listing none means the link never happened: nothing is unlinked', async () => {
+      const ledger = new AbapGitLedger(file);
+      ledger.put(intent);
+      const { done, steps } = recordingSteps([undefined]);
+      await cleanUpEntry(ledger, 'RUN1', steps, live());
+      assert.equal(done.includes('unlink K1'), false);
+      assert.equal(done.includes('package ZAGL_RUN1'), true);
+    });
+
+    it('unreadable or ambiguous R1: no package or branch is deleted, the entry stays', async () => {
+      for (const listRepos of [
+        async (): Promise<IRepoRow[]> => {
+          throw new Error('R1 unreadable');
+        },
+        async (): Promise<IRepoRow[]> => [
+          repo(row('S', 'L1')),
+          repo({ ...row('S', 'L2'), key: 'K2' }),
+        ],
+      ]) {
+        const ledger = new AbapGitLedger(file);
+        ledger.put(intent);
+        const kept = ledger.find('RUN1');
+        const { done, steps } = recordingSteps([row('S', 'L1')]);
+        await assert.rejects(
+          cleanUpEntry(ledger, 'RUN1', { ...steps, listRepos }, live()),
+        );
+        assert.deepEqual(done, []);
+        assert.deepEqual(new AbapGitLedger(file).find('RUN1'), kept);
+      }
+    });
+  });
+
+  describe('only what the run created', () => {
+    const base: ILedgerEntry = {
+      runId: 'RUN1',
+      backend: 'onprem',
+      systemKey: 'k',
+      url: URL,
+      fixtures: [],
+    };
+
+    it('a create is journaled before its write and confirmed after it', async () => {
+      const ledger = new AbapGitLedger(file);
+      ledger.put(base);
+      const outcome = await createFixture(
+        ledger,
+        'RUN1',
+        'package',
+        'ZP',
+        async () => {
+          assert.deepEqual(new AbapGitLedger(file).find('RUN1')?.fixtures, [
+            { kind: 'package', name: 'ZP', state: 'intent' },
+          ]);
+          return 'confirmed';
+        },
+      );
+      assert.equal(outcome, 'confirmed');
+      assert.deepEqual(new AbapGitLedger(file).find('RUN1')?.fixtures, [
+        { kind: 'package', name: 'ZP', state: 'confirmed' },
+      ]);
+    });
+
+    it('a definite refusal retires the fixture: it is never deleted', async () => {
+      const ledger = new AbapGitLedger(file);
+      ledger.put(base);
+      await createFixture(
+        ledger,
+        'RUN1',
+        'branch',
+        'b1',
+        async () => 'refused',
+      );
+      assert.deepEqual(ledger.find('RUN1')?.fixtures, []);
+      const { done, steps } = recordingSteps([undefined], {
+        exists: () => true,
+      });
+      await cleanUpEntry(ledger, 'RUN1', steps, live());
+      assert.deepEqual(done, []);
+    });
+
+    it('a write with no answer is uncertain: deleted only once seen to exist', async () => {
+      for (const [there, expected] of [
+        [true, ['interface ZIF_X']],
+        [false, []],
+      ] as const) {
+        const ledger = new AbapGitLedger(file);
+        ledger.put(base);
+        await assert.rejects(
+          createFixture(ledger, 'RUN1', 'interface', 'ZIF_X', async () => {
+            throw new Error('no answer');
+          }),
+          /no answer/,
+        );
+        assert.deepEqual(ledger.find('RUN1')?.fixtures, [
+          { kind: 'interface', name: 'ZIF_X', state: 'uncertain' },
+        ]);
+        const { done, steps } = recordingSteps([undefined], {
+          exists: () => there,
+        });
+        await cleanUpEntry(ledger, 'RUN1', steps, live());
+        assert.deepEqual(done, expected);
+        assert.equal(ledger.find('RUN1'), undefined);
+      }
+    });
+
+    it('an intent a run died on is checked like an uncertain one', async () => {
+      const ledger = new AbapGitLedger(file);
+      ledger.put(base);
+      ledger.journal('RUN1', 'branch', 'b1');
+      const asked: string[] = [];
+      const { done, steps } = recordingSteps([undefined], {
+        exists: (kind, name) => {
+          asked.push(`${kind} ${name}`);
+          return false;
+        },
+      });
+      await cleanUpEntry(ledger, 'RUN1', steps, live());
+      assert.deepEqual(asked, ['branch b1']);
+      assert.deepEqual(done, []);
+    });
+  });
+
+  describe('a cloud job', () => {
+    it('is refused while another is open: an unresolved job is never overwritten', () => {
+      const ledger = new AbapGitLedger(file);
+      ledger.put({ ...entry, pending: undefined });
+      ledger.openPending('RUN1', { what: 'push', l0: 'L0' });
+      assert.throws(
+        () => ledger.openPending('RUN1', { what: 'pull', l0: 'L1' }),
+        /push is still unresolved; pull is not submitted/,
+      );
+      assert.deepEqual(ledger.find('RUN1')?.pending, {
+        what: 'push',
+        l0: 'L0',
+      });
+      ledger.closePending('RUN1');
+      ledger.openPending('RUN1', { what: 'pull', l0: 'L1' });
+    });
+
+    it('a submit is refused by its route only with the T100 words, a failing status and its key', () => {
+      const answer = (
+        facts: object,
+        message = 'SAP refused the abapGit request with a T100 message.',
+      ) => ({
+        isError: true,
+        text: JSON.stringify({ message, facts }),
+      });
+      const keyed = {
+        status: 500,
+        messageClass: 'ABAPGIT',
+        messageNumber: '017',
+      };
+      assert.equal(isRouteRefusal(answer(keyed)), true);
+      assert.equal(isRouteRefusal({ ...answer(keyed), isError: false }), false);
+      assert.equal(
+        isRouteRefusal(answer(keyed, 'SAP refused the abapGit request.')),
+        false,
+      );
+      assert.equal(isRouteRefusal(answer({ ...keyed, status: 202 })), false);
+      assert.equal(
+        isRouteRefusal(answer({ status: 500, messageNumber: '017' })),
+        false,
+      );
+      assert.equal(
+        isRouteRefusal(answer({ status: 500, messageClass: 'ABAPGIT' })),
+        false,
+      );
+      assert.equal(
+        isRouteRefusal({ isError: true, text: '502 Bad Gateway' }),
+        false,
+      );
+    });
+  });
+});
+
+describe("the system's identity", () => {
+  it('over RFC: the destination with its server, system number and client; over HTTP: URL and client', () => {
+    const rfc = (over: object) =>
+      systemIdentityOf('DEST', {
+        connectionType: 'rfc',
+        ashost: 'host-a',
+        sysnr: '00',
+        client: '100',
+        ...over,
+      });
+    const keys = [
+      rfc({}),
+      rfc({ ashost: 'host-b' }),
+      rfc({ sysnr: '01' }),
+      rfc({ client: '200' }),
+      systemIdentityOf('OTHER', {
+        connectionType: 'rfc',
+        ashost: 'host-a',
+        sysnr: '00',
+        client: '100',
+      }),
+      rfc({
+        ashost: undefined,
+        mshost: 'ms',
+        msserv: '3600',
+        sysid: 'S1',
+        group: 'G',
+      }),
+      rfc({
+        ashost: undefined,
+        mshost: 'ms',
+        msserv: '3600',
+        sysid: 'S2',
+        group: 'G',
+      }),
+      systemIdentityOf('DEST', {
+        url: 'https://a.example.invalid',
+        client: '100',
+      }),
+      systemIdentityOf('DEST', {
+        url: 'https://b.example.invalid',
+        client: '100',
+      }),
+      systemIdentityOf('DEST', {
+        url: 'https://a.example.invalid',
+        client: '200',
+      }),
+    ];
+    assert.equal(new Set(keys).size, keys.length);
+  });
+});
+
+describe("the runner's stop request", () => {
+  it('aborts the wait signal when the stop file appears, and at once when it is there', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
+    try {
+      const stopFile = join(dir, 'stop');
+      const stop = stopSignalOf(stopFile);
+      assert.equal(stop.signal.aborted, false);
+      const aborted = once(stop.signal, 'abort');
+      writeFileSync(stopFile, 'interrupted');
+      await aborted;
+      stop.close();
+      assert.equal(stopSignalOf(stopFile).signal.aborted, true);
+      assert.equal(stopSignalOf(undefined).signal.aborted, false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

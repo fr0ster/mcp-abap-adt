@@ -132,6 +132,7 @@ const JSON_ANSWERING: readonly string[] = [
   'ActivateInclude',
   'ActivateInterface',
   'ActivateMetadataExtension',
+  'ActivateObjects',
   'ActivateProgram',
   'ActivateServiceBinding',
   'ActivateServiceDefinition',
@@ -438,6 +439,16 @@ it('accepts a tool without answer() whose handler selects its formatter by the l
     detailWiring(
       ['src/__tests__/fixtures/detail/declares-answer-selected.ts'],
       new Set(['FixtureAnswerSelected']),
+    ),
+    [],
+  );
+});
+
+it('accepts a tool that hands its arguments, whole, to the handler that reads detail', () => {
+  assert.deepStrictEqual(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-delegates-args.ts'],
+      new Set(['FixtureDelegatesArgs']),
     ),
     [],
   );

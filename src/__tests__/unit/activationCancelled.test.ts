@@ -20,8 +20,8 @@ import { afterEach, beforeEach, describe, it } from 'node:test';
 import { format } from 'node:util';
 import { buildObjectUri } from '@mcp-abap-adt/adt-clients/core';
 import { handleHandlerActivate } from '../../../compact-modify/src/handlers/handleHandlerActivate';
-import { handleActivateObjects } from '../../handlers/common/high/handleActivateObjects';
-import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
+import { handleActivateObjects as handleActivateObjectsOf } from '../../handlers/common/high/handleActivateObjects';
+import { handleActivateObject as handleActivateObjectOf } from '../../handlers/common/low/handleActivateObject';
 import { handleGetActivationResults } from '../../handlers/common/readonly/handleGetActivationRun';
 import type { HandlerContext } from '../../lib/handlers/interfaces';
 import {
@@ -35,6 +35,18 @@ import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
 import { setSystemContext } from '../helpers/processSystemContext';
 import { recordingConnection } from '../helpers/recordingConnection';
+
+/** handleActivateObjects at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleActivateObjects = (
+  context: Parameters<typeof handleActivateObjectsOf>[0],
+  args: Parameters<typeof handleActivateObjectsOf>[1],
+) => handleActivateObjectsOf(context, { detail: 'full', ...args });
+
+/** handleActivateObject at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleActivateObject = (
+  context: Parameters<typeof handleActivateObjectOf>[0],
+  args: Parameters<typeof handleActivateObjectOf>[1],
+) => handleActivateObjectOf(context, { detail: 'full', ...args });
 
 /** A run document kept as text: the reading a set that keeps it answers. */
 function kept(raw: string): AdtReading<string> {

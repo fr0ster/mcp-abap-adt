@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { type AnswerTable, answerAt } from '../../../lib/detail';
 import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 /**
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
@@ -124,7 +125,7 @@ import {
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
-import { detailOf } from '../../../lib/strategies/detail';
+import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
 import { projectActivation } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -212,7 +213,7 @@ function activateObjectSchema(variant: ProjectionVariant) {
       .default('terse')
       .optional()
       .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored when a group activation (more than one object, or a type this tool cannot map to a single family) runs in the background: that path answers a run and its messages, with no single document behind them.',
+        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it). For a group activation (more than one object, or a type this tool cannot map to a single family) run in the background: terse its verdict and messages, medium the run with its id and status, full also the objects sent; there is no single document, so raw is full.',
       ),
   });
 }
@@ -658,6 +659,7 @@ export async function handleActivateObject(
   }));
 
   const plan = activationPlan(activationObjects, variantOf(connection));
+  const runShown = answerAt(runAnswers(activationObjects), levelOf(args));
   if (typeof plan === 'string') return return_error(new Error(plan));
 
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);
@@ -734,7 +736,7 @@ export async function handleActivateObject(
     (answered) =>
       'synchronous' in answered
         ? projectActivation(detail)(answered.synchronous)
-        : runAnswer(answered.runs, activationObjects),
+        : runShown(answered.runs),
   );
 }
 
@@ -796,7 +798,46 @@ function refusedRun(
   };
 }
 
-/** A finished run, as `ActivateObjectLow` answers it. */
+/**
+ * A finished run at each `detail` (terse answers, step 5): terse its verdict
+ * as the synchronous activation answers it — `activated`, and
+ * `nothing_to_activate` and SAP's messages only when there are any; medium
+ * the run with its id, status and messages; full the answer before `detail`,
+ * which repeats the objects sent and explains itself in prose.
+ */
+function runAnswers(
+  activationObjects: readonly ActivationObject[],
+): AnswerTable<ActivationRunOutcome, object> {
+  const full = (outcome: ActivationRunOutcome) =>
+    runAnswer(outcome, activationObjects);
+  return {
+    terse: (outcome) => {
+      const answered = full(outcome);
+      if (!answered.accepted) return { accepted: false, activated: null };
+      return {
+        activated: answered.activated,
+        ...(answered.nothing_to_activate === true
+          ? { nothing_to_activate: true }
+          : {}),
+        ...(answered.messages.length > 0
+          ? { messages: answered.messages }
+          : {}),
+      };
+    },
+    medium: (outcome) => {
+      const {
+        objects: _objects,
+        message: _message,
+        ...answered
+      } = full(outcome);
+      return answered;
+    },
+    full,
+    raw: full,
+  };
+}
+
+/** A finished run, as `ActivateObjectLow` answered it before `detail` (full). */
 function runAnswer(
   outcome: ActivationRunOutcome,
   activationObjects: readonly ActivationObject[],

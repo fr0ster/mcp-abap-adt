@@ -5,7 +5,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
+import { handleActivateObject as handleActivateObjectOf } from '../../handlers/common/low/handleActivateObject';
 import { handleCheckObject } from '../../handlers/common/low/handleCheckObject';
 import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
@@ -28,6 +28,12 @@ import {
   refusedResponse,
 } from '../helpers/fakeClient';
 import { stateSystemKind } from '../helpers/systemKind';
+
+/** handleActivateObject at `detail: 'full'`, the answer these cases compare (terse answers, step 3). */
+const handleActivateObject = (
+  context: Parameters<typeof handleActivateObjectOf>[0],
+  args: Parameters<typeof handleActivateObjectOf>[1],
+) => handleActivateObjectOf(context, { detail: 'full', ...args });
 
 // The declared variant the boundary checks a type argument against.
 stateSystemKind('onprem');
@@ -349,7 +355,7 @@ describe('ActivateObjectLow', () => {
     } as any);
     fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
 
-    const result: any = await handleActivateObject(context as any, {
+    const result: any = await handleActivateObjectOf(context as any, {
       objects: [{ name: 'zd', type: 'DOMA/DD' }],
     });
 

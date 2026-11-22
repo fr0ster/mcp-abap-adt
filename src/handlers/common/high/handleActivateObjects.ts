@@ -11,6 +11,7 @@ import * as z from 'zod';
 import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { activationParentDescription } from '../../../lib/adtTypeCode';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { byVariant } from '../../../lib/variantDefinition';
 import {
   activationTypeDescription,
@@ -46,6 +47,7 @@ function activateObjectsSchema(variant: ProjectionVariant) {
         "Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.",
       ),
     preaudit: z.boolean().optional().describe(preauditDescription(variant)),
+    ...DETAIL_SHAPE,
   });
 }
 

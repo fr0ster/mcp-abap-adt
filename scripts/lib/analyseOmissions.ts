@@ -450,7 +450,8 @@ export function detailWiring(
       declares &&
       calls.length === 0 &&
       debugCalls.length === 0 &&
-      !handlerSelectsAnswer(source)
+      !handlerSelectsAnswer(source) &&
+      !handlerDelegatesArgs(source)
     ) {
       offenders.push(
         `${file} — tool declares detail and the handler never calls answer()`,
@@ -710,6 +711,46 @@ function handlerSelectsAnswer(source: ts.SourceFile): boolean {
     }
   }
   return found;
+}
+
+/**
+ * Whether the exported handler hands its own arguments, whole, to another
+ * handler and answers what that one answers — `return handleX(context, args,
+ * …)`: the `detail` the tool declares reaches the handler that reads it.
+ */
+function handlerDelegatesArgs(source: ts.SourceFile): boolean {
+  for (const statement of source.statements) {
+    if (
+      !ts.isFunctionDeclaration(statement) ||
+      statement.name?.text.startsWith('handle') !== true ||
+      statement.modifiers?.some(
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      ) !== true ||
+      statement.body === undefined
+    ) {
+      continue;
+    }
+    const argsParameter = statement.parameters[1]?.name;
+    if (argsParameter === undefined || !ts.isIdentifier(argsParameter)) {
+      continue;
+    }
+    for (const inner of statement.body.statements) {
+      if (
+        ts.isReturnStatement(inner) &&
+        inner.expression !== undefined &&
+        ts.isCallExpression(inner.expression) &&
+        ts.isIdentifier(inner.expression.expression) &&
+        inner.expression.expression.text.startsWith('handle') &&
+        inner.expression.arguments.some(
+          (argument) =>
+            ts.isIdentifier(argument) && argument.text === argsParameter.text,
+        )
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 function isDetailOfCall(expr: ts.Expression): boolean {

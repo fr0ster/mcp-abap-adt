@@ -18,7 +18,12 @@ import { mockModuleExports } from '../helpers/moduleMock';
 const AdtRuntimeClientMock = mock.fn<(...args: any[]) => any>(
   function AdtRuntimeClient() {
     return {
-      getProfiler: () => profiler,
+      getProfiler: (results?: any) => {
+        // The set the handler passes, kept: a trace list is read through the
+        // handler's own reading.
+        lastProfilerResults = results;
+        return profiler;
+      },
       getFeeds: (results?: any) => {
         // The set the handler passes, kept: a gateway case reads its document
         // through the handler's own reading.
@@ -80,6 +85,7 @@ const context = { connection: {} as any, logger: undefined };
 let profiler: Record<string, unknown>;
 let feeds: Record<string, unknown>;
 let lastFeedResults: any;
+let lastProfilerResults: any;
 let dumps: Record<string, unknown>;
 let classExecutor: Record<string, unknown>;
 let packageClient: Record<string, unknown>;
@@ -107,10 +113,27 @@ const feedListXml =
 // ---------------------------------------------------------------------------
 
 describe('RuntimeListProfilerTraceFiles', () => {
-  it('answers the parsed entries and their count — not a reader that returns nothing', async () => {
-    const entry = { id: 'trace-1', recordedAt: '2026-01-01T00:00:00Z' };
-    profiler = { list: mock.fn(async () => okResponse([entry])) };
+  const FEED =
+    '<?xml version="1.0" encoding="utf-8"?><atom:feed xmlns:atom="http://www.w3.org/2005/Atom" xmlns:trc="http://www.sap.com/adt/runtime/traces/abaptraces">' +
+    '<atom:entry><atom:id>/sap/bc/adt/runtime/traces/abaptraces/TRACE0000000000001</atom:id><atom:published>2026-01-01T00:00:00Z</atom:published>' +
+    '<trc:extendedData><trc:objectName>ZCL_X=====CP</trc:objectName><trc:state value="R" text="Finished"/><trc:runtime>42</trc:runtime><trc:user>SAPUSER01</trc:user><trc:host>HOST</trc:host></trc:extendedData>' +
+    '</atom:entry></atom:feed>';
+  const listing = () => {
+    profiler = {
+      list: async () =>
+        okResponse(
+          lastProfilerResults.list({
+            status: 200,
+            statusText: 'OK',
+            headers: {},
+            data: FEED,
+          }),
+        ),
+    };
+  };
 
+  it('answers the parsed entries and their count — not a reader that returns nothing', async () => {
+    listing();
     const result: any = await handleRuntimeListProfilerTraceFiles(
       context as any,
       { detail: 'full' },
@@ -119,28 +142,17 @@ describe('RuntimeListProfilerTraceFiles', () => {
 
     assert.equal(result.isError, false);
     assert.equal(body.count, 1);
-    assert.deepStrictEqual(body.entries, [entry]);
+    assert.equal(body.entries[0].id, 'TRACE0000000000001');
   });
 
   it('terse, by default: one TSV row per trace — id, recordedAt, objectName, state, runtime', async () => {
-    const entry = {
-      id: 'trace-1',
-      uri: '/sap/bc/adt/runtime/traces/abaptraces/trace-1',
-      recordedAt: '2026-01-01T00:00:00Z',
-      user: 'SAPUSER01',
-      objectName: 'ZCL_X=====CP',
-      state: { value: 'R', text: 'Finished' },
-      runtime: 42,
-      host: 'HOST',
-    };
-    profiler = { list: mock.fn(async () => okResponse([entry])) };
-
+    listing();
     const terse: any = await handleRuntimeListProfilerTraceFiles(
       context as any,
     );
     assert.equal(
       terse.content[0].text,
-      '# count 1\nid\trecordedAt\tobjectName\tstate\truntime\ntrace-1\t2026-01-01T00:00:00Z\tZCL_X=====CP\tFinished\t42',
+      '# count 1\nid\trecordedAt\tobjectName\tstate\truntime\nTRACE0000000000001\t2026-01-01T00:00:00Z\tZCL_X=====CP\tFinished\t42',
     );
     const medium: any = await handleRuntimeListProfilerTraceFiles(
       context as any,
@@ -149,6 +161,14 @@ describe('RuntimeListProfilerTraceFiles', () => {
     const body = JSON.parse(medium.content[0].text);
     assert.equal('uri' in body.entries[0], false);
     assert.equal(body.entries[0].host, 'HOST');
+  });
+
+  it('raw answers the feed as ADT sent it', async () => {
+    listing();
+    const raw: any = await handleRuntimeListProfilerTraceFiles(context as any, {
+      detail: 'raw',
+    });
+    assert.equal(raw.content[0].text, FEED);
   });
 });
 

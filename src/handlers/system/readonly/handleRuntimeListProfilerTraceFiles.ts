@@ -2,10 +2,18 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   type IAbapTraceEntry,
+  profilerTraceEntries,
 } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
+import {
+  answered,
+  type DetailTable,
+  formatted,
+  rawLevel,
+  readingAt,
+  tsv,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   DETAIL_SHAPE,
@@ -31,16 +39,17 @@ function mediumEntry(entry: IAbapTraceEntry) {
 }
 
 /**
- * What RuntimeListProfilerTraceFiles answers at each `detail`, selected
- * before the call (`src/lib/detail`), over adt-strategies' typed reading of
+ * What RuntimeListProfilerTraceFiles answers at each `detail`: the reading
+ * passed to the call (`src/lib/detail`) — terse, medium and full over
+ * adt-strategies' typed reading of
  * the traces feed (`profilerTraceEntries`): terse a TSV row per trace — id,
  * recordedAt, objectName, state, runtime (the uri is the id's, system,
  * client and host the same on every row, the runtime split the profile
- * view's); medium every field but the uri; full the answer before `detail`.
- * The typed reading keeps no document, so raw is the full answer.
+ * view's); medium every field but the uri; full the answer before `detail`;
+ * raw the feed as ADT sent it.
  */
-const TRACE_ANSWERS: AnswerTable<IAbapTraceEntry[], string | object> = {
-  terse: (entries) =>
+const TRACE_READINGS: DetailTable<string | object> = {
+  terse: formatted(profilerTraceEntries, (entries: IAbapTraceEntry[]) =>
     [
       `# count ${entries.length}`,
       tsv(
@@ -54,13 +63,18 @@ const TRACE_ANSWERS: AnswerTable<IAbapTraceEntry[], string | object> = {
         ]),
       ),
     ].join('\n'),
-  medium: (entries) => ({
+  ),
+  medium: formatted(profilerTraceEntries, (entries: IAbapTraceEntry[]) => ({
     success: true,
     count: entries.length,
     entries: entries.map(mediumEntry),
-  }),
-  full: (entries) => ({ success: true, count: entries.length, entries }),
-  raw: (entries) => ({ success: true, count: entries.length, entries }),
+  })),
+  full: formatted(profilerTraceEntries, (entries: IAbapTraceEntry[]) => ({
+    success: true,
+    count: entries.length,
+    entries,
+  })),
+  raw: rawLevel,
 };
 
 export async function handleRuntimeListProfilerTraceFiles(
@@ -68,14 +82,15 @@ export async function handleRuntimeListProfilerTraceFiles(
   args: ListArgs = {},
 ) {
   const { connection, logger } = context;
-  const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
-    ourProfiler,
-  );
-  const shown = answerAt(TRACE_ANSWERS, levelOf(args));
+  // The level's reading, selected before the call and passed to it.
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler({
+    ...ourProfiler,
+    list: readingAt(TRACE_READINGS, levelOf(args)),
+  });
 
   return answer(
     { tool: 'RuntimeListProfilerTraceFiles', detail: detailOf(args) },
     () => profiler.list({ analyse: analyseException }),
-    shown,
+    answered,
   );
 }

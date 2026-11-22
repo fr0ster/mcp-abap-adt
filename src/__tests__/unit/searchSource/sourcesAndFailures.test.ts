@@ -88,6 +88,12 @@ import {
   sourcesFrom,
 } from '../../helpers/sourceReaderFake';
 
+/** SearchSource at `detail: 'full'`, the JSON answer these cases read (terse answers, step 3). */
+const searchSourceFull = (
+  context: Parameters<typeof handleSearchSource>[0],
+  args: Parameters<typeof handleSearchSource>[1],
+) => handleSearchSource(context, { detail: 'full', ...args });
+
 /** The read tools a hit's fields must fill, by name: their argument schemas. */
 const READ_TOOLS: Record<
   string,
@@ -3327,7 +3333,7 @@ describe("D23b: the handler takes the server's strategies (DO22, DO24)", () => {
           ['throw', true],
         ] as const) {
           const asked: string[] = [];
-          const result = await handleSearchSource(
+          const result = await searchSourceFull(
             withStrategies(
               standOn(ALL, { refuse: { 'PROGRAM ZPROG': 500 } }),
               absent,
@@ -3360,7 +3366,7 @@ describe("D23b: the handler takes the server's strategies (DO22, DO24)", () => {
       ),
       async () => {
         const seen: Array<{ lines: readonly string[]; input: ScanInput }> = [];
-        const result = await handleSearchSource(
+        const result = await searchSourceFull(
           withStrategies(standOn(ALL), batch === 'absent', {
             lineMatchStrategy: {
               match(lines, input) {
@@ -3414,7 +3420,7 @@ describe("D23b: the handler takes the server's strategies (DO22, DO24)", () => {
         batch,
       ),
       async () => {
-        const result = await handleSearchSource(
+        const result = await searchSourceFull(
           contextOn(
             standOn(ALL, { refuse: { 'PROGRAM ZPROG': 500 } }),
             batch === 'absent' ? 'absent' : 'served',
@@ -3563,7 +3569,7 @@ describe("D23b: the handler's boundary: a decided value leaves the handler as it
     it(
       format('%s thrown inside the scan is answered as itself', _name),
       async () => {
-        const result = await handleSearchSource(
+        const result = await searchSourceFull(
           {
             ...contextOn(standOn(ONE), 'absent'),
             lineMatchStrategy: {

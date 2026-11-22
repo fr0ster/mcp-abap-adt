@@ -1,14 +1,24 @@
 import * as z from 'zod';
 import { isRfcConnection } from '../../../lib/connectionKind';
+import {
+  type AnswerTable,
+  answerAt,
+  type DetailLevel,
+  groupedTsv,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import { ANSWER_LEVELS } from '../../../lib/search-source/answerLevel';
+import {
+  ANSWER_LEVELS,
+  type AnswerLevel,
+} from '../../../lib/search-source/answerLevel';
 import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import {
   type OrchestratorInput,
+  type OrchestratorResult,
   runSearchSourceWithContext,
 } from '../../../lib/search-source/orchestrator';
 import { SCAN_OBJECT_TYPES } from '../../../lib/search-source/packageEnumerator';
@@ -16,6 +26,7 @@ import {
   skipSapAnswers,
   undecided,
 } from '../../../lib/search-source/readFailure';
+import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -97,6 +108,7 @@ export const TOOL_DEFINITION = {
       .enum(['active', 'inactive', 'workingArea'])
       .optional()
       .describe('The version every source is read at. Default active.'),
+    ...DETAIL_SHAPE,
   }),
 } as const;
 
@@ -110,15 +122,100 @@ type SearchSourceArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 // and found nothing, where one at a time read all 13 and found both hits, as
 // HTTP does.
 
+/**
+ * What each hit is read as, selected before the scan: the `answer` given, or
+ * — none given — `lines` at terse (the snippets at `answer: snippets` or at
+ * medium and full) and `snippets` at the other levels, as before `detail`.
+ */
+export function searchSourceAnswerLevel(
+  level: DetailLevel,
+  answer: AnswerLevel | undefined,
+): AnswerLevel {
+  return answer ?? (level === 'terse' ? 'lines' : 'snippets');
+}
+
+/** The include column of a hit: the class include, or a module's or include's group. */
+function includeColumn(hit: OrchestratorResult['results'][number]): string {
+  return 'include' in hit ? hit.include : hit.function_group_name;
+}
+
+/**
+ * The scan as TSV (terse): `# scanned` and `# truncated` counter lines, a
+ * `# not loaded by SAP PACKAGE TYPE` line per node the walk could not read,
+ * then the hits under `# object PACKAGE TYPE NAME` group lines — at lines
+ * `include\tline`, at snippets `include\tline\tsnippet`, at objects
+ * `include\thits`. Every hit is answered.
+ */
+export function searchSourceRows(result: OrchestratorResult): string {
+  const head = [
+    `# scanned objects ${result.scanned.objects} sources ${result.scanned.sources} objects_with_hits ${result.scanned.objects_with_hits}`,
+    ...(result.truncated.by_object_cap ? ['# truncated by_object_cap'] : []),
+    ...(result.truncated.by_max_hits === true
+      ? ['# truncated by_max_hits']
+      : []),
+    ...(result.not_loaded ?? []).map(
+      (node) => `# not loaded by SAP ${node.package} ${node.type}`,
+    ),
+  ];
+  const first = result.results[0];
+  const columns =
+    first === undefined || 'line' in first
+      ? first !== undefined && 'snippet' in first
+        ? ['include', 'line', 'snippet']
+        : ['include', 'line']
+      : ['include', 'hits'];
+  const groups = new Map<string, string[][]>();
+  for (const hit of result.results) {
+    const key = `${hit.devclass} ${hit.object_type} ${hit.object_name}`;
+    const rows = groups.get(key) ?? [];
+    rows.push(
+      'hits' in hit
+        ? [includeColumn(hit), String(hit.hits)]
+        : 'snippet' in hit
+          ? [includeColumn(hit), String(hit.line), hit.snippet]
+          : [includeColumn(hit), String(hit.line)],
+    );
+    groups.set(key, rows);
+  }
+  return [
+    ...head,
+    groupedTsv(
+      columns,
+      [...groups].map(([value, rows]) => ({ field: 'object', value, rows })),
+    ),
+  ].join('\n');
+}
+
+/**
+ * What SearchSource answers at each `detail`, selected before the scan
+ * (`src/lib/detail`): terse {@link searchSourceRows}; medium and full the
+ * answer before `detail`. A scan reads many documents and answers none whole,
+ * so raw is the full answer.
+ */
+const SEARCH_SOURCE_ANSWERS: AnswerTable<OrchestratorResult, string> = {
+  terse: searchSourceRows,
+  medium: (result) => JSON.stringify(result),
+  full: (result) => JSON.stringify(result),
+  raw: (result) => JSON.stringify(result),
+};
+
 export async function handleSearchSource(
   context: HandlerContext,
   args: SearchSourceArgs,
 ) {
   const { logger } = context;
+  const level = levelOf(args);
+  const shown = answerAt(SEARCH_SOURCE_ANSWERS, level);
+  const asked = {
+    ...args,
+    answer: searchSourceAnswerLevel(level, args.answer),
+  };
   try {
     const result = await runSearchSourceWithContext(
       context,
-      isRfcConnection(context.connection) ? { ...args, concurrency: 1 } : args,
+      isRfcConnection(context.connection)
+        ? { ...asked, concurrency: 1 }
+        : asked,
       // The server's strategies, set from its options; absent, the shipped
       // ones — the one place their default lives (DO24).
       {
@@ -131,7 +228,7 @@ export async function handleSearchSource(
       content: [
         {
           type: 'text',
-          text: JSON.stringify(result),
+          text: shown(result),
         },
       ],
     };

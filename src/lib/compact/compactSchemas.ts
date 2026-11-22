@@ -2327,6 +2327,7 @@ function systemProperties(
       .optional()
       .describe(
         said(actions, {
+          search_source: DETAIL_WORDS,
           search_object: DETAIL_WORDS,
           where_used: DETAIL_WORDS,
           package_tree: DETAIL_WORDS,

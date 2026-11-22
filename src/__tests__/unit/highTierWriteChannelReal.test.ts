@@ -118,7 +118,7 @@ const TEST_DOUBLES_OK =
 
 const TRANSPORT_CREATED_XML =
   '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">' +
-  '<tm:request tm:number="SIDK900123" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project="">' +
+  '<tm:request tm:number="TRLK900438" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project="">' +
   '<tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>';
 
 /**
@@ -422,7 +422,7 @@ const cases: ChannelCase[] = [
         requests.map((r) => `${r.method} ${r.url.split('?')[0]}`),
         [
           'POST /sap/bc/adt/cts/transportrequests',
-          'GET /sap/bc/adt/cts/transportrequests/SIDK900123',
+          'GET /sap/bc/adt/cts/transportrequests/TRLK900438',
           'PUT /sap/bc/adt/cts/transportrequests/TRLK900439',
         ],
       );

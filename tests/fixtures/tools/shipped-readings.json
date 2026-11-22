@@ -492,32 +492,32 @@
     ]
   },
   "CreateTransport read back as a bare root @terse": {
-    "isError": false,
-    "text": "{\"transport_number\":\"SIDK900011\",\"task_number\":null,\"note\":\"the request exists, but its read showed no task, so no task type was applied\"}",
+    "isError": true,
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
     ]
   },
   "CreateTransport read back as a bare root @medium": {
-    "isError": false,
-    "text": "{\"success\":true,\"transport_number\":\"SIDK900011\",\"description\":\"x\",\"transport_type\":\"workbench\",\"target_system\":\"LOCAL\",\"owner\":\"SAPUSER01\",\"task_number\":null,\"task_type\":null,\"note\":\"the request exists, but its read showed no task, so no task type was applied\",\"message\":\"Transport request SIDK900011 created successfully.\"}",
+    "isError": true,
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
     ]
   },
   "CreateTransport read back as a bare root @full": {
-    "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "isError": true,
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
     ]
   },
   "CreateTransport read back as a bare root @raw": {
-    "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "isError": true,
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"raw\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -525,7 +525,7 @@
   },
   "CreateTransport read back as no transport document @terse": {
     "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"Invalid transport XML structure - no tm:root found\"}",
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -533,7 +533,7 @@
   },
   "CreateTransport read back as no transport document @medium": {
     "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"Invalid transport XML structure - no tm:root found\"}",
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -541,7 +541,7 @@
   },
   "CreateTransport read back as no transport document @full": {
     "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"Invalid transport XML structure - no tm:root found\"}",
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -549,7 +549,7 @@
   },
   "CreateTransport read back as no transport document @raw": {
     "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"raw\",\"message\":\"Invalid transport XML structure - no tm:root found\"}",
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"raw\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -557,7 +557,7 @@
   },
   "CreateTransport read back as an empty root element @terse": {
     "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"Invalid transport XML structure - no tm:root found\"}",
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"terse\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -565,7 +565,7 @@
   },
   "CreateTransport read back as an empty root element @medium": {
     "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"Invalid transport XML structure - no tm:root found\"}",
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -573,7 +573,7 @@
   },
   "CreateTransport read back as an empty root element @full": {
     "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"Invalid transport XML structure - no tm:root found\"}",
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"full\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -581,7 +581,7 @@
   },
   "CreateTransport read back as an empty root element @raw": {
     "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"raw\",\"message\":\"Invalid transport XML structure - no tm:root found\"}",
+    "text": "{\"error\":\"client_threw\",\"tool\":\"CreateTransport\",\"detail\":\"raw\",\"message\":\"readTransportItem: the answer is not the transport request or task asked for\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"

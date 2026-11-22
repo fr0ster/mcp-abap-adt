@@ -23,6 +23,7 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   type ICreatedTransport,
+  readTransportItem,
   transportCreated,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -46,7 +47,6 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { atStep, withStep } from '../../../lib/strategies/step';
 import { failed, succeeded } from '../../../lib/strategies/stepResponse';
 import { return_error } from '../../../lib/utils';
-import { parseTransportXml } from '../readonly/handleGetTransport';
 
 /** S — Development/Correction, R — Repair, X — Unclassified, as created. */
 export const REQUEST_TASK_TYPES = ['S', 'R', 'X'] as const;
@@ -183,7 +183,6 @@ export async function handleCreateTransport(
       const request = createAdtClient(connection, logger).getRequest({
         ...resultsFor(transportDocuments),
         created: readingAt(createdReadings, levelOf(args)),
-        objects: firstTaskOf,
         taskTypeChanged: statusOnly,
       });
       const created = await withAdtHeaders(
@@ -202,8 +201,15 @@ export async function handleCreateTransport(
       );
       if (!created.ok) return created;
       const number = created.getResult().value.value.created.transportNumber;
+      // The request read back as adt-strategies reads it by its number
+      // (`readTransportItem`), the reading made for that number.
       const read = await atStep('read request task', () =>
-        request.readObjects(number, { analyse: analyseException }),
+        createAdtClient(connection, logger)
+          .getRequest({
+            ...resultsFor(transportDocuments),
+            objects: firstTaskOf(number),
+          })
+          .readObjects(number, { analyse: analyseException }),
       )();
       if (!read.ok) {
         return refusedAfterCreate(
@@ -298,29 +304,29 @@ function createdAt<A>(
 }
 
 /**
- * The request read back, as the server reads it (`parseTransportXml`, the
- * tasks of the root's `tm:request`): its first task's number, `undefined`
- * when it holds none; or what the read threw for a document with no
- * `tm:root` — a bare `<tm:root/>` included — in fixed words, with nothing of
- * the document in them. The throw is carried, not thrown, so it leaves the
- * call where the read it replaced threw it, after the read's own verdict.
- * adt-strategies' `transportObjectEntries` reads object entries, which a new
- * request's task does not hold, and `transportTree` answers a bare root as no
- * task and puts the document into its error.
+ * The request read back, as adt-strategies reads it by its number
+ * (`readTransportItem`, 0.28.0): its first task's number, `undefined` when it
+ * holds none; or what the reading threw for an answer that is not the
+ * request asked for, in fixed words with nothing of the document. The throw
+ * is carried, not thrown, so it leaves the call after the read's own
+ * verdict, where the read it replaced threw it.
  */
 type TaskRead =
   | { readonly kind: 'read'; readonly first: string | undefined }
   | { readonly kind: 'threw'; readonly thrown: unknown };
 
-function firstTaskOf(answer: IAdtWireResponse): TaskRead {
-  try {
-    const first = parseTransportXml(rawOf(answer), false, true).tasks?.[0]
-      ?.number;
-    return {
-      kind: 'read',
-      first: typeof first === 'string' && first !== '' ? first : undefined,
-    };
-  } catch (thrown) {
-    return { kind: 'threw', thrown };
-  }
+function firstTaskOf(number: string) {
+  return (answer: IAdtWireResponse): TaskRead => {
+    try {
+      const item = readTransportItem(rawOf(answer), number);
+      const first =
+        item.kind === 'request' ? item.tasks[0]?.header.number : undefined;
+      return {
+        kind: 'read',
+        first: first !== undefined && first !== '' ? first : undefined,
+      };
+    } catch (thrown) {
+      return { kind: 'threw', thrown };
+    }
+  };
 }

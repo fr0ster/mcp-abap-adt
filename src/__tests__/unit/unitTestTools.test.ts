@@ -293,7 +293,10 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
 
     // A run tool assembles reads (a start, its status, its result), so its
     // raw is the array of the documents, a synchronous run's one too.
-    assert.equal(result.content[0].text, JSON.stringify([RESULT.data]));
+    assert.equal(
+      result.content[0].text,
+      JSON.stringify([{ status: 200, body: RESULT.data }]),
+    );
   });
 
   it("SAP's refusal is an error, with the step", async () => {

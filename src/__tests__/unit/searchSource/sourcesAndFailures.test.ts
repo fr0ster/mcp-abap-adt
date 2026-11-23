@@ -401,6 +401,28 @@ describe('SearchSource: what cannot be read is skipped, the reads go on (DO17)',
     );
   }
 
+  // Codex round 6, P1-2: raw is every response, failures too — the source
+  // read SAP refused is its 404 in the array, never a gap.
+  it('raw: a source read SAP refused is its response in the array', async () => {
+    const { result } = searchOne(
+      {
+        refuseWith: {
+          'PROGRAM ZGONE': { status: 404, body: NOT_FOUND_BODY },
+        },
+      },
+      true,
+      { object_types: ['PROG'], detail: 'raw' },
+    );
+    const answered = await result;
+    const responses: Array<{ status: number; body: string }> = JSON.parse(
+      textOf(answered),
+    );
+    assert.ok(
+      responses.some((r) => r.status === 404 && r.body === NOT_FOUND_BODY),
+      textOf(answered),
+    );
+  });
+
   for (const [batch] of PATHS) {
     it(
       format(

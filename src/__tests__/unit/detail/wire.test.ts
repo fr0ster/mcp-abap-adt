@@ -30,7 +30,10 @@ describe('raw is what ADT sent', () => {
       return 'done';
     });
     assert.equal(result, 'done');
-    assert.deepStrictEqual(documents, ['<a/>', '<b/>']);
+    assert.deepStrictEqual(documents, [
+      { status: 200, body: '<a/>' },
+      { status: 200, body: '<b/>' },
+    ]);
     // The connection is its own again: nothing recorded after the call.
     assert.equal(connection.makeAdtRequest, own);
   });
@@ -46,13 +49,42 @@ describe('raw is what ADT sent', () => {
     assert.equal(connection.makeAdtRequest, own);
   });
 
-  it('one read answers its document; several, the array of them', () => {
-    assert.equal(wireText(['<a/>'], 'one'), '<a/>');
-    assert.equal(
-      wireText(['<a/>', '<b "x"/>'], 'assembled'),
-      JSON.stringify(['<a/>', '<b "x"/>']),
-    );
-    assert.equal(wireText(['<a/>'], 'assembled'), '["<a/>"]');
+  it('one read answers its body; an assembling tool, the array of the responses', () => {
+    const a = { status: 200, body: '<a/>' };
+    const b = { status: 404, body: '<b "x"/>' };
+    assert.equal(wireText([a], 'one'), '<a/>');
+    assert.equal(wireText([a, b], 'assembled'), JSON.stringify([a, b]));
+    assert.equal(wireText([a], 'assembled'), JSON.stringify([a]));
+  });
+
+  // Codex round 6, P1-2: raw is every response, failures too — a failed
+  // read is the failed response, never a gap.
+  it('records a refused response, answered or thrown, as it came, and rethrows', async () => {
+    const connection = recordingConnection([
+      { data: '<a/>' },
+      { data: 'refused', status: 500 },
+    ]);
+    const answering = connection.makeAdtRequest.bind(connection);
+    let sent = 0;
+    connection.makeAdtRequest = async (request: never) => {
+      sent += 1;
+      if (sent < 3) return answering(request);
+      throw Object.assign(new Error('Request failed with status code 401'), {
+        response: { status: 401, headers: {}, data: { message: 'no' } },
+      });
+    };
+    const thrown = new Error('kept');
+    const { documents } = await recordedWire(connection, async () => {
+      await connection.makeAdtRequest(get('/one'));
+      await connection.makeAdtRequest(get('/two'));
+      await assert.rejects(connection.makeAdtRequest(get('/three')), /401/);
+      return thrown;
+    });
+    assert.deepStrictEqual(documents, [
+      { status: 200, body: '<a/>' },
+      { status: 500, body: 'refused' },
+      { status: 401, body: '{"message":"no"}' },
+    ]);
   });
 
   it("a success's text is the wire; a failure is answered as it is", async () => {
@@ -70,7 +102,13 @@ describe('raw is what ADT sent', () => {
       };
     });
     assert.deepStrictEqual(answered.content, [
-      { type: 'text', text: '["<a/>","<b/>"]' },
+      {
+        type: 'text',
+        text: JSON.stringify([
+          { status: 200, body: '<a/>' },
+          { status: 200, body: '<b/>' },
+        ]),
+      },
     ]);
     const failure = {
       isError: true,

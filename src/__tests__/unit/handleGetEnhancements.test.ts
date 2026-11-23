@@ -453,7 +453,13 @@ describe('GetEnhancements answers every source whole at medium, full and raw', (
         const body = JSON.parse(result.content[0].text);
         // raw is what ADT sent: the documents read, the source whole inside.
         if (detail === 'raw') {
-          assert.deepStrictEqual(body, [document]);
+          // Every response, the include probes SAP refused (404) too.
+          assert.ok(
+            body.some(
+              (r: { status: number; body: string }) =>
+                r.status === 200 && r.body === document,
+            ),
+          );
           return;
         }
         assert.equal(body.enhancements[0].sourceCode, LONG);

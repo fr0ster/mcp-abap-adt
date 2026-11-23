@@ -467,27 +467,23 @@ describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READ
       if (first !== first.toUpperCase()) continue;
       const served = wire[key] ?? [];
       checked += 1;
-      // One document as it came, or an array of documents read: each served,
-      // in the order served (a write's status answer and a read-back that
-      // failed are served, not read).
-      const inOrder = (documents: readonly unknown[]) => {
-        let at = 0;
-        for (const document of documents) {
-          while (at < served.length && served[at] !== document) at += 1;
-          if (at === served.length) return false;
-          at += 1;
-        }
-        return documents.length > 0;
-      };
-      let documents: unknown;
+      // One document as it came, or the array of every response — each body
+      // served, in the order served, nothing left out.
+      let responses: unknown;
       try {
-        documents = JSON.parse(recorded.text);
+        responses = JSON.parse(recorded.text);
       } catch {
-        documents = undefined;
+        responses = undefined;
       }
+      const bodies = Array.isArray(responses)
+        ? responses.map((r) =>
+            typeof r === 'object' && r !== null ? Reflect.get(r, 'body') : r,
+          )
+        : undefined;
       assert.ok(
         served.includes(recorded.text) ||
-          (Array.isArray(documents) && inOrder(documents)),
+          (bodies !== undefined &&
+            JSON.stringify(bodies) === JSON.stringify(served)),
         `${key}: ${recorded.text.slice(0, 120)}`,
       );
     }

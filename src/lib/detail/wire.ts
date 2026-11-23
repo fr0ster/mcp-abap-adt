@@ -6,11 +6,13 @@
  * sent it — even when a call made one read — no parse, no projection,
  * nothing of ours mixed in.
  *
- * The documents are the bodies the call's connection answered while the
- * call ran (`recordedWire`): every document SAP answered (a `2xx`) to the
- * call's requests, batch envelopes included as they came; a refused
- * request's body is no document, so a refused read shows as the document
- * missing. A call on one connection is strictly sequential
+ * The responses are every answer the call's connection got while the call
+ * ran (`recordedWire`), in read order, batch envelopes included as they
+ * came: each with its status and its body, a refusal (a status outside
+ * `2xx`, whether the connection answered it or threw it) as it came too —
+ * a failed read is visible as the failed response, never as a gap. An
+ * assembled tool answers them as `{ status, body }` entries; a one-read
+ * tool answers its one body. A call on one connection is strictly sequential
  * (one session, one flow), so the bodies recorded are this call's. A body
  * the connection hands over as text is recorded as it is, bytes decoded as
  * UTF-8; one it hands over as an object (a JSON answer the HTTP client
@@ -24,6 +26,7 @@
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { type JsonValue, parseJson } from '../json';
+import { wireResponseOf } from '../wireResponse';
 
 /**
  * A body as the connection gave it, as text: text as it is, bytes as
@@ -37,21 +40,43 @@ export function recordedBody(data: unknown): string {
   return JSON.stringify(data) ?? '';
 }
 
-/** What `run` answered, and every body the connection answered meanwhile, in order. */
+/** One response as recorded: its status and its body as text. */
+export interface WireResponse {
+  readonly status: number;
+  readonly body: string;
+}
+
+/** The response a thrown request failure carries, when it carries one (outside the type system). */
+function thrownResponse(thrown: unknown): WireResponse | undefined {
+  if (typeof thrown !== 'object' || thrown === null) return undefined;
+  const response = wireResponseOf(Reflect.get(thrown, 'response'));
+  return response === undefined
+    ? undefined
+    : { status: response.status, body: recordedBody(response.data) };
+}
+
+/** What `run` answered, and every response the connection got meanwhile, in order. */
 export async function recordedWire<R>(
   connection: IAbapConnection,
   run: () => Promise<R>,
-): Promise<{ result: R; documents: string[] }> {
-  const documents: string[] = [];
+): Promise<{ result: R; documents: WireResponse[] }> {
+  const documents: WireResponse[] = [];
   const own = Object.hasOwn(connection, 'makeAdtRequest');
   const original = connection.makeAdtRequest;
   connection.makeAdtRequest = async (...request) => {
-    const answered = await original.apply(connection, request);
-    // A document SAP answered: a refusal (a status outside 2xx) is not a
-    // document read, and shows in the array as the document missing.
-    if (answered.status >= 200 && answered.status < 300) {
-      documents.push(recordedBody(answered.data));
+    let answered: Awaited<ReturnType<typeof original>>;
+    try {
+      answered = await original.apply(connection, request);
+    } catch (thrown) {
+      // A refusal the connection throws: its response, as it came.
+      const response = thrownResponse(thrown);
+      if (response !== undefined) documents.push(response);
+      throw thrown;
     }
+    documents.push({
+      status: answered.status,
+      body: recordedBody(answered.data),
+    });
     return answered;
   };
   try {
@@ -70,12 +95,14 @@ export function notOneDocumentWords(tool: string, read: number): string {
   return `${tool}: raw answers the one document this tool reads, and the call read ${read}`;
 }
 
-/** The raw text of what ADT sent: the one document, or the array of them. */
+/** The raw text of what ADT sent: the one body, or the array of the responses. */
 export function wireText(
-  documents: readonly string[],
+  documents: readonly WireResponse[],
   shape: WireShape,
 ): string {
-  return shape === 'one' ? (documents[0] ?? '') : JSON.stringify(documents);
+  return shape === 'one'
+    ? (documents[0]?.body ?? '')
+    : JSON.stringify(documents);
 }
 
 /** An answer of the MCP tool shape: what a raw answer replaces the text of. */

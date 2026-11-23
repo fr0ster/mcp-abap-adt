@@ -148,7 +148,10 @@ describe('GetWhereUsed detail', () => {
   // objects), so its raw is the array of the documents, whatever the call
   // (Codex round 5, P1-3): one object's call too.
   it('raw: the array of the documents as SAP sent them, one object too', async () => {
-    assert.equal(await whereUsed('raw'), JSON.stringify([DOCUMENT]));
+    assert.equal(
+      await whereUsed('raw'),
+      JSON.stringify([{ status: 200, body: DOCUMENT }]),
+    );
   });
 
   it('several objects at terse: one text, each under its object line', async () => {

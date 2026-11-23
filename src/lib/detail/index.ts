@@ -42,6 +42,7 @@ export {
   recordedBody,
   recordedWire,
   type WireOf,
+  type WireResponse,
   type WireShape,
   wireAnswer,
   wireText,

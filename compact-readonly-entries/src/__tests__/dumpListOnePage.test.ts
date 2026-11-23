@@ -179,7 +179,10 @@ describe('HandlerDumpList reads one page', () => {
       // tool walks pages, so it answers the array of them — here one.
       if (detail === 'raw') {
         assert.equal(textOf(compact.answer), FEED_END);
-        assert.equal(textOf(full), JSON.stringify([textOf(compact.answer)]));
+        assert.equal(
+          textOf(full),
+          JSON.stringify([{ status: 200, body: textOf(compact.answer) }]),
+        );
         return;
       }
       assert.equal(textOf(compact.answer), textOf(full));

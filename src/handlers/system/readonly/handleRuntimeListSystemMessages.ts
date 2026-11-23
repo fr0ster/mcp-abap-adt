@@ -8,13 +8,12 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import {
   answered,
-  completeAnswer,
   type DetailTable,
   formatted,
-  identityOf,
   rawLevel,
   readingAt,
-  Written,
+  rows,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -23,10 +22,6 @@ import {
   levelOf,
 } from '../../../lib/strategies/detail';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
-
-/** A message's identity: its id, and when it was created. */
-const messageIdentity = (m: ISystemMessageEntry) =>
-  identityOf([m.id ?? m.messageId ?? '', m.createdOn ?? '', m.title ?? '']);
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
@@ -96,29 +91,38 @@ const SYSTEM_MESSAGE_READINGS: DetailTable<string | object> = (() => {
     }),
   );
   return {
-    // Every message the feed held, or nothing (`completeAnswer`).
+    // Every message the feed held, written by the listing writer.
     terse: formatted(
       feedSystemMessages,
-      completeAnswer(
-        'RuntimeListSystemMessages',
-        (messages: ISystemMessageEntry[]) => messages.map(messageIdentity),
-        (messages: ISystemMessageEntry[]) =>
-          Written.text(
-            [
-              { head: 'count', value: String(messages.length) },
-              { header: ['id', 'createdOn', 'author', 'title'] },
-              ...messages.map((m) => ({
-                row: [
-                  m.id ?? m.messageId ?? '',
-                  m.createdOn ?? '',
-                  m.author ?? m.createdBy ?? '',
-                  m.title ?? '',
-                ],
-              })),
-            ],
-            [0, 1, 3],
-          ),
-      ),
+      (messages: ISystemMessageEntry[]) =>
+        writeListing({
+          heads: [{ head: 'count', value: String(messages.length) }],
+          reading: { messages },
+          lists: {
+            messages: rows('messages', {
+              columns: [
+                {
+                  name: 'id',
+                  cell: (m: ISystemMessageEntry) => m.id ?? m.messageId ?? '',
+                },
+                {
+                  name: 'createdOn',
+                  cell: (m: ISystemMessageEntry) => m.createdOn ?? '',
+                },
+                {
+                  name: 'author',
+                  cell: (m: ISystemMessageEntry) =>
+                    m.author ?? m.createdBy ?? '',
+                },
+                {
+                  name: 'title',
+                  cell: (m: ISystemMessageEntry) => m.title ?? '',
+                },
+              ],
+              header: 'always',
+            }),
+          },
+        }).answer,
     ),
     medium: every,
     full: every,

@@ -44,6 +44,9 @@ export {
   type Listing,
   type ListKeys,
   marks,
+  type Nested,
+  nest,
+  parts,
   type Root,
   type RowSchemas,
   type RowSpec,
@@ -51,6 +54,7 @@ export {
   sections,
   writeJson,
   writeJsonList,
+  writeJsonRoot,
   writeListing,
 } from './listing';
 export { cellsOf } from './tsvCells';

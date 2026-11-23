@@ -171,7 +171,7 @@ describe('writeListing: every item of every list, by construction', () => {
         children: [{ name: 'a', children: [{ name: '#b' }] }, { name: 'c' }],
       },
       lists: tree,
-      root: { cells: (n: N) => [n.name] },
+      root: { columns: [{ name: 'name', cell: (n: N) => n.name }] },
     }).answer;
     assert.equal(text, 'ROOT\n  a\n    \\#b\n  c');
   });

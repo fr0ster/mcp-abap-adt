@@ -15,10 +15,22 @@
 
 import { type Line, Written } from './complete';
 
-/** One column: its name, and the cell of one item. */
+/**
+ * One column: its name, and the cell of one item. `when` writes the cell
+ * only for the items it holds for (a tree row's technical name and URI of
+ * an object SAP listed without a name).
+ */
 export interface Column<I> {
   readonly name: string;
   readonly cell: (item: I) => string;
+  readonly when?: ((item: I) => boolean) | undefined;
+}
+
+/** The cells of one item: every column's, but one whose `when` does not hold. */
+function cellsOf<I>(columns: readonly Column<I>[], item: I): string[] {
+  return columns
+    .filter((column) => column.when === undefined || column.when(item))
+    .map((column) => column.cell(item));
 }
 
 /** A head line: `# head value` (or `# head`), no item. */
@@ -201,8 +213,8 @@ function rowLines<I>(
   }
   const rowOf = (item: I): Line[] => [
     depth === undefined
-      ? { row: spec.columns.map((column) => column.cell(item)) }
-      : { row: spec.columns.map((column) => column.cell(item)), depth },
+      ? { row: cellsOf(spec.columns, item) }
+      : { row: cellsOf(spec.columns, item), depth },
     ...(spec.lists === undefined
       ? []
       : listLines(
@@ -246,9 +258,9 @@ function rowLines<I>(
   return lines;
 }
 
-/** A tree's root row: the reading's own node, written as a row and no item. */
+/** A tree's root row: the reading's own node, written by its columns as a row and no item. */
 export interface Root<R> {
-  readonly cells: (reading: R) => readonly string[];
+  readonly columns: readonly Column<R>[];
 }
 
 /** What a listing writes: its heads, the reading, and a schema for each of its lists. */
@@ -266,9 +278,17 @@ export interface Listing<R> {
  * mark line, nothing chosen by the caller.
  */
 export function writeListing<R>(listing: Listing<R>): Written<string> {
+  return Written.text(listingLines(listing), []);
+}
+
+/** A listing's lines: its heads, a tree's root row, then every list of the reading. */
+function listingLines<R>(listing: Listing<R>): Line[] {
   const lines: Line[] = [...listing.heads];
   if (listing.root !== undefined) {
-    lines.push({ root: listing.root.cells(listing.reading), depth: 0 });
+    lines.push({
+      root: cellsOf(listing.root.columns, listing.reading),
+      depth: 0,
+    });
   }
   lines.push(
     ...listLines(
@@ -277,7 +297,39 @@ export function writeListing<R>(listing: Listing<R>): Written<string> {
       listing.root === undefined ? undefined : 1,
     ),
   );
-  return Written.text(lines, []);
+  return lines;
+}
+
+/** Only this module mints a nested listing's lines. */
+const nestedLines: unique symbol = Symbol('nested listing');
+
+/** A listing written inside another: its lines, which only `nest` makes. */
+export interface Nested {
+  readonly [nestedLines]: readonly Line[];
+}
+
+/** A listing to write inside a part of another (a list call's object, its own tree). */
+export function nest<R>(listing: Listing<R>): Nested {
+  return { [nestedLines]: listingLines(listing) };
+}
+
+/**
+ * The list `key` written as parts: per item its head lines, then its own
+ * listing (`nested`) — a list call's objects, each its tool's own answer.
+ */
+export function parts<I, K extends string>(
+  key: K,
+  heads: (item: I) => readonly Head[],
+  nested: (item: I) => Nested | undefined,
+): Bound<Holding<K, I>, K> {
+  return {
+    key,
+    write: (reading) =>
+      itemsOf(reading, key).flatMap((item): Line[] => [
+        ...heads(item),
+        ...(nested(item)?.[nestedLines] ?? []),
+      ]),
+  };
 }
 
 /** A JSON schema bound to the list `K` of a reading `R`: one entry per item it holds, or nothing when it is absent. */
@@ -302,6 +354,8 @@ export function entries<I, K extends string>(
   options?: {
     readonly as?: string | undefined;
     readonly lists?: JsonSchemas<I> | undefined;
+    /** An empty list writes no member, as an absent one (a tree's leaf, medium). */
+    readonly omitEmpty?: boolean | undefined;
   },
 ): JsonBound<Holding<K, I>, K> {
   return {
@@ -310,6 +364,7 @@ export function entries<I, K extends string>(
     write: (reading) => {
       const list = reading[key];
       if (list === undefined) return undefined;
+      if (options?.omitEmpty === true && list.length === 0) return undefined;
       return list.map((item) =>
         options?.lists === undefined
           ? entry(item)
@@ -356,4 +411,16 @@ export function writeJsonList<R, K extends ListKeys<R>>(
   list: JsonBound<R, K>,
 ): Written<readonly object[]> {
   return Written.answerOf(list.write(reading) ?? []);
+}
+
+/** The only writer of a JSON tree answer: the root's own members, then its lists through their schemas. */
+export function writeJsonRoot<R>(
+  reading: R,
+  entry: (root: R) => object,
+  lists: JsonSchemas<R>,
+): Written<object> {
+  return Written.answerOf({
+    ...entry(reading),
+    ...jsonMembers(reading, lists),
+  });
 }

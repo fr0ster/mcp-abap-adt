@@ -22,13 +22,18 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
-  identityOf,
-  type Line,
-  type ListedPart,
-  listedText,
-  Written,
+  type Column,
+  entries,
+  type Head,
+  type JsonSchemas,
+  type Listing,
+  nest,
+  parts,
+  type RowSchemas,
+  rows,
   wireAnswer,
+  writeJsonRoot,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withLongToolAdvice } from '../../../lib/longTools';
@@ -395,55 +400,60 @@ function treeOf(
   };
 }
 
-/** The tree as indented `type\tname` rows, the package first (terse). */
-function treeRows(node: PackageNode, descriptions: boolean, depth = 0): Line[] {
-  // An object SAP listed without a name: its technical name and URI after
-  // its type and empty name, what tells it apart — and its identity.
-  const nameless = node.name === '';
-  const cells = [
-    node.type,
-    node.name,
-    ...(nameless ? [node.techName ?? '', node.uri ?? ''] : []),
-    ...(descriptions ? [node.description ?? ''] : []),
+/**
+ * A tree row's columns: the type and the name; for an object SAP listed
+ * without a name its technical name and URI, what tells it apart; the
+ * description where asked.
+ */
+function treeColumns(descriptions: boolean): Column<PackageNode>[] {
+  const nameless = (node: PackageNode) => node.name === '';
+  const columns: Column<PackageNode>[] = [
+    { name: 'type', cell: (node) => node.type },
+    { name: 'name', cell: (node) => node.name },
+    { name: 'tech_name', cell: (node) => node.techName ?? '', when: nameless },
+    { name: 'uri', cell: (node) => node.uri ?? '', when: nameless },
   ];
-  return [
-    // The package asked is the tree's root, no item of it.
-    depth === 0
-      ? { root: cells, depth }
-      : // Every cell written is the row's identity, its description too:
-        // a description written for another item is refused.
-        { row: cells, depth, identity: cells.map((_, i) => i) },
-    ...(node.children ?? []).flatMap((child) =>
-      treeRows(child, descriptions, depth + 1),
-    ),
-  ];
+  return descriptions
+    ? [
+        ...columns,
+        { name: 'description', cell: (node) => node.description ?? '' },
+      ]
+    : columns;
+}
+
+/** The tree's rows below its root, every node at its depth (terse). */
+function treeSchemas(descriptions: boolean): RowSchemas<PackageNode> {
+  const schemas: RowSchemas<PackageNode> = {
+    children: rows('children', {
+      columns: treeColumns(descriptions),
+      header: 'none',
+      get lists() {
+        return schemas;
+      },
+    }),
+  };
+  return schemas;
 }
 
 /** A tree node with every field the walk read, no derived or backup field (medium). */
-interface MediumNode {
-  name: string;
-  type: string;
-  tech_name?: string;
-  uri?: string;
-  description?: string;
-  not_loaded?: true;
-  children?: MediumNode[];
-}
+const mediumEntry = (node: PackageNode) => ({
+  name: node.name,
+  type: node.type,
+  ...(node.techName !== undefined ? { tech_name: node.techName } : {}),
+  ...(node.uri !== undefined ? { uri: node.uri } : {}),
+  ...(node.description !== undefined ? { description: node.description } : {}),
+  ...(node.notLoaded === true ? { not_loaded: true as const } : {}),
+});
 
-function mediumNode(node: PackageNode): MediumNode {
-  const children = (node.children ?? []).map(mediumNode);
-  return {
-    name: node.name,
-    type: node.type,
-    ...(node.techName !== undefined ? { tech_name: node.techName } : {}),
-    ...(node.uri !== undefined ? { uri: node.uri } : {}),
-    ...(node.description !== undefined
-      ? { description: node.description }
-      : {}),
-    ...(node.notLoaded === true ? { not_loaded: true as const } : {}),
-    ...(children.length > 0 ? { children } : {}),
-  };
-}
+/** The tree's nodes below a node, medium: a leaf without its empty `children`. */
+const mediumSchemas: JsonSchemas<PackageNode> = {
+  children: entries('children', mediumEntry, {
+    omitEmpty: true,
+    get lists() {
+      return mediumSchemas;
+    },
+  }),
+};
 
 /** A package's tree as one level answers it: the arguments of {@link treeOf}. */
 interface TreeAnswerRead {
@@ -462,78 +472,37 @@ interface TreeAnswerRead {
  */
 type TreeAnswer = string | object;
 
-const TOOL = 'GetPackageTree';
+/** The terse tree: the package's own row, then every node at its depth. */
+const treeListing = ({
+  packageName,
+  walked,
+  options,
+}: TreeAnswerRead): Listing<PackageNode> => ({
+  heads: [],
+  reading: assembleTree(packageName, walked),
+  root: { columns: treeColumns(options.includeDescriptions) },
+  lists: treeSchemas(options.includeDescriptions),
+});
 
-/** An item's identity as a row writes it: its type and name, a nameless one's technical name and URI. */
-const itemIdentity = (
-  item: {
-    type: string;
-    name: string;
-    techName?: string | undefined;
-    uri?: string | undefined;
-    description?: string | undefined;
-  },
-  descriptions: boolean,
-) =>
-  identityOf([
-    item.type,
-    item.name,
-    ...(item.name === '' ? [item.techName ?? '', item.uri ?? ''] : []),
-    ...(descriptions ? [item.description ?? ''] : []),
-  ]);
-
-/** Every item the walk held, as the terse rows write it — its description too, where asked. */
-const heldTerse = ({ walked, options }: TreeAnswerRead) =>
-  walked.map((item) => itemIdentity(item, options.includeDescriptions));
-
-/** Every item the walk held, as the JSON nodes identify it (technical name and URI only for a nameless one). */
-const heldJson = ({ walked }: TreeAnswerRead) =>
-  walked.map((item) =>
-    identityOf([
-      item.type,
-      item.name,
-      item.name === '' ? (item.techName ?? '') : '',
-      item.name === '' ? (item.uri ?? '') : '',
-    ]),
-  );
-
-/** The terse tree: indented rows, the package's own row no item. */
-const terseTree = ({ packageName, walked, options }: TreeAnswerRead) =>
-  Written.text(
-    treeRows(assembleTree(packageName, walked), options.includeDescriptions),
-    [0, 1],
-  );
-
-// Every level answers every item the walk held, or nothing (`completeAnswer`).
+// Every level written from the assembled tree, every node of the walk in
+// it (`assembleTree`): the writers write one row or entry per node.
 const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
   // With include_descriptions, each row's description beside its type and
-  // name; the package's own row is no item, the rows below it are.
-  terse: completeAnswer(TOOL, heldTerse, terseTree),
-  // The nodes below the root, each identified by the fields written.
-  medium: completeAnswer(TOOL, heldJson, ({ packageName, walked }) =>
-    Written.jsonTreeRoot(
-      mediumNode(assembleTree(packageName, walked)),
-      (node) => node.children ?? [],
-      ['type', 'name', 'tech_name', 'uri'],
-      false,
-    ),
-  ),
-  full: completeAnswer(TOOL, heldJson, ({ packageName, walked, options }) =>
-    Written.jsonTree(
-      { package_name: packageName },
-      { tree: assembleTree(packageName, walked) },
-      (node) => node.children ?? [],
-      ['type', 'name', 'techName', 'uri'],
-      false,
-      {
-        metadata: {
-          include_subpackages: options.includeSubpackages,
-          max_depth: options.maxDepth,
-          include_descriptions: options.includeDescriptions,
-        },
-      },
-    ),
-  ),
+  // name; the package's own row is the root, the rows below it its nodes.
+  terse: (read) => writeListing(treeListing(read)).answer,
+  medium: ({ packageName, walked }) =>
+    writeJsonRoot(assembleTree(packageName, walked), mediumEntry, mediumSchemas)
+      .answer,
+  // The whole parse, as it is.
+  full: ({ packageName, walked, options }) => ({
+    package_name: packageName,
+    tree: assembleTree(packageName, walked),
+    metadata: {
+      include_subpackages: options.includeSubpackages,
+      max_depth: options.maxDepth,
+      include_descriptions: options.includeDescriptions,
+    },
+  }),
   raw: ({ packageName, walked, options }) =>
     treeOf(packageName, walked, options),
 };
@@ -542,6 +511,12 @@ const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
 type TreeOutcome =
   | { readonly read: TreeAnswerRead }
   | { readonly package_name: string; readonly error: unknown };
+
+/** One package asked by a list call: its name and its outcome. */
+interface AskedTree {
+  readonly name: string;
+  readonly outcome: TreeOutcome;
+}
 
 /** What a list call answers from: the packages asked, each one's outcome. */
 interface TreeList {
@@ -565,17 +540,28 @@ const jsonTrees = ({ outcomes, shown }: TreeList) =>
  */
 const TREE_LISTS: AnswerTable<TreeList, string> = {
   terse: ({ packageNames, outcomes }) =>
-    listedText(
-      TOOL,
-      outcomes.map((outcome, i): ListedPart<TreeAnswerRead> => {
-        const heads = [{ head: 'asked', value: packageNames[i] ?? '' }];
-        return 'read' in outcome
-          ? { heads, read: outcome.read }
-          : { heads, error: JSON.stringify(outcome) };
-      }),
-      heldTerse,
-      terseTree,
-    ),
+    writeListing({
+      heads: [],
+      reading: {
+        asked: outcomes.map((outcome, i) => ({
+          name: packageNames[i] ?? '',
+          outcome,
+        })),
+      },
+      lists: {
+        asked: parts(
+          'asked',
+          ({ name, outcome }: AskedTree): Head[] => [
+            { head: 'asked', value: name },
+            ...('read' in outcome
+              ? []
+              : [{ head: 'error', value: JSON.stringify(outcome) }]),
+          ],
+          ({ outcome }: AskedTree) =>
+            'read' in outcome ? nest(treeListing(outcome.read)) : undefined,
+        ),
+      },
+    }).answer,
   medium: jsonTrees,
   full: jsonTrees,
   raw: jsonTrees,

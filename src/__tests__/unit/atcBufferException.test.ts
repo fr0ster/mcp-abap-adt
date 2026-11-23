@@ -38,4 +38,19 @@ describe('an exception on a 200, as bytes or as text', () => {
     assert.equal(asBytes.isError, true, asBytes.content[0]?.text);
     assert.deepStrictEqual(asBytes, asText);
   });
+
+  it('a thrown refusal carries its body decoded too', async () => {
+    const base = recordingConnection([]);
+    const failure = {
+      response: { status: 404, headers: {}, data: Buffer.from(EXCEPTION) },
+    };
+    base.makeAdtRequest = async () => {
+      throw failure;
+    };
+    const connection = withDecodedBodies(base);
+    await assert.rejects(
+      connection.makeAdtRequest({ url: '/x', method: 'GET', timeout: 0 }),
+    );
+    assert.equal(failure.response.data as unknown, EXCEPTION);
+  });
 });

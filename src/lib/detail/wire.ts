@@ -115,7 +115,7 @@ export function partStatuses(body: string): number[] {
   const statuses: number[] = [];
   for (const line of body.split('\n')) {
     const [protocol = '', code = ''] = line.split(' ');
-    if (!protocol.startsWith('HTTP')) continue;
+    if (!protocol.toLowerCase().startsWith('http')) continue;
     if (code.length === 3 && Number.isInteger(Number(code))) {
       statuses.push(Number(code));
     }

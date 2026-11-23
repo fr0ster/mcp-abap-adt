@@ -32,7 +32,7 @@ import {
   stateSystemKind,
 } from './systemKind';
 import { child, childAt, entries } from './thrownValue';
-import { wireResponseOf } from './wireResponse';
+import { decodeResponseBytes } from './wireResponse';
 import { wireValueOf } from './wireValue';
 
 export type { AbapSystemKind } from './systemKind';
@@ -270,13 +270,7 @@ export function withDecodedBodies<T extends IAbapConnection>(connection: T): T {
 /** A thrown request failure's response body decoded to UTF-8 in place, when it is bytes. */
 function decodeThrownBody(thrown: unknown): void {
   if (typeof thrown !== 'object' || thrown === null) return;
-  const response = wireResponseOf(Reflect.get(thrown, 'response'));
-  if (response === undefined || !(response.data instanceof Uint8Array)) return;
-  Reflect.set(
-    Reflect.get(thrown, 'response'),
-    'data',
-    new TextDecoder().decode(response.data),
-  );
+  decodeResponseBytes(Reflect.get(thrown, 'response'));
 }
 
 function withHttpWireLog<T extends IAbapConnection>(connection: T): T {

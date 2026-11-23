@@ -436,7 +436,9 @@ describe('GetEnhancements include_nested lists an include SAP refused', () => {
   it('the refused include is listed with its name, the method error and the step, beside the others', async () => {
     fakeClient = walk({ name: 'ZINC2', status: 403 });
     const body = payloadOf(await run());
-    assert.equal(body.objects.length, 0); // the others answered (none holds an enhancement)
+    // Every object read is listed (Codex round 10), the two that answered.
+    assert.equal(body.objects.length, 2);
+    assert.equal(body.total_objects_with_enhancements, 0);
     assert.equal(body.total_objects_analyzed, 2); // the main object and ZINC1
     // One unread include, its one failure checked for the fields named.
     const [unread, ...more] = body.includes_unread;

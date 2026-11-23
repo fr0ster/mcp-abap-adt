@@ -35,10 +35,14 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import {
-  type AnswerTable,
-  answerAt,
+  asJsonResult,
+  asTextResult,
   type DetailLevel,
+  entries,
   type Head,
+  type JsonSchemas,
+  type ListAnswerTable,
+  listAnswerAt,
   marks,
   type Nested,
   nest,
@@ -46,8 +50,14 @@ import {
   type RowSchemas,
   rows,
   sections,
+  type TextResult,
+  values,
+  type Written,
   wireAnswer,
+  writeJson,
+  writeJsonList,
   writeListing,
+  writeWhole,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { ReadVersion } from '../../../lib/handlers/readVersion';
@@ -83,10 +93,10 @@ import { thrownAs } from '../../../lib/thrownValue';
 import { logger, return_error } from '../../../lib/utils';
 import {
   child,
-  entries,
   isList,
   text,
   type XmlRead,
+  entries as xmlEntries,
 } from '../../../lib/xml/tree';
 
 /**
@@ -167,7 +177,7 @@ export const TOOL_DEFINITION = {
       .boolean()
       .optional()
       .describe(
-        '[read-only] true: every field of each enhancement and every object read, those without enhancements included; false (default): each enhancement by name, type and source, objects without enhancements left out',
+        '[read-only] true: every field of each enhancement, as read; false (default): each enhancement by name, type and source. Either way every object read is answered, one without enhancements with total_enhancements 0',
       ),
     max_includes: z
       .number()
@@ -214,7 +224,9 @@ export interface EnhancementResponse {
 
 /** The first attribute of `node` whose name ends in `suffix` (`name` takes `enh:full_name` too). */
 function endingIn(node: XmlRead, suffix: string): string | undefined {
-  const found = entries(child(node, '@')).find(([key]) => key.endsWith(suffix));
+  const found = xmlEntries(child(node, '@')).find(([key]) =>
+    key.endsWith(suffix),
+  );
   return found ? attributeOf(node, found[0]) : undefined;
 }
 
@@ -758,47 +770,64 @@ function minimalEnhancement(enh: EnhancementImplementation) {
   };
 }
 
+/** An object's enhancements and refused probes, each entry short: written by the JSON writer. */
+const objectLists: JsonSchemas<EnhancementResponse> = {
+  enhancements: entries('enhancements', minimalEnhancement),
+  unreadable: entries('unreadable', (entry: FailureEntry) => entry),
+};
+
 /**
- * Filters a nested enhancement response to show minimal information: the
- * objects with enhancements, each enhancement short.
+ * A nested enhancement response at medium, written from its own lists:
+ * every object read — one without enhancements too, with its zero count —
+ * each enhancement short, each refused probe whole.
  */
 export function filterMinimalNested(response: NestedEnhancements) {
-  // Only objects with enhancements — and every object with a probe SAP
-  // refused, with its probes: the detail of a failed read is never dropped.
-  const filteredObjects = response.objects
-    .filter(
-      (obj) => obj.enhancements.length > 0 || (obj.unreadable ?? []).length > 0,
-    )
-    .map((obj) => ({
-      object_name: obj.object_name,
-      object_type: obj.object_type,
-      enhancements: obj.enhancements.map(minimalEnhancement),
-      ...(obj.unreadable ? { unreadable: obj.unreadable } : {}),
-    }));
-
-  return {
-    ...response,
-    detailed: false,
-    total_objects_with_enhancements: filteredObjects.length,
-    total_objects_analyzed: response.total_objects_analyzed,
-    filtered_out: response.total_objects_analyzed - filteredObjects.length,
-    objects: filteredObjects,
-  };
+  return writeJson(
+    {
+      main_object: response.main_object,
+      include_nested: response.include_nested,
+      total_objects_analyzed: response.total_objects_analyzed,
+      total_enhancements_found: response.total_enhancements_found,
+    },
+    response,
+    {
+      objects: entries(
+        'objects',
+        (obj: EnhancementResponse) => ({
+          object_name: obj.object_name,
+          object_type: obj.object_type,
+          total_enhancements: obj.enhancements.length,
+        }),
+        { lists: objectLists },
+      ),
+      includes_unread: entries(
+        'includes_unread',
+        (unread: IncludeUnread) => unread,
+      ),
+    },
+    {
+      detailed: false,
+      // The objects that have enhancements, counted; every object is listed.
+      total_objects_with_enhancements: response.objects.filter(
+        (obj) => obj.enhancements.length > 0,
+      ).length,
+    },
+  );
 }
 
-/** Filters one object's enhancement response to show minimal information. */
+/** One object's enhancement response at medium, written from its own lists. */
 function filterMinimalEnhancements(response: EnhancementResponse) {
-  const filteredEnhancements = response.enhancements.map(minimalEnhancement);
-
-  return {
-    object_name: response.object_name,
-    object_type: response.object_type,
-    context: response.context,
-    detailed: false,
-    total_enhancements: filteredEnhancements.length,
-    enhancements: filteredEnhancements,
-    ...(response.unreadable ? { unreadable: response.unreadable } : {}),
-  };
+  return writeJson(
+    {
+      object_name: response.object_name,
+      object_type: response.object_type,
+      context: response.context,
+      detailed: false,
+      total_enhancements: response.enhancements.length,
+    },
+    response,
+    objectLists,
+  );
 }
 
 /** What an enhancements read answered: one object, or one with its includes. */
@@ -870,37 +899,37 @@ function terseListing(read: EnhancementsRead): Nested {
 }
 
 /** The terse text of a read. */
-const terseText = ({ read }: EnhancementsShown): string =>
+const terseText = ({ read }: EnhancementsShown): Written<string> =>
   writeListing({
     heads: [],
     reading: { read: [read] },
     lists: { read: parts('read', () => [], terseListing) },
-  }).answer;
+  });
 
 /**
  * What `GetEnhancements` answers at each `detail`, selected before the reads
  * (`src/lib/detail`): the answer is built from several requests, so each
  * level is a formatter of what they read. Terse is TSV — each object's
  * enhancements, name, type and description, no source; medium, full and raw
- * the JSON answer, every source whole (`detailed` adds every field and the
- * objects without enhancements).
+ * the JSON answer, every source whole and every object read, one without
+ * enhancements with its zero count (`detailed` adds every field).
  */
-const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
+const ENHANCEMENT_ANSWERS: ListAnswerTable<EnhancementsShown, string | object> =
   (() => {
-    const former = ({ read, detailed }: EnhancementsShown): object =>
-      read.kind === 'single'
-        ? detailed
-          ? { ...read.response, detailed: true }
-          : filterMinimalEnhancements(read.response)
-        : detailed
-          ? { ...read.response, detailed: true }
+    // Detailed: the reading whole, every field; else every object and
+    // enhancement written short by the JSON writer.
+    const former = ({ read, detailed }: EnhancementsShown): Written<object> =>
+      detailed
+        ? writeWhole<object>({ ...read.response, detailed: true })
+        : read.kind === 'single'
+          ? filterMinimalEnhancements(read.response)
           : filterMinimalNested(read.response);
     return {
       // Every enhancement and every part not read, by the listing writer.
       terse: terseText,
       medium: former,
-      full: former,
-      raw: former,
+      full: (shown) => former(shown).answer,
+      raw: (shown) => former(shown).answer,
     };
   })();
 
@@ -1910,11 +1939,11 @@ interface ListOf {
  * every other answer: terse one text written by the listing writer, the other
  * levels a JSON array of the entries.
  */
-const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+const LIST_ANSWERS: ListAnswerTable<ListOf, McpResult> = {
   terse: terseList,
   medium: jsonList,
-  full: jsonList,
-  raw: jsonList,
+  full: (list) => jsonList(list).answer,
+  raw: (list) => jsonList(list).answer,
 };
 
 /** A list call's answer: one entry per asked, in the order asked, at the level asked. */
@@ -1926,11 +1955,11 @@ function listAnswer(
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
-  return answerAt(LIST_ANSWERS, level)({ objects, results });
+  return listAnswerAt(LIST_ANSWERS, level)({ objects, results });
 }
 
 /** A list call's terse text. */
-function terseList({ objects, results }: ListOf): McpResult {
+function terseList({ objects, results }: ListOf): Written<TextResult> {
   // Every object's text written by the listing writer: a failure under its
   // escaped `# object` line and one `# error` line; an answered one as its
   // own terse listing.
@@ -1963,8 +1992,8 @@ function terseList({ objects, results }: ListOf): McpResult {
           read === undefined ? undefined : terseListing(read.read),
       ),
     },
-  }).answer;
-  return { isError: false, content: [{ type: 'text', text }] };
+  });
+  return asTextResult(text);
 }
 
 /** One object of a list call: what was asked, its answer, and its read when answered. */
@@ -1975,21 +2004,25 @@ interface AnsweredObject {
 }
 
 /** A list call's entries as a JSON array. */
-function jsonList({ objects, results }: ListOf): McpResult {
-  const entries = results.map((result, i) => {
-    const asked = objects[i];
-    return result.isError
-      ? {
-          object_name: asked.object_name,
-          object_type: asked.object_type,
-          error: payloadOfAnswer(result),
-        }
-      : payloadOfAnswer(result);
-  });
-  return {
-    isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries) }],
-  };
+function jsonList({ objects, results }: ListOf): Written<TextResult> {
+  // Every answer one entry, written by the listing writer.
+  return asJsonResult(
+    writeJsonList(
+      { answered: results.map((result, i) => ({ result, i })) },
+      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
+        ((result, i) => {
+          const asked = objects[i];
+          return result.isError
+            ? {
+                object_name: asked.object_name,
+                object_type: asked.object_type,
+                error: payloadOfAnswer(result),
+              }
+            : payloadOfAnswer(result);
+        })(result, i),
+      ),
+    ),
+  );
 }
 
 /**
@@ -2018,7 +2051,7 @@ async function answeredGetEnhancements(
   args: GetEnhancementsArgs,
 ) {
   const listed = args?.objects;
-  const shown = answerAt(ENHANCEMENT_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(ENHANCEMENT_ANSWERS, levelOf(args));
   try {
     if (listed === undefined) {
       const objectName = args.object_name;

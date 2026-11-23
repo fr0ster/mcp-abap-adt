@@ -469,11 +469,12 @@ describe('GetEnhancements answers every source whole at medium, full and raw', (
   }
 });
 
-// Owner, step 9: medium with include_nested keeps every object with a probe
-// SAP refused, its probes beside it — the detail of a failed read is never
-// dropped; an object with neither enhancements nor refused probes leaves.
+// Codex round 10, P1-4: medium with include_nested writes every object read
+// — one without enhancements too, with its zero count, as one with refused
+// probes, its probes beside it; the count of objects with enhancements
+// counts only those.
 describe('GetEnhancements medium, nested', () => {
-  it('keeps an object whose probes SAP refused, with them', () => {
+  it('writes every object read, its probes and its count', () => {
     const refusedProbe = {
       message: 'no authorization',
       step: 'read enhancements',
@@ -498,16 +499,25 @@ describe('GetEnhancements medium, nested', () => {
           unreadable: [refusedProbe],
         },
       ],
-    });
+    }).answer;
+    const objects = minimal.objects as Array<{ object_name: string }>;
     assert.deepStrictEqual(
-      minimal.objects.map((o) => o.object_name),
-      ['ZPROG', 'ZINC_REFUSED'],
+      objects.map((o) => o.object_name),
+      ['ZPROG', 'ZINC_EMPTY', 'ZINC_REFUSED'],
     );
-    assert.deepStrictEqual(minimal.objects[1], {
+    assert.deepStrictEqual(objects[1], {
+      object_name: 'ZINC_EMPTY',
+      object_type: 'include',
+      total_enhancements: 0,
+      enhancements: [],
+    });
+    assert.deepStrictEqual(objects[2], {
       object_name: 'ZINC_REFUSED',
       object_type: 'include',
+      total_enhancements: 0,
       enhancements: [],
       unreadable: [refusedProbe],
     });
+    assert.equal(minimal.total_objects_with_enhancements, 1);
   });
 });

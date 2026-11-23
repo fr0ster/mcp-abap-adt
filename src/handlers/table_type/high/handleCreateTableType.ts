@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { createArguments } from '../../../lib/handlers/createArguments';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTableType Handler - ABAP Table Type Creation via ADT API
  *
@@ -35,8 +35,9 @@ import {
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
-import { answer } from '../../../lib/answer';
+import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import { tableTypeChanges } from '../../../lib/strategies/documentChanges';
@@ -168,7 +169,7 @@ export const TOOL_DEFINITION = {
       .default(true)
       .optional()
       .describe('Activate the table type after creation (default: true).'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -176,10 +177,31 @@ export const TOOL_DEFINITION = {
  * required one may be absent and is refused below. */
 type CreateTableTypeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent (`wireAnswer`): every response
+ * its requests got — the writes, and the metadata read back after them.
+ */
 export async function handleCreateTableType(
   context: HandlerContext,
   args: CreateTableTypeArgs,
-) {
+): Promise<McpResult> {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'CreateTableType',
+        shape: 'assembled',
+      },
+      () => answeredCreateTableType(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredCreateTableType(context, args);
+}
+
+async function answeredCreateTableType(
+  context: HandlerContext,
+  args: CreateTableTypeArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   if (!args.table_type_name) {

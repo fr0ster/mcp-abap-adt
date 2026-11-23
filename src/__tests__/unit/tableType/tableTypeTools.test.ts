@@ -329,6 +329,35 @@ describe('CreateTableType', () => {
     );
   });
 
+  // Codex round 7: raw is every response the call got — the metadata read
+  // back after the write and after the activation too.
+  it('raw: every response, the metadata read-backs included', async () => {
+    const connection = recordingConnection([
+      undefined,
+      undefined,
+      undefined,
+      { data: STRING_TABLE },
+    ]);
+    const result = await handleCreateTableType(
+      { connection, logger: undefined },
+      {
+        table_type_name: 'ztt_x',
+        package_name: 'ZP',
+        description: 'A table type',
+        transport_request: 'K1',
+        row_type_kind: 'dictionaryType',
+        row_type_name: 'MARA',
+        detail: 'raw',
+      },
+    );
+    assert.equal(result.isError, false, textOf(result));
+    const responses: Array<{ status: number; body: string }> = JSON.parse(
+      textOf(result),
+    );
+    assert.equal(responses.length, connection.requests.length);
+    assert.equal(responses[3]?.body, STRING_TABLE);
+  });
+
   it('writes every definition property given into the document SAP created', async () => {
     const connection = created();
     await handleCreateTableType(

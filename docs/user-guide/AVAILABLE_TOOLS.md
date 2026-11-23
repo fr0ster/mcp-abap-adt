@@ -1043,7 +1043,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getinactiveobjects-read-only-system"></a>
 #### GetInactiveObjects (Read-Only / System)
-**Description:** [read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.
+**Description:** [read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation: by default (detail terse) TSV rows of type, name and owner; with detail medium the same as JSON; full the parse; raw the document.
 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
@@ -5057,4 +5057,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-22*
+*Last updated: 2026-11-23*

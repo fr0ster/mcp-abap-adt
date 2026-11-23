@@ -254,7 +254,7 @@
   "GetStructuresList a structure, an include, one not read @terse": {
     "isError": false,
     "parts": [
-      "# structure ZS\nZS\troot\t\n  ZINC\tinclude\t\n    ZS\tinclude\t\tcyclic\n  ZGONE\tinclude\t\tnot read"
+      "# structure ZS\nZS\troot\t\n  ZINC\tinclude\t\n    ZS\tinclude\t\tcyclic\n  ZGONE\tinclude\t\tnot read\n# failure\t{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}\n# failure\t{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read table\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
     ]
   },
   "GetStructuresList a structure, an include, one not read @medium": {
@@ -397,6 +397,24 @@
     "isError": false,
     "parts": [
       "{\"success\":true,\"include_name\":\"ZINC\",\"main_programs\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog\"},{\"name\":\"#ZPROG2\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog2\"},{\"name\":\"ZFG\",\"type\":\"FUGR/F\",\"uri\":\"/sap/bc/adt/functions/groups/zfg\"}]}"
+    ]
+  },
+  "RuntimeListFeeds descriptors through the handler @terse": {
+    "isError": false,
+    "parts": [
+      "# feed descriptors\n# count 2\nid\ttitle\tcategory\n/sap/bc/adt/runtime/dumps\tABAP Runtime Errors\t\n/sap/bc/adt/runtime/traces\tTraces\\ttabbed\t"
+    ]
+  },
+  "RuntimeListFeeds descriptors through the handler @medium": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"feed_type\":\"descriptors\",\"count\":2,\"entries\":[{\"id\":\"/sap/bc/adt/runtime/dumps\",\"title\":\"ABAP Runtime Errors\",\"url\":\"/sap/bc/adt/runtime/dumps\"},{\"id\":\"/sap/bc/adt/runtime/traces\",\"title\":\"Traces\\ttabbed\",\"url\":\"/sap/bc/adt/runtime/traces\"}]}"
+    ]
+  },
+  "RuntimeListFeeds descriptors through the handler @full": {
+    "isError": false,
+    "parts": [
+      "{\"success\":true,\"feed_type\":\"descriptors\",\"count\":2,\"entries\":[{\"id\":\"/sap/bc/adt/runtime/dumps\",\"title\":\"ABAP Runtime Errors\",\"url\":\"/sap/bc/adt/runtime/dumps\"},{\"id\":\"/sap/bc/adt/runtime/traces\",\"title\":\"Traces\\ttabbed\",\"url\":\"/sap/bc/adt/runtime/traces\"}]}"
     ]
   },
   "ReadTransportActionLog lines and separators @terse": {

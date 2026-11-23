@@ -35,6 +35,7 @@ import { handleGetObjectStructure } from '../../../handlers/system/readonly/hand
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import {
   type FeedShown,
+  handleRuntimeListFeeds,
   terseFeedText,
 } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { searchSourceRows } from '../../../handlers/system/readonly/handleSearchSource';
@@ -671,6 +672,20 @@ for (const shown of FEEDS) {
   });
 }
 
+// RuntimeListFeeds through its handler, at every level (Codex round 11):
+// the feed list SAP answers, two feeds, one holding a tab in its title.
+const FEED_LIST = `${xmlHead}<atom:feed xmlns:atom="http://www.w3.org/2005/Atom"><atom:entry><atom:id>/sap/bc/adt/runtime/dumps</atom:id><atom:title>ABAP Runtime Errors</atom:title><atom:link href="/sap/bc/adt/runtime/dumps"/></atom:entry><atom:entry><atom:id>/sap/bc/adt/runtime/traces</atom:id><atom:title>Traces&#9;tabbed</atom:title><atom:link href="/sap/bc/adt/runtime/traces"/></atom:entry></atom:feed>`;
+CASES['RuntimeListFeeds descriptors through the handler'] = async (detail) =>
+  answeredOf(
+    await handleRuntimeListFeeds(
+      ctx([{ data: FEED_LIST }]) as never,
+      {
+        feed_type: 'descriptors',
+        detail,
+      } as never,
+    ),
+  );
+
 const logEntry = (text: string) =>
   `<log:entry><log:message><log:messageText key="TK(188)">${text}</log:messageText></log:message></log:entry>`;
 CASES['ReadTransportActionLog lines and separators'] = async (detail) =>
@@ -919,6 +934,23 @@ SINGLE['assembleTree an object of a package the tree does not reach'] =
       ),
     ],
   });
+
+// Codex round 11: GetStructuresList writes every failure of a node not
+// read, each its own line — the structure read's and the table read's.
+describe('GetStructuresList terse: every failure of a node not read', () => {
+  it('ZGONE: the structure read and the table read, each a # failure line', async () => {
+    const run =
+      CASES['GetStructuresList a structure, an include, one not read'];
+    assert.ok(run !== undefined);
+    const [text = ''] = (await run('terse')).parts;
+    const failures = text
+      .split('\n')
+      .filter((line) => line.startsWith('# failure\t'));
+    assert.equal(failures.length, 2, text);
+    assert.ok(failures[0]?.includes('"step":"read structure"'), text);
+    assert.ok(failures[1]?.includes('"step":"read table"'), text);
+  });
+});
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

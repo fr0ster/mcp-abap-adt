@@ -34,8 +34,11 @@ export {
 export {
   type Bound,
   type Column,
+  entries,
   type Group,
   type Head,
+  type JsonBound,
+  type JsonSchemas,
   type KindSpec,
   kinds,
   type Listing,
@@ -46,6 +49,8 @@ export {
   type RowSpec,
   rows,
   sections,
+  writeJson,
+  writeJsonList,
   writeListing,
 } from './listing';
 export { cellsOf } from './tsvCells';

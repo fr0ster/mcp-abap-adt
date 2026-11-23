@@ -273,3 +273,81 @@ export function writeListing<R>(listing: Listing<R>): Written<string> {
   );
   return Written.text(lines, []);
 }
+
+/** A JSON schema bound to the list `K` of a reading `R`: one entry per item it holds, or nothing when it is absent. */
+export interface JsonBound<R, K> {
+  readonly key: K;
+  /** The member the entries are written under in the answer. */
+  readonly as: string;
+  readonly write: (reading: R) => readonly object[] | undefined;
+}
+
+/** One JSON schema for every list of `R`, each bound to its own key: a list without one is a compile error. */
+export type JsonSchemas<R> = { readonly [K in ListKeys<R>]: JsonBound<R, K> };
+
+/**
+ * The list `key` written as JSON entries, one per item: the item's own
+ * members from `entry`, then its own lists (`lists`), each under its name.
+ * An absent list writes no member; an empty one, `[]`.
+ */
+export function entries<I, K extends string>(
+  key: K,
+  entry: (item: I) => object,
+  options?: {
+    readonly as?: string | undefined;
+    readonly lists?: JsonSchemas<I> | undefined;
+  },
+): JsonBound<Holding<K, I>, K> {
+  return {
+    key,
+    as: options?.as ?? key,
+    write: (reading) => {
+      const list = reading[key];
+      if (list === undefined) return undefined;
+      return list.map((item) =>
+        options?.lists === undefined
+          ? entry(item)
+          : { ...entry(item), ...jsonMembers(item, options.lists) },
+      );
+    },
+  };
+}
+
+/** Every list of `value` as its JSON member, in its schemas' order; an absent one writes none. */
+function jsonMembers<R>(
+  value: R,
+  schemas: JsonSchemas<R>,
+): Record<string, readonly object[]> {
+  const members: Record<string, readonly object[]> = {};
+  const bound: readonly JsonBound<R, ListKeys<R>>[] =
+    Object.values<JsonBound<R, ListKeys<R>>>(schemas);
+  for (const schema of bound) {
+    const written = schema.write(value);
+    if (written !== undefined) members[schema.as] = written;
+  }
+  return members;
+}
+
+/**
+ * The only writer of a JSON list answer: `rest`, then every list of the
+ * reading as its member — each item one entry, nothing chosen by the
+ * caller — then `after`. The lists are written again after `after`, so
+ * none of its keys can replace them.
+ */
+export function writeJson<R, A extends object, B extends object>(
+  rest: A,
+  reading: R,
+  lists: JsonSchemas<R>,
+  after?: B | undefined,
+): Written<A & Partial<B> & Record<string, readonly object[]>> {
+  const members = jsonMembers(reading, lists);
+  return Written.answerOf({ ...rest, ...members, ...after, ...members });
+}
+
+/** The only writer of a JSON array answer: one entry per item of the reading's list. */
+export function writeJsonList<R, K extends ListKeys<R>>(
+  reading: R,
+  list: JsonBound<R, K>,
+): Written<readonly object[]> {
+  return Written.answerOf(list.write(reading) ?? []);
+}

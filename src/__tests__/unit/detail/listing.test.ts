@@ -8,11 +8,14 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  entries,
   kinds,
   marks,
   type RowSchemas,
   rows,
   sections,
+  writeJson,
+  writeJsonList,
   writeListing,
 } from '../../../lib/detail';
 
@@ -244,5 +247,52 @@ describe('writeListing: every item of every list, by construction', () => {
     kinds('parts', (p: { ok: boolean }) => (p.ok ? 'answered' : 'failed'), {
       answered: { mark: 'ok', words: () => [] },
     });
+  });
+});
+
+describe('writeJson: every item of every list one entry, by construction', () => {
+  type Part = {
+    readonly name: string;
+    readonly items?: readonly { readonly n: string }[] | undefined;
+  };
+  const reading = {
+    parts: [{ name: 'A', items: [{ n: 'a1' }, { n: 'a2' }] }, { name: 'B' }],
+  };
+  const parts = entries('parts', (p: Part) => ({ package_name: p.name }), {
+    as: 'packages',
+    lists: {
+      items: entries('items', (i: { n: string }) => ({ name: i.n }), {
+        as: 'objects',
+      }),
+    },
+  });
+
+  it('nested lists under their names; an absent list writes no member', () => {
+    assert.deepStrictEqual(
+      writeJson({ total: 2 }, reading, { parts }, { parts: 'replaced?' })
+        .answer,
+      {
+        total: 2,
+        packages: [
+          { package_name: 'A', objects: [{ name: 'a1' }, { name: 'a2' }] },
+          { package_name: 'B' },
+        ],
+        parts: 'replaced?',
+      },
+    );
+    assert.deepStrictEqual(writeJsonList(reading, parts).answer, [
+      { package_name: 'A', objects: [{ name: 'a1' }, { name: 'a2' }] },
+      { package_name: 'B' },
+    ]);
+  });
+
+  it('after cannot replace a list', () => {
+    const answer = writeJson({}, reading, { parts }, { packages: [] }).answer;
+    assert.equal(answer.packages?.length, 2);
+  });
+
+  it('a list without a JSON schema does not compile', () => {
+    // @ts-expect-error `parts` is a list of the reading and has no schema.
+    writeJson({}, reading, {});
   });
 });

@@ -308,6 +308,15 @@ export class Written<A> {
     );
   }
 
+  /**
+   * An answer a listing writer (`./listing`) built from the reading's own
+   * lists, complete by construction; transitional until the writers own
+   * the type (plan 9.8).
+   */
+  static answerOf<A>(answer: A): Written<A> {
+    return new Written(answer, []);
+  }
+
   /** A written JSON value as its text, its items unchanged. */
   static stringified<A>(written: Written<A>): Written<string> {
     return new Written(

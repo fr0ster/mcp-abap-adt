@@ -451,6 +451,11 @@ describe('GetEnhancements answers every source whole at medium, full and raw', (
           { object_name: 'SAPLZFG', object_type: 'program', detail, detailed },
         );
         const body = JSON.parse(result.content[0].text);
+        // raw is what ADT sent: the documents read, the source whole inside.
+        if (detail === 'raw') {
+          assert.deepStrictEqual(body, [document]);
+          return;
+        }
         assert.equal(body.enhancements[0].sourceCode, LONG);
       });
     }

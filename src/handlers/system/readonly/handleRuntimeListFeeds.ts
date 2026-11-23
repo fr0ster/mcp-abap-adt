@@ -30,7 +30,12 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { withSystemKindOf } from '../../../lib/connectionFactory';
-import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
+import {
+  type AnswerTable,
+  answerAt,
+  tsv,
+  wireAnswer,
+} from '../../../lib/detail';
 import {
   DUMP_FILTERS,
   dumpFiltersRefusal,
@@ -557,11 +562,28 @@ const PAGE_FEEDS = {
  */
 export async function handleRuntimeListFeedPage(
   context: HandlerContext,
-  args: Omit<RuntimeListFeedsArgs, 'feed_type'> & {
-    feed_type?: keyof typeof PAGE_FEEDS | undefined;
-    top?: number | undefined;
-  },
+  args: FeedPageArgs,
   tool = 'HandlerDumpList',
+) {
+  // One page is one read: at `raw` its document, as SAP sent it.
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'one', () =>
+      answeredFeedPage(context, { ...args, detail: 'full' }, tool),
+    );
+  }
+  return answeredFeedPage(context, args, tool);
+}
+
+/** What one page of a feed is asked with. */
+type FeedPageArgs = Omit<RuntimeListFeedsArgs, 'feed_type'> & {
+  feed_type?: keyof typeof PAGE_FEEDS | undefined;
+  top?: number | undefined;
+};
+
+async function answeredFeedPage(
+  context: HandlerContext,
+  args: FeedPageArgs,
+  tool: string,
 ) {
   const { connection, logger } = context;
   const feedType = args?.feed_type ?? 'dumps';
@@ -849,8 +871,27 @@ const PAGED_FEEDS = new Set(['dumps', 'system_messages', 'gateway_errors']);
  * envelopes, one round at a time; the sequential reads where the
  * destination has no communication batch. One feed of one request (the
  * descriptors or the variants) is sent as itself.
+ *
+ * At `raw` what ADT sent: the documents the call's reads answered, read
+ * with the tool at full (`wireAnswer`, `src/lib/detail/wire.ts`).
  */
 export async function handleRuntimeListFeeds(
+  context: HandlerContext,
+  args: RuntimeListFeedsArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      context.connection,
+      args?.feed_types !== undefined || PAGED_FEEDS.has(String(args?.feed_type))
+        ? 'assembled'
+        : 'one',
+      () => answeredRuntimeListFeeds(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredRuntimeListFeeds(context, args);
+}
+
+async function answeredRuntimeListFeeds(
   context: HandlerContext,
   args: RuntimeListFeedsArgs,
 ) {

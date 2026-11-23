@@ -24,6 +24,7 @@ import {
   type DetailLevel,
   indentedTsv,
   type TreeRow,
+  wireAnswer,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -312,7 +313,8 @@ function fullStructures(read: StructuresRead): string {
  * `structure\tkind\tattribute` rows (a node not read or cyclic marked), with
  * `# appends_unavailable` when where-used failed and a
  * `# append_candidate_unread NAME` line per candidate SAP refused to read; medium and full the answer
- * before `detail`. A tree reads many documents, so raw is the full answer.
+ * before `detail`. A tree reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
   terse: (read) =>
@@ -1179,7 +1181,23 @@ function listAnswer(
   };
 }
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetStructuresList(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetStructuresList(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetStructuresList(context, args);
+}
+
+async function answeredGetStructuresList(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {

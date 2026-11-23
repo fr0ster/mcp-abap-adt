@@ -27,7 +27,7 @@ import * as z from 'zod';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt } from '../../../lib/detail';
+import { answerAt, wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   DETAIL_SHAPE,
@@ -55,7 +55,23 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleListFunctionModules(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredListFunctionModules(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredListFunctionModules(context, args);
+}
+
+async function answeredListFunctionModules(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {

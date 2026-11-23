@@ -175,6 +175,13 @@ describe('HandlerDumpList reads one page', () => {
         } as never,
         { feed_type: 'dumps', detail },
       )) as Answer;
+      // raw is what ADT sent: the page is one read, its document; the full
+      // tool walks pages, so it answers the array of them — here one.
+      if (detail === 'raw') {
+        assert.equal(textOf(compact.answer), FEED_END);
+        assert.equal(textOf(full), JSON.stringify([textOf(compact.answer)]));
+        return;
+      }
       assert.equal(textOf(compact.answer), textOf(full));
     });
   }

@@ -24,6 +24,7 @@ import {
   answerAt,
   indentedTsv,
   type TreeRow,
+  wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withLongToolAdvice } from '../../../lib/longTools';
@@ -451,8 +452,8 @@ interface TreeAnswerRead {
  * before the reads (`src/lib/detail`): terse the tree as indented
  * `type\tname` lines; medium the tree with every field the walk read, no
  * kind, isPackage, codeFormat, restoreStatus or empty children; full the
- * answer before `detail`. A walk reads many documents and answers none
- * whole, so raw is the full answer.
+ * answer before `detail`. A walk reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 type TreeAnswer = string | MediumNode | ReturnType<typeof treeOf>;
 
@@ -473,8 +474,23 @@ const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
 
 /**
  * Main handler for GetPackageTree MCP tool
+ *
+ * At `raw` what ADT sent: the documents the call's reads answered, read
+ * with the tool at full (`wireAnswer`, `src/lib/detail/wire.ts`).
  */
 export async function handleGetPackageTree(
+  context: HandlerContext,
+  args: GetPackageTreeArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetPackageTree(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetPackageTree(context, args);
+}
+
+async function answeredGetPackageTree(
   context: HandlerContext,
   args: GetPackageTreeArgs,
 ) {

@@ -81,8 +81,8 @@ export async function fetchFunctionGroupChildren(
  * each `detail`, selected before the reads (`src/lib/detail`): terse the
  * group and the total, then a `name\tdescription` row per child; medium
  * every field the node structure read but the uri; full the answer before
- * `detail` under `listKey`, with every field read under `objects`. The answer is built from two requests, so raw is
- * the full answer.
+ * `detail` under `listKey`, with every field read under `objects`. The answer is built from two requests, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 export function functionGroupListAnswers(
   functionGroupName: string,

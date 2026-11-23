@@ -932,7 +932,7 @@
   },
   "GetPackageContents a root SAP could not load @raw": {
     "isError": false,
-    "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true}]",
+    "text": "[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"]",
     "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageTree a root SAP could not load @terse": {
@@ -961,7 +961,7 @@
   },
   "GetPackageTree a root SAP could not load @raw": {
     "isError": false,
-    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "text": "[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><pak:package xmlns:pak=\\\"http://www.sap.com/adt/packages\\\" xmlns:adtcore=\\\"http://www.sap.com/adt/core\\\" adtcore:name=\\\"ZPKG\\\" adtcore:type=\\\"DEVC/K\\\" adtcore:description=\\\"A package\\\"/>\",\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"]",
     "requests": [
       "GET /sap/bc/adt/packages/zpkg?version=active",
       "POST /sap/bc/adt/repository/nodestructure"
@@ -993,7 +993,7 @@
   },
   "GetPackageContents a subpackage node SAP could not load @raw": {
     "isError": false,
-    "text": "[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"notLoaded\":true}]",
+    "text": "[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT/><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><NODE_ID>000001</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES></DATA></asx:values></asx:abap>\",\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"]",
     "requests": [
       "POST /sap/bc/adt/repository/nodestructure",
       "POST /sap/bc/adt/repository/nodestructure"
@@ -1028,7 +1028,7 @@
   },
   "GetPackageTree a subpackage node SAP could not load @raw": {
     "isError": false,
-    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "text": "[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><pak:package xmlns:pak=\\\"http://www.sap.com/adt/packages\\\" xmlns:adtcore=\\\"http://www.sap.com/adt/core\\\" adtcore:name=\\\"ZPKG\\\" adtcore:type=\\\"DEVC/K\\\" adtcore:description=\\\"A package\\\"/>\",\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT/><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><NODE_ID>000001</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES></DATA></asx:values></asx:abap>\",\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>SAP_TEXT</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"]",
     "requests": [
       "GET /sap/bc/adt/packages/zpkg?version=active",
       "POST /sap/bc/adt/repository/nodestructure",
@@ -1052,7 +1052,7 @@
   },
   "GetPackageContents two objects SAP listed without a name @raw": {
     "isError": false,
-    "text": "[{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/a\"},{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/b\"}]",
+    "text": "[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/ddic/tables/a</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>TABL/DT</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/ddic/tables/b</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"]",
     "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents a subpackage SAP listed without a name @terse": {
@@ -1081,7 +1081,7 @@
   },
   "GetPackageContents a subpackage SAP listed without a name @raw": {
     "isError": false,
-    "text": "[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true},{\"name\":\"\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"uri\":\"/sap/bc/adt/packages/nameless\"},{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"kind\":\"program\",\"packageName\":\"ZSUB\",\"isPackage\":false}]",
+    "text": "[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/packages/nameless</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><OBJECT_NAME>ZSUB</OBJECT_NAME><TECH_NAME>ZSUB</TECH_NAME><OBJECT_URI>/sap/bc/adt/packages/zsub</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\",\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>PROG/P</OBJECT_TYPE><OBJECT_NAME>ZP_IN_SUB</OBJECT_NAME><TECH_NAME>ZP_IN_SUB</TECH_NAME><OBJECT_URI>/sap/bc/adt/programs/programs/zp_in_sub</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"]",
     "requests": [
       "POST /sap/bc/adt/repository/nodestructure",
       "POST /sap/bc/adt/repository/nodestructure"
@@ -1116,7 +1116,7 @@
   },
   "GetPackageTree a subpackage SAP listed without a name @raw": {
     "isError": false,
-    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"uri\":\"/sap/bc/adt/packages/nameless\",\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "text": "[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><pak:package xmlns:pak=\\\"http://www.sap.com/adt/packages\\\" xmlns:adtcore=\\\"http://www.sap.com/adt/core\\\" adtcore:name=\\\"ZPKG\\\" adtcore:type=\\\"DEVC/K\\\" adtcore:description=\\\"A package\\\"/>\",\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/packages/nameless</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><OBJECT_NAME>ZSUB</OBJECT_NAME><TECH_NAME>ZSUB</TECH_NAME><OBJECT_URI>/sap/bc/adt/packages/zsub</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\",\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><asx:abap xmlns:asx=\\\"http://www.sap.com/abapxml\\\" version=\\\"1.0\\\"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>PROG/P</OBJECT_TYPE><OBJECT_NAME>ZP_IN_SUB</OBJECT_NAME><TECH_NAME>ZP_IN_SUB</TECH_NAME><OBJECT_URI>/sap/bc/adt/programs/programs/zp_in_sub</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>\"]",
     "requests": [
       "GET /sap/bc/adt/packages/zpkg?version=active",
       "POST /sap/bc/adt/repository/nodestructure",

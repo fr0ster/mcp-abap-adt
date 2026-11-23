@@ -34,7 +34,12 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
-import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
+import {
+  type AnswerTable,
+  answerAt,
+  tsv,
+  wireAnswer,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { ReadVersion } from '../../../lib/handlers/readVersion';
 import {
@@ -1874,7 +1879,23 @@ function listAnswer(
   };
 }
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetEnhancements(
+  context: HandlerContext,
+  args: GetEnhancementsArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetEnhancements(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetEnhancements(context, args);
+}
+
+async function answeredGetEnhancements(
   context: HandlerContext,
   args: GetEnhancementsArgs,
 ) {

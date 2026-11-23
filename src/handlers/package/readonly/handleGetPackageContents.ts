@@ -9,7 +9,12 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
-import { type AnswerTable, answerAt, groupedTsv } from '../../../lib/detail';
+import {
+  type AnswerTable,
+  answerAt,
+  groupedTsv,
+  wireAnswer,
+} from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -197,8 +202,8 @@ function mediumItem(packageName: string, item: WalkedItem) {
  * walk (`src/lib/detail`): terse the objects as TSV under `# package` group
  * lines (`# asked P` before each package of several, a failed walk as
  * `# error`); medium every field the walk read, no uri; full the list before
- * `detail`. A walk reads many documents and answers none whole, so raw is
- * the full list.
+ * `detail`. A walk reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 const CONTENTS_ANSWERS: AnswerTable<ContentsRead, string> = {
   terse: (read) => {
@@ -230,7 +235,23 @@ const CONTENTS_ANSWERS: AnswerTable<ContentsRead, string> = {
   raw: (read) => JSON.stringify(perPackage(read, assembleList)),
 };
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetPackageContents(
+  context: HandlerContext,
+  args: GetPackageContentsArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetPackageContents(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetPackageContents(context, args);
+}
+
+async function answeredGetPackageContents(
   context: HandlerContext,
   args: GetPackageContentsArgs,
 ) {

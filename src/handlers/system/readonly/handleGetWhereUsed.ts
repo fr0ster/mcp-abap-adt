@@ -56,6 +56,7 @@ import {
   answerAt,
   type DetailLevel,
   groupedTsv,
+  wireAnswer,
 } from '../../../lib/detail';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import {
@@ -902,8 +903,24 @@ const onlyAnswer = (outcome: WhereUsedOutcome): McpResult =>
  * where a call sends more than one request; the sequential reads where the
  * destination has no communication batch. One object without a type filter
  * is one request, sent as itself.
+ *
+ * At `raw` what ADT sent: the documents the call's reads answered, read
+ * with the tool at full (`wireAnswer`, `src/lib/detail/wire.ts`).
  */
 export async function handleGetWhereUsed(
+  context: HandlerContext,
+  args: WhereUsedArgs,
+) {
+  // One object is one usage read, answered as it came by its own `raw`.
+  if (levelOf(args) === 'raw' && args.objects !== undefined) {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetWhereUsed(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetWhereUsed(context, args);
+}
+
+async function answeredGetWhereUsed(
   context: HandlerContext,
   args: WhereUsedArgs,
 ) {

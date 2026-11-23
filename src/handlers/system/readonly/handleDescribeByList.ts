@@ -50,7 +50,7 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
-import { type AnswerTable, answerAt } from '../../../lib/detail';
+import { type AnswerTable, answerAt, wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AnswerValue,
@@ -125,7 +125,8 @@ interface DescribedItem {
  * rows (name, type, description, package), `NAME\t-` for an object no
  * search found, `# error NAME` and its failure for a refused one; medium and
  * full the answer before `detail`, one content entry per object found. The
- * answer is built from several searches, so raw is the full answer.
+ * answer is built from several searches, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
   terse: (items) => {
@@ -361,8 +362,23 @@ async function describeInEnvelopes(
  * DescribeByList: a description of every object, read in ADT batch
  * envelopes; the sequential searches where the destination has no
  * communication batch.
+ *
+ * At `raw` what ADT sent: the documents the call's reads answered, read
+ * with the tool at full (`wireAnswer`, `src/lib/detail/wire.ts`).
  */
 export async function handleDescribeByList(
+  context: HandlerContext,
+  args: DescribeArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredDescribeByList(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredDescribeByList(context, args);
+}
+
+async function answeredDescribeByList(
   context: HandlerContext,
   args: DescribeArgs,
 ) {

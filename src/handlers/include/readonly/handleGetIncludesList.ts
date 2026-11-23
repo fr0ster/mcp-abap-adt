@@ -42,6 +42,7 @@ import {
   type DetailLevel,
   indentedTsv,
   type TreeRow,
+  wireAnswer,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -355,7 +356,8 @@ function mediumInclude(node: IncludeNode): MediumIncludeNode {
  * before the reads (`src/lib/detail`): terse the tree as indented names
  * under `# object`, a `# unreadable NAME` line per include that could not be
  * read; medium the tree without empty children; full the answer before
- * `detail`. A tree reads many documents, so raw is the full answer.
+ * `detail`. A tree reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 const INCLUDES_ANSWERS: AnswerTable<IncludesRead, string> = {
   terse: (read) =>
@@ -1085,7 +1087,23 @@ function listAnswer(
   };
 }
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetIncludesList(
+  context: HandlerContext,
+  args: IncludesListArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetIncludesList(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetIncludesList(context, args);
+}
+
+async function answeredGetIncludesList(
   context: HandlerContext,
   args: IncludesListArgs,
 ) {

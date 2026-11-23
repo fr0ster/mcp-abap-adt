@@ -80,6 +80,9 @@ function answeredOf(result: {
 /** The connection of the case running now: its requests are recorded. */
 const last: { connection?: RecordingConnection | undefined } = {};
 
+/** The bodies the running case's connection answered, in order. */
+const servedBodies = (): string[] => [...(last.connection?.served ?? [])];
+
 /** The requests the running case sent, as method and url. */
 const sentRequests = (): string[] =>
   (last.connection?.requests ?? []).map(
@@ -417,6 +420,8 @@ CASES['GetPackageTree a subpackage SAP listed without a name'] = async (
 
 describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READINGS=1 rewrites the fixture)', () => {
   const answered: Answers = {};
+  /** What each case's connection answered, in order: the wire. */
+  const wire: Record<string, string[]> = {};
   const expected: Answers =
     process.env.WRITE_SHIPPED_READINGS === '1'
       ? {}
@@ -442,12 +447,45 @@ describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READ
           ...answer,
           requests: sentRequests(),
         };
+        wire[key] = servedBodies();
         if (process.env.WRITE_SHIPPED_READINGS !== '1') {
           assert.deepStrictEqual(answered[key], expected[key]);
         }
       });
     }
   }
+
+  // `raw` is what ADT sent (the owner's ruling): one document as it came,
+  // or the array of the documents read, in order — never the parse. The one
+  // named exception: a created request whose read-back failed carries the
+  // read-back's diagnostic beside the create document (Codex round 4, P1).
+  it('raw is wire text: a document served, or the array of every one', () => {
+    let checked = 0;
+    for (const [key, recorded] of Object.entries(answered)) {
+      if (!key.endsWith('@raw') || recorded.isError) continue;
+      // A tool's case (its name, upper case first); a helper's case takes
+      // no `detail`.
+      const first = key[0] ?? '';
+      if (first !== first.toUpperCase()) continue;
+      const served = wire[key] ?? [];
+      checked += 1;
+      if (recorded.text.startsWith('{"documents":')) {
+        const { documents, read_back } = JSON.parse(recorded.text);
+        assert.ok(key.startsWith('CreateTransport'), key);
+        assert.equal(typeof read_back, 'string', key);
+        for (const document of documents) {
+          assert.ok(served.includes(document), key);
+        }
+        continue;
+      }
+      assert.ok(
+        served.includes(recorded.text) ||
+          recorded.text === JSON.stringify(served),
+        `${key}: ${recorded.text.slice(0, 120)}`,
+      );
+    }
+    assert.ok(checked > 0);
+  });
 
   it('no error repeats the document it was answered', () => {
     for (const [key, recorded] of Object.entries(answered)) {

@@ -1,6 +1,11 @@
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
-import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
+import {
+  type AnswerTable,
+  answerAt,
+  tsv,
+  wireAnswer,
+} from '../../../lib/detail';
 import {
   onEveryVariant,
   type RuleVariant,
@@ -473,7 +478,8 @@ function parentRows(list: ParentList, descriptions: boolean): string {
  * before the walk (`src/lib/detail`): terse its objects as TSV (type, name,
  * the technical name only where it differs, the description when asked
  * for); medium every field read but the uri; full the answer before
- * `detail`. A walk reads many documents, so raw is the full answer.
+ * `detail`. A walk reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 function objectsListAnswers(
   descriptions: boolean,
@@ -505,7 +511,23 @@ function objectsListAnswers(
   };
 }
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetObjectsList(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetObjectsList(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetObjectsList(context, args);
+}
+
+async function answeredGetObjectsList(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {

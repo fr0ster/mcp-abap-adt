@@ -5,6 +5,7 @@ import {
   answerAt,
   type DetailLevel,
   groupedTsv,
+  wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -210,8 +211,8 @@ export function searchSourceRows(result: OrchestratorResult): string {
 /**
  * What SearchSource answers at each `detail`, selected before the scan
  * (`src/lib/detail`): terse {@link searchSourceRows}; medium and full the
- * answer before `detail`. A scan reads many documents and answers none whole,
- * so raw is the full answer.
+ * answer before `detail`. A scan reads many documents, so
+ * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 const SEARCH_SOURCE_ANSWERS: AnswerTable<OrchestratorResult, string> = {
   terse: searchSourceRows,
@@ -220,7 +221,23 @@ const SEARCH_SOURCE_ANSWERS: AnswerTable<OrchestratorResult, string> = {
   raw: (result) => JSON.stringify(result),
 };
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleSearchSource(
+  context: HandlerContext,
+  args: SearchSourceArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredSearchSource(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredSearchSource(context, args);
+}
+
+async function answeredSearchSource(
   context: HandlerContext,
   args: SearchSourceArgs,
 ) {

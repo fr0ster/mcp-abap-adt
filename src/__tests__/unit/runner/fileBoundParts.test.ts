@@ -78,6 +78,32 @@ describe('the process table', () => {
 });
 
 describe('a live file, by its place on disk', () => {
+  it('ignores case on Windows, and only there', () => {
+    const mixed = path.join(
+      'repo',
+      'SRC',
+      '__TESTS__',
+      'Integration',
+      'a.test.js',
+    );
+    const { printed } = partRun(
+      [
+        `const file = ${JSON.stringify(mixed)};`,
+        "const roots = ['src/__tests__/integration', 'src/__tests__/admin'];",
+        "const source = 'SRC/__Tests__/ADMIN/b.test.ts';",
+        'print({',
+        "  file: [bound.isLiveFile(file, 'win32'), bound.isLiveFile(file, 'linux'), bound.isLiveFile(file)],",
+        "  source: [bound.isLiveSource(source, roots, 'win32'), bound.isLiveSource(source, roots, 'linux'), bound.isLiveSource(source, roots)],",
+        '});',
+      ].join('\n'),
+    );
+    const native = process.platform === 'win32';
+    assert.deepEqual(printed, {
+      file: [true, false, native],
+      source: [true, false, native],
+    });
+  });
+
   it('is any file under __tests__/integration or __tests__/admin, compiled or not, through any link', () => {
     const real = path.join(scratch.dir, 'real', 'src', '__tests__');
     fs.mkdirSync(path.join(real, 'integration'), { recursive: true });

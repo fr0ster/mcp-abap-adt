@@ -19,16 +19,20 @@ export const MAX_BOUND_SECONDS = 2147483;
  * has a `__tests__` directory whose next directory is `integration` or
  * `admin` (the live roots, `src/__tests__/integration` and
  * `src/__tests__/admin`, and their compiled tree under `.test-build/tree/`).
- * A path that cannot be resolved is read as written.
+ * A path that cannot be resolved is read as written. On Windows (`platform`
+ * `win32`) the names are compared ignoring case, as its file system does.
  */
-export function isLiveFile(file) {
+export function isLiveFile(file, platform = process.platform) {
   let canonical = file;
   try {
     canonical = realpathSync(file);
   } catch {
     // Read as written.
   }
-  const parts = canonical.split(sep).flatMap((part) => part.split('/'));
+  const parts = folded(canonical, platform)
+    .split(sep)
+    .flatMap((part) => part.split('/'))
+    .flatMap((part) => part.split('\\'));
   for (let i = 0; i + 1 < parts.length; i += 1) {
     if (
       parts[i] === '__tests__' &&
@@ -38,6 +42,22 @@ export function isLiveFile(file) {
     }
   }
   return false;
+}
+
+/** `text` as the platform's file system compares it: lower case on Windows. */
+function folded(text, platform) {
+  return platform === 'win32' ? text.toLowerCase() : text;
+}
+
+/**
+ * Whether `source` (a repository path written with `/`) is under one of
+ * `roots` (the live roots), compared as the platform's file system compares
+ * names: ignoring case on Windows, where `SRC/__TESTS__/INTEGRATION/…`
+ * names the same file.
+ */
+export function isLiveSource(source, roots, platform = process.platform) {
+  const text = folded(source, platform);
+  return roots.some((root) => text.startsWith(`${folded(root, platform)}/`));
 }
 
 /** The integer `text` is written in decimal digits, or undefined. */
@@ -115,15 +135,22 @@ function processTable() {
 }
 
 /**
- * Ends the process tree of `pid`, which leads a process group of its own:
- * on Windows `taskkill /T /F`; elsewhere every descendant is found in the
- * process table and stopped (`SIGSTOP`) until no new one appears — so none
- * forks or is reparented away meanwhile, whatever session or group it moved
- * to —, then the group and each process found get `SIGKILL`. Answers
- * `{ ok: true }`, or `{ ok: false, reason }` when the tree could not be
- * ended whole (the group is still killed when the table cannot be read).
+ * Ends the process tree of `pid`, which leads a process group of its own,
+ * as the tree is when this is called: on Windows `taskkill /T /F`;
+ * elsewhere every descendant then in the process table under `pid` is
+ * stopped (`SIGSTOP`), the table read again until no new one appears, so
+ * none forks or leaves meanwhile, whatever group or session it is in; then
+ * the group and each process found get `SIGKILL`. The limit: a descendant
+ * that left the tree before this call — reparented away when the process
+ * that started it exited — is no longer under `pid` and is not reached.
+ * Answers `{ ok: true }`, or `{ ok: false, reason }` when the tree could
+ * not be ended whole (the group is still killed when the table cannot be
+ * read). A `pid` of 1 or less is refused: `-1` would signal every process.
  */
 export function endTree(pid) {
+  if (!Number.isInteger(pid) || pid <= 1) {
+    return { ok: false, reason: `no process tree to end at pid ${pid}` };
+  }
   if (process.platform === 'win32') {
     const run = spawnSync('taskkill', ['/pid', String(pid), '/T', '/F'], {
       encoding: 'utf8',

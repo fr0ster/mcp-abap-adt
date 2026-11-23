@@ -163,12 +163,17 @@ describe('the batch sentence of an assembled description is its note', () => {
   };
 
   it('served where batches are recorded: assembled again with its batchable note', () => {
-    const served = servedDescription(toolDescription(parts), 'GetClass', true);
+    const own = { ...parts, purpose: purpose('Reads one batched class.') };
+    const served = servedDescription(toolDescription(own), 'GetClass', true);
+    // Assembled, not appended: its parts are known by its text — checked
+    // before anything else assembles the same text.
+    assert.deepStrictEqual(partsOfDescription(served)?.notes, [
+      batchable('GetClass'),
+    ]);
     assert.equal(
       served,
-      toolDescription({ ...parts, notes: [batchable('GetClass')] }),
+      toolDescription({ ...own, notes: [batchable('GetClass')] }),
     );
-    assert.notEqual(partsOfDescription(served), undefined);
   });
 
   it('served elsewhere as it was assembled', () => {

@@ -14,6 +14,8 @@ import {
   IncompleteAnswerError,
   identityOf,
   incompleteAnswerWords,
+  type Line,
+  listedText,
   Written,
 } from '../../../lib/detail';
 import { return_error } from '../../../lib/utils';
@@ -192,23 +194,93 @@ describe('completeAnswer over the cells written', () => {
     assert.equal(written.answer.split('\n').length, 3, written.answer);
   });
 
-  it('sections: one root across the whole text, a second refused', () => {
+  // Codex round 9, probe one: a second root never stands in for an omitted
+  // row — root validity is its own check.
+  it('a second root cannot replace an omitted row', () => {
+    const shown = completeAnswer(
+      'Tool',
+      () => [identityOf(['root', 'X'])],
+      () =>
+        Written.text(
+          [
+            { root: ['P'], depth: 0 },
+            { root: ['X'], depth: 0 },
+          ],
+          [0, 1],
+        ),
+    );
+    assert.throws(() => shown(undefined), IncompleteAnswerError);
+  });
+
+  it('two roots and nothing held: refused by the root check alone', () => {
     const shown = completeAnswer(
       'Tool',
       () => [],
       () =>
-        Written.sections([
-          Written.text([{ root: ['P'], depth: 0 }], [0]),
-          Written.text([{ bulletRoot: 'Q', depth: 0 }], [0]),
-        ]),
+        Written.text(
+          [
+            { root: ['P'], depth: 0 },
+            { bulletRoot: 'Q', depth: 0 },
+          ],
+          [0],
+        ),
     );
     assert.throws(() => shown(undefined), IncompleteAnswerError);
-    const one = completeAnswer(
-      'Tool',
-      () => [],
-      () => Written.sections([Written.text([{ root: ['P'], depth: 0 }], [0])]),
+  });
+
+  // Codex round 9, probe two, and the GetPackageTree regression: each part
+  // of a list is its own section — its root allowed, its items counted
+  // against its own read.
+  type Tree = { readonly name: string; readonly children: readonly string[] };
+  const heldOf = (tree: Tree) => tree.children.map((c) => identityOf([c]));
+  const treeOf = (tree: Tree) =>
+    Written.text(
+      [
+        { root: [tree.name], depth: 0 },
+        ...tree.children.map((c): Line => ({ row: [c], depth: 1 })),
+      ],
+      [0],
     );
-    assert.equal(one(undefined), 'P');
+
+  it('listedText: two trees, each its own root, pass', () => {
+    const text = listedText(
+      'Tool',
+      [
+        {
+          heads: [{ head: 'asked', value: 'A' }],
+          read: { name: 'A', children: ['a1'] },
+        },
+        {
+          heads: [{ head: 'asked', value: 'B' }],
+          read: { name: 'B', children: ['b1'] },
+        },
+      ],
+      heldOf,
+      treeOf,
+    );
+    assert.equal(text, '# asked A\nA\n  a1\n# asked B\nB\n  b1');
+  });
+
+  it("listedText: an item written under another object's section is refused", () => {
+    const swapped = (tree: Tree) =>
+      treeOf(
+        tree.name === 'A'
+          ? { name: 'A', children: ['a1', 'b1'] }
+          : { name: 'B', children: [] },
+      );
+    assert.throws(
+      () =>
+        listedText(
+          'Tool',
+          [
+            { heads: [], read: { name: 'A', children: ['a1'] } },
+            { heads: [], read: { name: 'B', children: ['b1'] } },
+          ],
+          heldOf,
+          swapped,
+        ),
+      IncompleteAnswerError,
+    );
   });
 
   it('nested: the inner answer is set whole, the container cannot replace it', () => {

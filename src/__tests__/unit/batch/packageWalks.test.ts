@@ -748,6 +748,75 @@ describe('HandlerGet part contents', () => {
 });
 
 describe('GetPackageTree', () => {
+  // Codex round 9: several packages at terse, each tree its own section
+  // under its own root — never incomplete_answer — on both paths.
+  for (const path of ['batched', 'sequential'] as const) {
+    it(`terse, two packages answered (${path}): each tree as full holds it`, async () => {
+      const on = () =>
+        path === 'batched'
+          ? contextOn(system())
+          : contextOn(system(), 'absent');
+      const terse = await withinTurns(
+        handleGetPackageTreeOf(on(), {
+          package_names: ['ZROOT_A', 'ZROOT_B'],
+          detail: 'terse',
+          background: false,
+        }),
+      );
+      assert.notEqual(
+        (terse as { isError?: boolean }).isError,
+        true,
+        textOf(terse),
+      );
+      const full = payloadOf(
+        await withinTurns(
+          handleGetPackageTree(on(), {
+            package_names: ['ZROOT_A', 'ZROOT_B'],
+            background: false,
+          }),
+        ),
+      );
+      const names = (node: {
+        name: string;
+        children?: unknown[];
+      }): string[] => [
+        node.name,
+        ...(
+          (node.children ?? []) as Array<{ name: string; children?: unknown[] }>
+        ).flatMap(names),
+      ];
+      const expected = (full as Array<{ tree: { name: string } }>).flatMap(
+        (entry) => names(entry.tree),
+      );
+      const written = textOf(terse)
+        .split('\n')
+        .filter((line) => !line.startsWith('#'))
+        .map((line) => line.trim().split('\t')[1] ?? line.trim());
+      assert.deepStrictEqual(written, expected, textOf(terse));
+    });
+  }
+
+  it('terse, one package answered and one refused', async () => {
+    const model = { refuse: { [nodeKey('DEVC/K', 'ZROOT_B', '40')]: 403 } };
+    const terse = await withinTurns(
+      handleGetPackageTreeOf(contextOn(system(model)), {
+        package_names: ['ZROOT_A', 'ZROOT_B'],
+        detail: 'terse',
+        background: false,
+      }),
+    );
+    const text = textOf(terse);
+    assert.notEqual((terse as { isError?: boolean }).isError, true, text);
+    const lines = text.split('\n');
+    assert.equal(lines[0], '# asked ZROOT_A');
+    assert.ok(lines.includes('# asked ZROOT_B'), text);
+    assert.equal(
+      lines.filter((line) => line.startsWith('# error ')).length,
+      1,
+      text,
+    );
+  });
+
   it('same answer as the sequential version', async () => {
     const a = await withinTurns(
       handleGetPackageTree(contextOn(system()), { package_name: 'ZROOT_A' }),

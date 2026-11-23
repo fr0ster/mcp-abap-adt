@@ -106,19 +106,24 @@ export class Written<A> {
     return #written in value && value.#written;
   }
 
-  /**
-   * Every item the answer holds: its rows, and each root after the first —
-   * a text has one root at most, across every section it is joined from,
-   * so another root is an item no reading holds and the guard refuses it.
-   */
+  /** Every item the answer holds, as its rows, marks and bullets write it. */
   get identities(): readonly string[] {
-    return [...this.items, ...this.roots.slice(1)];
+    return this.items;
+  }
+
+  /**
+   * Whether the answer's roots are valid: a text has one root at most. A
+   * check of its own, never an item: a second root cannot stand in for an
+   * omitted row (Codex round 9).
+   */
+  get rootsValid(): boolean {
+    return this.roots <= 1;
   }
 
   private constructor(
     readonly answer: A,
     private readonly items: readonly string[],
-    private readonly roots: readonly string[] = [],
+    private readonly roots = 0,
   ) {}
 
   /**
@@ -132,8 +137,8 @@ export class Written<A> {
   ): Written<string> {
     const texts: string[] = [];
     const identities: string[] = [];
-    // Each root's identity: every root after the first is an item.
-    const roots: string[] = [];
+    // Roots counted apart from the items: more than one is refused.
+    let roots = 0;
     for (const entry of lines) {
       if ('head' in entry) {
         // The label and the value escaped: SAP's text can add no line.
@@ -153,7 +158,7 @@ export class Written<A> {
         );
       } else if ('root' in entry) {
         texts.push(written(entry.root, entry.depth));
-        roots.push(identityOf(['root', ...entry.root]));
+        roots += 1;
       } else if ('mark' in entry) {
         // The marker and each word a cell, the words tab-separated: a tab
         // inside a word is escaped, so two lists of words never read alike.
@@ -166,7 +171,7 @@ export class Written<A> {
         identities.push(identityOf(entry.identity));
       } else if ('bulletRoot' in entry) {
         texts.push(`${'  '.repeat(entry.depth)}- ${cell(entry.bulletRoot)}`);
-        roots.push(identityOf(['root', entry.bulletRoot]));
+        roots += 1;
       } else {
         texts.push(entry.title);
       }
@@ -280,19 +285,6 @@ export class Written<A> {
     );
   }
 
-  /**
-   * Written texts as sections of one text, each item kept. The text has
-   * one root at most across all its sections: a root after the first is an
-   * item, and the guard refuses it.
-   */
-  static sections(parts: readonly Written<string>[]): Written<string> {
-    return new Written(
-      parts.map((part) => part.answer).join('\n'),
-      parts.flatMap((part) => part.items),
-      parts.flatMap((part) => part.roots),
-    );
-  }
-
   /** A tool's answer of text entries, each an item identified by its text as written. */
   static content(entries: readonly { type: 'text'; text: string }[]): Written<{
     isError: boolean;
@@ -379,19 +371,19 @@ export function listedText<R>(
   held: (read: R) => readonly string[],
   render: (read: R) => Written<string>,
 ): string {
-  return completeAnswer(
-    tool,
-    () => parts.flatMap((part) => ('read' in part ? held(part.read) : [])),
-    () =>
-      Written.sections(
-        parts.flatMap((part) => [
-          Written.text(part.heads, []),
-          'read' in part
-            ? render(part.read)
-            : Written.text([{ head: 'error', value: part.error }], []),
-        ]),
-      ),
-  )(undefined);
+  // Each part is its own section, guarded on its own: its read's items
+  // against its own rows, its own root at most — an item of one object
+  // written under another is refused (Codex round 9).
+  const sectioned = completeAnswer(tool, held, render);
+  return parts
+    .flatMap((part) => [
+      Written.text(part.heads, []).answer,
+      'read' in part
+        ? sectioned(part.read)
+        : Written.text([{ head: 'error', value: part.error }], []).answer,
+    ])
+    .filter((text) => text !== '')
+    .join('\n');
 }
 
 /** A JSON row's identity: its text keys' values, an absent one `''`. */
@@ -443,6 +435,7 @@ export function completeAnswer<T, A>(
     const written = render(value);
     if (
       !Written.isWritten(written) ||
+      !written.rootsValid ||
       !sameItems(held(value), written.identities)
     ) {
       throw new IncompleteAnswerError(tool);

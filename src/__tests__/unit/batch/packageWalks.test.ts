@@ -881,9 +881,13 @@ describe('GetObjectsList', () => {
     );
   });
 
-  it("envelopes per spec §11's row (per level: every node of the level)", async () => {
+  // The owner's decision: pass 1 reads the node structures in batch for the
+  // identities alone; terse (the default) makes no second batch.
+  it("terse: envelopes per spec §11's row (per level: every node of the level), and no second batch", async () => {
     const fake = system();
-    await withinTurns(handleGetObjectsList(contextOn(fake), single));
+    await withinTurns(
+      handleGetObjectsListOf(contextOn(fake), { ...single, detail: 'terse' }),
+    );
     assert.deepStrictEqual(fake.envelopes.map(partKeys), [
       [nodeKey('PROG/P', 'ZPROG_X')],
       [
@@ -892,6 +896,23 @@ describe('GetObjectsList', () => {
       ],
       [nodeKey('PROG/P', 'ZPROG_X', '103')],
     ]);
+  });
+
+  // Medium reads each object's own metadata in a second batch: one
+  // envelope of independent GETs after the node structures'.
+  it("medium: the node structures, then one envelope of the objects' metadata reads", async () => {
+    const fake = system();
+    await withinTurns(
+      handleGetObjectsListOf(contextOn(fake), { ...single, detail: 'medium' }),
+    );
+    const envelopes = fake.envelopes.map(partKeys);
+    assert.equal(envelopes.length, 4);
+    const second = envelopes[3] ?? [];
+    assert.ok(second.length > 0);
+    assert.ok(
+      second.every((key) => key.startsWith('GET ')),
+      second.join('\n'),
+    );
   });
 
   it('no envelope holds a request needing another of its parts', async () => {
@@ -920,7 +941,9 @@ describe('GetObjectsList', () => {
         ],
       }),
     );
-    assert.equal(fake.envelopes.length, 3);
+    // The node structures' three levels, and one envelope of metadata reads
+    // (full reads each object's description from its metadata).
+    assert.equal(fake.envelopes.length, 4);
     const [x, y] = payloadOf(result);
     assertMatchObject(x, {
       parent_type: 'PROG/P',
@@ -964,7 +987,8 @@ describe('GetObjectsList', () => {
     const fake = system();
     await withinTurns(handleGetObjectsList(contextOn(fake, 'absent'), single));
     assert.equal(fake.envelopes.length, 0);
-    assert.equal(fake.directs.length, 4);
+    // Four node structures, and the three objects' metadata reads (full).
+    assert.equal(fake.directs.length, 7);
   });
 });
 

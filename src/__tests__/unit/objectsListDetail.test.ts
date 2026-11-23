@@ -46,13 +46,16 @@ async function objectsList(
 }
 
 describe('GetObjectsList detail', () => {
-  it("terse, by default: type and name, the technical name where it differs, a nameless one's uri, the description asked for by default", async () => {
+  // The owner's decision: terse is identifier rows, no description — the
+  // node structure's descriptions are never taken (in a batch they belong
+  // to other parts), and terse reads no second pass for them.
+  it("terse, by default: identifier rows — type, name, the technical name where it differs, a nameless one's uri — no description", async () => {
     const expected = [
       '# parent FUGR/F ZFG',
       '# total 2',
-      'type\tname\ttech_name\turi\tdescription',
-      'FUGR/FF\tZ_FM\t\t\tA module',
-      'FUGR/I\tZFG_TOP\tLZFGTOP\t\t',
+      'type\tname\ttech_name\turi',
+      'FUGR/FF\tZ_FM\t\t',
+      'FUGR/I\tZFG_TOP\tLZFGTOP\t',
     ].join('\n');
     assert.equal(await objectsList(), expected);
     assert.equal(await objectsList('terse'), expected);
@@ -85,11 +88,11 @@ describe('GetObjectsList detail', () => {
   it('two nameless objects apart only by uri: two terse rows, each with its uri', async () => {
     const lines = (await objectsList('terse', NAMELESS)).split('\n');
     assert.ok(
-      lines.includes('FUGR/I\t\tLZFGX\t/sap/bc/adt/x/one\t'),
+      lines.includes('FUGR/I\t\tLZFGX\t/sap/bc/adt/x/one'),
       lines.join('\n'),
     );
     assert.ok(
-      lines.includes('FUGR/I\t\tLZFGX\t/sap/bc/adt/x/two\t'),
+      lines.includes('FUGR/I\t\tLZFGX\t/sap/bc/adt/x/two'),
       lines.join('\n'),
     );
   });
@@ -105,4 +108,78 @@ describe('GetObjectsList detail', () => {
       assert.ok(text.includes('not loaded by SAP'), text);
     });
   }
+
+  // The owner's decision (SAP's `CL_SEU_ADT_RES_REPO_STRUCTURE` keeps a
+  // static text table every batch part grows and reads by row index): the
+  // node structure's descriptions are never used. Here they are wrong on
+  // purpose; medium takes each object's from its own metadata, and an
+  // object whose metadata carries none has none.
+  it("medium: descriptions from each object's metadata, never the node structure's", async () => {
+    const WRONG = LEVEL.replaceAll(
+      '</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>',
+      '</OBJECT_URI><DESCRIPTION>WRONG</DESCRIPTION></SEU_ADT_REPOSITORY_OBJ_NODE>',
+    ).replace('<DESCRIPTION>A module</DESCRIPTION>', '');
+    const connection = recordingConnection([
+      { data: WRONG },
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><fmodule:abapFunctionModule xmlns:fmodule="http://www.sap.com/adt/functions/fmodules" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="Z_FM" adtcore:description="Right"/>',
+      },
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><finclude:abapFunctionGroupInclude xmlns:finclude="http://www.sap.com/adt/functions/fincludes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZFG_TOP"/>',
+      },
+    ]);
+    declareSystemKind(connection, 'onprem');
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    const result = await handleGetObjectsList(
+      { connection, logger: undefined, batchAvailability },
+      {
+        parent_name: 'ZFG',
+        parent_tech_name: 'ZFG',
+        parent_type: 'FUGR/F',
+        detail: 'medium',
+      },
+    );
+    const text = result.content[0]?.text ?? '';
+    assert.equal(result.isError, false, text);
+    assert.ok(!text.includes('WRONG'), text);
+    const answer = JSON.parse(text);
+    assert.equal(answer.objects[0].description, 'Right');
+    assert.equal(answer.objects[1].description, undefined);
+  });
+
+  it('terse: one pass, no metadata read', async () => {
+    const connection = recordingConnection([{ data: LEVEL }]);
+    declareSystemKind(connection, 'onprem');
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    await handleGetObjectsList(
+      { connection, logger: undefined, batchAvailability },
+      { parent_name: 'ZFG', parent_tech_name: 'ZFG', parent_type: 'FUGR/F' },
+    );
+    assert.equal(connection.requests.length, 1);
+  });
+
+  // A failed pass-2 read is the call's error, never an object answered
+  // without its description as if complete.
+  it('medium: a metadata read SAP refuses makes the call its error', async () => {
+    const connection = recordingConnection([
+      { data: LEVEL },
+      { status: 500, data: 'refused' },
+      { data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core"/>' },
+    ]);
+    declareSystemKind(connection, 'onprem');
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    const result = await handleGetObjectsList(
+      { connection, logger: undefined, batchAvailability },
+      {
+        parent_name: 'ZFG',
+        parent_tech_name: 'ZFG',
+        parent_type: 'FUGR/F',
+        detail: 'medium',
+      },
+    );
+    assert.equal(result.isError, true, result.content[0]?.text);
+  });
 });

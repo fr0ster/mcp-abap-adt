@@ -248,7 +248,8 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       {
         headers: DEFAULT_ADT_HEADERS['utils.fetchNodeStructure'],
         nodeId: '000000',
-        withShortDescriptions: true,
+        // Pass 1 asks no description (the owner's decision).
+        withShortDescriptions: false,
       },
     ]);
   });
@@ -761,7 +762,10 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
       DESCRIPTION: 'Shared FUGR for include/FM tests',
     };
     assert.deepStrictEqual(byTypeRow, expected);
-    assert.deepStrictEqual(listRow, expected);
+    // GetObjectsList's pass 1 takes no description (the owner's decision);
+    // its identity fields are the same row.
+    const { DESCRIPTION: _description, ...identity } = expected;
+    assert.deepStrictEqual(listRow, identity);
   });
 
   it('GetObjectNodeFromCache finds a row either handler wrote, by its real technical name', async () => {

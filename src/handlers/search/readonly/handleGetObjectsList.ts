@@ -57,7 +57,9 @@ const FIELDS = {
   with_short_descriptions: z
     .boolean()
     .optional()
-    .describe('[read-only] Include short descriptions (default: true)'),
+    .describe(
+      "[read-only] With detail medium or full: read each object's description from its metadata (default: true)",
+    ),
   ...ASSEMBLED_DETAIL_SHAPE,
 };
 
@@ -141,7 +143,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...onEveryVariant(
     withLongToolAdvice(
-      '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope.',
+      '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope, for the identities of the objects. By default (detail terse) TSV of identifier rows (type, name, tech_name, uri), no description. With detail medium or full the description of each object is read from its own metadata in a second ADT batch envelope, where its type has a metadata endpoint.',
     ),
     schemaOn,
   ),
@@ -154,6 +156,7 @@ import type {
   IAdtFailure,
   IAdtResponse,
 } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import {
   type AdtHeadersContext,
   withAdtHeaders,
@@ -165,21 +168,30 @@ import {
   isCredentialPayload,
   thrownEntry,
 } from '../../../lib/answer';
-import { withSequentialFallback } from '../../../lib/batch/phases';
+import { runPhase, withSequentialFallback } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type MetadataRead,
+  metadataReadOf,
+} from '../../../lib/strategies/metadataReads';
 import {
   batchReader,
   childNodesOf,
   endsTheCall,
   isNotLoaded,
+  METADATA_STEP,
+  metadataDescriptionOf,
+  metadataTypeOf,
   NOT_LOADED_BY_SAP,
   type NodeLevel,
   nodeItemsOf,
   nodeStructureOn,
 } from '../../../lib/strategies/packageWalk';
+import { rawOf } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { atStep } from '../../../lib/strategies/step';
 import { return_error } from '../../../lib/utils';
 
 function utilsOf(context: HandlerContext) {
@@ -221,7 +233,11 @@ function flatObjects(level: NodeLevel, nodeType: string): FlatObject[] {
     OBJECT_NAME: o.name,
     ...(o.techName ? { TECH_NAME: o.techName } : {}),
     ...(o.uri ? { OBJECT_URI: o.uri } : {}),
-    ...(o.description ? { DESCRIPTION: o.description } : {}),
+    // Pass 1 takes identities only, never descriptions: in a batch SAP's
+    // node structure assigns texts by row index from a static table every
+    // part of the envelope grows (`CL_SEU_ADT_RES_REPO_STRUCTURE`,
+    // `get_the_shorttexts`, `INDEX start_tabix + sy-tabix`), so a batched
+    // part's descriptions belong to other parts (the owner's decision).
   }));
   if (isNotLoaded(level)) {
     objects.push({
@@ -545,7 +561,8 @@ function objectsListAnswers(
     terse: completeAnswer(
       TOOL,
       (list: ParentList) => list.objects.map(terseIdentity),
-      (list) => parentRows(list, descriptions),
+      // Identifier rows: no description at terse (pass 2 reads none there).
+      (list) => parentRows(list, false),
     ),
     // Each object identified by the fields written.
     medium: completeAnswer(
@@ -608,6 +625,143 @@ function objectsListAnswers(
   };
 }
 
+/** What pass 2 reads: every object's description (medium, full), or only the types SAP left out (terse). */
+type SecondPass = 'descriptions' | 'types';
+
+/** One object pass 2 reads, by its list and its place in it, and the read that answers it. */
+interface SecondRead {
+  readonly list: number;
+  readonly index: number;
+  readonly read: (
+    connection: IAbapConnection,
+  ) => Promise<IAdtResponse<string, IAdtError>>;
+}
+
+/** An object's metadata read by its own URI: for an object SAP listed without a type. */
+function uriRead(uri: string): SecondRead['read'] {
+  return atStep(METADATA_STEP, async (connection: IAbapConnection) => {
+    const answered = await connection.makeAdtRequest({
+      url: uri,
+      method: 'GET',
+      timeout: 0,
+    });
+    return succeeded(rawOf(answered));
+  });
+}
+
+/** An object's metadata read by its type (`metadataReadOf`), its document as text. */
+function typedRead(
+  context: HandlerContext,
+  read: MetadataRead,
+): SecondRead['read'] {
+  return async (connection) => {
+    const answered = await atStep(
+      METADATA_STEP,
+      read,
+    )(createAdtClient(connection, context.logger));
+    if (!answered.ok) return answered;
+    const value = answered.getResult().value;
+    return succeeded(typeof value === 'string' ? value : value.raw);
+  };
+}
+
+/**
+ * The reads pass 2 makes of `lists`: at `types`, each object SAP listed
+ * without a type, by its URI; at `descriptions`, every object too, by the
+ * metadata read of its type. An object whose type has no metadata read
+ * (`metadataReadOf` answers none) and that SAP gave no URI keeps no
+ * description: no endpoint answers it here.
+ */
+function secondReads(
+  context: HandlerContext,
+  lists: readonly {
+    parentType: string;
+    parentName: string;
+    objects: readonly FlatObject[];
+  }[],
+  pass: SecondPass,
+): SecondRead[] {
+  return lists.flatMap((list, l) =>
+    list.objects.flatMap((o, index): SecondRead[] => {
+      if (o.NOT_LOADED === true) return [];
+      if (o.OBJECT_TYPE === '') {
+        return o.OBJECT_URI === undefined
+          ? []
+          : [{ list: l, index, read: uriRead(o.OBJECT_URI) }];
+      }
+      if (pass === 'types') return [];
+      const read = metadataReadOf({
+        type: o.OBJECT_TYPE,
+        name: o.OBJECT_NAME,
+        ...(list.parentType === 'FUGR/F'
+          ? { functionGroup: list.parentName }
+          : {}),
+      });
+      if (read !== undefined)
+        return [{ list: l, index, read: typedRead(context, read) }];
+      return o.OBJECT_URI === undefined
+        ? []
+        : [{ list: l, index, read: uriRead(o.OBJECT_URI) }];
+    }),
+  );
+}
+
+/**
+ * Pass 2: each object's own metadata, read in one batch envelope (the reads
+ * are independent GETs), else one by one — the description from there,
+ * never from the node structure, and the type for an object SAP listed
+ * without one. Every object pass 1 found stays; a read that fails is the
+ * call's failure, never an object answered without what it lacks.
+ */
+async function secondPass(
+  context: HandlerContext,
+  lists: readonly {
+    parentType: string;
+    parentName: string;
+    objects: readonly FlatObject[];
+  }[],
+  pass: SecondPass,
+): Promise<IAdtResponse<FlatObject[][], IAdtError>> {
+  const reads = secondReads(context, lists, pass);
+  const out = lists.map((list) => list.objects.map((o) => ({ ...o })));
+  if (reads.length === 0) return succeeded(out);
+  const answers = await withSequentialFallback(
+    context,
+    async () => {
+      const results = await runPhase(context, reads, (each, batch) =>
+        each.read(batch),
+      );
+      return results.map((result) => {
+        if (!result.ok) throw result.error;
+        return result.value;
+      });
+    },
+    async () => {
+      const results: IAdtResponse<string, IAdtError>[] = [];
+      for (const each of reads)
+        results.push(await each.read(context.connection));
+      return results;
+    },
+  );
+  for (const [i, each] of reads.entries()) {
+    const answered = answers[i];
+    if (answered === undefined) continue;
+    if (!answered.ok) return answered;
+    const object = out[each.list]?.[each.index];
+    if (object === undefined) continue;
+    const document = answered.getResult().value;
+    if (object.OBJECT_TYPE === '') {
+      const type = metadataTypeOf(document);
+      if (type !== undefined) object.OBJECT_TYPE = type;
+    }
+    if (pass === 'descriptions') {
+      const description = metadataDescriptionOf(document);
+      if (description !== undefined) object.DESCRIPTION = description;
+    }
+  }
+  return succeeded(out);
+}
+
 /**
  * The tool's answer; at `raw` what ADT sent — the documents the call's
  * reads answered, read with the tool at full (`wireAnswer`).
@@ -649,6 +803,11 @@ async function answeredGetObjectsList(
   const level = levelOf(args);
   // Every object the parent's walk held, or nothing (`completeAnswer`).
   const shown = answerAt(objectsListAnswers(withDescriptions), levelOf(args));
+  // Pass 2 at medium and full: every object's description from its own
+  // metadata; at terse — or with descriptions declined — only the types
+  // SAP left out.
+  const pass: SecondPass =
+    level !== 'terse' && withDescriptions ? 'descriptions' : 'types';
 
   if (listed !== undefined && listed.length > 0) {
     const parents: Parent[] = [];
@@ -670,13 +829,34 @@ async function answeredGetObjectsList(
       async () => {
         read = await withSequentialFallback(
           context,
-          () => walkParentsBatched(context, parents, withDescriptions),
-          () => walkParentsSequential(context, parents, withDescriptions),
+          () => walkParentsBatched(context, parents, false),
+          () => walkParentsSequential(context, parents, false),
         );
         // A credential failure SAP answered ends the call as it came.
         if (read.ended !== undefined) {
           return read.ended;
         }
+        // Pass 2 over every parent read, in one envelope.
+        const walked = read.walks.flatMap((walk, i) =>
+          walk.ok
+            ? [
+                {
+                  i,
+                  parentType: parents[i]?.type ?? '',
+                  parentName: parents[i]?.name ?? '',
+                  objects: walk.getResult().value,
+                },
+              ]
+            : [],
+        );
+        const second = await secondPass(context, walked, pass);
+        if (!second.ok) return second;
+        const lists = second.getResult().value;
+        const walks = [...read.walks];
+        walked.forEach((entry, j) => {
+          walks[entry.i] = ok(lists[j] ?? []);
+        });
+        read = { walks };
         return ok([]);
       },
       () => {
@@ -723,14 +903,14 @@ async function answeredGetObjectsList(
   // recursive walk over many such calls, not one reading.
   return answer(
     { tool: 'GetObjectsList', detail: detailOf(args) },
-    () =>
-      withSequentialFallback(
+    async () => {
+      const walked = await withSequentialFallback(
         context,
         async () => {
           const read = await walkParentsBatched(
             context,
             [{ type: parentType, name: parentName }],
-            withDescriptions,
+            false,
           );
           const walk = read.ended ?? read.walks[0];
           if ('thrown' in walk) throw walk.thrown;
@@ -743,10 +923,19 @@ async function answeredGetObjectsList(
             parentType,
             parentName,
             '000000',
-            withDescriptions,
+            false,
             new Set(),
           ),
-      ),
+      );
+      if (!walked.ok) return walked;
+      const second = await secondPass(
+        context,
+        [{ parentType, parentName, objects: walked.getResult().value }],
+        pass,
+      );
+      if (!second.ok) return second;
+      return ok(second.getResult().value[0] ?? []);
+    },
     (objects: FlatObject[]) => {
       const result = {
         parent_name,

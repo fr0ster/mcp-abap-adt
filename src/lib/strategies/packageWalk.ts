@@ -983,6 +983,24 @@ export function walkedIdentity(item: {
 /** The step of a failed object metadata read. */
 export const METADATA_STEP = 'read object metadata';
 
+/** The `adtcore:type` of a metadata document's root element: what an object SAP listed without a type is. */
+export function metadataTypeOf(xml: string): string | undefined {
+  let doc: XmlNode | undefined;
+  try {
+    doc = parseXml(parser, xml);
+  } catch {
+    return undefined;
+  }
+  for (const [name, root] of nodeEntries(doc)) {
+    if (name.startsWith('?') || typeof root !== 'object') {
+      continue;
+    }
+    const type = nodeChild(root, 'adtcore:type');
+    return typeof type === 'string' ? type.trim() || undefined : undefined;
+  }
+  return undefined;
+}
+
 /** The `adtcore:description` of a metadata document's root element. */
 export function metadataDescriptionOf(xml: string): string | undefined {
   let doc: XmlNode | undefined;

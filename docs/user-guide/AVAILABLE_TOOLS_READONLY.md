@@ -162,7 +162,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
 #### GetAbapGitModifiedObjects (Read-Only / Abapgit)
-**Description:** [read-only] Reads every object a pull of the repository would change in the system: changed in the remote, in the system or in both, added or deleted on either side, and those held by another package. Answers facts only: each object with its type, name, package, URI and SAP's action: 1 add, 2 update (changed only in the remote), 3 overwrite (changed in the system), 4 delete, 5 delete and re-create, 6 package move.
+**Description:** [read-only] Reads what a pull of the repository would change in the system: every changed object (changed in the remote, in the system or in both, added or deleted on either side), the repository's own package left out, and as package warnings the objects whose package in the system differs from the package their path maps to. Answers facts only: each object with its type, name, package, URI and SAP's action: 1 add, 2 update (changed only in the remote), 3 overwrite (changed in the system), 4 delete, 5 delete and re-create, 6 package move; SAP leaves a package warning with action 5 out of every selection.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
 

@@ -17,10 +17,12 @@
  * L234–240); with one (`pull.req.v1`, `overwrite`) only the selected
  * entries (L230–233). The job sets every entry it was not handed to `N`
  * (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152), and the import drops an
- * `N` entry only when it is changed locally (`CL_ABAPGIT_OBJECTS->
- * warning_overwrite_find` L1833: `lstate` set; `warning_overwrite_adjust`
- * L1791): a change made only in the remote is imported whether selected or
- * not, a local change only when selected. The run's interface is activated
+ * `N` overwrite entry when it is changed locally (`CL_ABAPGIT_OBJECTS->
+ * warning_overwrite_find` L1841–1844: `lstate` set; `warning_overwrite_adjust`
+ * L1791), every `N` package warning (`warning_package_adjust` L1858–1897),
+ * and deletes only `Y` entries (`CL_ABAPGIT_BG_ACTION_PULL->
+ * delete_unnecessary_objects` L39–72): only a remote-only add or update is
+ * imported unselected, a local change only when selected. The run's interface is activated
  * before its push, so the first remote change is listed `update` and the
  * pull imports it; the later local change makes it `overwrite`, and a pull
  * selecting it overwrites it.

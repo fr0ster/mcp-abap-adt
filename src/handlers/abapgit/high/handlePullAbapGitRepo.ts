@@ -53,18 +53,20 @@ const IMPORTS =
   'every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too';
 
 /**
- * On the cloud (Code, read 2026-11-23): R6 lists every changed object
- * (`CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find` L140–210). SAP's pull
- * handler hands its job every R6 entry when the request selects none
- * (`CL_ABAPGIT_RES_REPO_PULL->post` L234–240), only the selected ones with
- * `overwrite` (L230–233); the job marks the others `N`
- * (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152), and the import drops an
- * `N` entry only when it is changed locally or held by another package
- * (`CL_ABAPGIT_OBJECTS->warning_overwrite_adjust` L1791,
- * `warning_package_adjust`): a remote-only change is imported either way.
+ * On the cloud (Code, read 2026-11-23): SAP's pull handler hands its job
+ * every R6 entry when the request selects none (`CL_ABAPGIT_RES_REPO_PULL->
+ * post` L234–240), only the selected ones with `overwrite` (L230–233); the
+ * job marks the others `N` (`CL_ABAPGIT_BG_ACTION_PULL->execute`
+ * L123–152). An `N` entry stays out: a deletion runs only for `Y`
+ * (`delete_unnecessary_objects` L39–72), an `N` package warning is left
+ * out whatever its state (`CL_ABAPGIT_OBJECTS->warning_package_adjust`
+ * L1858–1897), an `N` overwrite entry with a local state is left out
+ * (`warning_overwrite_adjust` L1791, `warning_overwrite_find` L1841–1844).
+ * So only a remote-only add or update is imported unselected
+ * (`pullSelection.ts`).
  */
 const CLOUD_IMPORTS =
-  'every object the modified-objects read lists is brought to its remote version; with overwrite, SAP selects by name against the list as it stands when its job runs: the objects changed in the system or held by another package are overwritten when overwrite names them, the others keeping their system version, and the objects changed only in the remote are imported either way';
+  'the job takes every object the modified-objects read lists and brings it to its remote version; given overwrite, SAP selects by name against the list as it stands when its job runs: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state';
 
 const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 

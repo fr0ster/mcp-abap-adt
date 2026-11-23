@@ -265,7 +265,7 @@ function writeProperties(actions: readonly AbapGitWriteAction[]) {
     ),
     overwrite: OVERWRITE_FIELD.optional().describe(
       said(actions, {
-        pull: 'cloud: the objects of modified_objects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused. SAP selects by name when its job runs, against the list as it stands then: an object changed in the system or held by another package is overwritten when its name is selected, the others keep their system version, and one changed only in the remote is imported either way. Without it the pull overwrites every listed object.',
+        pull: 'cloud: the objects of modified_objects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every selection. Without it the job takes every listed object.',
       }),
     ),
     comment: COMMENT_FIELD.optional().describe(
@@ -345,7 +345,7 @@ const ACTION_SENTENCES_GET: Readonly<Record<AbapGitGetAction, string>> = {
   external_repo:
     'external_repo(url*, detail) the access mode and the branches of the remote repository at url',
   modified_objects:
-    "modified_objects(repository_key*, detail) every object a pull would change: changed in the remote, in the system or both, added or deleted, or held by another package, each with SAP's action (1 add, 2 update: changed only in the remote, 3 overwrite: changed in the system, 4 delete, 5 delete and re-create, 6 package move)",
+    "modified_objects(repository_key*, detail) what a pull would change: every changed object (changed in the remote, in the system or both, added or deleted), the repository's own package left out, and as package warnings the objects whose package in the system differs from the package their path maps to, each with SAP's action (1 add, 2 update: changed only in the remote, 3 overwrite: changed in the system, 4 delete, 5 delete and re-create, 6 package move); SAP leaves a package warning with action 5 out of every selection",
   staging:
     'staging(repository_key*, detail) the unstaged, staged and ignored objects with their files, and the proposed author and committer',
   checks:
@@ -359,7 +359,7 @@ const ACTION_SENTENCES_WRITE: Readonly<Record<AbapGitWriteAction, string>> = {
   link: 'link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch',
   unlink:
     "unlink(repository_key*) ends the repository's binding to its package; the objects stay",
-  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job, its objects are inactive, and it brings every object modified_objects lists to its remote version, or with overwrite only the objects changed in the system or held by another package that overwrite names, the objects changed only in the remote imported either way',
+  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job, its objects are inactive, and it brings every object modified_objects lists to its remote version, or with overwrite selects by name: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state',
   push: 'push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job',
   switch_branch:
     'switch_branch(repository_key*, branch*, create*) switches the branch, creating it in the remote with create true',

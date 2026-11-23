@@ -5,6 +5,8 @@ import {
   answerAt,
   completeAnswer,
   identityOf,
+  type ListedPart,
+  listedText,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -865,26 +867,42 @@ async function answeredGetObjectsList(
         return ok([]);
       },
       () => {
-        const entries = read.walks.map((walk, i) => {
+        const outcomes = read.walks.map((walk, i) => {
           const asked = {
             parent_name: listed[i]?.parent_name,
             parent_type: listed[i]?.parent_type,
           };
           return walk.ok
-            ? shown({ ...asked, objects: walk.getResult().value })
+            ? { list: { ...asked, objects: walk.getResult().value } }
             : { ...asked, error: failureOfWalk(walk) };
         });
-        // At terse each parent's list is text: one text, a failed walk as
-        // its parent line and `# error`; at the other levels the entries.
-        return level === 'terse'
-          ? entries
-              .map((entry) =>
-                typeof entry === 'string'
-                  ? entry
-                  : `# parent ${JSON.stringify(entry)}`,
-              )
-              .join('\n')
-          : entries;
+        // At terse each parent's list is text written through `Written`:
+        // one text, a failed walk under its escaped `# parent` line and one
+        // `# error` line; at the other levels the entries.
+        if (level === 'terse') {
+          return listedText(
+            'GetObjectsList',
+            outcomes.map(
+              (outcome): ListedPart<ParentList> =>
+                'list' in outcome
+                  ? { heads: [], read: outcome.list }
+                  : {
+                      heads: [
+                        {
+                          head: 'parent',
+                          value: `${outcome.parent_type ?? ''} ${outcome.parent_name ?? ''}`,
+                        },
+                      ],
+                      error: JSON.stringify(outcome.error),
+                    },
+            ),
+            (list) => list.objects.map(terseIdentity),
+            (list) => parentRows(list, false),
+          );
+        }
+        return outcomes.map((outcome) =>
+          'list' in outcome ? shown(outcome.list) : outcome,
+        );
       },
     );
   }

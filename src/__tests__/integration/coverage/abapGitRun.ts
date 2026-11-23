@@ -255,6 +255,12 @@ export class AbapGitRun {
   private readonly branchName = `abapgit-live-${this.runId.toLowerCase()}`;
   private readonly secondName = `${this.branchName}-b`;
   readonly interfaceName = `ZIF_AGS${this.runId}`;
+  /** The second run interface: changed locally with the first, left out of the selection. */
+  readonly secondInterface = `ZIF_AGS${this.runId}B`;
+  /** Both run interfaces, created and pushed together. */
+  get interfaceNames(): readonly string[] {
+    return [this.interfaceName, this.secondInterface];
+  }
   readonly packageName =
     this.backend === 'cloud' ? `ZAGS${this.runId}` : `$ZAGS${this.runId}`;
   private readonly remote: IAbapGitRemote | undefined;
@@ -315,7 +321,12 @@ export class AbapGitRun {
 
   /** The interface's file name in the repository. */
   get fileName(): string {
-    return `${this.interfaceName.toLowerCase()}.intf.abap`;
+    return this.fileOf(this.interfaceName);
+  }
+
+  /** An interface's file name in the repository. */
+  fileOf(name: string): string {
+    return `${name.toLowerCase()}.intf.abap`;
   }
 
   /** Skips `t` with the run's reason, when there is one. */
@@ -426,27 +437,29 @@ export class AbapGitRun {
   }
 
   /**
-   * Creates the run's interface in its package, its name read free first,
-   * then writes its source at `v1` and activates it — the object in sync
-   * before its push, so the remote change is the remote's only
+   * Creates both run interfaces in the run's package, each name read free
+   * first, then writes each source at `v1` and activates it — the objects
+   * in sync before their push, so a remote change is the remote's only
    * (`abapGitPull.ts`).
    */
-  async createInterface(): Promise<void> {
-    await expectNameFree({
-      tool: 'GetInterface',
-      args: { interface_name: this.interfaceName },
-    });
-    await this.createInSap('interface', this.interfaceName, 'CreateInterface', {
-      interface_name: this.interfaceName,
-      description: 'abapGit live run interface',
-      package_name: this.packageName,
-    });
-    const written = await livePrepare('UpdateInterface', {
-      interface_name: this.interfaceName,
-      source_code: interfaceSource(this.interfaceName, this.marker('v1')),
-      activate: true,
-    });
-    assert.equal(written.isError, false, written.text);
+  async createInterfaces(): Promise<void> {
+    for (const name of this.interfaceNames) {
+      await expectNameFree({
+        tool: 'GetInterface',
+        args: { interface_name: name },
+      });
+      await this.createInSap('interface', name, 'CreateInterface', {
+        interface_name: name,
+        description: 'abapGit live run interface',
+        package_name: this.packageName,
+      });
+      const written = await livePrepare('UpdateInterface', {
+        interface_name: name,
+        source_code: interfaceSource(name, this.marker('v1')),
+        activate: true,
+      });
+      assert.equal(written.isError, false, written.text);
+    }
   }
 
   /** The server's restriction: the run's remote, and what a case adds. */
@@ -596,13 +609,15 @@ export class AbapGitRun {
     }
   }
 
-  /** The remote branch holds the interface's file. */
+  /** The remote branch holds each run interface's file. */
   async assertPushed(): Promise<void> {
-    const path = `src/${this.fileName}`;
-    assert.ok(
-      (await this.github().readFile(this.branchName, path)) !== undefined,
-      path,
-    );
+    for (const name of this.interfaceNames) {
+      const path = `src/${this.fileOf(name)}`;
+      assert.ok(
+        (await this.github().readFile(this.branchName, path)) !== undefined,
+        path,
+      );
+    }
   }
 
   /**
@@ -612,8 +627,9 @@ export class AbapGitRun {
   async changeRemote(
     from: 'v1' | 'v2' = 'v1',
     to: 'v2' | 'v3' = 'v2',
+    name: string = this.interfaceName,
   ): Promise<string> {
-    const path = `src/${this.fileName}`;
+    const path = `src/${this.fileOf(name)}`;
     const before = await this.github().readFile(this.branchName, path);
     assert.ok(before !== undefined, path);
     const marker = this.marker(to);
@@ -639,6 +655,11 @@ export class AbapGitRun {
       [ACTION_UPDATE],
       'R6 lists the run interface once as update (changed only in the remote)',
     );
+    assert.deepEqual(
+      actionsOf(facts, this.secondInterface),
+      [],
+      'R6 lists the unchanged second interface',
+    );
   }
 
   /**
@@ -647,22 +668,45 @@ export class AbapGitRun {
    * `overwrite` that selects it, its type and name as R6 answered them.
    */
   overwriteChangedLocally(facts: unknown): { type: string; name: string }[] {
-    assert.deepEqual(
-      actionsOf(facts, this.interfaceName),
-      [ACTION_OVERWRITE],
-      'R6 lists the run interface once as overwrite (changed locally)',
-    );
+    for (const name of this.interfaceNames) {
+      assert.deepEqual(
+        actionsOf(facts, name),
+        [ACTION_OVERWRITE],
+        `R6 lists ${name} once as overwrite (changed locally)`,
+      );
+    }
     return overwriteOf(facts, this.interfaceName);
   }
 
-  /** Writes the interface in SAP at `l1` and activates it: a local change. */
-  async changeLocally(): Promise<void> {
+  /** Writes `name` in SAP at `l1` and activates it: a local change. */
+  async changeLocally(name: string = this.interfaceName): Promise<void> {
     const written = await livePrepare('UpdateInterface', {
-      interface_name: this.interfaceName,
-      source_code: interfaceSource(this.interfaceName, this.marker('l1')),
+      interface_name: name,
+      source_code: interfaceSource(name, this.marker('l1')),
       activate: true,
     });
     assert.equal(written.isError, false, written.text);
+  }
+
+  /**
+   * `name`, left out of the selection, keeps its local change: both its
+   * inactive and its active source hold `l1`, none the remote's `v2`
+   * (`CL_ABAPGIT_OBJECTS->warning_overwrite_adjust` L1791: an unselected
+   * entry changed locally is dropped from the import).
+   */
+  async assertKeptLocal(name: string): Promise<void> {
+    for (const version of ['inactive', 'active'] as const) {
+      const source = await livePrepare('GetInterface', {
+        interface_name: name,
+        version,
+      });
+      assert.equal(source.isError, false, source.text);
+      assert.ok(
+        source.text.includes(this.marker('l1')) &&
+          !source.text.includes(this.marker('v2')),
+        `${name} (${version}) keeps its local change`,
+      );
+    }
   }
 
   /**

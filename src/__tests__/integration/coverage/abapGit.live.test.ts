@@ -71,18 +71,18 @@ liveSuite(['onprem', 'cloud'], 'abapGit, the full tools', () => {
     run.confirmLink(listed);
   });
 
-  it('3. pushes a run-owned interface the staging shows; the remote branch holds its file', async (t) => {
+  it('3. pushes the two run-owned interfaces the staging shows; the remote branch holds their files', async (t) => {
     if (run.skipped(t)) return;
-    await run.createInterface();
+    await run.createInterfaces();
     const staged = await liveCall('GetAbapGitStaging', {
       repository_key: run.key(),
       detail: 'full',
     });
-    const objects = pushedObjectsOf(
-      json('GetAbapGitStaging', staged),
-      run.interfaceName,
+    const staging = json('GetAbapGitStaging', staged);
+    const objects = run.interfaceNames.flatMap((name) =>
+      pushedObjectsOf(staging, name),
     );
-    assert.equal(objects.length, 1);
+    assert.equal(objects.length, 2);
     const job = await run.openJob('PushAbapGitRepo');
     const pushed = await liveCall('PushAbapGitRepo', {
       repository_key: run.key(),
@@ -139,10 +139,12 @@ liveSuite(['onprem', 'cloud'], 'abapGit, the full tools', () => {
     await run.assertPulled(marker);
   });
 
-  it('4d. on the cloud: a local change, selected in overwrite, is overwritten by the pull', async (t) => {
+  it('4d. on the cloud: of two local changes the one selected in overwrite is overwritten, the other kept', async (t) => {
     if (run.skippedUnless(t, 'cloud')) return;
     await run.changeLocally();
+    await run.changeLocally(run.secondInterface);
     const changed = await run.changeRemote('v2', 'v3');
+    await run.changeRemote('v1', 'v2', run.secondInterface);
     const modified = await liveCall('GetAbapGitModifiedObjects', {
       repository_key: run.key(),
       detail: 'full',
@@ -157,6 +159,7 @@ liveSuite(['onprem', 'cloud'], 'abapGit, the full tools', () => {
     });
     await run.endJob('PullAbapGitRepo', job, pulled);
     await run.assertPulled(changed, 'l1');
+    await run.assertKeptLocal(run.secondInterface);
   });
 
   it('5. on premise: switches to the second branch and back; R1’s branch follows', async (t) => {

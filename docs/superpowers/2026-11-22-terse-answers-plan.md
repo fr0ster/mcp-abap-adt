@@ -213,6 +213,17 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    error rule stays at the reading's edge: what a reading cannot read is its typed state, and raw's
    failed-read rule is unchanged. The tool docs are regenerated.
 
+   9.11 **Known limits of "by construction"** (owner, after Codex round 11). Each of these needs
+   deliberate code a reviewer sees, and is accepted:
+   - `writeWhole` takes any object, so a hand-filtered copy of a reading passes for it;
+   - a nested listing can be built from a filtered copy of the same type;
+   - a column's or head's callback chooses an item's fields (never which items are written);
+   - the full and raw formatters are free functions;
+   - a list whose items are themselves lists of objects is not looked into;
+   - a record of JSON values is one value, written whole.
+   DescribeByList's terse still reads SearchObject's terse text back into cells, any cell past
+   the four columns kept as an `# extra` line; it is named here for the owner's decision.
+
    9.10 **Gate and review.** The gate runs detached until `DONE fail=0`. Then push, then Codex,
    which gets this step's text as its scope.
 

@@ -72,6 +72,12 @@ import {
   waitForRun,
 } from '../helpers/abapGitLedger';
 import {
+  interfaceSource,
+  overwrittenNames,
+  succeeded,
+  swapMarker,
+} from '../helpers/abapGitPull';
+import {
   GitHubFixtures,
   GitHubRefusal,
   type IAbapGitRemote,
@@ -408,7 +414,17 @@ export class AbapGitRun {
     }
   }
 
-  /** Creates the run's interface in its package, its name read free first. */
+  /** The marker the run's interface holds at `version`. */
+  marker(version: 'v1' | 'v2'): string {
+    return `abapGit live run ${this.runId} ${version}`;
+  }
+
+  /**
+   * Creates the run's interface in its package, its name read free first,
+   * then writes its source at `v1` and activates it — the object in sync
+   * before its push, so the remote change is the remote's only
+   * (`abapGitPull.ts`).
+   */
   async createInterface(): Promise<void> {
     await expectNameFree({
       tool: 'GetInterface',
@@ -419,6 +435,12 @@ export class AbapGitRun {
       description: 'abapGit live run interface',
       package_name: this.packageName,
     });
+    const written = await livePrepare('UpdateInterface', {
+      interface_name: this.interfaceName,
+      source_code: interfaceSource(this.interfaceName, this.marker('v1')),
+      activate: true,
+    });
+    assert.equal(written.isError, false, written.text);
   }
 
   /** The server's restriction: the run's remote, and what a case adds. */
@@ -556,6 +578,10 @@ export class AbapGitRun {
       );
       this.ledger.closePending(this.runId);
       this.logKey = ended.appLogKey;
+      assert.ok(
+        succeeded(ended.runStatus),
+        `${what} ended with status ${ended.runStatus ?? '(none)'} (log key ${ended.appLogKey})`,
+      );
     } catch (error) {
       if (error instanceof RunWaitCancelled) {
         this.kept = `${what} could not be correlated: ${error.message}`;
@@ -573,30 +599,69 @@ export class AbapGitRun {
     );
   }
 
-  /** Changes the interface's file in the remote; answers the line it added. */
+  /**
+   * Changes the interface's file in the remote from `v1` to `v2`, the
+   * constant's value only; answers the `v2` marker.
+   */
   async changeRemote(): Promise<string> {
     const path = `src/${this.fileName}`;
     const before = await this.github().readFile(this.branchName, path);
-    assert.ok(before !== undefined);
-    const marker = `"abapGit live run ${this.runId}`;
+    assert.ok(before !== undefined, path);
+    const marker = this.marker('v2');
     await this.github().writeFile(
       this.branchName,
       path,
-      `${before.text.trimEnd()}\n${marker}\n`,
+      swapMarker(before.text, this.marker('v1'), marker),
       before.sha,
       `abapGit live run ${this.runId}: a remote change`,
     );
     return marker;
   }
 
-  /** The interface's source in SAP holds `marker` (the cloud's pull imports it inactive). */
+  /**
+   * R6's facts (`detail: "full"`) list no run interface as changed
+   * locally: the change is the remote's only, so the server's pull, which
+   * sends no selection, imports it (`abapGitPull.ts`).
+   */
+  assertRemoteOnly(facts: unknown): void {
+    assert.deepEqual(
+      overwrittenNames(facts).filter((name) => name === this.interfaceName),
+      [],
+      'R6 lists the run interface as changed locally: a pull with no selection would leave it out',
+    );
+  }
+
+  /**
+   * The pulled change is in SAP. On premise the pull activates: the active
+   * source holds it. On the cloud the pull imports inactive
+   * (`CL_ABAPGIT_OBJECTS` L1127–1133; Code; adt-clients ERRATA, measured
+   * 2026-11-22): the inactive version holds it, the active one still the
+   * pushed `v1`.
+   */
   async assertPulled(marker: string): Promise<void> {
-    const source = await livePrepare('GetInterface', {
-      interface_name: this.interfaceName,
-      ...(this.backend === 'cloud' ? { version: 'inactive' } : {}),
-    });
-    assert.equal(source.isError, false, source.text);
-    assert.ok(source.text.includes(marker), 'the pulled change is in SAP');
+    const read = async (version: 'active' | 'inactive') => {
+      const source = await livePrepare('GetInterface', {
+        interface_name: this.interfaceName,
+        version,
+      });
+      assert.equal(source.isError, false, source.text);
+      return source.text;
+    };
+    if (this.backend === 'onprem') {
+      assert.ok(
+        (await read('active')).includes(marker),
+        'the pulled change is active',
+      );
+      return;
+    }
+    assert.ok(
+      (await read('inactive')).includes(marker),
+      'the pulled change is the inactive version',
+    );
+    assert.ok(
+      (await read('active')).includes(this.marker('v1')),
+      'the active version is still the pushed one',
+    );
   }
 
   /** A branch create, its name read free first and the create journaled. */

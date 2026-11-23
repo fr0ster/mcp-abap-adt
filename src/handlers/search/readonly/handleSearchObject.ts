@@ -9,15 +9,14 @@ import { answer } from '../../../lib/answer';
 import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import {
   answered,
-  completeAnswer,
   type DetailTable,
   formatted,
   fullLevel,
-  identityOf,
   rawLevel,
   readingAt,
+  rows,
   structuredValue,
-  Written,
+  writeListing,
 } from '../../../lib/detail';
 import {
   onEveryVariant,
@@ -112,28 +111,23 @@ export const TOOL_DEFINITION = {
  * migration: a header and one line per hit, the code as SAP sent it, known
  * or not; no hit answers nothing.
  */
-function hitLines(hits: readonly ISearchResult[]): Written<string> {
-  return Written.text(
-    hits.length === 0
-      ? []
-      : [
-          { header: ['name', 'type', 'description', 'package'] },
-          ...hits.map((h) => ({
-            row: [
-              h.name,
-              h.type ?? h.unknownType,
-              h.description,
-              h.packageName ?? '',
-            ],
-          })),
+function hitLines(hits: readonly ISearchResult[]): string {
+  return writeListing({
+    heads: [],
+    reading: { hits },
+    lists: {
+      hits: rows('hits', {
+        columns: [
+          { name: 'name', cell: (h: ISearchResult) => h.name },
+          { name: 'type', cell: (h: ISearchResult) => h.type ?? h.unknownType },
+          { name: 'description', cell: (h: ISearchResult) => h.description },
+          { name: 'package', cell: (h: ISearchResult) => h.packageName ?? '' },
         ],
-    [0, 1],
-  );
+        header: 'when-rows',
+      }),
+    },
+  }).answer;
 }
-
-/** A hit's identity, as its row writes it: its name and its type (the code SAP sent, known or not). */
-const hitIdentity = (h: ISearchResult) =>
-  identityOf([h.name, h.type ?? h.unknownType]);
 
 /**
  * What `SearchObject` answers at each `detail`: the reading the search is
@@ -142,15 +136,8 @@ const hitIdentity = (h: ISearchResult) =>
  * references since 0.28.0), written as lines.
  */
 const SEARCH_READINGS: DetailTable<XmlNode | string> = {
-  // Every hit, or nothing (`completeAnswer`).
-  terse: formatted(
-    utilSearchHits,
-    completeAnswer(
-      'SearchObject',
-      (hits: readonly ISearchResult[]) => hits.map(hitIdentity),
-      hitLines,
-    ),
-  ),
+  // Every hit, written by the listing writer.
+  terse: formatted(utilSearchHits, hitLines),
   medium: fullLevel,
   full: fullLevel,
   raw: rawLevel,

@@ -254,14 +254,17 @@ row SAP answered is answered. `detail` has four levels:
   assembles reads — package contents and tree, the other repository walks, `SearchSource`,
   `DescribeByList`, the include, structure and function group lists, `GetEnhancements`,
   `GetWhereUsed`, `GetUnitTest`, `GetCdsUnitTest`, `GetUnitTestResult`, `GetCdsUnitTestResult`, the
-  unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `CreateTransportTask`, `ActivateObjectLow`
-  — always answers a JSON array of every response the call got, in read order, each as
+  unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `CreateTransportTask`, `CreateTableType`,
+  `UpdateTableType`, `ActivateObjectLow` — always answers a JSON array of every response the call got, in read order, each as
   `{ "status", "body" }` as ADT sent it, an array even when the call read one: no parse, no
   projection, nothing of ours mixed in. A failed read is there as its failed response, never as a
-  gap — at `CreateTransport`, a read-back SAP refused. A body the connection hands over as an object
-  is its JSON text. When the call fails — `full` refuses it, or answers with an error explained in
-  it — `raw` gives the same error answer as `full`; otherwise the two differ: `full` is the whole
-  parse, `raw` what ADT sent.
+  gap; `CreateTransport` answers a read-back that failed — with SAP's response or with none — as
+  `{ "responses", "read_back" }`, the responses beside the same note `full` gives. A body the
+  connection hands over as an object is its JSON text, bytes their UTF-8 text. `raw` and `full`
+  give the same error when the exchange itself failed (a refusal, no response), or `full` explains
+  an error inside its answer; on a parse failure — every exchange answered, our reading refused it
+  — `raw` still gives the documents, while `full` gives the parse's error. Otherwise the two differ:
+  `full` is the whole parse, `raw` what ADT sent.
 
 An answer is the complete result or an error, never a partial one. A formatter that reshapes a
 reading writes through shared writers that take typed rows and read each item's identity from the

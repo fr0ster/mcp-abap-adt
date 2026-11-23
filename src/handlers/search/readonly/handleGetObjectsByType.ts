@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and, for an object listed by its uri alone, that uri — with with_short_descriptions, its description too; each node SAP marks as unloaded is a `#` line of its own.',
+    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and, for an object listed by its uri alone, that uri — with with_short_descriptions, its description too; each node SAP marks as unloaded is a `#` line of its own, and each child node of the type node a `# child_node` line naming its type and node id.',
   inputSchema: z.object({
     parent_name: z.string().describe('[read-only] Parent object name'),
     parent_tech_name: z.string().describe('[read-only] Parent technical name'),

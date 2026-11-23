@@ -409,7 +409,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one).
-- `detailed` (boolean, optional) - [read-only] true: every field of each enhancement and every object read, those without enhancements included; false (default): each enhancement by name, type and source, objects without enhancements left out
+- `detailed` (boolean, optional) - [read-only] true: every field of each enhancement, as read; false (default): each enhancement by name, type and source. Either way every object read is answered, one without enhancements with total_enhancements 0
 - `include_nested` (boolean, optional) - [read-only] true: also the enhancements of every include of a program or function group
 - `max_includes` (integer, optional) - [read-only] With include_nested: how many includes are read (default 50)
 - `object_name` (string, optional) - Name of the ABAP object (with object_type; or give objects)
@@ -744,7 +744,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getobjectsbytype-read-only-search"></a>
 #### GetObjectsByType (Read-Only / Search)
-**Description:** [read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and, for an object listed by its uri alone, that uri — with with_short_descriptions, its description too; each node SAP marks as unloaded is a `#` line of its own.
+**Description:** [read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and, for an object listed by its uri alone, that uri — with with_short_descriptions, its description too; each node SAP marks as unloaded is a `#` line of its own, and each child node of the type node a `# child_node` line naming its type and node id.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 

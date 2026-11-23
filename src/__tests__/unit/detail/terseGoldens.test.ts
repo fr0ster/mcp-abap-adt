@@ -25,15 +25,24 @@ import { handleGetObjectsByType } from '../../../handlers/search/readonly/handle
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
+import { searchSourceRows } from '../../../handlers/system/readonly/handleSearchSource';
 import {
   createBatchAvailability,
   NO_BATCH_ENDPOINT_STATUS,
 } from '../../../lib/batch/availability';
 import type { DetailLevel } from '../../../lib/detail';
+import { substringLineMatch } from '../../../lib/search-source/lineScanner';
+import { runSearchSource } from '../../../lib/search-source/orchestrator';
+import { skipSapAnswers } from '../../../lib/search-source/readFailure';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { recordingConnection } from '../../helpers/recordingConnection';
 import { repositoryRoot } from '../../helpers/repoRoot';
+import {
+  exactPackages,
+  listing,
+  sourcesFrom,
+} from '../../helpers/sourceReaderFake';
 
 const FIXTURE_SOURCE = path.join(
   repositoryRoot(__dirname),
@@ -386,6 +395,59 @@ CASES['GetEnhancements two classes, one refused'] = async (detail) =>
       } as never,
     ),
   );
+
+/** A scan of one package: a program with hits, a node SAP could not load, a target listed without a name. */
+async function scanned(answer: 'objects' | 'lines' | 'snippets') {
+  return runSearchSource(
+    {
+      lineMatch: substringLineMatch,
+      sapAnswers: skipSapAnswers,
+      fetchPackageContents: async (name) =>
+        listing(name, [
+          {
+            name: 'not loaded by SAP',
+            type: 'CLAS/OC',
+            packageName: 'ZPKG',
+            isPackage: false,
+            notLoaded: true,
+          },
+          {
+            name: '',
+            type: 'PROG/P',
+            packageName: 'ZPKG',
+            isPackage: false,
+            uri: '/sap/bc/adt/programs/programs/znameless',
+          },
+          {
+            name: 'ZPROG',
+            type: 'PROG/P',
+            packageName: 'ZPKG',
+            isPackage: false,
+          },
+          {
+            name: 'ZPROG2',
+            type: 'PROG/P',
+            packageName: 'ZPKG',
+            isPackage: false,
+          },
+        ]),
+      sourceReader: sourcesFrom({
+        'PROG:ZPROG': 'one hit\nnone\nhit\ttwo',
+        'PROG:ZPROG2': 'hit',
+      }),
+      resolvePackages: exactPackages,
+    },
+    { query: 'hit', packages: ['ZPKG'], answer },
+  );
+}
+
+// SearchSource's terse rows (`searchSourceRows`), at each answer level.
+for (const answer of ['objects', 'lines', 'snippets'] as const) {
+  CASES[`SearchSource rows at ${answer}`] = async () => ({
+    isError: false,
+    text: searchSourceRows(await scanned(answer)),
+  });
+}
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

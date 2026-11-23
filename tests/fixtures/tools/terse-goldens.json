@@ -250,5 +250,41 @@
   "GetEnhancements two classes, one refused @full": {
     "isError": false,
     "text": "[{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":0,\"enhancements\":[]},{\"object_name\":\"ZCL_GONE\",\"object_type\":\"class\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read enhancements\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+  },
+  "SearchSource rows at objects @terse": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\thits\n# object ZPKG PROG ZPROG\nZPROG\t2\n# object ZPKG PROG ZPROG2\nZPROG2\t1"
+  },
+  "SearchSource rows at objects @medium": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\thits\n# object ZPKG PROG ZPROG\nZPROG\t2\n# object ZPKG PROG ZPROG2\nZPROG2\t1"
+  },
+  "SearchSource rows at objects @full": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\thits\n# object ZPKG PROG ZPROG\nZPROG\t2\n# object ZPKG PROG ZPROG2\nZPROG2\t1"
+  },
+  "SearchSource rows at lines @terse": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\n# object ZPKG PROG ZPROG\nZPROG\t1\nZPROG\t3\n# object ZPKG PROG ZPROG2\nZPROG2\t1"
+  },
+  "SearchSource rows at lines @medium": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\n# object ZPKG PROG ZPROG\nZPROG\t1\nZPROG\t3\n# object ZPKG PROG ZPROG2\nZPROG2\t1"
+  },
+  "SearchSource rows at lines @full": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\n# object ZPKG PROG ZPROG\nZPROG\t1\nZPROG\t3\n# object ZPKG PROG ZPROG2\nZPROG2\t1"
+  },
+  "SearchSource rows at snippets @terse": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\tsnippet\n# object ZPKG PROG ZPROG\nZPROG\t1\tone hit\nZPROG\t3\thit\\ttwo\n# object ZPKG PROG ZPROG2\nZPROG2\t1\thit"
+  },
+  "SearchSource rows at snippets @medium": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\tsnippet\n# object ZPKG PROG ZPROG\nZPROG\t1\tone hit\nZPROG\t3\thit\\ttwo\n# object ZPKG PROG ZPROG2\nZPROG2\t1\thit"
+  },
+  "SearchSource rows at snippets @full": {
+    "isError": false,
+    "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\tsnippet\n# object ZPKG PROG ZPROG\nZPROG\t1\tone hit\nZPROG\t3\thit\\ttwo\n# object ZPKG PROG ZPROG2\nZPROG2\t1\thit"
   }
 }

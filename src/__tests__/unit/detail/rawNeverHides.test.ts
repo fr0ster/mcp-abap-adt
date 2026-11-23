@@ -38,7 +38,8 @@ describe('raw never hides an error', () => {
     const full = await at('full');
     const raw = await at('raw');
     assert.ok((full.answered.content[0]?.text ?? '').includes('"error"'));
-    assert.deepStrictEqual(raw.answered, full.answered);
+    // Full's refusals, answered as an error (Codex round 9).
+    assert.deepStrictEqual(raw.answered, { ...full.answered, isError: true });
     assert.equal(raw.sent, full.sent);
   });
 });

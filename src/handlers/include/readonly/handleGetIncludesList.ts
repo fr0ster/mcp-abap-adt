@@ -43,6 +43,8 @@ import {
   type DetailLevel,
   identityOf,
   type Line,
+  type ListedPart,
+  listedText,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -322,6 +324,23 @@ interface IncludesRead {
 /** What a level answers of one object's tree. */
 type IncludesShown = (read: IncludesRead) => string;
 
+/**
+ * Each answered object's read, by the answer it became: a list call writes
+ * every object's terse text from these through `Written`, never by
+ * splicing the single answers' texts.
+ */
+const readsOf = new WeakMap<McpResult, IncludesRead>();
+
+/** One object's answer at its level, its read kept for a list call. */
+function readAnswer(shown: IncludesShown, read: IncludesRead): McpResult {
+  const result: McpResult = {
+    isError: false,
+    content: [{ type: 'text', text: shown(read) }],
+  };
+  readsOf.set(result, read);
+  return result;
+}
+
 /** The tree as indented rows: name, and `cyclic` or `duplicate` where it is so. */
 function includeRows(node: IncludeNode, depth = 0): Line[] {
   const mark =
@@ -380,24 +399,26 @@ const heldTerse = (read: IncludesRead) => [
   ),
 ];
 
+/** One object's terse text: its `# object` line, unreadable includes and rows. */
+const terseIncludes = (read: IncludesRead) =>
+  Written.text(
+    [
+      { head: 'object', value: `${read.object_type} ${read.object_name}` },
+      ...read.unreadable.map(
+        (entry): Line => ({
+          mark: 'unreadable',
+          words: [unreadableName(entry)],
+        }),
+      ),
+      ...includeRows(read.tree),
+    ],
+    [0],
+  );
+
 // Every node (and, at terse, every unreadable include), or nothing
 // (`completeAnswer`); each identified by what is written.
 const INCLUDES_ANSWERS: AnswerTable<IncludesRead, string> = {
-  terse: completeAnswer('GetIncludesList', heldTerse, (read) =>
-    Written.text(
-      [
-        { head: 'object', value: `${read.object_type} ${read.object_name}` },
-        ...read.unreadable.map(
-          (entry): Line => ({
-            mark: 'unreadable',
-            words: [unreadableName(entry)],
-          }),
-        ),
-        ...includeRows(read.tree),
-      ],
-      [0],
-    ),
-  ),
+  terse: completeAnswer('GetIncludesList', heldTerse, terseIncludes),
   medium: completeAnswer(
     'GetIncludesList',
     (read: IncludesRead) => treeNames(read.tree),
@@ -607,20 +628,12 @@ async function includesListOf(
 
     const tree: IncludeNode = { name: parent.name, children };
 
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: shown({
-            object_name: parent.name,
-            object_type: parent.kind,
-            tree,
-            unreadable,
-          }),
-        },
-      ],
-    };
+    return readAnswer(shown, {
+      object_name: parent.name,
+      object_type: parent.kind,
+      tree,
+      unreadable,
+    });
   } catch (error) {
     logger?.error(`Error getting includes list: ${messageOf(error)}`);
     // A carried method error as it is, a chain failure as it came, a throw
@@ -973,20 +986,12 @@ async function treeFromAnswers(
     }
 
     const tree: IncludeNode = { name: parent.name, children };
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: shown({
-            object_name: parent.name,
-            object_type: parent.kind,
-            tree,
-            unreadable,
-          }),
-        },
-      ],
-    };
+    return readAnswer(shown, {
+      object_name: parent.name,
+      object_type: parent.kind,
+      tree,
+      unreadable,
+    });
   } catch (error) {
     logger?.error(`Error getting includes list: ${messageOf(error)}`);
     return answerCaught(error, { tool: 'GetIncludesList', detail: 'terse' });
@@ -1098,15 +1103,29 @@ function listAnswer(
   level: DetailLevel,
 ): McpResult {
   if (level === 'terse') {
-    const text = results
-      .map((result, i) => {
+    // Every object's text through `Written`: a failure under its escaped
+    // `# object` line and one `# error` line; an answered one as its own
+    // terse writer writes it.
+    const text = listedText(
+      'GetIncludesList',
+      results.map((result, i): ListedPart<IncludesRead> => {
         const asked = objects[i];
-        const body = result.content[0]?.text ?? '';
-        return result.isError
-          ? `# object ${asked?.object_type ?? ''} ${asked?.object_name ?? ''}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
-          : body;
-      })
-      .join('\n');
+        const read = readsOf.get(result);
+        return result.isError || read === undefined
+          ? {
+              heads: [
+                {
+                  head: 'object',
+                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+                },
+              ],
+              error: JSON.stringify(payloadOfAnswer(result)),
+            }
+          : { heads: [], read };
+      }),
+      heldTerse,
+      terseIncludes,
+    );
     return { isError: false, content: [{ type: 'text', text }] };
   }
   const entries = results.map((result, i) => {

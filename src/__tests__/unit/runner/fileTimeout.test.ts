@@ -1,22 +1,24 @@
 /**
- * The per-file bound of the unit run (`--file-timeout <seconds>`): a file
- * whose process runs past it has its process tree ended, is named on stderr
- * with the last test it started, and fails the run; the files after it still
- * run, and the run's end lists every file stopped. A file that ends within
- * the bound is untouched, and its timer is cleared when it ends, so it never
- * stops another file later. Without the option there is no bound, and under a live npm
- * script the option is refused.
+ * The per-file bound of the unit run (`--file-timeout <seconds>`), end to
+ * end through the runner over fixture repositories: a file whose process
+ * runs past it has its whole process tree ended — a grandchild in a session
+ * of its own included —, is named on stderr with the last test it started
+ * once its close is seen, and fails the run; the other files still run, and
+ * the run's end lists every file stopped. Files that end within the bound
+ * are untouched, and a finished file's timer never stops another file. No
+ * file inherits the runner's marker variable. The bound is refused above
+ * 2147483 s, under a live npm script, and for a live or integration file
+ * however `--repo` names it. The parts are tested one by one in
+ * `fileBoundParts.test.ts`.
  *
- * The file that never ends holds an interval that is not unreferenced, and a
- * connection to this test that echoes what it is sent. Once the runner has
- * said it stopped the file, a line sent to it is echoed only by a process
- * still running: a killed one closes the connection instead (the kill is
- * sent before the runner's words can reach this test). A survivor is then
- * told to end, so a runner that does not kill fails this test instead of
+ * A file that never ends holds an interval it does not unreference, and so
+ * does the grandchild it starts; each ends itself after `FALLBACK_MS` and
+ * records it, so a runner that does not end them fails this test instead of
  * hanging it.
  */
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import * as fs from 'node:fs';
 import * as net from 'node:net';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
@@ -33,33 +35,59 @@ import {
 const scratch = temporaryDir('file-timeout-');
 after(() => scratch.remove());
 
-/** Seconds: long enough for the file to start its second test on a slow runner. */
+/** Seconds: long enough for a file to start its test on a slow runner. */
 const BOUND = 10;
+/** When a file or grandchild the runner failed to end ends itself. */
+const FALLBACK_MS = 40_000;
 
-const HANGS = 'src/__tests__/a-hangs.test.ts';
-const FINE = 'src/__tests__/b-fine.test.ts';
+const HANGS_A = 'src/__tests__/a-hangs.test.ts';
+const HANGS_B = 'src/__tests__/b-hangs.test.ts';
+const FINE = 'src/__tests__/c-fine.test.ts';
 
-/** A file whose second test never ends until it hears `go` on `$HOLD_PORT`. */
-const HANGS_SOURCE = [
-  "import { connect } from 'node:net';",
-  "import { it } from 'node:test';",
-  "it('starts first', () => {});",
-  "it('never ends', async () => {",
-  '  const ticks = setInterval(() => {}, 1000);',
-  "  const socket = connect(Number(process.env.HOLD_PORT), '127.0.0.1');",
-  "  socket.on('error', () => undefined);",
-  '  await new Promise<void>((resolve) => {',
-  "    socket.on('data', (data) => {",
-  "      if (String(data).includes('go')) {",
-  '        clearInterval(ticks);',
-  '        socket.destroy();',
-  '        resolve();',
-  '      } else socket.write(data);',
-  '    });',
-  '  });',
-  '});',
+/**
+ * A grandchild (`grandchild.cjs`, plain node): says `grandchild <name>` on
+ * `$HOLD_PORT`, holds an interval, and after the fallback records that it
+ * ended by itself and exits.
+ */
+const GRANDCHILD = [
+  "const { appendFileSync } = require('node:fs');",
+  "const { connect } = require('node:net');",
+  'const name = process.argv[2];',
+  'const ticks = setInterval(() => {}, 1000);',
+  "const socket = connect(Number(process.env.HOLD_PORT), '127.0.0.1');",
+  "socket.on('error', () => undefined);",
+  "socket.write('grandchild ' + name + '\\n');",
+  'setTimeout(() => {',
+  "  appendFileSync(process.env.RECORD, 'grandchild ' + name + ' ended by itself\\n');",
+  '  clearInterval(ticks);',
+  '  socket.destroy();',
+  `}, ${FALLBACK_MS});`,
   '',
 ].join('\n');
+
+/**
+ * A file whose test starts a grandchild in a session (POSIX) or console
+ * (Windows) of its own, then never ends until its fallback.
+ */
+function hangsSource(name: string): string {
+  return [
+    "import { spawn } from 'node:child_process';",
+    "import { appendFileSync } from 'node:fs';",
+    "import { it } from 'node:test';",
+    "it('starts first', () => {});",
+    `it('never ends ${name}', async () => {`,
+    "  const grandchild = spawn(process.execPath, [process.env.GRANDCHILD ?? '', '" +
+      name +
+      "'], { detached: true, stdio: 'ignore' });",
+    '  grandchild.unref();',
+    '  const ticks = setInterval(() => {}, 1000);',
+    `  await new Promise((resolve) => setTimeout(resolve, ${FALLBACK_MS}));`,
+    `  appendFileSync(process.env.RECORD ?? '', '${name} ended by itself\\n');`,
+    '  clearInterval(ticks);',
+    '});',
+    '',
+  ].join('\n');
+}
 
 /** The fixture repository holding `sources`, built. */
 function built(
@@ -72,24 +100,48 @@ function built(
   return repo;
 }
 
+/** The runner over a fixture, in the unit run's environment. */
+function runner(
+  args: readonly string[],
+  set: Readonly<Record<string, string>> = {},
+) {
+  return runTool(
+    'run-tests.mjs',
+    args,
+    environment(set, ['npm_lifecycle_event']),
+  );
+}
+
 describe('the per-file bound', () => {
-  it('ends a file that runs past it, names it and its last test, runs the rest, and fails the run', async (t) => {
+  it('ends two files that run past it, their grandchildren too, names each with its last test, runs the rest, and fails the run', async () => {
     const server = net.createServer();
-    const held = new Promise<net.Socket>((resolve) => {
-      server.once('connection', resolve);
+    const heard: string[] = [];
+    const closes: Promise<void>[] = [];
+    server.on('connection', (socket) => {
+      socket.on('error', () => undefined);
+      closes.push(
+        new Promise((resolve) => {
+          socket.on('close', () => resolve());
+        }),
+      );
+      socket.on('data', (data) => {
+        heard.push(...String(data).split('\n').filter(Boolean));
+      });
     });
     await new Promise<void>((resolve) => {
       server.listen(0, '127.0.0.1', resolve);
     });
-    t.after(() => server.close());
     const address = server.address();
     assert.ok(typeof address === 'object' && address !== null);
     const repo = built('hangs', {
-      [HANGS]: HANGS_SOURCE,
+      [HANGS_A]: hangsSource('a'),
+      [HANGS_B]: hangsSource('b'),
       [FINE]: nodeTestSource('fine', 'NEVER'),
+      'grandchild.cjs': GRANDCHILD,
     });
     const record = path.join(scratch.dir, 'hangs.record');
-    let output = '';
+    let stdout = '';
+    let stderr = '';
     const child = spawn(
       process.execPath,
       [
@@ -97,63 +149,68 @@ describe('the per-file bound', () => {
         '--repo',
         repo,
         '--concurrency',
-        '1',
+        '2',
         '--file-timeout',
         String(BOUND),
         '--test-reporter=tap',
       ],
       {
         cwd: REPO,
-        env: environment({ RECORD: record, HOLD_PORT: String(address.port) }, [
-          'npm_lifecycle_event',
-        ]),
+        env: environment(
+          {
+            RECORD: record,
+            HOLD_PORT: String(address.port),
+            GRANDCHILD: path.join(repo, 'grandchild.cjs'),
+          },
+          ['npm_lifecycle_event'],
+        ),
         stdio: ['ignore', 'pipe', 'pipe'],
       },
     );
     child.stdout.on('data', (chunk) => {
-      output += String(chunk);
+      stdout += String(chunk);
     });
-    const stopped = new Promise<void>((resolve) => {
-      child.stderr.on('data', (chunk) => {
-        output += String(chunk);
-        if (output.includes('was stopped')) resolve();
-      });
+    child.stderr.on('data', (chunk) => {
+      stderr += String(chunk);
     });
-    const exited = new Promise<number>((resolve) => {
-      child.on('close', (code) => resolve(code ?? 1));
+    const code = await new Promise<number>((resolve) => {
+      child.on('close', (status) => resolve(status ?? 1));
     });
-    // A runner that ends before the file connects fails here, not by hanging.
-    const socket = await Promise.race([held, exited.then(() => undefined)]);
-    assert.ok(socket !== undefined, output);
-    socket.on('error', () => undefined);
-    const closed = new Promise<string>((resolve) => {
-      socket.once('close', () => resolve('closed'));
-    });
-    await stopped;
-    const echoed = new Promise<string>((resolve) => {
-      socket.once('data', () => resolve('echoed: the file still runs'));
-    });
-    if (!socket.destroyed) socket.write('alive?');
-    const answer = await Promise.race([closed, echoed]);
-    // A survivor ends by itself, so the runner ends and the case fails.
-    if (answer !== 'closed') socket.write('go');
-    const code = await exited;
-    assert.equal(answer, 'closed', output);
-    assert.equal(code, 1, output);
-    assert.ok(
-      output.includes(
-        `run-tests: ${HANGS} ran past the bound of ${BOUND} s and was stopped; the last test started: never ends`,
-      ),
-      output,
+    // Every grandchild's connection is closed: killed, or ended by itself.
+    await Promise.all(closes);
+    server.close();
+    const both = `stdout:\n${stdout}\nstderr:\n${stderr}`;
+    assert.deepEqual(heard.sort(), ['grandchild a', 'grandchild b'], both);
+    // Nothing ended by itself: the bound ended both files and both
+    // grandchildren; the file after them ran.
+    assert.deepEqual(recorded(record), ['fine'], both);
+    assert.equal(code, 1, both);
+    for (const [file, name] of [
+      [HANGS_A, 'a'],
+      [HANGS_B, 'b'],
+    ]) {
+      assert.ok(
+        stderr.includes(
+          `run-tests: ${file} ran past the bound of ${BOUND} s and was stopped; the last test started: never ends ${name}\n`,
+        ),
+        both,
+      );
+    }
+    const header = `run-tests: 2 files ran past the bound of ${BOUND} s and were stopped:\n`;
+    const at = stderr.indexOf(header);
+    assert.ok(at >= 0, both);
+    assert.deepEqual(
+      stderr
+        .slice(at + header.length)
+        .split('\n')
+        .filter(Boolean)
+        .sort(),
+      [`  ${HANGS_A}`, `  ${HANGS_B}`],
+      both,
     );
-    // The file after it ran, and the run's end names the stopped file.
-    assert.deepEqual(recorded(record), ['fine']);
-    assert.ok(
-      output.includes(
-        `run-tests: 1 file ran past the bound of ${BOUND} s and was stopped:\n  ${HANGS}`,
-      ),
-      output,
-    );
+    // The runner's words are on stderr alone; the reports on stdout.
+    assert.equal(stdout.includes('run-tests:'), false, both);
+    assert.ok(stdout.includes('ok 1 - fine'), both);
   });
 
   it("leaves files that end within it untouched, and clears each file's timer when it ends", () => {
@@ -176,8 +233,7 @@ describe('the per-file bound', () => {
       'src/__tests__/c.test.ts': waits('c'),
     });
     const record = path.join(scratch.dir, 'fine.record');
-    const run = runTool(
-      'run-tests.mjs',
+    const run = runner(
       [
         '--repo',
         repo,
@@ -187,23 +243,46 @@ describe('the per-file bound', () => {
         '15',
         '--test-reporter=tap',
       ],
-      environment({ RECORD: record }, ['npm_lifecycle_event']),
+      { RECORD: record },
     );
     assert.equal(run.status, 0, run.stdout + run.stderr);
     assert.deepEqual(recorded(record), ['a', 'b', 'c']);
     assert.equal(run.stderr.includes('bound'), false, run.stderr);
   });
 
-  it('refuses a bound that is not a positive integer of seconds', () => {
-    for (const value of ['0', '-1', '1.5', 'x', '']) {
-      const run = runTool(
-        'run-tests.mjs',
-        ['--concurrency', '1', '--file-timeout', value, '--list'],
-        environment({}, ['npm_lifecycle_event']),
-      );
+  it("gives no file the marker the runner's own environment holds", () => {
+    const repo = built('marker', { [FINE]: nodeTestSource('fine', 'NEVER') });
+    const marker = path.join(scratch.dir, 'inherited-marker');
+    const record = path.join(scratch.dir, 'marker.record');
+    const run = runner(
+      ['--repo', repo, '--concurrency', '1', '--test-reporter=tap'],
+      { RECORD: record, MCP_ABAP_ADT_STARTED_FILE: marker },
+    );
+    assert.equal(run.status, 0, run.stdout + run.stderr);
+    assert.deepEqual(recorded(record), ['fine']);
+    assert.equal(fs.existsSync(marker), false);
+  });
+
+  it('refuses a bound that is not a positive integer of seconds up to 2147483', () => {
+    for (const value of ['0', '-1', '1.5', 'x', '', '2147484', '99999999999']) {
+      const run = runner([
+        '--concurrency',
+        '1',
+        '--file-timeout',
+        value,
+        '--list',
+      ]);
       assert.equal(run.status, 1, value);
       assert.ok(run.stderr.includes('--file-timeout'), run.stderr);
     }
+    const largest = runner([
+      '--concurrency',
+      '1',
+      '--file-timeout',
+      '2147483',
+      '--list',
+    ]);
+    assert.equal(largest.status, 0, largest.stderr);
   });
 
   it('is refused under a live npm script: a live run has no bound', () => {
@@ -214,5 +293,40 @@ describe('the per-file bound', () => {
     );
     assert.equal(run.status, 1, run.stdout);
     assert.ok(run.stderr.includes('live npm script'), run.stderr);
+  });
+
+  it('is refused for a live or integration file, however --repo names it', () => {
+    const live = 'src/__tests__/integration/x.test.ts';
+    const repo = built('live', { [live]: nodeTestSource('live', 'NEVER') });
+    const compiled = path.join(
+      repo,
+      '.test-build',
+      'tree',
+      'src',
+      '__tests__',
+      'integration',
+      'x.test.js',
+    );
+    const record = path.join(scratch.dir, 'live.record');
+    const run = runner(
+      [
+        '--repo',
+        path.dirname(repo),
+        '--concurrency',
+        '1',
+        '--file-timeout',
+        '60',
+        compiled,
+      ],
+      { RECORD: record },
+    );
+    assert.equal(run.status, 1, run.stdout + run.stderr);
+    assert.ok(
+      run.stderr.includes(
+        '--file-timeout is refused for a live or integration file',
+      ),
+      run.stderr,
+    );
+    assert.deepEqual(recorded(record), []);
   });
 });

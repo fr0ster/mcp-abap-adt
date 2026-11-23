@@ -9,8 +9,11 @@
 export {
   completeAnswer,
   IncompleteAnswerError,
+  type ItemGroup,
+  type ItemRow,
   incompleteAnswerWords,
-  type Rendered,
+  type TreeItemRow,
+  Written,
 } from './complete';
 export {
   type AnswerTable,

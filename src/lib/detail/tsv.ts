@@ -12,26 +12,7 @@
  * so no row reads as a group line. Nothing is dropped or cut.
  */
 
-/** A cell, escaped for one column of one line. */
-function cell(value: string): string {
-  let written = '';
-  for (const character of value) {
-    if (character === '\\') written += '\\\\';
-    else if (character === '\t') written += '\\t';
-    else if (character === '\n') written += '\\n';
-    else if (character === '\r') written += '\\r';
-    else written += character;
-  }
-  return written;
-}
-
-/** One row as a line: its first cell may not read as a group line. */
-function line(row: readonly string[]): string {
-  const cells = row.map(cell);
-  const first = cells[0];
-  if (first?.startsWith('#')) cells[0] = `\\${first}`;
-  return cells.join('\t');
-}
+import { cell, line } from './tsvCells';
 
 /** One row as its line, escaped as in {@link tsv}: for a writer that interleaves its own group lines. */
 export function tsvRow(row: readonly string[]): string {

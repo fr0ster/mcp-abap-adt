@@ -13,40 +13,87 @@ import {
   completeAnswer,
   IncompleteAnswerError,
   incompleteAnswerWords,
+  Written,
 } from '../../../lib/detail';
 import { return_error } from '../../../lib/utils';
 
 const held = (items: readonly string[]) => items;
 
-describe('completeAnswer', () => {
-  it('the items held, each rendered: the answer, unchanged', () => {
-    const shown = completeAnswer('Tool', held, (items: readonly string[]) => ({
-      answer: items.join(','),
-      rendered: [...items],
-    }));
-    assert.equal(shown(['a', 'b', 'a']), 'a,b,a');
+/** The rows of a list of names: each its cell and its identity. */
+const rowsOf = (items: readonly string[]) =>
+  items.map((item) => ({ cells: [item], identity: item }));
+
+describe('completeAnswer over the written rows', () => {
+  it('every item written: the answer, unchanged', () => {
+    const shown = completeAnswer('Tool', held, (items: readonly string[]) =>
+      Written.tsv(['name'], rowsOf(items)),
+    );
+    assert.equal(shown(['a', 'b', 'a']), 'name\na\nb\na');
   });
 
-  for (const [label, rendered] of [
-    ['one dropped', ['a', 'b']],
+  // Codex's mutation (round 5, P1-1): one row fewer handed to the writer,
+  // the full list of identities beside it. The identities are the rows
+  // written, so the claim has nowhere to go: the answer is refused.
+  it('one row fewer to tsv, the full identities claimed: refused', () => {
+    const claimed = ['a', 'b', 'a'];
+    const shown = completeAnswer('Tool', held, (items: readonly string[]) => {
+      const written = Written.tsv(['name'], rowsOf(items.slice(1)));
+      void claimed;
+      return written;
+    });
+    assert.throws(
+      () => shown(claimed),
+      (thrown: unknown) =>
+        thrown instanceof IncompleteAnswerError &&
+        thrown.message === incompleteAnswerWords('Tool') &&
+        thrown.message.includes("detail: 'full'"),
+    );
+  });
+
+  for (const [label, written] of [
     ['two merged', ['a', 'b']],
     ['one missed and another doubled', ['a', 'a', 'a']],
     ['one added', ['a', 'b', 'a', 'c']],
   ] as const) {
     it(`${label}: refused in fixed words naming the tool`, () => {
-      const shown = completeAnswer('Tool', held, () => ({
-        answer: 'partial',
-        rendered,
-      }));
-      assert.throws(
-        () => shown(['a', 'b', 'a']),
-        (thrown: unknown) =>
-          thrown instanceof IncompleteAnswerError &&
-          thrown.message === incompleteAnswerWords('Tool') &&
-          thrown.message.includes("detail: 'full'"),
+      const shown = completeAnswer('Tool', held, () =>
+        Written.tsv(['name'], rowsOf(written)),
       );
+      assert.throws(() => shown(['a', 'b', 'a']), IncompleteAnswerError);
     });
   }
+
+  it('a plain claim is no written answer: it does not compile', () => {
+    // @ts-expect-error a formatter's own claim is not `Written`.
+    completeAnswer('Tool', held, () => ({ answer: '', identities: [] }));
+  });
+
+  it('the JSON writers read the items from the answer itself', () => {
+    const list = Written.list(
+      { objects: [{ name: 'a' }, { name: 'b' }] },
+      (answer) => answer.objects,
+      (o) => o.name,
+    );
+    assert.deepStrictEqual(list.identities, ['a', 'b']);
+    const tree = Written.tree(
+      { name: 'r', children: [{ name: 'c', children: [] }] },
+      (answer) => answer,
+      (node) => node.children,
+      (node, depth) => `${depth}|${node.name}`,
+      false,
+    );
+    assert.deepStrictEqual(tree.identities, ['1|c']);
+  });
+
+  it('plain lines carry no item; written parts carry theirs, in order', () => {
+    const written = Written.lines([
+      '# head',
+      Written.row(['x'], 'x'),
+      Written.marked('incomplete', ['type=T'], 'i'),
+    ]);
+    assert.equal(written.answer, '# head\nx\n# incomplete type=T');
+    assert.deepStrictEqual(written.identities, ['x', 'i']);
+  });
 });
 
 describe('the answer boundary answers an incomplete answer as its error', () => {

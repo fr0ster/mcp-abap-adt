@@ -1,18 +1,41 @@
 /**
- * `detail: 'raw'` is what ADT sent. A tool that makes one read answers that
- * document as it came; a tool that assembles several reads answers a JSON
- * array of the documents, in the order they were read, each as ADT sent it —
- * no parse, no projection, nothing of ours mixed in (the owner's ruling,
- * Codex round 4).
+ * `detail: 'raw'` is what ADT sent. The shape belongs to the tool, not to
+ * the call (the owner's ruling, Codex round 5): a tool that makes one read
+ * answers that document as it came; a tool that assembles reads answers a
+ * JSON array of the documents, in the order they were read, each as ADT
+ * sent it — even when a call made one read — no parse, no projection,
+ * nothing of ours mixed in.
  *
  * The documents are the bodies the call's connection answered while the
- * call ran (`recordedWire`): the reads the tool made, batch envelopes
- * included as they came. A call on one connection is strictly sequential
- * (one session, one flow), so the bodies recorded are this call's.
+ * call ran (`recordedWire`): every document SAP answered (a `2xx`) to the
+ * call's requests, batch envelopes included as they came; a refused
+ * request's body is no document, so a refused read shows as the document
+ * missing. A call on one connection is strictly sequential
+ * (one session, one flow), so the bodies recorded are this call's. A body
+ * the connection hands over as text is recorded as it is, bytes decoded as
+ * UTF-8; one it hands over as an object (a JSON answer the HTTP client
+ * already parsed) is recorded as its JSON text — never as `String()` writes
+ * an object.
+ *
+ * Raw never hides an error: a call the tool refuses at `full`, or answers
+ * with an error explained inside it (an entry's `error`, a `failures`
+ * list), is answered at `raw` exactly as `full` answers it.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { bodyTextOf } from '../wireValue';
+import { type JsonValue, parseJson } from '../json';
+
+/**
+ * A body as the connection gave it, as text: text as it is, bytes as
+ * UTF-8, an object as its JSON text, nothing as `''`. The body comes from
+ * outside the type system, so it is told apart here.
+ */
+export function recordedBody(data: unknown): string {
+  if (typeof data === 'string') return data;
+  if (data === undefined || data === null) return '';
+  if (data instanceof Uint8Array) return new TextDecoder().decode(data);
+  return JSON.stringify(data) ?? '';
+}
 
 /** What `run` answered, and every body the connection answered meanwhile, in order. */
 export async function recordedWire<R>(
@@ -24,7 +47,11 @@ export async function recordedWire<R>(
   const original = connection.makeAdtRequest;
   connection.makeAdtRequest = async (...request) => {
     const answered = await original.apply(connection, request);
-    documents.push(bodyTextOf(answered));
+    // A document SAP answered: a refusal (a status outside 2xx) is not a
+    // document read, and shows in the array as the document missing.
+    if (answered.status >= 200 && answered.status < 300) {
+      documents.push(recordedBody(answered.data));
+    }
     return answered;
   };
   try {
@@ -35,10 +62,15 @@ export async function recordedWire<R>(
   }
 }
 
-/** How a tool's reads stand: one document, or several assembled. */
+/** A tool's raw shape: one document, or the array of the documents it assembles. */
 export type WireShape = 'one' | 'assembled';
 
-/** The raw answer of what ADT sent: the one document, or the array of them. */
+/** The words of a one-read tool whose call read another number of documents. */
+export function notOneDocumentWords(tool: string, read: number): string {
+  return `${tool}: raw answers the one document this tool reads, and the call read ${read}`;
+}
+
+/** The raw text of what ADT sent: the one document, or the array of them. */
 export function wireText(
   documents: readonly string[],
   shape: WireShape,
@@ -48,24 +80,69 @@ export function wireText(
 
 /** An answer of the MCP tool shape: what a raw answer replaces the text of. */
 interface ToolAnswer {
-  isError?: boolean | undefined;
-  content: Array<{ type: string; text?: string }>;
+  isError: boolean;
+  content: Array<{ type: 'text'; text: string }>;
+}
+
+/** Whether a JSON value explains an error inside it: a member `error`, or a non-empty `failures`. */
+function explainsError(value: JsonValue): boolean {
+  if (Array.isArray(value)) return value.some(explainsError);
+  if (value === null || typeof value !== 'object') return false;
+  for (const [key, member] of Object.entries(value)) {
+    if (key === 'error') return true;
+    if (key === 'failures' && Array.isArray(member) && member.length > 0) {
+      return true;
+    }
+    if (explainsError(member)) return true;
+  }
+  return false;
+}
+
+/** Whether a tool's answer refuses, or explains an error inside it. */
+function refusesOrExplains(answer: ToolAnswer): boolean {
+  if (answer.isError === true) return true;
+  return answer.content.some((part) => {
+    const json = parseJson(part.text);
+    return json !== undefined && explainsError(json);
+  });
+}
+
+/** Which tool answers, and its raw shape. */
+export interface WireOf {
+  readonly connection: IAbapConnection;
+  readonly tool: string;
+  readonly shape: WireShape;
 }
 
 /**
  * The tool's answer at `raw`: `run` (the tool at `full`, on the recording
- * connection) answered, and on success its text is what ADT sent. A failure
- * is answered as it is.
+ * connection) answered, and its text is what ADT sent. A call `full`
+ * refuses or explains an error in is answered as `full` answers it; a
+ * one-read tool whose call read another number of documents is an error.
  */
-export async function wireAnswer<A extends ToolAnswer>(
-  connection: IAbapConnection,
-  shape: WireShape,
-  run: () => Promise<A>,
-): Promise<A> {
-  const { result, documents } = await recordedWire(connection, run);
-  if (result.isError === true) return result;
+export async function wireAnswer(
+  of: WireOf,
+  run: () => Promise<ToolAnswer>,
+): Promise<ToolAnswer> {
+  const { result, documents } = await recordedWire(of.connection, run);
+  if (refusesOrExplains(result)) return result;
+  if (of.shape === 'one' && documents.length !== 1) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            error: 'raw_shape',
+            tool: of.tool,
+            message: notOneDocumentWords(of.tool, documents.length),
+          }),
+        },
+      ],
+    };
+  }
   return {
     ...result,
-    content: [{ type: 'text', text: wireText(documents, shape) }],
+    content: [{ type: 'text', text: wireText(documents, of.shape) }],
   };
 }

@@ -35,7 +35,10 @@ export {
   tsvRow,
 } from './tsv';
 export {
+  notOneDocumentWords,
+  recordedBody,
   recordedWire,
+  type WireOf,
   type WireShape,
   wireAnswer,
   wireText,

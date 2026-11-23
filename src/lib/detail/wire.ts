@@ -19,9 +19,12 @@
  * already parsed) is recorded as its JSON text — never as `String()` writes
  * an object.
  *
- * Raw never hides an error: a call the tool refuses at `full`, or answers
- * with an error explained inside it (an entry's `error`, a `failures`
- * list), is answered at `raw` exactly as `full` answers it.
+ * Raw never hides a failed exchange: a call whose exchange failed (a
+ * refusal, no response) and that the tool refuses at `full`, or that full
+ * answers with an error explained inside it (an entry's `error`, a
+ * `failures` list), is answered at `raw` exactly as `full` answers it. On a
+ * parse failure — every exchange answered, our reading refused it — raw
+ * still answers the documents.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
@@ -59,8 +62,11 @@ function thrownResponse(thrown: unknown): WireResponse | undefined {
 export async function recordedWire<R>(
   connection: IAbapConnection,
   run: () => Promise<R>,
-): Promise<{ result: R; documents: WireResponse[] }> {
+): Promise<{ result: R; documents: WireResponse[]; unanswered: number }> {
   const documents: WireResponse[] = [];
+  // Requests that failed with no response of SAP's (a timeout, an abort, a
+  // refusal of the connection's own).
+  let unanswered = 0;
   const own = Object.hasOwn(connection, 'makeAdtRequest');
   const original = connection.makeAdtRequest;
   connection.makeAdtRequest = async (...request) => {
@@ -71,6 +77,7 @@ export async function recordedWire<R>(
       // A refusal the connection throws: its response, as it came.
       const response = thrownResponse(thrown);
       if (response !== undefined) documents.push(response);
+      else unanswered += 1;
       throw thrown;
     }
     documents.push({
@@ -80,7 +87,7 @@ export async function recordedWire<R>(
     return answered;
   };
   try {
-    return { result: await run(), documents };
+    return { result: await run(), documents, unanswered };
   } finally {
     if (own) connection.makeAdtRequest = original;
     else Reflect.deleteProperty(connection, 'makeAdtRequest');
@@ -173,8 +180,21 @@ export async function wireAnswer(
   of: WireOf,
   run: () => Promise<ToolAnswer>,
 ): Promise<ToolAnswer> {
-  const { result, documents } = await recordedWire(of.connection, run);
-  if (refusesOrExplains(result)) return result;
+  const { result, documents, unanswered } = await recordedWire(
+    of.connection,
+    run,
+  );
+  // The exchange itself failed — a refusal, no response — or full explains
+  // an error inside its answer: raw gives the same answer. A call whose
+  // every exchange SAP answered but whose parse failed (a `200` that is no
+  // outline) still gives the documents: raw is what ADT sent.
+  const exchangeFailed =
+    unanswered > 0 ||
+    documents.some(
+      (document) => document.status < 200 || document.status >= 300,
+    );
+  const parseFailed = result.isError && !exchangeFailed && documents.length > 0;
+  if (!parseFailed && refusesOrExplains(result)) return result;
   const failure =
     of.explainedBy === undefined
       ? undefined
@@ -208,8 +228,11 @@ export async function wireAnswer(
       ],
     };
   }
+  // What ADT sent, answered as it came: a success, the parse's failure
+  // being full's to explain.
   return {
     ...result,
+    isError: false,
     content: [{ type: 'text', text: wireText(documents, of.shape) }],
   };
 }

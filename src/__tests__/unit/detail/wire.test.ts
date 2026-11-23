@@ -146,6 +146,43 @@ describe('raw is what ADT sent', () => {
     });
   }
 
+  // The owner's ruling (Codex round 7): raw and full give the same error
+  // when the exchange itself failed; on a parse failure — every exchange
+  // answered — raw still gives the documents.
+  it('a parse failure after answered exchanges: raw gives the documents', async () => {
+    const connection = recordingConnection([{ data: '<html/>' }]);
+    const answered = await wireAnswer(
+      { connection, tool: 'Tool', shape: 'one' },
+      async () => {
+        await connection.makeAdtRequest(get('/one'));
+        return {
+          isError: true,
+          content: [
+            { type: 'text' as const, text: '{"error":"not an outline"}' },
+          ],
+        };
+      },
+    );
+    assert.equal(answered.isError, false);
+    assert.equal(answered.content[0]?.text, '<html/>');
+  });
+
+  it('a refused exchange: raw gives the same error as full', async () => {
+    const connection = recordingConnection([{ status: 500, data: 'refused' }]);
+    const failure = {
+      isError: true,
+      content: [{ type: 'text' as const, text: '{"error":"refused"}' }],
+    };
+    const answered = await wireAnswer(
+      { connection, tool: 'Tool', shape: 'assembled' },
+      async () => {
+        await connection.makeAdtRequest(get('/one'));
+        return failure;
+      },
+    );
+    assert.equal(answered, failure);
+  });
+
   it('a one-read tool whose call read two documents: an error, not the first', async () => {
     const connection = recordingConnection([
       { data: '<a/>' },

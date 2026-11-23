@@ -38,7 +38,10 @@ beforeEach(() => {
 const create = mock.method(
   createConnectionModule,
   'createConnection',
-  (_spec: createConnectionModule.ConnectionSpec) => ({}),
+  // A connection's request member: the factory decodes its bodies.
+  (_spec: createConnectionModule.ConnectionSpec) => ({
+    makeAdtRequest: async () => ({ status: 200, data: '', headers: {} }),
+  }),
 );
 
 const rfcConfig = {

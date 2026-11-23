@@ -107,14 +107,15 @@ export async function recordedWire<R>(
 }
 
 /**
- * The statuses of a batch envelope's inner parts: each part's status line,
- * `HTTP/1.x NNN …`, read line by line. Each is that read's answer.
+ * The statuses of a batch envelope's inner parts: each part's status line
+ * (the protocol name, a space, a three-digit code), read line by line. Each
+ * is that read's answer.
  */
 export function partStatuses(body: string): number[] {
   const statuses: number[] = [];
   for (const line of body.split('\n')) {
-    if (!line.startsWith('HTTP/1.')) continue;
-    const code = line.split(' ')[1] ?? '';
+    const [protocol = '', code = ''] = line.split(' ');
+    if (!protocol.startsWith('HTTP')) continue;
     if (code.length === 3 && Number.isInteger(Number(code))) {
       statuses.push(Number(code));
     }

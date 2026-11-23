@@ -32,6 +32,7 @@ import {
   stateSystemKind,
 } from './systemKind';
 import { child, childAt, entries } from './thrownValue';
+import { wireResponseOf } from './wireResponse';
 import { wireValueOf } from './wireValue';
 
 export type { AbapSystemKind } from './systemKind';
@@ -257,22 +258,25 @@ export function withDecodedBodies<T extends IAbapConnection>(connection: T): T {
         ? { ...answer, data: new TextDecoder().decode(answer.data) }
         : answer;
     } catch (thrown) {
-      // A thrown value is outside the type system: its response read by
-      // its fields, and its bytes decoded in place.
-      const response =
-        typeof thrown === 'object' && thrown !== null
-          ? Reflect.get(thrown, 'response')
-          : undefined;
-      if (typeof response === 'object' && response !== null) {
-        const data = Reflect.get(response, 'data');
-        if (data instanceof Uint8Array) {
-          Reflect.set(response, 'data', new TextDecoder().decode(data));
-        }
-      }
+      // A thrown value is outside the type system: its response read as a
+      // wire answer, and its bytes decoded in place on the thrown object.
+      decodeThrownBody(thrown);
       throw thrown;
     }
   };
   return connection;
+}
+
+/** A thrown request failure's response body decoded to UTF-8 in place, when it is bytes. */
+function decodeThrownBody(thrown: unknown): void {
+  if (typeof thrown !== 'object' || thrown === null) return;
+  const response = wireResponseOf(Reflect.get(thrown, 'response'));
+  if (response === undefined || !(response.data instanceof Uint8Array)) return;
+  Reflect.set(
+    Reflect.get(thrown, 'response'),
+    'data',
+    new TextDecoder().decode(response.data),
+  );
 }
 
 function withHttpWireLog<T extends IAbapConnection>(connection: T): T {

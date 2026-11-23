@@ -54,7 +54,7 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  type Rendered,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -126,8 +126,7 @@ interface DescribedItem {
 }
 
 /** An object asked for, by its name and type. */
-const askedIdentity = ({ obj }: DescribedItem) =>
-  `object|${obj.name}|${obj.type ?? ''}`;
+const askedIdentity = ({ obj }: DescribedItem) => `object|${obj.name}`;
 
 /** Every object asked for, by its identity. */
 const heldAsked = (items: readonly DescribedItem[]) => items.map(askedIdentity);
@@ -140,58 +139,82 @@ const heldAsked = (items: readonly DescribedItem[]) => items.map(askedIdentity);
 const fullDescribed = completeAnswer(
   'DescribeByList',
   heldAsked,
-  (items: readonly DescribedItem[]): Rendered<McpResult> => {
-    const rendered: string[] = [];
-    const content = items.map((item) => {
-      rendered.push(askedIdentity(item));
-      return item.described.entry;
-    });
-    return { answer: { isError: false, content }, rendered };
-  },
+  // The objects read from the entries written: each names its object.
+  (items: readonly DescribedItem[]): Written<McpResult> =>
+    Written.list(
+      { isError: false, content: items.map((item) => item.described.entry) },
+      (answer) => answer.content,
+      (entry) => {
+        const written = parseJson(entry.text);
+        return written !== null &&
+          typeof written === 'object' &&
+          !Array.isArray(written) &&
+          typeof written.name === 'string'
+          ? `object|${written.name}`
+          : '';
+      },
+    ),
 );
 
 /**
  * What DescribeByList answers at each `detail`, selected before the
- * searches (`src/lib/detail`): terse one TSV — one header, each object's
- * rows (name, type, description, package), `NAME\t-` for an object no
- * search found, `# error NAME` and its failure for a refused one; medium and
+ * searches (`src/lib/detail`): terse one TSV — one header, the rows of
+ * each object SAP described (name, type, description, package), `# error
+ * NAME` and its failure for a refused one, and nothing for a name SAP did
+ * not describe (terse lists what SAP returned); medium and
  * full one content entry per object asked ({@link fullDescribed}). The
  * answer is built from several searches, so raw never reaches this table:
  * the handler answers it as the wire documents (`wireAnswer`). Every level
  * answers every object asked, or nothing (`completeAnswer`).
  */
+/** The hit rows a search answered for an object: SAP's description of it, if any. */
+const hitRowsOf = ({ described }: DescribedItem) =>
+  (described.hits ?? '')
+    .split('\n')
+    .slice(1)
+    .filter((row) => row !== '');
+
+/**
+ * Every object SAP answered for at terse: one it described, or one whose
+ * search it refused. A name SAP did not describe is no item: terse does not
+ * say what is absent (the owner's rule) — medium and full do.
+ */
+const heldAnswered = (items: readonly DescribedItem[]) =>
+  items
+    .filter(
+      (item) =>
+        item.described.failure !== undefined || hitRowsOf(item).length > 0,
+    )
+    .map(askedIdentity);
+
 const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
   terse: completeAnswer(
     'DescribeByList',
-    heldAsked,
-    (items: readonly DescribedItem[]): Rendered<McpResult> => {
-      const lines = ['name\ttype\tdescription\tpackage'];
-      const rendered: string[] = [];
-      for (const item of items) {
-        const { obj, described } = item;
-        if (described.failure !== undefined) {
-          lines.push(
-            `# error ${obj.name} ${JSON.stringify(described.failure)}`,
-          );
-          rendered.push(askedIdentity(item));
-          continue;
-        }
-        const rows = (described.hits ?? '')
-          .split('\n')
-          .slice(1)
-          .filter((row) => row !== '');
-        if (rows.length === 0) lines.push(`${obj.name}\t-\t\t`);
-        else lines.push(...rows);
-        rendered.push(askedIdentity(item));
-      }
-      return {
-        answer: {
-          isError: false,
-          content: [{ type: 'text', text: lines.join('\n') }],
-        },
-        rendered,
-      };
-    },
+    heldAnswered,
+    (items: readonly DescribedItem[]): Written<McpResult> =>
+      Written.asText(
+        Written.lines([
+          'name\ttype\tdescription\tpackage',
+          ...items.flatMap((item) => {
+            const { obj, described } = item;
+            if (described.failure !== undefined) {
+              return [
+                Written.marked(
+                  'error',
+                  [obj.name, JSON.stringify(described.failure)],
+                  askedIdentity(item),
+                ),
+              ];
+            }
+            // The search's own hit rows (SearchObject's guarded writer); an
+            // object SAP did not describe has none, and no line.
+            const [first, ...rest] = hitRowsOf(item);
+            return first === undefined
+              ? []
+              : [Written.block([first, ...rest], askedIdentity(item))];
+          }),
+        ]),
+      ),
   ),
   medium: fullDescribed,
   full: fullDescribed,

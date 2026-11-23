@@ -39,7 +39,9 @@ async function describe_(detail?: 'terse' | 'medium' | 'full') {
 }
 
 describe('DescribeByList detail', () => {
-  it('terse, by default: one header, a row per object, - for none found', async () => {
+  // Terse lists what SAP returned (the owner's rule): no row only to say a
+  // name asked for was not described — medium and full say it.
+  it('terse, by default: one header, the rows SAP described, none for a name it did not', async () => {
     const result = await describe_();
     assert.equal(result.content.length, 1);
     assert.equal(
@@ -47,7 +49,6 @@ describe('DescribeByList detail', () => {
       [
         'name\ttype\tdescription\tpackage',
         'ZCL_A\tCLAS/OC\tA class\tZPKG',
-        'ZNONE\t-\t\t',
       ].join('\n'),
     );
   });

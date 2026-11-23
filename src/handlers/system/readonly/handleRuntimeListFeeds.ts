@@ -34,6 +34,7 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
+  type DetailLevel,
   identityOf,
   type ListedPart,
   listedText,
@@ -909,32 +910,57 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
-/** A list call's answer: one entry per feed, in the order asked. */
+/** What a list call answers from: the entries asked, and each one's answer. */
+interface ListOf {
+  readonly feedTypes: readonly string[];
+  readonly results: readonly McpResult[];
+}
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written through `Written`, the other
+ * levels a JSON array of the entries.
+ */
+const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+  terse: terseList,
+  medium: jsonList,
+  full: jsonList,
+  raw: jsonList,
+};
+
+/** A list call's answer: one entry per asked, in the order asked, at the level asked. */
 function listAnswer(
   feedTypes: readonly string[],
   results: readonly McpResult[],
-  terse: boolean,
+  level: DetailLevel,
 ): McpResult {
-  if (terse) {
-    // Every feed's text through `Written`: a failure under its escaped
-    // `# feed` line and one `# error` line; an answered one as its own
-    // terse writer writes it.
-    const text = listedText(
-      'RuntimeListFeeds',
-      results.map((result, i): ListedPart<FeedShown> => {
-        const read = readsOf.get(result);
-        return result.isError || read === undefined
-          ? {
-              heads: [{ head: 'feed', value: feedTypes[i] ?? '' }],
-              error: JSON.stringify(payloadOfAnswer(result)),
-            }
-          : { heads: [], read };
-      }),
-      heldFeedItems,
-      terseFeedText,
-    );
-    return { isError: false, content: [{ type: 'text', text }] };
-  }
+  return answerAt(LIST_ANSWERS, level)({ feedTypes, results });
+}
+
+/** A list call's terse text. */
+function terseList({ feedTypes, results }: ListOf): McpResult {
+  // Every feed's text through `Written`: a failure under its escaped
+  // `# feed` line and one `# error` line; an answered one as its own
+  // terse writer writes it.
+  const text = listedText(
+    'RuntimeListFeeds',
+    results.map((result, i): ListedPart<FeedShown> => {
+      const read = readsOf.get(result);
+      return result.isError || read === undefined
+        ? {
+            heads: [{ head: 'feed', value: feedTypes[i] ?? '' }],
+            error: JSON.stringify(payloadOfAnswer(result)),
+          }
+        : { heads: [], read };
+    }),
+    heldFeedItems,
+    terseFeedText,
+  );
+  return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** A list call's entries as a JSON array. */
+function jsonList({ feedTypes, results }: ListOf): McpResult {
   const entries = results.map((result, i) =>
     result.isError
       ? { feed_type: feedTypes[i], error: payloadOfAnswer(result) }
@@ -981,7 +1007,6 @@ async function answeredRuntimeListFeeds(
 ) {
   const ctx = { tool: 'RuntimeListFeeds', detail: detailOf(args) };
   const shown = answerAt(FEED_ANSWERS, levelOf(args));
-  const terse = levelOf(args) === 'terse';
   const listed = args?.feed_types;
   if (listed === undefined) {
     if (!PAGED_FEEDS.has(String(args?.feed_type))) {
@@ -1025,7 +1050,7 @@ async function answeredRuntimeListFeeds(
         );
         return 'ended' in outcome
           ? outcome.ended
-          : listAnswer(listed, outcome.answers, terse);
+          : listAnswer(listed, outcome.answers, levelOf(args));
       } catch (error) {
         if (failureOf(error) === undefined) throw error;
         return answerThrown(error, ctx);
@@ -1040,7 +1065,7 @@ async function answeredRuntimeListFeeds(
         if (endsList(result)) return result;
         results.push(result);
       }
-      return listAnswer(listed, results, terse);
+      return listAnswer(listed, results, levelOf(args));
     },
   );
 }

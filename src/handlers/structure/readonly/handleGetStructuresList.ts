@@ -1198,32 +1198,57 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
-/** A list call's answer: one entry per structure, in the order asked. */
+/** What a list call answers from: the entries asked, and each one's answer. */
+interface ListOf {
+  readonly names: readonly string[];
+  readonly results: readonly McpResult[];
+}
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written through `Written`, the other
+ * levels a JSON array of the entries.
+ */
+const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+  terse: terseList,
+  medium: jsonList,
+  full: jsonList,
+  raw: jsonList,
+};
+
+/** A list call's answer: one entry per asked, in the order asked, at the level asked. */
 function listAnswer(
   names: readonly string[],
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
-  if (level === 'terse') {
-    // Every structure's text through `Written`: a failure under its escaped
-    // `# structure` line and one `# error` line; an answered one as its own
-    // terse writer writes it.
-    const text = listedText(
-      'GetStructuresList',
-      results.map((result, i): ListedPart<StructuresRead> => {
-        const read = readsOf.get(result);
-        return result.isError || read === undefined
-          ? {
-              heads: [{ head: 'structure', value: names[i] ?? '' }],
-              error: JSON.stringify(payloadOfAnswer(result)),
-            }
-          : { heads: [], read };
-      }),
-      heldStructures,
-      terseStructures,
-    );
-    return { isError: false, content: [{ type: 'text', text }] };
-  }
+  return answerAt(LIST_ANSWERS, level)({ names, results });
+}
+
+/** A list call's terse text. */
+function terseList({ names, results }: ListOf): McpResult {
+  // Every structure's text through `Written`: a failure under its escaped
+  // `# structure` line and one `# error` line; an answered one as its own
+  // terse writer writes it.
+  const text = listedText(
+    'GetStructuresList',
+    results.map((result, i): ListedPart<StructuresRead> => {
+      const read = readsOf.get(result);
+      return result.isError || read === undefined
+        ? {
+            heads: [{ head: 'structure', value: names[i] ?? '' }],
+            error: JSON.stringify(payloadOfAnswer(result)),
+          }
+        : { heads: [], read };
+    }),
+    heldStructures,
+    terseStructures,
+  );
+  return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** A list call's entries as a JSON array. */
+function jsonList({ names, results }: ListOf): McpResult {
   const entries = results.map((result, i) =>
     result.isError
       ? { structure_name: names[i], error: payloadOfAnswer(result) }

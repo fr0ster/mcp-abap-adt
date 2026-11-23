@@ -768,6 +768,59 @@ async function secondPass(
   return succeeded(out);
 }
 
+/** One parent's list, or its walk's failure. */
+type ParentOutcome =
+  | { readonly list: ParentList }
+  | {
+      readonly parent_name: string | undefined;
+      readonly parent_type: string | undefined;
+      readonly error: FailureEntry;
+    };
+
+/** What a list call answers from: each parent's outcome, and its level's answer. */
+interface ParentLists {
+  readonly outcomes: readonly ParentOutcome[];
+  readonly shown: (list: ParentList) => string | object;
+}
+
+/** A list call's entries. */
+const jsonParents = ({ outcomes, shown }: ParentLists) =>
+  outcomes.map((outcome) =>
+    'list' in outcome ? shown(outcome.list) : outcome,
+  );
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written through `Written`, a failed
+ * walk under its escaped `# parent` line and one `# error` line; the other
+ * levels the entries.
+ */
+const PARENT_LISTS: AnswerTable<ParentLists, string | object> = {
+  terse: ({ outcomes }) =>
+    listedText(
+      'GetObjectsList',
+      outcomes.map(
+        (outcome): ListedPart<ParentList> =>
+          'list' in outcome
+            ? { heads: [], read: outcome.list }
+            : {
+                heads: [
+                  {
+                    head: 'parent',
+                    value: `${outcome.parent_type ?? ''} ${outcome.parent_name ?? ''}`,
+                  },
+                ],
+                error: JSON.stringify(outcome.error),
+              },
+      ),
+      (list) => list.objects.map(terseIdentity),
+      (list) => parentRows(list, false),
+    ),
+  medium: jsonParents,
+  full: jsonParents,
+  raw: jsonParents,
+};
+
 /**
  * The tool's answer; at `raw` what ADT sent — the documents the call's
  * reads answered, read with the tool at full (`wireAnswer`).
@@ -876,33 +929,8 @@ async function answeredGetObjectsList(
             ? { list: { ...asked, objects: walk.getResult().value } }
             : { ...asked, error: failureOfWalk(walk) };
         });
-        // At terse each parent's list is text written through `Written`:
-        // one text, a failed walk under its escaped `# parent` line and one
-        // `# error` line; at the other levels the entries.
-        if (level === 'terse') {
-          return listedText(
-            'GetObjectsList',
-            outcomes.map(
-              (outcome): ListedPart<ParentList> =>
-                'list' in outcome
-                  ? { heads: [], read: outcome.list }
-                  : {
-                      heads: [
-                        {
-                          head: 'parent',
-                          value: `${outcome.parent_type ?? ''} ${outcome.parent_name ?? ''}`,
-                        },
-                      ],
-                      error: JSON.stringify(outcome.error),
-                    },
-            ),
-            (list) => list.objects.map(terseIdentity),
-            (list) => parentRows(list, false),
-          );
-        }
-        return outcomes.map((outcome) =>
-          'list' in outcome ? shown(outcome.list) : outcome,
-        );
+        // Through the list table, like every other answer.
+        return answerAt(PARENT_LISTS, level)({ outcomes, shown });
       },
     );
   }

@@ -924,11 +924,29 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
+/** What a list call answers from: the entries asked, and each one's answer. */
+interface ListOf {
+  readonly objects: ReadonlyArray<{
+    readonly object_name: string;
+    readonly object_type: string;
+  }>;
+  readonly targets: readonly WhereUsedArgs[];
+  readonly results: readonly McpResult[];
+}
+
 /**
- * A list call's answer: one entry per object, in the order asked — at terse
- * one text, each object's answer under its `# object TYPE NAME` line (a
- * failure as `# error` and its payload), at the other levels a JSON array.
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written through `Written`, the other
+ * levels a JSON array of the entries.
  */
+const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+  terse: terseList,
+  medium: jsonList,
+  full: jsonList,
+  raw: jsonList,
+};
+
+/** A list call's answer: one entry per asked, in the order asked, at the level asked. */
 function listAnswer(
   objects: ReadonlyArray<{
     readonly object_name: string;
@@ -938,31 +956,38 @@ function listAnswer(
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
-  if (level === 'terse') {
-    // Every object's text written through `Written`: its name escaped in
-    // its `# object` line, its usages as the single answer's rows, a
-    // failure as one escaped `# error` line — a name cannot add a row.
-    const reads = targets.map((target) => readsOf.get(target));
-    const text = listedText(
-      'GetWhereUsed',
-      results.map((result, i): ListedPart<WhereUsedRead> => {
-        const asked = objects[i];
-        const heads = [
-          {
-            head: 'object',
-            value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
-          },
-        ];
-        const read = reads[i];
-        return result.isError || read === undefined
-          ? { heads, error: JSON.stringify(payloadOfAnswer(result)) }
-          : { heads, read };
-      }),
-      heldUsages,
-      (read) => whereUsedRows(read.result),
-    );
-    return { isError: false, content: [{ type: 'text', text }] };
-  }
+  return answerAt(LIST_ANSWERS, level)({ objects, targets, results });
+}
+
+/** A list call's terse text. */
+function terseList({ objects, targets, results }: ListOf): McpResult {
+  // Every object's text written through `Written`: its name escaped in
+  // its `# object` line, its usages as the single answer's rows, a
+  // failure as one escaped `# error` line — a name cannot add a row.
+  const reads = targets.map((target) => readsOf.get(target));
+  const text = listedText(
+    'GetWhereUsed',
+    results.map((result, i): ListedPart<WhereUsedRead> => {
+      const asked = objects[i];
+      const heads = [
+        {
+          head: 'object',
+          value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+        },
+      ];
+      const read = reads[i];
+      return result.isError || read === undefined
+        ? { heads, error: JSON.stringify(payloadOfAnswer(result)) }
+        : { heads, read };
+    }),
+    heldUsages,
+    (read) => whereUsedRows(read.result),
+  );
+  return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** A list call's entries as a JSON array. */
+function jsonList({ objects, targets, results }: ListOf): McpResult {
   const entries = results.map((result, i) => {
     const asked = objects[i];
     return result.isError

@@ -38,6 +38,7 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
+  type DetailLevel,
   identityOf,
   type Line,
   type ListedPart,
@@ -1892,41 +1893,69 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
-/** A list call's answer: one entry per object, in the order asked. */
+/** What a list call answers from: the entries asked, and each one's answer. */
+interface ListOf {
+  readonly objects: ReadonlyArray<{
+    readonly object_name: string;
+    readonly object_type: string;
+  }>;
+  readonly results: readonly McpResult[];
+}
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written through `Written`, the other
+ * levels a JSON array of the entries.
+ */
+const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+  terse: terseList,
+  medium: jsonList,
+  full: jsonList,
+  raw: jsonList,
+};
+
+/** A list call's answer: one entry per asked, in the order asked, at the level asked. */
 function listAnswer(
   objects: ReadonlyArray<{
     readonly object_name: string;
     readonly object_type: string;
   }>,
   results: readonly McpResult[],
-  terse: boolean,
+  level: DetailLevel,
 ): McpResult {
-  if (terse) {
-    // Every object's text through `Written`: a failure under its escaped
-    // `# object` line and one `# error` line; an answered one as its own
-    // terse writer writes it.
-    const text = listedText(
-      'GetEnhancements',
-      results.map((result, i): ListedPart<EnhancementsShown> => {
-        const asked = objects[i];
-        const read = readsOf.get(result);
-        return result.isError || read === undefined
-          ? {
-              heads: [
-                {
-                  head: 'object',
-                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
-                },
-              ],
-              error: JSON.stringify(payloadOfAnswer(result)),
-            }
-          : { heads: [], read };
-      }),
-      heldTerse,
-      terseText,
-    );
-    return { isError: false, content: [{ type: 'text', text }] };
-  }
+  return answerAt(LIST_ANSWERS, level)({ objects, results });
+}
+
+/** A list call's terse text. */
+function terseList({ objects, results }: ListOf): McpResult {
+  // Every object's text through `Written`: a failure under its escaped
+  // `# object` line and one `# error` line; an answered one as its own
+  // terse writer writes it.
+  const text = listedText(
+    'GetEnhancements',
+    results.map((result, i): ListedPart<EnhancementsShown> => {
+      const asked = objects[i];
+      const read = readsOf.get(result);
+      return result.isError || read === undefined
+        ? {
+            heads: [
+              {
+                head: 'object',
+                value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+              },
+            ],
+            error: JSON.stringify(payloadOfAnswer(result)),
+          }
+        : { heads: [], read };
+    }),
+    heldTerse,
+    terseText,
+  );
+  return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** A list call's entries as a JSON array. */
+function jsonList({ objects, results }: ListOf): McpResult {
   const entries = results.map((result, i) => {
     const asked = objects[i];
     return result.isError
@@ -1970,7 +1999,6 @@ async function answeredGetEnhancements(
 ) {
   const listed = args?.objects;
   const shown = answerAt(ENHANCEMENT_ANSWERS, levelOf(args));
-  const terse = levelOf(args) === 'terse';
   try {
     if (listed === undefined) {
       const objectName = args.object_name;
@@ -2036,7 +2064,7 @@ async function answeredGetEnhancements(
               : await enhancementsOf(context, single(o), shown),
           );
         }
-        return listAnswer(objects, results, terse);
+        return listAnswer(objects, results, levelOf(args));
       },
       async () => {
         // One object after another, each as the single call reads it; a
@@ -2047,7 +2075,7 @@ async function answeredGetEnhancements(
           if (endsList(result)) return result;
           results.push(result);
         }
-        return listAnswer(objects, results, terse);
+        return listAnswer(objects, results, levelOf(args));
       },
     );
   } catch (error) {

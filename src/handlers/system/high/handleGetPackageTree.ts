@@ -538,6 +538,49 @@ const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
     treeOf(packageName, walked, options),
 };
 
+/** One package's read, or its failure entry. */
+type TreeOutcome =
+  | { readonly read: TreeAnswerRead }
+  | { readonly package_name: string; readonly error: unknown };
+
+/** What a list call answers from: the packages asked, each one's outcome. */
+interface TreeList {
+  readonly packageNames: readonly string[];
+  readonly outcomes: readonly TreeOutcome[];
+  readonly shown: (read: TreeAnswerRead) => TreeAnswer;
+}
+
+/** A list call's entries as a JSON array. */
+const jsonTrees = ({ outcomes, shown }: TreeList) =>
+  JSON.stringify(
+    outcomes.map((outcome) =>
+      'read' in outcome ? shown(outcome.read) : outcome,
+    ),
+  );
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written through `Written`, each tree
+ * under its escaped `# asked` line; the other levels a JSON array.
+ */
+const TREE_LISTS: AnswerTable<TreeList, string> = {
+  terse: ({ packageNames, outcomes }) =>
+    listedText(
+      TOOL,
+      outcomes.map((outcome, i): ListedPart<TreeAnswerRead> => {
+        const heads = [{ head: 'asked', value: packageNames[i] ?? '' }];
+        return 'read' in outcome
+          ? { heads, read: outcome.read }
+          : { heads, error: JSON.stringify(outcome) };
+      }),
+      heldTerse,
+      terseTree,
+    ),
+  medium: jsonTrees,
+  full: jsonTrees,
+  raw: jsonTrees,
+};
+
 /**
  * Main handler for GetPackageTree MCP tool
  *
@@ -663,28 +706,13 @@ async function answeredGetPackageTree(
             error: thrownEntry(walked.error, 'read package node structure'),
           };
     });
-    // At terse each package's tree is text written through `Written`: one
-    // text, each under its escaped `# asked` line; at the other levels a
-    // JSON array of the entries.
-    if (levelOf(args) === 'terse') {
-      return return_response({
-        data: listedText(
-          TOOL,
-          outcomes.map((outcome, i): ListedPart<TreeAnswerRead> => {
-            const heads = [{ head: 'asked', value: packageNames[i] ?? '' }];
-            return 'read' in outcome
-              ? { heads, read: outcome.read }
-              : { heads, error: JSON.stringify(outcome) };
-          }),
-          heldTerse,
-          terseTree,
-        ),
-      });
-    }
-    const entries = outcomes.map((outcome) =>
-      'read' in outcome ? shown(outcome.read) : outcome,
-    );
-    return return_response({ data: JSON.stringify(entries) });
+    // Through the list table, like every other answer.
+    return return_response({
+      data: answerAt(
+        TREE_LISTS,
+        levelOf(args),
+      )({ packageNames, outcomes, shown }),
+    });
   } catch (error) {
     logger?.error('Failed to fetch package tree', error);
     return return_error(error);

@@ -1096,38 +1096,63 @@ function endsList(result: McpResult): boolean {
   return failed !== undefined && isCredentialPayload(failed);
 }
 
-/** A list call's answer: one entry per object, in the order asked. */
+/** What a list call answers from: the entries asked, and each one's answer. */
+interface ListOf {
+  readonly objects: ReadonlyArray<{ object_name: string; object_type: string }>;
+  readonly results: readonly McpResult[];
+}
+
+/**
+ * A list call's answer at each `detail`, selected through the table like
+ * every other answer: terse one text written through `Written`, the other
+ * levels a JSON array of the entries.
+ */
+const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+  terse: terseList,
+  medium: jsonList,
+  full: jsonList,
+  raw: jsonList,
+};
+
+/** A list call's answer: one entry per asked, in the order asked, at the level asked. */
 function listAnswer(
   objects: ReadonlyArray<{ object_name: string; object_type: string }>,
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
-  if (level === 'terse') {
-    // Every object's text through `Written`: a failure under its escaped
-    // `# object` line and one `# error` line; an answered one as its own
-    // terse writer writes it.
-    const text = listedText(
-      'GetIncludesList',
-      results.map((result, i): ListedPart<IncludesRead> => {
-        const asked = objects[i];
-        const read = readsOf.get(result);
-        return result.isError || read === undefined
-          ? {
-              heads: [
-                {
-                  head: 'object',
-                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
-                },
-              ],
-              error: JSON.stringify(payloadOfAnswer(result)),
-            }
-          : { heads: [], read };
-      }),
-      heldTerse,
-      terseIncludes,
-    );
-    return { isError: false, content: [{ type: 'text', text }] };
-  }
+  return answerAt(LIST_ANSWERS, level)({ objects, results });
+}
+
+/** A list call's terse text. */
+function terseList({ objects, results }: ListOf): McpResult {
+  // Every object's text through `Written`: a failure under its escaped
+  // `# object` line and one `# error` line; an answered one as its own
+  // terse writer writes it.
+  const text = listedText(
+    'GetIncludesList',
+    results.map((result, i): ListedPart<IncludesRead> => {
+      const asked = objects[i];
+      const read = readsOf.get(result);
+      return result.isError || read === undefined
+        ? {
+            heads: [
+              {
+                head: 'object',
+                value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+              },
+            ],
+            error: JSON.stringify(payloadOfAnswer(result)),
+          }
+        : { heads: [], read };
+    }),
+    heldTerse,
+    terseIncludes,
+  );
+  return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** A list call's entries as a JSON array. */
+function jsonList({ objects, results }: ListOf): McpResult {
   const entries = results.map((result, i) => {
     const asked = objects[i];
     return result.isError

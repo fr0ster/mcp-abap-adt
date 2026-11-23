@@ -131,8 +131,16 @@ export function searchSourceAnswerLevel(
   level: DetailLevel,
   answer: AnswerLevel | undefined,
 ): AnswerLevel {
-  return answer ?? (level === 'terse' ? 'lines' : 'snippets');
+  return answerAt(HIT_READINGS, level)(answer);
 }
+
+/** Each level's default for what a hit is read as, the `answer` given kept. */
+const HIT_READINGS: AnswerTable<AnswerLevel | undefined, AnswerLevel> = {
+  terse: (answer) => answer ?? 'lines',
+  medium: (answer) => answer ?? 'snippets',
+  full: (answer) => answer ?? 'snippets',
+  raw: (answer) => answer ?? 'snippets',
+};
 
 /** The include column of a hit: the class include, or a module's or include's group. */
 function includeColumn(hit: OrchestratorResult['results'][number]): string {

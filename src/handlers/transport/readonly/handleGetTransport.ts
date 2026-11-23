@@ -43,9 +43,11 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
+  completeAnswer,
   type DetailTable,
   formatted,
   fullLevel,
+  type Rendered,
   rawLevel,
   readingAt,
 } from '../../../lib/detail';
@@ -63,7 +65,7 @@ export const TOOL_DEFINITION = {
   name: 'GetTransport',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] Reads the transport request or transport task named by transport_number; kind says which: 'request' or 'task'. A transport request answers its header (number, description, type, status, owner, target system) and its tasks, each with number, owner, status, description and object count. A transport task answers its header (number, parent request, description, type, status, owner), its parent request (number, type, status, target system), and its objects, each with pgmid, type, name and position, with their count; an object SAP lists without a name or a type is listed apart, under incomplete_objects, with the fields it has, and counted.",
+    "[read-only] Reads the transport request or transport task named by transport_number; kind says which: 'request' or 'task'. A transport request answers its header (number, description, type, status, owner, target system) and its tasks, each with number, owner, status, description and object count. A transport task answers its header (number, parent request, description, type, status, owner), its parent request (number, type, status, target system), and its objects, each with pgmid, type, name and position, with their count; an object SAP lists nameless or untyped is listed apart, under incomplete_objects, with the fields it has, and counted.",
   inputSchema: z.object({
     transport_number: z.string().describe('Transport request or task number'),
     include_objects: z
@@ -103,6 +105,19 @@ interface TerseOptions {
  */
 function terseRequest(item: ITransportRequestItem, options: TerseOptions) {
   const request = item.header;
+  const answer = terseRequestAnswer(item, options);
+  // Tasks left out at the caller's choice are represented by their count.
+  const rendered = options.includeTasks
+    ? (answer.tasks ?? []).map((task) => `task|${task.number}`)
+    : heldItems(item);
+  return { answer, rendered };
+}
+
+function terseRequestAnswer(
+  item: ITransportRequestItem,
+  options: TerseOptions,
+) {
+  const request = item.header;
   const tasks = item.tasks.map((task) => ({
     number: task.header.number,
     owner: task.header.owner,
@@ -133,6 +148,41 @@ function terseRequest(item: ITransportRequestItem, options: TerseOptions) {
  * position (`LIMU` or `R3TR` decides what a move or a removal addresses).
  */
 function terseTask(item: ITransportTaskItem, options: TerseOptions) {
+  const answer = terseTaskAnswer(item, options);
+  // Objects left out at the caller's choice are represented by their count.
+  const rendered = options.includeObjects
+    ? [
+        ...(answer.objects ?? []).map(
+          (o) =>
+            `object|${o.pgmid ?? ''}|${o.type}|${o.name}|${o.position ?? ''}`,
+        ),
+        ...(answer.incomplete_objects ?? []).map(
+          (o) => `incomplete|${JSON.stringify(o)}`,
+        ),
+      ]
+    : heldItems(item);
+  return { answer, rendered };
+}
+
+/**
+ * Every item a transport's reading holds: a request's tasks, or a task's
+ * objects and the entries it lists without a name or a type.
+ */
+function heldItems(item: ITransportItem): string[] {
+  if (item.kind === 'request') {
+    return item.tasks.map((task) => `task|${task.header.number}`);
+  }
+  return [
+    ...item.objects.map(
+      (o) => `object|${o.pgmid ?? ''}|${o.type}|${o.name}|${o.position ?? ''}`,
+    ),
+    ...(item.incompleteEntries ?? []).map(
+      (o) => `incomplete|${JSON.stringify(incompleteRow(o))}`,
+    ),
+  ];
+}
+
+function terseTaskAnswer(item: ITransportTaskItem, options: TerseOptions) {
   const task = item.header;
   const parent = item.parent;
   const objects = item.objects.map((entry) => ({
@@ -219,14 +269,21 @@ function transportReadings(options: TerseOptions): DetailTable<TransportRead> {
     answer,
   });
   return {
+    // Every task or object the transport holds, or nothing
+    // (`completeAnswer`).
     terse: formatted(read, ({ item }) => ({
       item,
       shown:
         item === undefined
           ? undefined
-          : item.kind === 'task'
-            ? terseTask(item, options)
-            : terseRequest(item, options),
+          : completeAnswer(
+              'GetTransport',
+              heldItems,
+              (held: ITransportItem): Rendered<AnswerObject> =>
+                held.kind === 'task'
+                  ? terseTask(held, options)
+                  : terseRequest(held, options),
+            )(item),
     })),
     medium: formatted(read, ({ item, answer }) => ({
       item,

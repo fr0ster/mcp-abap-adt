@@ -37,9 +37,11 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   fullLevel,
+  type Rendered,
   rawLevel,
   readingAt,
   tsv,
@@ -96,10 +98,29 @@ interface Entry {
  * the rows they hold — a removal names the task, the pgmid, the type, the
  * name and the position. Every entry is answered.
  */
+/** An entry's identity: its task, pgmid, type, name and position. */
+const entryIdentity = (entry: ITransportObjectEntry) =>
+  `entry|${entry.task ?? ''}|${entry.pgmid ?? 'R3TR'}|${entry.type}|${entry.name}|${entry.position ?? ''}`;
+
+/** An incomplete entry's identity: the fields it carries. */
+const incompleteIdentity = (entry: ITransportIncompleteEntry) =>
+  `incomplete|${incompleteFields(entry)
+    .map(([field, value]) => `${field}=${value}`)
+    .join(' ')}`;
+
+/** Every item the reading held: its entries and its incomplete entries. */
+export function heldEntries(list: ITransportObjectEntryList): string[] {
+  return [
+    ...list.entries.map(entryIdentity),
+    ...(list.incompleteEntries ?? []).map(incompleteIdentity),
+  ];
+}
+
 function transportRows(
   transportNumber: string,
   list: ITransportObjectEntryList,
-): string {
+): Rendered<string> {
+  const rendered: string[] = [];
   const entries = list.entries;
   const incomplete = list.incompleteEntries ?? [];
   const lines = [
@@ -122,6 +143,7 @@ function transportRows(
       lines.push(`# pgmid ${entryPgmid}`);
     }
     lines.push(tsvRow([entry.type, entry.name, entry.position ?? '']));
+    rendered.push(entryIdentity(entry));
   }
   // An entry SAP lists without a name or a type: a line of every identity
   // field it carries, the ones it lacks absent.
@@ -131,8 +153,9 @@ function transportRows(
         .map(([field, value]) => `${field}=${value}`)
         .join(' ')}`,
     );
+    rendered.push(incompleteIdentity(entry));
   }
-  return lines.join('\n');
+  return { answer: lines.join('\n'), rendered };
 }
 
 /** An incomplete entry's identity fields that are present, in a fixed order. */
@@ -159,34 +182,40 @@ export async function handleReadTransportObjects(
 
   const detail = detailOf(args);
 
-  const terseObjects = (list: ITransportObjectEntryList) => {
+  const mediumObjects = (list: ITransportObjectEntryList) => {
     const entries: readonly ITransportObjectEntry[] = list.entries;
     const incomplete = list.incompleteEntries ?? [];
     return {
-      success: true,
-      transport_number: args.transport_number,
-      count: entries.length + incomplete.length,
-      ...(incomplete.length > 0
-        ? {
-            incomplete_objects: incomplete.map((entry) =>
-              Object.fromEntries(incompleteFields(entry)),
-            ),
-          }
-        : {}),
-      objects: entries.map(
-        (entry): ReadTransportEntry => ({
-          pgmid: entry.pgmid ?? 'R3TR',
-          type: entry.type,
-          name: entry.name,
-          // Optional, and said so: an entry the server described without one
-          // cannot be removed, and inventing an empty string would produce a
-          // call that answers 200 and removes nothing.
-          position: entry.position ?? null,
-          ...(entry.task ? { task: entry.task } : {}),
-          ...(entry.description ? { description: entry.description } : {}),
-          ...(entry.lockStatus ? { lock_status: entry.lockStatus } : {}),
-        }),
-      ),
+      rendered: [
+        ...entries.map(entryIdentity),
+        ...incomplete.map(incompleteIdentity),
+      ],
+      answer: {
+        success: true,
+        transport_number: args.transport_number,
+        count: entries.length + incomplete.length,
+        ...(incomplete.length > 0
+          ? {
+              incomplete_objects: incomplete.map((entry) =>
+                Object.fromEntries(incompleteFields(entry)),
+              ),
+            }
+          : {}),
+        objects: entries.map(
+          (entry): ReadTransportEntry => ({
+            pgmid: entry.pgmid ?? 'R3TR',
+            type: entry.type,
+            name: entry.name,
+            // Optional, and said so: an entry the server described without one
+            // cannot be removed, and inventing an empty string would produce a
+            // call that answers 200 and removes nothing.
+            position: entry.position ?? null,
+            ...(entry.task ? { task: entry.task } : {}),
+            ...(entry.description ? { description: entry.description } : {}),
+            ...(entry.lockStatus ? { lock_status: entry.lockStatus } : {}),
+          }),
+        ),
+      },
     };
   };
 
@@ -195,13 +224,22 @@ export async function handleReadTransportObjects(
   // adt-strategies' `transportObjectEntryList` (each entry once, with its
   // task and position; the incomplete ones apart, since 0.28.2), full the
   // parse, raw the document.
+  // Each formatter answers every entry it was given, or nothing
+  // (`completeAnswer`).
+  const TOOL = 'ReadTransportObjects';
   const readings: DetailTable<
-    string | XmlNode | ReturnType<typeof terseObjects>
+    string | XmlNode | ReturnType<typeof mediumObjects>['answer']
   > = {
-    terse: formatted(transportObjectEntryList, (list) =>
-      transportRows(args.transport_number, list),
+    terse: formatted(
+      transportObjectEntryList,
+      completeAnswer(TOOL, heldEntries, (list) =>
+        transportRows(args.transport_number, list),
+      ),
     ),
-    medium: formatted(transportObjectEntryList, terseObjects),
+    medium: formatted(
+      transportObjectEntryList,
+      completeAnswer(TOOL, heldEntries, mediumObjects),
+    ),
     full: fullLevel,
     raw: rawLevel,
   };

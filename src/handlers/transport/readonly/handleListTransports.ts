@@ -15,9 +15,11 @@ import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   fullLevel,
+  type Rendered,
   rawLevel,
   readingAt,
   tsv,
@@ -137,6 +139,32 @@ export function listedTransports(tree: ITransportTree): TransportEntry[] {
   return listed;
 }
 
+/**
+ * Every request a listing holds, once each by its number: one SAP lists
+ * through several branches is one request; one with no number is an item
+ * all the same, which no answer can name (`completeAnswer` refuses it).
+ */
+export function heldRequests(tree: ITransportTree): string[] {
+  const numbers = new Set<string>();
+  const held: string[] = [];
+  tree.requests.forEach((request, index) => {
+    const attributes = request.attributes;
+    const number = attributes['tm:number'] || attributes['adtcore:name'] || '';
+    if (number === '') {
+      held.push(`numberless|${index}`);
+      return;
+    }
+    if (numbers.has(number)) return;
+    numbers.add(number);
+    held.push(`request|${number}`);
+  });
+  return held;
+}
+
+/** The identities of the requests an answer lists. */
+const listedIdentities = (transports: readonly TransportEntry[]) =>
+  transports.map((t) => `request|${t.number}`);
+
 /** A listing document's requests — for the #168 regression guard, which asserts against raw XML. */
 export function parseTransportListXml(xmlData: string): TransportEntry[] {
   return listedTransports(
@@ -163,33 +191,51 @@ type ListAnswer = ListedAnswer | XmlNode | string;
  */
 const LIST_READINGS: DetailTable<ListAnswer> = (() => {
   const listed = listedTransports;
+  // Every request the listing holds, or nothing (`completeAnswer`).
+  const every = <A>(render: (tree: ITransportTree) => Rendered<A>) =>
+    completeAnswer('ListTransports', heldRequests, render);
   return {
-    terse: formatted(listingOf, (tree) => {
-      const transports = listed(tree);
-      return [
-        `# count ${transports.length}`,
-        tsv(
-          ['number', 'type', 'status', 'owner', 'target', 'description'],
-          transports.map((t) => [
+    terse: formatted(
+      listingOf,
+      every((tree) => {
+        const transports = listed(tree);
+        // The identity of each request, recorded where its row is written.
+        const rendered: string[] = [];
+        const rows = transports.map((t) => {
+          rendered.push(`request|${t.number}`);
+          return [
             t.number,
             t.type ?? '',
             t.status ?? '',
             t.owner ?? '',
             t.target ?? '',
             t.description ?? '',
-          ]),
-        ),
-      ].join('\n');
-    }),
-    medium: formatted(listingOf, (tree) => {
-      const transports = listed(tree);
-      const listedAnswer: ListedAnswer = {
-        success: true,
-        count: transports.length,
-        transports,
-      };
-      return listedAnswer;
-    }),
+          ];
+        });
+        return {
+          rendered,
+          answer: [
+            `# count ${transports.length}`,
+            tsv(
+              ['number', 'type', 'status', 'owner', 'target', 'description'],
+              rows,
+            ),
+          ].join('\n'),
+        };
+      }),
+    ),
+    medium: formatted(
+      listingOf,
+      every((tree) => {
+        const transports = listed(tree);
+        const listedAnswer: ListedAnswer = {
+          success: true,
+          count: transports.length,
+          transports,
+        };
+        return { rendered: listedIdentities(transports), answer: listedAnswer };
+      }),
+    ),
     full: fullLevel,
     raw: rawLevel,
   };

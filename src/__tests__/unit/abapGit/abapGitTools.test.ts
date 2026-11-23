@@ -172,6 +172,7 @@ describe('the abapGit tools: registration', () => {
     }
     const link = definitionOf('LinkAbapGitRepo');
     assert.deepEqual(schemaKeys(definitionOf('PullAbapGitRepo'), 'cloud'), [
+      'overwrite',
       'repository_key',
       'transport_request',
     ]);
@@ -195,6 +196,17 @@ describe('the abapGit tools: registration', () => {
     const schema = definitionOf('ListAbapGitRepos').inputSchema;
     assert.equal(schema.safeParse({ detail: 'medium' }).success, true);
     assert.equal(schema.safeParse({ detail: 'raw' }).success, false);
+  });
+
+  it("the cloud pull's overwrite takes objects of non-empty type and name, at least one", () => {
+    const schema = definitionOf('PullAbapGitRepo').variants?.cloud.inputSchema;
+    assert.ok(schema !== undefined);
+    const parses = (overwrite: unknown) =>
+      schema.safeParse({ repository_key: REPO_KEY, overwrite }).success;
+    assert.equal(parses([{ type: 'CLAS/OC', name: 'ZCL_DEMO' }]), true);
+    assert.equal(parses([]), false);
+    assert.equal(parses([{ type: '', name: 'ZCL_DEMO' }]), false);
+    assert.equal(parses([{ type: 'CLAS/OC', name: '' }]), false);
   });
 
   it('a deny entry removes the tool it names', () => {
@@ -366,6 +378,102 @@ describe('the abapGit tools: requests', () => {
     assert.equal(request.stateless, true);
     assert.equal(request.noResend, true);
     assert.equal(text, '{"status":200,"result":"done"}');
+  });
+
+  it('PullAbapGitRepo with overwrite reads R6, then sends exactly the selected entries as R6 answered them (pull.req.v1)', async () => {
+    const { sent, text } = await run(
+      (context) =>
+        handlePullAbapGitRepo(context, {
+          repository_key: REPO_KEY,
+          overwrite: [{ type: 'CLAS/OC', name: 'ZCL_DEMO' }],
+        }),
+      R1,
+      (request) =>
+        request.method === 'GET'
+          ? { status: 200, data: modifiedObjects }
+          : { status: 202, data: '' },
+    );
+    assert.equal(sent.length, 2);
+    const [read, pull] = sent;
+    assert.ok(read !== undefined && pull !== undefined);
+    assert.equal(
+      pathOf(read.url),
+      `/sap/bc/adt/abapgit/repos/${REPO_KEY}/pull/modifiedobjects`,
+    );
+    assert.equal(pull.method, 'POST');
+    assert.equal(
+      pathOf(pull.url),
+      `/sap/bc/adt/abapgit/repos/${REPO_KEY}/pull`,
+    );
+    assert.equal(
+      header(pull, 'Content-Type'),
+      'application/abapgit.adt.repo.pull.req.v1+xml',
+    );
+    assert.equal(header(pull, 'Accept'), 'application/abapgit.adt.repo.v3+xml');
+    const body = String(pull.data);
+    assert.equal(
+      body.includes(
+        `<abapgitpullrequest:branchName>${REPO_BRANCH}</abapgitpullrequest:branchName>`,
+      ),
+      true,
+      body,
+    );
+    assert.equal(
+      body.includes(
+        '<agitpullmodifiedobjects:overwriteObjects><agitpullmodifiedobjects:abapgitobjects adtcore:uri="/sap/bc/adt/oo/classes/zcl_demo" adtcore:type="CLAS/OC" adtcore:name="ZCL_DEMO" adtcore:packageName="ZPKG" agitpullmodifiedobjects:action="2"/></agitpullmodifiedobjects:overwriteObjects>',
+      ),
+      true,
+      body,
+    );
+    assert.equal(body.includes('ZDEMO'), false, body);
+    assert.equal(pull.stateless, true);
+    assert.equal(pull.noResend, true);
+    assert.equal(text, '{"status":202,"result":"accepted"}');
+  });
+
+  it('an overwrite entry R6 does not list is refused after R6, nothing pulled', async () => {
+    const { sent, text } = await run(
+      (context) =>
+        handlePullAbapGitRepo(context, {
+          repository_key: REPO_KEY,
+          overwrite: [{ type: 'CLAS/OC', name: 'ZCL_OTHER' }],
+        }),
+      R1,
+      () => ({ status: 200, data: modifiedObjects }),
+    );
+    assert.equal(only(sent).method, 'GET');
+    assert.equal(JSON.parse(text).error, 'abapgit_overwrite_not_listed');
+    // The name R6 lists, under another type: matched by both.
+    const otherType = await run(
+      (context) =>
+        handlePullAbapGitRepo(context, {
+          repository_key: REPO_KEY,
+          overwrite: [{ type: 'PROG/P', name: 'ZCL_DEMO' }],
+        }),
+      R1,
+      () => ({ status: 200, data: modifiedObjects }),
+    );
+    assert.equal(only(otherType.sent).method, 'GET');
+    assert.equal(
+      JSON.parse(otherType.text).error,
+      'abapgit_overwrite_not_listed',
+    );
+  });
+
+  it('an overwrite naming one object twice is refused with nothing sent', async () => {
+    const { sent, text } = await run(
+      (context) =>
+        handlePullAbapGitRepo(context, {
+          repository_key: REPO_KEY,
+          overwrite: [
+            { type: 'CLAS/OC', name: 'ZCL_DEMO' },
+            { type: 'CLAS/OC', name: 'ZCL_DEMO' },
+          ],
+        }),
+      R1,
+    );
+    assert.equal(sent.length, 0);
+    assert.equal(JSON.parse(text).error, 'abapgit_overwrite_duplicate');
   });
 
   it('a cloud pull answers accepted after its one request; on premise done with the objects', async () => {

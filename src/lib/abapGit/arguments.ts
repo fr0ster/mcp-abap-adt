@@ -101,5 +101,26 @@ export const OBJECTS_FIELD = z
     'The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.',
   );
 
+const OVERWRITE_OBJECT = z.object({
+  type: z
+    .string()
+    .min(1)
+    .describe("The object's type, as GetAbapGitModifiedObjects answers it."),
+  name: z
+    .string()
+    .min(1)
+    .describe("The object's name, as GetAbapGitModifiedObjects answers it."),
+});
+
+export const OVERWRITE_FIELD = z
+  .array(OVERWRITE_OBJECT)
+  .min(1)
+  .describe(
+    'The objects listed by GetAbapGitModifiedObjects that the pull overwrites with their remote version, each once, by type and name.',
+  );
+
+/** An object a pull overwrites, as the tool takes it. */
+export type OverwriteArgument = z.output<typeof OVERWRITE_OBJECT>;
+
 /** A staged object as the tool takes it. */
 export type StagedObjectArgument = z.output<typeof STAGED_OBJECT>;

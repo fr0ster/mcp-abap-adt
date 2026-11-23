@@ -93,9 +93,11 @@ export function abapGitVerdict(
 export const ABAPGIT_HEADERS: {
   readonly link: IAdtHeaders;
   readonly pull: IAdtHeaders;
+  readonly pullSelective: IAdtHeaders;
   readonly externalRepo: IAdtHeaders;
 } = {
   link: DEFAULT_ADT_HEADERS['abapGit.link'],
   pull: DEFAULT_ADT_HEADERS['abapGit.pull'],
+  pullSelective: DEFAULT_ADT_HEADERS['abapGit.pullSelective'],
   externalRepo: DEFAULT_ADT_HEADERS['abapGit.checkExternalRepo'],
 };

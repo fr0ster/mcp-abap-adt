@@ -1,12 +1,25 @@
 /**
  * PullAbapGitRepo: pull a repository by its key (R4, `pullRepo`), on the
- * branch R1 lists for it — never a branch of the arguments, never a
- * selection (`repo.v3`) — with the credential bound to the R1 entry's URL.
+ * branch R1 lists for it — never a branch of the arguments — with the
+ * credential bound to the R1 entry's URL. Without `overwrite` the
+ * `repo.v3` document; on the cloud with `overwrite`, R6 is read first and
+ * the entries it names are sent as R6 answered them (`pull.req.v1`,
+ * `pullSelection.ts`). On premise the pull takes no selection
+ * (`ZCL_ABAPGIT_RES_REPO_PULL->post` reads the user, the password and the
+ * request only; adt-clients ERRATA), so `overwrite` is cloud's.
  */
 
+import type { IAbapGitPullSelection } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
-import { answer } from '../../../lib/abapGit/answers';
 import {
+  type AbapGitAnswerContext,
+  abapGitFailure,
+  abapGitThrown,
+  answer,
+} from '../../../lib/abapGit/answers';
+import {
+  OVERWRITE_FIELD,
+  type OverwriteArgument,
   REPOSITORY_KEY_FIELD,
   TRANSPORT_REQUEST_FIELD,
 } from '../../../lib/abapGit/arguments';
@@ -20,6 +33,11 @@ import {
 } from '../../../lib/abapGit/client';
 import { objectsAnswer } from '../../../lib/abapGit/formats';
 import type { KindToolDefinition } from '../../../lib/abapGit/kindTool';
+import {
+  assertEachOnce,
+  pullSelection,
+} from '../../../lib/abapGit/pullSelection';
+import type { McpResult } from '../../../lib/answer';
 import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
@@ -29,20 +47,21 @@ const FIELDS = {
 };
 
 const ONPREM_SCHEMA = z.object({ ...FIELDS, background: BACKGROUND_FIELD });
-const CLOUD_SCHEMA = z.object(FIELDS);
+const CLOUD_SCHEMA = z.object({
+  ...FIELDS,
+  overwrite: OVERWRITE_FIELD.optional(),
+});
 
 const IMPORTS =
   'every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too';
 
 /**
- * On the cloud, SAP's pull job keeps every object R6 lists — changed in the
- * system, or held by another package — unless the call selects it: it sets
- * every unselected entry to "not imported" (`CL_ABAPGIT_BG_ACTION_PULL->execute`
- * L123–152; Code). This tool sends no selection, so they keep their system
- * version.
+ * On the cloud, SAP's pull job imports an object R6 lists — changed in the
+ * system, or held by another package — only when the call selects it
+ * (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152; Code): `overwrite`.
  */
 const CLOUD_IMPORTS =
-  'every object changed only in the remote is imported; an object changed in the system, or held by another package, keeps its system version (GetAbapGitModifiedObjects lists those objects)';
+  'every object changed only in the remote is imported; of the objects GetAbapGitModifiedObjects lists (changed in the system, or held by another package), the pull overwrites those named in overwrite with their remote version, and the others keep their system version';
 
 const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 
@@ -63,12 +82,51 @@ export const TOOL_DEFINITION: KindToolDefinition<
   },
 };
 
+/** The selection `overwrite` names, read off R6; or the call's answer when it is refused. */
+async function selectionOf(
+  context: HandlerContext,
+  overwrite: readonly OverwriteArgument[],
+  ctx: AbapGitAnswerContext,
+): Promise<
+  | { readonly selection: IAbapGitPullSelection }
+  | { readonly refused: McpResult }
+> {
+  try {
+    assertEachOnce(overwrite);
+    const admission = admissionOf(context);
+    const repo = admittedRepo(admission);
+    const modified = await abapGitClientOf(
+      context.connection,
+      context.logger,
+    ).getModifiedObjects(
+      { key: repo.key },
+      { ...credentialOption(admission), analyse: abapGitVerdict },
+    );
+    if (!modified.ok) return { refused: abapGitFailure(modified.getError()) };
+    return {
+      selection: pullSelection(modified.getResult().value.facts, overwrite),
+    };
+  } catch (thrown) {
+    return { refused: abapGitThrown(thrown, ctx) };
+  }
+}
+
 export async function handlePullAbapGitRepo(
   context: HandlerContext,
   args: z.output<typeof CLOUD_SCHEMA>,
 ) {
+  const ctx: AbapGitAnswerContext = {
+    tool: 'PullAbapGitRepo',
+    detail: 'terse',
+  };
+  let selection: IAbapGitPullSelection | undefined;
+  if (args.overwrite !== undefined) {
+    const selected = await selectionOf(context, args.overwrite, ctx);
+    if ('refused' in selected) return selected.refused;
+    selection = selected.selection;
+  }
   return answer(
-    { tool: 'PullAbapGitRepo', detail: 'terse' },
+    ctx,
     async () => {
       const admission = admissionOf(context);
       const repo = admittedRepo(admission);
@@ -79,10 +137,14 @@ export async function handlePullAbapGitRepo(
           ...(args.transport_request !== undefined
             ? { transportRequest: args.transport_request }
             : {}),
+          ...(selection !== undefined ? { selection } : {}),
         },
         {
           ...credentialOption(admission),
-          headers: ABAPGIT_HEADERS.pull,
+          headers:
+            selection !== undefined
+              ? ABAPGIT_HEADERS.pullSelective
+              : ABAPGIT_HEADERS.pull,
           analyse: abapGitVerdict,
         },
       );

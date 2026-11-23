@@ -34,9 +34,14 @@
 
 import { cell, line } from './tsvCells';
 
-/** An item's identity from its identity values, as a reading's held items are computed. */
+/**
+ * An item's identity from its identity values, each escaped as a written
+ * cell is (`./tsvCells`): the same escaped value the text holds, so a line
+ * break or a tab in SAP's text can neither add a line or a column nor make
+ * two items one. A reading's held items are computed with it too.
+ */
 export function identityOf(values: readonly string[]): string {
-  return values.join('\t');
+  return values.map(cell).join('\t');
 }
 
 /** One line of a written text. */
@@ -76,18 +81,6 @@ export type Line =
         | '';
     };
 
-/** A word kept on one line: a line break or a tab in it written as its escape. */
-function oneLine(word: string): string {
-  let written = '';
-  for (const character of word) {
-    if (character === '\n') written += '\\n';
-    else if (character === '\r') written += '\\r';
-    else if (character === '\t') written += '\\t';
-    else written += character;
-  }
-  return written;
-}
-
 /** The identity of a row: its identity columns, as written. */
 function rowIdentity(
   cells: readonly string[],
@@ -101,8 +94,17 @@ function rowIdentity(
  * serializers below, which take both from what they write.
  */
 export class Written<A> {
-  /** Makes the type nominal: nothing but these serializers builds one. */
-  private readonly written = true;
+  /**
+   * Makes the type nominal, and an instance opaque: nothing but these
+   * serializers builds one, and an assigned copy (`Object.assign`) carries
+   * no `#written` — `completeAnswer` refuses it.
+   */
+  readonly #written = true;
+
+  /** Whether `value` is an instance a serializer made, not a copy. */
+  static isWritten<A>(value: Written<A>): boolean {
+    return #written in value && value.#written;
+  }
 
   private constructor(
     readonly answer: A,
@@ -120,12 +122,16 @@ export class Written<A> {
   ): Written<string> {
     const texts: string[] = [];
     const identities: string[] = [];
+    // A text has one root at most: another root is written as an item, which
+    // no reading holds — the guard refuses it.
+    let roots = 0;
     for (const entry of lines) {
       if ('head' in entry) {
+        // The value escaped: SAP's text can add no line.
         texts.push(
           entry.value === undefined
             ? `# ${entry.head}`
-            : `# ${entry.head} ${entry.value}`,
+            : `# ${entry.head} ${cell(entry.value)}`,
         );
       } else if ('group' in entry) {
         texts.push(`# ${entry.group} ${cell(entry.value)}`);
@@ -138,15 +144,19 @@ export class Written<A> {
         );
       } else if ('root' in entry) {
         texts.push(written(entry.root, entry.depth));
+        roots += 1;
+        if (roots > 1) identities.push(identityOf(['root', ...entry.root]));
       } else if ('mark' in entry) {
-        const words = entry.words.map(oneLine);
-        texts.push([`# ${entry.mark}`, ...words].join(' '));
-        identities.push(identityOf([entry.mark, ...words]));
+        // The words escaped as cells, and the identity from the same values.
+        texts.push([`# ${entry.mark}`, ...entry.words.map(cell)].join(' '));
+        identities.push(identityOf([entry.mark, ...entry.words]));
       } else if ('bullet' in entry) {
-        texts.push(`${'  '.repeat(entry.depth)}- ${entry.bullet}`);
+        texts.push(`${'  '.repeat(entry.depth)}- ${cell(entry.bullet)}`);
         identities.push(identityOf(entry.identity));
       } else if ('bulletRoot' in entry) {
-        texts.push(`${'  '.repeat(entry.depth)}- ${entry.bulletRoot}`);
+        texts.push(`${'  '.repeat(entry.depth)}- ${cell(entry.bulletRoot)}`);
+        roots += 1;
+        if (roots > 1) identities.push(identityOf(['root', entry.bulletRoot]));
       } else {
         texts.push(entry.title);
       }
@@ -174,8 +184,10 @@ export class Written<A> {
     const rows: readonly I[] = Object.values<readonly I[] | undefined>(
       rowsBy,
     ).flatMap((list) => list ?? []);
+    // The rows spread again after `after`: a key of `after` cannot overwrite
+    // them, and each keeps its place in the answer.
     return new Written(
-      { ...rest, ...rowsBy, ...after },
+      { ...rest, ...rowsBy, ...after, ...rowsBy },
       rows.map((row) => textIdentity(row, identityKeys)),
     );
   }
@@ -199,8 +211,10 @@ export class Written<A> {
     after?: T,
   ): Written<R & Record<K, N> & Partial<T>> {
     const roots: readonly N[] = Object.values<N>(rootBy);
+    // The tree spread again after `after`: a key of `after` cannot
+    // overwrite it.
     return new Written(
-      { ...rest, ...rootBy, ...after },
+      { ...rest, ...rootBy, ...after, ...rootBy },
       roots.flatMap((root) =>
         treeIdentities(root, childrenOf, identityKeys, withRoot),
       ),
@@ -352,7 +366,10 @@ export function completeAnswer<T, A>(
 ): (value: T) => A {
   return (value) => {
     const written = render(value);
-    if (!sameItems(held(value), written.identities)) {
+    if (
+      !Written.isWritten(written) ||
+      !sameItems(held(value), written.identities)
+    ) {
       throw new IncompleteAnswerError(tool);
     }
     return written.answer;

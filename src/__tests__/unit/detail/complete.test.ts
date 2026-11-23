@@ -93,6 +93,47 @@ describe('completeAnswer over the cells written', () => {
     assert.throws(() => shown(NAMELESS), IncompleteAnswerError);
   });
 
+  // Codex round 7: SAP's text may hold a line break or a tab — it can add
+  // no line and no column, and the identity is the same escaped value.
+  it('a line break in a head value or a cell adds no line', () => {
+    const written = Written.text(
+      [
+        { head: 'object', value: 'ZA\n# injected' },
+        { header: ['name'] },
+        { row: ['a\tb\nc'] },
+      ],
+      [0],
+    );
+    assert.equal(written.answer.split('\n').length, 3, written.answer);
+    assert.deepStrictEqual(written.identities, [identityOf(['a\tb\nc'])]);
+  });
+
+  it('an extra root: refused', () => {
+    const shown = completeAnswer(
+      'Tool',
+      () => [identityOf(['child'])],
+      () =>
+        Written.text(
+          [
+            { root: ['P'], depth: 0 },
+            { row: ['child'], depth: 1 },
+            { root: ['Q'], depth: 0 },
+          ],
+          [0],
+        ),
+    );
+    assert.throws(() => shown(undefined), IncompleteAnswerError);
+  });
+
+  it('a copy of a written answer is no written answer: refused', () => {
+    const shown = completeAnswer(
+      'Tool',
+      () => [identityOf(['a'])],
+      () => Object.assign({}, Written.text([{ row: ['a'] }], [0])),
+    );
+    assert.throws(() => shown(undefined), IncompleteAnswerError);
+  });
+
   it('a plain claim is no written answer: it does not compile', () => {
     // @ts-expect-error a formatter's own claim is not `Written`.
     completeAnswer('Tool', held, () => ({ answer: '', identities: [] }));

@@ -33,6 +33,7 @@ import {
   terseFeedText,
 } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { searchSourceRows } from '../../../handlers/system/readonly/handleSearchSource';
+import { handleListTransports } from '../../../handlers/transport/readonly/handleListTransports';
 import { handleReadTransportActionLog } from '../../../handlers/transport/readonly/handleReadTransportActionLog';
 import {
   createBatchAvailability,
@@ -673,6 +674,44 @@ CASES['ReadTransportActionLog lines and separators'] = async (detail) =>
         },
       ]) as never,
       { transport_number: 'SIDK900012', detail } as never,
+    ),
+  );
+
+const request = (attributes: string, tasks = '') =>
+  `<tm:request ${attributes}>${tasks}</tm:request>`;
+const LISTING = `${xmlHead}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction=""><tm:workbench tm:parent_name=""><tm:modifiable tm:parent_name="">${[
+  request(
+    'tm:number="SIDK900001" tm:desc="One" tm:type="K" tm:status="D" tm:owner="SAPUSER01" tm:target="/QAS/"',
+  ),
+  request(
+    'tm:desc="Without a number" tm:type="K" tm:status="D" tm:owner="SAPUSER01"',
+  ),
+  request(
+    'tm:number="SIDK900002" tm:desc="Two" tm:type="K" tm:status="D" tm:owner="SAPUSER01"',
+    '<tm:task tm:number="SIDK900003" tm:owner="SAPUSER01"/>',
+  ),
+].join(
+  '',
+)}</tm:modifiable></tm:workbench><tm:workbench tm:parent_name=""><tm:modifiable tm:parent_name="">${[
+  request(
+    'tm:number="SIDK900001" tm:desc="One" tm:type="K" tm:status="D" tm:owner="SAPUSER01" tm:target="/QAS/"',
+  ),
+  request(
+    'tm:number="SIDK900002" tm:desc="Two, another text" tm:type="K" tm:status="D" tm:owner="SAPUSER02"',
+    '<tm:task tm:number="SIDK900004" tm:owner="SAPUSER02"/>',
+  ),
+].join('')}</tm:modifiable></tm:workbench></tm:root>`;
+
+CASES[
+  'ListTransports a repeat, a number repeated with other content, a request without a number'
+] = async (detail) =>
+  answeredOf(
+    await handleListTransports(
+      ctx([{ data: LISTING }]) as never,
+      {
+        user: 'SAPUSER01',
+        detail,
+      } as never,
     ),
   );
 

@@ -21,11 +21,11 @@ import {
  * same words serve every set: they name no batch tool.
  */
 export const RECORDABLE_SENTENCE =
-  'Recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.';
+  'Recordable: in batch mode a call is recorded under the next number and gives back empty content at once; its answer is read by number after the batch ends.';
 
 /** The sentence of a tool recorded only for some arguments, `when` in words. */
 export function recordableWhenSentence(when: string): string {
-  return `When ${when}, recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.`;
+  return `When ${when}, recordable: in batch mode a call is recorded under the next number and gives back empty content at once; its answer is read by number after the batch ends.`;
 }
 
 /**
@@ -45,7 +45,7 @@ function ruleWords(tool: string, rule: WhenRule[number]): string[] {
   const name =
     rule.field === undefined
       ? rule.argument
-      : `the ${rule.field} of every ${rule.argument} entry`;
+      : `the ${rule.field} of every ${rule.argument} item`;
   if (rule.present === true) words.push(`${name} is given`);
   if (rule.present === false) words.push(`${name} is absent`);
   if (rule.equals !== undefined) {

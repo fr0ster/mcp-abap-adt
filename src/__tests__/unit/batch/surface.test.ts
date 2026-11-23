@@ -77,7 +77,7 @@ const END_WORDS =
 const ANSWERS_WORDS =
   "Answers the calls of the last executed batch by number: for each number asked, the tool's answer, built from the call's parts of SAP's response when the number is first read and kept for later reads; the numbers asked are processed in parallel. Takes one number or a list of numbers; an unknown number answers as unknown.";
 const RECORDABLE_TAIL =
-  'recordable: in batch mode a call is recorded under the next number and answers with empty content; its answer is read by number after the batch ends.';
+  'recordable: in batch mode a call is recorded under the next number and gives back empty content at once; its answer is read by number after the batch ends.';
 const ELIGIBLE_WORDS = `Recordable: ${RECORDABLE_TAIL.slice('recordable: '.length)}`;
 const OUTSIDE_WORDS = 'Runs outside batch mode.';
 

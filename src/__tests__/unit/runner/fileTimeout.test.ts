@@ -397,7 +397,8 @@ describe('the per-file bound', () => {
       'INTEGRATION',
       'x.test.ts',
     );
-    const unbounded = runner(['--concurrency', '1', source], {
+    assert.ok(fs.existsSync(source), 'this drive names files case-sensitively');
+    const unbounded = runner(['--repo', repo, '--concurrency', '1', source], {
       RECORD: record,
     });
     assert.equal(unbounded.status, 1, unbounded.stdout + unbounded.stderr);

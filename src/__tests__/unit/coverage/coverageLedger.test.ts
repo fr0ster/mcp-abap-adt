@@ -200,6 +200,18 @@ describe('the coverage ledger guard', () => {
     // where no live case runs, for the reason stated.
     assertEquals(reasonRows(readJson(LEDGER)), [
       {
+        key: 'CheckAbapGitRepo',
+        kind: 'onprem',
+        reason:
+          "SAP's on-premise abapGit handler cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); the live case asserts that refusal whole, 500 with no T100 key",
+      },
+      {
+        key: 'HandlerAbapGitGet#checks',
+        kind: 'onprem',
+        reason:
+          "SAP's on-premise abapGit handler cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); the live case asserts that refusal whole, 500 with no T100 key",
+      },
+      {
         key: 'HandlerActivate#PROGRAM_TEXT_ELEMENTS',
         kind: 'cloud',
         reason:

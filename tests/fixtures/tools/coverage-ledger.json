@@ -106,7 +106,9 @@
   "CheckAbapGitRepo": {
     "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
     "live": {
-      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "onprem": {
+        "reason": "SAP's on-premise abapGit handler cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); the live case asserts that refusal whole, 500 with no T100 key"
+      },
       "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
     }
   },
@@ -776,7 +778,9 @@
   "HandlerAbapGitGet#checks": {
     "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
     "live": {
-      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "onprem": {
+        "reason": "SAP's on-premise abapGit handler cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); the live case asserts that refusal whole, 500 with no T100 key"
+      },
       "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
     }
   },

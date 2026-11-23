@@ -54,7 +54,7 @@ export function wireValueOf(value: unknown): WireValue {
 }
 
 /**
- * An answer's body as text, the way `String` writes it; an absent one
+ * An answer's body as text, the way `String` writes it (bytes as UTF-8); an absent one
  * (`undefined`, `null`) is `''`. The body is read once, told apart by
  * {@link wireValueOf}, and written from what that answers.
  */
@@ -69,7 +69,8 @@ export function bodyTextOf(
     case 'null':
       return '';
     case 'bytes':
-      return String(body.bytes);
+      // A `Buffer`'s text, as UTF-8 — never its numbers.
+      return new TextDecoder().decode(body.bytes);
     case 'list':
     case 'object':
     case 'other':

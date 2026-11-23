@@ -6,6 +6,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { handleGetPackage } from '../../../handlers/package/high/handleGetPackage';
+import { ourAtc } from '../../../lib/strategies/resultSets';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { recordingConnection } from '../../helpers/recordingConnection';
 
@@ -24,5 +25,28 @@ describe('a one-read tool answers its document at raw', () => {
     );
     assert.equal(answered.isError, false, answered.content[0]?.text);
     assert.equal(answered.content[0]?.text, METADATA);
+  });
+
+  // Codex round 7: a body the connection hands over as bytes (a Buffer) is
+  // its UTF-8 text, never its numbers.
+  it('GetPackage: a Buffer body is its UTF-8 text', async () => {
+    const connection = recordingConnection([{ data: Buffer.from(METADATA) }]);
+    declareSystemKind(connection, 'onprem');
+    const answered = await handleGetPackage(
+      { connection, logger: undefined } as never,
+      { package_name: 'zpkg', detail: 'raw' } as never,
+    );
+    assert.equal(answered.content[0]?.text, METADATA);
+  });
+
+  it('the ATC findings and result readings: a Buffer body is its UTF-8 text', () => {
+    const answer = {
+      status: 200,
+      statusText: 'OK',
+      headers: {},
+      data: Buffer.from('<atcworklist:worklist/>'),
+    };
+    assert.equal(ourAtc.findings(answer), '<atcworklist:worklist/>');
+    assert.equal(ourAtc.result(answer), '<atcworklist:worklist/>');
   });
 });

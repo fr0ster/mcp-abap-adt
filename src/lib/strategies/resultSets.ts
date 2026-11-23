@@ -479,12 +479,21 @@ export const ourUnitTest = {
  */
 export const ourAtc = {
   ...atcDocuments,
+  // The documents as text, a `Buffer` body as its UTF-8 (`verbatim` over
+  // our `rawOf`), never its numbers (Codex round 7).
+  findings: verbatimText,
+  result: verbatimText,
   checkVariant: atcSystemCheckVariant,
   worklist: atcWorklistId,
   startedRun: atcStartedRun,
   waitingRun: atcWaitingRun,
   runStatus: atcRunStatus,
 };
+
+/** A document as text: the body as our `rawOf` reads it. */
+function verbatimText(answer: IAdtWireResponse): string {
+  return rawOf(answer);
+}
 
 /**
  * The profiler set with the readings adt-clients 22 applied by default

@@ -838,7 +838,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackage-read-only-package"></a>
 #### GetPackage (Read-Only / Package)
-**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
+**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Per `detail`: terse a TSV summary (its facts as `# field value` lines, one row per sub-package); medium and full the details under `metadata`, with `part: "metadata"`; raw the document as SAP sent it.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -3396,7 +3396,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.
+**Description:** [read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Per `detail`: terse a TSV summary (its facts as `# field value` lines, one row per sub-package); medium and full the details under `metadata`, with `part: "metadata"`; raw the document as SAP sent it.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 

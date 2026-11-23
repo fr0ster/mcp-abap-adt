@@ -457,7 +457,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
 #### GetAbapGitModifiedObjects (Read-Only / Abapgit)
-**Description:** [read-only] Reads the objects of the system that a pull of the repository would overwrite: those changed locally, and those held by another package. Answers facts only: each object with its type, name, package, URI and the action SAP names for it.
+**Description:** [read-only] Reads every object a pull of the repository would change in the system: changed in the remote, in the system or in both, added or deleted on either side, and those held by another package. Answers facts only: each object with its type, name, package, URI and SAP's action: 1 add, 2 update (changed only in the remote), 3 overwrite (changed in the system), 4 delete, 5 delete and re-create, 6 package move.
 
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
 

@@ -127,7 +127,7 @@ function offered<P extends object, A extends string>(
 const ACTION_WORDS_GET: Readonly<Record<AbapGitGetAction, string>> = {
   repos: 'repos (the linked repositories)',
   external_repo: 'external_repo (what a remote repository offers)',
-  modified_objects: 'modified_objects (what a pull would overwrite)',
+  modified_objects: 'modified_objects (what a pull would change)',
   staging: 'staging (what changed)',
   checks: "checks (the repository's connection to its remote)",
   file: 'file (one file of the repository)',
@@ -265,7 +265,7 @@ function writeProperties(actions: readonly AbapGitWriteAction[]) {
     ),
     overwrite: OVERWRITE_FIELD.optional().describe(
       said(actions, {
-        pull: 'cloud: the objects of modified_objects that the pull overwrites with their remote version, each once, by type and name; the others keep their system version. Without it the pull overwrites every one.',
+        pull: 'cloud: the objects of modified_objects to overwrite with their remote version, each once, by type and name: an object changed in the system or held by another package is overwritten only when named here, and one changed only in the remote is imported either way. Without it the pull overwrites every listed object.',
       }),
     ),
     comment: COMMENT_FIELD.optional().describe(
@@ -345,7 +345,7 @@ const ACTION_SENTENCES_GET: Readonly<Record<AbapGitGetAction, string>> = {
   external_repo:
     'external_repo(url*, detail) the access mode and the branches of the remote repository at url',
   modified_objects:
-    'modified_objects(repository_key*, detail) the objects a pull would overwrite, changed locally or held by another package',
+    "modified_objects(repository_key*, detail) every object a pull would change: changed in the remote, in the system or both, added or deleted, or held by another package, each with SAP's action (1 add, 2 update: changed only in the remote, 3 overwrite: changed in the system, 4 delete, 5 delete and re-create, 6 package move)",
   staging:
     'staging(repository_key*, detail) the unstaged, staged and ignored objects with their files, and the proposed author and committer',
   checks:
@@ -359,7 +359,7 @@ const ACTION_SENTENCES_WRITE: Readonly<Record<AbapGitWriteAction, string>> = {
   link: 'link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch',
   unlink:
     "unlink(repository_key*) ends the repository's binding to its package; the objects stay",
-  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job, its objects are inactive, and of the objects modified_objects lists (changed in the system, or held by another package) it overwrites every one, or with overwrite only those it names',
+  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job, its objects are inactive, and it brings every object modified_objects lists to its remote version, or with overwrite only the objects changed in the system or held by another package that overwrite names, the objects changed only in the remote imported either way',
   push: 'push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job',
   switch_branch:
     'switch_branch(repository_key*, branch*, create*) switches the branch, creating it in the remote with create true',

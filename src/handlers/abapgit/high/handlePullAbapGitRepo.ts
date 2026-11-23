@@ -56,15 +56,18 @@ const IMPORTS =
   'every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too';
 
 /**
- * On the cloud, SAP's pull handler hands its job every object R6 lists —
- * changed in the system, or held by another package — when the request
- * selects none (`CL_ABAPGIT_RES_REPO_PULL->post` L234–240), and only the
- * selected ones with `overwrite` (L230–233); the job leaves every other
- * entry unimported (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152). Code,
- * read on the cloud 2026-11-23.
+ * On the cloud (Code, read 2026-11-23): R6 lists every changed object
+ * (`CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find` L140–210). SAP's pull
+ * handler hands its job every R6 entry when the request selects none
+ * (`CL_ABAPGIT_RES_REPO_PULL->post` L234–240), only the selected ones with
+ * `overwrite` (L230–233); the job marks the others `N`
+ * (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152), and the import drops an
+ * `N` entry only when it is changed locally or held by another package
+ * (`CL_ABAPGIT_OBJECTS->warning_overwrite_adjust` L1791,
+ * `warning_package_adjust`): a remote-only change is imported either way.
  */
 const CLOUD_IMPORTS =
-  'every object changed only in the remote is imported; the objects changed in the system or held by another package are overwritten with their remote version — with overwrite, only those it names, the others keeping their system version';
+  'every object the modified-objects read lists is brought to its remote version; with overwrite, the objects changed in the system or held by another package are overwritten only when overwrite names them, the others keeping their system version, and the objects changed only in the remote are imported either way';
 
 const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 

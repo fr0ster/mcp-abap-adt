@@ -179,6 +179,24 @@ interface OutlineRead {
   outline: IObjectOutline | undefined;
 }
 
+/** A document read with its parse: a document that is no outline throws. */
+const parsedRead = (document: string): OutlineRead => ({
+  document,
+  outline: outlineOf(document),
+});
+
+/**
+ * How the call reads SAP's document at each `detail`: parsed at terse,
+ * medium and full — inside the call, so a document that is no outline is
+ * the call's failure — and as it came at raw.
+ */
+const OUTLINE_READS: AnswerTable<string, OutlineRead> = {
+  terse: parsedRead,
+  medium: parsedRead,
+  full: parsedRead,
+  raw: (document) => ({ document, outline: undefined }),
+};
+
 /** A component's definition: its first link with a position, else its first. */
 function definitionOf(component: AnsweredComponent): AnsweredLink | undefined {
   return (
@@ -288,8 +306,9 @@ export async function handleGetObjectOutline(
     outlineAnswers(object_type, objectName, version),
     levelOf(args),
   );
+  const readAt = answerAt(OUTLINE_READS, levelOf(args));
   /** The outline the call read, for the projection: parsed once. */
-  const read: { outline?: IObjectOutline } = {};
+  const read: { outline?: IObjectOutline | undefined } = {};
 
   return answer(
     { tool: 'GetObjectOutline', detail },
@@ -302,8 +321,8 @@ export async function handleGetObjectOutline(
         });
       // The document is read once, inside the call, as GetObjectStructure
       // checks its own: an answer that is no outline is the call's failure.
-      if (detail !== 'raw' && response.ok) {
-        read.outline = outlineOf(response.getResult().value);
+      if (response.ok) {
+        read.outline = readAt(response.getResult().value).outline;
       }
       return response;
     },

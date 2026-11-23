@@ -340,6 +340,28 @@ describe('GetObjectOutline', () => {
     assert.ok(result.text.includes('no outline document'));
   });
 
+  // The parse is the level's (OUTLINE_READS): raw answers what SAP sent,
+  // read or not; every other level reads it, and refuses what is not one.
+  it('raw answers a 200 that is not an outline as it came; terse refuses it', async () => {
+    const at = (detail: 'raw' | 'terse') =>
+      run({
+        tool: 'GetObjectOutline',
+        variant: 'onprem',
+        stand: 'recording',
+        args: {
+          object_type: 'CLAS/OC',
+          object_name: 'ZMCP_D1_9E25_CL',
+          detail,
+        },
+        answers: [{ status: 200, data: '<not-an-outline/>' }],
+        expected: 'none',
+      });
+    const raw = await at('raw');
+    assert.equal(raw.isError, false);
+    assert.equal(raw.text, '<not-an-outline/>');
+    assert.equal((await at('terse')).isError, true);
+  });
+
   it('on the cloud a program is refused before anything is sent', async () => {
     const recorded = await recordCase({
       tool: 'GetObjectOutline',

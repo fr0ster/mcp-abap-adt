@@ -379,6 +379,34 @@ describe('two nodes SAP could not load in one level', () => {
   });
 });
 
+// Plan 9.3: the tree is what the writer writes, so it holds every walked
+// object exactly once — an object whose package the tree never reaches
+// included, at the root, where it was dropped.
+describe('the tree holds every walked object', () => {
+  it('an object of a package the tree does not reach is at the root', () => {
+    const walked = [
+      { name: 'SUB', type: 'DEVC/K', packageName: 'P' },
+      { name: 'ZA', type: 'CLAS/OC', packageName: 'SUB' },
+      { name: 'ZORPHAN', type: 'PROG/P', packageName: 'ELSEWHERE' },
+      { name: 'ZSELF', type: 'DEVC/K', packageName: 'P' },
+      { name: 'ZSELF', type: 'DEVC/K', packageName: 'ZSELF' },
+    ];
+    const tree = assembleTree('P', walked);
+    const names: string[] = [];
+    const visit = (node: { name: string; children?: readonly unknown[] }) => {
+      for (const child of (node.children ?? []) as Array<{
+        name: string;
+        children?: readonly unknown[];
+      }>) {
+        names.push(child.name);
+        visit(child);
+      }
+    };
+    visit(tree);
+    assert.deepStrictEqual([...names].sort(), walked.map((o) => o.name).sort());
+  });
+});
+
 describe('concurrentReader', () => {
   const context = { connection: {} } as unknown as HandlerContext;
   const tick = () => new Promise((resolve) => setImmediate(resolve));

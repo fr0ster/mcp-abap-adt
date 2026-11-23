@@ -1132,8 +1132,13 @@ export function assembleTree(
     byOwner.set(owner, [...(byOwner.get(owner) ?? []), o]);
   }
   const seen = new Set<string>([rootName]);
-  const childrenOf = (owner: string): PackageNode[] =>
-    (byOwner.get(owner) ?? []).map((o) => nodeOf(o));
+  // The owners whose objects the tree placed: every other owner's objects
+  // go under the root, so the tree holds every object walked (plan 9.3).
+  const placed = new Set<string>();
+  const childrenOf = (owner: string): PackageNode[] => {
+    placed.add(owner);
+    return (byOwner.get(owner) ?? []).map((o) => nodeOf(o));
+  };
   const nodeOf = (o: WalkedItem): PackageNode => {
     const kind = kindOf(o.type);
     const codeFormat = codeFormatOf(o.type);
@@ -1168,6 +1173,13 @@ export function assembleTree(
     };
   };
 
+  const children = childrenOf(rootName);
+  for (const [owner, owned] of byOwner) {
+    if (!placed.has(owner)) {
+      placed.add(owner);
+      children.push(...owned.map((o) => nodeOf(o)));
+    }
+  }
   return {
     name: rootName,
     type: PACKAGE_CODE,
@@ -1175,6 +1187,6 @@ export function assembleTree(
     isPackage: true,
     codeFormat: 'xml',
     restoreStatus: 'ok',
-    children: childrenOf(rootName),
+    children,
   };
 }

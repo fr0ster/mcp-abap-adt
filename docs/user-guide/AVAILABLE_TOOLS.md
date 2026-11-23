@@ -5227,4 +5227,4 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 ---
 
-*Last updated: 2026-11-22*
+*Last updated: 2026-11-23*

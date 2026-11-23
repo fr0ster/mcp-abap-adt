@@ -34,6 +34,16 @@ const CLOUD_SCHEMA = z.object(FIELDS);
 const IMPORTS =
   'every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too';
 
+/**
+ * On the cloud, SAP's pull job keeps every object R6 lists — changed in the
+ * system, or held by another package — unless the call selects it: it sets
+ * every unselected entry to "not imported" (`CL_ABAPGIT_BG_ACTION_PULL->execute`
+ * L123–152; Code). This tool sends no selection, so they keep their system
+ * version.
+ */
+const CLOUD_IMPORTS =
+  'every object changed only in the remote is imported; an object changed in the system, or held by another package, keeps its system version (GetAbapGitModifiedObjects lists those objects)';
+
 const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 
 export const TOOL_DEFINITION: KindToolDefinition<
@@ -48,7 +58,7 @@ export const TOOL_DEFINITION: KindToolDefinition<
     inputSchema: ONPREM_SCHEMA,
   },
   cloud: {
-    description: `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. SAP accepts it as its own job, which runs to its end; the objects it imports are inactive, and the repository list shows its run state. Answers facts only: SAP's status and accepted.`,
+    description: `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${CLOUD_IMPORTS}. SAP accepts it as its own job, which runs to its end; the objects it imports are inactive, and the repository list shows its run state. Answers facts only: SAP's status and accepted.`,
     inputSchema: CLOUD_SCHEMA,
   },
 };

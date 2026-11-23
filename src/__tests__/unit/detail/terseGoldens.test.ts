@@ -29,6 +29,7 @@ import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGe
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
+import { handleGetObjectOutline } from '../../../handlers/system/readonly/handleGetObjectOutline';
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import {
   type FeedShown,
@@ -743,6 +744,39 @@ CASES['GetATCResult a recorded result'] = async (detail) =>
       { display_id: 'E6AC99B2161F1FE1B5A1E9B68E5CD628', detail } as never,
     ),
   );
+
+for (const [label, corpus, type, name] of [
+  [
+    'a class',
+    'read-outline-class--01-objectstructure',
+    'CLAS/OC',
+    'ZCL_MCP_SHR',
+  ],
+  [
+    'a program',
+    'read-outline-program--01-objectstructure',
+    'PROG/P',
+    'ZMCP_SHR_PROG',
+  ],
+  [
+    'a function group',
+    'read-outline-function-group--01-objectstructure',
+    'FUGR/F',
+    'ZMCP_SHR_FGRP',
+  ],
+] as const) {
+  CASES[`GetObjectOutline ${label}`] = async (detail) =>
+    answeredOf(
+      await handleGetObjectOutline(
+        ctx([{ data: corpusBody(corpus) }]) as never,
+        {
+          object_type: type,
+          object_name: name,
+          detail,
+        } as never,
+      ),
+    );
+}
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-11-23
+## [Unreleased] - 2026-11-24
 
 ### Added
 
@@ -36,6 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A hanging unit test file fails the run with its name.** The runner takes `--file-timeout <seconds>`, and `npm test` passes `600`: a file still running then has its process tree ended as it is when the bound fires (every process still under the file's, whatever group or session it is in; a descendant reparented away before then is not reached), is named on stderr with the last test it started once its close is seen, and fails the run, while the other files run on and the run's end lists each file past the bound as `stopped` or `kill failed`; a tree that cannot be ended fails the run at once. Before, nothing bounded a file, and a hang ran until CI's 45-minute job timeout cancelled the job with no test named. The slowest unit file measured in CI took 194.5 s. The runner refuses the option under a live npm script and for any file under `__tests__/integration` or `__tests__/admin`, by its place on disk: live runs stay unbounded.
 - **A task number read through `GetTransport` showed the parent request's type and target, with no objects.** SAP answers a task's number with the task's document, whose `tm:request` holds the parent request's header, and `GetTransport` read that element as the item read (measured on premise and on the cloud, 2026-11-22). A task is now read from `tm:task`; the parent is answered only as `parent_request`.
 - **A top-level package can be created, locked and unlocked.** A package bound to a transport layer with no super package was refused before any request: `CreatePackage` and compact `HandlerCreate` `PACKAGE` required `super_package`, and `LockObjectLow` and compact `HandlerLock` `PACKAGE` answered "super_package is required for package locking.". SAP's package lock reads the package by its name alone, and adt-clients' `AdtPackage.lock()` sends the LOCK from the name alone; a create with no super package writes an empty `<pak:superPackage/>` (measured on premise, 2026-11-21: create `201`, LOCK `200`, UNLOCK `200`).
   - `CreatePackage` and `HandlerCreate` `PACKAGE`: `super_package` is optional, the package this package belongs to.

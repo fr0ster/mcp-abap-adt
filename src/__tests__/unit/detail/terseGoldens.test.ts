@@ -16,7 +16,12 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
+import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
+import {
+  createBatchAvailability,
+  NO_BATCH_ENDPOINT_STATUS,
+} from '../../../lib/batch/availability';
 import type { DetailLevel } from '../../../lib/detail';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { recordingConnection } from '../../helpers/recordingConnection';
@@ -102,6 +107,58 @@ for (const [label, descriptions, data] of [
         node_id: '000029',
         with_short_descriptions: descriptions,
       }),
+    );
+}
+
+/** A destination with no communication batch: reads go one by one, in order. */
+const sequential = (answers: Array<{ data: string; status?: number }>) => {
+  const availability = createBatchAvailability();
+  availability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+  return { ...ctx(answers), batchAvailability: availability };
+};
+
+const node = (type: string, name: string, description = '') =>
+  `<OBJECT_TYPE>${type}</OBJECT_TYPE><OBJECT_NAME>${name}</OBJECT_NAME><TECH_NAME>${name}</TECH_NAME><OBJECT_URI>/sap/bc/adt/x/${name.toLowerCase()}</OBJECT_URI>${description === '' ? '' : `<DESCRIPTION>${description}</DESCRIPTION>`}`;
+
+/** A package root with a class, a subpackage, a nameless object and a node not loaded. */
+const ROOT_P = level(
+  node('CLAS/OC', 'ZCL_A', 'Class A'),
+  node('DEVC/K', 'ZSUB', 'Sub'),
+  '<OBJECT_TYPE>PROG/P</OBJECT_TYPE><OBJECT_NAME/><OBJECT_URI>/sap/bc/adt/programs/programs/nameless</OBJECT_URI>',
+  '<OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME>',
+);
+const ROOT_SUB = level(node('PROG/P', 'ZPROG', 'Program'));
+const REFUSED = {
+  status: 403,
+  data: `${xmlHead}<exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><namespace id="com.sap.adt"/><type id="ExceptionNotAuthorized"/><message lang="EN">no authorization</message></exc:exception>`,
+};
+
+for (const descriptions of [false, true]) {
+  CASES[
+    `GetPackageContents one package, a subpackage${descriptions ? ', descriptions' : ''}`
+  ] = async (detail) =>
+    answeredOf(
+      await handleGetPackageContents(
+        sequential([{ data: ROOT_P }, { data: ROOT_SUB }]) as never,
+        {
+          package_name: 'ZPKG',
+          include_descriptions: descriptions,
+          detail,
+        } as never,
+      ),
+    );
+  CASES[
+    `GetPackageContents two packages, one refused${descriptions ? ', descriptions' : ''}`
+  ] = async (detail) =>
+    answeredOf(
+      await handleGetPackageContents(
+        sequential([{ data: ROOT_SUB }, REFUSED]) as never,
+        {
+          package_names: ['ZSUB', 'ZGONE'],
+          include_descriptions: descriptions,
+          detail,
+        } as never,
+      ),
     );
 }
 

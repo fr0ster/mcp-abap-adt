@@ -261,7 +261,8 @@ row SAP answered is answered. `detail` has four levels:
   gap; `CreateTransport` answers a read-back that failed — with SAP's response or with none — as
   `{ "responses", "read_back" }`, the responses beside the same note `full` gives. A body the
   connection hands over as an object is its JSON text, bytes their UTF-8 text. `raw` and `full`
-  give the same error when the exchange itself failed (a refusal, no response), or `full` explains
+  give the same error when the exchange itself failed (a refusal, no response, a part of a batch
+  envelope answered outside `2xx` whatever the envelope's own status), or `full` explains
   an error inside its answer; on a parse failure — every exchange answered, our reading refused it
   — `raw` still gives the documents, while `full` gives the parse's error. Otherwise the two differ:
   `full` is the whole parse, `raw` what ADT sent.

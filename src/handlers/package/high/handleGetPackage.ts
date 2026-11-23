@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
   name: 'GetPackage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Returns it under `metadata`, with `part: "metadata"`: a summary, the details or the document as SAP sent it, per `detail`.',
+    '[read-only] Reads the ABAP package named by package_name in one request: its ADT metadata document (description, super-package, sub-packages, ...), at the version asked. Per `detail`: terse a TSV summary (its facts as `# field value` lines, one row per sub-package); medium and full the details under `metadata`, with `part: "metadata"`; raw the document as SAP sent it.',
   inputSchema: z.object({
     package_name: requiredText('package_name is required').describe(
       'Package name.',

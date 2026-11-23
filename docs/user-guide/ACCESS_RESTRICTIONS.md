@@ -171,7 +171,10 @@ decides. The grounds, read in SAP's code:
   runs and matches a selection by object name alone (`CL_ABAPGIT_BG_ACTION_PULL`,
   `deserialize_checks` L113, decisions L123–154), and deletes the objects whose deletion it
   confirmed (`delete_unnecessary_objects` L39–72): a selection checked before the submit does not
-  bound what the job writes. A selective pull (`overwrite`) is a pull, refused the same way.
+  bound what the job writes. An unselected entry is dropped from the import only when it is
+  changed in the system or held by another package (`CL_ABAPGIT_OBJECTS->warning_overwrite_adjust`
+  L1791, `warning_package_adjust`): an object changed only in the remote is imported whatever the
+  selection. A selective pull (`overwrite`) is a pull, refused the same way.
 - **On ABAP Cloud, a pull given a request may create a task in it.** When the user has no task in
   the request, SAP creates one (`CL_ABAPGIT_RES_REPO_PULL->check_and_create_task`,
   `TR_INSERT_NEW_COMM` L76) — and an entry for a request does not cover its tasks.
@@ -200,7 +203,7 @@ sent". The list is read once per call; a background run gets the call's entry an
 
 ### Fail closed
 
-Each of these refuses the call in fixed words; nothing but the list (where it was read) is sent:
+Each of these refuses the call in fixed words; nothing is sent but the reads its row names — the repository list where it was read, and for the last two `overwrite` rows the modified-objects list as well:
 
 | Case | Code |
 |---|---|

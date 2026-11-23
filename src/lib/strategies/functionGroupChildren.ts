@@ -7,9 +7,10 @@ import type {
 import type { AdtCodes } from '../adtProjections';
 import {
   type AnswerTable,
-  completeAnswer,
-  identityOf,
-  Written,
+  entries,
+  rows,
+  writeJson,
+  writeListing,
 } from '../detail';
 import {
   childNodesOf,
@@ -123,61 +124,51 @@ export function functionGroupListAnswers(
     [listKey]: objects.map((o) => o.name),
     objects,
   });
-  const tool =
-    listKey === 'includes'
-      ? 'ListFunctionGroupIncludes'
-      : 'ListFunctionModules';
   /** A nameless child's URI, what tells it apart; `''` for a named one. */
   const namelessUri = (o: GroupChild) => (o.name === '' ? (o.uri ?? '') : '');
-  // Every child the node structure held, or nothing (`completeAnswer`);
-  // each identified by the cells or fields written.
+  // Every child the node structure held, written from the list by the
+  // listing writers: one row or entry each.
   return {
-    terse: completeAnswer(
-      tool,
-      (objects: GroupChild[]) =>
-        objects.map((o) => identityOf([o.name, namelessUri(o)])),
-      (objects: GroupChild[]) =>
-        Written.text(
-          [
-            { head: 'function_group', value: functionGroupName },
-            { head: 'total', value: String(objects.length) },
-            { header: ['name', 'uri', 'description'] },
-            ...objects.map((o) => ({
-              row: [o.name, namelessUri(o), o.description ?? ''],
-            })),
-          ],
-          [0, 1],
-        ),
-    ),
+    terse: (objects: GroupChild[]) =>
+      writeListing({
+        heads: [
+          { head: 'function_group', value: functionGroupName },
+          { head: 'total', value: String(objects.length) },
+        ],
+        reading: { objects },
+        lists: {
+          objects: rows('objects', {
+            columns: [
+              { name: 'name', cell: (o: GroupChild) => o.name },
+              { name: 'uri', cell: namelessUri },
+              {
+                name: 'description',
+                cell: (o: GroupChild) => o.description ?? '',
+              },
+            ],
+            header: 'always',
+          }),
+        },
+      }).answer,
     // Every field the node structure read but the uri — kept for a child
     // SAP listed without a name, what tells it apart.
-    medium: completeAnswer(
-      tool,
-      (objects: GroupChild[]) =>
-        objects.map((o) => identityOf([o.type, o.name, namelessUri(o)])),
-      (objects: GroupChild[]) =>
-        Written.json(
-          { function_group_name: functionGroupName, total: objects.length },
-          {
-            [listKey]: objects.map(
-              ({ uri, ...fields }): GroupChild =>
-                fields.name === '' && uri !== undefined
-                  ? { ...fields, uri }
-                  : fields,
-            ),
-          },
-          ['type', 'name', 'uri'],
-        ),
-    ),
-    full: completeAnswer(
-      tool,
-      (objects: GroupChild[]) =>
-        objects.map((o) => identityOf([o.type, o.name, o.uri ?? ''])),
-      (objects: GroupChild[]) => {
-        const { objects: rows, ...rest } = full(objects);
-        return Written.json(rest, { objects: rows }, ['type', 'name', 'uri']);
-      },
-    ),
+    medium: (objects: GroupChild[]) =>
+      writeJson(
+        { function_group_name: functionGroupName, total: objects.length },
+        { objects },
+        {
+          objects: entries(
+            'objects',
+            ({ uri, ...fields }: GroupChild): GroupChild =>
+              fields.name === '' && uri !== undefined
+                ? { ...fields, uri }
+                : fields,
+            { as: listKey },
+          ),
+        },
+      ).answer,
+    // The whole parse, as it is.
+    full,
     raw: full,
   };
 }

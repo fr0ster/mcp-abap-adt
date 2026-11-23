@@ -98,19 +98,33 @@ async function whereUsed(
 }
 
 describe('GetWhereUsed detail', () => {
-  it('terse, by default: the usages grouped by package, no node and no uri', async () => {
+  it('terse, by default: the usages grouped by package, no node, the uri only for a nameless one', async () => {
     const expected = [
       '# total 3',
-      'type\tname\tusage',
+      'type\tname\turi\tusage',
       '# package ZPKG',
-      'CLAS/OC\tZCL_USER\t',
-      'PROG/P\tZPROG\tgradeDirect,includeTest',
+      'CLAS/OC\tZCL_USER\t\t',
+      'PROG/P\tZPROG\t\tgradeDirect,includeTest',
       '# package ZOTHER',
-      'INTF/OI\tZIF_X\t',
+      'INTF/OI\tZIF_X\t\t',
     ].join('\n');
     assert.equal(await whereUsed(undefined), expected);
     assert.equal(await whereUsed('terse'), expected);
   });
+
+  // Codex round 7: a reference SAP lists without a name but with an
+  // address and a usage is an object that uses the one asked — it reaches
+  // every level, counted, its URI what tells it apart.
+  const NAMELESS = DOCUMENT.replace(
+    '</usagereferences:referencedObjects>',
+    `${ref('/sap/bc/adt/oo/classes/nameless', 'CLAS/OC', '', 'ZPKG', 'gradeDirect,includeTest')}</usagereferences:referencedObjects>`,
+  );
+  for (const detail of ['terse', 'medium', 'full'] as const) {
+    it(`a nameless usage with its uri reaches ${detail}`, async () => {
+      const text = await whereUsed(detail, [NAMELESS]);
+      assert.ok(text.includes('/sap/bc/adt/oo/classes/nameless'), text);
+    });
+  }
 
   it('medium: every reference with every field, no uri', async () => {
     const answer = JSON.parse(await whereUsed('medium'));

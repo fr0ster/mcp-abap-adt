@@ -85,6 +85,7 @@ import {
   presentScopeOptions,
   type WhereUsedListRead,
   type WhereUsedListResult,
+  type WhereUsedReference,
   type WhereUsedSource,
   whereUsedOn,
 } from '../../../lib/strategies/whereUsedList';
@@ -390,36 +391,44 @@ function whereUsedRows(result: WhereUsedListResult): Written<string> {
       row: [
         reference.type,
         reference.name,
+        namelessUri(reference),
         usage === COMMON_USAGE ? '' : usage,
       ],
     });
     groups.set(pkg, rows);
   }
-  // Each usage identified by its type and name as written, its package by
-  // the group line it stands under.
+  // Each usage identified by its type and name as written — and a nameless
+  // one by its URI — its package by the group line it stands under.
   return Written.text(
     [
       { head: 'total', value: String(result.totalReferences) },
-      { header: ['type', 'name', 'usage'] },
+      { header: ['type', 'name', 'uri', 'usage'] },
       ...[...groups].flatMap(([value, rows]): Line[] => [
         { group: 'package', value },
         ...rows,
       ]),
     ],
-    [0, 1],
+    [0, 1, 2],
   );
 }
 
-/** A reference's identity, as written: its type, name and package (each counted as often as it comes). */
+/** A reference SAP listed without a name: its URI, what tells it apart; `''` for a named one. */
+function namelessUri(reference: { name: string; uri?: string | undefined }) {
+  return reference.name === '' ? (reference.uri ?? '') : '';
+}
+
+/** A reference's identity at medium, as written: its type, name, package and a nameless one's URI. */
 function referenceIdentity(reference: {
   type: string;
   name: string;
   package_name?: string | undefined;
+  uri?: string | undefined;
 }): string {
   return identityOf([
     reference.type,
     reference.name,
     reference.package_name ?? '',
+    namelessUri(reference),
   ]);
 }
 
@@ -427,7 +436,9 @@ function referenceIdentity(reference: {
 const heldUsages = ({ result }: WhereUsedRead) =>
   result.references
     .filter((reference) => reference.usage_information !== undefined)
-    .map((reference) => identityOf([reference.type, reference.name]));
+    .map((reference) =>
+      identityOf([reference.type, reference.name, namelessUri(reference)]),
+    );
 
 /** Every reference the list held, its package and container nodes too. */
 const heldReferences = ({ result }: WhereUsedRead) =>
@@ -455,15 +466,39 @@ const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, string | object> = {
         result_description: result.resultDescription,
       },
       {
-        references: result.references.map(({ uri: _uri, ...fields }) => fields),
+        // Every field but the URI — kept for a reference SAP listed without
+        // a name, what tells it apart.
+        references: result.references.map(
+          ({ uri, ...fields }): WhereUsedReference =>
+            fields.name === '' && uri !== undefined
+              ? { ...fields, uri }
+              : fields,
+        ),
       },
-      ['type', 'name', 'package_name'],
+      ['type', 'name', 'package_name', 'uri'],
     ),
   ),
-  full: completeAnswer('GetWhereUsed', heldReferences, ({ result, args }) => {
-    const { references, ...rest } = fullWhereUsed(result, args);
-    return Written.json(rest, { references }, ['type', 'name', 'package_name']);
-  }),
+  full: completeAnswer(
+    'GetWhereUsed',
+    ({ result }: WhereUsedRead) =>
+      result.references.map((reference) =>
+        identityOf([
+          reference.type,
+          reference.name,
+          reference.package_name ?? '',
+          reference.uri ?? '',
+        ]),
+      ),
+    ({ result, args }) => {
+      const { references, ...rest } = fullWhereUsed(result, args);
+      return Written.json(rest, { references }, [
+        'type',
+        'name',
+        'package_name',
+        'uri',
+      ]);
+    },
+  ),
   raw: ({ result }) => result.document,
 };
 

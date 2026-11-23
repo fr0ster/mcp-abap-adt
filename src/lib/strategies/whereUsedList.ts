@@ -148,8 +148,15 @@ export const whereUsedListReading = (
   answer: IAdtWireResponse,
 ): WhereUsedListRead => {
   const read = utilWhereUsedReferences(answer);
+  // A reference SAP lists without a name is kept when it carries an address
+  // and a usage — an object that uses the one asked, its URI what tells it
+  // apart (Codex round 7); one with neither is no reference.
   const references: WhereUsedReference[] = read.references
-    .filter((reference) => reference.name !== '')
+    .filter(
+      (reference) =>
+        reference.name !== '' ||
+        (reference.uri !== '' && reference.usageInformation !== ''),
+    )
     .map((reference) => ({
       name: reference.name,
       type: reference.type ?? reference.unknownType,

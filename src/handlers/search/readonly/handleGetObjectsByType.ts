@@ -5,7 +5,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type.',
+    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and the uri of an object listed without a name.',
   inputSchema: z.object({
     parent_name: z.string().describe('[read-only] Parent object name'),
     parent_tech_name: z.string().describe('[read-only] Parent technical name'),
@@ -28,11 +28,18 @@ import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
+  completeAnswer,
+  identityOf,
+  type Line,
+  Written,
+} from '../../../lib/detail';
+import {
   type CachedObject,
   objectsListCache,
 } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
+  type NodeItem,
   type NodeLevel,
   nodeItemsOf,
 } from '../../../lib/strategies/packageWalk';
@@ -40,8 +47,7 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 /**
- * Grouped, human-readable text — the same shape this tool answered before the
- * migration, built off `ourUtils.node` (adt-strategies' `utilNodeContents`,
+ * TSV under `# parent`, `# node_id` and `# count` lines, built off `ourUtils.node` (adt-strategies' `utilNodeContents`,
  * 0.28.1: complete and incomplete objects, each listed) instead of a
  * hand-rolled regex over the raw node-structure XML. The cached rows carry
  * `TECH_NAME`/`OBJECT_URI` where the node does. `format: 'raw'` stays
@@ -62,41 +68,39 @@ function formatObjects(
     ...(o.description ? { DESCRIPTION: o.description } : {}),
   }));
 
-  if (objects.length === 0) {
-    return {
-      text: `No objects found for node_id '${nodeId}' in ${parentType} '${parentName}'.`,
-      cached,
-    };
-  }
+  // Every object SAP listed under the node, as TSV through `Written`:
+  // names escaped, each row an item the guard counts.
+  const text = completeAnswer(
+    'GetObjectsByType',
+    () => objects.map(itemIdentity),
+    () =>
+      Written.text(
+        [
+          { head: 'parent', value: `${parentType} ${parentName}` },
+          { head: 'node_id', value: nodeId },
+          { head: 'count', value: String(objects.length) },
+          { header: ['type', 'name', 'tech_name', 'uri'] },
+          ...objects.map((o): Line => ({ row: itemCells(o) })),
+        ],
+        [0, 1, 2, 3],
+      ),
+  )(undefined);
+  return { text, cached };
+}
 
-  let responseText = `Found ${objects.length} objects for node_id '${nodeId}' in ${parentType} '${parentName}':\n\n`;
-  const objectTypes = [...new Set(objects.map((o) => o.type))];
+/** A row's cells: the technical name where it is not the name, the URI of a nameless object. */
+function itemCells(o: NodeItem): string[] {
+  return [
+    o.type,
+    o.name,
+    o.techName !== undefined && o.techName !== o.name ? o.techName : '',
+    o.name === '' ? (o.uri ?? '') : '',
+  ];
+}
 
-  if (objectTypes.length > 1) {
-    for (const objType of objectTypes) {
-      const typeObjects = objects.filter((o) => o.type === objType);
-      responseText += `Type: ${objType} (${typeObjects.length} objects)\n`;
-      for (const o of typeObjects) {
-        responseText += `   - ${o.name}\n`;
-      }
-      responseText += '\n';
-    }
-  } else {
-    responseText += `Object Type: ${objectTypes[0]}\n\n`;
-    for (const o of objects) {
-      responseText += `   - ${o.name}\n`;
-    }
-  }
-
-  responseText += `\nSummary: ${objects.length} objects found\n`;
-  if (objectTypes.length > 1) {
-    for (const objType of objectTypes) {
-      const count = objects.filter((o) => o.type === objType).length;
-      responseText += `   ${objType}: ${count} objects\n`;
-    }
-  }
-
-  return { text: responseText, cached };
+/** An object's identity, as its row writes it. */
+function itemIdentity(o: NodeItem): string {
+  return identityOf(itemCells(o));
 }
 
 export async function handleGetObjectsByType(

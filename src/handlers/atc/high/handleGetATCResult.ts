@@ -2,15 +2,29 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import {
+  type AnswerTable,
+  answerAt,
+  completeAnswer,
+  Written,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import { terseFinding } from '../../../lib/strategies/atcFindings';
+import {
+  FINDING_KEYS,
+  findingIdentity,
+  terseFinding,
+} from '../../../lib/strategies/atcFindings';
 import { parseAtcResult } from '../../../lib/strategies/atcResults';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 
 /**
@@ -50,24 +64,54 @@ export async function handleGetATCResult(
   return answer(
     { tool: 'GetATCResult', detail },
     () => atc.getResult(displayId, { analyse: analyseException }),
-    (document) => {
-      // raw: the result document as SAP sent it, nothing of ours around it.
-      if (detail === 'raw') return document;
-      const reading = parseAtcResult(String(document ?? ''));
-      return {
-        success: true,
-        display_id: reading.display_id,
-        title: reading.title,
-        check_variant: reading.check_variant,
-        created_at: reading.created_at,
-        objects_checked: reading.objects_checked,
-        finding_count: reading.findings.length,
-        by_priority: reading.by_priority,
-        findings:
-          detail === 'full'
-            ? reading.findings
-            : reading.findings.map(terseFinding),
-      };
-    },
+    (document) =>
+      answerAt(RESULT_ANSWERS, levelOf(args))(String(document ?? '')),
   );
 }
+
+/** The result's header: what it is and what it counted. */
+function resultHead(reading: ReturnType<typeof parseAtcResult>) {
+  return {
+    success: true,
+    display_id: reading.display_id,
+    title: reading.title,
+    check_variant: reading.check_variant,
+    created_at: reading.created_at,
+    objects_checked: reading.objects_checked,
+    finding_count: reading.findings.length,
+    by_priority: reading.by_priority,
+  };
+}
+
+/**
+ * What the stored result answers at each `detail`, selected through a table
+ * (`src/lib/detail`): terse the findings to act on (every finding, or
+ * nothing: `completeAnswer`), medium and full the whole parse, raw the
+ * result document as SAP sent it, nothing of ours around it.
+ */
+const RESULT_ANSWERS: AnswerTable<string, string | object> = (() => {
+  const whole = (document: string) => {
+    const reading = parseAtcResult(document);
+    return { ...resultHead(reading), findings: reading.findings };
+  };
+  return {
+    terse: completeAnswer(
+      'GetATCResult',
+      (document: string) =>
+        parseAtcResult(document)
+          .findings.map(terseFinding)
+          .map(findingIdentity),
+      (document: string) => {
+        const reading = parseAtcResult(document);
+        return Written.json(
+          resultHead(reading),
+          { findings: reading.findings.map(terseFinding) },
+          FINDING_KEYS,
+        );
+      },
+    ),
+    medium: whole,
+    full: whole,
+    raw: (document: string) => document,
+  };
+})();

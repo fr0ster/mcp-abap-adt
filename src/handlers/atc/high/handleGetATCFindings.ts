@@ -2,6 +2,12 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import {
+  type AnswerTable,
+  answerAt,
+  completeAnswer,
+  Written,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -9,10 +15,16 @@ import {
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import {
+  FINDING_KEYS,
+  findingIdentity,
   parseAtcWorklist,
   terseFinding,
 } from '../../../lib/strategies/atcFindings';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { ourAtc } from '../../../lib/strategies/resultSets';
 
 /**
@@ -55,37 +67,69 @@ export async function handleGetATCFindings(
   return answer(
     { tool: 'GetATCFindings', detail },
     () => atc.getFindings(worklistId, { analyse: analyseException }),
-    (document) => {
-      // `raw` is the document, which is the whole point of having the level:
-      // a caller needing an attribute neither reading keeps (the finding's
-      // own uri, its checksum, its processor) has it there.
-      if (detail === 'raw') return document;
-      const reading = parseAtcWorklist(String(document ?? ''));
-      return {
-        success: true,
-        worklist_id: worklistId,
-        objects_checked: reading.objects_checked,
-        finding_count: reading.findings.length,
-        by_priority: reading.by_priority,
-        // `full` is the whole parse; `terse` the fields to act on.
-        findings:
-          detail === 'full'
-            ? reading.findings
-            : reading.findings.map(terseFinding),
-        // **Zero objects is not zero findings.** A run writes into the
-        // worklist as it goes, so reading one whose run is still going
-        // answers a worklist with nothing in it — measured against trial on
-        // 2026-09-20, where a read taken right after `wait: false` answered
-        // no objects at all while `GetATCRunStatus` still said `running`.
-        // Left as counts alone that reads exactly like a clean check, which
-        // is the one outcome the client's own notes call dangerous. So when
-        // the worklist holds nothing, the answer says what that means.
-        ...(reading.objects_checked === 0
-          ? {
-              note: 'This worklist holds no objects yet. A run fills it as it completes, so this is not a clean result — ask GetATCRunStatus whether the run has finished, then read again.',
-            }
-          : {}),
-      };
-    },
+    (document) =>
+      answerAt(
+        findingsAnswers(worklistId),
+        levelOf(args),
+      )(String(document ?? '')),
   );
+}
+
+/**
+ * What the worklist answers at each `detail`, selected through a table
+ * (`src/lib/detail`): terse the findings to act on (every finding, or
+ * nothing: `completeAnswer`), medium and full the whole parse, raw the
+ * document — which is the whole point of having the level: a caller
+ * needing an attribute neither reading keeps (the finding's own uri, its
+ * checksum, its processor) has it there.
+ */
+function findingsAnswers(
+  worklistId: string,
+): AnswerTable<string, string | object> {
+  const head = (reading: ReturnType<typeof parseAtcWorklist>) => ({
+    success: true,
+    worklist_id: worklistId,
+    objects_checked: reading.objects_checked,
+    finding_count: reading.findings.length,
+    by_priority: reading.by_priority,
+  });
+  // **Zero objects is not zero findings.** A run writes into the worklist as
+  // it goes, so reading one whose run is still going answers a worklist with
+  // nothing in it — measured against trial on 2026-09-20, where a read taken
+  // right after `wait: false` answered no objects at all while
+  // `GetATCRunStatus` still said `running`. Left as counts alone that reads
+  // exactly like a clean check, which is the one outcome the client's own
+  // notes call dangerous. So when the worklist holds nothing, the answer
+  // says what that means.
+  const noteOf = (reading: ReturnType<typeof parseAtcWorklist>) =>
+    reading.objects_checked === 0
+      ? {
+          note: 'This worklist holds no objects yet. A run fills it as it completes, so this is not a clean result — ask GetATCRunStatus whether the run has finished, then read again.',
+        }
+      : {};
+  const whole = (document: string) => {
+    const reading = parseAtcWorklist(document);
+    return { ...head(reading), findings: reading.findings, ...noteOf(reading) };
+  };
+  return {
+    terse: completeAnswer(
+      'GetATCFindings',
+      (document: string) =>
+        parseAtcWorklist(document)
+          .findings.map(terseFinding)
+          .map(findingIdentity),
+      (document: string) => {
+        const reading = parseAtcWorklist(document);
+        return Written.json(
+          head(reading),
+          { findings: reading.findings.map(terseFinding) },
+          FINDING_KEYS,
+          noteOf(reading),
+        );
+      },
+    ),
+    medium: whole,
+    full: whole,
+    raw: (document) => document,
+  };
 }

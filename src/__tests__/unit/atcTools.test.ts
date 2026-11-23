@@ -756,6 +756,22 @@ describe('the two readers', () => {
     assert.equal(raw.content[0].text, RESULT_DOCUMENT);
   });
 
+  // Codex round 6, P1-5: GetATCResult's terse findings go through the
+  // guarded writer — every finding the result holds, each to act on.
+  it('GetATCResult terse: a finding per finding the result holds', async () => {
+    const DOCUMENT = corpusBody(
+      'atc-result-by-display-id-objects--01-results-e6ac99b2161f1fe1b5a26b71db975628',
+    );
+    atc = { getResult: async () => okResponse(DOCUMENT) };
+    const terse: any = await handleGetATCResult(context as any, {
+      display_id: 'D1',
+    });
+    assert.equal(terse.isError, false, terse.content[0].text);
+    const answer = payload(terse);
+    assert.equal(answer.findings.length, answer.finding_count);
+    assert.ok(answer.findings.length > 0);
+  });
+
   it('says so when the worklist is empty, rather than reading as clean', async () => {
     // What a read answers while the run is still going: measured against
     // trial, a worklist read right after `wait: false` carried no objects at

@@ -1,13 +1,18 @@
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { type AnswerTable, answerAt } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
 import {
   packageDetails,
@@ -31,6 +36,30 @@ export const TOOL_DEFINITION = {
 
 type GetPackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * What the package answers at each `detail`, selected through a table
+ * (`src/lib/detail`): terse a summary, medium and full the details, raw
+ * the metadata document as SAP sent it, nothing of ours around it.
+ */
+function packageAnswers(
+  packageName: string,
+  version: string,
+): AnswerTable<string, string | object> {
+  const answered = (metadata: object) => ({
+    success: true,
+    package_name: packageName,
+    version,
+    part: 'metadata',
+    metadata,
+  });
+  return {
+    terse: (document) => answered(packageSummary(document)),
+    medium: (document) => answered(packageDetails(document)),
+    full: (document) => answered(packageDetails(document)),
+    raw: (document) => document,
+  };
+}
+
 export async function handleGetPackage(
   context: HandlerContext,
   args: GetPackageArgs,
@@ -48,19 +77,10 @@ export async function handleGetPackage(
   return answer(
     { tool: 'GetPackage', detail },
     () => readPackageMetadata(client, { packageName }, version),
-    // raw: the metadata document as SAP sent it, nothing of ours around it.
     (metadata: AdtReading<string>) =>
-      detail === 'raw'
-        ? metadata.raw
-        : {
-            success: true,
-            package_name: packageName,
-            version,
-            part: 'metadata',
-            metadata:
-              detail === 'full'
-                ? packageDetails(metadata.raw)
-                : packageSummary(metadata.raw),
-          },
+      answerAt(
+        packageAnswers(packageName, version),
+        levelOf(args),
+      )(metadata.raw),
   );
 }

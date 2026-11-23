@@ -32,6 +32,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
+import { identityOf } from '../detail';
 import { fragmentStart, hrefParts } from '../sourceHref';
 import { parseXml } from '../xml/node';
 
@@ -101,6 +102,26 @@ export interface AtcFindingFull extends AtcFinding {
 }
 
 /** The terse fields of a finding, in the order they were always answered. */
+/** A finding's identity, as its terse row writes it: object, type, location, check and message. */
+export function findingIdentity(finding: AtcFinding): string {
+  return identityOf([
+    finding.object,
+    finding.object_type,
+    finding.location ?? '',
+    finding.check ?? '',
+    finding.message ?? '',
+  ]);
+}
+
+/** The identity keys of a terse finding, in {@link findingIdentity}'s order. */
+export const FINDING_KEYS = [
+  'object',
+  'object_type',
+  'location',
+  'check',
+  'message',
+] as const;
+
 export function terseFinding(finding: AtcFindingFull): AtcFinding {
   return {
     object: finding.object,

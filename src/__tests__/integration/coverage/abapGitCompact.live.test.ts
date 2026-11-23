@@ -145,6 +145,28 @@ liveSuite(['onprem', 'cloud'], 'abapGit, compact', () => {
     await run.assertPulled(marker);
   });
 
+  it('4d. on the cloud: a local change, selected in overwrite, is overwritten by the pull', async (t) => {
+    if (run.skippedUnless(t, 'cloud')) return;
+    await run.changeLocally();
+    const changed = await run.changeRemote('v2', 'v3');
+    const modified = await liveCall('HandlerAbapGitGet', {
+      action: 'modified_objects',
+      repository_key: run.key(),
+      detail: 'full',
+    });
+    const overwrite = run.overwriteChangedLocally(
+      json('GetAbapGitModifiedObjects', modified),
+    );
+    const job = await run.openJob('PullAbapGitRepo');
+    const pulled = await liveCall('HandlerAbapGit', {
+      action: 'pull',
+      repository_key: run.key(),
+      overwrite,
+    });
+    await run.endJob('PullAbapGitRepo', job, pulled);
+    await run.assertPulled(changed, 'l1');
+  });
+
   it('5. on premise: switches to the second branch and back; R1’s branch follows', async (t) => {
     if (run.skippedUnless(t, 'onprem')) return;
     const away = await liveCall('HandlerAbapGit', {

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   interfaceSource,
+  overwriteOf,
   overwrittenNames,
   succeeded,
   swapMarker,
@@ -46,6 +47,22 @@ describe("R6's locally changed objects", () => {
         packageWarningObjects: [{ name: 'ZAGS_I2', type: 'INTF' }],
       }),
       ['ZAGS_I1'],
+    );
+  });
+
+  it("overwrite names R6's overwrite entries of one name by their type and name as R6 answered them", () => {
+    assert.deepEqual(
+      overwriteOf(
+        {
+          overwriteObjects: [
+            { name: 'ZAGS_I1', type: 'INTF', uri: '/u', action: 2 },
+            { name: 'ZAGS_I3', type: 'INTF' },
+          ],
+          packageWarningObjects: [{ name: 'ZAGS_I1', type: 'INTF' }],
+        },
+        'ZAGS_I1',
+      ),
+      [{ type: 'INTF', name: 'ZAGS_I1' }],
     );
   });
 

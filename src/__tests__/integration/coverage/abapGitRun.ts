@@ -73,6 +73,7 @@ import {
 } from '../helpers/abapGitLedger';
 import {
   interfaceSource,
+  overwriteOf,
   overwrittenNames,
   succeeded,
   swapMarker,
@@ -415,7 +416,7 @@ export class AbapGitRun {
   }
 
   /** The marker the run's interface holds at `version`. */
-  marker(version: 'v1' | 'v2'): string {
+  marker(version: 'v1' | 'v2' | 'v3' | 'l1'): string {
     return `abapGit live run ${this.runId} ${version}`;
   }
 
@@ -600,18 +601,21 @@ export class AbapGitRun {
   }
 
   /**
-   * Changes the interface's file in the remote from `v1` to `v2`, the
-   * constant's value only; answers the `v2` marker.
+   * Changes the interface's file in the remote from `from` to `to`, the
+   * constant's value only; answers the `to` marker.
    */
-  async changeRemote(): Promise<string> {
+  async changeRemote(
+    from: 'v1' | 'v2' = 'v1',
+    to: 'v2' | 'v3' = 'v2',
+  ): Promise<string> {
     const path = `src/${this.fileName}`;
     const before = await this.github().readFile(this.branchName, path);
     assert.ok(before !== undefined, path);
-    const marker = this.marker('v2');
+    const marker = this.marker(to);
     await this.github().writeFile(
       this.branchName,
       path,
-      swapMarker(before.text, this.marker('v1'), marker),
+      swapMarker(before.text, this.marker(from), marker),
       before.sha,
       `abapGit live run ${this.runId}: a remote change`,
     );
@@ -620,25 +624,53 @@ export class AbapGitRun {
 
   /**
    * R6's facts (`detail: "full"`) list no run interface as changed
-   * locally: the change is the remote's only, so the server's pull, which
-   * sends no selection, imports it (`abapGitPull.ts`).
+   * locally: the interface was activated before its push and the change is
+   * the remote's only (`abapGitPull.ts`).
    */
   assertRemoteOnly(facts: unknown): void {
     assert.deepEqual(
       overwrittenNames(facts).filter((name) => name === this.interfaceName),
       [],
-      'R6 lists the run interface as changed locally: a pull with no selection would leave it out',
+      'R6 lists the run interface as changed locally after a remote-only change',
     );
+  }
+
+  /**
+   * R6's facts (`detail: "full"`) list the run interface as changed
+   * locally; answers the `overwrite` that selects it, its type and name as
+   * R6 answered them.
+   */
+  overwriteChangedLocally(facts: unknown): { type: string; name: string }[] {
+    const overwrite = overwriteOf(facts, this.interfaceName);
+    assert.equal(
+      overwrite.length,
+      1,
+      'R6 lists the run interface once as changed locally after its local change',
+    );
+    return overwrite;
+  }
+
+  /** Writes the interface in SAP at `l1` and activates it: a local change. */
+  async changeLocally(): Promise<void> {
+    const written = await livePrepare('UpdateInterface', {
+      interface_name: this.interfaceName,
+      source_code: interfaceSource(this.interfaceName, this.marker('l1')),
+      activate: true,
+    });
+    assert.equal(written.isError, false, written.text);
   }
 
   /**
    * The pulled change is in SAP. On premise the pull activates: the active
    * source holds it. On the cloud the pull imports inactive
    * (`CL_ABAPGIT_OBJECTS` L1127–1133; Code; adt-clients ERRATA, measured
-   * 2026-11-22): the inactive version holds it, the active one still the
-   * pushed `v1`.
+   * 2026-11-22): the inactive version holds it, the active one still
+   * `active` (the pushed `v1` by default).
    */
-  async assertPulled(marker: string): Promise<void> {
+  async assertPulled(
+    marker: string,
+    active: 'v1' | 'l1' = 'v1',
+  ): Promise<void> {
     const read = async (version: 'active' | 'inactive') => {
       const source = await livePrepare('GetInterface', {
         interface_name: this.interfaceName,
@@ -659,8 +691,8 @@ export class AbapGitRun {
       'the pulled change is the inactive version',
     );
     assert.ok(
-      (await read('active')).includes(this.marker('v1')),
-      'the active version is still the pushed one',
+      (await read('active')).includes(this.marker(active)),
+      'the active version is still the one before the pull',
     );
   }
 

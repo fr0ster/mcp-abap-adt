@@ -393,7 +393,9 @@ if (named.length > 0) {
 if (fileTimeout !== undefined) {
   // By where each file is on disk, whatever `--repo` says: a live or
   // integration file is never bounded.
-  const liveFiles = files.filter(isLiveFile);
+  // Called with the file alone: `filter`'s index would be read as the
+  // platform, and Windows would compare case.
+  const liveFiles = files.filter((file) => isLiveFile(file));
   if (liveFiles.length > 0) {
     fail(
       `--file-timeout is refused for a live or integration file: ${liveFiles.join(', ')}`,

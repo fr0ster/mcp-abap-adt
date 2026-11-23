@@ -819,6 +819,36 @@ for (const [label, data] of [
     );
 }
 
+// Plan 9.7: the tree is what the writer writes, so it holds every node of
+// the document — a node in a cycle of parents, or one sharing another's id,
+// included.
+CASES['GetObjectStructure a cycle of parents and a repeated id'] = async (
+  detail,
+) =>
+  answeredOf(
+    await handleGetObjectStructure(
+      ctx([
+        {
+          data: `${xmlHead}<projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/projectexplorer">${[
+            structureNode(
+              'nodeid="000010" parentid="000011" objecttype="CLAS/OA" objectname="ZCL_X" description="A" isfolder="false"',
+            ),
+            structureNode(
+              'nodeid="000011" parentid="000010" objecttype="CLAS/OA" objectname="ZCL_X" description="B" isfolder="false"',
+            ),
+            structureNode(
+              'nodeid="000012" objecttype="CLAS/OA" objectname="ZCL_X" description="C" isfolder="false"',
+            ),
+            structureNode(
+              'nodeid="000012" objecttype="CLAS/OA" objectname="ZCL_X" description="D" isfolder="false"',
+            ),
+          ].join('')}</projectexplorer:objectstructure>`,
+        },
+      ]) as never,
+      { objecttype: 'CLAS/OC', objectname: 'ZCL_X', detail } as never,
+    ),
+  );
+
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';
   const expected: Record<string, Answered> = fs.existsSync(FIXTURE_SOURCE)

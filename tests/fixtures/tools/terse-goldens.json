@@ -502,5 +502,17 @@
   "GetObjectStructure an empty structure @full": {
     "isError": false,
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
+  },
+  "GetObjectStructure a cycle of parents and a repeated id @terse": {
+    "isError": true,
+    "text": "{\"error\":\"incomplete_answer\",\"tool\":\"GetObjectStructure\",\"detail\":\"terse\",\"message\":\"GetObjectStructure: the compact answer could not represent every item the reading held, so nothing is answered; ask detail: 'full'\"}"
+  },
+  "GetObjectStructure a cycle of parents and a repeated id @medium": {
+    "isError": true,
+    "text": "{\"error\":\"incomplete_answer\",\"tool\":\"GetObjectStructure\",\"detail\":\"full\",\"message\":\"GetObjectStructure: the compact answer could not represent every item the reading held, so nothing is answered; ask detail: 'full'\"}"
+  },
+  "GetObjectStructure a cycle of parents and a repeated id @full": {
+    "isError": false,
+    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"projectexplorer:node\":[{\"@\":{\"nodeid\":\"000010\",\"parentid\":\"000011\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"A\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000011\",\"parentid\":\"000010\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"B\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000012\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"C\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000012\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"D\",\"isfolder\":\"false\"}}],\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
   }
 }

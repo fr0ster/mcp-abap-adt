@@ -914,6 +914,32 @@ describe('GetObjectsList', () => {
       second.join('\n'),
     );
   });
+  // Codex round 8: a part's own status is that read's answer. A metadata
+  // part answering 500 inside an envelope SAP answered 200 is a failed read:
+  // full answers the error, and raw the same error, never a success.
+  it('a metadata part refused inside an answered envelope: full and raw the same error', async () => {
+    const probe = system();
+    await withinTurns(
+      handleGetObjectsListOf(contextOn(probe), { ...single, detail: 'medium' }),
+    );
+    const metadataKey = (probe.envelopes.map(partKeys)[3] ?? [])[0] ?? '';
+    assert.ok(metadataKey.startsWith('GET '), metadataKey);
+    const model = { refuse: { [metadataKey]: 500 } };
+    const full = await withinTurns(
+      handleGetObjectsListOf(contextOn(system(model)), {
+        ...single,
+        detail: 'full',
+      }),
+    );
+    const raw = await withinTurns(
+      handleGetObjectsListOf(contextOn(system(model)), {
+        ...single,
+        detail: 'raw',
+      }),
+    );
+    assert.equal((full as { isError?: boolean }).isError, true);
+    assert.deepStrictEqual(raw, full);
+  });
 
   it('no envelope holds a request needing another of its parts', async () => {
     const fake = system();

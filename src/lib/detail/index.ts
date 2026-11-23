@@ -40,6 +40,7 @@ export {
 export { cellsOf } from './tsvCells';
 export {
   notOneDocumentWords,
+  partStatuses,
   recordedBody,
   recordedWire,
   type WireOf,

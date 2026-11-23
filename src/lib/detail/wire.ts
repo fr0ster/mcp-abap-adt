@@ -62,8 +62,16 @@ function thrownResponse(thrown: unknown): WireResponse | undefined {
 export async function recordedWire<R>(
   connection: IAbapConnection,
   run: () => Promise<R>,
-): Promise<{ result: R; documents: WireResponse[]; unanswered: number }> {
+): Promise<{
+  result: R;
+  documents: WireResponse[];
+  unanswered: number;
+  failedParts: number;
+}> {
   const documents: WireResponse[] = [];
+  // Inner parts of a batch envelope SAP answered outside `2xx`: each is a
+  // read that failed, whatever the envelope's own status.
+  let failedParts = 0;
   // Requests that failed with no response of SAP's (a timeout, an abort, a
   // refusal of the connection's own).
   let unanswered = 0;
@@ -80,18 +88,38 @@ export async function recordedWire<R>(
       else unanswered += 1;
       throw thrown;
     }
-    documents.push({
-      status: answered.status,
-      body: recordedBody(answered.data),
-    });
+    const body = recordedBody(answered.data);
+    documents.push({ status: answered.status, body });
+    const url = request[0]?.url ?? '';
+    if (url.endsWith('/batch')) {
+      failedParts += partStatuses(body).filter(
+        (status) => status < 200 || status >= 300,
+      ).length;
+    }
     return answered;
   };
   try {
-    return { result: await run(), documents, unanswered };
+    return { result: await run(), documents, unanswered, failedParts };
   } finally {
     if (own) connection.makeAdtRequest = original;
     else Reflect.deleteProperty(connection, 'makeAdtRequest');
   }
+}
+
+/**
+ * The statuses of a batch envelope's inner parts: each part's status line,
+ * `HTTP/1.x NNN …`, read line by line. Each is that read's answer.
+ */
+export function partStatuses(body: string): number[] {
+  const statuses: number[] = [];
+  for (const line of body.split('\n')) {
+    if (!line.startsWith('HTTP/1.')) continue;
+    const code = line.split(' ')[1] ?? '';
+    if (code.length === 3 && Number.isInteger(Number(code))) {
+      statuses.push(Number(code));
+    }
+  }
+  return statuses;
 }
 
 /** A tool's raw shape: one document, or the array of the documents it assembles. */
@@ -180,7 +208,7 @@ export async function wireAnswer(
   of: WireOf,
   run: () => Promise<ToolAnswer>,
 ): Promise<ToolAnswer> {
-  const { result, documents, unanswered } = await recordedWire(
+  const { result, documents, unanswered, failedParts } = await recordedWire(
     of.connection,
     run,
   );
@@ -190,6 +218,7 @@ export async function wireAnswer(
   // outline) still gives the documents: raw is what ADT sent.
   const exchangeFailed =
     unanswered > 0 ||
+    failedParts > 0 ||
     documents.some(
       (document) => document.status < 200 || document.status >= 300,
     );

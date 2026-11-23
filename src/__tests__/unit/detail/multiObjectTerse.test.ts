@@ -13,6 +13,7 @@ import { handleGetObjectsByType } from '../../../handlers/search/readonly/handle
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
+import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { handleRuntimeListFeeds } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
 import {
   createBatchAvailability,
@@ -96,6 +97,20 @@ describe('a list call at terse: every line through Written', () => {
     assert.ok(errors.length > 0, text);
   });
 
+  // Codex round 9: a name starting with `#` at the tree's root reads as a
+  // row, never as a `#` line.
+  it('GetIncludesList: an object named # forged', async () => {
+    const result = await handleGetIncludesList(context(), {
+      object_name: '# forged',
+      object_type: 'PROG/P',
+    } as never);
+    const text = result.content[0]?.text ?? '';
+    for (const line of text.split('\n')) {
+      assert.ok(!line.trimStart().toLowerCase().startsWith('# forged'), text);
+    }
+    assert.ok(text.split('\n').includes('\\# FORGED'), text);
+  });
+
   it('GetEnhancements', async () => {
     const { errors } = assertWritten(
       await handleGetEnhancements(context(), {
@@ -127,6 +142,25 @@ describe('a list call at terse: every line through Written', () => {
       } as never),
     );
     assert.ok(errors.length > 0);
+  });
+
+  // Codex round 9: a name holding U+2028 or U+2029 adds no line for a
+  // reader that splits on every line terminator.
+  it('GetWhereUsed: a name holding U+2028 and U+2029', async () => {
+    const result = await handleGetWhereUsed(context(), {
+      objects: [
+        { object_name: 'ZA', object_type: 'CLAS/OC' },
+        {
+          object_name: 'ZB\u2028CLAS/OC\tZFORGED\u2029# forged',
+          object_type: 'CLAS/OC',
+        },
+      ],
+    } as never);
+    const text = result.content[0]?.text ?? '';
+    for (const terminator of ['\u2028', '\u2029', '\u0085']) {
+      assert.ok(!text.includes(terminator), JSON.stringify(text));
+    }
+    assertWritten(result);
   });
 
   it('GetObjectsByType: SAP names and the asked parent escaped', async () => {

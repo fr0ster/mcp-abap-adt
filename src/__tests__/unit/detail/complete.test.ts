@@ -18,6 +18,7 @@ import {
   listedText,
   Written,
 } from '../../../lib/detail';
+import { cellsOf } from '../../../lib/detail/tsvCells';
 import { return_error } from '../../../lib/utils';
 
 /** Two objects SAP listed without a name, apart only by their URI. */
@@ -180,6 +181,41 @@ describe('completeAnswer over the cells written', () => {
     const four = Written.text([{ mark: 'm', words: ['a', 'b', 'c'] }], [0]);
     const answers = [one, two, three, four].map((w) => w.answer);
     assert.equal(new Set(answers).size, 4, answers.join(' | '));
+  });
+
+  // Codex round 9: every line terminator a reader may split on is escaped,
+  // and reads back.
+  it('every line terminator in a cell is escaped, and reads back', () => {
+    const value = 'a\u2028b\u2029c\u0085d\ve\ff\ng\rh\ti\\j';
+    const written = Written.text([{ row: [value, 'x'] }], [0]);
+    for (const terminator of [
+      '\n',
+      '\r',
+      '\v',
+      '\f',
+      '\u0085',
+      '\u2028',
+      '\u2029',
+    ]) {
+      assert.ok(
+        !written.answer.includes(terminator),
+        JSON.stringify(written.answer),
+      );
+    }
+    assert.deepStrictEqual(cellsOf(written.answer), [value, 'x']);
+  });
+
+  it('a first cell starting with # is escaped at every depth, the root too', () => {
+    const written = Written.text(
+      [
+        { root: ['# forged'], depth: 0 },
+        { row: ['# forged'], depth: 1 },
+      ],
+      [0],
+    );
+    for (const text of written.answer.split('\n')) {
+      assert.ok(!text.trimStart().startsWith('#'), written.answer);
+    }
   });
 
   it('head labels and header cells are escaped like every value', () => {

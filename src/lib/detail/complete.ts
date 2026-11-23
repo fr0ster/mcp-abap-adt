@@ -320,9 +320,11 @@ export class Written<A> {
 
 /** A row's text: its cells as a line, indented by its depth in a tree. */
 function written(cells: readonly string[], depth: number | undefined): string {
+  // A first cell starting with `#` escaped at every depth, the root's
+  // included: no row reads as a `#` line (Codex round 9).
   return depth === undefined
     ? line(cells)
-    : `${'  '.repeat(depth)}${cells.map(cell).join('\t')}`;
+    : `${'  '.repeat(depth)}${line(cells)}`;
 }
 
 /** A tree's nodes, depth first, each by its identity keys; the root's too when `withRoot`. */

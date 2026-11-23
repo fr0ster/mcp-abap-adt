@@ -1,8 +1,9 @@
 /**
- * A cell and a row of the terse list format (`./tsv`), escaped: a backslash,
- * a tab, a line feed and a carriage return are written as their escapes,
- * and a row's first cell starting with `#` gets a backslash before it, so no
- * row reads as a group line. Shared by `./tsv` and the guarded serializers
+ * A cell and a row of the terse list format, escaped: a backslash, a tab and
+ * every line terminator — line feed, carriage return, vertical tab, form
+ * feed, NEL, the line and paragraph separators — are written as their
+ * escapes, and a row's first cell starting with `#` gets a backslash before
+ * it, so no row reads as a `#` line. Shared by the guarded serializers
  * (`./complete`).
  */
 
@@ -14,7 +15,17 @@ export function cell(value: string): string {
     else if (character === '\t') written += '\\t';
     else if (character === '\n') written += '\\n';
     else if (character === '\r') written += '\\r';
-    else written += character;
+    else if (character === '\v') written += '\\v';
+    else if (character === '\f') written += '\\f';
+    // Every other line terminator a reader may split on — NEL, the line
+    // and paragraph separators — as its `\\uXXXX` escape (Codex round 9).
+    else if (
+      character === '\u0085' ||
+      character === '\u2028' ||
+      character === '\u2029'
+    ) {
+      written += `\\u${character.charCodeAt(0).toString(16).padStart(4, '0')}`;
+    } else written += character;
   }
   return written;
 }
@@ -35,16 +46,31 @@ export function cellsOf(written: string): string[] {
   const cells: string[] = [];
   let current = '';
   let escaped = false;
+  // The four hex digits of a `\\uXXXX` escape still to read.
+  let code: string | undefined;
   for (const character of written) {
-    if (escaped) {
-      current +=
-        character === 't'
-          ? '\t'
-          : character === 'n'
-            ? '\n'
-            : character === 'r'
-              ? '\r'
-              : character;
+    if (code !== undefined) {
+      code += character;
+      if (code.length === 4) {
+        current += String.fromCharCode(Number.parseInt(code, 16));
+        code = undefined;
+      }
+    } else if (escaped) {
+      if (character === 'u') code = '';
+      else {
+        current +=
+          character === 't'
+            ? '\t'
+            : character === 'n'
+              ? '\n'
+              : character === 'r'
+                ? '\r'
+                : character === 'v'
+                  ? '\v'
+                  : character === 'f'
+                    ? '\f'
+                    : character;
+      }
       escaped = false;
     } else if (character === '\\') {
       escaped = true;

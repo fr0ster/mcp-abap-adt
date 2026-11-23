@@ -54,14 +54,17 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
   type DetailLevel,
-  identityOf,
-  type Line,
-  type ListedPart,
-  listedText,
-  Written,
+  entries,
+  type Head,
+  type Listing,
+  nest,
+  omitting,
+  parts,
+  rows,
   wireAnswer,
+  writeJson,
+  writeListing,
 } from '../../../lib/detail';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import {
@@ -382,36 +385,50 @@ function fullWhereUsed(result: WhereUsedListResult, args: WhereUsedArgs) {
  * tree carry none, and leave — each usage names its package on the group
  * line. Every usage is answered: nothing is cut.
  */
-function whereUsedRows(result: WhereUsedListResult): Written<string> {
-  const groups = new Map<string, Line[]>();
-  for (const reference of result.references) {
-    const usage = reference.usage_information;
-    if (usage === undefined) continue;
-    const pkg = reference.package_name ?? '';
-    const rows = groups.get(pkg) ?? [];
-    rows.push({
-      row: [
-        reference.type,
-        reference.name,
-        namelessUri(reference),
-        usage === COMMON_USAGE ? '' : usage,
-      ],
-    });
-    groups.set(pkg, rows);
-  }
-  // Each usage identified by its type and name as written — and a nameless
-  // one by its URI — its package by the group line it stands under.
-  return Written.text(
-    [
-      { head: 'total', value: String(result.totalReferences) },
-      { header: ['type', 'name', 'uri', 'usage'] },
-      ...[...groups].flatMap(([value, rows]): Line[] => [
-        { group: 'package', value },
-        ...rows,
-      ]),
-    ],
-    [0, 1, 2],
-  );
+function whereUsedListing(
+  result: WhereUsedListResult,
+): Listing<WhereUsedListResult> {
+  return {
+    heads: [{ head: 'total', value: String(result.totalReferences) }],
+    reading: result,
+    lists: {
+      references: rows('references', {
+        columns: [
+          {
+            name: 'type',
+            cell: (reference: WhereUsedReference) => reference.type,
+          },
+          {
+            name: 'name',
+            cell: (reference: WhereUsedReference) => reference.name,
+          },
+          { name: 'uri', cell: namelessUri },
+          {
+            name: 'usage',
+            cell: (reference: WhereUsedReference) =>
+              reference.usage_information === COMMON_USAGE
+                ? ''
+                : (reference.usage_information ?? ''),
+          },
+        ],
+        header: 'always',
+        groups: [
+          {
+            label: 'package',
+            of: (reference: WhereUsedReference) => reference.package_name ?? '',
+            mode: 'gathered',
+          },
+        ],
+        // The terse shape (approved): usages only — the package and
+        // container nodes of SAP's tree carry no usage, and leave.
+        omit: omitting(
+          (reference: WhereUsedReference) =>
+            reference.usage_information === undefined ? 'node' : 'usage',
+          { node: 'a package or container node of the tree: no usage' },
+        ),
+      }),
+    },
+  };
 }
 
 /** A reference SAP listed without a name: its URI, what tells it apart; `''` for a named one. */
@@ -419,88 +436,39 @@ function namelessUri(reference: { name: string; uri?: string | undefined }) {
   return reference.name === '' ? (reference.uri ?? '') : '';
 }
 
-/** A reference's identity at medium, as written: its type, name, package and a nameless one's URI. */
-function referenceIdentity(reference: {
-  type: string;
-  name: string;
-  package_name?: string | undefined;
-  uri?: string | undefined;
-}): string {
-  return identityOf([
-    reference.type,
-    reference.name,
-    reference.package_name ?? '',
-    namelessUri(reference),
-  ]);
-}
-
-/** Every usage the list held — a reference SAP gave `usageInformation` — by its type and name as a row writes it. */
-const heldUsages = ({ result }: WhereUsedRead) =>
-  result.references
-    .filter((reference) => reference.usage_information !== undefined)
-    .map((reference) =>
-      identityOf([reference.type, reference.name, namelessUri(reference)]),
-    );
-
-/** Every reference the list held, its package and container nodes too. */
-const heldReferences = ({ result }: WhereUsedRead) =>
-  result.references.map(referenceIdentity);
-
 /**
  * What GetWhereUsed answers at each `detail`, selected before the requests
- * (`src/lib/detail`): terse the usages ({@link whereUsedRows}); medium every
+ * (`src/lib/detail`): terse the usages ({@link whereUsedListing}, its nodes an `omit` kind); medium every
  * reference with every field read, without its uri; full the answer before
  * `detail`; raw SAP's document. The list is adt-strategies'
  * `utilWhereUsedReferences` (the util set's where-used slot), package nodes
  * kept.
  */
 const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, string | object> = {
-  // Every usage (terse) or reference (medium, full), or nothing
-  // (`completeAnswer`).
-  terse: completeAnswer('GetWhereUsed', heldUsages, ({ result }) =>
-    whereUsedRows(result),
-  ),
-  // The references read from the answer written.
-  medium: completeAnswer('GetWhereUsed', heldReferences, ({ result }) =>
-    Written.json(
+  // Every usage (terse) or reference (medium, full), written from the
+  // list's own references by the listing writers.
+  terse: ({ result }) => writeListing(whereUsedListing(result)).answer,
+  medium: ({ result }) =>
+    writeJson(
       {
         total_references: result.totalReferences,
         result_description: result.resultDescription,
       },
+      result,
       {
         // Every field but the URI — kept for a reference SAP listed without
         // a name, what tells it apart.
-        references: result.references.map(
-          ({ uri, ...fields }): WhereUsedReference =>
+        references: entries(
+          'references',
+          ({ uri, ...fields }: WhereUsedReference): WhereUsedReference =>
             fields.name === '' && uri !== undefined
               ? { ...fields, uri }
               : fields,
         ),
       },
-      ['type', 'name', 'package_name', 'uri'],
-    ),
-  ),
-  full: completeAnswer(
-    'GetWhereUsed',
-    ({ result }: WhereUsedRead) =>
-      result.references.map((reference) =>
-        identityOf([
-          reference.type,
-          reference.name,
-          reference.package_name ?? '',
-          reference.uri ?? '',
-        ]),
-      ),
-    ({ result, args }) => {
-      const { references, ...rest } = fullWhereUsed(result, args);
-      return Written.json(rest, { references }, [
-        'type',
-        'name',
-        'package_name',
-        'uri',
-      ]);
-    },
-  ),
+    ).answer,
+  // The answer before `detail`, as it is.
+  full: ({ result, args }) => fullWhereUsed(result, args),
   raw: ({ result }) => result.document,
 };
 
@@ -961,34 +929,53 @@ function listAnswer(
 
 /** A list call's terse text. */
 function terseList({ objects, targets, results }: ListOf): McpResult {
-  // Every object's text written through `Written`: its name escaped in
-  // its `# object` line, its usages as the single answer's rows, a
-  // failure as one escaped `# error` line — a name cannot add a row.
-  const reads = targets.map((target) => readsOf.get(target));
-  const text = listedText(
-    'GetWhereUsed',
-    results.map((result, i): ListedPart<WhereUsedRead> => {
-      const asked = objects[i];
-      const heads = [
-        {
-          head: 'object',
-          value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
-        },
-      ];
-      const read = reads[i];
-      return result.isError || read === undefined
-        ? { heads, error: JSON.stringify(payloadOfAnswer(result)) }
-        : { heads, read };
-    }),
-    heldUsages,
-    (read) => whereUsedRows(read.result),
-  );
+  // Every object's text written by the listing writer: its name escaped in
+  // its `# object` line, its usages as its own terse listing, a failure as
+  // one escaped `# error` line — a name cannot add a row.
+  const text = writeListing({
+    heads: [],
+    reading: {
+      answered: results.map((result, i) => ({
+        asked: objects[i],
+        result,
+        read: result.isError ? undefined : readsOf.get(targets[i] ?? {}),
+      })),
+    },
+    lists: {
+      answered: parts(
+        'answered',
+        ({ asked, result, read }: AnsweredObject): Head[] => [
+          {
+            head: 'object',
+            value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+          },
+          ...(read === undefined
+            ? [
+                {
+                  head: 'error',
+                  value: JSON.stringify(payloadOfAnswer(result)),
+                },
+              ]
+            : []),
+        ],
+        ({ read }: AnsweredObject) =>
+          read === undefined ? undefined : nest(whereUsedListing(read.result)),
+      ),
+    },
+  }).answer;
   return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** One object of a list call: what was asked, its answer, and its read when answered. */
+interface AnsweredObject {
+  readonly asked: ListOf['objects'][number] | undefined;
+  readonly result: McpResult;
+  readonly read: WhereUsedRead | undefined;
 }
 
 /** A list call's entries as a JSON array. */
 function jsonList({ objects, targets, results }: ListOf): McpResult {
-  const entries = results.map((result, i) => {
+  const answers = results.map((result, i) => {
     const asked = objects[i];
     return result.isError
       ? {
@@ -1000,7 +987,7 @@ function jsonList({ objects, targets, results }: ListOf): McpResult {
   });
   return {
     isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries) }],
+    content: [{ type: 'text', text: JSON.stringify(answers) }],
   };
 }
 

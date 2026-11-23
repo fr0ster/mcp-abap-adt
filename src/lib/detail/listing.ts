@@ -89,6 +89,39 @@ export interface RowSpec<I> {
   readonly lists?: RowSchemas<I> | undefined;
   /** The list is a tree's top: its rows at depth 0, their own lists one level deeper each. */
   readonly tree?: boolean | undefined;
+  /**
+   * Kinds of item the answer's approved shape leaves out by definition
+   * (`omitting`): each item is still visited, its kind read, and only an
+   * item of a kind named here — with the reason — writes no row.
+   */
+  readonly omit?: Omitting<I> | undefined;
+}
+
+/** Kinds of item a list's rows leave out, each named with its reason. */
+export interface Omitting<I> {
+  readonly omits: (item: I) => boolean;
+  readonly reasons: Readonly<Record<string, string>>;
+}
+
+/**
+ * Items of the kinds named left out of a list's rows, by definition of the
+ * answer's shape: `kind` reads every item's kind, `omitted` names each
+ * kind left out and why — a kind not named is written.
+ */
+export function omitting<I, K extends string>(
+  kind: (item: I) => K,
+  omitted: { readonly [P in K]?: string },
+): Omitting<I> {
+  const reasons: Record<string, string> = {};
+  for (const [kindName, reason] of Object.entries<string | undefined>(
+    omitted,
+  )) {
+    if (reason !== undefined) reasons[kindName] = reason;
+  }
+  return {
+    omits: (item) => reasons[kind(item)] !== undefined,
+    reasons,
+  };
 }
 
 /** The items of the list `key` of a reading. */
@@ -147,6 +180,8 @@ export function sections<I, K extends string>(
 /** How one item of a list of several kinds is written: a row, a mark line, or a section. */
 export type KindSpec<I> =
   | { readonly row: RowSpec<I> }
+  /** A kind the answer's approved shape leaves out by definition: written as nothing, the reason stated. */
+  | { readonly omit: string }
   | { readonly mark: string; readonly words: (item: I) => readonly string[] }
   | {
       readonly heads: (item: I) => readonly Head[];
@@ -171,7 +206,9 @@ export function kinds<I, K extends string, T extends string>(
       const lines: Line[] = header === undefined ? [] : [{ header }];
       for (const item of items) {
         const spec: KindSpec<I> = specs[kind(item)];
-        if ('row' in spec) {
+        if ('omit' in spec) {
+          // Visited, and left out by the shape: nothing written.
+        } else if ('row' in spec) {
           lines.push(
             ...rowLines([item], { ...spec.row, header: 'none' }, depth),
           );
@@ -208,6 +245,15 @@ function rowLines<I>(
 ): Line[] {
   const depth = spec.tree === true && outerDepth === undefined ? 0 : outerDepth;
   const lines: Line[] = [];
+  const omit = spec.omit;
+  if (omit !== undefined) {
+    // Every item visited: one of a kind the shape leaves out writes no row.
+    return rowLines(
+      items.filter((item) => !omit.omits(item)),
+      { ...spec, omit: undefined },
+      outerDepth,
+    );
+  }
   if (
     spec.header === 'always' ||
     (spec.header === 'when-rows' && items.length > 0)

@@ -46,6 +46,8 @@ export {
   marks,
   type Nested,
   nest,
+  type Omitting,
+  omitting,
   parts,
   type Root,
   type RowSchemas,

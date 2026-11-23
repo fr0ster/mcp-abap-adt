@@ -217,4 +217,21 @@ describe('GetWhereUsed detail', () => {
     );
     assert.equal(lines.filter((line) => line.startsWith('# object')).length, 2);
   });
+
+  // Step 9: the nodes of SAP's tree are the one kind terse leaves out
+  // (`omit`); a reference SAP gave usageInformation — empty too — is a
+  // usage, never in the omitted kind.
+  it('terse: every reference with usageInformation is a row, only the nodes leave', async () => {
+    const WITH_EMPTY = DOCUMENT.replace(
+      '</usagereferences:referencedObjects>',
+      `${ref('/sap/bc/adt/oo/classes/zcl_empty', 'CLAS/OC', 'ZCL_EMPTY', 'ZPKG', '')}</usagereferences:referencedObjects>`,
+    );
+    const lines = (await whereUsed('terse', [WITH_EMPTY])).split('\n');
+    const rows = lines.filter((line) => !line.startsWith('#')).slice(1);
+    assert.deepStrictEqual(
+      rows.map((row) => row.split('\t')[1]),
+      ['ZCL_USER', 'ZPROG', 'ZCL_EMPTY', 'ZIF_X'],
+      lines.join('\n'),
+    );
+  });
 });

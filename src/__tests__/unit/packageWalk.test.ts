@@ -405,6 +405,30 @@ describe('the tree holds every walked object', () => {
     visit(tree);
     assert.deepStrictEqual([...names].sort(), walked.map((o) => o.name).sort());
   });
+
+  type Named = { name: string; children?: readonly Named[] };
+  const everyName = (tree: Named): string[] =>
+    (tree.children ?? []).flatMap((c) => [c.name, ...everyName(c)]);
+
+  // Codex round 10: the orphan's objects come before the chain that holds
+  // its package — written once, under that package.
+  it('an orphan listed before its missing-parent chain is written once, under its package', () => {
+    const walked = [
+      { name: 'ZLEAF', type: 'PROG/P', packageName: 'ZSUB' },
+      { name: 'ZSUB', type: 'DEVC/K', packageName: 'ZMID' },
+    ];
+    const tree = assembleTree('P', walked) as Named;
+    assert.deepStrictEqual(everyName(tree), ['ZSUB', 'ZLEAF']);
+  });
+
+  it('owners listing each other are written once each', () => {
+    const walked = [
+      { name: 'ZY', type: 'DEVC/K', packageName: 'ZX' },
+      { name: 'ZX', type: 'DEVC/K', packageName: 'ZY' },
+    ];
+    const tree = assembleTree('P', walked) as Named;
+    assert.deepStrictEqual([...everyName(tree)].sort(), ['ZX', 'ZY']);
+  });
 });
 
 describe('concurrentReader', () => {

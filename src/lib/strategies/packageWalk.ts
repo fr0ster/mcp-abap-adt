@@ -1167,19 +1167,37 @@ export function assembleTree(
         kind === 'package' &&
         o.notLoaded !== true &&
         o.name !== '' &&
-        !seen.has(o.name.toUpperCase())
+        !seen.has(o.name.toUpperCase()) &&
+        !placed.has(o.name.toUpperCase())
           ? (seen.add(o.name.toUpperCase()), childrenOf(o.name.toUpperCase()))
           : [],
     };
   };
 
   const children = childrenOf(rootName);
+  // The owners the walk did not reach from the root go under it, each once:
+  // first those no other unplaced owner lists as its package (the top of a
+  // chain whose parent is missing), so a package listed in such a chain
+  // brings its own objects with it, whatever order the walk found them in;
+  // then whatever is left (a chain of owners listing each other).
+  const listedPackages = new Set(
+    [...byOwner]
+      .filter(([owner]) => !placed.has(owner))
+      .flatMap(([, owned]) =>
+        owned
+          .filter((o) => kindOf(o.type) === 'package' && o.name !== '')
+          .map((o) => o.name.toUpperCase()),
+      ),
+  );
+  const attach = (owner: string, owned: WalkedItem[]) => {
+    if (placed.has(owner)) return;
+    placed.add(owner);
+    children.push(...owned.map((o) => nodeOf(o)));
+  };
   for (const [owner, owned] of byOwner) {
-    if (!placed.has(owner)) {
-      placed.add(owner);
-      children.push(...owned.map((o) => nodeOf(o)));
-    }
+    if (!listedPackages.has(owner)) attach(owner, owned);
   }
+  for (const [owner, owned] of byOwner) attach(owner, owned);
   return {
     name: rootName,
     type: PACKAGE_CODE,

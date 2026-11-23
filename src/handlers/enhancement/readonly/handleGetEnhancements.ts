@@ -18,11 +18,14 @@ import {
 } from '../../../lib/adtHeaders/withAdtHeaders';
 import type { AdtCodes, TableMainOf } from '../../../lib/adtProjections';
 import {
+  answerPayload,
   type FailureEntry,
   failedPayloadOf,
   failureEntry,
   isCredentialFailure,
   isCredentialPayload,
+  type ListedAnswer,
+  listedAnswer,
   type McpResult,
   messageOf,
   thrownEntry,
@@ -42,18 +45,22 @@ import {
   type Head,
   type JsonSchemas,
   type ListAnswerTable,
+  type Listing,
   listAnswerAt,
   marks,
   type Nested,
   nest,
-  parts,
+  partsOf,
   type RowSchemas,
   rows,
   sections,
   type TextResult,
   values,
   type Written,
+  wholeEntries,
+  wholeMarks,
   wireAnswer,
+  within,
   writeJson,
   writeJsonList,
   writeListing,
@@ -65,7 +72,6 @@ import {
   isAnswerList,
   isAnswerObject,
   type JsonValue,
-  jsonOrText,
 } from '../../../lib/json';
 import {
   ASSEMBLED_DETAIL_SHAPE,
@@ -93,7 +99,6 @@ import { thrownAs } from '../../../lib/thrownValue';
 import { logger, return_error } from '../../../lib/utils';
 import {
   child,
-  isList,
   text,
   type XmlRead,
   entries as xmlEntries,
@@ -800,9 +805,8 @@ export function filterMinimalNested(response: NestedEnhancements) {
         }),
         { lists: objectLists },
       ),
-      includes_unread: entries(
+      includes_unread: wholeEntries<IncludeUnread, 'includes_unread'>(
         'includes_unread',
-        (unread: IncludeUnread) => unread,
       ),
     },
     {
@@ -867,44 +871,58 @@ const objectSchemas: RowSchemas<EnhancementResponse> = {
   ]),
 };
 
+/** The lists of a response with its includes: each object's section, then every include not read. */
+const nestedSchemas: RowSchemas<NestedEnhancements> = {
+  objects: sections('objects', objectHeads, objectSchemas),
+  // Each include whose enhancements could not be read, whole: its
+  // failures inside it.
+  includes_unread: wholeMarks<IncludeUnread, 'includes_unread'>(
+    'includes_unread',
+    'include_unread',
+  ),
+};
+
+/** A read as its terse listing reads it: one object's response, or one with its includes. */
+interface EnhancementsTerse {
+  readonly single?: EnhancementResponse | undefined;
+  readonly nested?: NestedEnhancements | undefined;
+}
+
+/** A read's response under the member its kind names. */
+const terseOf = (read: EnhancementsRead): EnhancementsTerse =>
+  read.kind === 'single'
+    ? { single: read.response }
+    : { nested: read.response };
+
 /**
  * The terse listing of a read, written from its own lists: one object's
  * heads and lists, or — with its includes — the total, each object's
  * section, and every include whose enhancements could not be read.
  */
-function terseListing(read: EnhancementsRead): Nested {
-  return read.kind === 'single'
-    ? nest({
-        heads: objectHeads(read.response),
-        reading: read.response,
-        lists: objectSchemas,
-      })
-    : nest({
-        heads: [
-          {
-            head: 'total',
-            value: String(read.response.total_enhancements_found),
-          },
-        ],
-        reading: read.response,
-        lists: {
-          objects: sections('objects', objectHeads, objectSchemas),
-          includes_unread: marks(
-            'includes_unread',
-            'include_unread',
-            (unread: IncludeUnread) => [JSON.stringify(unread)],
-          ),
-        },
-      });
+function terseListing(read: EnhancementsTerse): Listing<EnhancementsTerse> {
+  return {
+    heads:
+      read.single !== undefined
+        ? objectHeads(read.single)
+        : read.nested !== undefined
+          ? [
+              {
+                head: 'total',
+                value: String(read.nested.total_enhancements_found),
+              },
+            ]
+          : [],
+    reading: read,
+    lists: {
+      single: within<EnhancementResponse, 'single'>('single', objectSchemas),
+      nested: within<NestedEnhancements, 'nested'>('nested', nestedSchemas),
+    },
+  };
 }
 
 /** The terse text of a read. */
 const terseText = ({ read }: EnhancementsShown): Written<string> =>
-  writeListing({
-    heads: [],
-    reading: { read: [read] },
-    lists: { read: parts('read', () => [], terseListing) },
-  });
+  writeListing(terseListing(terseOf(read)));
 
 /**
  * What `GetEnhancements` answers at each `detail`, selected before the reads
@@ -1916,7 +1934,7 @@ const ONE_REQUEST_HOSTS: readonly HostSpelling[] = [
 
 /** An answer's payload: its JSON, else its text. */
 function payloadOfAnswer(result: McpResult): JsonValue {
-  return jsonOrText(result.content[0]?.text ?? '');
+  return answerPayload(result);
 }
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
@@ -1968,14 +1986,17 @@ function terseList({ objects, results }: ListOf): Written<TextResult> {
     reading: {
       answered: results.map((result, i) => ({
         asked: objects[i],
-        result,
-        read: result.isError ? undefined : readsOf.get(result),
+        answer: answerPayload(result),
+        read: (() => {
+          const shown = result.isError ? undefined : readsOf.get(result);
+          return shown === undefined ? undefined : terseOf(shown.read);
+        })(),
       })),
     },
     lists: {
-      answered: parts(
+      answered: partsOf(
         'answered',
-        ({ asked, result, read }: AnsweredObject): Head[] =>
+        ({ asked, answer, read }: AnsweredObject): Head[] =>
           read === undefined
             ? [
                 {
@@ -1984,12 +2005,12 @@ function terseList({ objects, results }: ListOf): Written<TextResult> {
                 },
                 {
                   head: 'error',
-                  value: JSON.stringify(payloadOfAnswer(result)),
+                  value: JSON.stringify(answer),
                 },
               ]
             : [],
-        ({ read }: AnsweredObject) =>
-          read === undefined ? undefined : terseListing(read.read),
+        'read',
+        (read) => nest(terseListing(read)),
       ),
     },
   });
@@ -1999,8 +2020,8 @@ function terseList({ objects, results }: ListOf): Written<TextResult> {
 /** One object of a list call: what was asked, its answer, and its read when answered. */
 interface AnsweredObject {
   readonly asked: ListOf['objects'][number] | undefined;
-  readonly result: McpResult;
-  readonly read: EnhancementsShown | undefined;
+  readonly answer: JsonValue;
+  readonly read: EnhancementsTerse | undefined;
 }
 
 /** A list call's entries as a JSON array. */
@@ -2008,18 +2029,18 @@ function jsonList({ objects, results }: ListOf): Written<TextResult> {
   // Every answer one entry, written by the listing writer.
   return asJsonResult(
     writeJsonList(
-      { answered: results.map((result, i) => ({ result, i })) },
-      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
-        ((result, i) => {
+      { answered: results.map(listedAnswer) },
+      values('answered', ({ isError, answer, i }: ListedAnswer) =>
+        ((isError, answer, i) => {
           const asked = objects[i];
-          return result.isError
+          return isError
             ? {
                 object_name: asked.object_name,
                 object_type: asked.object_type,
-                error: payloadOfAnswer(result),
+                error: answer,
               }
-            : payloadOfAnswer(result);
-        })(result, i),
+            : answer;
+        })(isError, answer, i),
       ),
     ),
   );

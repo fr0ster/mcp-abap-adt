@@ -23,10 +23,13 @@ import {
 import { acceptedCodeOf, tableCodeOf } from '../../../lib/adtTypeCode';
 import {
   answerCaught,
+  answerPayload,
   failedPayloadOf,
   failureEntry,
   failurePayload,
   isCredentialPayload,
+  type ListedAnswer,
+  listedAnswer,
   type McpResult,
   messageOf,
 } from '../../../lib/answer';
@@ -49,8 +52,10 @@ import {
   type Listing,
   listAnswerAt,
   marks,
+  member,
   nest,
-  parts,
+  node,
+  partsOf,
   type RowSchemas,
   rows,
   type TextResult,
@@ -59,16 +64,11 @@ import {
   wireAnswer,
   writeJson,
   writeJsonList,
-  writeJsonRoot,
   writeListing,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AnswerObject,
-  type JsonValue,
-  jsonOrText,
-} from '../../../lib/json';
+import type { AnswerObject, JsonValue } from '../../../lib/json';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
@@ -409,14 +409,15 @@ const unreadableName = (entry: AnswerObject) => String(entry.name ?? '');
  * One object's terse text, written from its read: its `# object` line, a
  * mark per include that could not be read, then the tree from its root.
  */
-const includesListing = (read: IncludesRead): Listing<IncludesTerse> => ({
+const includesListing = (read: IncludesRead): Listing<IncludesRead> => ({
   heads: [{ head: 'object', value: `${read.object_type} ${read.object_name}` }],
-  reading: { unreadable: read.unreadable, tree: [read.tree] },
+  reading: read,
   lists: {
     unreadable: marks('unreadable', 'unreadable', (entry: AnswerObject) => [
       unreadableName(entry),
     ]),
-    tree: rows('tree', {
+    // The tree from its root: the root a row, every node below it.
+    tree: node('tree', {
       columns: includeColumns,
       header: 'none',
       tree: true,
@@ -425,12 +426,6 @@ const includesListing = (read: IncludesRead): Listing<IncludesTerse> => ({
   },
 });
 
-/** What one object's terse text writes: what could not be read, and the tree from its root. */
-interface IncludesTerse {
-  readonly unreadable: readonly AnswerObject[];
-  readonly tree: readonly IncludeNode[];
-}
-
 // Every node (and, at terse, every unreadable include), written from the
 // read by the listing writers: one row, line or entry each.
 const INCLUDES_ANSWERS: ListAnswerTable<IncludesRead, string> = {
@@ -438,13 +433,11 @@ const INCLUDES_ANSWERS: ListAnswerTable<IncludesRead, string> = {
   medium: (read) =>
     jsonText(
       writeJson(
+        { object_name: read.object_name, object_type: read.object_type },
+        read,
         {
-          object_name: read.object_name,
-          object_type: read.object_type,
-          tree: writeJsonRoot(read.tree, mediumEntry, mediumSchemas).answer,
-        },
-        { unreadable: read.unreadable },
-        {
+          // The tree from its root, every node below it.
+          tree: member('tree', mediumEntry, { lists: mediumSchemas }),
           unreadable: entries('unreadable', (entry: AnswerObject) => entry, {
             omitEmpty: true,
           }),
@@ -1104,7 +1097,7 @@ async function includeTrees(
 
 /** A failed answer's payload: its JSON, else its text. */
 function payloadOfAnswer(result: McpResult): JsonValue {
-  return jsonOrText(result.content[0]?.text ?? '');
+  return answerPayload(result);
 }
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
@@ -1150,14 +1143,14 @@ function terseList({ objects, results }: ListOf): Written<TextResult> {
     reading: {
       answered: results.map((result, i) => ({
         asked: objects[i],
-        result,
+        answer: answerPayload(result),
         read: result.isError ? undefined : readsOf.get(result),
       })),
     },
     lists: {
-      answered: parts(
+      answered: partsOf(
         'answered',
-        ({ asked, result, read }: AnsweredObject): Head[] =>
+        ({ asked, answer, read }: AnsweredObject): Head[] =>
           read === undefined
             ? [
                 {
@@ -1166,12 +1159,12 @@ function terseList({ objects, results }: ListOf): Written<TextResult> {
                 },
                 {
                   head: 'error',
-                  value: JSON.stringify(payloadOfAnswer(result)),
+                  value: JSON.stringify(answer),
                 },
               ]
             : [],
-        ({ read }: AnsweredObject) =>
-          read === undefined ? undefined : nest(includesListing(read)),
+        'read',
+        (read) => nest(includesListing(read)),
       ),
     },
   });
@@ -1181,7 +1174,7 @@ function terseList({ objects, results }: ListOf): Written<TextResult> {
 /** One object of a list call: what was asked, its answer, and its read when answered. */
 interface AnsweredObject {
   readonly asked: ListOf['objects'][number] | undefined;
-  readonly result: McpResult;
+  readonly answer: JsonValue;
   readonly read: IncludesRead | undefined;
 }
 
@@ -1190,18 +1183,18 @@ function jsonList({ objects, results }: ListOf): Written<TextResult> {
   // Every answer one entry, written by the listing writer.
   return asJsonResult(
     writeJsonList(
-      { answered: results.map((result, i) => ({ result, i })) },
-      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
-        ((result, i) => {
+      { answered: results.map(listedAnswer) },
+      values('answered', ({ isError, answer, i }: ListedAnswer) =>
+        ((isError, answer, i) => {
           const asked = objects[i];
-          return result.isError
+          return isError
             ? {
                 object_name: asked.object_name,
                 object_type: asked.object_type,
-                error: payloadOfAnswer(result),
+                error: answer,
               }
-            : payloadOfAnswer(result);
-        })(result, i),
+            : answer;
+        })(isError, answer, i),
       ),
     ),
   );

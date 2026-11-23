@@ -38,10 +38,13 @@ import { acceptedCodeOf, notAccepted } from '../../../lib/adtTypeCode';
 import {
   answer,
   answerFailure,
+  answerPayload,
   answerThrown,
   failedPayloadOf,
   failureEntry,
   isCredentialPayload,
+  type ListedAnswer,
+  listedAnswer,
   type McpResult,
 } from '../../../lib/answer';
 import { failureOf } from '../../../lib/auth/failures';
@@ -62,7 +65,7 @@ import {
   listAnswerAt,
   nest,
   omitting,
-  parts,
+  partsOf,
   rows,
   type TextResult,
   values,
@@ -79,7 +82,7 @@ import {
   withInCallSchema,
 } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { type JsonValue, jsonFields, jsonOrText } from '../../../lib/json';
+import { type JsonValue, jsonFields } from '../../../lib/json';
 import { withLongToolAdvice } from '../../../lib/longTools';
 import {
   ASSEMBLED_DETAIL_SHAPE,
@@ -889,7 +892,7 @@ const readsOf = new WeakMap<WhereUsedArgs, WhereUsedRead>();
 
 /** An answer's payload: its JSON, else its text. */
 function payloadOfAnswer(result: McpResult): JsonValue {
-  return jsonOrText(result.content[0]?.text ?? '');
+  return answerPayload(result);
 }
 
 /** Whether an answer is a credential failure: it ends a call for several objects. */
@@ -943,14 +946,16 @@ function terseList({ objects, targets, results }: ListOf): Written<TextResult> {
     reading: {
       answered: results.map((result, i) => ({
         asked: objects[i],
-        result,
-        read: result.isError ? undefined : readsOf.get(targets[i] ?? {}),
+        answer: answerPayload(result),
+        read: result.isError
+          ? undefined
+          : readsOf.get(targets[i] ?? {})?.result,
       })),
     },
     lists: {
-      answered: parts(
+      answered: partsOf(
         'answered',
-        ({ asked, result, read }: AnsweredObject): Head[] => [
+        ({ asked, answer, read }: AnsweredObject): Head[] => [
           {
             head: 'object',
             value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
@@ -959,13 +964,13 @@ function terseList({ objects, targets, results }: ListOf): Written<TextResult> {
             ? [
                 {
                   head: 'error',
-                  value: JSON.stringify(payloadOfAnswer(result)),
+                  value: JSON.stringify(answer),
                 },
               ]
             : []),
         ],
-        ({ read }: AnsweredObject) =>
-          read === undefined ? undefined : nest(whereUsedListing(read.result)),
+        'read',
+        (read) => nest(whereUsedListing(read)),
       ),
     },
   });
@@ -975,8 +980,8 @@ function terseList({ objects, targets, results }: ListOf): Written<TextResult> {
 /** One object of a list call: what was asked, its answer, and its read when answered. */
 interface AnsweredObject {
   readonly asked: ListOf['objects'][number] | undefined;
-  readonly result: McpResult;
-  readonly read: WhereUsedRead | undefined;
+  readonly answer: JsonValue;
+  readonly read: WhereUsedListResult | undefined;
 }
 
 /** A list call's entries as a JSON array. */
@@ -984,18 +989,18 @@ function jsonList({ objects, targets, results }: ListOf): Written<TextResult> {
   // Every answer one entry, written by the listing writer.
   return asJsonResult(
     writeJsonList(
-      { answered: results.map((result, i) => ({ result, i })) },
-      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
-        ((result, i) => {
+      { answered: results.map(listedAnswer) },
+      values('answered', ({ isError, answer, i }: ListedAnswer) =>
+        ((isError, answer, i) => {
           const asked = objects[i];
-          return result.isError
+          return isError
             ? {
                 object_name: asked.object_name,
                 object_type: asked.object_type,
-                error: payloadOfAnswer(result),
+                error: answer,
               }
-            : payloadOfAnswer(result);
-        })(result, i),
+            : answer;
+        })(isError, answer, i),
       ),
     ),
   );

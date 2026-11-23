@@ -18,9 +18,12 @@ import type {
 import * as z from 'zod';
 import {
   answer,
+  answerPayload,
   answerThrown,
   failedPayloadOf,
   isCredentialPayload,
+  type ListedAnswer,
+  listedAnswer,
   type McpResult,
 } from '../../../lib/answer';
 import { failureOf } from '../../../lib/auth/failures';
@@ -33,19 +36,22 @@ import { withSystemKindOf } from '../../../lib/connectionFactory';
 import {
   asJsonResult,
   asTextResult,
-  type Column,
   type DetailLevel,
   type Head,
+  headLines,
   type ListAnswerTable,
+  type Listing,
   listAnswerAt,
-  type Nested,
   nest,
   parts,
+  partsOf,
+  type RowSchemas,
   rows,
   type TextResult,
   values,
   type Written,
   wireAnswer,
+  within,
   writeJsonList,
   writeListing,
   writeWhole,
@@ -57,7 +63,7 @@ import {
 } from '../../../lib/dumpFilters';
 import { withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { type JsonValue, jsonOrText } from '../../../lib/json';
+import type { JsonValue } from '../../../lib/json';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
@@ -292,150 +298,166 @@ export type FeedShown =
       readonly answered: FeedPageAnswer<IGatewayErrorEntry>;
     };
 
-/** A feed's entries as written: one row per entry — a feed without variants one row with none. */
-function feedListing(shown: FeedShown): Nested {
+/** One variant of a feed. */
+type FeedVariant = FeedVariants['variants'][number];
+
+/** A feed's answer, by its feed. */
+type FeedAnswer<F extends FeedShown['feed']> = Extract<
+  FeedShown,
+  { readonly feed: F }
+>['answered'];
+
+/** A feed's answer as its terse listing reads it: under the member its feed names. */
+interface FeedTerse {
+  readonly heads: readonly Head[];
+  readonly descriptors?: FeedAnswer<'descriptors'> | undefined;
+  readonly variants?: FeedAnswer<'variants'> | undefined;
+  readonly dumps?: FeedAnswer<'dumps'> | undefined;
+  readonly system_messages?: FeedAnswer<'system_messages'> | undefined;
+  readonly gateway_errors?: FeedAnswer<'gateway_errors'> | undefined;
+}
+
+/** A feed read as its terse listing reads it. */
+function feedTerse(shown: FeedShown): FeedTerse {
   const heads = feedHeads(shown);
   switch (shown.feed) {
     case 'descriptors':
-      return nest({
-        heads,
-        reading: shown.answered,
-        lists: {
-          entries: rows('entries', {
-            header: 'always',
-            columns: [
-              { name: 'id', cell: (e: IFeedDescriptor) => e.id },
-              { name: 'title', cell: (e: IFeedDescriptor) => e.title },
-              {
-                name: 'category',
-                cell: (e: IFeedDescriptor) => e.category ?? '',
-              },
-            ],
-          }),
-        },
-      });
+      return { heads, descriptors: shown.answered };
     case 'variants':
-      return nest({
-        heads,
-        reading: shown.answered,
-        lists: {
-          // Every feed: one without variants is a row with none.
-          entries: parts(
-            'entries',
-            () => [],
-            (feed: FeedVariants) =>
-              nest({
-                heads: [],
-                reading:
-                  feed.variants.length === 0
-                    ? { variants: [{ title: '', query: '', is_default: '' }] }
-                    : {
-                        variants: feed.variants.map((v) => ({
-                          title: v.title,
-                          query: v.query,
-                          is_default: String(v.is_default),
-                        })),
-                      },
-                lists: {
-                  variants: rows('variants', {
-                    columns: [
-                      { name: 'feed', cell: () => feed.feed },
-                      { name: 'title', cell: (v: VariantCells) => v.title },
-                      { name: 'query', cell: (v: VariantCells) => v.query },
-                      {
-                        name: 'is_default',
-                        cell: (v: VariantCells) => v.is_default,
-                      },
-                    ],
-                    header: 'none',
-                  }),
-                },
-              }),
-            ['feed', 'title', 'query', 'is_default'],
-          ),
-        },
-      });
+      return { heads, variants: shown.answered };
     case 'dumps':
-      return nest({
-        heads,
-        reading: shown.answered,
-        lists: {
-          entries: rows('entries', {
-            header: 'always',
-            columns: [
-              { name: 'dump_id', cell: (e: DumpEntry) => e.dump_id },
-              { name: 'updated', cell: (e: DumpEntry) => e.updated },
-              { name: 'title', cell: (e: DumpEntry) => e.title },
-            ],
-          }),
-        },
-      });
+      return { heads, dumps: shown.answered };
     case 'system_messages':
-      return nest({
-        heads,
-        reading: shown.answered,
-        lists: {
-          entries: rows('entries', {
-            header: 'always',
-            columns: [
-              {
-                name: 'id',
-                cell: (e: ISystemMessageEntry) => e.id ?? e.messageId ?? '',
-              },
-              {
-                name: 'createdOn',
-                cell: (e: ISystemMessageEntry) => e.createdOn ?? '',
-              },
-              {
-                name: 'author',
-                cell: (e: ISystemMessageEntry) => e.author ?? e.createdBy ?? '',
-              },
-              {
-                name: 'title',
-                cell: (e: ISystemMessageEntry) => e.title ?? '',
-              },
-            ],
-          }),
-        },
-      });
+      return { heads, system_messages: shown.answered };
     case 'gateway_errors':
-      return nest({
-        heads,
-        reading: shown.answered,
-        lists: {
-          entries: rows('entries', {
-            header: 'always',
-            columns: [
-              { name: 'opid', cell: (e: IGatewayErrorEntry) => e.opid ?? '' },
-              {
-                name: 'detail_kind',
-                cell: (e: IGatewayErrorEntry) => detailKindOf(e),
-              },
-              {
-                name: 'dateTime',
-                cell: (e: IGatewayErrorEntry) => e.dateTime ?? '',
-              },
-              { name: 'type', cell: (e: IGatewayErrorEntry) => e.type ?? '' },
-              {
-                name: 'shortText',
-                cell: (e: IGatewayErrorEntry) => e.shortText ?? '',
-              },
-              {
-                name: 'username',
-                cell: (e: IGatewayErrorEntry) => e.username ?? '',
-              },
-            ],
-          }),
-        },
-      });
+      return { heads, gateway_errors: shown.answered };
   }
 }
 
-/** A variant's cells as a row writes them. */
-interface VariantCells {
-  readonly title: string;
-  readonly query: string;
-  readonly is_default: string;
+/** Each feed's entries: one row per entry — a feed without variants one row with none. */
+const FEED_SCHEMAS: RowSchemas<FeedTerse> = {
+  // The feed, its count and SAP's paging, before its entries.
+  heads: headLines('heads'),
+  descriptors: within<FeedAnswer<'descriptors'>, 'descriptors'>('descriptors', {
+    entries: rows('entries', {
+      header: 'always',
+      columns: [
+        { name: 'id', cell: (e: IFeedDescriptor) => e.id },
+        { name: 'title', cell: (e: IFeedDescriptor) => e.title },
+        {
+          name: 'category',
+          cell: (e: IFeedDescriptor) => e.category ?? '',
+        },
+      ],
+    }),
+  }),
+  variants: within<FeedAnswer<'variants'>, 'variants'>('variants', {
+    // Every feed: one without variants is a row with none (its root).
+    entries: parts(
+      'entries',
+      () => [],
+      (feed: FeedVariants) =>
+        nest({
+          heads: [],
+          reading: feed,
+          root:
+            feed.variants.length === 0
+              ? {
+                  columns: [
+                    { name: 'feed', cell: () => feed.feed },
+                    { name: 'title', cell: () => '' },
+                    { name: 'query', cell: () => '' },
+                    { name: 'is_default', cell: () => '' },
+                  ],
+                }
+              : undefined,
+          lists: {
+            variants: rows('variants', {
+              columns: [
+                { name: 'feed', cell: () => feed.feed },
+                { name: 'title', cell: (v: FeedVariant) => v.title },
+                { name: 'query', cell: (v: FeedVariant) => v.query },
+                {
+                  name: 'is_default',
+                  cell: (v: FeedVariant) => String(v.is_default),
+                },
+              ],
+              header: 'none',
+            }),
+          },
+        }),
+      ['feed', 'title', 'query', 'is_default'],
+    ),
+  }),
+  dumps: within<FeedAnswer<'dumps'>, 'dumps'>('dumps', {
+    entries: rows('entries', {
+      header: 'always',
+      columns: [
+        { name: 'dump_id', cell: (e: DumpEntry) => e.dump_id },
+        { name: 'updated', cell: (e: DumpEntry) => e.updated },
+        { name: 'title', cell: (e: DumpEntry) => e.title },
+      ],
+    }),
+  }),
+  system_messages: within<FeedAnswer<'system_messages'>, 'system_messages'>(
+    'system_messages',
+    {
+      entries: rows('entries', {
+        header: 'always',
+        columns: [
+          {
+            name: 'id',
+            cell: (e: ISystemMessageEntry) => e.id ?? e.messageId ?? '',
+          },
+          {
+            name: 'createdOn',
+            cell: (e: ISystemMessageEntry) => e.createdOn ?? '',
+          },
+          {
+            name: 'author',
+            cell: (e: ISystemMessageEntry) => e.author ?? e.createdBy ?? '',
+          },
+          {
+            name: 'title',
+            cell: (e: ISystemMessageEntry) => e.title ?? '',
+          },
+        ],
+      }),
+    },
+  ),
+  gateway_errors: within<FeedAnswer<'gateway_errors'>, 'gateway_errors'>(
+    'gateway_errors',
+    {
+      entries: rows('entries', {
+        header: 'always',
+        columns: [
+          { name: 'opid', cell: (e: IGatewayErrorEntry) => e.opid ?? '' },
+          {
+            name: 'detail_kind',
+            cell: (e: IGatewayErrorEntry) => detailKindOf(e),
+          },
+          {
+            name: 'dateTime',
+            cell: (e: IGatewayErrorEntry) => e.dateTime ?? '',
+          },
+          { name: 'type', cell: (e: IGatewayErrorEntry) => e.type ?? '' },
+          {
+            name: 'shortText',
+            cell: (e: IGatewayErrorEntry) => e.shortText ?? '',
+          },
+          {
+            name: 'username',
+            cell: (e: IGatewayErrorEntry) => e.username ?? '',
+          },
+        ],
+      }),
+    },
+  ),
+};
+
+/** A feed's entries as written, under its heads. */
+function feedListing(read: FeedTerse): Listing<FeedTerse> {
+  return { heads: [], reading: read, lists: FEED_SCHEMAS };
 }
 
 /** A dump entry as the dumps feed answers it. */
@@ -463,11 +485,7 @@ function feedHeads(shown: FeedShown): Head[] {
 
 /** A feed's terse text: TSV under its `# feed` and `# count` lines, every entry a row. */
 export function terseFeedText(shown: FeedShown): Written<string> {
-  return writeListing({
-    heads: [],
-    reading: { feed: [shown] },
-    lists: { feed: parts('feed', () => [], feedListing) },
-  });
+  return writeListing(feedListing(feedTerse(shown)));
 }
 
 /**
@@ -958,7 +976,7 @@ async function feedsInRounds(
 
 /** An answer's payload: its JSON, else its text. */
 function payloadOfAnswer(result: McpResult): JsonValue {
-  return jsonOrText(result.content[0]?.text ?? '');
+  return answerPayload(result);
 }
 
 /** Whether an answer is a credential failure: it ends a call for several feeds. */
@@ -1004,25 +1022,28 @@ function terseList({ feedTypes, results }: ListOf): Written<TextResult> {
     reading: {
       answered: results.map((result, i) => ({
         feed: feedTypes[i] ?? '',
-        result,
-        read: result.isError ? undefined : readsOf.get(result),
+        answer: answerPayload(result),
+        read: (() => {
+          const shown = result.isError ? undefined : readsOf.get(result);
+          return shown === undefined ? undefined : feedTerse(shown);
+        })(),
       })),
     },
     lists: {
-      answered: parts(
+      answered: partsOf(
         'answered',
-        ({ feed, result, read }: AnsweredFeed): Head[] =>
+        ({ feed, answer, read }: AnsweredFeed): Head[] =>
           read === undefined
             ? [
                 { head: 'feed', value: feed },
                 {
                   head: 'error',
-                  value: JSON.stringify(payloadOfAnswer(result)),
+                  value: JSON.stringify(answer),
                 },
               ]
             : [],
-        ({ read }: AnsweredFeed) =>
-          read === undefined ? undefined : feedListing(read),
+        'read',
+        (read) => nest(feedListing(read)),
       ),
     },
   });
@@ -1032,8 +1053,8 @@ function terseList({ feedTypes, results }: ListOf): Written<TextResult> {
 /** One feed of a list call: its type, its answer, and its read when answered. */
 interface AnsweredFeed {
   readonly feed: string;
-  readonly result: McpResult;
-  readonly read: FeedShown | undefined;
+  readonly answer: JsonValue;
+  readonly read: FeedTerse | undefined;
 }
 
 /** A list call's entries as a JSON array. */
@@ -1041,12 +1062,14 @@ function jsonList({ feedTypes, results }: ListOf): Written<TextResult> {
   // Every answer one entry, written by the listing writer.
   return asJsonResult(
     writeJsonList(
-      { answered: results.map((result, i) => ({ result, i })) },
-      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
-        ((result, i) =>
-          result.isError
-            ? { feed_type: feedTypes[i], error: payloadOfAnswer(result) }
-            : payloadOfAnswer(result))(result, i),
+      { answered: results.map(listedAnswer) },
+      values('answered', ({ isError, answer, i }: ListedAnswer) =>
+        ((isError, answer, i) =>
+          isError ? { feed_type: feedTypes[i], error: answer } : answer)(
+          isError,
+          answer,
+          i,
+        ),
       ),
     ),
   );

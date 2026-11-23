@@ -7,14 +7,18 @@ import {
   type ListAnswerTable,
   type Listing,
   listAnswerAt,
+  listWrittenAt,
   nest,
   parts,
+  partsOf,
   rows,
-  values,
+  type Written,
   wireAnswer,
   writeJson,
   writeJsonList,
   writeListing,
+  writeWhole,
+  writtenValues,
 } from '../../../lib/detail';
 import {
   onEveryVariant,
@@ -188,7 +192,6 @@ import {
   batchReader,
   childNodesOf,
   endsTheCall,
-  isNotLoaded,
   METADATA_STEP,
   metadataDescriptionOf,
   metadataTypeOf,
@@ -742,20 +745,21 @@ type ParentOutcome =
       readonly parent_name: string | undefined;
       readonly parent_type: string | undefined;
       readonly error: FailureEntry;
+      readonly list?: undefined;
     };
 
 /** What a list call answers from: each parent's outcome, and its level's answer. */
 interface ParentLists {
   readonly outcomes: readonly ParentOutcome[];
-  readonly shown: (list: ParentList) => string | object;
+  readonly shown: (list: ParentList) => Written<string | object>;
 }
 
 /** A list call's entries. */
 const jsonParents = ({ outcomes, shown }: ParentLists) =>
   writeJsonList(
     { outcomes },
-    values('outcomes', (outcome: ParentOutcome) =>
-      'list' in outcome ? shown(outcome.list) : outcome,
+    writtenValues('outcomes', (outcome: ParentOutcome) =>
+      outcome.list === undefined ? writeWhole(outcome) : shown(outcome.list),
     ),
   );
 
@@ -771,10 +775,10 @@ const PARENT_LISTS: ListAnswerTable<ParentLists, string | object> = {
       heads: [],
       reading: { outcomes },
       lists: {
-        outcomes: parts(
+        outcomes: partsOf(
           'outcomes',
           (outcome: ParentOutcome): Head[] =>
-            'list' in outcome
+            outcome.list !== undefined
               ? []
               : [
                   {
@@ -783,10 +787,8 @@ const PARENT_LISTS: ListAnswerTable<ParentLists, string | object> = {
                   },
                   { head: 'error', value: JSON.stringify(outcome.error) },
                 ],
-          (outcome: ParentOutcome) =>
-            'list' in outcome
-              ? nest(parentListing(outcome.list, false))
-              : undefined,
+          'list',
+          (list) => nest(parentListing(list, false)),
         ),
       },
     }),
@@ -904,7 +906,10 @@ async function answeredGetObjectsList(
             : { ...asked, error: failureOfWalk(walk) };
         });
         // Through the list table, like every other answer.
-        return listAnswerAt(PARENT_LISTS, level)({ outcomes, shown });
+        return listAnswerAt(
+          PARENT_LISTS,
+          level,
+        )({ outcomes, shown: listWrittenAt(objectsListAnswers(), level) });
       },
     );
   }

@@ -10,6 +10,7 @@ import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 
 import {
   answerFailure,
+  type FailureEntry,
   failureEntry,
   isCredentialPayload,
   thrownEntry,
@@ -20,7 +21,6 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import {
-  answerAt,
   type Column,
   entries,
   type Head,
@@ -29,15 +29,18 @@ import {
   type ListAnswerTable,
   type Listing,
   listAnswerAt,
+  listWrittenAt,
   nest,
-  parts,
+  partsOf,
   type RowSchemas,
   rows,
-  values,
+  type Written,
   wireAnswer,
   writeJsonList,
   writeJsonRoot,
   writeListing,
+  writeWhole,
+  writtenValues,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withLongToolAdvice } from '../../../lib/longTools';
@@ -58,7 +61,6 @@ import {
   type PackageNode,
   readNode,
   type WalkedItem,
-  walkedIdentity,
   walkPackage,
   walkPackages,
 } from '../../../lib/strategies/packageWalk';
@@ -481,11 +483,18 @@ const treeListing = ({
   packageName,
   walked,
   options,
-}: TreeAnswerRead): Listing<PackageNode> => ({
+}: TreeAnswerRead): Listing<PackageNode> =>
+  treeListingOf(assembleTree(packageName, walked), options.includeDescriptions);
+
+/** An assembled tree's terse listing: its root a row, every node below it. */
+const treeListingOf = (
+  tree: PackageNode,
+  includeDescriptions: boolean,
+): Listing<PackageNode> => ({
   heads: [],
-  reading: assembleTree(packageName, walked),
-  root: { columns: treeColumns(options.includeDescriptions) },
-  lists: treeSchemas(options.includeDescriptions),
+  reading: tree,
+  root: { columns: treeColumns(includeDescriptions) },
+  lists: treeSchemas(includeDescriptions),
 });
 
 // Every level written from the assembled tree, every node of the walk in
@@ -517,19 +526,30 @@ const TREE_ANSWERS: ListAnswerTable<TreeAnswerRead, TreeAnswer> = {
 /** One package's read, or its failure entry. */
 type TreeOutcome =
   | { readonly read: TreeAnswerRead }
-  | { readonly package_name: string; readonly error: unknown };
+  | {
+      readonly package_name: string;
+      readonly error: FailureEntry;
+      readonly read?: undefined;
+    };
 
-/** One package asked by a list call: its name and its outcome. */
+/**
+ * One package asked by a list call, as its terse part reads it: its name,
+ * its failure, or its assembled tree and whether rows carry descriptions.
+ */
 interface AskedTree {
   readonly name: string;
-  readonly outcome: TreeOutcome;
+  readonly failed:
+    | { readonly package_name: string; readonly error: FailureEntry }
+    | undefined;
+  readonly tree: PackageNode | undefined;
+  readonly includeDescriptions: boolean;
 }
 
 /** What a list call answers from: the packages asked, each one's outcome. */
 interface TreeList {
   readonly packageNames: readonly string[];
   readonly outcomes: readonly TreeOutcome[];
-  readonly shown: (read: TreeAnswerRead) => TreeAnswer;
+  readonly shown: (read: TreeAnswerRead) => Written<TreeAnswer>;
 }
 
 /** A list call's entries as a JSON array. */
@@ -537,8 +557,8 @@ const jsonTrees = ({ outcomes, shown }: TreeList) =>
   jsonText(
     writeJsonList(
       { outcomes },
-      values('outcomes', (outcome: TreeOutcome) =>
-        'read' in outcome ? shown(outcome.read) : outcome,
+      writtenValues('outcomes', (outcome: TreeOutcome) =>
+        outcome.read === undefined ? writeWhole(outcome) : shown(outcome.read),
       ),
     ),
   );
@@ -553,22 +573,31 @@ const TREE_LISTS: ListAnswerTable<TreeList, string> = {
     writeListing({
       heads: [],
       reading: {
-        asked: outcomes.map((outcome, i) => ({
-          name: packageNames[i] ?? '',
-          outcome,
-        })),
+        asked: outcomes.map(
+          (outcome, i): AskedTree => ({
+            name: packageNames[i] ?? '',
+            failed: outcome.read === undefined ? outcome : undefined,
+            tree:
+              outcome.read === undefined
+                ? undefined
+                : assembleTree(outcome.read.packageName, outcome.read.walked),
+            includeDescriptions:
+              outcome.read?.options.includeDescriptions === true,
+          }),
+        ),
       },
       lists: {
-        asked: parts(
+        asked: partsOf(
           'asked',
-          ({ name, outcome }: AskedTree): Head[] => [
+          ({ name, failed }: AskedTree): Head[] => [
             { head: 'asked', value: name },
-            ...('read' in outcome
+            ...(failed === undefined
               ? []
-              : [{ head: 'error', value: JSON.stringify(outcome) }]),
+              : [{ head: 'error', value: JSON.stringify(failed) }]),
           ],
-          ({ outcome }: AskedTree) =>
-            'read' in outcome ? nest(treeListing(outcome.read)) : undefined,
+          'tree',
+          (tree, { includeDescriptions }) =>
+            nest(treeListingOf(tree, includeDescriptions)),
         ),
       },
     }),
@@ -707,7 +736,11 @@ async function answeredGetPackageTree(
       data: listAnswerAt(
         TREE_LISTS,
         levelOf(args),
-      )({ packageNames, outcomes, shown }),
+      )({
+        packageNames,
+        outcomes,
+        shown: listWrittenAt(TREE_ANSWERS, levelOf(args)),
+      }),
     });
   } catch (error) {
     logger?.error('Failed to fetch package tree', error);

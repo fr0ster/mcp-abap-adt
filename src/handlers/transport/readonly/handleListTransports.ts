@@ -158,16 +158,11 @@ type ListAnswer = ListedAnswer | XmlNode | string;
  * What `ListTransports` answers at each `detail`: the reading the listing is
  * read with, selected before the call (`src/lib/detail`): terse a TSV row per
  * request (number, type, status, owner, target, description); medium the
- * requests as JSON; full the parse; raw the document.
+ * requests as JSON; full the parse; raw the document. Each is pure: it
+ * reads the answer and nothing else, the logger included.
  */
-function listReadings(
-  logger: HandlerContext['logger'],
-): DetailTable<ListAnswer> {
-  const listed = (tree: ITransportTree) => {
-    const transports = listedTransports(tree);
-    logger?.info(`ListTransports: found ${transports.length} transport(s)`);
-    return transports;
-  };
+const LIST_READINGS: DetailTable<ListAnswer> = (() => {
+  const listed = listedTransports;
   return {
     terse: formatted(listingOf, (tree) => {
       const transports = listed(tree);
@@ -198,7 +193,7 @@ function listReadings(
     full: fullLevel,
     raw: rawLevel,
   };
-}
+})();
 
 /** `D` modifiable, and `R` released beside it when asked for. */
 type RequestStatuses = readonly ['D'] | readonly ['D', 'R'];
@@ -267,7 +262,7 @@ export async function handleListTransports(
         createAdtClient(connection, logger)
           .getRequest({
             ...resultsFor(transportDocuments),
-            list: readingAt(listReadings(logger), levelOf(args)),
+            list: readingAt(LIST_READINGS, levelOf(args)),
           })
           .list({
             analyse: analyseException,

@@ -68,6 +68,28 @@ describe('ListTransports sends the query by user', () => {
     else process.env.SAP_SYSTEM_TYPE = previous;
   });
 
+  // Each level's reading is pure (Codex P2): it reads the answer and
+  // nothing else, the logger included.
+  it('the reading logs nothing: a logger refusing its lines changes nothing', async () => {
+    const connection = recordingConnection([{ data: LISTING }]);
+    declareSystemKind(connection, 'onprem');
+    const logger = {
+      debug() {},
+      warn() {},
+      error() {},
+      info(message: unknown) {
+        if (String(message).startsWith('ListTransports')) {
+          throw new Error('the reading logged');
+        }
+      },
+    };
+    const answered = await runWithRequestContext(
+      { login: 'session_user' },
+      () => handleListTransportsOf({ connection, logger } as never, {}),
+    );
+    assert.equal(answered.isError === true, false, JSON.stringify(answered));
+  });
+
   it("the session's login, not the responsible: modifiable requests of every type", async () => {
     const { requests } = await sentFor({});
     assert.deepStrictEqual(

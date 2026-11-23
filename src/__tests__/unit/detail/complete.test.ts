@@ -12,87 +12,121 @@ import { answer, answerThrown } from '../../../lib/answer';
 import {
   completeAnswer,
   IncompleteAnswerError,
+  identityOf,
   incompleteAnswerWords,
   Written,
 } from '../../../lib/detail';
 import { return_error } from '../../../lib/utils';
 
-const held = (items: readonly string[]) => items;
+/** Two objects SAP listed without a name, apart only by their URI. */
+const NAMELESS = [
+  { type: 'CLAS/OC', name: '', uri: '/sap/bc/adt/x/one' },
+  { type: 'CLAS/OC', name: '', uri: '/sap/bc/adt/x/two' },
+];
+type Item = (typeof NAMELESS)[number];
 
-/** The rows of a list of names: each its cell and its identity. */
-const rowsOf = (items: readonly string[]) =>
-  items.map((item) => ({ cells: [item], identity: item }));
+/** What the reading held: each object by the values its row writes. */
+const held = (items: readonly Item[]) =>
+  items.map((item) => identityOf([item.type, item.name, item.uri]));
 
-describe('completeAnswer over the written rows', () => {
-  it('every item written: the answer, unchanged', () => {
-    const shown = completeAnswer('Tool', held, (items: readonly string[]) =>
-      Written.tsv(['name'], rowsOf(items)),
+/** The rows a formatter writes, as it would. */
+const rows = (items: readonly Item[]) =>
+  items.map((item) => ({ row: [item.type, item.name, item.uri] }));
+
+describe('completeAnswer over the cells written', () => {
+  it('every object written: the answer, unchanged', () => {
+    const shown = completeAnswer('Tool', held, (items: readonly Item[]) =>
+      Written.text(
+        [{ header: ['type', 'name', 'uri'] }, ...rows(items)],
+        [0, 1, 2],
+      ),
     );
-    assert.equal(shown(['a', 'b', 'a']), 'name\na\nb\na');
+    assert.equal(
+      shown(NAMELESS),
+      'type\tname\turi\nCLAS/OC\t\t/sap/bc/adt/x/one\nCLAS/OC\t\t/sap/bc/adt/x/two',
+    );
   });
 
-  // Codex's mutation (round 5, P1-1): one row fewer handed to the writer,
-  // the full list of identities beside it. The identities are the rows
-  // written, so the claim has nowhere to go: the answer is refused.
-  it('one row fewer to tsv, the full identities claimed: refused', () => {
-    const claimed = ['a', 'b', 'a'];
-    const shown = completeAnswer('Tool', held, (items: readonly string[]) => {
-      const written = Written.tsv(['name'], rowsOf(items.slice(1)));
-      void claimed;
-      return written;
-    });
+  // Codex's first surviving mutation (round 6, P1-1): the first object's
+  // URI written into both rows. The identities are the cells written, so the
+  // two rows read as one object twice: refused.
+  it("the first object's URI written into both rows: refused", () => {
+    const shown = completeAnswer('Tool', held, (items: readonly Item[]) =>
+      Written.text(
+        [
+          { header: ['type', 'name', 'uri'] },
+          ...items.map((item) => ({
+            row: [item.type, item.name, items[0]?.uri ?? ''],
+          })),
+        ],
+        [0, 1, 2],
+      ),
+    );
     assert.throws(
-      () => shown(claimed),
+      () => shown(NAMELESS),
       (thrown: unknown) =>
         thrown instanceof IncompleteAnswerError &&
-        thrown.message === incompleteAnswerWords('Tool') &&
-        thrown.message.includes("detail: 'full'"),
+        thrown.message === incompleteAnswerWords('Tool'),
     );
   });
 
-  for (const [label, written] of [
-    ['two merged', ['a', 'b']],
-    ['one missed and another doubled', ['a', 'a', 'a']],
-    ['one added', ['a', 'b', 'a', 'c']],
-  ] as const) {
-    it(`${label}: refused in fixed words naming the tool`, () => {
-      const shown = completeAnswer('Tool', held, () =>
-        Written.tsv(['name'], rowsOf(written)),
-      );
-      assert.throws(() => shown(['a', 'b', 'a']), IncompleteAnswerError);
-    });
-  }
+  // Codex's second surviving mutation: an extra row appended. A row is an
+  // item, and nothing appends text after the writer: refused.
+  it('an extra row appended: refused', () => {
+    const shown = completeAnswer('Tool', held, (items: readonly Item[]) =>
+      Written.text(
+        [
+          { header: ['type', 'name', 'uri'] },
+          ...rows(items),
+          { row: ['CLAS/OC', 'ZEXTRA', ''] },
+        ],
+        [0, 1, 2],
+      ),
+    );
+    assert.throws(() => shown(NAMELESS), IncompleteAnswerError);
+  });
+
+  it('one row fewer: refused', () => {
+    const shown = completeAnswer('Tool', held, (items: readonly Item[]) =>
+      Written.text(rows(items.slice(1)), [0, 1, 2]),
+    );
+    assert.throws(() => shown(NAMELESS), IncompleteAnswerError);
+  });
 
   it('a plain claim is no written answer: it does not compile', () => {
     // @ts-expect-error a formatter's own claim is not `Written`.
     completeAnswer('Tool', held, () => ({ answer: '', identities: [] }));
   });
 
-  it('the JSON writers read the items from the answer itself', () => {
-    const list = Written.list(
-      { objects: [{ name: 'a' }, { name: 'b' }] },
-      (answer) => answer.objects,
-      (o) => o.name,
-    );
-    assert.deepStrictEqual(list.identities, ['a', 'b']);
-    const tree = Written.tree(
+  it('the JSON writers identify each row by its fields, as placed in the answer', () => {
+    const json = Written.json({ count: 2 }, { objects: NAMELESS }, [
+      'type',
+      'name',
+      'uri',
+    ]);
+    assert.deepStrictEqual(json.answer, { count: 2, objects: NAMELESS });
+    assert.deepStrictEqual(json.identities, held(NAMELESS));
+    const tree = Written.jsonTreeRoot(
       { name: 'r', children: [{ name: 'c', children: [] }] },
-      (answer) => answer,
       (node) => node.children,
-      (node, depth) => `${depth}|${node.name}`,
+      ['name'],
       false,
     );
-    assert.deepStrictEqual(tree.identities, ['1|c']);
+    assert.deepStrictEqual(tree.identities, [identityOf(['c'])]);
   });
 
-  it('plain lines carry no item; written parts carry theirs, in order', () => {
-    const written = Written.lines([
-      '# head',
-      Written.row(['x'], 'x'),
-      Written.marked('incomplete', ['type=T'], 'i'),
+  it('a head line is never a row; a mark is an item', () => {
+    const written = Written.text(
+      [
+        { head: 'count', value: '1' },
+        { mark: 'incomplete', words: ['type=T'] },
+      ],
+      [0],
+    );
+    assert.equal(written.answer, '# count 1\n# incomplete type=T');
+    assert.deepStrictEqual(written.identities, [
+      identityOf(['incomplete', 'type=T']),
     ]);
-    assert.equal(written.answer, '# head\nx\n# incomplete type=T');
-    assert.deepStrictEqual(written.identities, ['x', 'i']);
   });
 });
 

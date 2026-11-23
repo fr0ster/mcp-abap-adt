@@ -9,10 +9,10 @@
 export {
   completeAnswer,
   IncompleteAnswerError,
-  type ItemGroup,
-  type ItemRow,
+  identityOf,
   incompleteAnswerWords,
-  type TreeItemRow,
+  type Line,
+  type TextKey,
   Written,
 } from './complete';
 export {
@@ -37,6 +37,7 @@ export {
   tsv,
   tsvRow,
 } from './tsv';
+export { cellsOf } from './tsvCells';
 export {
   notOneDocumentWords,
   recordedBody,

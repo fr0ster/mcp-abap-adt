@@ -4,48 +4,77 @@
  * ours that drops, merges or misses an item, so the model reads an answer
  * that looks whole and is not.
  *
- * **The identities come from what was written, never from a claim beside
- * it** (Codex round 5, P1-1). A guarded formatter writes its answer only
- * through the serializers of {@link Written} — `tsv`, `groupedTsv`,
- * `indented`, `lines`, the JSON writers `list` and `tree` — each of which
- * takes typed rows (or reads the emitted JSON) and returns the text and the
- * identity of every item written, both from the same rows. `Written` has a
- * private constructor, so a formatter that builds its text any other way has
- * no `Written` to hand `completeAnswer`, and does not compile.
+ * **The identities are the cells written** (Codex rounds 5 and 6, P1-1). A
+ * guarded formatter writes its answer only through {@link Written}: for
+ * text, `Written.text` over typed lines — `#` heads, a header, item rows,
+ * item marks, tree bullets — whose items' identities are their identity
+ * columns *as written into the text*; for JSON, `Written.json` and
+ * `Written.jsonTree`, which place the typed rows into the answer and read
+ * each identity from the same row. Nothing appends text after a serializer
+ * ran, and `Written` has a private constructor, so a formatter that builds
+ * text any other way has no `Written` to hand `completeAnswer` and does not
+ * compile. A head line is always `# …`, so it can carry no row.
  *
  * `completeAnswer` compares the identities written with the items the
  * reading held — its entries, and the incomplete entries, not-loaded nodes
- * and incomplete objects beside them — each as often as it comes. On any
+ * and incomplete objects beside them — each as often as it comes, the held
+ * ones computed from the reading's own values ({@link identityOf}). On any
  * difference the call ends with `IncompleteAnswerError`, in fixed words
  * naming the tool, which the answer boundary answers as the error
  * `incomplete_answer` (`src/lib/answer.ts`, `src/lib/utils.ts`) — no partial
  * answer, and no SAP text.
  *
- * `raw` answers the documents as ADT sent them (`./wire`), and the generic
+ * Out of scope, as contrived forms in our own code: a cast, and mutating a
+ * value after a serializer wrote it.
+ *
+ * `raw` answers the responses as ADT sent them (`./wire`), and the generic
  * parse of `full` (`fullLevel`) keeps every element: neither reshapes, so
- * neither can lose an item. A `full` of our own assembly is guarded like any
- * other formatter.
+ * neither can lose an item.
  */
 
 import { cell, line } from './tsvCells';
 
-/** A row of a list: its cells, and the identity of the item it is written of. */
-export interface ItemRow {
-  readonly cells: readonly string[];
-  readonly identity: string;
+/** An item's identity from its identity values, as a reading's held items are computed. */
+export function identityOf(values: readonly string[]): string {
+  return values.join('\t');
 }
 
-/** A row of an indented tree: its depth (0 for the root) as well. */
-export interface TreeItemRow extends ItemRow {
-  readonly depth: number;
-}
-
-/** A run of rows sharing one value, stated once on its group line. */
-export interface ItemGroup {
-  readonly field: string;
-  readonly value: string;
-  readonly rows: readonly ItemRow[];
-}
+/** One line of a written text. */
+export type Line =
+  /** `# head value` (or `# head`): no item, and never a row. */
+  | { readonly head: string; readonly value?: string | undefined }
+  /** `# group value`, the value escaped as a cell: a group of the rows after it, no item. */
+  | { readonly group: string; readonly value: string }
+  /** The header line: the columns, tab-separated. */
+  | { readonly header: readonly string[] }
+  /**
+   * A row that is an item; `depth` indents it as a tree node; `identity`
+   * names the columns of its identity where they differ from the text's.
+   */
+  | {
+      readonly row: readonly string[];
+      readonly depth?: number | undefined;
+      readonly identity?: readonly number[] | undefined;
+    }
+  /** A tree's root row: written as a row, and no item. */
+  | { readonly root: readonly string[]; readonly depth?: number | undefined }
+  /** `# mark words…`, a line that is an item (an entry without a name, a node not loaded, a failure). */
+  | { readonly mark: string; readonly words: readonly string[] }
+  /** `- label`, a tree's node as a bullet, indented by its depth, identified by its identity words. */
+  | {
+      readonly bullet: string;
+      readonly depth: number;
+      readonly identity: readonly string[];
+    }
+  /** A bullet that is no item: the object asked, which SAP did not send. */
+  | { readonly bulletRoot: string; readonly depth: number }
+  /** A fixed title line; `''` ends the text with a line feed. */
+  | {
+      readonly title:
+        | 'tree:'
+        | 'No nodes found in object structure response.'
+        | '';
+    };
 
 /** A word kept on one line: a line break or a tab in it written as its escape. */
 function oneLine(word: string): string {
@@ -59,9 +88,17 @@ function oneLine(word: string): string {
   return written;
 }
 
+/** The identity of a row: its identity columns, as written. */
+function rowIdentity(
+  cells: readonly string[],
+  identityColumns: readonly number[],
+): string {
+  return identityOf(identityColumns.map((index) => cells[index] ?? ''));
+}
+
 /**
  * An answer and the identity of every item it holds, made only by the
- * serializers below, which take both from the same rows.
+ * serializers below, which take both from what they write.
  */
 export class Written<A> {
   /** Makes the type nominal: nothing but these serializers builds one. */
@@ -72,115 +109,126 @@ export class Written<A> {
     readonly identities: readonly string[],
   ) {}
 
-  /** The header line, then one line per row (`./tsv`'s format). */
-  static tsv(
-    columns: readonly string[],
-    rows: readonly ItemRow[],
-  ): Written<string> {
-    return new Written(
-      [columns.join('\t'), ...rows.map((row) => line(row.cells))].join('\n'),
-      rows.map((row) => row.identity),
-    );
-  }
-
-  /** The header line, then each group: its group line, then its rows. */
-  static groupedTsv(
-    columns: readonly string[],
-    groups: readonly ItemGroup[],
-  ): Written<string> {
-    const lines = [columns.join('\t')];
-    const identities: string[] = [];
-    for (const group of groups) {
-      lines.push(`# ${group.field} ${cell(group.value)}`);
-      for (const row of group.rows) {
-        lines.push(line(row.cells));
-        identities.push(row.identity);
-      }
-    }
-    return new Written(lines.join('\n'), identities);
-  }
-
-  /** A tree as indented rows, two spaces per level; a row whose identity is `''` is no item (a root). */
-  static indented(rows: readonly TreeItemRow[]): Written<string> {
-    return new Written(
-      rows
-        .map(
-          (row) => `${'  '.repeat(row.depth)}${row.cells.map(cell).join('\t')}`,
-        )
-        .join('\n'),
-      rows.flatMap((row) => (row.identity === '' ? [] : [row.identity])),
-    );
-  }
-
   /**
-   * A tree as bulleted lines, `- label`, two spaces per level of depth, each
-   * line ending with a line feed; a row whose identity is `''` is no item.
+   * A text of typed lines (`./tsv`'s format). Each item's identity is read
+   * from what is written: a row's identity columns (`identityColumns`, or
+   * the row's own), a mark's marker and words, a bullet's identity words.
    */
-  static bulleted(
-    rows: readonly { depth: number; label: string; identity: string }[],
-  ): Written<string> {
-    return new Written(
-      rows.map((row) => `${'  '.repeat(row.depth)}- ${row.label}\n`).join(''),
-      rows.flatMap((row) => (row.identity === '' ? [] : [row.identity])),
-    );
-  }
-
-  /** One row as its line, for a writer that interleaves its own group lines. */
-  static row(cells: readonly string[], identity: string): Written<string> {
-    return new Written(line(cells), [identity]);
-  }
-
-  /**
-   * A `#` line that is one item: an entry SAP lists without a name, a node
-   * SAP could not load, an object's failure. Its words are kept on the one
-   * line — a line break or a tab in them is written as its escape.
-   */
-  static marked(
-    marker: string,
-    words: readonly string[],
-    identity: string,
-  ): Written<string> {
-    return new Written([`# ${marker}`, ...words.map(oneLine)].join(' '), [
-      identity,
-    ]);
-  }
-
-  /**
-   * Lines already written by another tool's guarded writer (a search's
-   * hit rows) that are one item here: at least one line.
-   */
-  static block(
-    lines: readonly [string, ...string[]],
-    identity: string,
-  ): Written<string> {
-    return new Written(lines.join('\n'), [identity]);
-  }
-
-  /** Lines joined: plain lines carry no item, written parts carry theirs, in order. */
-  static lines(
-    parts: readonly (string | Written<string>)[],
-    separator = '\n',
+  static text(
+    lines: readonly Line[],
+    identityColumns: readonly number[],
   ): Written<string> {
     const texts: string[] = [];
     const identities: string[] = [];
-    for (const part of parts) {
-      if (typeof part === 'string') {
-        texts.push(part);
-        continue;
+    for (const entry of lines) {
+      if ('head' in entry) {
+        texts.push(
+          entry.value === undefined
+            ? `# ${entry.head}`
+            : `# ${entry.head} ${entry.value}`,
+        );
+      } else if ('group' in entry) {
+        texts.push(`# ${entry.group} ${cell(entry.value)}`);
+      } else if ('header' in entry) {
+        texts.push(entry.header.join('\t'));
+      } else if ('row' in entry) {
+        texts.push(written(entry.row, entry.depth));
+        identities.push(
+          rowIdentity(entry.row, entry.identity ?? identityColumns),
+        );
+      } else if ('root' in entry) {
+        texts.push(written(entry.root, entry.depth));
+      } else if ('mark' in entry) {
+        const words = entry.words.map(oneLine);
+        texts.push([`# ${entry.mark}`, ...words].join(' '));
+        identities.push(identityOf([entry.mark, ...words]));
+      } else if ('bullet' in entry) {
+        texts.push(`${'  '.repeat(entry.depth)}- ${entry.bullet}`);
+        identities.push(identityOf(entry.identity));
+      } else if ('bulletRoot' in entry) {
+        texts.push(`${'  '.repeat(entry.depth)}- ${entry.bulletRoot}`);
+      } else {
+        texts.push(entry.title);
       }
-      texts.push(part.answer);
-      identities.push(...part.identities);
     }
-    return new Written(texts.join(separator), identities);
+    return new Written(texts.join('\n'), identities);
   }
 
-  /** A JSON answer whose items are a list inside it: their identities read from the answer itself. */
-  static list<A, I>(
-    answer: A,
-    itemsOf: (answer: A) => readonly I[],
-    identityOf: (item: I) => string,
-  ): Written<A> {
-    return new Written(answer, itemsOf(answer).map(identityOf));
+  /**
+   * A JSON answer: `rest`, with the typed rows of `rowsBy` (each key a
+   * list's name in the answer, in order) after it, and `after`'s keys
+   * after them. Each row's identity is read from
+   * the row itself: its `identityKeys`' text values.
+   */
+  static json<
+    R extends object,
+    K extends string,
+    I extends object,
+    T extends object = Record<never, never>,
+  >(
+    rest: R,
+    rowsBy: Partial<Record<K, readonly I[]>>,
+    identityKeys: readonly TextKey<I>[],
+    after?: T,
+  ): Written<R & Partial<Record<K, readonly I[]>> & Partial<T>> {
+    const rows: readonly I[] = Object.values<readonly I[] | undefined>(
+      rowsBy,
+    ).flatMap((list) => list ?? []);
+    return new Written(
+      { ...rest, ...rowsBy, ...after },
+      rows.map((row) => textIdentity(row, identityKeys)),
+    );
+  }
+
+  /**
+   * A JSON tree: `rest`, the root of `rootBy` (one key) after it, and
+   * `after`'s keys after that. Each node's identity is read from the node:
+   * its `identityKeys`' text values; the root's too when `withRoot`.
+   */
+  static jsonTree<
+    R extends object,
+    K extends string,
+    N extends object,
+    T extends object = Record<never, never>,
+  >(
+    rest: R,
+    rootBy: Record<K, N>,
+    childrenOf: (node: N) => readonly N[],
+    identityKeys: readonly TextKey<N>[],
+    withRoot: boolean,
+    after?: T,
+  ): Written<R & Record<K, N> & Partial<T>> {
+    const roots: readonly N[] = Object.values<N>(rootBy);
+    return new Written(
+      { ...rest, ...rootBy, ...after },
+      roots.flatMap((root) =>
+        treeIdentities(root, childrenOf, identityKeys, withRoot),
+      ),
+    );
+  }
+
+  /** A JSON tree that is the answer itself: its nodes identified as in {@link Written.jsonTree}. */
+  static jsonTreeRoot<N extends object>(
+    root: N,
+    childrenOf: (node: N) => readonly N[],
+    identityKeys: readonly TextKey<N>[],
+    withRoot: boolean,
+  ): Written<N> {
+    return new Written(
+      root,
+      treeIdentities(root, childrenOf, identityKeys, withRoot),
+    );
+  }
+
+  /** A JSON answer that is the typed rows themselves, each identified by its `identityKeys`' text values. */
+  static jsonRows<I extends object>(
+    rows: readonly I[],
+    identityKeys: readonly TextKey<I>[],
+  ): Written<readonly I[]> {
+    return new Written(
+      rows,
+      rows.map((row) => textIdentity(row, identityKeys)),
+    );
   }
 
   /** JSON answers in a list, each with the items it holds. */
@@ -191,27 +239,23 @@ export class Written<A> {
     );
   }
 
-  /**
-   * A JSON tree: the identities of its nodes read from the answer itself,
-   * depth first; the root's too when `withRoot`.
-   */
-  static tree<A, N>(
-    answer: A,
-    rootOf: (answer: A) => N,
-    childrenOf: (node: N) => readonly N[],
-    identityOf: (node: N, depth: number) => string,
-    withRoot: boolean,
-  ): Written<A> {
-    const below = (node: N, depth: number): string[] =>
-      childrenOf(node).flatMap((child) => [
-        identityOf(child, depth + 1),
-        ...below(child, depth + 1),
-      ]);
-    const root = rootOf(answer);
-    return new Written(answer, [
-      ...(withRoot ? [identityOf(root, 0)] : []),
-      ...below(root, 0),
-    ]);
+  /** Written texts as sections of one text, each item kept. */
+  static sections(parts: readonly Written<string>[]): Written<string> {
+    return new Written(
+      parts.map((part) => part.answer).join('\n'),
+      parts.flatMap((part) => part.identities),
+    );
+  }
+
+  /** A tool's answer of text entries, each an item identified by its text as written. */
+  static content(entries: readonly { type: 'text'; text: string }[]): Written<{
+    isError: boolean;
+    content: Array<{ type: 'text'; text: string }>;
+  }> {
+    return new Written(
+      { isError: false, content: [...entries] },
+      entries.map((entry) => identityOf([entry.text])),
+    );
   }
 
   /** A written text as a tool's text answer, its items unchanged. */
@@ -229,6 +273,46 @@ export class Written<A> {
   static stringified<A>(written: Written<A>): Written<string> {
     return new Written(JSON.stringify(written.answer), written.identities);
   }
+}
+
+/** A row's text: its cells as a line, indented by its depth in a tree. */
+function written(cells: readonly string[], depth: number | undefined): string {
+  return depth === undefined
+    ? line(cells)
+    : `${'  '.repeat(depth)}${cells.map(cell).join('\t')}`;
+}
+
+/** A tree's nodes, depth first, each by its identity keys; the root's too when `withRoot`. */
+function treeIdentities<N>(
+  root: N,
+  childrenOf: (node: N) => readonly N[],
+  identityKeys: readonly TextKey<N>[],
+  withRoot: boolean,
+): string[] {
+  const below = (node: N): string[] =>
+    childrenOf(node).flatMap((child) => [
+      textIdentity(child, identityKeys),
+      ...below(child),
+    ]);
+  return [
+    ...(withRoot ? [textIdentity(root, identityKeys)] : []),
+    ...below(root),
+  ];
+}
+
+/** The keys of `I` whose values are text (or absent). */
+export type TextKey<I> = {
+  [P in keyof I]-?: I[P] extends string | undefined ? P : never;
+}[keyof I];
+
+/** A JSON row's identity: its text keys' values, an absent one `''`. */
+function textIdentity<I>(row: I, keys: readonly TextKey<I>[]): string {
+  return identityOf(
+    keys.map((key) => {
+      const value: I[TextKey<I>] = row[key];
+      return typeof value === 'string' ? value : '';
+    }),
+  );
 }
 
 /** The fixed words of an incomplete answer: the tool, and what to ask instead. */

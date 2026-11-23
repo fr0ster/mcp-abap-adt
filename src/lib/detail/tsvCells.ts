@@ -26,3 +26,35 @@ export function line(row: readonly string[]): string {
   if (first?.startsWith('#')) cells[0] = `\\${first}`;
   return cells.join('\t');
 }
+
+/**
+ * A line {@link line} wrote, read back into its cells: the inverse of the
+ * escapes, for a writer that takes another tool's written rows as its own.
+ */
+export function cellsOf(written: string): string[] {
+  const cells: string[] = [];
+  let current = '';
+  let escaped = false;
+  for (const character of written) {
+    if (escaped) {
+      current +=
+        character === 't'
+          ? '\t'
+          : character === 'n'
+            ? '\n'
+            : character === 'r'
+              ? '\r'
+              : character;
+      escaped = false;
+    } else if (character === '\\') {
+      escaped = true;
+    } else if (character === '\t') {
+      cells.push(current);
+      current = '';
+    } else {
+      current += character;
+    }
+  }
+  cells.push(current);
+  return cells;
+}

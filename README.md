@@ -268,12 +268,17 @@ row SAP answered is answered. `detail` has four levels:
   is the documents, and a failed exchange `full` neither refuses nor reports (the probe of a batch
   endpoint a destination does not serve) is there as its failed response, never as a gap.
 
-An answer is the complete result or an error, never a partial one. A formatter that reshapes a
-reading writes through shared writers that take typed rows and read each item's identity from the
-cells they write, and those are compared with every item the reading held — its entries, and the
-incomplete entries, not-loaded nodes and incomplete objects beside them. On any difference the call
-answers the error `incomplete_answer`, in fixed words that name the tool and ask for
-`detail: 'full'`, which gives the whole parse; `raw` gives the responses as ADT sent them. Terse
+An answer is the complete result or an error, never a partial one. A terse or medium list is
+written from the reading's own lists, by construction: each tool states a column schema for every
+list its reading holds — a list without one does not compile — and the writer takes the lists from
+the reading itself and writes one row (or line, or entry) per item, every cell from that item, so no
+formatter chooses its items. A kind of item the approved answer leaves out by definition (the
+package and container nodes of a where-used tree, a separator line of an action log, a branch
+repeating a transport request already listed, a component's links in an outline) is named with its
+reason in the tool's schemas, every item still visited. What a reading cannot show — a node SAP
+could not load, an include or a probe SAP refused, a read that failed — is a typed list of the
+reading and is written like any other. Every value is escaped: a tab or any line terminator in SAP's
+text adds no column and no line. Terse
 lists what SAP returned: no row says that something asked for is absent — a consumer reads that with
 its own call, or asks `medium` or `full` where a tool states it — while what SAP itself returned stays,
 incomplete objects and nodes SAP could not load included (a node SAP could not load is its

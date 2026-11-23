@@ -30,10 +30,11 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
-  identityOf,
-  type Line,
-  Written,
+  type Column,
+  omitted,
+  type RowSchemas,
+  rows,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -210,48 +211,49 @@ function definitionOf(component: AnsweredComponent): AnsweredLink | undefined {
 /**
  * The outline as indented rows: name, type, visibility, the definition's
  * line, and its source where it is not the one the `# source` line names (a
- * local include, a module's include).
+ * local include, a module's include) — every component, from the root.
  */
-/** A component's identity: its depth, name and type. */
-function componentIdentity(component: AnsweredComponent) {
-  return identityOf([component.name, component.type]);
-}
-
-/** Every component of a tree, with and below its root. */
-function componentIdentities(component: AnsweredComponent): string[] {
-  return [
-    componentIdentity(component),
-    ...component.children.flatMap(componentIdentities),
-  ];
-}
-
-function outlineRows(
-  component: AnsweredComponent,
-  source: string | undefined,
-  depth = 0,
-): Line[] {
-  const definition = definitionOf(component);
-  const line =
-    definition?.start === undefined ? '' : String(definition.start.line);
-  const elsewhere =
-    definition === undefined || definition.source === source
-      ? ''
-      : definition.source;
-  return [
+function outlineSchemas(source: string | undefined): {
+  readonly columns: Column<AnsweredComponent>[];
+  readonly below: RowSchemas<AnsweredComponent>;
+} {
+  const columns: Column<AnsweredComponent>[] = [
+    { name: 'name', cell: (component) => component.name },
+    { name: 'type', cell: (component) => component.type },
+    { name: 'visibility', cell: (component) => component.visibility ?? '' },
     {
-      depth,
-      row: [
-        component.name,
-        component.type,
-        component.visibility ?? '',
-        line,
-        elsewhere,
-      ],
+      name: 'line',
+      cell: (component) => {
+        const start = definitionOf(component)?.start;
+        return start === undefined ? '' : String(start.line);
+      },
     },
-    ...component.children.flatMap((child) =>
-      outlineRows(child, source, depth + 1),
-    ),
+    {
+      name: 'source',
+      cell: (component) => {
+        const definition = definitionOf(component);
+        return definition === undefined || definition.source === source
+          ? ''
+          : definition.source;
+      },
+    },
   ];
+  const below: RowSchemas<AnsweredComponent> = {
+    // The approved terse shape: a component's links repeat the source the
+    // `# source` line names, and leave.
+    links: omitted<AnsweredLink, 'links'>(
+      'links',
+      'a link repeats the source the `# source` line names',
+    ),
+    children: rows('children', {
+      columns,
+      header: 'none',
+      get lists() {
+        return below;
+      },
+    }),
+  };
+  return { columns, below };
 }
 
 /**
@@ -272,54 +274,41 @@ function outlineAnswers(
       ? undefined
       : componentOf(outline.base, outline.root);
   return {
-    // Every component of the outline, or nothing (`completeAnswer`).
+    // Every component of the outline, written by the listing writer.
     // No outline read: the document as it came (nothing reshaped).
     terse: ({ document, outline }: OutlineRead) => {
       const root = outline === undefined ? undefined : components(outline);
       if (root === undefined) return document;
-      return completeAnswer(
-        'GetObjectOutline',
-        componentIdentities,
-        (tree: AnsweredComponent) => {
-          const source = definitionOf(tree)?.source;
-          return Written.text(
-            [
-              { head: 'object', value: `${objectType} ${objectName}` },
-              ...(source === undefined
-                ? []
-                : [{ head: 'source', value: source }]),
-              { header: ['name', 'type', 'visibility', 'line', 'source'] },
-              ...outlineRows(tree, source),
-            ],
-            [0, 1],
-          );
+      const source = definitionOf(root)?.source;
+      const { columns, below } = outlineSchemas(source);
+      return writeListing({
+        heads: [
+          { head: 'object', value: `${objectType} ${objectName}` },
+          ...(source === undefined ? [] : [{ head: 'source', value: source }]),
+        ],
+        reading: { tree: [root] },
+        lists: {
+          tree: rows('tree', {
+            columns,
+            header: 'always',
+            tree: true,
+            lists: below,
+          }),
         },
-      )(root);
+      }).answer;
     },
-    // Every component, each identified by its name and type as written, or
-    // nothing (`completeAnswer`); no outline read: the document as it came.
+    // Every component with its links (the reading's own tree, every
+    // component in it); no outline read: the document as it came.
     medium: ({ document, outline }: OutlineRead) => {
       const root = outline === undefined ? undefined : components(outline);
       if (outline === undefined) return document;
-      const rest = {
+      return {
         success: true,
         object_type: objectType,
         object_name: objectName,
         version,
+        outline: root,
       };
-      if (root === undefined) return { ...rest, outline: undefined };
-      return completeAnswer(
-        'GetObjectOutline',
-        componentIdentities,
-        (tree: AnsweredComponent) =>
-          Written.jsonTree(
-            rest,
-            { outline: tree },
-            (node) => node.children,
-            ['name', 'type'],
-            true,
-          ),
-      )(root);
     },
     full: ({ document, outline }) => outline ?? document,
     raw: ({ document }) => document,

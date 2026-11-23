@@ -148,6 +148,28 @@ export function rows<I, K extends string>(
   };
 }
 
+/**
+ * The list `key` left out of the text whole, by definition of the answer's
+ * approved shape (a component's links at terse: each repeats the source the
+ * `# source` line names) — its reason stated where the schemas are, so a
+ * reviewer sees it; every item visited, none written.
+ */
+export function omitted<I, K extends string>(
+  key: K,
+  reason: string,
+): Bound<Holding<K, I>, K> & { readonly reason: string } {
+  return {
+    key,
+    reason,
+    write: (reading) => {
+      for (const _item of itemsOf(reading, key)) {
+        // Visited: the shape writes no line for it.
+      }
+      return [];
+    },
+  };
+}
+
 /** The list `key` written as mark lines, `# mark words…`, one per item. */
 export function marks<I, K extends string>(
   key: K,

@@ -47,6 +47,7 @@ export {
   type Nested,
   nest,
   type Omitting,
+  omitted,
   omitting,
   parts,
   type Root,

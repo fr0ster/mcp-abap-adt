@@ -75,6 +75,17 @@ describe('the meaning checks themselves', () => {
 
 const served = servedModels();
 const only = process.env.MEANING_MODELS?.split(',');
+/** The model a run requires (CI): an Ollama that cannot serve it fails, never skips. */
+const required = process.env.MEANING_REQUIRED;
+
+/**
+ * Whether the checks mean anything yet: they rank assembled tools, and the
+ * first are assembled in group (2) of plan step 10.7, which sets this.
+ */
+const MEANING_LIVE = false;
+
+/** The fewest tools a ranking among them says something about. */
+const MEANING_FEWEST = 10;
 
 describe('description and name against function, through the local Ollama', () => {
   let tools: ServedTool[] = [];
@@ -83,8 +94,15 @@ describe('description and name against function, through the local Ollama', () =
       ...(await servedCatalog(setOf('core'))),
       ...(await servedCatalog(setOf('compact'))),
     ];
+    // A compact tool is ranked per action once group (10) of step 10.7
+    // assembles its actions: until then none of its texts is assembled.
     const seen = new Set<string>();
-    tools = all.filter((tool) => {
+    tools = [
+      ...all,
+      // The tools only the HTTP transports serve (a long session, …).
+      ...(await servedCatalog(setOf('core'), 'http')),
+      ...(await servedCatalog(setOf('compact'), 'http')),
+    ].filter((tool) => {
       if (seen.has(tool.name)) return false;
       seen.add(tool.name);
       return partsOfDescription(tool.description) !== undefined;
@@ -92,21 +110,33 @@ describe('description and name against function, through the local Ollama', () =
   });
 
   for (const model of MODELS) {
+    const unserved =
+      served === undefined
+        ? `the Ollama at ${OLLAMA_URL} does not answer`
+        : served.has(model.model)
+          ? undefined
+          : `the Ollama at ${OLLAMA_URL} does not serve ${model.model}`;
     const reason =
       only !== undefined && !only.includes(model.model)
         ? `skipped: MEANING_MODELS names ${only.join(', ')}`
-        : served === undefined
-          ? `skipped: the Ollama at ${OLLAMA_URL} does not answer`
-          : served.has(model.model)
-            ? undefined
-            : `skipped: the Ollama at ${OLLAMA_URL} does not serve ${model.model}`;
+        : !MEANING_LIVE
+          ? 'skipped: not yet meaningful — no tool is assembled before group (2) of plan step 10.7'
+          : unserved !== undefined && required !== model.model
+            ? `skipped: ${unserved}`
+            : undefined;
     it(`${model.model}: each tool's description and name rank its own function first, against the baseline`, {
       skip: reason ?? false,
     }, async () => {
+      // Required here, and not served: the run fails, naming why.
+      assert.equal(unserved, undefined, unserved);
       const assembled = tools.flatMap((tool) => {
         const parts = partsOfDescription(tool.description);
         return parts === undefined ? [] : [{ tool, parts }];
       });
+      assert.ok(
+        assembled.length >= MEANING_FEWEST,
+        `${assembled.length} assembled tools: a ranking needs ${MEANING_FEWEST}`,
+      );
       const functionTexts = assembled.map(
         ({ parts }) =>
           `${model.document}${[parts.purpose.text, ...parts.returns.map((fact) => fact.text)].join(' ')}`,
@@ -136,10 +166,9 @@ describe('description and name against function, through the local Ollama', () =
       const baseline: MeaningBaseline = JSON.parse(
         fs.readFileSync(BASELINE_FILE, 'utf8'),
       );
-      assert.deepStrictEqual(
-        baselineFaults(failures, baseline[model.model] ?? []),
-        [],
-      );
+      const recorded = baseline[model.model];
+      assert.ok(recorded !== undefined, `no baseline for ${model.model}`);
+      assert.deepStrictEqual(baselineFaults(failures, recorded), []);
     });
   }
 });

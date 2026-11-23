@@ -180,33 +180,55 @@ export type Needed<R, K> = SchemaKeys<ElementOf<R, K>>;
 /**
  * Whether `R` holds, at any depth, what no schema can write: a member typed
  * `unknown` or `any` (a reading is typed by its contract), a Map or a Set,
+ * a member that may be any JSON value holding an array of items that are
+ * not, a nesting past the depth cap (each type checked once on the way
+ * down),
  * or an index signature whose values hold lists of anything but JSON data
  * (JSON data is written whole).
  */
 type RefusedAt<R, D extends readonly unknown[]> =
-  TooDeep<D> extends true
-    ? false
-    : Opaque<R> extends true
-      ? true
-      : AnyJson<R> extends true
+  Opaque<R> extends true
+    ? true
+    : AnyJson<R> extends true
+      ? // Any JSON value is one value — but an array in it of items that
+        // are not themselves any JSON value is a list of the reading hidden
+        // among scalars: refused.
+        [ListPart<R>] extends [never]
         ? false
-        : R extends Plain | ((...args: never[]) => unknown)
+        : AnyJson<ListPart<R>[number]> extends true
           ? false
-          : R extends Collection
-            ? true
-            : R extends readonly (infer E)[]
-              ? RefusedAt<E, Deeper<D>>
-              : string extends keyof R
-                ? AnyJson<R[string & keyof R]> extends true
-                  ? false
-                  : [ListPart<R[string & keyof R]>] extends [never]
-                    ? RefusedAt<R[string & keyof R], Deeper<D>>
-                    : true
-                : true extends {
-                      [K in keyof R]-?: RefusedAt<R[K], Deeper<D>>;
-                    }[keyof R]
-                  ? true
-                  : false;
+          : true
+      : R extends unknown
+        ? RefusedArm<R, D>
+        : never;
+
+/** `RefusedAt` of one arm of a union. */
+type RefusedArm<R, D extends readonly unknown[]> =
+  // A type met again on the way down (a tree's node, a self reference):
+  // checked where it was first met.
+  [R] extends [D[number]]
+    ? false
+    : // Past the depth cap: no reading of a tool nests this deep, so a
+      // reading that does is refused rather than left unchecked.
+      TooDeep<D> extends true
+      ? true
+      : R extends Plain | ((...args: never[]) => unknown)
+        ? false
+        : R extends Collection
+          ? true
+          : R extends readonly (infer E)[]
+            ? RefusedAt<E, D>
+            : string extends keyof R
+              ? AnyJson<R[string & keyof R]> extends true
+                ? false
+                : [ListPart<R[string & keyof R]>] extends [never]
+                  ? RefusedAt<R[string & keyof R], [...D, R]>
+                  : true
+              : true extends {
+                    [K in keyof R]-?: RefusedAt<R[K], [...D, R]>;
+                  }[keyof R]
+                ? true
+                : false;
 
 /**
  * An item JSON writes whole: every member a value JSON keeps — no function,
@@ -237,7 +259,13 @@ type JsonSafe<I, D extends readonly unknown[] = []> =
 type Listless<T> = T & ([SchemaKeys<T>] extends [never] ? unknown : never);
 
 /** `T`, or `never` when the reading holds what no schema can write. */
-export type Writable<R, T> = RefusedAt<R, []> extends true ? never : T;
+export type Writable<R, T> = [R] extends [readonly unknown[]]
+  ? // A reading is an object holding its lists, never a list itself: a list
+    // given as the reading has no member a schema could be bound to.
+    never
+  : RefusedAt<R, []> extends true
+    ? never
+    : T;
 
 /** Only this module mints a binding. */
 const binding: unique symbol = Symbol('binding');
@@ -549,6 +577,12 @@ export type Discriminant<I> = {
     : never;
 }[keyof I];
 
+/** The arm of `I` whose discriminant `D` is `P`, or `never`. */
+type KindArm<I, D extends PropertyKey, P> = Extract<
+  I,
+  { readonly [Q in D]: P }
+>;
+
 /** The kinds the discriminant `D` of `I` can be. */
 export type KindOf<I, D extends Discriminant<I>> = I[D] & string;
 
@@ -581,10 +615,12 @@ export function kinds<I, K extends string, D extends Discriminant<I>>(
   key: K,
   discriminant: D,
   specs: {
-    readonly [P in KindOf<I, D>]: KindSpec<
-      I,
-      Extract<I, { readonly [Q in D]: P }>
-    >;
+    readonly [P in KindOf<I, D>]: KindArm<I, D, P> extends never
+      ? // No arm of the item's union has this kind alone (`{ kind: 'a' |
+        // 'b' }` on one object type): no spec can be given, so such an
+        // item is no list of kinds.
+        never
+      : KindSpec<I, KindArm<I, D, P>>;
   },
   header?: readonly string[] | undefined,
 ): Bound<Holding<K, I>, K, SchemaKeys<I>> {
@@ -803,11 +839,11 @@ export function parts<I, K extends string>(
 export function partsOf<I, K extends string, M extends keyof I & string>(
   key: K,
   heads: (item: I) => readonly Head[],
-  member: M,
+  member: OneMember<M>,
   nested: (
-    value: Exclude<I[M], undefined>,
+    value: Exclude<I[OneMember<M>], undefined>,
     item: I,
-  ) => Nested<Exclude<I[M], undefined>>,
+  ) => Nested<Exclude<I[OneMember<M>], undefined>>,
   header?: readonly string[] | undefined,
 ): Bound<Holding<K, I>, K, M> {
   return {
@@ -824,6 +860,21 @@ export function partsOf<I, K extends string, M extends keyof I & string>(
     ],
   };
 }
+
+/**
+ * `M` when it is one member, never a union of several: a part writes one
+ * member, so each other member holding lists needs a part of its own.
+ */
+type OneMember<M> = [M] extends [UnionToIntersection<M>] ? M : never;
+
+/** The intersection of a union's arms: what only one member satisfies. */
+type UnionToIntersection<U> = (
+  U extends unknown
+    ? (arm: U) => void
+    : never
+) extends (all: infer I) => void
+  ? I
+  : never;
 
 /** The lines of the listing `nested` makes of a value present. */
 function nestedOf<V>(

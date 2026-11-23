@@ -7,6 +7,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import type { ITransportObjectEntryList } from '@mcp-abap-adt/adt-strategies';
 import {
   entries,
   formatted,
@@ -191,15 +192,21 @@ describe('writeListing: every item of every list, by construction', () => {
   });
 
   it('sections and kinds: each item by its own spec', () => {
-    type Part = {
-      readonly kind: 'answered' | 'failed';
-      readonly name: string;
-      readonly rows: readonly string[];
-    };
+    type Part =
+      | {
+          readonly kind: 'answered';
+          readonly name: string;
+          readonly rows: readonly string[];
+        }
+      | {
+          readonly kind: 'failed';
+          readonly name: string;
+          readonly rows?: undefined;
+        };
     const reading: { parts: readonly Part[] } = {
       parts: [
         { kind: 'answered', name: 'A', rows: ['a1', 'a2'] },
-        { kind: 'failed', name: 'B', rows: [] },
+        { kind: 'failed', name: 'B' },
       ],
     };
     const text = writeListing({
@@ -260,7 +267,7 @@ describe('writeListing: every item of every list, by construction', () => {
   });
 
   it('a kind left without its spec does not compile', () => {
-    type P = { readonly kind: 'answered' | 'failed' };
+    type P = { readonly kind: 'answered' } | { readonly kind: 'failed' };
     // @ts-expect-error `failed` has no spec.
     kinds<P, 'parts', 'kind'>('parts', 'kind', {
       answered: { mark: 'ok', words: () => [] },
@@ -273,6 +280,128 @@ describe('writeListing: every item of every list, by construction', () => {
 // Codex round 11: children cannot be dropped through optional options, a
 // list at any depth or in a record needs its schema, an opaque member does
 // not compile, and a JSON name is any name.
+// Codex round 12: a part writes one member, `nest` takes no list as its
+// reading, `kinds` needs a union of arms, and a reading's scalar-or-array
+// members and its depth are checked where it reaches a writer.
+describe('round 12: no item misses the output', () => {
+  type Listed = { readonly name: string; readonly kids: readonly string[] };
+  type Two = {
+    readonly name: string;
+    readonly primary?: Listed | undefined;
+    readonly secondary?: Listed | undefined;
+  };
+  const listedListing = (value: Listed) => ({
+    heads: [],
+    reading: value,
+    lists: {
+      kids: marks('kids', 'kid', (kid: string) => [kid]),
+    },
+  });
+
+  it('a part writes one member: a union selector does not compile', () => {
+    const either = (): 'primary' | 'secondary' => 'primary';
+    partsOf(
+      'items',
+      (item: Two) => [{ head: 'item', value: item.name }],
+      // @ts-expect-error a union of members is no one member.
+      either(),
+      (value: Listed) => nest(listedListing(value)),
+    );
+  });
+
+  it('every member holding lists needs a part of its own', () => {
+    const schemas: RowSchemas<{ items: readonly Two[] }> = {
+      // @ts-expect-error `secondary` holds lists no part writes.
+      items: partsOf(
+        'items',
+        (item: Two) => [{ head: 'item', value: item.name }],
+        'primary',
+        (value) => nest(listedListing(value)),
+      ),
+    };
+    void schemas;
+  });
+
+  it('nest takes no list as its reading', () => {
+    nest({
+      heads: [],
+      reading: ['a', 'b'],
+      // @ts-expect-error a list has no member a schema is bound to.
+      lists: {},
+    });
+  });
+
+  it('kinds refuses a discriminant that is a union on one object type', () => {
+    type OneType = {
+      readonly kind: 'a' | 'b';
+      readonly children: readonly string[];
+    };
+    kinds<OneType, 'items', 'kind'>('items', 'kind', {
+      // @ts-expect-error no arm is of kind `a` alone: no spec can be given.
+      a: { mark: 'a', words: () => [] },
+      // @ts-expect-error nor of kind `b`.
+      b: { omit: 'never written' },
+    });
+  });
+
+  it('a member that may be any JSON value holding a list of the reading does not compile', () => {
+    type Mixed = {
+      readonly items: readonly { name: string }[];
+      readonly extra:
+        | string
+        | number
+        | boolean
+        | null
+        | readonly {
+            readonly name: string;
+            readonly kids: readonly string[];
+          }[];
+    };
+    // @ts-expect-error the list in `extra` is hidden among scalars.
+    const schemas: RowSchemas<Mixed> = {
+      items: rows('items', {
+        columns: [{ name: 'name', cell: (o: { name: string }) => o.name }],
+        header: 'none',
+      }),
+    };
+    void schemas;
+  });
+
+  it('a reading nesting past the depth cap does not compile', () => {
+    type Leaf = { readonly items: readonly { name: string }[] };
+    type Deep = {
+      readonly a: {
+        readonly b: {
+          readonly c: {
+            readonly d: {
+              readonly e: {
+                readonly f: {
+                  readonly g: { readonly h: { readonly i: Leaf } };
+                };
+              };
+            };
+          };
+        };
+      };
+    };
+    // @ts-expect-error nine objects down: refused rather than unchecked.
+    const schemas: JsonSchemas<Deep> = {};
+    void schemas;
+  });
+
+  it("a tool's real reading, mutated, does not compile", () => {
+    type Mutated = ITransportObjectEntryList & {
+      readonly extra: string | number | boolean | null | readonly Two[];
+    };
+    // @ts-expect-error the mutated member hides a list among scalars.
+    const schemas: JsonSchemas<Mutated> = {
+      entries: values('entries', () => ''),
+      incompleteEntries: values('incompleteEntries', () => ''),
+    };
+    void schemas;
+  });
+});
+
 describe('round 11: no item misses the output', () => {
   type Lost = {
     readonly a: readonly { readonly children: readonly string[] }[];
@@ -653,7 +782,9 @@ describe('omit: a kind the shape leaves out, stated with its reason', () => {
     assert.equal(text, 'A\nB');
   });
   it('kinds: an omit spec writes nothing for its kind', () => {
-    type K = { readonly kind: 'node' | 'usage'; readonly name: string };
+    type K =
+      | { readonly kind: 'node'; readonly name: string }
+      | { readonly kind: 'usage'; readonly name: string };
     const kinded: { refs: readonly K[] } = {
       refs: [
         { kind: 'node', name: 'NODE' },

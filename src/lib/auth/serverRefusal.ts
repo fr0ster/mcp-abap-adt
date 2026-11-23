@@ -119,7 +119,7 @@ export const ABAPGIT_OVERWRITE_NOT_DECLARED_WORDS =
 
 /** A selected name R6 lists under another type too: SAP's job matches by name alone. */
 export const ABAPGIT_OVERWRITE_AMBIGUOUS_WORDS =
-  'overwrite names an object whose name the modified-objects read lists under another type too, and SAP selects by name alone, so the pull would overwrite both; the repository list and the modified-objects read were sent, no pull';
+  'overwrite names an object whose name the modified-objects read lists under another type too, and SAP selects by name within each of its two lists, so the selection could take an object not named; the server refuses any such collision, within a list or across both; the repository list and the modified-objects read were sent, no pull';
 
 /** A `url` argument that is no URL, or carries userinfo, a query, a fragment or a dot segment (spec §5.1). */
 export const ABAPGIT_URL_REFUSED_WORDS =

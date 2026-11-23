@@ -57,16 +57,13 @@ const IMPORTS =
  * every R6 entry when the request selects none (`CL_ABAPGIT_RES_REPO_PULL->
  * post` L234–240), only the selected ones with `overwrite` (L230–233); the
  * job marks the others `N` (`CL_ABAPGIT_BG_ACTION_PULL->execute`
- * L123–152). An `N` entry stays out: a deletion runs only for `Y`
- * (`delete_unnecessary_objects` L39–72), an `N` package warning is left
- * out whatever its state (`CL_ABAPGIT_OBJECTS->warning_package_adjust`
- * L1858–1897), an `N` overwrite entry with a local state is left out
- * (`warning_overwrite_adjust` L1791, `warning_overwrite_find` L1841–1844).
- * So only a remote-only add or update is imported unselected
+ * L123–152), a package warning with action 5 always `N` (L143–146). Of
+ * the `N` entries, one with a local state, a remote deletion and any
+ * package warning stay out; an `N` remote-only add or update is imported
  * (`pullSelection.ts`).
  */
 const CLOUD_IMPORTS =
-  'the job takes every object the modified-objects read lists and brings it to its remote version; given overwrite, SAP selects by name against the list as it stands when its job runs: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state';
+  'the job takes every object the modified-objects read lists and brings it to its remote version, a package warning with action 5 (delete and re-create) excepted: SAP leaves it out; given overwrite, SAP selects by name against the list as it stands when its job runs: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state';
 
 const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 

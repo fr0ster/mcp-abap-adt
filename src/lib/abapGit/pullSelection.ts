@@ -13,21 +13,19 @@
  *   A selected entry whose action changed to a deletion gets `N`
  *   (L127–130), and a `delete_add` package warning is always `N`
  *   (L143–146): it cannot be selected.
- * - An `N` entry stays out of the pull: a deletion runs only for `Y`
- *   (`delete_unnecessary_objects` L39–72); an `N` package warning is left
- *   out whatever its state (`CL_ABAPGIT_OBJECTS->warning_package_adjust`
- *   L1858–1897); an `N` overwrite entry is left out when it has a local
- *   state (`warning_overwrite_adjust` L1791, `warning_overwrite_find`
- *   L1841–1844). So only a remote-only add or update is imported
- *   unselected; an unselected local change, remote deletion or
- *   package-warning object keeps its system state.
+ * - Of the `N` entries, these stay out: one with a local state
+ *   (`warning_overwrite_adjust` L1791, `warning_overwrite_find`
+ *   L1841–1844), a remote deletion (deleted only for `Y`,
+ *   `delete_unnecessary_objects` L39–72), and any package warning
+ *   (`CL_ABAPGIT_OBJECTS->warning_package_adjust` L1858–1897). An `N`
+ *   remote-only add or update is imported.
  *
- * So a selected name R6 lists under another type too is refused: SAP would
- * take both. This is stricter than SAP needs: SAP matches by name within
- * each list (L124 overwrite, L139 package warnings), so a name in one list
- * and the other under another type would not be taken together; it is
- * refused anyway, since telling the two cases apart buys the caller nothing
- * and a refusal leaves nothing changed. adt-clients' live suite measured the selective pull in this
+ * So a selected name R6 lists under another type too is refused. SAP
+ * matches by name within each list (L124 overwrite, L139 package warnings):
+ * a collision inside one list would take an object not named. The server
+ * refuses a collision across the two lists as well, which SAP would not
+ * confuse — stricter than SAP, since telling the two cases apart buys the
+ * caller nothing and a refusal leaves nothing changed. adt-clients' live suite measured the selective pull in this
  * form (`pull.req.v1`, its ERRATA, 2026-11-22). Duplicates in `overwrite`
  * are refused before any connection (`admission.ts`, step 2a).
  */

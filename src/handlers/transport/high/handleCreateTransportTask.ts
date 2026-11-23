@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { createArguments } from '../../../lib/handlers/createArguments';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTransportTask — a task of your own under a shared request.
  *
@@ -46,12 +46,14 @@ import {
   type FailureEntry,
   failureEntry,
   isCredentialPayload,
+  type McpResult,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   type DetailTable,
   type LevelReading,
   readingAt,
+  wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -99,7 +101,7 @@ export const TOOL_DEFINITION = {
       .describe(
         'S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).',
       ),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -149,10 +151,31 @@ function createdTaskAt<A>(
   };
 }
 
+/**
+ * The tool's answer; at `raw` what ADT sent (`wireAnswer`): it creates the
+ * task and then types it, so its raw is the array of both responses.
+ */
 export async function handleCreateTransportTask(
   context: HandlerContext,
   args: CreateTransportTaskArgs,
-) {
+): Promise<McpResult> {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'CreateTransportTask',
+        shape: 'assembled',
+      },
+      () => answeredCreateTransportTask(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredCreateTransportTask(context, args);
+}
+
+async function answeredCreateTransportTask(
+  context: HandlerContext,
+  args: CreateTransportTaskArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   for (const name of ['transport_number', 'target_user'] as const) {
@@ -222,6 +245,8 @@ export async function handleCreateTransportTask(
     ),
     medium: createdTaskAt((number) => (settled) => terseTask(number, settled)),
     full: createdTaskAt((_number, parsed, raw) => () => parsed ?? raw),
+    // Never reached: raw is every response, recorded by `wireAnswer` (the
+    // handler, above).
     raw: createdTaskAt((_number, _parsed, raw) => () => raw),
   };
   type TaskAnswer =

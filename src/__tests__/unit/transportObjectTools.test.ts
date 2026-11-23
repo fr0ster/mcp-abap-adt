@@ -444,10 +444,9 @@ describe('CreateTransportTask', () => {
         detail: 'raw',
       }),
     );
-    // A raw answer is a string, so `answer()` gives it somewhere to put the
-    // note: `{ result, cleanup }`.
-    assert.ok(raw.cleanup.message.includes('still Unclassified'));
-    assert.notEqual(raw.result, undefined);
+    // Raw never hides an error: full explains the type change's refusal
+    // (its `failures`), so raw answers exactly as full does.
+    assert.deepStrictEqual(raw, full);
   });
 
   it('types the task as asked, and leaves it alone when asked for X', async () => {

@@ -331,17 +331,73 @@ describe('round 12: no item misses the output', () => {
     });
   });
 
-  it('kinds refuses a discriminant that is a union on one object type', () => {
+  it('kinds cannot drop the lists of a discriminant that is a union on one object type', () => {
     type OneType = {
       readonly kind: 'a' | 'b';
       readonly children: readonly string[];
     };
     kinds<OneType, 'items', 'kind'>('items', 'kind', {
-      // @ts-expect-error no arm is of kind `a` alone: no spec can be given.
+      // @ts-expect-error an item of kind `a` holds `children`: no mark line.
       a: { mark: 'a', words: () => [] },
-      // @ts-expect-error nor of kind `b`.
-      b: { omit: 'never written' },
+      // @ts-expect-error nor for kind `b`.
+      b: { mark: 'b', words: () => [] },
     });
+  });
+
+  it('kinds counts a wider arm beside an exact one: its child list cannot be dropped', () => {
+    type Mixed =
+      | { readonly kind: 'a'; readonly name: string }
+      | { readonly kind: string; readonly children: readonly string[] };
+    kinds<Mixed, 'items', 'kind'>('items', 'kind', {
+      // @ts-expect-error an item of kind `a` may be the wider arm, with children.
+      a: { mark: 'a', words: () => [] },
+    });
+  });
+
+  it('a reading that is a list on any arm of a union does not compile', () => {
+    type Either = { readonly items: readonly string[] } | readonly string[];
+    // @ts-expect-error one arm is a list: no schema is bound to a list.
+    const schemas: RowSchemas<Either> = {};
+    void schemas;
+  });
+
+  it('a part of an item that is an object or a list does not compile', () => {
+    type Item =
+      | { readonly kids: readonly string[] }
+      | readonly { readonly kids: readonly string[] }[];
+    parts(
+      'items',
+      () => [],
+      (item: Item) =>
+        nest({
+          heads: [],
+          reading: item,
+          // @ts-expect-error an item that may be a list has no schemas.
+          lists: { kids: marks('kids', 'kid', (kid: string) => [kid]) },
+        }),
+    );
+  });
+
+  it('a union with one refused arm does not compile', () => {
+    type Either =
+      | { readonly items: readonly string[] }
+      | { readonly items: readonly string[]; readonly extra: unknown };
+    // @ts-expect-error the second arm holds `unknown`.
+    const schemas: RowSchemas<Either> = {
+      items: marks('items', 'item', (item: string) => [item]),
+    };
+    void schemas;
+  });
+
+  it('a narrower type met on the way down is checked in its own right', () => {
+    type Node = {
+      readonly name: string;
+      readonly parent?: Node | undefined;
+      readonly special?: (Node & { readonly extra: unknown }) | undefined;
+    };
+    // @ts-expect-error `special` is a narrower Node, holding `unknown`.
+    const schemas: RowSchemas<{ readonly node: Node }> = {};
+    void schemas;
   });
 
   it('a member that may be any JSON value holding a list of the reading does not compile', () => {

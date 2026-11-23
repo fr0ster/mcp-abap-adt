@@ -6,6 +6,7 @@
  * list from the reading's own lists, complete by construction.
  */
 
+export type { Line } from './complete';
 export {
   type AnswerTable,
   answerAt,
@@ -37,7 +38,9 @@ export {
   entries,
   type Group,
   type Head,
+  type HeadShape,
   headLines,
+  headShape,
   type JsonBound,
   type JsonSchemas,
   jsonShapesOf,
@@ -79,6 +82,7 @@ export {
   writeJsonRoot,
   writeListing,
   writeWhole,
+  writtenLines,
   writtenValues,
 } from './listing';
 export { cellsOf } from './tsvCells';

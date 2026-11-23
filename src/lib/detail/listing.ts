@@ -76,6 +76,24 @@ export interface Head {
   readonly value?: string | undefined;
 }
 
+/** Only this module mints a head's shape. */
+const headShaped: unique symbol = Symbol('head shape');
+
+/**
+ * A head a listing writes, as data: its label, and what it tells in domain
+ * words — what a tool's description says of it. Only `headShape` makes one.
+ */
+export interface HeadShape {
+  readonly [headShaped]: true;
+  readonly label: string;
+  readonly about: string;
+}
+
+/** The shape of the head `label`, telling `about` (`the package read`). */
+export function headShape(label: string, about: string): HeadShape {
+  return { [headShaped]: true, label, about };
+}
+
 /** A mark line: `# mark words…`, each word a tab-separated cell. */
 export interface Mark {
   readonly mark: string;
@@ -207,11 +225,28 @@ type RefusedAt<R, D extends readonly unknown[]> =
         ? RefusedArm<R, D>
         : never;
 
+/** Whether `A` and `B` are the very same type (not merely assignable). */
+type Same<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2
+    ? true
+    : false;
+
+/** Whether `R` is one of the types `D` met on the way down. */
+type MetBefore<R, D extends readonly unknown[]> = D extends readonly [
+  infer Head,
+  ...infer Tail,
+]
+  ? Same<R, Head> extends true
+    ? true
+    : MetBefore<R, Tail>
+  : false;
+
 /** `RefusedAt` of one arm of a union. */
 type RefusedArm<R, D extends readonly unknown[]> =
-  // A type met again on the way down (a tree's node, a self reference):
-  // checked where it was first met.
-  [R] extends [D[number]]
+  // The very type met again on the way down (a tree's node, a self
+  // reference): checked where it was first met. By identity, never by a
+  // structural subtype, so a narrower type is checked in its own right.
+  MetBefore<R, D> extends true
     ? false
     : // Past the depth cap: no reading of a tool nests this deep, so a
       // reading that does is refused rather than left unchecked.
@@ -264,11 +299,17 @@ type JsonSafe<I, D extends readonly unknown[] = []> =
 type Listless<T> = T & ([SchemaKeys<T>] extends [never] ? unknown : never);
 
 /** `T`, or `never` when the reading holds what no schema can write. */
-export type Writable<R, T> = [R] extends [readonly unknown[]]
-  ? // A reading is an object holding its lists, never a list itself: a list
-    // given as the reading has no member a schema could be bound to.
+export type Writable<R, T> = true extends (
+  R extends readonly unknown[]
+    ? true
+    : false
+)
+  ? // A reading is an object holding its lists, never a list itself — on no
+    // arm of a union: a list given as the reading has no member a schema
+    // could be bound to.
     never
-  : RefusedAt<R, []> extends true
+  : // A union is refused when any one of its arms is.
+    true extends RefusedAt<R, []>
     ? never
     : T;
 
@@ -290,6 +331,8 @@ type ShapeOf =
       readonly list: string;
       readonly columns: readonly string[];
       readonly means: readonly (string | undefined)[];
+      /** The head labels it writes: its heading's, its groups'. */
+      readonly heads: readonly string[];
       readonly tree: boolean;
       readonly omits: Readonly<Record<string, string>>;
       readonly lists: () => readonly ListShape[];
@@ -310,6 +353,8 @@ type ShapeOf =
       readonly kind: 'kinds';
       readonly list: string;
       readonly discriminant: string;
+      /** The header a row kind writes once, before the first item. */
+      readonly header: readonly string[] | undefined;
       readonly kinds: readonly KindShape[];
     }
   | {
@@ -336,6 +381,7 @@ export type KindShape =
   | {
       readonly kind: string;
       readonly row: readonly string[];
+      readonly means: readonly (string | undefined)[];
       readonly lists: () => readonly ListShape[];
     }
   | { readonly kind: string; readonly omit: string }
@@ -353,6 +399,10 @@ function rowsShape<I>(
     list,
     columns: spec.columns.map((column) => column.name),
     means: spec.columns.map((column) => column.means),
+    heads: [
+      ...(spec.heading === undefined ? [] : [spec.heading.head]),
+      ...(spec.groups ?? []).map((group) => group.label),
+    ],
     tree: spec.tree === true || kind === 'node',
     omits: spec.omit?.reasons ?? {},
     lists: () => rowShapes(spec.lists),
@@ -364,11 +414,13 @@ function kindsShape<I>(
   list: string,
   discriminant: PropertyKey,
   table: Readonly<Record<string, KindSpec<I, never> | undefined>>,
+  header: readonly string[] | undefined,
 ): ListShape {
   return {
     kind: 'kinds',
     list,
     discriminant: String(discriminant),
+    header,
     kinds: Object.entries(table).flatMap(([kind, spec]): KindShape[] =>
       spec === undefined
         ? []
@@ -379,6 +431,7 @@ function kindsShape<I>(
                 {
                   kind,
                   row: spec.row.columns.map((column) => column.name),
+                  means: spec.row.columns.map((column) => column.means),
                   lists: () => rowShapes(spec.row.lists),
                 },
               ]
@@ -738,10 +791,15 @@ export type Discriminant<I> = {
 }[keyof I];
 
 /** The arm of `I` whose discriminant `D` is `P`, or `never`. */
-type KindArm<I, D extends PropertyKey, P> = Extract<
-  I,
-  { readonly [Q in D]: P }
->;
+type KindArm<I, D extends PropertyKey, P> = I extends unknown
+  ? D extends keyof I
+    ? P extends I[D]
+      ? // Every arm whose discriminant may be `P` — a wider arm (`kind:
+        // string`) beside the exact one included, so its lists count too.
+        I
+      : never
+    : never
+  : never;
 
 /** The kinds the discriminant `D` of `I` can be. */
 export type KindOf<I, D extends Discriminant<I>> = I[D] & string;
@@ -787,7 +845,7 @@ export function kinds<I, K extends string, D extends Discriminant<I>>(
   return {
     [binding]: true,
     key,
-    shape: kindsShape<I>(key, discriminant, specs),
+    shape: kindsShape<I>(key, discriminant, specs, header),
     write: (reading, depth) => {
       const items = itemsOf(reading, key);
       const lines: Line[] = header === undefined ? [] : [{ header }];
@@ -955,6 +1013,14 @@ export interface Listing<R> {
  */
 export function writeListing<R>(listing: Listing<R>): Written<string> {
   return new Written(mint, renderLines(listingLines(listing)));
+}
+
+/**
+ * The lines a listing writes, as data — what the description tests read to
+ * tie a tool's Returns to what it writes (`returnsMatch.ts`).
+ */
+export function writtenLines<R>(listing: Listing<R>): readonly Line[] {
+  return listingLines(listing);
 }
 
 /** A listing's lines: its heads, a tree's root row, then every list of the reading. */

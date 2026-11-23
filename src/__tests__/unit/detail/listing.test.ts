@@ -9,6 +9,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import type { ITransportObjectEntryList } from '@mcp-abap-adt/adt-strategies';
 import {
+  byListing,
   entries,
   formatted,
   type JsonSchemas,
@@ -298,6 +299,8 @@ describe('round 12: no item misses the output', () => {
     },
   });
 
+  const NO_KIDS: Listed = { name: '', kids: [] };
+
   it('a part writes one member: a union selector does not compile', () => {
     const either = (): 'primary' | 'secondary' => 'primary';
     partsOf(
@@ -305,7 +308,7 @@ describe('round 12: no item misses the output', () => {
       (item: Two) => [{ head: 'item', value: item.name }],
       // @ts-expect-error a union of members is no one member.
       either(),
-      (value: Listed) => nest(listedListing(value)),
+      byListing(listedListing(NO_KIDS).lists, listedListing),
     );
   });
 
@@ -316,7 +319,7 @@ describe('round 12: no item misses the output', () => {
         'items',
         (item: Two) => [{ head: 'item', value: item.name }],
         'primary',
-        (value) => nest(listedListing(value)),
+        byListing(listedListing(NO_KIDS).lists, listedListing),
       ),
     };
     void schemas;
@@ -344,12 +347,20 @@ describe('round 12: no item misses the output', () => {
     });
   });
 
-  it('kinds counts a wider arm beside an exact one: its child list cannot be dropped', () => {
+  it('kinds refuses a discriminant one arm widens to string (Codex)', () => {
     type Mixed =
       | { readonly kind: 'a'; readonly name: string }
       | { readonly kind: string; readonly children: readonly string[] };
+    // Codex's case, the other way round: the wider arm without lists.
+    type Other =
+      | { readonly kind: 'a'; readonly children: readonly string[] }
+      | { readonly kind: string; readonly name: string };
+    // @ts-expect-error `kind` widens to string on one arm: no discriminant.
+    kinds<Other, 'items', 'kind'>('items', 'kind', {
+      a: { omit: 'never written' },
+    });
+    // @ts-expect-error `kind` widens to string on one arm: no discriminant.
     kinds<Mixed, 'items', 'kind'>('items', 'kind', {
-      // @ts-expect-error an item of kind `a` may be the wider arm, with children.
       a: { mark: 'a', words: () => [] },
     });
   });
@@ -368,13 +379,11 @@ describe('round 12: no item misses the output', () => {
     parts(
       'items',
       () => [],
-      (item: Item) =>
-        nest({
-          heads: [],
-          reading: item,
-          // @ts-expect-error an item that may be a list has no schemas.
-          lists: { kids: marks('kids', 'kid', (kid: string) => [kid]) },
-        }),
+      byListing<Item, Item>(
+        // @ts-expect-error an item that may be a list has no schemas.
+        { kids: marks('kids', 'kid', (kid: string) => [kid]) },
+        () => ({ heads: [] }),
+      ),
     );
   });
 
@@ -766,6 +775,8 @@ describe('nested listings, conditional cells, JSON trees', () => {
     lists: tree,
   });
 
+  const TREE_ROOT: N = { name: '' };
+
   it('parts: each part its heads, then its own nested listing', () => {
     type Asked = { readonly name: string; readonly tree?: N | undefined };
     const text = writeListing({
@@ -781,7 +792,12 @@ describe('nested listings, conditional cells, JSON trees', () => {
           'asked',
           (a: Asked) => [{ head: 'asked', value: a.name }],
           'tree',
-          (tree) => nest(listingOf(tree)),
+          {
+            variants: {
+              only: { lists: tree, root: listingOf(TREE_ROOT).root },
+            },
+            frame: () => ({ variant: 'only' }),
+          },
         ),
       },
     }).answer;

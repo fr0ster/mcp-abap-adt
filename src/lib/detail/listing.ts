@@ -361,6 +361,8 @@ type ShapeOf =
       readonly kind: 'parts';
       readonly list: string;
       readonly member?: string | undefined;
+      /** What every declared variant of its listing writes. */
+      readonly nested: () => readonly ListShape[];
     }
   | {
       readonly kind: 'entries' | 'member';
@@ -783,12 +785,23 @@ export function within<O, K extends string>(
  * and no constant selector stands in for the item's own.
  */
 export type Discriminant<I> = {
-  [K in keyof I]-?: I[K] extends string
-    ? string extends I[K]
-      ? never
-      : K
-    : never;
-}[keyof I];
+  // Over the keys every arm holds, not arm by arm: a key is a discriminant
+  // only when it is a union of string literals on every arm — one arm
+  // widening it (`kind: string`) beside an exact one (`kind: 'a'`) leaves
+  // an item whose kind no spec can name.
+  [K in keyof I & string]-?: true extends WidenedOn<I, K> ? never : K;
+}[keyof I & string];
+
+/** Whether some arm of `I` holds `K` as anything but string literals. */
+type WidenedOn<I, K extends PropertyKey> = I extends unknown
+  ? K extends keyof I
+    ? I[K] extends string
+      ? string extends I[K]
+        ? true
+        : false
+      : true
+    : true
+  : never;
 
 /** The arm of `I` whose discriminant `D` is `P`, or `never`. */
 type KindArm<I, D extends PropertyKey, P> = I extends unknown
@@ -1063,26 +1076,119 @@ export function nest<R>(listing: Listing<R>): Nested<R> {
 }
 
 /**
- * The list `key` written as parts: per item its head lines, then the
- * listing of the item itself (`nested`, a listing of exactly the item) —
- * every list the item holds written by that listing's schemas.
+ * How a part's listing is written: the schemas it may be written by, each
+ * a named variant declared here (with its tree root, where it has one) —
+ * so what a part writes is known before any item is, and a tool's
+ * description states it — and, per value, which variant writes it and the
+ * heads and title lines framing it.
  */
-export function parts<I, K extends string>(
+export interface NestSpec<V, T, L extends string> {
+  readonly variants: {
+    readonly [P in L]: {
+      readonly lists: RowSchemas<V>;
+      readonly root?: Root<V> | undefined;
+    };
+  };
+  readonly frame: (
+    value: V,
+    item: T,
+  ) => {
+    readonly variant: L;
+    readonly heads?: readonly Head[] | undefined;
+    readonly title?: Listing<V>['title'];
+    readonly end?: Listing<V>['end'];
+  };
+}
+
+/**
+ * A spec of one variant: every value written by `lists`, framed by the
+ * heads and title lines `listing` gives it (its own lists are not read —
+ * the declared ones write it).
+ */
+export function byListing<V, T>(
+  lists: RowSchemas<V>,
+  listing: (value: V, item: T) => Pick<Listing<V>, 'heads' | 'title' | 'end'>,
+): NestSpec<V, T, 'only'> {
+  return {
+    variants: { only: { lists } },
+    frame: (value, item) => {
+      const framed = listing(value, item);
+      return {
+        variant: 'only',
+        heads: framed.heads,
+        title: framed.title,
+        end: framed.end,
+      };
+    },
+  };
+}
+
+/** The lines of `value`'s listing by its spec. */
+function nestedLinesOf<V, T, L extends string>(
+  value: V,
+  item: T,
+  spec: NestSpec<V, T, L>,
+): Line[] {
+  const frame = spec.frame(value, item);
+  const variant = spec.variants[frame.variant];
+  return listingLines({
+    heads: frame.heads ?? [],
+    reading: value,
+    lists: variant.lists,
+    root: variant.root,
+    title: frame.title,
+    end: frame.end,
+  });
+}
+
+/** What every variant of a part's spec writes, as data. */
+function nestShapes<V, T, L extends string>(
+  spec: NestSpec<V, T, L>,
+): readonly ListShape[] {
+  const variants: readonly {
+    readonly lists: RowSchemas<V>;
+    readonly root?: Root<V> | undefined;
+  }[] = Object.values(spec.variants);
+  return variants.flatMap((variant): ListShape[] => [
+    ...(variant.root === undefined
+      ? []
+      : [
+          {
+            kind: 'node' as const,
+            list: '',
+            columns: variant.root.columns.map((column) => column.name),
+            means: variant.root.columns.map((column) => column.means),
+            heads: [],
+            tree: true,
+            omits: {},
+            lists: () => [],
+          },
+        ]),
+    ...rowShapes(variant.lists),
+  ]);
+}
+
+/**
+ * The list `key` written as parts: per item its head lines, then the
+ * listing of the item itself by its spec (`nested`) — every list the item
+ * holds written by a declared variant's schemas.
+ */
+export function parts<I, K extends string, L extends string>(
   key: K,
   heads: (item: I) => readonly Head[],
-  nested: (item: I) => Nested<I>,
+  nested: NestSpec<I, I, L>,
   header?: readonly string[] | undefined,
 ): Bound<Holding<K, I>, K, SchemaKeys<I>> {
   return {
     [binding]: true,
     key,
-    shape: { kind: 'parts', list: key },
+    shape: { kind: 'parts', list: key, nested: () => nestShapes(nested) },
     // One header before the first part, where asked.
     write: (reading) => [
       ...(header === undefined ? [] : [{ header }]),
       ...itemsOf(reading, key).flatMap((item): Line[] => [
         ...heads(item),
-        ...nested(item)[nestedLines],
+        ...nestedLinesOf(item, item, nested),
       ]),
     ],
   };
@@ -1090,30 +1196,39 @@ export function parts<I, K extends string>(
 
 /**
  * The list `key` written as parts: per item its head lines, then, where the
- * item holds its member `member`, the listing of exactly that value — a
- * list call's object, its read written as its single call writes it. It
- * covers that member alone: an item holding any other list is refused.
+ * item holds its member `member`, the listing of exactly that value by its
+ * spec — a list call's object, its read written as its single call writes
+ * it. It covers that member alone: an item holding any other list is
+ * refused.
  */
-export function partsOf<I, K extends string, M extends keyof I & string>(
+export function partsOf<
+  I,
+  K extends string,
+  M extends keyof I & string,
+  L extends string,
+>(
   key: K,
   heads: (item: I) => readonly Head[],
   member: OneMember<M>,
-  nested: (
-    value: Exclude<I[OneMember<M>], undefined>,
-    item: I,
-  ) => Nested<Exclude<I[OneMember<M>], undefined>>,
+  nested: NestSpec<Exclude<I[OneMember<M>], undefined>, I, L>,
   header?: readonly string[] | undefined,
 ): Bound<Holding<K, I>, K, M> {
   return {
     [binding]: true,
     key,
-    shape: { kind: 'parts', list: key, member },
+    shape: {
+      kind: 'parts',
+      list: key,
+      member,
+      nested: () => nestShapes(nested),
+    },
     write: (reading) => [
       ...(header === undefined ? [] : [{ header }]),
       ...itemsOf(reading, key).flatMap((item): Line[] => {
+        const value = item[member];
         return [
           ...heads(item),
-          ...nestedOf(item[member], (value) => nested(value, item)),
+          ...(defined(value) ? nestedLinesOf(value, item, nested) : []),
         ];
       }),
     ],
@@ -1134,14 +1249,6 @@ type UnionToIntersection<U> = (
 ) extends (all: infer I) => void
   ? I
   : never;
-
-/** The lines of the listing `nested` makes of a value present. */
-function nestedOf<V>(
-  value: V,
-  nested: (value: Exclude<V, undefined>) => Nested<Exclude<V, undefined>>,
-): readonly Line[] {
-  return defined(value) ? nested(value)[nestedLines] : [];
-}
 
 /** Whether a member's value is present. */
 function defined<V>(value: V): value is Exclude<V, undefined> {

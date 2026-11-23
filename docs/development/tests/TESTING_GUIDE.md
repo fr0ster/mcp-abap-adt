@@ -117,8 +117,11 @@ the tests needs Node 22.15 or later (CI takes the latest 22 and 24).
   (`npm test -- --concurrency <N>`; given twice, the last one wins) — `2` on every runner
   kind, from `ci.yml`'s matrix, and `2` in `release.yml`. The figures are below.
 - **A bound per file, given by the script.** `npm test` passes `--file-timeout 600` (seconds;
-  at most 2147483): a file still running then has its whole process tree ended, is named with
-  the last test it started, and fails the run, while the other files run on. The slowest file measured in CI was 194.5 s
+  at most 2147483): a file still running then has its process tree ended as it is when the
+  bound fires — every process still under the file's, whatever group or session it is in; a
+  descendant reparented away before then (its launcher exited) is not reached —, is named with
+  the last test it started, and fails the run, while the other files run on. A tree that cannot
+  be ended is listed `kill failed` and fails the run at once. The slowest file measured in CI was 194.5 s
   (`unknownSweep.test.ts`, macOS, 2026-11-23); change the bound with
   `npm test -- --file-timeout <seconds>` (the last one wins). Without the option there is no
   bound, so the other scripts (`test:install`, `test:retrieval`, …) run unbounded unless given

@@ -632,7 +632,7 @@ describe('GetStructuresList: an append candidate SAP refused to read is listed',
     });
     const lines = result.content[0].text.split('\n');
     assert.ok(
-      lines.includes('# append_candidate_unread ZREFUSED'),
+      lines.includes('# append_candidate_unread\tZREFUSED'),
       lines.join('\n'),
     );
   });

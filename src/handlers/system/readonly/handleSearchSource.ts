@@ -158,7 +158,7 @@ function includeColumn(hit: OrchestratorResult['results'][number]): string {
 
 /**
  * The scan as TSV (terse): `# scanned` and `# truncated` counter lines, a
- * `# not loaded by SAP PACKAGE TYPE` line per node the walk could not read,
+ * `# not loaded by SAP<TAB>PACKAGE<TAB>TYPE` line per node the walk could not read,
  * then the hits under `# object PACKAGE TYPE NAME` group lines — at lines
  * `include\tline`, at snippets `include\tline\tsnippet`, at objects
  * `include\thits`. Every hit is answered.

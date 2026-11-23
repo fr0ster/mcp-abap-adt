@@ -359,7 +359,7 @@ function mediumInclude(node: IncludeNode): MediumIncludeNode {
 /**
  * What GetIncludesList answers of one object at each `detail`, selected
  * before the reads (`src/lib/detail`): terse the tree as indented names
- * under `# object`, a `# unreadable NAME` line per include that could not be
+ * under `# object`, a `# unreadable<TAB>NAME` line per include that could not be
  * read; medium the tree without empty children; full the answer before
  * `detail`. A tree reads many documents, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).

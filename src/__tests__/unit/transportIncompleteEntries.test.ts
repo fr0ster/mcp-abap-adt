@@ -62,7 +62,7 @@ describe('an entry SAP lists without a name reaches the answer', () => {
     assert.ok(lines.includes('# count 3'), lines.join('\n'));
     assert.ok(
       lines.includes(
-        `# incomplete task=${TASK} pgmid=R3TR type=PROG position=000003`,
+        `# incomplete\ttask=${TASK}\tpgmid=R3TR\ttype=PROG\tposition=000003`,
       ),
       lines.join('\n'),
     );

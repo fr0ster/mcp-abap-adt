@@ -317,7 +317,7 @@ function fullStructures(read: StructuresRead): string {
  * selected before the reads (`src/lib/detail`): terse the tree as indented
  * `structure\tkind\tattribute` rows (a node not read or cyclic marked), with
  * `# appends_unavailable` when where-used failed and a
- * `# append_candidate_unread NAME` line per candidate SAP refused to read; medium and full the answer
+ * `# append_candidate_unread<TAB>NAME` line per candidate SAP refused to read; medium and full the answer
  * before `detail`. A tree reads many documents, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */

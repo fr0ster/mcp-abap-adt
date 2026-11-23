@@ -95,7 +95,7 @@ describe('DescribeByList detail', () => {
       { objects: [{ name: 'ZCL_A', type: 'CLAS' }] },
     );
     const text = result.content[0]?.text ?? '';
-    assert.ok(text.includes('# error ZCL_A'), text);
+    assert.ok(text.includes('# error\tZCL_A'), text);
     assert.ok(text.includes('the second search failed'), text);
   });
 });

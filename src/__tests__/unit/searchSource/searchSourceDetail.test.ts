@@ -77,7 +77,7 @@ describe('SearchSource detail', () => {
       searchSourceRows(await scanned('lines')),
       [
         '# scanned objects 1 sources 1 objects_with_hits 1',
-        '# not loaded by SAP ZPKG CLAS/OC',
+        '# not loaded by SAP\tZPKG\tCLAS/OC',
         'include\tline',
         '# object ZPKG PROG ZPROG',
         'ZPROG\t1',
@@ -142,7 +142,7 @@ describe('SearchSource and an object SAP lists without a name', () => {
       searchSourceRows(result)
         .split('\n')
         .includes(
-          '# incomplete ZPKG PROG/P uri=/sap/bc/adt/programs/programs/znameless',
+          '# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless',
         ),
     );
   });

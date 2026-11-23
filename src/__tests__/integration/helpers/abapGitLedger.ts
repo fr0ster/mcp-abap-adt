@@ -47,8 +47,6 @@ import {
   readFileSync,
   renameSync,
   unlinkSync,
-  unwatchFile,
-  watchFile,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -538,15 +536,16 @@ export function isRouteRefusal(answer: {
 }
 
 /** How often the stop file is polled: short, and the poll keeps no process alive. */
-const STOP_POLL_MS = 100;
+export const STOP_POLL_MS = 100;
 
 /**
  * A signal the runner's stop request aborts (its stop file, `file`, written
- * on the first interrupt): aborted at once when the file is there, else when
- * a stat poll sees it (`fs.watchFile`, unreferenced, the same on every OS —
- * `fs.watch` rides FSEvents on macOS, whose stream starts asynchronously
- * and can miss a file created right after it returns). `close` stops the
- * poll. Without a stop file the signal never aborts.
+ * on the first interrupt): checked once at once, then every
+ * `STOP_POLL_MS` by an unreferenced interval, aborted the first time the
+ * file is there. A state poll has no baseline, so it misses no file, unlike
+ * change detection (`fs.watch` rides FSEvents on macOS, `fs.watchFile`
+ * takes its first stat asynchronously). The abort and `close` clear the
+ * interval. Without a stop file the signal never aborts.
  */
 export function stopSignalOf(file: string | undefined): {
   readonly signal: AbortSignal;
@@ -556,22 +555,19 @@ export function stopSignalOf(file: string | undefined): {
   if (file === undefined || file === '') {
     return { signal: controller.signal, close: () => {} };
   }
-  const stop = () => {
-    unwatchFile(file, listener);
+  let poll: ReturnType<typeof setInterval> | undefined;
+  const check = () => {
+    if (controller.signal.aborted || !existsSync(file)) return;
+    clearInterval(poll);
     controller.abort();
   };
-  const listener = () => {
-    if (existsSync(file)) stop();
-  };
-  // Register first, check after: a file written before the poll's first stat
-  // becomes that stat's baseline and fires no change, so only a check made
-  // after registering sees it (libuv `fs-poll.c`).
-  watchFile(file, { interval: STOP_POLL_MS, persistent: false }, listener);
-  if (existsSync(file)) stop();
-  return {
-    signal: controller.signal,
-    close: () => unwatchFile(file, listener),
-  };
+  check();
+  if (controller.signal.aborted) {
+    return { signal: controller.signal, close: () => {} };
+  }
+  poll = setInterval(check, STOP_POLL_MS);
+  poll.unref();
+  return { signal: controller.signal, close: () => clearInterval(poll) };
 }
 
 /** What cleaning up one ledger entry needs, injected by the suite. */

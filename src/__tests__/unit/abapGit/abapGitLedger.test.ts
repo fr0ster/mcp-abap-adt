@@ -23,13 +23,15 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { afterEach, beforeEach, describe, it } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
-
-// The module object itself (not a namespace copy), so mock.method reaches the helper's calls.
-import fsModule = require('node:fs');
-
+import {
+  advanceTimersByTimeAsync,
+  getTimerCount,
+  useFakeTimers,
+  useRealTimers,
+} from '../../helpers/fakeTime';
 import {
   AbapGitLedger,
   acquireRunLock,
@@ -46,6 +48,7 @@ import {
   readRunLock,
   releasingRunLock,
   runState,
+  STOP_POLL_MS,
   stopSignalOf,
   systemIdentityOf,
   waitForRun,
@@ -599,97 +602,53 @@ describe("the runner's stop request", () => {
   });
 });
 
-describe("the runner's stop request: polling, no FSEvents", () => {
-  it('a stop file already there aborts at once', () => {
+describe("the runner's stop request: a state poll on fake time", () => {
+  afterEach(() => useRealTimers());
+
+  it('a stop file there before the call aborts at once, with no poll left', () => {
+    useFakeTimers({ apis: ['setInterval'] });
     const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
     try {
       const stopFile = join(dir, 'stop');
       writeFileSync(stopFile, 'interrupted');
       const stop = stopSignalOf(stopFile);
       assert.equal(stop.signal.aborted, true);
+      assert.equal(getTimerCount(), 0);
       stop.close();
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it('watches the file by stat polling, and close stops it', () => {
-    const watched = mock.method(fsModule, 'watchFile');
-    const unwatched = mock.method(fsModule, 'unwatchFile');
+  it('a stop file written between ticks aborts on the next tick, and the abort clears the poll', async () => {
+    useFakeTimers({ apis: ['setInterval'] });
     const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
     try {
       const stopFile = join(dir, 'stop');
       const stop = stopSignalOf(stopFile);
-      assert.equal(watched.mock.callCount(), 1);
-      assert.equal(watched.mock.calls[0]?.arguments[0], stopFile);
-      stop.close();
-      assert.equal(unwatched.mock.callCount(), 1);
-      assert.equal(unwatched.mock.calls[0]?.arguments[0], stopFile);
-      assert.equal(
-        unwatched.mock.calls[0]?.arguments.at(-1),
-        watched.mock.calls[0]?.arguments.at(-1),
-      );
-    } finally {
-      watched.mock.restore();
-      unwatched.mock.restore();
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('a stop file written between the first check and the first poll still aborts', async () => {
-    const real = fsModule.watchFile;
-    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
-    const stopFile = join(dir, 'stop');
-    // The file appears inside the watch's registration, before the real
-    // poll takes its first stat: that stat is its baseline, so only a check
-    // made after registering can see the file.
-    const watched = mock.method(
-      fsModule,
-      'watchFile',
-      (...args: Parameters<typeof fsModule.watchFile>) => {
-        writeFileSync(stopFile, 'interrupted');
-        return Reflect.apply(real, fsModule, args);
-      },
-    );
-    try {
-      const stop = stopSignalOf(stopFile);
-      const bound = new AbortController();
-      const first = await Promise.race([
-        stop.signal.aborted
-          ? 'aborted'
-          : once(stop.signal, 'abort').then(() => 'aborted'),
-        delay(2_000, 'missed', { signal: bound.signal }).catch(() => 'missed'),
-      ]);
-      bound.abort();
-      stop.close();
-      assert.equal(watched.mock.callCount(), 1);
-      assert.equal(first, 'aborted', 'the stop file was missed');
-    } finally {
-      watched.mock.restore();
-      rmSync(dir, { recursive: true, force: true });
-    }
-  });
-
-  it('the abort alone removes the watch, before any close', async () => {
-    const unwatched = mock.method(fsModule, 'unwatchFile');
-    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
-    try {
-      const stopFile = join(dir, 'stop');
-      const stop = stopSignalOf(stopFile);
-      assert.equal(unwatched.mock.callCount(), 0);
-      const bound = new AbortController();
-      const aborted = once(stop.signal, 'abort').then(() => 'aborted');
+      assert.equal(stop.signal.aborted, false);
+      assert.equal(getTimerCount(), 1);
+      await advanceTimersByTimeAsync(STOP_POLL_MS);
+      assert.equal(stop.signal.aborted, false);
       writeFileSync(stopFile, 'interrupted');
-      const first = await Promise.race([
-        aborted,
-        delay(10_000, 'missed', { signal: bound.signal }).catch(() => 'missed'),
-      ]);
-      bound.abort();
-      assert.equal(first, 'aborted');
-      assert.equal(unwatched.mock.callCount(), 1);
-      assert.equal(unwatched.mock.calls[0]?.arguments[0], stopFile);
+      await advanceTimersByTimeAsync(STOP_POLL_MS);
+      assert.equal(stop.signal.aborted, true);
+      assert.equal(getTimerCount(), 0);
     } finally {
-      unwatched.mock.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('close clears the poll', () => {
+    useFakeTimers({ apis: ['setInterval'] });
+    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
+    try {
+      const stop = stopSignalOf(join(dir, 'stop'));
+      assert.equal(getTimerCount(), 1);
+      stop.close();
+      assert.equal(getTimerCount(), 0);
+      assert.equal(stop.signal.aborted, false);
+    } finally {
       rmSync(dir, { recursive: true, force: true });
     }
   });

@@ -213,6 +213,15 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    error rule stays at the reading's edge: what a reading cannot read is its typed state, and raw's
    failed-read rule is unchanged. The tool docs are regenerated.
 
+   9.7a **The abapGit tools** (merged from #374, which reached main first with the older `detail`
+   module): `ListAbapGitRepos`, `CheckAbapGitExternalRepo`, `GetAbapGitBranchInfo`,
+   `GetAbapGitModifiedObjects`, `GetAbapGitStaging` and `GetAbapGitErrorLog` write terse and medium
+   by the listing writer through `ListAnswerTable` (`src/lib/abapGit/formats.ts`), and
+   `LinkAbapGitRepo` / `PullAbapGitRepo`'s objects by the JSON writer. Each has its golden over the
+   abapGit unit fixtures (`src/__tests__/helpers/abapGitSap.ts`), recorded with the formatters
+   before the move; four answers change their layout only (heads before the header, a header per
+   `# list`), named in the CHANGELOG.
+
    9.11 **Known limits of "by construction"** (owner, after Codex round 11). Each of these needs
    deliberate code a reviewer sees, and is accepted:
    - `writeWhole` takes any object, so a hand-filtered copy of a reading passes for it;
@@ -369,7 +378,12 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    tools not yet moved, shrinking with each group; (2) the tools on the writers, in the order of
    9.3–9.7; (3) source readers; (4) metadata readers; (5) CRUD; (6) check, validate and activate;
    (7) runs and results; (8) sessions and transports; (9) debugger; (10) compact; (11) the
-   allowlist removed. Each group regenerates the tool docs (`npm run docs:tools`:
+   allowlist removed. The abapGit tools join the groups by kind: the six reads on the writers
+   (9.7a) in group (2), `GetAbapGitFile` with the source readers (3), `LinkAbapGitRepo`,
+   `UnlinkAbapGitRepo`, `PullAbapGitRepo`, `PushAbapGitRepo` and `SwitchAbapGitBranch` with
+   sessions and transports (8), `CheckAbapGitRepo` with check, validate and activate (6); the
+   abapGit `detail` text (`ABAPGIT_DETAIL_SHAPE`, no `raw`) becomes the shared text of 10.3 with
+   its levels. Each group regenerates the tool docs (`npm run docs:tools`:
    AVAILABLE_TOOLS and the compact docs), the listed-schemas fixtures
    (`tests/fixtures/tools/listed-schemas.json`, `rebuilt-descriptions.json`) and the goldens
    through their writers, and names the regenerated files in its commit.

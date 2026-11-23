@@ -25,6 +25,7 @@ import { handleGetObjectsByType } from '../../../handlers/search/readonly/handle
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
+import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
 import { searchSourceRows } from '../../../handlers/system/readonly/handleSearchSource';
 import {
   createBatchAvailability,
@@ -448,6 +449,33 @@ for (const answer of ['objects', 'lines', 'snippets'] as const) {
     text: searchSourceRows(await scanned(answer)),
   });
 }
+
+/** A quickSearch answer of two hits, one with an empty description. */
+const SEARCH_HITS = `${xmlHead}<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_a" adtcore:type="CLAS/OC" adtcore:name="ZCL_A" adtcore:packageName="ZPKG" adtcore:description="one &amp; only"/><adtcore:objectReference adtcore:uri="/sap/bc/adt/oo/classes/zcl_a2" adtcore:type="CLAS/OC" adtcore:name="ZCL_A2" adtcore:description=""/></adtcore:objectReferences>`;
+const NO_HITS = `${xmlHead}<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"/>`;
+
+CASES['DescribeByList a described object, one not found, one refused'] = async (
+  detail,
+) =>
+  answeredOf(
+    await handleDescribeByList(
+      sequential([
+        { data: SEARCH_HITS },
+        { data: NO_HITS },
+        { data: NO_HITS },
+        REFUSED,
+        REFUSED,
+      ]) as never,
+      {
+        objects: [
+          { name: 'ZCL_A', type: 'CLAS/OC' },
+          { name: 'ZNONE', type: 'CLAS/OC' },
+          { name: 'ZREF', type: 'CLAS/OC' },
+        ],
+        detail,
+      } as never,
+    ),
+  );
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

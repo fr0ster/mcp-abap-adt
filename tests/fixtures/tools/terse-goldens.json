@@ -286,5 +286,17 @@
   "SearchSource rows at snippets @full": {
     "isError": false,
     "text": "# scanned objects 2 sources 2 objects_with_hits 2\n# not loaded by SAP\tZPKG\tCLAS/OC\n# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless\ninclude\tline\tsnippet\n# object ZPKG PROG ZPROG\nZPROG\t1\tone hit\nZPROG\t3\thit\\ttwo\n# object ZPKG PROG ZPROG2\nZPROG2\t1\thit"
+  },
+  "DescribeByList a described object, one not found, one refused @terse": {
+    "isError": false,
+    "text": "name\ttype\tdescription\tpackage\nZCL_A\tCLAS/OC\tone & only\tZPKG\nZCL_A2\tCLAS/OC\t\t"
+  },
+  "DescribeByList a described object, one not found, one refused @medium": {
+    "isError": false,
+    "text": "{\"name\":\"ZCL_A\",\"results\":[{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"adtcore:objectReferences\":{\"adtcore:objectReference\":[{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/oo/classes/zcl_a\",\"adtcore:type\":\"CLAS/OC\",\"adtcore:name\":\"ZCL_A\",\"adtcore:packageName\":\"ZPKG\",\"adtcore:description\":\"one & only\"}},{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/oo/classes/zcl_a2\",\"adtcore:type\":\"CLAS/OC\",\"adtcore:name\":\"ZCL_A2\",\"adtcore:description\":\"\"}}],\"@\":{\"xmlns:adtcore\":\"http://www.sap.com/adt/core\"}}}]}\n{\"name\":\"ZNONE\",\"type\":\"CLAS/OC\",\"found\":false}\n{\"name\":\"ZREF\",\"type\":\"CLAS/OC\",\"found\":false}"
+  },
+  "DescribeByList a described object, one not found, one refused @full": {
+    "isError": false,
+    "text": "{\"name\":\"ZCL_A\",\"results\":[{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"adtcore:objectReferences\":{\"adtcore:objectReference\":[{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/oo/classes/zcl_a\",\"adtcore:type\":\"CLAS/OC\",\"adtcore:name\":\"ZCL_A\",\"adtcore:packageName\":\"ZPKG\",\"adtcore:description\":\"one & only\"}},{\"@\":{\"adtcore:uri\":\"/sap/bc/adt/oo/classes/zcl_a2\",\"adtcore:type\":\"CLAS/OC\",\"adtcore:name\":\"ZCL_A2\",\"adtcore:description\":\"\"}}],\"@\":{\"xmlns:adtcore\":\"http://www.sap.com/adt/core\"}}}]}\n{\"name\":\"ZNONE\",\"type\":\"CLAS/OC\",\"found\":false}\n{\"name\":\"ZREF\",\"type\":\"CLAS/OC\",\"found\":false}"
   }
 }

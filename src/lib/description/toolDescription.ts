@@ -9,8 +9,16 @@ import type { Note } from './notes';
 import type { Purpose } from './purpose';
 import type { ReturnsFact } from './returns';
 
+/**
+ * The tag a description opens with, from the tool's kind: a read tool is
+ * `[read-only]`, a low-level tool `[low-level]` — written by the builder
+ * alone, never by the purpose sentence.
+ */
+export type DescriptionTag = 'read-only' | 'low-level';
+
 /** What a description is assembled from. */
 export interface DescriptionParts {
+  readonly tag?: DescriptionTag | undefined;
   readonly purpose: Purpose;
   readonly returns: readonly ReturnsFact[];
   readonly notes?: readonly Note[] | undefined;
@@ -19,9 +27,10 @@ export interface DescriptionParts {
 /** Every assembled description's parts, by its text: what the description tests read. */
 const assembled = new Map<string, DescriptionParts>();
 
-/** A tool's description: purpose, then its facts, then its notes. */
+/** A tool's description: its tag, its purpose, then its facts, then its notes. */
 export function toolDescription(parts: DescriptionParts): string {
   const text = [
+    ...(parts.tag === undefined ? [] : [`[${parts.tag}]`]),
     parts.purpose.text,
     ...parts.returns.map((each) => each.text),
     ...(parts.notes ?? []).map((note) => note.text),

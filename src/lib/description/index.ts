@@ -14,6 +14,7 @@ export {
 } from './returns';
 export {
   type DescriptionParts,
+  type DescriptionTag,
   partsOfDescription,
   toolDescription,
 } from './toolDescription';

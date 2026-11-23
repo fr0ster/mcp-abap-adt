@@ -32,6 +32,7 @@ import {
   answer,
   type FailureEntry,
   failureEntry,
+  isCredentialFailure,
   isCredentialPayload,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -201,14 +202,52 @@ export async function handleCreateTransport(
     medium: createdAt(
       (created) => (settled) => terseCreatedTransport(created, settled),
     ),
-    full: createdAt((_created, raw) => () => parseStructure(raw) ?? raw),
-    raw: createdAt((_created, raw) => () => raw),
+    // full the parse of the create's answer, and raw its document; a failed
+    // read-back's note beside either, so it is said at every level.
+    full: createdAt((created, raw) => (settled) => {
+      const parsed = parseStructure(raw) ?? raw;
+      return settled.readBackFailed === undefined
+        ? parsed
+        : {
+            create: parsed,
+            read_back: readBackFailedNote(
+              created.transportNumber,
+              settled.readBackFailed,
+            ),
+          };
+    }),
+    raw: createdAt(
+      (created, raw) => (settled) =>
+        settled.readBackFailed === undefined
+          ? raw
+          : {
+              documents: [raw],
+              read_back: readBackFailedNote(
+                created.transportNumber,
+                settled.readBackFailed,
+              ),
+            },
+    ),
   };
   type Terse =
     | ReturnType<typeof terseCreatedTransport>
     | ReturnType<typeof terseNumbers>
     | XmlNode
-    | string;
+    | string
+    | { create: XmlNode | string; read_back: string }
+    | { documents: string[]; read_back: string };
+
+  // The request read back as adt-strategies reads it by its number
+  // (`readTransportItem`), the reading made for that number.
+  const readBack = (number: string) =>
+    atStep('read request task', () =>
+      createAdtClient(connection, logger)
+        .getRequest({
+          ...resultsFor(transportDocuments),
+          objects: firstTaskOf(number),
+        })
+        .readObjects(number, { analyse: analyseException }),
+    )();
 
   return answer(
     { tool: 'CreateTransport', detail },
@@ -234,16 +273,21 @@ export async function handleCreateTransport(
       );
       if (!created.ok) return created;
       const number = created.getResult().value.value.created.transportNumber;
-      // The request read back as adt-strategies reads it by its number
-      // (`readTransportItem`), the reading made for that number.
-      const read = await atStep('read request task', () =>
-        createAdtClient(connection, logger)
-          .getRequest({
-            ...resultsFor(transportDocuments),
-            objects: firstTaskOf(number),
-          })
-          .readObjects(number, { analyse: analyseException }),
-      )();
+      let read: Awaited<ReturnType<typeof readBack>>;
+      try {
+        read = await readBack(number);
+      } catch (thrown) {
+        // A read-back the connection refused, or that threw on the way: the
+        // request exists all the same.
+        task = {
+          number: null,
+          type: null,
+          readBackFailed: isCredentialFailure(thrown)
+            ? 'authentication'
+            : 'server',
+        };
+        return created;
+      }
       // Once SAP has created the request its number is never lost: a
       // read-back that fails — its credentials refused, refused otherwise,
       // or not the request — is the created request, with a note naming the

@@ -8,6 +8,8 @@
 
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, describe, it } from 'node:test';
+import { authError } from '@mcp-abap-adt/auth-errors';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { resetSystemContextCache } from '../../lib/systemContext';
 import { declareSystemKind } from '../../lib/systemKind';
@@ -88,5 +90,33 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
     assert.notEqual(full, raw);
     assert.ok((raw ?? '').includes('<tm:root'));
     assert.ok(!(full ?? '').includes('<tm:root'));
+  });
+
+  it('a read-back the connection refuses (AuthRefusedError) keeps the number at every level', async () => {
+    for (const detail of ['terse', 'medium', 'full', 'raw'] as const) {
+      let sent = 0;
+      const connection = recordingConnection([{ data: CREATED }]);
+      declareSystemKind(connection, 'onprem');
+      const created = connection.makeAdtRequest.bind(connection);
+      connection.makeAdtRequest = async (request: never) => {
+        sent += 1;
+        if (sent === 1) return created(request);
+        throw new AuthRefusedError(
+          authError.connection({
+            problem: 'refused-after-renewal',
+            at: 'request',
+          }),
+          'request',
+        );
+      };
+      const answered = (await handleCreateTransport(
+        { connection, logger: undefined } as never,
+        { description: 'x', detail } as never,
+      )) as { isError?: boolean; content: Array<{ text?: string }> };
+      const text = answered.content[0]?.text ?? '';
+      assert.equal(answered.isError === true, false, text);
+      assert.ok(text.includes(NUMBER), text);
+      assert.ok(text.includes(READ_BACK_WORDS('authentication')), text);
+    }
   });
 });

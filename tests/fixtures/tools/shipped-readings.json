@@ -509,7 +509,7 @@
   },
   "CreateTransport read back as a bare root @full": {
     "isError": false,
-    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"tm:task\":[{\"@\":{\"tm:owner\":\"SAPUSER01\"}}],\"@\":{\"tm:number\":\"SIDK900011\",\"tm:desc\":\"x\",\"tm:type\":\"K\",\"tm:target\":\"LOCAL\",\"tm:cts_project\":\"\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"newrequest\"}}}",
+    "text": "{\"create\":{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"tm:task\":[{\"@\":{\"tm:owner\":\"SAPUSER01\"}}],\"@\":{\"tm:number\":\"SIDK900011\",\"tm:desc\":\"x\",\"tm:type\":\"K\",\"tm:target\":\"LOCAL\",\"tm:cts_project\":\"\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"newrequest\"}}},\"read_back\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -517,7 +517,7 @@
   },
   "CreateTransport read back as a bare root @raw": {
     "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "text": "{\"documents\":[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><tm:root xmlns:tm=\\\"http://www.sap.com/cts/adt/tm\\\" tm:useraction=\\\"newrequest\\\"><tm:request tm:number=\\\"SIDK900011\\\" tm:desc=\\\"x\\\" tm:type=\\\"K\\\" tm:target=\\\"LOCAL\\\" tm:cts_project=\\\"\\\"><tm:task tm:owner=\\\"SAPUSER01\\\"/></tm:request></tm:root>\"],\"read_back\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -541,7 +541,7 @@
   },
   "CreateTransport read back as no transport document @full": {
     "isError": false,
-    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"tm:task\":[{\"@\":{\"tm:owner\":\"SAPUSER01\"}}],\"@\":{\"tm:number\":\"SIDK900011\",\"tm:desc\":\"x\",\"tm:type\":\"K\",\"tm:target\":\"LOCAL\",\"tm:cts_project\":\"\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"newrequest\"}}}",
+    "text": "{\"create\":{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"tm:task\":[{\"@\":{\"tm:owner\":\"SAPUSER01\"}}],\"@\":{\"tm:number\":\"SIDK900011\",\"tm:desc\":\"x\",\"tm:type\":\"K\",\"tm:target\":\"LOCAL\",\"tm:cts_project\":\"\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"newrequest\"}}},\"read_back\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -549,7 +549,7 @@
   },
   "CreateTransport read back as no transport document @raw": {
     "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "text": "{\"documents\":[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><tm:root xmlns:tm=\\\"http://www.sap.com/cts/adt/tm\\\" tm:useraction=\\\"newrequest\\\"><tm:request tm:number=\\\"SIDK900011\\\" tm:desc=\\\"x\\\" tm:type=\\\"K\\\" tm:target=\\\"LOCAL\\\" tm:cts_project=\\\"\\\"><tm:task tm:owner=\\\"SAPUSER01\\\"/></tm:request></tm:root>\"],\"read_back\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -573,7 +573,7 @@
   },
   "CreateTransport read back as an empty root element @full": {
     "isError": false,
-    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"tm:task\":[{\"@\":{\"tm:owner\":\"SAPUSER01\"}}],\"@\":{\"tm:number\":\"SIDK900011\",\"tm:desc\":\"x\",\"tm:type\":\"K\",\"tm:target\":\"LOCAL\",\"tm:cts_project\":\"\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"newrequest\"}}}",
+    "text": "{\"create\":{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"tm:root\":{\"tm:request\":[{\"tm:task\":[{\"@\":{\"tm:owner\":\"SAPUSER01\"}}],\"@\":{\"tm:number\":\"SIDK900011\",\"tm:desc\":\"x\",\"tm:type\":\"K\",\"tm:target\":\"LOCAL\",\"tm:cts_project\":\"\"}}],\"@\":{\"xmlns:tm\":\"http://www.sap.com/cts/adt/tm\",\"tm:useraction\":\"newrequest\"}}},\"read_back\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"
@@ -581,7 +581,7 @@
   },
   "CreateTransport read back as an empty root element @raw": {
     "isError": false,
-    "text": "<?xml version=\"1.0\" encoding=\"utf-8\"?><tm:root xmlns:tm=\"http://www.sap.com/cts/adt/tm\" tm:useraction=\"newrequest\"><tm:request tm:number=\"SIDK900011\" tm:desc=\"x\" tm:type=\"K\" tm:target=\"LOCAL\" tm:cts_project=\"\"><tm:task tm:owner=\"SAPUSER01\"/></tm:request></tm:root>",
+    "text": "{\"documents\":[\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><tm:root xmlns:tm=\\\"http://www.sap.com/cts/adt/tm\\\" tm:useraction=\\\"newrequest\\\"><tm:request tm:number=\\\"SIDK900011\\\" tm:desc=\\\"x\\\" tm:type=\\\"K\\\" tm:target=\\\"LOCAL\\\" tm:cts_project=\\\"\\\"><tm:task tm:owner=\\\"SAPUSER01\\\"/></tm:request></tm:root>\"],\"read_back\":\"the request SIDK900011 was created, but reading it back failed (malformed): read it with GetTransport, transport_number SIDK900011\"}",
     "requests": [
       "POST /sap/bc/adt/cts/transportrequests",
       "GET /sap/bc/adt/cts/transportrequests/SIDK900011"

@@ -33,13 +33,15 @@ import { withSystemKindOf } from '../../../lib/connectionFactory';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
+  type Column,
   type DetailLevel,
-  identityOf,
-  type ListedPart,
-  listedText,
-  Written,
+  type Head,
+  type Nested,
+  nest,
+  parts,
+  rows,
   wireAnswer,
+  writeListing,
 } from '../../../lib/detail';
 import {
   DUMP_FILTERS,
@@ -283,135 +285,148 @@ export type FeedShown =
       readonly answered: FeedPageAnswer<IGatewayErrorEntry>;
     };
 
-/** A feed's columns, the columns of an item's identity, and a row per item. */
-function feedRows(shown: FeedShown): {
-  columns: string[];
-  identity: number[];
-  rows: string[][];
-} {
+/** Rows of a feed's entries, the header first, its cells from `columns`. */
+function entryRows<I>(columns: Column<I>[]) {
+  return rows('entries', { columns, header: 'always' });
+}
+
+/** A feed's entries as written: one row per entry — a feed without variants one row with none. */
+function feedListing(shown: FeedShown): Nested {
+  const heads = feedHeads(shown);
   switch (shown.feed) {
     case 'descriptors':
-      return {
-        columns: ['id', 'title', 'category'],
-        identity: [0],
-        rows: shown.answered.entries.map((e) => [
-          e.id,
-          e.title,
-          e.category ?? '',
-        ]),
-      };
+      return nest({
+        heads,
+        reading: shown.answered,
+        lists: {
+          entries: entryRows<IFeedDescriptor>([
+            { name: 'id', cell: (e) => e.id },
+            { name: 'title', cell: (e) => e.title },
+            { name: 'category', cell: (e) => e.category ?? '' },
+          ]),
+        },
+      });
     case 'variants':
-      return {
-        columns: ['feed', 'title', 'query', 'is_default'],
-        identity: [0, 1, 2],
-        // Every feed: one without variants is a row with none.
-        rows: shown.answered.entries.flatMap((feed) =>
-          feed.variants.length === 0
-            ? [[feed.feed, '', '', '']]
-            : feed.variants.map((v) => [
-                feed.feed,
-                v.title,
-                v.query,
-                String(v.is_default),
-              ]),
-        ),
-      };
+      return nest({
+        heads,
+        reading: shown.answered,
+        lists: {
+          // Every feed: one without variants is a row with none.
+          entries: parts(
+            'entries',
+            () => [],
+            (feed: FeedVariants) =>
+              nest({
+                heads: [],
+                reading:
+                  feed.variants.length === 0
+                    ? { variants: [{ title: '', query: '', is_default: '' }] }
+                    : {
+                        variants: feed.variants.map((v) => ({
+                          title: v.title,
+                          query: v.query,
+                          is_default: String(v.is_default),
+                        })),
+                      },
+                lists: {
+                  variants: rows('variants', {
+                    columns: [
+                      { name: 'feed', cell: () => feed.feed },
+                      { name: 'title', cell: (v: VariantCells) => v.title },
+                      { name: 'query', cell: (v: VariantCells) => v.query },
+                      {
+                        name: 'is_default',
+                        cell: (v: VariantCells) => v.is_default,
+                      },
+                    ],
+                    header: 'none',
+                  }),
+                },
+              }),
+            ['feed', 'title', 'query', 'is_default'],
+          ),
+        },
+      });
     case 'dumps':
-      return {
-        columns: ['dump_id', 'updated', 'title'],
-        identity: [0],
-        rows: shown.answered.entries.map((e) => [
-          e.dump_id,
-          e.updated,
-          e.title,
-        ]),
-      };
+      return nest({
+        heads,
+        reading: shown.answered,
+        lists: {
+          entries: entryRows<DumpEntry>([
+            { name: 'dump_id', cell: (e) => e.dump_id },
+            { name: 'updated', cell: (e) => e.updated },
+            { name: 'title', cell: (e) => e.title },
+          ]),
+        },
+      });
     case 'system_messages':
-      return {
-        columns: ['id', 'createdOn', 'author', 'title'],
-        identity: [0],
-        rows: shown.answered.entries.map((e) => [
-          e.id ?? e.messageId ?? '',
-          e.createdOn ?? '',
-          e.author ?? e.createdBy ?? '',
-          e.title ?? '',
-        ]),
-      };
+      return nest({
+        heads,
+        reading: shown.answered,
+        lists: {
+          entries: entryRows<ISystemMessageEntry>([
+            { name: 'id', cell: (e) => e.id ?? e.messageId ?? '' },
+            { name: 'createdOn', cell: (e) => e.createdOn ?? '' },
+            { name: 'author', cell: (e) => e.author ?? e.createdBy ?? '' },
+            { name: 'title', cell: (e) => e.title ?? '' },
+          ]),
+        },
+      });
     case 'gateway_errors':
-      return {
-        columns: [
-          'opid',
-          'detail_kind',
-          'dateTime',
-          'type',
-          'shortText',
-          'username',
-        ],
-        identity: [0],
-        rows: shown.answered.entries.map((e) => [
-          e.opid ?? '',
-          detailKindOf(e),
-          e.dateTime ?? '',
-          e.type ?? '',
-          e.shortText ?? '',
-          e.username ?? '',
-        ]),
-      };
+      return nest({
+        heads,
+        reading: shown.answered,
+        lists: {
+          entries: entryRows<IGatewayErrorEntry>([
+            { name: 'opid', cell: (e) => e.opid ?? '' },
+            { name: 'detail_kind', cell: detailKindOf },
+            { name: 'dateTime', cell: (e) => e.dateTime ?? '' },
+            { name: 'type', cell: (e) => e.type ?? '' },
+            { name: 'shortText', cell: (e) => e.shortText ?? '' },
+            { name: 'username', cell: (e) => e.username ?? '' },
+          ]),
+        },
+      });
   }
 }
 
-/** Every item a feed holds, as its row identifies it: each entry, each variant, a feed without variants. */
-function heldFeedItems(shown: FeedShown): string[] {
-  switch (shown.feed) {
-    case 'descriptors':
-      return shown.answered.entries.map((e) => identityOf([e.id]));
-    case 'variants':
-      return shown.answered.entries.flatMap((feed) =>
-        feed.variants.length === 0
-          ? [identityOf([feed.feed, '', ''])]
-          : feed.variants.map((v) => identityOf([feed.feed, v.title, v.query])),
-      );
-    case 'dumps':
-      return shown.answered.entries.map((e) => identityOf([e.dump_id]));
-    case 'system_messages':
-      return shown.answered.entries.map((e) =>
-        identityOf([e.id ?? e.messageId ?? '']),
-      );
-    case 'gateway_errors':
-      return shown.answered.entries.map((e) => identityOf([e.opid ?? '']));
-  }
+/** A variant's cells as a row writes them. */
+interface VariantCells {
+  readonly title: string;
+  readonly query: string;
+  readonly is_default: string;
 }
 
-/**
- * A feed's terse answer: TSV under its `# feed` and `# count` lines — every
- * item the feed holds, or nothing (`completeAnswer`).
- */
-const terseFeed = completeAnswer(
-  'RuntimeListFeeds',
-  heldFeedItems,
-  (shown: FeedShown) => terseFeedText(shown),
-);
+/** A dump entry as the dumps feed answers it. */
+interface DumpEntry {
+  readonly dump_id: string;
+  readonly updated: string;
+  readonly title: string;
+}
 
-/** A feed's terse text: its `# feed`, `# count` and paging lines, then its rows. */
-export function terseFeedText(shown: FeedShown): Written<string> {
-  const { columns, identity, rows } = feedRows(shown);
+/** A feed's heads: the feed, its count, and SAP's paging where it has more. */
+function feedHeads(shown: FeedShown): Head[] {
   const paged =
     shown.feed === 'descriptors' || shown.feed === 'variants'
       ? { next_to: undefined, incomplete_second: undefined }
       : shown.answered;
-  return Written.text(
-    [
-      { head: 'feed', value: shown.feed },
-      { head: 'count', value: String(shown.answered.count) },
-      ...(paged.next_to ? [{ head: 'next_to', value: paged.next_to }] : []),
-      ...(paged.incomplete_second
-        ? [{ head: 'incomplete_second', value: paged.incomplete_second }]
-        : []),
-      { header: columns },
-      ...rows.map((row) => ({ row })),
-    ],
-    identity,
-  );
+  return [
+    { head: 'feed', value: shown.feed },
+    { head: 'count', value: String(shown.answered.count) },
+    ...(paged.next_to ? [{ head: 'next_to', value: paged.next_to }] : []),
+    ...(paged.incomplete_second
+      ? [{ head: 'incomplete_second', value: paged.incomplete_second }]
+      : []),
+  ];
+}
+
+/** A feed's terse text: TSV under its `# feed` and `# count` lines, every entry a row. */
+export function terseFeedText(shown: FeedShown): string {
+  return writeListing({
+    heads: [],
+    reading: { feed: [shown] },
+    lists: { feed: parts('feed', () => [], feedListing) },
+  }).answer;
 }
 
 /**
@@ -420,7 +435,7 @@ export function terseFeedText(shown: FeedShown): Written<string> {
  * full and raw the former JSON, every field.
  */
 const FEED_ANSWERS: AnswerTable<FeedShown, string | object> = {
-  terse: terseFeed,
+  terse: terseFeedText,
   medium: (shown) => shown.answered,
   full: (shown) => shown.answered,
   raw: (shown) => shown.answered,
@@ -939,24 +954,44 @@ function listAnswer(
 
 /** A list call's terse text. */
 function terseList({ feedTypes, results }: ListOf): McpResult {
-  // Every feed's text through `Written`: a failure under its escaped
-  // `# feed` line and one `# error` line; an answered one as its own
-  // terse writer writes it.
-  const text = listedText(
-    'RuntimeListFeeds',
-    results.map((result, i): ListedPart<FeedShown> => {
-      const read = readsOf.get(result);
-      return result.isError || read === undefined
-        ? {
-            heads: [{ head: 'feed', value: feedTypes[i] ?? '' }],
-            error: JSON.stringify(payloadOfAnswer(result)),
-          }
-        : { heads: [], read };
-    }),
-    heldFeedItems,
-    terseFeedText,
-  );
+  // Every feed's text written by the listing writer: a failure under its
+  // escaped `# feed` line and one `# error` line; an answered one as its
+  // own terse listing.
+  const text = writeListing({
+    heads: [],
+    reading: {
+      answered: results.map((result, i) => ({
+        feed: feedTypes[i] ?? '',
+        result,
+        read: result.isError ? undefined : readsOf.get(result),
+      })),
+    },
+    lists: {
+      answered: parts(
+        'answered',
+        ({ feed, result, read }: AnsweredFeed): Head[] =>
+          read === undefined
+            ? [
+                { head: 'feed', value: feed },
+                {
+                  head: 'error',
+                  value: JSON.stringify(payloadOfAnswer(result)),
+                },
+              ]
+            : [],
+        ({ read }: AnsweredFeed) =>
+          read === undefined ? undefined : feedListing(read),
+      ),
+    },
+  }).answer;
   return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** One feed of a list call: its type, its answer, and its read when answered. */
+interface AnsweredFeed {
+  readonly feed: string;
+  readonly result: McpResult;
+  readonly read: FeedShown | undefined;
 }
 
 /** A list call's entries as a JSON array. */

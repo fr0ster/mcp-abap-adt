@@ -324,14 +324,18 @@ export function parts<I, K extends string>(
   key: K,
   heads: (item: I) => readonly Head[],
   nested: (item: I) => Nested | undefined,
+  header?: readonly string[] | undefined,
 ): Bound<Holding<K, I>, K> {
   return {
     key,
-    write: (reading) =>
-      itemsOf(reading, key).flatMap((item): Line[] => [
+    // One header before the first part, where asked.
+    write: (reading) => [
+      ...(header === undefined ? [] : [{ header }]),
+      ...itemsOf(reading, key).flatMap((item): Line[] => [
         ...heads(item),
         ...(nested(item)?.[nestedLines] ?? []),
       ]),
+    ],
   };
 }
 

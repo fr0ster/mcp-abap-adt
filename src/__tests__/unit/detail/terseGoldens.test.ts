@@ -649,7 +649,7 @@ const FEEDS: readonly FeedShown[] = [
 for (const shown of FEEDS) {
   CASES[`RuntimeListFeeds terse ${shown.feed}`] = async () => ({
     isError: false,
-    text: terseFeedText(shown).answer,
+    text: terseFeedText(shown),
   });
 }
 

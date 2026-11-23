@@ -413,7 +413,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitExternalRepo.ts`
 
 **Parameters:**
-- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
 - `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
 
 ---
@@ -437,7 +437,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `app_log_key` (string, required) - The run log key ListAbapGitRepos answers for the repository's last run.
-- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 
 ---
@@ -462,7 +462,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
 
 **Parameters:**
-- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 
 ---
@@ -474,7 +474,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
 
 **Parameters:**
-- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 
 ---
@@ -486,7 +486,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/abapgit/readonly/handleListAbapGitRepos.ts`
 
 **Parameters:**
-- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
 - `package_name` (string, optional) - Only the repository linked to this package.
 - `repository_key` (string, optional) - Only the repository with this key.
 
@@ -631,7 +631,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type.
@@ -726,7 +726,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `detailed` (boolean, optional) - [read-only] true: every field of each enhancement, as read; false (default): each enhancement by name, type and source. Either way every object read is answered, one without enhancements with total_enhancements 0
 - `include_nested` (boolean, optional) - [read-only] true: also the enhancements of every include of a program or function group
 - `max_includes` (integer, optional) - [read-only] With include_nested: how many includes are read (default 50)
@@ -791,7 +791,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name.
 
 ---
@@ -803,7 +803,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name.
 
 ---
@@ -851,13 +851,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getincludeslist-read-only-include"></a>
 #### GetIncludesList (Read-Only / Include)
-**Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Recursively discover and list ALL include files within an ABAP program or include. Takes object_name and object_type (one object: its tree) or objects (several objects: one entry per object, in the order given, each { object_name, object_type, tree } or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
 - `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
 - `object_type` (string, optional, one of: `PROG/P`, `PROG/I`, `FUGR/F`, `CLAS/OC`, `FUGR`, `CLAS`) - [read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC. A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
@@ -872,7 +872,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name.
 
 ---
@@ -918,7 +918,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -956,7 +956,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -964,13 +964,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackagecontents-read-only-package"></a>
 #### GetPackageContents (Read-Only / Package)
-**Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages. Takes package_name (one package: its list) or package_names (several packages: one entry per package, in the order given, each { package_name, objects } or { package_name, error }). Each level of the walk is read in one ADT batch envelope: the root node structures of its packages, then their type nodes; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/package/readonly/handleGetPackageContents.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_descriptions` (boolean, optional) - Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)
 - `include_subpackages` (boolean, optional) - Include contents of subpackages recursively (default: false)
 - `max_depth` (number, optional) - Maximum depth for recursive package traversal (default: 5)
@@ -1020,13 +1020,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectslist-read-only-search"></a>
 #### GetObjectsList (Read-Only / Search)
-**Description:** [read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope, for the identities of the objects. By default (detail terse) TSV of identifier rows: type, name, tech_name, uri. With detail medium or full the description of each object is read from its own metadata in a second ADT batch envelope, where its type has a metadata endpoint. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope, for the identities of the objects. By default (detail terse) TSV of identifier rows: type, name, tech_name, uri. With detail medium or full the description of each object is read from its own metadata in a second ADT batch envelope, where its type has a metadata endpoint. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsList.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, optional) - [read-only] Several parents, read together (give this or parent_name)
 - `parent_name` (string, optional) - [read-only] Parent object name (with parent_tech_name and parent_type; or give objects)
 - `parent_tech_name` (string, optional) - [read-only] Parent technical name
@@ -1037,13 +1037,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="searchobject-read-only-search"></a>
 #### SearchObject (Read-Only / Search)
-**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system's object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Search ABAP repository by object name or wildcard pattern (e.g. 'Z*'). Answers: "find object X", "does X exist", "list objects matching...", "search for program/class/table by name". Supports all repository object types — optionally filter by a name of the system's object types list (PROG, CLAS, INTF, DEVC, TABL, STRU, DDLS, DTEL, FUGR, FUNC, SRVD, SRVB, BDEF, DDLX, etc.). Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/search/readonly/handleSearchObject.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
@@ -1110,13 +1110,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. Takes structure_name (one structure: its tree) or structure_names (several structures: one entry per structure, in the order given, each its tree answer or { structure_name, error }). Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; legacy systems (BASIS < 7.50) refuse it (issue #207). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. Takes structure_name (one structure: its tree) or structure_names (several structures: one entry per structure, in the order given, each its tree answer or { structure_name, error }). Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; legacy systems (BASIS < 7.50) refuse it (issue #207). Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
 - `structure_name` (string, optional) - Structure name (or give structure_names).
 - `structure_names` (array, optional) - Several structure names, read together (give this or structure_name).
@@ -1129,13 +1129,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="describebylist-read-only-system"></a>
 #### DescribeByList (Read-Only / System)
-**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/readonly/handleDescribeByList.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, required)
 
 ---
@@ -1147,7 +1147,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `validate_type` (string, optional) - Type name to validate (optional)
 
 ---
@@ -1159,13 +1159,13 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
 <a id="getobjectinfo-read-only-system"></a>
 #### GetObjectInfo (Read-Only / System)
-**Description:** [read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Returns the object tree of the package (DEVC), class (CLAS), program (PROG), function group (FUGR) or other object named by parent_type and parent_name. Shows root, group nodes, and terminal leaves up to maxDepth. With enrich=true each node also carries its description and package, from a repository search. Takes parent_type and parent_name (one object: its tree) or objects (several objects: one tree per object, in the order given; a failed one as { OBJECT_TYPE, OBJECT_NAME, error }). Read in ADT batch envelopes: per tier the root node structures of its nodes, then their type nodes; with enrich, the search of every node last. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetObjectInfo.ts`
 
@@ -1200,7 +1200,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1208,7 +1208,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **On ABAP Cloud (`cloud`):** [read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column (lines from 1, columns from 0, the end exclusive), the lines a ranged source read (start_line, end_line) answers. Returns the components as a tree.
 
 **Parameters (`cloud`):**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, FUGR/F (class, interface, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1222,7 +1222,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
 - `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
 
@@ -1246,7 +1246,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getsqlquery-read-only-system"></a>
 #### GetSqlQuery (Read-Only / System)
-**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Execute ABAP SQL SELECT queries on database tables and CDS views via SAP ADT Data Preview API. Use for ad-hoc data retrieval, row counts, and filtered queries. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetSqlQuery.ts`
 
@@ -1254,7 +1254,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
 - `sql_query` (string, required) - SQL query to execute
 
@@ -1267,7 +1267,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transaction_name` (string, required) - Name of the ABAP transaction
 
 ---
@@ -1286,7 +1286,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Lists where the object named by object_name and object_type is used, for every type object_type takes, a function module (BAPI included) too: every object that uses, calls or references it, with its type and package. Takes object_name and object_type (one object: its list) or objects (several objects: one entry per object, in the order given, each its list or { object_name, object_type, error }). Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
@@ -1295,7 +1295,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `container` (string, optional, one of: `program`, `function_group`) - With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
 - `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
 - `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
@@ -1307,7 +1307,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimeanalyzeprofilertrace-read-only-system"></a>
 #### RuntimeAnalyzeProfilerTrace (Read-Only / System)
-**Description:** [read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] [runtime] Read profiler trace view and return compact analysis summary (totals + top entries). Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.ts`
 
@@ -1340,7 +1340,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `detail_kind` (string, optional) - The error's detail_kind, from the list: the kind its detail is read under. Required with opid.
 - `error_url` (string, optional) - An error's detailUri, from the list at detail medium or full: answers that error's detail instead of the list.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
@@ -1353,7 +1353,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimegetprofilertracedata-read-only-system"></a>
 #### RuntimeGetProfilerTraceData (Read-Only / System)
-**Description:** [read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] [runtime] Read profiler trace data by trace id/uri: hitlist, statements, or db accesses. Returns parsed JSON payload. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetProfilerTraceData.ts`
 
@@ -1370,14 +1370,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }). By default (detail terse) TSV under "# feed" and "# count" lines, next_to and incomplete_second as "#" lines: descriptors id, title, category; variants feed, title, query, is_default; dumps dump_id, updated, title; system messages id, createdOn, author, title; gateway errors opid, detail_kind, dateTime, type, shortText, username. With detail medium or full every field as JSON. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }). By default (detail terse) TSV under "# feed" and "# count" lines, next_to and incomplete_second as "#" lines: descriptors id, title, category; variants feed, title, query, is_default; dumps dump_id, updated, title; system messages id, createdOn, author, title; gateway errors opid, detail_kind, dateTime, type, shortText, username. With detail medium or full every field as JSON. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `component` (string, optional) - Dumps whose application component contains this text, in any case.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
 - `feed_type` (string, optional, one of: `descriptors`, `variants`, `dumps`, `system_messages`, `gateway_errors`) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `feed_types` (array, optional) - Several feeds, read together with the same filters (give this or feed_type).
@@ -1398,7 +1398,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
@@ -1409,7 +1409,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Maximum number of messages to return.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
@@ -1419,14 +1419,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="searchsource-read-only-system"></a>
 #### SearchSource (Read-Only / System)
-**Description:** [read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call's `version` (default active). `packages` takes exact package names and masks (Z*, /NS/Z?); in a mask `*` (zero or more characters) and `?` (one character) are the wildcards, and `+`, `_`, `%` and `#` are characters of the name; a mask is resolved by the repository quick search to every package it matches. `object_types` and `object_filter` select the scan targets of the resolved packages (`PROG` selects programs and program includes, `FUGR` function groups with their modules and includes); every target is read in one run, unless `max_hits` is reached. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `"` comment lines. `max_hits_per_object` limits the hits of each object only when given; each module and each include of a function group is an object of its own, and a program include is one object however many function groups list it (its hits answered and counted once, from the first listing in the scan order). `max_hits` limits the hits of the whole answer, counted in the scan order after `max_hits_per_object`: reached, the scan stops reading, and `truncated.by_max_hits` is true when anything was left. `answer` sets what each hit is answered as: `lines` with the line only (the default at detail terse), `snippets` with line and snippet (the default at medium and full), `objects` one entry per object and include with its number of hits. The answer lists each hit (`results`: package, object type, object name, include, line, snippet). The `object_type` of a hit names its kind of source: `PROG` a program, `PROG/I` a program include (`object_name` the include name), `CLAS` a class with `include` the class name for its main source or `definitions`, `implementations`, `macros`, `testclasses` for its local includes, `INTF`, `DDLS`, `BDEF`, `DDLX` and `SRVD` the object source; a hit in a function module is `FUGR/FF` (`object_name` the module) and a hit in an include addressed under its function group is `FUGR/I` (`object_name` the include), each with `function_group_name`, the group, in place of `include`; an include a function group lists among the program includes is `PROG/I`; `scanned.objects` counts the objects read, `scanned.sources` the sources read (each once) and `scanned.objects_with_hits` the objects with a hit; `truncated.by_object_cap` is true when an object had more hits than `max_hits_per_object`. At a stop the counters report what was done until it; where the reads go in batches, `scanned.sources` counts the sources of the last batch read, those read past the stop included. A source, an object or a package SAP refuses is skipped, and a type node or subpackage SAP refuses is skipped with everything under it; a read that fails before SAP answers ends the call as an error. Sources are read in ADT batch envelopes where the system offers them, each source once per call. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Search ABAP source text inside one or more packages: programs, program includes, function groups (function modules and includes), classes (main source and the four local includes), interfaces, CDS data definitions, behavior definitions, metadata extensions and service definitions. Each source is read at the call's `version` (default active). `packages` takes exact package names and masks (Z*, /NS/Z?); in a mask `*` (zero or more characters) and `?` (one character) are the wildcards, and `+`, `_`, `%` and `#` are characters of the name; a mask is resolved by the repository quick search to every package it matches. `object_types` and `object_filter` select the scan targets of the resolved packages (`PROG` selects programs and program includes, `FUGR` function groups with their modules and includes); every target is read in one run, unless `max_hits` is reached. A line matches when it contains `query` (and `query2`, when given), case-insensitively, and a line containing an `exclude` entry is dropped; `exclude_comments` skips col-1 `*` and full-line `"` comment lines. `max_hits_per_object` limits the hits of each object only when given; each module and each include of a function group is an object of its own, and a program include is one object however many function groups list it (its hits answered and counted once, from the first listing in the scan order). `max_hits` limits the hits of the whole answer, counted in the scan order after `max_hits_per_object`: reached, the scan stops reading, and `truncated.by_max_hits` is true when anything was left. `answer` sets what each hit is answered as: `lines` with the line only (the default at detail terse), `snippets` with line and snippet (the default at medium and full), `objects` one entry per object and include with its number of hits. The answer lists each hit (`results`: package, object type, object name, include, line, snippet). The `object_type` of a hit names its kind of source: `PROG` a program, `PROG/I` a program include (`object_name` the include name), `CLAS` a class with `include` the class name for its main source or `definitions`, `implementations`, `macros`, `testclasses` for its local includes, `INTF`, `DDLS`, `BDEF`, `DDLX` and `SRVD` the object source; a hit in a function module is `FUGR/FF` (`object_name` the module) and a hit in an include addressed under its function group is `FUGR/I` (`object_name` the include), each with `function_group_name`, the group, in place of `include`; an include a function group lists among the program includes is `PROG/I`; `scanned.objects` counts the objects read, `scanned.sources` the sources read (each once) and `scanned.objects_with_hits` the objects with a hit; `truncated.by_object_cap` is true when an object had more hits than `max_hits_per_object`. At a stop the counters report what was done until it; where the reads go in batches, `scanned.sources` counts the sources of the last batch read, those read past the stop included. A source, an object or a package SAP refuses is skipped, and a type node or subpackage SAP refuses is skipped with everything under it; a read that fails before SAP answers ends the call as an error. Sources are read in ADT batch envelopes where the system offers them, each source once per call. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/readonly/handleSearchSource.ts`
 
 **Parameters:**
 - `answer` (string, optional, one of: `objects`, `lines`, `snippets`) - What each hit is answered as: lines (line, no snippet; the default at detail terse), snippets (line and snippet; the default at medium and full) or objects (one entry per object and include with its number of hits).
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `exclude` (array, optional) - Up to 3 substrings; a line containing any of them is dropped.
 - `exclude_comments` (boolean, optional) - Skip col-1 '*' and full-line '"' comment lines. Default false (comments are scanned).
 - `include_subpackages` (boolean, optional) - Recurse into subpackages (default true).
@@ -1463,7 +1463,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="gettablecontents-read-only-table"></a>
 #### GetTableContents (Read-Only / Table)
-**Description:** [read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the contents (data preview, like SE16/SE16N) of the ABAP database table or CDS view named by table_name: every column, up to max_rows rows (default 100). Answers sql_query, row_number (the max_rows asked), execution_time, total_rows (the rows the table or view holds), columns and rows. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/table/readonly/handleGetTableContents.ts`
 
@@ -1471,7 +1471,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `max_rows` (number, optional) - Maximum number of rows to retrieve
 - `table_name` (string, required) - Name of the ABAP table
 
@@ -1535,7 +1535,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_objects` (boolean, optional (default: true)) - With detail terse: list a task's objects (default: true); their count is answered either way.
 - `include_tasks` (boolean, optional (default: true)) - With detail terse: list a request's tasks (default: true); their count is answered either way.
 - `transport_number` (string, required) - Transport request or task number
@@ -1544,7 +1544,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listtransports-read-only-transport"></a>
 #### ListTransports (Read-Only / Transport)
-**Description:** [read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] List the transport requests of a user: the workbench, customizing and transport-of-copies requests the user owns or holds a task in, as SAP selects them. Returns each request's number, description, type, status, owner and target. Modifiable requests by default; with modifiable_only false, released requests too, from SAP's default window of the last 14 days. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
@@ -1552,7 +1552,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `modifiable_only` (boolean, optional) - Modifiable requests only (true, the default), or modifiable and released requests (false; released ones from SAP's default window of the last 14 days).
 - `user` (string, optional) - The SAP user whose requests to list, sent in upper case. Default: the session's login user.
 
@@ -1567,7 +1567,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
 
 ---
@@ -1581,7 +1581,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.
 
 ---
@@ -1598,7 +1598,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `format` (string, optional, one of: `abapunit`, `junit`) - Result format: abapunit or junit.
 - `run_id` (string, required) - Run id a unit test run answered.
 - `with_navigation_uris` (boolean, optional) - Include navigation URIs in result if supported.
@@ -1619,7 +1619,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
-- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer.
 - `package_name` (string, required) - The ABAP package the repository is linked to.
 - `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
 
@@ -1723,26 +1723,26 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getatcfindings-high-level-atc"></a>
 #### GetATCFindings (High-Level / Atc)
-**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
 
 <a id="getatcresult-high-level-atc"></a>
 #### GetATCResult (High-Level / Atc)
-**Description:** [read-only] Reads the stored ATC result named by display_id. Answers the result's title, check_variant and created_at, how many objects it covered, the counts per priority and each finding with the object, the source position (location and line), the priority, which check ran and what it said. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the result gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Reads the stored ATC result named by display_id. Answers the result's title, check_variant and created_at, how many objects it covered, the counts per priority and each finding with the object, the source position (location and line), the priority, which check ran and what it said. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the result gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes). Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/atc/high/handleGetATCResult.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `display_id` (string, required) - Display ID of a stored ATC result.
 
 ---
@@ -1760,7 +1760,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listatcresults-high-level-atc"></a>
 #### ListATCResults (High-Level / Atc)
-**Description:** [read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Lists the ATC results the system holds, newest first. Answers each result with its display_id, title, check_variant, run_series, created_at, the finding counts per priority and the failure count. created_by names whose results (a user name, or * for every user); central_only=true lists central results only; age_min and age_max bound the age in days, and when both are absent the system applies an age window of its own. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/atc/high/handleListATCResults.ts`
 
@@ -1807,7 +1807,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Behavior definition name (root entity).
 
 ---
@@ -1837,7 +1837,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `implementation_type` (string, required, one of: `Managed`, `Unmanaged`, `Abstract`, `Projection`) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', 'Projection'
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `name` (string, required) - Behavior Definition name (usually same as Root Entity name)
@@ -1857,7 +1857,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -1889,7 +1889,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -1911,7 +1911,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `behavior_definition` (string, required) - Behavior Definition name. The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
 - `class_name` (string, required) - Behavior Implementation class name.
 - `description` (string, optional) - Class description. If not provided, class_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package name
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
@@ -1927,7 +1927,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -1961,7 +1961,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, optional) - Activate behavior implementation after update. Default: true.
 - `behavior_definition` (string, required) - Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).
 - `class_name` (string, required) - Behavior Implementation class name. Must exist in the system.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `implementation_code` (string, required) - Implementation code for the implementations include. Contains the actual behavior implementation methods.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -1980,7 +1980,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
@@ -2011,7 +2011,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `class_name` (string, required) - Class name.
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `final` (boolean, optional) - Mark class as final. Default: false
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name.
@@ -2030,7 +2030,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -2046,7 +2046,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
@@ -2062,7 +2062,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
@@ -2078,7 +2078,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting test class. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
@@ -2094,7 +2094,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
@@ -2191,7 +2191,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `class_name` (string, required) - Class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `source_code` (string, required) - Complete ABAP class source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
@@ -2209,7 +2209,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name.
 - `definitions_code` (string, required) - Updated source code for local definitions.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
@@ -2225,7 +2225,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `macros_code` (string, required) - Updated source code for local macros.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -2242,7 +2242,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating test class. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `test_class_code` (string, required) - Updated source code for the local test class.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -2259,7 +2259,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
 - `class_name` (string, required) - Parent class name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `local_types_code` (string, required) - Updated source code for local types.
 - `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
@@ -2275,14 +2275,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
 **On ABAP Cloud (`cloud`):** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.
 
 **Parameters (`cloud`):**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
@@ -2619,7 +2619,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
@@ -2650,7 +2650,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional (default: CHAR)) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.
 - `decimals` (number, optional (default: 0)) - Decimal places. Usually inherited from domain.
 - `description` (string, optional) - Data element description. If not provided, data_element_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `heading_label` (string, optional) - Heading field label (max 55 chars). Applied during update step after creation.
 - `length` (number, optional (default: 100)) - Data type length. Usually inherited from domain.
 - `long_label` (string, optional) - Long field label (max 40 chars). Applied during update step after creation.
@@ -2677,7 +2677,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -2710,7 +2710,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional) - Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType
 - `decimals` (number, optional) - Decimals - for predefinedAbapType or refToPredefinedAbapType
 - `description` (string, optional) - New data element description
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `field_label_heading` (string, optional) - Heading field label (max 55 chars)
 - `field_label_long` (string, optional) - Long field label (max 40 chars)
 - `field_label_medium` (string, optional) - Medium field label (max 20 chars)
@@ -2739,7 +2739,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 
 ---
 
@@ -2769,7 +2769,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
 - `description` (string, optional) - Optional description (defaults to ddl_name).
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
@@ -2786,7 +2786,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
@@ -2820,7 +2820,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `ddl_name` (string, required) - DDL source name.
 - `ddl_source` (string, required) - Complete DDL source code.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
@@ -2837,7 +2837,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Metadata Extension name.
 
 ---
@@ -2867,7 +2867,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `name` (string, required) - Metadata Extension name
 - `package_name` (string, required) - Package name
@@ -2885,7 +2885,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: true
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
@@ -2904,7 +2904,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `domain_name` (string, required) - Domain name.
 
 ---
@@ -2937,7 +2937,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `datatype` (string, optional (default: CHAR)) - (optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional (default: 0)) - (optional) Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - (optional) Domain description. If not provided, domain_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `domain_name` (string, required) - Domain name.
 - `fixed_values` (array, optional) - (optional) Array of fixed values for domain value range
 - `length` (number, optional (default: 100)) - (optional) Field length (max depends on datatype)
@@ -2959,7 +2959,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `domain_name` (string, required) - Domain name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -2993,7 +2993,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `datatype` (string, optional) - Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional) - Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - New domain description (optional)
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `domain_name` (string, required) - Domain name to update
 - `fixed_values` (array, optional) - Array of fixed values for domain value range
 - `length` (number, optional) - Field length (max depends on datatype)
@@ -3017,7 +3017,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name.
 
 ---
@@ -3031,7 +3031,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name.
 - `function_module_name` (string, required) - Function module name.
 
@@ -3077,7 +3077,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name. Up to 26 characters.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
@@ -3095,7 +3095,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Optional description for the function module
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Parent function group name
 - `function_module_name` (string, required) - Function module name. Up to 30 characters.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -3112,7 +3112,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, required) - New description for the function group.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name. Must exist in the system.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -3128,7 +3128,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate function module after source update. Default: false. Set to true to activate immediately.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name containing the function module.
 - `function_module_name` (string, required) - Function module name. Function module must already exist.
 - `source_code` (string, required) - Complete ABAP function module source code, from FUNCTION to ENDFUNCTION.
@@ -3148,7 +3148,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - FunctionGroup name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3179,7 +3179,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Optional description for the include
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Parent function group name
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -3193,7 +3193,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name containing the include.
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -3208,7 +3208,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional (default: false)) - Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group name containing the include.
 - `include_name` (string, required) - Include name. Include must already exist.
 - `source_code` (string, required) - Complete ABAP include source code.
@@ -3228,7 +3228,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - FunctionGroup name containing the function module.
 - `function_module_name` (string, required) - FunctionModule name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -3265,7 +3265,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name.
 
 ---
@@ -3280,7 +3280,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Include description. If not provided, include_name is used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name.
@@ -3297,7 +3297,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3313,7 +3313,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate the include after the write. Default: false.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name. The include must already exist.
 - `source_code` (string, required) - Complete ABAP source of the include.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -3327,7 +3327,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/include/high/handleUpdateIncludeMetadata.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_name` (string, required) - Include name. The include must already exist.
 - `metadata` (string, required) - The whole ADT metadata document of the include, as GetInclude part "metadata" returns it, with the changes made; it is sent as given and replaces the stored one.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -3346,7 +3346,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `interface_name` (string, required) - Interface name.
 
 ---
@@ -3375,7 +3375,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `interface_name` (string, required) - Interface name.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
@@ -3392,7 +3392,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `interface_name` (string, required) - Interface name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3425,7 +3425,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate interface after update. Default: true.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `interface_name` (string, required) - Interface name. Must exist in the system.
 - `source_code` (string, required) - Complete ABAP interface source code with INTERFACE...ENDINTERFACE section.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
@@ -3443,7 +3443,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - (optional) Short description. If not provided, message_class_name is used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `message_class_name` (string, required) - Message class name.
 - `package_name` (string, required) - Package name.
@@ -3474,7 +3474,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `message_class_name` (string, required) - Message class name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects, optional for local ones.
 
@@ -3511,7 +3511,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -3525,7 +3525,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, required) - New short description for the message class.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `message_class_name` (string, required) - Message class name.
 - `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
@@ -3559,7 +3559,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `metadata_extension_name` (string, required) - MetadataExtension name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3610,7 +3610,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `application_component` (string, optional) - Application component (optional, e.g., BC-ABA)
 - `description` (string, optional) - Package description. If not provided, package_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name.
 - `package_type` (string, optional (default: development), one of: `development`, `structure`) - Package type: 'development' (default) or 'structure'
@@ -3631,7 +3631,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
 - `package_name` (string, required) - Package name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
@@ -3647,7 +3647,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -3663,7 +3663,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, required) - New description for the package.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package name. Package must already exist.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
@@ -3681,7 +3681,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Program name.
 
 ---
@@ -3711,7 +3711,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
 - `program_name` (string, required) - Program name.
@@ -3728,7 +3728,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Program name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3761,7 +3761,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Program name. Program must already exist.
 - `source_code` (string, required) - Complete ABAP program source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
@@ -3780,7 +3780,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Service binding name.
 
 ---
@@ -3797,7 +3797,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, optional (default: true)) - Activate the service binding after create, then read its service group. Default: true.
 - `binding_variant` (string, optional (default: ODATA_V4_UI), one of: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - ABAP package name.
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
@@ -3818,7 +3818,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
 - `service_binding_name` (string, required) - Service binding name to delete.
 - `transport_request` (string, optional) - Optional transport request for deletion transport flow.
@@ -3862,7 +3862,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `binding_variant` (string, required (default: ODATA_V4_UI), one of: `ODATA_V2_UI`, `ODATA_V2_WEB_API`, `ODATA_V4_UI`, `ODATA_V4_WEB_API`) - Service binding variant. Determines OData version for publish/unpublish routing.
 - `desired_publication_state` (string, required, one of: `published`, `unpublished`, `unchanged`) - Target publication state.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `response_format` (string, optional (default: xml), one of: `xml`, `json`, `plain`) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name to update.
 - `service_name` (string, required) - Published service name, from the binding. Required: an OData V2 publication job resolves the service by name and version and refuses without them. Ignored for V4, where the request names its target on its own.
@@ -3878,7 +3878,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Optional description used during validation.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - ABAP package of the binding, which the validation checks.
 - `service_binding_name` (string, required) - Service binding name to validate.
 - `service_binding_version` (string, optional) - Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.
@@ -3898,7 +3898,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Service definition name.
 
 ---
@@ -3914,7 +3914,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after creation. Default: true.
 - `description` (string, optional) - Service definition description. If not provided, service_definition_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
 - `service_definition_name` (string, required) - Service definition name.
@@ -3932,7 +3932,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `service_definition_name` (string, required) - ServiceDefinition name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -3965,7 +3965,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after update. Default: true.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `service_definition_name` (string, required) - Service definition name. Must exist in the system.
 - `source_code` (string, required) - Complete service definition source code.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
@@ -3984,7 +3984,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `structure_name` (string, required) - Structure name.
 
 ---
@@ -4015,7 +4015,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 - `description` (string, optional) - Structure description. If not provided, structure_name will be used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `fields` (array, required) - Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.
 - `includes` (array, optional) - Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
@@ -4034,7 +4034,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `structure_name` (string, required) - Structure name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -4068,7 +4068,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for structure. Example: '@EndUserText.label : \'My Structure\' @AbapCatalog.tableCategory : #TRANSPARENT define structure zz_s_test_001 { client : abap.clnt not null; id : abap.char(10); name : abap.char(255); }'
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `structure_name` (string, required) - Structure name. Structure must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -4079,14 +4079,14 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getpackagetree-high-level-system"></a>
 #### GetPackageTree (High-Level / System)
-**Description:** [read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Returns the complete tree of the ABAP package named by package_name: its subpackages and objects. Returns hierarchical tree with object names, types, and descriptions. Takes package_name (one package: its tree) or package_names (several packages: one entry per package, in the order given, each { package_name, tree, metadata } or { package_name, error }). Read in ADT batch envelopes: the active package metadata with the root node structure, then each level of the walk; with include_descriptions, as single requests, several at a time. Runs on an ABAP session of its own. By default the call gives back a run_handle at once, and the result is read by that handle; with background false the result comes in the call.
 
 **Source:** `src/handlers/system/high/handleGetPackageTree.ts`
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `debug` (boolean, optional (default: false)) - Include diagnostic metadata in response (counts, types, hierarchy info). Default: false
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include_descriptions` (boolean, optional (default: false)) - Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
@@ -4188,7 +4188,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_name` (string, required) - Table name.
 
 ---
@@ -4218,7 +4218,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, optional) - Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `master_language` (string, optional) - Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
 - `package_name` (string, required) - Package name
 - `table_name` (string, required) - Table name.
@@ -4235,7 +4235,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_name` (string, required) - Table name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -4269,7 +4269,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `activate` (boolean, optional) - Activate table after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for table. Example: '@EndUserText.label : \'My Table\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_name` (string, required) - Table name. Table must already exist.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
@@ -4285,7 +4285,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
 - `buffering` (object, optional) - Buffering; each field given replaces the stored one.
 - `data_class` (string, optional) - Data class. The value help lists APPL0 (master data), APPL1 (transaction data), APPL2 (organization and customizing) and DDIM, DFACT, DODS; SAP checks the value when the table is activated.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `load_unit` (string, optional) - Load unit.
 - `logging_enabled` (boolean, optional) - Whether changes to the table data are logged.
 - `sharing_type` (string, optional) - Sharing type.
@@ -4301,7 +4301,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
 - `buffering` (object, optional) - Buffering; each field given replaces the stored one.
 - `data_class` (string, optional) - Data class. The value help lists APPL0 (master data), APPL1 (transaction data), APPL2 (organization and customizing) and DDIM, DFACT, DODS; SAP checks the value when the table is activated.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `is_writable_by_amdp` (boolean, optional) - true allows AMDP writes; activation then needs buffering N, logging off and no replacement object.
 - `load_unit` (string, optional) - Load unit.
 - `logging_enabled` (boolean, optional) - Whether changes to the table data are logged.
@@ -4326,7 +4326,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `activate` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_type_name` (string, required) - Table type name.
 
 ---
@@ -4359,7 +4359,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
 - `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - Table type description. When left out, table_type_name is used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
 - `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
 - `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).
@@ -4380,7 +4380,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `delete` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `table_type_name` (string, required) - Table type name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
@@ -4414,7 +4414,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
 - `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - New table type description.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
 - `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
 - `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).
@@ -4436,7 +4436,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `headings` (object, optional) - The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
 - `object_kind` (string, required, one of: `program`, `function_group`, `class`) - Kind of object: program, function_group, class.
 - `object_name` (string, required) - Name of the program, function group or class.
@@ -4448,7 +4448,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters (`cloud`):**
 - `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `headings` (object, optional) - The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
 - `object_kind` (string, required, one of: `function_group`, `class`) - Kind of object: function_group, class.
 - `object_name` (string, required) - Name of the program, function group or class.
@@ -4470,7 +4470,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
@@ -4488,7 +4488,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `description` (string, required) - Transport request description (mandatory)
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `owner` (string, optional) - Transport owner (optional, defaults to current user)
 - `target_system` (string, optional) - Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'
 - `task_type` (string, optional (default: S), one of: `S`, `R`, `X`) - The type given to the request's task: S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.
@@ -4505,7 +4505,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `target_user` (string, required) - The user the task belongs to: an SAP user id (sent in upper case), e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
 - `task_type` (string, optional (default: S), one of: `S`, `R`, `X`) - S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).
 - `transport_number` (string, required) - The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.
@@ -4521,7 +4521,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `objects` (array, required) - The entries to move, at least one — each with object_name, object_type, position (in the source task) and an optional pgmid.
 - `target_number` (string, required) - Number of the transport task the entries move to.
 - `transport_number` (string, required) - Number of the transport task that holds the entries.
@@ -4537,7 +4537,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
@@ -4555,7 +4555,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_number` (string, required) - Number of the transport task to sort and compress.
 
 ---
@@ -4574,7 +4574,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `cds_view_name` (string, required) - CDS view under test (DDL source). Must be active and testable with test doubles.
 - `class_name` (string, required) - Name of the new global class that holds the tests.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `package_name` (string, required) - Package of the new test class.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable package.
@@ -4588,7 +4588,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/unit_test/high/handleCreateFunctionGroupUnitTest.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group that gets the tests. Must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -4602,7 +4602,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/unit_test/high/handleCreateProgramUnitTest.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Report that gets the tests. Must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -4619,7 +4619,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
@@ -4635,7 +4635,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
@@ -4650,7 +4650,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
@@ -4664,7 +4664,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `format` (string, optional, one of: `abapunit`, `junit`) - Result format: abapunit or junit.
 - `run_id` (string, required) - Run id a unit test run answered.
 - `with_navigation_uris` (boolean, optional) - Include navigation URIs in result if supported.
@@ -4680,7 +4680,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `duration` (object, optional) - Durations the run accepts.
 - `risk_level` (object, optional) - Risk levels the run accepts.
 - `scope` (object, optional) - Which tests the run covers. Assigned tests are test classes linked to the object by an ABAP Doc @testing relation (the tests of a CDS view are such).
@@ -4697,7 +4697,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `wait` (boolean, optional) - true (default): the call reads the run's status at once, and a run SAP answers running again by long polling, SAP holding each read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
 
 ---
@@ -4711,7 +4711,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group whose tests run.
 - `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
@@ -4728,7 +4728,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, optional) - Function group holding the function module; required by runner sync.
 - `function_module_name` (string, required) - Function module whose function group the tests run for.
 - `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
@@ -4746,7 +4746,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Report whose tests run.
 - `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
@@ -4764,7 +4764,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class whose tests run.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it. At raw: everything SAP sent for the call, in the order it was read.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `runner` (string, optional (default: async), one of: `async`, `sync`) - async (default): starts the run; wait decides whether the call returns the result once the run finished or the run_id right after the start; suited to long suites. sync: one request that returns the finished result, called with wait left out.
 - `scope` (object, optional) - Which tests the run covers, sent with either runner. Foreign tests are test classes linked to the object by an ABAP Doc @testing relation (a function module's tests are often linked so). With runner sync they execute only with foreign_tests true: with the defaults (foreign_tests false, add_foreign_tests_as_preview true) SAP lists them as a preview, unexecuted. Runner async executes them with the defaults as well.
 - `wait` (boolean, optional) - true (default): the call reads the run's status at once, and a run SAP answers running again by long polling, SAP holding each read until the run finishes, and returns the result of a run SAP answers finished, the call lasting as long as the run; a run SAP reports unstarted is read again by long polling, and a run that long-polled read reports unstarted returns the run_id and that status, and any other status is an error stating what SAP answered. false: the call answers the run_id right after the start, and the run's status and result are read by run_id. A long run under a client with a request time limit is started with false.
@@ -4781,7 +4781,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Test class of the CDS view. Must already exist.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
@@ -4794,7 +4794,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `function_group_name` (string, required) - Function group whose tests are replaced. Its test include must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -4808,7 +4808,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/unit_test/high/handleUpdateProgramUnitTest.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `program_name` (string, required) - Report whose tests are replaced. Its test include must already exist.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
@@ -4825,7 +4825,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `class_name` (string, required) - Class that holds the tests. Must already exist.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
 - `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
@@ -4844,7 +4844,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugCancel.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -4856,7 +4856,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugGetTable.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `query` (string, optional) - A SELECT over the variable.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 - `variable` (string, required) - The table variable to read.
@@ -4871,7 +4871,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `breakpoints` (array, required) - Lines in SQLScript methods of a class.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -4884,7 +4884,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `breakpoints` (array, required) - Lines in SQLScript methods of a class.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
 - `stop_existing` (boolean, optional (default: false)) - Ends an AMDP debug session of this user left behind.
 
@@ -4898,7 +4898,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `action` (string, required, one of: `over`, `continue`) - over runs the current statement, continue runs to the next stop.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -4910,7 +4910,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugStop.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -4922,7 +4922,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleAmdpDebugWait.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `hold_seconds` (number, optional (default: 10)) - Longest wait for a change, at most 30 seconds.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -4969,7 +4969,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugCreateMemorySnapshot.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -4982,7 +4982,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `condition` (string, optional) - Stops only when this ABAP condition holds.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Variable to watch; a path reaches a component.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -4996,7 +4996,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `breakpoint_id` (string, required) - Breakpoint id.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5008,7 +5008,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugDeleteWatchpoint.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 - `watchpoint_id` (string, required) - Watchpoint id.
 
@@ -5021,7 +5021,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugGetMemorySizes.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5033,7 +5033,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugGetStack.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5045,7 +5045,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugGetVariables.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `names` (array, optional) - Variables by name; a path reads a component or a table row.
 - `parents` (array, optional) - Instead of names: members of these scopes, objects or tables.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
@@ -5059,7 +5059,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugListBreakpoints.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5071,7 +5071,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugListWatchpoints.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5084,7 +5084,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `breakpoints` (array, required) - Breakpoints: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5098,7 +5098,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `background_rfc` (boolean, optional) - Debugs background RFC calls.
 - `create_exception_object` (boolean, optional) - Creates the exception object even where a CATCH does not ask for it.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `shared_object_debugging` (boolean, optional) - Debugs shared objects.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 - `system_debugging` (boolean, optional) - Steps into system programs and stops at breakpoints there.
@@ -5113,7 +5113,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugSetStackPosition.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `position` (integer, required) - Frame position as the stack numbers it; the stopped frame has the highest position.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -5126,7 +5126,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugSetVariable.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `name` (string, required) - Variable to set; a path reaches a component.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 - `value` (string, required) - New value; converted to the type by the system.
@@ -5142,7 +5142,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `breakpoints` (array, required) - Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
 - `debugging_mode` (string, optional, one of: `user`, `terminal`) - user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `request_user` (string, optional) - User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
 - `settings` (object, optional) - Debugger settings, applied after each attach; a field left out keeps its value.
@@ -5157,7 +5157,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 **Parameters:**
 - `action` (string, required, one of: `into`, `over`, `return`, `continue`, `detach`, `release_debugger`) - into enters the call, over runs it, return leaves the current one, continue runs to the next stop; detach lets the program run on, the listener and the breakpoints kept; release_debugger frees the debugger and the program runs on. detach and release_debugger apply to ABAP only.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5169,7 +5169,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugStepToLine.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `include` (string, optional) - For a class: definitions, implementations, macros or testclasses; the main source when omitted.
 - `line` (integer, required) - For a line: the line in the object source.
 - `mode` (string, required, one of: `run`, `jump`) - run executes up to the line; jump moves there without executing what lies between.
@@ -5187,7 +5187,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugStop.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5201,7 +5201,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Parameters:**
 - `breakpoints` (array, required) - Breakpoints, at least one: a line, an exception class, an ABAP statement or a message; a line breakpoint may carry a condition.
 - `debugging_mode` (string, optional, one of: `user`, `terminal`) - user (when omitted) catches the requests of the request user; terminal catches the requests that carry this debug session's ids and needs no configuration: the run it starts carries them, so without run it catches only requests carrying the same ids.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `request_user` (string, optional) - User mode: the SAP user whose requests are caught; the connected user when omitted. Debugging another user's requests needs the debug authorization for that user. Not taken in terminal mode.
 - `run` (object, optional) - A class (as a console application) or a report started in the background once listening; its outcome is reported as the end of the session.
 - `settings` (object, optional) - Debugger settings, applied after each attach; a field left out keeps its value.
@@ -5215,7 +5215,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugTerminate.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
 ---
@@ -5227,7 +5227,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleDebugWait.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `hold_seconds` (number, optional (default: 10)) - Longest wait for a change, at most 30 seconds.
 - `state_handle` (string, required) - Opaque handle identifying the server-held state this operation works on.
 
@@ -5240,7 +5240,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotDelta.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `from_id` (string, required) - Snapshot id to compare from.
 - `key` (string, optional) - Object key, for children and references.
 - `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
@@ -5256,7 +5256,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotGet.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `key` (string, optional) - Object key, for children and references.
 - `max_objects` (integer, optional (default: 50)) - Objects in a ranking, children or references answer.
 - `snapshot_id` (string, required) - Snapshot id.
@@ -5271,7 +5271,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 **Source:** `src/handlers/debugger/debug/handleMemorySnapshotList.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default) what a next call needs: the identifiers and a short description; "medium" every item the tool read, with its main properties; "full" the tool's whole answer; "raw" what SAP sent.
 - `user` (string, optional) - Only the snapshots of this SAP user.
 
 ---

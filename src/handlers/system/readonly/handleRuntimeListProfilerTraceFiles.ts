@@ -8,13 +8,14 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import {
   answered,
-  completeAnswer,
   type DetailTable,
+  entries,
   formatted,
-  identityOf,
   rawLevel,
   readingAt,
-  Written,
+  rows,
+  writeJson,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -51,47 +52,50 @@ function mediumEntry(entry: IAbapTraceEntry) {
  * raw the feed as ADT sent it.
  */
 /** Every trace the feed held, by its id. */
-const heldTraces = (entries: readonly IAbapTraceEntry[]) =>
-  entries.map((entry) => identityOf([entry.id]));
-
-// Every trace the feed held, or nothing (`completeAnswer`).
+// Every trace the feed held, written by the listing writers.
 const TRACE_READINGS: DetailTable<string | object> = {
   terse: formatted(
     profilerTraceEntries,
-    completeAnswer(
-      'RuntimeListProfilerTraceFiles',
-      heldTraces,
-      (entries: IAbapTraceEntry[]) =>
-        Written.text(
-          [
-            { head: 'count', value: String(entries.length) },
-            { header: ['id', 'recordedAt', 'objectName', 'state', 'runtime'] },
-            ...entries.map((entry) => ({
-              row: [
-                entry.id,
-                entry.recordedAt,
-                entry.objectName,
-                entry.state?.text ?? '',
-                String(entry.runtime),
-              ],
-            })),
-          ],
-          [0],
-        ),
-    ),
+    (entries: IAbapTraceEntry[]) =>
+      writeListing({
+        heads: [{ head: 'count', value: String(entries.length) }],
+        reading: { entries },
+        lists: {
+          entries: rows('entries', {
+            columns: [
+              { name: 'id', cell: (entry: IAbapTraceEntry) => entry.id },
+              {
+                name: 'recordedAt',
+                cell: (entry: IAbapTraceEntry) => entry.recordedAt,
+              },
+              {
+                name: 'objectName',
+                cell: (entry: IAbapTraceEntry) => entry.objectName,
+              },
+              {
+                name: 'state',
+                cell: (entry: IAbapTraceEntry) => entry.state?.text ?? '',
+              },
+              {
+                name: 'runtime',
+                cell: (entry: IAbapTraceEntry) => String(entry.runtime),
+              },
+            ],
+            header: 'always',
+          }),
+        },
+      }).answer,
   ),
   medium: formatted(
     profilerTraceEntries,
-    completeAnswer(
-      'RuntimeListProfilerTraceFiles',
-      heldTraces,
-      (entries: IAbapTraceEntry[]) =>
-        Written.json(
-          { success: true, count: entries.length },
-          { entries: entries.map(mediumEntry) },
-          ['id'],
-        ),
-    ),
+    (traces: IAbapTraceEntry[]) =>
+      writeJson(
+        { success: true, count: traces.length },
+        { entries: traces },
+        {
+          entries: entries('entries', mediumEntry),
+        },
+      ).answer,
   ),
   full: formatted(profilerTraceEntries, (entries: IAbapTraceEntry[]) => ({
     success: true,

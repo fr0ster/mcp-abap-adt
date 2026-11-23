@@ -259,6 +259,13 @@ row SAP answered is answered. `detail` has four levels:
   create's document and the request read back: at raw a failed read-back shows as the missing
   document, and the note naming the failure is at `terse`, `medium` and `full`.
 
+An answer is the complete result or an error, never a partial one. Each formatter that reshapes
+a reading reports the items it wrote, by the reading's own identity, and they are compared with every
+item the reading held — its entries, and the incomplete entries, not-loaded nodes and incomplete
+objects beside them. On any difference the call answers the error `incomplete_answer`, in fixed
+words that name the tool and ask for `detail: 'full'`, which gives the whole parse; `raw` gives the
+documents as ADT sent them.
+
 JSON answers are minified. A compact tool answers as the full tool it reads through, at every
 level.
 

@@ -58,6 +58,8 @@ import {
   type DetailLevel,
   identityOf,
   type Line,
+  type ListedPart,
+  listedText,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -941,46 +943,24 @@ function listAnswer(
     // its `# object` line, its usages as the single answer's rows, a
     // failure as one escaped `# error` line — a name cannot add a row.
     const reads = targets.map((target) => readsOf.get(target));
-    const answered = (i: number): WhereUsedRead | undefined =>
-      results[i]?.isError === true ? undefined : reads[i];
-    const text = completeAnswer(
+    const text = listedText(
       'GetWhereUsed',
-      () =>
-        results.flatMap((_result, i) => {
-          const read = answered(i);
-          return read === undefined ? [] : heldUsages(read);
-        }),
-      () =>
-        Written.sections(
-          results.flatMap((result, i) => {
-            const asked = objects[i];
-            const read = answered(i);
-            const head = Written.text(
-              [
-                {
-                  head: 'object',
-                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
-                },
-              ],
-              [],
-            );
-            return [
-              head,
-              read === undefined
-                ? Written.text(
-                    [
-                      {
-                        head: 'error',
-                        value: JSON.stringify(payloadOfAnswer(result)),
-                      },
-                    ],
-                    [],
-                  )
-                : whereUsedRows(read.result),
-            ];
-          }),
-        ),
-    )(undefined);
+      results.map((result, i): ListedPart<WhereUsedRead> => {
+        const asked = objects[i];
+        const heads = [
+          {
+            head: 'object',
+            value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+          },
+        ];
+        const read = reads[i];
+        return result.isError || read === undefined
+          ? { heads, error: JSON.stringify(payloadOfAnswer(result)) }
+          : { heads, read };
+      }),
+      heldUsages,
+      (read) => whereUsedRows(read.result),
+    );
     return { isError: false, content: [{ type: 'text', text }] };
   }
   const entries = results.map((result, i) => {

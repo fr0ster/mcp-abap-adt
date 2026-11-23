@@ -2,7 +2,7 @@
  * Byte-identical goldens for the move to completeness by construction (plan
  * step 9.2): each tool's answer at terse, medium and full, on fixed
  * documents, recorded by the code before the tool moved onto
- * `writeListing` (`npm test -- --env WRITE_TERSE_GOLDENS=1 <this file>`,
+ * `writeListing` (`npm run goldens:terse`, `scripts/write-terse-goldens.mjs`,
  * refused under CI) and reviewed in its diff. Every later change must leave
  * each answer equal; a change of an answer is recorded in the step that
  * makes it, named in its commit.
@@ -69,10 +69,13 @@ const FIXTURE_SOURCE = path.join(
 
 const DETAILS: readonly DetailLevel[] = ['terse', 'medium', 'full'];
 
-/** What a handler answered: its error flag and its text. */
+/**
+ * What a handler answered: its error flag and the text of each MCP content
+ * part, part for part — a boundary between parts is part of the answer.
+ */
 interface Answered {
   isError: boolean;
-  text: string;
+  parts: string[];
 }
 
 function answeredOf(result: {
@@ -81,7 +84,7 @@ function answeredOf(result: {
 }): Answered {
   return {
     isError: result.isError === true,
-    text: result.content.map((part) => part.text ?? '').join('\n'),
+    parts: result.content.map((part) => part.text ?? ''),
   };
 }
 
@@ -108,7 +111,14 @@ const level = (...entries: string[]) =>
 /** Every case: its name, and how to run it at one detail. */
 const CASES: Record<string, (detail: DetailLevel) => Promise<Answered>> = {};
 
-// GetObjectsByType takes no `detail`: its one answer, at each level the same.
+/**
+ * Every case with one answer, whatever the level — a tool that takes no
+ * `detail`, or a writer called directly: recorded once, under its name
+ * alone, so no level's label names an answer that level does not give.
+ */
+const SINGLE: Record<string, () => Promise<Answered>> = {};
+
+// GetObjectsByType takes no `detail`: its one answer.
 for (const [label, descriptions, data] of [
   [
     'objects, a nameless one, two nodes not loaded, descriptions',
@@ -130,7 +140,7 @@ for (const [label, descriptions, data] of [
   ],
   ['an empty level', true, level()],
 ] as const) {
-  CASES[`GetObjectsByType ${label}`] = async () =>
+  SINGLE[`GetObjectsByType ${label}`] = async () =>
     answeredOf(
       await handleGetObjectsByType(ctx([{ data }]) as never, {
         parent_name: 'ZPKG',
@@ -458,9 +468,9 @@ async function scanned(answer: 'objects' | 'lines' | 'snippets') {
 
 // SearchSource's terse rows (`searchSourceRows`), at each answer level.
 for (const answer of ['objects', 'lines', 'snippets'] as const) {
-  CASES[`SearchSource rows at ${answer}`] = async () => ({
+  SINGLE[`SearchSource rows at ${answer}`] = async () => ({
     isError: false,
-    text: searchSourceRows(await scanned(answer)),
+    parts: [searchSourceRows(await scanned(answer)).answer],
   });
 }
 
@@ -655,9 +665,9 @@ const FEEDS: readonly FeedShown[] = [
   },
 ];
 for (const shown of FEEDS) {
-  CASES[`RuntimeListFeeds terse ${shown.feed}`] = async () => ({
+  SINGLE[`RuntimeListFeeds terse ${shown.feed}`] = async () => ({
     isError: false,
-    text: terseFeedText(shown),
+    parts: [terseFeedText(shown).answer],
   });
 }
 
@@ -896,16 +906,18 @@ CASES[
 // The package tree the writers write (`assembleTree`): an object of a
 // package the tree never reaches goes under the root — every walked object
 // in it (plan 9.3).
-CASES['assembleTree an object of a package the tree does not reach'] =
+SINGLE['assembleTree an object of a package the tree does not reach'] =
   async () => ({
     isError: false,
-    text: JSON.stringify(
-      assembleTree('P', [
-        { name: 'SUB', type: 'DEVC/K', packageName: 'P' },
-        { name: 'ZA', type: 'CLAS/OC', packageName: 'SUB' },
-        { name: 'ZORPHAN', type: 'PROG/P', packageName: 'ELSEWHERE' },
-      ]),
-    ),
+    parts: [
+      JSON.stringify(
+        assembleTree('P', [
+          { name: 'SUB', type: 'DEVC/K', packageName: 'P' },
+          { name: 'ZA', type: 'CLAS/OC', packageName: 'SUB' },
+          { name: 'ZORPHAN', type: 'PROG/P', packageName: 'ELSEWHERE' },
+        ]),
+      ),
+    ],
   });
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
@@ -913,22 +925,30 @@ describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 reco
   const expected: Record<string, Answered> = fs.existsSync(FIXTURE_SOURCE)
     ? JSON.parse(fs.readFileSync(FIXTURE_SOURCE, 'utf8'))
     : {};
-  const answered: Record<string, Answered> = { ...expected };
+  // Only the keys of this run: a case removed or renamed leaves no stale
+  // golden behind.
+  const answered: Record<string, Answered> = {};
 
+  const check = (key: string, run: () => Promise<Answered>) =>
+    it(key, async () => {
+      const answer = await run();
+      answered[key] = answer;
+      if (!writing) assert.deepStrictEqual(answer, expected[key]);
+    });
   for (const [name, run] of Object.entries(CASES)) {
-    for (const detail of DETAILS) {
-      const key = `${name} @${detail}`;
-      it(key, async () => {
-        const answer = await run(detail);
-        answered[key] = answer;
-        if (!writing) assert.deepStrictEqual(answer, expected[key]);
-      });
-    }
+    for (const detail of DETAILS)
+      check(`${name} @${detail}`, () => run(detail));
   }
+  for (const [name, run] of Object.entries(SINGLE)) check(name, run);
 
   after(() => {
     if (!writing) return;
     if (process.env.CI) throw new Error('the goldens are not written under CI');
+    const every =
+      Object.keys(CASES).length * DETAILS.length + Object.keys(SINGLE).length;
+    if (Object.keys(answered).length !== every) {
+      throw new Error('the goldens are written only by a run of every case');
+    }
     fs.writeFileSync(FIXTURE_SOURCE, `${JSON.stringify(answered, null, 2)}\n`);
   });
 });

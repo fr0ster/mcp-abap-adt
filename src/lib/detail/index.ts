@@ -2,21 +2,10 @@
  * The detail mechanism every handler shares: `./levels` maps each level of
  * `detail` to the reading passed into the adt-clients member (selected before
  * the call), `./tsv` writes the terse list format, `./wire` answers
- * `raw` as what ADT sent, and `./complete` refuses an answer that does not
- * hold every item its reading held.
+ * `raw` as what ADT sent, and `./listing` writes every terse and medium
+ * list from the reading's own lists, complete by construction.
  */
 
-export {
-  completeAnswer,
-  IncompleteAnswerError,
-  identityOf,
-  incompleteAnswerWords,
-  type Line,
-  type ListedPart,
-  listedText,
-  type TextKey,
-  Written,
-} from './complete';
 export {
   type AnswerTable,
   answerAt,
@@ -56,6 +45,7 @@ export {
   type RowSpec,
   rows,
   sections,
+  Written,
   writeJson,
   writeJsonList,
   writeJsonRoot,

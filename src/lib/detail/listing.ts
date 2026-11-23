@@ -13,7 +13,24 @@
  *   rows to drop one; the writer writes every item it holds.
  */
 
-import { type Line, Written } from './complete';
+import { type Line, renderLines } from './complete';
+
+/** Only this module mints a written answer. */
+const mint: unique symbol = Symbol('written');
+
+/**
+ * An answer a listing writer wrote from the reading's own lists, complete
+ * by construction. Only the writers below make one: its constructor takes
+ * a token this module does not export.
+ */
+export class Written<A> {
+  constructor(
+    token: typeof mint,
+    readonly answer: A,
+  ) {
+    void token;
+  }
+}
 
 /**
  * One column: its name, and the cell of one item. `when` writes the cell
@@ -191,7 +208,7 @@ export function bullets<I, K extends string>(
       return itemsOf(reading, key).flatMap((item): Line[] => [
         options.synthetic?.(item) === true
           ? { bulletRoot: label(item), depth }
-          : { bullet: label(item), depth, identity: [] },
+          : { bullet: label(item), depth },
         ...(options.lists === undefined
           ? []
           : listLines(item, options.lists, depth + 1)),
@@ -385,7 +402,7 @@ export interface Listing<R> {
  * mark line, nothing chosen by the caller.
  */
 export function writeListing<R>(listing: Listing<R>): Written<string> {
-  return Written.text(listingLines(listing), []);
+  return new Written(mint, renderLines(listingLines(listing)));
 }
 
 /** A listing's lines: its heads, a tree's root row, then every list of the reading. */
@@ -520,7 +537,7 @@ export function writeJson<R, A extends object, B extends object>(
   after?: B | undefined,
 ): Written<A & Partial<B> & Record<string, readonly object[]>> {
   const members = jsonMembers(reading, lists);
-  return Written.answerOf({ ...rest, ...members, ...after, ...members });
+  return new Written(mint, { ...rest, ...members, ...after, ...members });
 }
 
 /** The only writer of a JSON array answer: one entry per item of the reading's list. */
@@ -528,7 +545,7 @@ export function writeJsonList<R, K extends ListKeys<R>, E extends object>(
   reading: R,
   list: JsonBound<R, K, E>,
 ): Written<readonly E[]> {
-  return Written.answerOf(list.write(reading) ?? []);
+  return new Written(mint, list.write(reading) ?? []);
 }
 
 /** The only writer of a JSON tree answer: the root's own members, then its lists through their schemas. */
@@ -537,7 +554,7 @@ export function writeJsonRoot<R>(
   entry: (root: R) => object,
   lists: JsonSchemas<R>,
 ): Written<object> {
-  return Written.answerOf({
+  return new Written(mint, {
     ...entry(reading),
     ...jsonMembers(reading, lists),
   });

@@ -11,14 +11,24 @@ import type { HeadShape, KindShape, ListShape } from '../detail';
 /** Only this module mints a fact. */
 const minted: unique symbol = Symbol('returns fact');
 
-/** One fact of what a tool gives back; only this module's factories make one. */
-export interface ReturnsFact {
-  readonly [minted]: true;
-  readonly text: string;
+/**
+ * One fact of what a tool gives back; only this module's factories make one
+ * — nominal, so no spread of one with other words is a fact.
+ */
+export class ReturnsFact {
+  readonly #fact = true;
+
+  constructor(
+    token: typeof minted,
+    readonly text: string,
+  ) {
+    void token;
+    void this.#fact;
+  }
 }
 
 function fact(text: string): ReturnsFact {
-  return { [minted]: true, text };
+  return new ReturnsFact(minted, text);
 }
 
 /** `text` with its first letter capitalised, ending with one full stop. */
@@ -71,13 +81,33 @@ function listFacts(shape: ListShape, seen: Set<object>): ReturnsFact[] {
     case 'kinds':
       return [
         ...(about === undefined ? [] : [fact(sentence(about))]),
-        ...shape.kinds.flatMap((kind: KindShape) =>
-          'omit' in kind
-            ? [fact(sentence(kind.omit))]
-            : 'lists' in kind
-              ? below(kind.lists)
-              : [],
-        ),
+        ...shape.kinds.flatMap((kind: KindShape): ReturnsFact[] => {
+          if ('omit' in kind) return [fact(sentence(kind.omit))];
+          // A row kind's cells, by their nouns — headerless or not.
+          const nouns =
+            'means' in kind
+              ? kind.means.flatMap((noun) => (noun === undefined ? [] : [noun]))
+              : [];
+          return [
+            ...(nouns.length > 0 && about !== undefined
+              ? [fact(sentence(`${about}: ${joined(nouns)}`))]
+              : []),
+            ...('lists' in kind ? below(kind.lists) : []),
+          ];
+        }),
+      ];
+    case 'parts':
+      // Each part's listing: what every declared variant writes, a tree's
+      // root by the part's own noun.
+      return [
+        ...(about === undefined ? [] : [fact(sentence(about))]),
+        ...shape.nested().flatMap((child) => {
+          if (seen.has(child)) return [];
+          seen.add(child);
+          return child.kind === 'node' && child.list === ''
+            ? rootFacts(child, about)
+            : listFacts(child, seen);
+        }),
       ];
     case 'bullets':
     case 'sections':
@@ -95,6 +125,17 @@ function listFacts(shape: ListShape, seen: Set<object>): ReturnsFact[] {
         ...('omits' in shape ? omits(shape.omits) : []),
       ];
   }
+}
+
+/** A part's tree root: its cells' nouns, under the part's own noun. */
+function rootFacts(shape: ListShape, about: string | undefined): ReturnsFact[] {
+  if (shape.kind !== 'node') return [];
+  const nouns = shape.means.flatMap((noun) =>
+    noun === undefined ? [] : [noun],
+  );
+  return nouns.length > 0 && about !== undefined
+    ? [fact(sentence(`${about}, its root: ${joined(nouns)}`))]
+    : [];
 }
 
 /**

@@ -406,7 +406,7 @@ describe('GetEnhancements terse, by default', () => {
     );
 
     const text: string = result.content[0].text;
-    assert.equal(result.isError, false);
+    assert.equal(result.isError, false, text);
     assert.deepStrictEqual(text.split('\n').slice(-2), [
       'name\ttype\tdescription',
       'Z_FIRST\tENHO/XHH\t',

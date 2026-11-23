@@ -5,7 +5,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 
 import type { AdtCodes } from '../adtProjections';
-import { type AnswerTable, completeAnswer, tsv } from '../detail';
+import { type AnswerTable, completeAnswer, Written } from '../detail';
 import {
   childNodesOf,
   type NodeItem,
@@ -112,36 +112,39 @@ export function functionGroupListAnswers(
   const held = (objects: NodeItem[]) => objects.map(identity);
   // Every child the node structure held, or nothing (`completeAnswer`).
   return {
-    terse: completeAnswer(tool, held, (objects: NodeItem[]) => {
-      const rows = objects.map((o) => ({
-        cells: [o.name, o.description ?? ''],
-        identity: identity(o),
-      }));
-      return {
-        answer: [
-          `# function_group ${functionGroupName}`,
-          `# total ${objects.length}`,
-          tsv(
-            ['name', 'description'],
-            rows.map((row) => row.cells),
-          ),
-        ].join('\n'),
-        rendered: rows.map((row) => row.identity),
-      };
-    }),
-    medium: completeAnswer(tool, held, (objects: NodeItem[]) => {
-      const kept = objects.map(({ uri: _uri, ...fields }) => fields);
-      return {
-        answer: {
-          function_group_name: functionGroupName,
-          total: objects.length,
-          [listKey]: kept,
-        },
-        // The uri leaves; a nameless child is still told apart by it.
-        rendered: kept.map((fields, i) =>
-          identity({ ...fields, uri: objects[i]?.uri }),
+    terse: completeAnswer(tool, held, (objects: NodeItem[]) =>
+      Written.lines([
+        `# function_group ${functionGroupName}`,
+        `# total ${objects.length}`,
+        Written.tsv(
+          ['name', 'description'],
+          objects.map((o) => ({
+            cells: [o.name, o.description ?? ''],
+            identity: identity(o),
+          })),
         ),
+      ]),
+    ),
+    // Every field the node structure read but the uri — kept for a child
+    // SAP listed without a name, what tells it apart; the children read
+    // from the answer written.
+    medium: completeAnswer(tool, held, (objects: NodeItem[]) => {
+      const kept = objects.map(({ uri, ...fields }) =>
+        fields.name === '' && uri !== undefined ? { ...fields, uri } : fields,
+      );
+      const answer: {
+        function_group_name: string;
+        total: number;
+      } & Partial<Record<typeof listKey, typeof kept>> = {
+        function_group_name: functionGroupName,
+        total: objects.length,
+        [listKey]: kept,
       };
+      return Written.list(
+        answer,
+        (written) => written[listKey] ?? [],
+        identity,
+      );
     }),
     full,
     raw: full,

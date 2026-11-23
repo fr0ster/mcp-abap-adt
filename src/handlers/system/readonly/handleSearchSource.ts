@@ -7,7 +7,8 @@ import {
   completeAnswer,
   type DetailLevel,
   groupedTsv,
-  type Rendered,
+  type ItemRow,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -184,36 +185,7 @@ function heldHits(result: OrchestratorResult): string[] {
   ];
 }
 
-function renderedRows(result: OrchestratorResult): Rendered<string> {
-  // The identity of each item, recorded where its line is written.
-  const rendered: string[] = [];
-  const head = [
-    `# scanned objects ${result.scanned.objects} sources ${result.scanned.sources} objects_with_hits ${result.scanned.objects_with_hits}`,
-    ...(result.truncated.by_object_cap ? ['# truncated by_object_cap'] : []),
-    ...(result.truncated.by_max_hits === true
-      ? ['# truncated by_max_hits']
-      : []),
-    ...(result.not_loaded ?? []).map((node) => {
-      rendered.push(`not-loaded|${node.package}|${node.type}`);
-      return `# not loaded by SAP ${node.package} ${node.type}`;
-    }),
-    // A target SAP listed without a name: never scanned, named by what tells
-    // it apart.
-    ...(result.incomplete ?? []).map((target) => {
-      rendered.push(
-        `incomplete|${target.package}|${target.type}|${target.tech_name ?? ''}|${target.uri ?? ''}`,
-      );
-      return [
-        '# incomplete',
-        target.package,
-        target.type,
-        ...(target.tech_name !== undefined
-          ? [`tech_name=${target.tech_name}`]
-          : []),
-        ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
-      ].join(' ');
-    }),
-  ];
+function renderedRows(result: OrchestratorResult): Written<string> {
   const first = result.results[0];
   const columns =
     first === undefined || 'line' in first
@@ -221,30 +193,55 @@ function renderedRows(result: OrchestratorResult): Rendered<string> {
         ? ['include', 'line', 'snippet']
         : ['include', 'line']
       : ['include', 'hits'];
-  const groups = new Map<string, string[][]>();
+  const groups = new Map<string, ItemRow[]>();
   for (const hit of result.results) {
     const key = `${hit.devclass} ${hit.object_type} ${hit.object_name}`;
     const rows = groups.get(key) ?? [];
-    rows.push(
-      'hits' in hit
-        ? [includeColumn(hit), String(hit.hits)]
-        : 'snippet' in hit
-          ? [includeColumn(hit), String(hit.line), hit.snippet]
-          : [includeColumn(hit), String(hit.line)],
-    );
-    rendered.push(hitIdentity(hit));
+    rows.push({
+      cells:
+        'hits' in hit
+          ? [includeColumn(hit), String(hit.hits)]
+          : 'snippet' in hit
+            ? [includeColumn(hit), String(hit.line), hit.snippet]
+            : [includeColumn(hit), String(hit.line)],
+      identity: hitIdentity(hit),
+    });
     groups.set(key, rows);
   }
-  return {
-    answer: [
-      ...head,
-      groupedTsv(
-        columns,
-        [...groups].map(([value, rows]) => ({ field: 'object', value, rows })),
+  return Written.lines([
+    `# scanned objects ${result.scanned.objects} sources ${result.scanned.sources} objects_with_hits ${result.scanned.objects_with_hits}`,
+    ...(result.truncated.by_object_cap ? ['# truncated by_object_cap'] : []),
+    ...(result.truncated.by_max_hits === true
+      ? ['# truncated by_max_hits']
+      : []),
+    ...(result.not_loaded ?? []).map((node) =>
+      Written.marked(
+        'not loaded by SAP',
+        [node.package, node.type],
+        `not-loaded|${node.package}|${node.type}`,
       ),
-    ].join('\n'),
-    rendered,
-  };
+    ),
+    // A target SAP listed without a name: never scanned, named by what tells
+    // it apart.
+    ...(result.incomplete ?? []).map((target) =>
+      Written.marked(
+        'incomplete',
+        [
+          target.package,
+          target.type,
+          ...(target.tech_name !== undefined
+            ? [`tech_name=${target.tech_name}`]
+            : []),
+          ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
+        ],
+        `incomplete|${target.package}|${target.type}|${target.tech_name ?? ''}|${target.uri ?? ''}`,
+      ),
+    ),
+    Written.groupedTsv(
+      columns,
+      [...groups].map(([value, rows]) => ({ field: 'object', value, rows })),
+    ),
+  ]);
 }
 
 /**

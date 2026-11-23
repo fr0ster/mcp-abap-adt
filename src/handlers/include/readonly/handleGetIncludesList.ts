@@ -41,8 +41,8 @@ import {
   answerAt,
   completeAnswer,
   type DetailLevel,
-  indentedTsv,
-  type TreeRow,
+  type TreeItemRow,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
@@ -322,7 +322,7 @@ interface IncludesRead {
 type IncludesShown = (read: IncludesRead) => string;
 
 /** The tree as indented rows: name, and `cyclic` or `duplicate` where it is so. */
-function includeRows(node: IncludeNode, depth = 0): TreeRow[] {
+function includeRows(node: IncludeNode, depth = 0): TreeItemRow[] {
   const mark =
     node.cyclic === true
       ? 'cyclic'
@@ -330,7 +330,11 @@ function includeRows(node: IncludeNode, depth = 0): TreeRow[] {
         ? 'duplicate'
         : '';
   return [
-    { depth, cells: mark === '' ? [node.name] : [node.name, mark] },
+    {
+      depth,
+      cells: mark === '' ? [node.name] : [node.name, mark],
+      identity: `include|${depth}|${node.name}`,
+    },
     ...node.children.flatMap((child) => includeRows(child, depth + 1)),
   ];
 }
@@ -385,38 +389,38 @@ const heldIncludes = (read: IncludesRead) => [
 
 // Every node and unreadable include, or nothing (`completeAnswer`).
 const INCLUDES_ANSWERS: AnswerTable<IncludesRead, string> = {
-  terse: completeAnswer('GetIncludesList', heldIncludes, (read) => {
-    const rows = includeRows(read.tree);
-    const unreadable = read.unreadable.map((entry) => String(entry.name ?? ''));
-    return {
-      answer: [
-        `# object ${read.object_type} ${read.object_name}`,
-        ...unreadable.map((name) => `# unreadable ${name}`),
-        indentedTsv(rows),
-      ].join('\n'),
-      rendered: [
-        ...rows.map((row) => `include|${row.depth}|${row.cells[0] ?? ''}`),
-        ...unreadable.map((name) => `unreadable|${name}`),
-      ],
-    };
-  }),
-  medium: completeAnswer('GetIncludesList', heldIncludes, (read) => {
-    const tree = mediumInclude(read.tree);
-    return {
-      answer: JSON.stringify({
-        object_name: read.object_name,
-        object_type: read.object_type,
-        tree,
-        ...(read.unreadable.length > 0 ? { unreadable: read.unreadable } : {}),
+  terse: completeAnswer('GetIncludesList', heldIncludes, (read) =>
+    Written.lines([
+      `# object ${read.object_type} ${read.object_name}`,
+      ...read.unreadable.map((entry) => {
+        const name = String(entry.name ?? '');
+        return Written.marked('unreadable', [name], `unreadable|${name}`);
       }),
-      rendered: [
-        ...treeIdentities(tree, (n) => n.children ?? []),
-        ...read.unreadable.map(
-          (entry) => `unreadable|${String(entry.name ?? '')}`,
-        ),
-      ],
-    };
-  }),
+      Written.indented(includeRows(read.tree)),
+    ]),
+  ),
+  // The nodes and the unreadable includes read from the answer written.
+  medium: completeAnswer('GetIncludesList', heldIncludes, (read) =>
+    Written.stringified(
+      Written.list(
+        {
+          object_name: read.object_name,
+          object_type: read.object_type,
+          tree: mediumInclude(read.tree),
+          ...(read.unreadable.length > 0
+            ? { unreadable: read.unreadable }
+            : {}),
+        },
+        (answer) => [
+          ...treeIdentities(answer.tree, (n) => n.children ?? []),
+          ...(answer.unreadable ?? []).map(
+            (entry) => `unreadable|${String(entry.name ?? '')}`,
+          ),
+        ],
+        (identity) => identity,
+      ),
+    ),
+  ),
   full: fullIncludes,
   raw: fullIncludes,
 };

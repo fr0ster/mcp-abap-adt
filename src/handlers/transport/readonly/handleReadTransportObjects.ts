@@ -41,11 +41,11 @@ import {
   type DetailTable,
   formatted,
   fullLevel,
-  type Rendered,
   rawLevel,
   readingAt,
   tsv,
   tsvRow,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -119,11 +119,10 @@ export function heldEntries(list: ITransportObjectEntryList): string[] {
 function transportRows(
   transportNumber: string,
   list: ITransportObjectEntryList,
-): Rendered<string> {
-  const rendered: string[] = [];
+): Written<string> {
   const entries = list.entries;
   const incomplete = list.incompleteEntries ?? [];
-  const lines = [
+  const lines: Array<string | Written<string>> = [
     `# transport ${transportNumber}`,
     `# count ${entries.length + incomplete.length}`,
     tsv(['type', 'name', 'position'], []),
@@ -142,21 +141,36 @@ function transportRows(
       pgmid = entryPgmid;
       lines.push(`# pgmid ${entryPgmid}`);
     }
-    lines.push(tsvRow([entry.type, entry.name, entry.position ?? '']));
-    rendered.push(entryIdentity(entry));
+    lines.push(
+      Written.row(
+        [entry.type, entry.name, entry.position ?? ''],
+        entryIdentity(entry),
+      ),
+    );
   }
   // An entry SAP lists without a name or a type: a line of every identity
   // field it carries, the ones it lacks absent.
   for (const entry of incomplete) {
     lines.push(
-      `# incomplete ${incompleteFields(entry)
-        .map(([field, value]) => `${field}=${value}`)
-        .join(' ')}`,
+      Written.marked(
+        'incomplete',
+        incompleteFields(entry).map(([field, value]) => `${field}=${value}`),
+        incompleteIdentity(entry),
+      ),
     );
-    rendered.push(incompleteIdentity(entry));
   }
-  return { answer: lines.join('\n'), rendered };
+  return Written.lines(lines);
 }
+
+/** An entry's identity as the medium answer writes it. */
+const writtenEntryIdentity = (o: ReadTransportEntry) =>
+  `entry|${o.task ?? ''}|${o.pgmid}|${o.type}|${o.name}|${o.position ?? ''}`;
+
+/** An incomplete entry's identity as the medium answer writes it: the fields it carries, in order. */
+const writtenIncompleteIdentity = (o: { [field: string]: string }) =>
+  `incomplete|${Object.entries(o)
+    .map(([field, value]) => `${field}=${value}`)
+    .join(' ')}`;
 
 /** An incomplete entry's identity fields that are present, in a fixed order. */
 function incompleteFields(
@@ -185,38 +199,42 @@ export async function handleReadTransportObjects(
   const mediumObjects = (list: ITransportObjectEntryList) => {
     const entries: readonly ITransportObjectEntry[] = list.entries;
     const incomplete = list.incompleteEntries ?? [];
-    return {
-      rendered: [
-        ...entries.map(entryIdentity),
-        ...incomplete.map(incompleteIdentity),
-      ],
-      answer: {
-        success: true,
-        transport_number: args.transport_number,
-        count: entries.length + incomplete.length,
-        ...(incomplete.length > 0
-          ? {
-              incomplete_objects: incomplete.map((entry) =>
-                Object.fromEntries(incompleteFields(entry)),
-              ),
-            }
-          : {}),
-        objects: entries.map(
-          (entry): ReadTransportEntry => ({
-            pgmid: entry.pgmid ?? 'R3TR',
-            type: entry.type,
-            name: entry.name,
-            // Optional, and said so: an entry the server described without one
-            // cannot be removed, and inventing an empty string would produce a
-            // call that answers 200 and removes nothing.
-            position: entry.position ?? null,
-            ...(entry.task ? { task: entry.task } : {}),
-            ...(entry.description ? { description: entry.description } : {}),
-            ...(entry.lockStatus ? { lock_status: entry.lockStatus } : {}),
-          }),
-        ),
-      },
+    const answer = {
+      success: true,
+      transport_number: args.transport_number,
+      count: entries.length + incomplete.length,
+      ...(incomplete.length > 0
+        ? {
+            incomplete_objects: incomplete.map((entry) =>
+              Object.fromEntries(incompleteFields(entry)),
+            ),
+          }
+        : {}),
+      objects: entries.map(
+        (entry): ReadTransportEntry => ({
+          pgmid: entry.pgmid ?? 'R3TR',
+          type: entry.type,
+          name: entry.name,
+          // Optional, and said so: an entry the server described without one
+          // cannot be removed, and inventing an empty string would produce a
+          // call that answers 200 and removes nothing.
+          position: entry.position ?? null,
+          ...(entry.task ? { task: entry.task } : {}),
+          ...(entry.description ? { description: entry.description } : {}),
+          ...(entry.lockStatus ? { lock_status: entry.lockStatus } : {}),
+        }),
+      ),
     };
+    // The items read from the answer itself: its objects and its
+    // incomplete ones.
+    return Written.list(
+      answer,
+      (written) => [
+        ...written.objects.map(writtenEntryIdentity),
+        ...(written.incomplete_objects ?? []).map(writtenIncompleteIdentity),
+      ],
+      (identity: string) => identity,
+    );
   };
 
   // What the entries answer at each level: the reading the slot is given,

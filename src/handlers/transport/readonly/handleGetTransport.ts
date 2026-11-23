@@ -47,9 +47,9 @@ import {
   type DetailTable,
   formatted,
   fullLevel,
-  type Rendered,
   rawLevel,
   readingAt,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AnswerObject } from '../../../lib/json';
@@ -104,13 +104,12 @@ interface TerseOptions {
  * count of its objects; no object is listed.
  */
 function terseRequest(item: ITransportRequestItem, options: TerseOptions) {
-  const request = item.header;
-  const answer = terseRequestAnswer(item, options);
-  // Tasks left out at the caller's choice are represented by their count.
-  const rendered = options.includeTasks
-    ? (answer.tasks ?? []).map((task) => `task|${task.number}`)
-    : heldItems(item);
-  return { answer, rendered };
+  // The tasks read from the answer itself.
+  return Written.list(
+    terseRequestAnswer(item, options),
+    (answer) => answer.tasks ?? [],
+    (task) => `task|${task.number}`,
+  );
 }
 
 function terseRequestAnswer(
@@ -148,30 +147,34 @@ function terseRequestAnswer(
  * position (`LIMU` or `R3TR` decides what a move or a removal addresses).
  */
 function terseTask(item: ITransportTaskItem, options: TerseOptions) {
-  const answer = terseTaskAnswer(item, options);
-  // Objects left out at the caller's choice are represented by their count.
-  const rendered = options.includeObjects
-    ? [
-        ...(answer.objects ?? []).map(
-          (o) =>
-            `object|${o.pgmid ?? ''}|${o.type}|${o.name}|${o.position ?? ''}`,
-        ),
-        ...(answer.incomplete_objects ?? []).map(
-          (o) => `incomplete|${JSON.stringify(o)}`,
-        ),
-      ]
-    : heldItems(item);
-  return { answer, rendered };
+  // The objects and the incomplete ones, read from the answer itself.
+  return Written.list(
+    terseTaskAnswer(item, options),
+    (answer) => [
+      ...(answer.objects ?? []).map(
+        (o) =>
+          `object|${o.pgmid ?? ''}|${o.type}|${o.name}|${o.position ?? ''}`,
+      ),
+      ...(answer.incomplete_objects ?? []).map(
+        (o) => `incomplete|${JSON.stringify(o)}`,
+      ),
+    ],
+    (identity) => identity,
+  );
 }
 
 /**
- * Every item a transport's reading holds: a request's tasks, or a task's
- * objects and the entries it lists without a name or a type.
+ * Every item a transport's answer must list: a request's tasks, or a task's
+ * objects and the entries it lists without a name or a type — none when
+ * the caller asked for their count alone (`include_tasks` or
+ * `include_objects` false).
  */
-function heldItems(item: ITransportItem): string[] {
+function heldItems(item: ITransportItem, options: TerseOptions): string[] {
   if (item.kind === 'request') {
+    if (!options.includeTasks) return [];
     return item.tasks.map((task) => `task|${task.header.number}`);
   }
+  if (!options.includeObjects) return [];
   return [
     ...item.objects.map(
       (o) => `object|${o.pgmid ?? ''}|${o.type}|${o.name}|${o.position ?? ''}`,
@@ -278,8 +281,8 @@ function transportReadings(options: TerseOptions): DetailTable<TransportRead> {
           ? undefined
           : completeAnswer(
               'GetTransport',
-              heldItems,
-              (held: ITransportItem): Rendered<AnswerObject> =>
+              (held: ITransportItem) => heldItems(held, options),
+              (held: ITransportItem): Written<AnswerObject> =>
                 held.kind === 'task'
                   ? terseTask(held, options)
                   : terseRequest(held, options),

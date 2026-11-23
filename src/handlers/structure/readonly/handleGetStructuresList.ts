@@ -23,8 +23,8 @@ import {
   answerAt,
   completeAnswer,
   type DetailLevel,
-  indentedTsv,
-  type TreeRow,
+  type TreeItemRow,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
@@ -284,7 +284,7 @@ interface StructuresRead {
 type StructuresShown = (read: StructuresRead) => string;
 
 /** The tree as indented rows: structure, kind, the component it is under. */
-function structureRows(node: StructureNode, depth = 0): TreeRow[] {
+function structureRows(node: StructureNode, depth = 0): TreeItemRow[] {
   const marks = [
     ...(node.cyclic === true ? ['cyclic'] : []),
     ...(node.error !== undefined ? ['not read'] : []),
@@ -293,6 +293,7 @@ function structureRows(node: StructureNode, depth = 0): TreeRow[] {
     {
       depth,
       cells: [node.structure, node.kind, node.attribute ?? '', ...marks],
+      identity: `structure|${depth}|${node.structure}|${node.kind}|${node.attribute ?? ''}`,
     },
     ...node.children.flatMap((child) => structureRows(child, depth + 1)),
   ];
@@ -339,29 +340,21 @@ const heldStructures = (read: StructuresRead) => [
 // Every node and unread candidate, or nothing (`completeAnswer`); medium
 // and full write the tree whole.
 const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
-  terse: completeAnswer('GetStructuresList', heldStructures, (read) => {
-    const rows = structureRows(read.tree);
-    return {
-      answer: [
-        `# structure ${read.structure_name}`,
-        ...(read.appends_unavailable ? ['# appends_unavailable'] : []),
-        // Each candidate SAP refused to read, by name: the one to read again.
-        ...read.append_candidates_unread.map(
-          (unread) => `# append_candidate_unread ${unread.candidate}`,
+  terse: completeAnswer('GetStructuresList', heldStructures, (read) =>
+    Written.lines([
+      `# structure ${read.structure_name}`,
+      ...(read.appends_unavailable ? ['# appends_unavailable'] : []),
+      // Each candidate SAP refused to read, by name: the one to read again.
+      ...read.append_candidates_unread.map((unread) =>
+        Written.marked(
+          'append_candidate_unread',
+          [unread.candidate],
+          `unread|${unread.candidate}`,
         ),
-        indentedTsv(rows),
-      ].join('\n'),
-      rendered: [
-        ...rows.map(
-          (row) =>
-            `structure|${row.depth}|${row.cells[0] ?? ''}|${row.cells[1] ?? ''}|${row.cells[2] ?? ''}`,
-        ),
-        ...read.append_candidates_unread.map(
-          (unread) => `unread|${unread.candidate}`,
-        ),
-      ],
-    };
-  }),
+      ),
+      Written.indented(structureRows(read.tree)),
+    ]),
+  ),
   medium: fullStructures,
   full: fullStructures,
   raw: fullStructures,

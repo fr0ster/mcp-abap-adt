@@ -38,8 +38,8 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  type Rendered,
   tsv,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -801,37 +801,34 @@ interface EnhancementsShown {
 }
 
 /** One object's terse lines: its `# object` line, then its rows. */
-function terseObjectLines(
-  response: EnhancementResponse,
-  rendered: string[],
-): string[] {
-  const lines = [
+function terseObjectLines(response: EnhancementResponse): Written<string> {
+  return Written.lines([
     `# object ${response.object_type} ${response.object_name}`,
     ...(response.context ? [`# context ${response.context}`] : []),
     `# count ${response.enhancements.length}`,
-  ];
-  if (response.enhancements.length > 0) {
-    lines.push(
-      tsv(
-        ['name', 'type', 'description'],
-        response.enhancements.map((enh) => {
-          rendered.push(enhancementIdentity(response, enh));
-          return [
-            enh.name,
-            enh.type,
-            (enh.description ?? '').split('\n')[0] ?? '',
-          ];
-        }),
+    ...(response.enhancements.length > 0
+      ? [
+          Written.tsv(
+            ['name', 'type', 'description'],
+            response.enhancements.map((enh) => ({
+              cells: [
+                enh.name,
+                enh.type,
+                (enh.description ?? '').split('\n')[0] ?? '',
+              ],
+              identity: enhancementIdentity(response, enh),
+            })),
+          ),
+        ]
+      : []),
+    ...(response.unreadable ?? []).map((entry) =>
+      Written.marked(
+        'unreadable',
+        [JSON.stringify(entry)],
+        `unreadable|${response.object_name}|${JSON.stringify(entry)}`,
       ),
-    );
-  }
-  for (const entry of response.unreadable ?? []) {
-    lines.push(`# unreadable ${JSON.stringify(entry)}`);
-    rendered.push(
-      `unreadable|${response.object_name}|${JSON.stringify(entry)}`,
-    );
-  }
-  return lines;
+    ),
+  ]);
 }
 
 /** An enhancement's identity: the object it enhances, its name and type. */
@@ -884,27 +881,20 @@ const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
                   (unread) => `include_unread|${JSON.stringify(unread)}`,
                 ),
               ],
-        ({ read }: EnhancementsShown): Rendered<string> => {
-          const rendered: string[] = [];
-          if (read.kind === 'single') {
-            return {
-              answer: terseObjectLines(read.response, rendered).join('\n'),
-              rendered,
-            };
-          }
-          const nested = read.response;
-          const answer = [
-            `# total ${nested.total_enhancements_found}`,
-            ...nested.objects.flatMap((object) =>
-              terseObjectLines(object, rendered),
-            ),
-            ...(nested.includes_unread ?? []).map((unread) => {
-              rendered.push(`include_unread|${JSON.stringify(unread)}`);
-              return `# include_unread ${JSON.stringify(unread)}`;
-            }),
-          ].join('\n');
-          return { answer, rendered };
-        },
+        ({ read }: EnhancementsShown): Written<string> =>
+          read.kind === 'single'
+            ? terseObjectLines(read.response)
+            : Written.lines([
+                `# total ${read.response.total_enhancements_found}`,
+                ...read.response.objects.map(terseObjectLines),
+                ...(read.response.includes_unread ?? []).map((unread) =>
+                  Written.marked(
+                    'include_unread',
+                    [JSON.stringify(unread)],
+                    `include_unread|${JSON.stringify(unread)}`,
+                  ),
+                ),
+              ]),
       ),
       medium: former,
       full: former,

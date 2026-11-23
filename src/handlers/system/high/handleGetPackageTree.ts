@@ -23,8 +23,8 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  indentedTsv,
-  type TreeRow,
+  type TreeItemRow,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -397,11 +397,12 @@ function treeRows(
   node: PackageNode,
   descriptions: boolean,
   depth = 0,
-): Array<TreeRow & { identity: string }> {
+): TreeItemRow[] {
   return [
     {
       depth,
-      identity: nodeIdentity(node),
+      // The package asked is the tree's root, no item of it.
+      identity: depth === 0 ? '' : nodeIdentity(node),
       // An object SAP listed without a name: its technical name and URI
       // after its type and empty name, what tells it apart.
       cells: [
@@ -465,19 +466,6 @@ const TOOL = 'GetPackageTree';
 /** Every item the walk held, each by its identity. */
 const heldItems = ({ walked }: TreeAnswerRead) => walked.map(walkedIdentity);
 
-/** The identities of a tree's nodes below its root, depth first. */
-function belowRoot<N extends { children?: N[] | undefined }>(
-  root: N,
-  identityOf: (node: N) => string,
-): string[] {
-  const below = (node: N): string[] =>
-    (node.children ?? []).flatMap((child) => [
-      identityOf(child),
-      ...below(child),
-    ]);
-  return below(root);
-}
-
 /** A tree node's identity, the walk's (`walkedIdentity`). */
 const nodeIdentity = (node: PackageNode) => walkedIdentity(node);
 
@@ -485,20 +473,19 @@ const nodeIdentity = (node: PackageNode) => walkedIdentity(node);
 const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
   // With include_descriptions, each row's description beside its type and
   // name.
-  terse: completeAnswer(TOOL, heldItems, ({ packageName, walked, options }) => {
-    const tree = assembleTree(packageName, walked);
-    const rows = treeRows(tree, options.includeDescriptions);
-    return {
-      answer: indentedTsv(rows),
-      // The rows below the package's own, by the node each was written of.
-      rendered: rows.slice(1).map((row) => row.identity),
-    };
-  }),
-  medium: completeAnswer(TOOL, heldItems, ({ packageName, walked }) => {
-    const answer = mediumNode(assembleTree(packageName, walked));
-    return {
-      answer,
-      rendered: belowRoot(answer, (node) =>
+  // The package's own row is no item: the rows below it are.
+  terse: completeAnswer(TOOL, heldItems, ({ packageName, walked, options }) =>
+    Written.indented(
+      treeRows(assembleTree(packageName, walked), options.includeDescriptions),
+    ),
+  ),
+  // The nodes read from the tree written, below its root.
+  medium: completeAnswer(TOOL, heldItems, ({ packageName, walked }) =>
+    Written.tree(
+      mediumNode(assembleTree(packageName, walked)),
+      (answer) => answer,
+      (node) => node.children ?? [],
+      (node) =>
         walkedIdentity({
           type: node.type,
           name: node.name,
@@ -506,13 +493,18 @@ const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
           uri: node.uri,
           notLoaded: node.not_loaded,
         }),
-      ),
-    };
-  }),
-  full: completeAnswer(TOOL, heldItems, ({ packageName, walked, options }) => {
-    const answer = treeOf(packageName, walked, options);
-    return { answer, rendered: belowRoot(answer.tree, nodeIdentity) };
-  }),
+      false,
+    ),
+  ),
+  full: completeAnswer(TOOL, heldItems, ({ packageName, walked, options }) =>
+    Written.tree(
+      treeOf(packageName, walked, options),
+      (answer) => answer.tree,
+      (node) => node.children ?? [],
+      nodeIdentity,
+      false,
+    ),
+  ),
   raw: ({ packageName, walked, options }) =>
     treeOf(packageName, walked, options),
 };

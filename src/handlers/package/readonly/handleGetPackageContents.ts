@@ -14,8 +14,8 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  groupedTsv,
-  type Rendered,
+  type ItemRow,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
@@ -171,9 +171,8 @@ function contentsRendered(
   packageName: string,
   items: readonly WalkedItem[],
   descriptions: boolean,
-): Rendered<string> {
-  const rendered: string[] = [];
-  const groups = new Map<string, string[][]>();
+): Written<string> {
+  const groups = new Map<string, ItemRow[]>();
   for (const item of items) {
     const owner = (item.packageName ?? packageName).toUpperCase();
     const rows = groups.get(owner) ?? [];
@@ -187,21 +186,20 @@ function contentsRendered(
         ? item.techName
         : '';
     const uri = item.name === '' ? (item.uri ?? '') : '';
-    rows.push(
-      descriptions
+    rows.push({
+      cells: descriptions
         ? [item.type, item.name, techName, uri, item.description ?? '']
         : [item.type, item.name, techName, uri],
-    );
-    rendered.push(walkedIdentity(item));
+      identity: walkedIdentity(item),
+    });
     groups.set(owner, rows);
   }
-  const answer = groupedTsv(
+  return Written.groupedTsv(
     descriptions
       ? ['type', 'name', 'tech_name', 'uri', 'description']
       : ['type', 'name', 'tech_name', 'uri'],
     [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
   );
-  return { answer, rendered };
 }
 
 /** Each item through `each`, guarded: every item the walk held, or nothing. */
@@ -209,10 +207,10 @@ function everyItem<A>(
   each: (item: WalkedItem) => A,
   identityOf: (answered: A) => string,
 ) {
-  return completeAnswer(TOOL, heldItems, (items: readonly WalkedItem[]) => {
-    const answer = items.map(each);
-    return { answer, rendered: answer.map(identityOf) };
-  });
+  // The items read from the list written.
+  return completeAnswer(TOOL, heldItems, (items: readonly WalkedItem[]) =>
+    Written.list(items.map(each), (answer) => answer, identityOf),
+  );
 }
 
 /** Every field the walk read of an object, without its uri. */

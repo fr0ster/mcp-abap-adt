@@ -56,8 +56,8 @@ import {
   answerAt,
   completeAnswer,
   type DetailLevel,
-  groupedTsv,
-  type Rendered,
+  type ItemRow,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
@@ -348,12 +348,18 @@ interface WhereUsedRead {
   args: WhereUsedArgs;
 }
 
-/** The answer GetWhereUsed gave before `detail`: `full`. */
-function fullWhereUsed(
+/** {@link fullWhereUsed} as the JSON value the cache keeps. */
+function fullWhereUsedJson(
   result: WhereUsedListResult,
   args: WhereUsedArgs,
 ): JsonValue {
-  return jsonFields({
+  const full = fullWhereUsed(result, args);
+  return jsonFields({ ...full, references: full.references.map(jsonFields) });
+}
+
+/** The answer GetWhereUsed gave before `detail`: `full`. */
+function fullWhereUsed(result: WhereUsedListResult, args: WhereUsedArgs) {
+  return {
     object_name: args.object_name,
     object_type: args.object_type,
     container: args.container,
@@ -362,8 +368,8 @@ function fullWhereUsed(
     disable_types: args.disable_types,
     total_references: result.totalReferences,
     result_description: result.resultDescription,
-    references: result.references.map(jsonFields),
-  });
+    references: result.references,
+  };
 }
 
 /**
@@ -372,32 +378,30 @@ function fullWhereUsed(
  * tree carry none, and leave — each usage names its package on the group
  * line. Every usage is answered: nothing is cut.
  */
-function whereUsedRows(result: WhereUsedListResult): Rendered<string> {
-  const rendered: string[] = [];
-  const groups = new Map<string, string[][]>();
+function whereUsedRows(result: WhereUsedListResult): Written<string> {
+  const groups = new Map<string, ItemRow[]>();
   for (const reference of result.references) {
     const usage = reference.usage_information;
     if (usage === undefined) continue;
-    rendered.push(referenceIdentity(reference));
     const pkg = reference.package_name ?? '';
     const rows = groups.get(pkg) ?? [];
-    rows.push([
-      reference.type,
-      reference.name,
-      usage === COMMON_USAGE ? '' : usage,
-    ]);
+    rows.push({
+      cells: [
+        reference.type,
+        reference.name,
+        usage === COMMON_USAGE ? '' : usage,
+      ],
+      identity: referenceIdentity(reference),
+    });
     groups.set(pkg, rows);
   }
-  return {
-    answer: [
-      `# total ${result.totalReferences}`,
-      groupedTsv(
-        ['type', 'name', 'usage'],
-        [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
-      ),
-    ].join('\n'),
-    rendered,
-  };
+  return Written.lines([
+    `# total ${result.totalReferences}`,
+    Written.groupedTsv(
+      ['type', 'name', 'usage'],
+      [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
+    ),
+  ]);
 }
 
 /** A reference's identity: its type, name and package (each counted as often as it comes). */
@@ -427,29 +431,31 @@ const heldReferences = ({ result }: WhereUsedRead) =>
  * `utilWhereUsedReferences` (the util set's where-used slot), package nodes
  * kept.
  */
-const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, JsonValue> = {
+const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, string | object> = {
   // Every usage (terse) or reference (medium, full), or nothing
   // (`completeAnswer`).
   terse: completeAnswer('GetWhereUsed', heldUsages, ({ result }) =>
     whereUsedRows(result),
   ),
-  medium: completeAnswer('GetWhereUsed', heldReferences, ({ result }) => {
-    const references = result.references.map(
-      ({ uri: _uri, ...fields }) => fields,
-    );
-    return {
-      answer: jsonFields({
+  // The references read from the answer written.
+  medium: completeAnswer('GetWhereUsed', heldReferences, ({ result }) =>
+    Written.list(
+      {
         total_references: result.totalReferences,
         result_description: result.resultDescription,
-        references: references.map(jsonFields),
-      }),
-      rendered: references.map(referenceIdentity),
-    };
-  }),
-  full: completeAnswer('GetWhereUsed', heldReferences, ({ result, args }) => ({
-    answer: fullWhereUsed(result, args),
-    rendered: result.references.map(referenceIdentity),
-  })),
+        references: result.references.map(({ uri: _uri, ...fields }) => fields),
+      },
+      (answer) => answer.references,
+      referenceIdentity,
+    ),
+  ),
+  full: completeAnswer('GetWhereUsed', heldReferences, ({ result, args }) =>
+    Written.list(
+      fullWhereUsed(result, args),
+      (answer) => answer.references,
+      referenceIdentity,
+    ),
+  ),
   raw: ({ result }) => result.document,
 };
 
@@ -540,7 +546,7 @@ async function whereUsedOf(
       // The cache keeps the full answer, whatever the level answered.
       objectsListCache.setCache({
         isError: false,
-        content: [{ type: 'json', json: fullWhereUsed(result, typedArgs) }],
+        content: [{ type: 'json', json: fullWhereUsedJson(result, typedArgs) }],
       });
       return shown({ result, args: typedArgs });
     },
@@ -657,7 +663,7 @@ async function whereUsedFromAnswers(
       // The cache keeps the full answer, whatever the level answered.
       objectsListCache.setCache({
         isError: false,
-        content: [{ type: 'json', json: fullWhereUsed(result, typedArgs) }],
+        content: [{ type: 'json', json: fullWhereUsedJson(result, typedArgs) }],
       });
       return shown({ result, args: typedArgs });
     },

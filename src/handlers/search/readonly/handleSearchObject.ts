@@ -13,10 +13,10 @@ import {
   type DetailTable,
   formatted,
   fullLevel,
-  type Rendered,
   rawLevel,
   readingAt,
   structuredValue,
+  Written,
 } from '../../../lib/detail';
 import {
   onEveryVariant,
@@ -111,17 +111,17 @@ export const TOOL_DEFINITION = {
  * migration: a header and one line per hit, the code as SAP sent it, known
  * or not; no hit answers nothing.
  */
-function hitLines(hits: readonly ISearchResult[]): Rendered<string> {
-  if (hits.length === 0) return { answer: '', rendered: [] };
-  const lines = ['name\ttype\tdescription\tpackage'];
-  const rendered: string[] = [];
-  for (const h of hits) {
-    lines.push(
-      `${h.name}\t${h.type ?? h.unknownType}\t${h.description}\t${h.packageName ?? ''}`,
-    );
-    rendered.push(hitIdentity(h));
-  }
-  return { answer: lines.join('\n'), rendered };
+function hitLines(hits: readonly ISearchResult[]): Written<string> {
+  if (hits.length === 0) return Written.lines([]);
+  return Written.lines([
+    'name\ttype\tdescription\tpackage',
+    ...hits.map((h) =>
+      Written.row(
+        [h.name, h.type ?? h.unknownType, h.description, h.packageName ?? ''],
+        hitIdentity(h),
+      ),
+    ),
+  ]);
 }
 
 /** A hit's identity: its type (the code SAP sent, known or not) and name. */

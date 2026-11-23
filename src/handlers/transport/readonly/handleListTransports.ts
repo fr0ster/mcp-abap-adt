@@ -19,10 +19,10 @@ import {
   type DetailTable,
   formatted,
   fullLevel,
-  type Rendered,
   rawLevel,
   readingAt,
   tsv,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -161,10 +161,6 @@ export function heldRequests(tree: ITransportTree): string[] {
   return held;
 }
 
-/** The identities of the requests an answer lists. */
-const listedIdentities = (transports: readonly TransportEntry[]) =>
-  transports.map((t) => `request|${t.number}`);
-
 /** A listing document's requests — for the #168 regression guard, which asserts against raw XML. */
 export function parseTransportListXml(xmlData: string): TransportEntry[] {
   return listedTransports(
@@ -192,36 +188,30 @@ type ListAnswer = ListedAnswer | XmlNode | string;
 const LIST_READINGS: DetailTable<ListAnswer> = (() => {
   const listed = listedTransports;
   // Every request the listing holds, or nothing (`completeAnswer`).
-  const every = <A>(render: (tree: ITransportTree) => Rendered<A>) =>
+  const every = <A>(render: (tree: ITransportTree) => Written<A>) =>
     completeAnswer('ListTransports', heldRequests, render);
   return {
     terse: formatted(
       listingOf,
       every((tree) => {
         const transports = listed(tree);
-        // The identity of each request, recorded where its row is written.
-        const rendered: string[] = [];
-        const rows = transports.map((t) => {
-          rendered.push(`request|${t.number}`);
-          return [
-            t.number,
-            t.type ?? '',
-            t.status ?? '',
-            t.owner ?? '',
-            t.target ?? '',
-            t.description ?? '',
-          ];
-        });
-        return {
-          rendered,
-          answer: [
-            `# count ${transports.length}`,
-            tsv(
-              ['number', 'type', 'status', 'owner', 'target', 'description'],
-              rows,
-            ),
-          ].join('\n'),
-        };
+        return Written.lines([
+          `# count ${transports.length}`,
+          Written.tsv(
+            ['number', 'type', 'status', 'owner', 'target', 'description'],
+            transports.map((t) => ({
+              cells: [
+                t.number,
+                t.type ?? '',
+                t.status ?? '',
+                t.owner ?? '',
+                t.target ?? '',
+                t.description ?? '',
+              ],
+              identity: `request|${t.number}`,
+            })),
+          ),
+        ]);
       }),
     ),
     medium: formatted(
@@ -233,7 +223,12 @@ const LIST_READINGS: DetailTable<ListAnswer> = (() => {
           count: transports.length,
           transports,
         };
-        return { rendered: listedIdentities(transports), answer: listedAnswer };
+        // The requests read from the answer itself.
+        return Written.list(
+          listedAnswer,
+          (written) => written.transports,
+          (t) => `request|${t.number}`,
+        );
       }),
     ),
     full: fullLevel,

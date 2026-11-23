@@ -18,10 +18,10 @@ import {
   type DetailTable,
   formatted,
   fullLevel,
-  type Rendered,
   rawLevel,
   readingAt,
   tsv,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -70,10 +70,12 @@ function refOf(object: IInactiveObject): InactiveObjectRef {
 /** The list as the tool answers it at terse and medium. */
 function inactiveAnswer(read: IInactiveObjectsResponse) {
   const objects = read.objects.map(refOf);
-  return {
-    answer: { success: true, count: objects.length, objects },
-    rendered: objects.map(refIdentity),
-  };
+  // The objects read from the answer written.
+  return Written.list(
+    { success: true, count: objects.length, objects },
+    (answer) => answer.objects,
+    refIdentity,
+  );
 }
 
 /** An object's identity: its type, name and parent. */
@@ -85,18 +87,18 @@ const heldInactive = (read: IInactiveObjectsResponse) =>
   read.objects.map(refOf).map(refIdentity);
 
 /** The list at terse: a TSV row per object — its type, name and owner. */
-function terseInactive(read: IInactiveObjectsResponse): Rendered<string> {
+function terseInactive(read: IInactiveObjectsResponse): Written<string> {
   const objects = read.objects.map(refOf);
-  return {
-    answer: [
-      `# count ${objects.length}`,
-      tsv(
-        ['type', 'name', 'parent'],
-        objects.map((o) => [o.type, o.name, o.parentName ?? '']),
-      ),
-    ].join('\n'),
-    rendered: objects.map(refIdentity),
-  };
+  return Written.lines([
+    `# count ${objects.length}`,
+    Written.tsv(
+      ['type', 'name', 'parent'],
+      objects.map((o) => ({
+        cells: [o.type, o.name, o.parentName ?? ''],
+        identity: refIdentity(o),
+      })),
+    ),
+  ]);
 }
 
 /**

@@ -20,6 +20,7 @@ import {
   rawLevel,
   readingAt,
   tsv,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -56,19 +57,17 @@ const TYPE_READINGS: DetailTable<INamedItem[] | XmlNode | string> = {
     completeAnswer(
       'GetAdtTypes',
       (items: INamedItem[]) => items.map((item) => item.name),
-      (items: INamedItem[]) => {
-        const rows = items.map((item) => [
-          item.name,
-          (item.description ?? '').split('\n')[0] ?? '',
-        ]);
-        return {
-          answer: [
-            `# count ${items.length}`,
-            tsv(['name', 'description'], rows),
-          ].join('\n'),
-          rendered: rows.map((row) => row[0] ?? ''),
-        };
-      },
+      (items: INamedItem[]) =>
+        Written.lines([
+          `# count ${items.length}`,
+          Written.tsv(
+            ['name', 'description'],
+            items.map((item) => ({
+              cells: [item.name, (item.description ?? '').split('\n')[0] ?? ''],
+              identity: item.name,
+            })),
+          ),
+        ]),
     ),
   ),
   medium: formatted(utilNamedItems, (items) => items),

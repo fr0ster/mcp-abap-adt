@@ -34,8 +34,9 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  type Rendered,
+  type ItemRow,
   tsv,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import {
@@ -294,10 +295,7 @@ function pageLines(answered: {
 }
 
 /** A row of a feed's terse answer, and the identity of the item it was written of. */
-interface FeedRow {
-  readonly cells: string[];
-  readonly identity: string;
-}
+type FeedRow = ItemRow;
 
 /** A feed's columns and rows: one row per item it holds. */
 function feedRows(shown: FeedShown): { columns: string[]; rows: FeedRow[] } {
@@ -405,24 +403,16 @@ function heldFeedItems(shown: FeedShown): string[] {
 const terseFeed = completeAnswer(
   'RuntimeListFeeds',
   heldFeedItems,
-  (shown: FeedShown): Rendered<string> => {
+  (shown: FeedShown): Written<string> => {
     const { columns, rows } = feedRows(shown);
-    const head = [`# feed ${shown.feed}`, `# count ${shown.answered.count}`];
-    const paged =
-      shown.feed === 'descriptors' || shown.feed === 'variants'
+    return Written.lines([
+      `# feed ${shown.feed}`,
+      `# count ${shown.answered.count}`,
+      ...(shown.feed === 'descriptors' || shown.feed === 'variants'
         ? []
-        : pageLines(shown.answered);
-    return {
-      answer: [
-        ...head,
-        ...paged,
-        tsv(
-          columns,
-          rows.map((row) => row.cells),
-        ),
-      ].join('\n'),
-      rendered: rows.map((row) => row.identity),
-    };
+        : pageLines(shown.answered)),
+      Written.tsv(columns, rows),
+    ]);
   },
 );
 

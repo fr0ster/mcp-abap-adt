@@ -13,7 +13,7 @@ export type { AnswerDetail };
  * shapes the SUCCESS answer only; a failure carries everything at every level.
  */
 const DETAIL_WORDS =
-  'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).';
+  'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).';
 
 /** The `detail` field of a tool's zod input schema. */
 export const DETAIL_SHAPE = {

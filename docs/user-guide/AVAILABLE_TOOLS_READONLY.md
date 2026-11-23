@@ -160,7 +160,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
@@ -188,7 +188,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `display_id` (string, required) - Display ID of a stored ATC result.
 
 ---
@@ -299,7 +299,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `class`, `program`, `interface`, `function_module`, `table`, `structure`, `ddl`, `behavior_definition`, `metadata_extension`, `table_type`) - Object type.
@@ -408,7 +408,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/enhancement/readonly/handleGetEnhancements.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `detailed` (boolean, optional) - [read-only] true: every field of each enhancement and every object read, those without enhancements included; false (default): each enhancement by name, type and source, objects without enhancements left out
 - `include_nested` (boolean, optional) - [read-only] true: also the enhancements of every include of a program or function group
 - `max_includes` (integer, optional) - [read-only] With include_nested: how many includes are read (default 50)
@@ -469,7 +469,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `function_group_name` (string, required) - Function group name.
 
 ---
@@ -481,7 +481,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `function_group_name` (string, required) - Function group name.
 
 ---
@@ -551,7 +551,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
 - `object_name` (string, optional) - Name of the ABAP program or include (with object_type; or give objects)
 - `object_type` (string, optional, one of: `PROG/P`, `PROG/I`, `FUGR/F`, `CLAS/OC`, `FUGR`, `CLAS`) - [read-only] ADT object type of the parent. Supported: PROG/P, PROG/I, FUGR/F, CLAS/OC. A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
@@ -566,7 +566,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `include_name` (string, required) - Include name.
 
 ---
@@ -626,7 +626,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -663,7 +663,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `include_descriptions` (boolean, optional) - Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)
 - `include_subpackages` (boolean, optional) - Include contents of subpackages recursively (default: false)
 - `max_depth` (number, optional) - Maximum depth for recursive package traversal (default: 5)
@@ -681,7 +681,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -718,7 +718,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
@@ -733,7 +733,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `objects` (array, optional) - [read-only] Several parents, read together (give this or parent_name)
 - `parent_name` (string, optional) - [read-only] Parent object name (with parent_tech_name and parent_type; or give objects)
 - `parent_tech_name` (string, optional) - [read-only] Parent technical name
@@ -807,7 +807,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
 - `structure_name` (string, optional) - Structure name (or give structure_names).
 - `structure_names` (array, optional) - Several structure names, read together (give this or structure_name).
@@ -870,7 +870,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `transaction_name` (string, required) - Name of the ABAP transaction
 
 ---
@@ -882,7 +882,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 
 ---
 
@@ -940,7 +940,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `component` (string, optional) - Dumps whose application component contains this text, in any case.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
 - `feed_type` (string, optional, one of: `descriptors`, `variants`, `dumps`, `system_messages`, `gateway_errors`) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `feed_types` (array, optional) - Several feeds, read together with the same filters (give this or feed_type).
@@ -961,7 +961,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleRuntimeListSystemMessages.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Maximum number of messages to return.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
@@ -976,7 +976,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetGatewayErrorLog.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `detail_kind` (string, optional) - The error's detail_kind, from the list: the kind its detail is read under. Required with opid.
 - `error_url` (string, optional) - An error's detailUri, from the list at detail medium or full: answers that error's detail instead of the list.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
@@ -998,7 +998,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `container` (string, optional, one of: `program`, `function_group`) - With object_type PROG/PX, required: whose text elements they are, program or function_group. Taken by PROG/PX alone.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `disable_types` (array, optional) - Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.
 - `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
 - `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
@@ -1032,7 +1032,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 
 ---
 
@@ -1043,7 +1043,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `validate_type` (string, optional) - Type name to validate (optional)
 
 ---
@@ -1055,7 +1055,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
 - `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
 
@@ -1068,7 +1068,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
@@ -1096,7 +1096,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `objects` (array, required)
 
 ---
@@ -1110,7 +1110,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
 - `debug` (boolean, optional (default: false)) - Include diagnostic metadata in response (counts, types, hierarchy info). Default: false
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `include_descriptions` (boolean, optional (default: false)) - Include each object's description in the response. The package metadata and the walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes. Default: false
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
@@ -1129,7 +1129,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
 - `sql_query` (string, required) - SQL query to execute
 
@@ -1144,7 +1144,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Parameters:**
 - `answer` (string, optional, one of: `objects`, `lines`, `snippets`) - What each hit is answered as: lines (line, no snippet; the default at detail terse), snippets (line and snippet; the default at medium and full) or objects (one entry per object and include with its number of hits).
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `exclude` (array, optional) - Up to 3 substrings; a line containing any of them is dropped.
 - `exclude_comments` (boolean, optional) - Skip col-1 '*' and full-line '"' comment lines. Default false (comments are scanned).
 - `include_subpackages` (boolean, optional) - Recurse into subpackages (default true).
@@ -1253,7 +1253,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `include_objects` (boolean, optional (default: true)) - With detail terse: list a task's objects (default: true); their count is answered either way.
 - `include_tasks` (boolean, optional (default: true)) - With detail terse: list a request's tasks (default: true); their count is answered either way.
 - `transport_number` (string, required) - Transport request or task number
@@ -1270,7 +1270,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `modifiable_only` (boolean, optional) - Modifiable requests only (true, the default), or modifiable and released requests (false; released ones from SAP's default window of the last 14 days).
 - `user` (string, optional) - The SAP user whose requests to list, sent in upper case. Default: the session's login user.
 
@@ -1285,7 +1285,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.
 
 ---
@@ -1299,7 +1299,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
 
 ---
@@ -1316,7 +1316,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).
 - `format` (string, optional, one of: `abapunit`, `junit`) - Result format: abapunit or junit.
 - `run_id` (string, required) - Run id a unit test run answered.
 - `with_navigation_uris` (boolean, optional) - Include navigation URIs in result if supported.

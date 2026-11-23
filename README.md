@@ -249,11 +249,13 @@ row SAP answered is answered. `detail` has four levels:
   package, a task, an object). An item's details come from that item's own tool.
 - `medium`: every field the reading read, without the document's leftovers (URIs, namespaces).
 - `full`: the whole parse, the answer as it was before `detail` where a tool did not take it.
-- `raw`: for a tool that reads one document, that document as ADT sent it, for debugging. A
-  tool whose answer is assembled from several reads — package contents and tree, the other
-  repository walks, `SearchSource`, `DescribeByList`, the include, structure and function group
-  lists, `GetEnhancements`, the paged runtime feeds — has no one document to give: its `raw` is
-  the same as `full`, the assembled answer.
+- `raw`: what ADT sent. A tool that makes one read answers that document as is. A tool that
+  assembles several reads — package contents and tree, the other repository walks, `SearchSource`,
+  `DescribeByList`, the include, structure and function group lists, `GetEnhancements`,
+  `GetWhereUsed` for several `objects`, `GetUnitTest`, `GetCdsUnitTest`, the paged runtime feeds
+  and several `feed_types` — answers a JSON array of the wire documents, in the order they were
+  read, each as ADT sent it: no parse, no projection, nothing of ours mixed in. `full` is the
+  whole parse, and the two levels never give the same answer.
 
 JSON answers are minified. A compact tool answers as the full tool it reads through, at every
 level.

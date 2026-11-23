@@ -410,7 +410,9 @@ function treeRows(node: PackageNode, descriptions: boolean, depth = 0): Line[] {
     // The package asked is the tree's root, no item of it.
     depth === 0
       ? { root: cells, depth }
-      : { row: cells, depth, identity: nameless ? [0, 1, 2, 3] : [0, 1] },
+      : // Every cell written is the row's identity, its description too:
+        // a description written for another item is refused.
+        { row: cells, depth, identity: cells.map((_, i) => i) },
     ...(node.children ?? []).flatMap((child) =>
       treeRows(child, descriptions, depth + 1),
     ),
@@ -463,20 +465,26 @@ type TreeAnswer = string | object;
 const TOOL = 'GetPackageTree';
 
 /** An item's identity as a row writes it: its type and name, a nameless one's technical name and URI. */
-const itemIdentity = (item: {
-  type: string;
-  name: string;
-  techName?: string | undefined;
-  uri?: string | undefined;
-}) =>
-  identityOf(
-    item.name === ''
-      ? [item.type, item.name, item.techName ?? '', item.uri ?? '']
-      : [item.type, item.name],
-  );
+const itemIdentity = (
+  item: {
+    type: string;
+    name: string;
+    techName?: string | undefined;
+    uri?: string | undefined;
+    description?: string | undefined;
+  },
+  descriptions: boolean,
+) =>
+  identityOf([
+    item.type,
+    item.name,
+    ...(item.name === '' ? [item.techName ?? '', item.uri ?? ''] : []),
+    ...(descriptions ? [item.description ?? ''] : []),
+  ]);
 
-/** Every item the walk held, as the terse rows identify it. */
-const heldTerse = ({ walked }: TreeAnswerRead) => walked.map(itemIdentity);
+/** Every item the walk held, as the terse rows write it — its description too, where asked. */
+const heldTerse = ({ walked, options }: TreeAnswerRead) =>
+  walked.map((item) => itemIdentity(item, options.includeDescriptions));
 
 /** Every item the walk held, as the JSON nodes identify it (technical name and URI only for a nameless one). */
 const heldJson = ({ walked }: TreeAnswerRead) =>

@@ -796,6 +796,34 @@ describe('GetPackageTree', () => {
     });
   }
 
+  // Codex round 9: a row's description is part of what the guard compares —
+  // terse with descriptions writes each item's own.
+  it("terse with descriptions: each row carries its own item's description", async () => {
+    const terse = await withinTurns(
+      handleGetPackageTreeOf(contextOn(system()), {
+        package_name: 'ZROOT_A',
+        include_descriptions: true,
+        detail: 'terse',
+        background: false,
+      }),
+    );
+    const text = textOf(terse);
+    assert.notEqual((terse as { isError?: boolean }).isError, true, text);
+    const rows = text
+      .split('\n')
+      .slice(1)
+      .map((line) => line.trim().split('\t'));
+    assert.deepStrictEqual(
+      rows.map((cells) => [cells[1], cells.at(-1)]),
+      [
+        ['ZSUB_A', 'Sub A'],
+        ['ZPROG_A', 'Program A'],
+        ['ZCL_A', 'Class A'],
+      ],
+      text,
+    );
+  });
+
   it('terse, one package answered and one refused', async () => {
     const model = { refuse: { [nodeKey('DEVC/K', 'ZROOT_B', '40')]: 403 } };
     const terse = await withinTurns(

@@ -150,21 +150,6 @@ function labelOf(node: ObjectStructureTreeNode, withOwner: boolean): string {
   return `${node.objecttype}: ${name}${owner}`;
 }
 
-function serializeTree(
-  tree: ObjectStructureTreeNode[],
-  withOwner: boolean,
-  indent: string = '',
-): string {
-  let result = '';
-  for (const node of tree) {
-    result += `${indent}- ${labelOf(node, withOwner)}\n`;
-    if (node.children && node.children.length > 0) {
-      result += serializeTree(node.children, withOwner, `${indent}  `);
-    }
-  }
-  return result;
-}
-
 /**
  * The same masking `GetNodeStructureLow` guards against, over a different
  * document. `getObjectStructure` takes `analyseException`, which reads an
@@ -190,23 +175,6 @@ export function assertObjectStructurePresent(value: XmlRead): void {
       'No object structure document was returned for this object — the answer carries no exception to read, so an absent projectexplorer:objectstructure root cannot be told apart from "this object has no substructure" here. Verify the object exists before trusting an empty answer.',
     );
   }
-}
-
-/**
- * Exported so `GetObjectStructureLow` (`src/handlers/system/low/`) can answer
- * the same tree text without a second copy of `flatNodesOf`/`buildNestedTree`/
- * `serializeTree` — both tools read the same `projectexplorer:objectstructure`
- * document through the same `ourUtils.objectStructure` (`structured`) reading.
- */
-export function treeText(
-  value: XmlRead,
-  root?: { objecttype: string; objectname: string },
-  withOwner = true,
-): string {
-  assertObjectStructurePresent(value);
-  const nodes = flatNodesOf(value);
-  if (nodes.length === 0) return 'No nodes found in object structure response.';
-  return `tree:\n${serializeTree(buildNestedTree(nodes, root), withOwner)}`;
 }
 
 /** The tree as bullets, depth first; the object asked, which SAP did not send, no item. */

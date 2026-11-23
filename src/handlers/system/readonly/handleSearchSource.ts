@@ -6,7 +6,6 @@ import {
   answerAt,
   completeAnswer,
   type DetailLevel,
-  groupedTsv,
   identityOf,
   type Line,
   Written,

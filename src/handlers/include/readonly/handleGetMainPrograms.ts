@@ -12,7 +12,6 @@ import {
   identityOf,
   rawLevel,
   readingAt,
-  tsv,
   Written,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';

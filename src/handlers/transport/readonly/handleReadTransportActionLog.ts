@@ -19,7 +19,6 @@ import {
   answerAt,
   completeAnswer,
   identityOf,
-  tsv,
   Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

@@ -14,7 +14,6 @@ import {
   identityOf,
   rawLevel,
   readingAt,
-  tsv,
   Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

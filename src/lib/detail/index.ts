@@ -12,6 +12,8 @@ export {
   identityOf,
   incompleteAnswerWords,
   type Line,
+  type ListedPart,
+  listedText,
   type TextKey,
   Written,
 } from './complete';
@@ -29,14 +31,6 @@ export {
   readingAt,
   structuredValue,
 } from './levels';
-export {
-  groupedTsv,
-  indentedTsv,
-  type TreeRow,
-  type TsvGroup,
-  tsv,
-  tsvRow,
-} from './tsv';
 export { cellsOf } from './tsvCells';
 export {
   notOneDocumentWords,

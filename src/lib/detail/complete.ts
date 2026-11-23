@@ -356,6 +356,44 @@ export type TextKey<I> = {
   [P in keyof I]-?: I[P] extends string | undefined ? P : never;
 }[keyof I];
 
+/**
+ * One part of a list call's terse text: its own head lines (the object or
+ * feed it answers for), then the object's own written answer — or its
+ * failure, one escaped `# error` line.
+ */
+export type ListedPart<R> = { readonly heads: readonly Line[] } & (
+  | { readonly read: R }
+  | { readonly error: string }
+);
+
+/**
+ * A list call's terse text, written entirely through `Written`: each part's
+ * heads escaped as head lines, its read rendered by the tool's own terse
+ * writer, its failure one `# error` line. Guarded like a single answer:
+ * every item each read held is written, or the call answers
+ * `incomplete_answer`.
+ */
+export function listedText<R>(
+  tool: string,
+  parts: readonly ListedPart<R>[],
+  held: (read: R) => readonly string[],
+  render: (read: R) => Written<string>,
+): string {
+  return completeAnswer(
+    tool,
+    () => parts.flatMap((part) => ('read' in part ? held(part.read) : [])),
+    () =>
+      Written.sections(
+        parts.flatMap((part) => [
+          Written.text(part.heads, []),
+          'read' in part
+            ? render(part.read)
+            : Written.text([{ head: 'error', value: part.error }], []),
+        ]),
+      ),
+  )(undefined);
+}
+
 /** A JSON row's identity: its text keys' values, an absent one `''`. */
 function textIdentity<I>(row: I, keys: readonly TextKey<I>[]): string {
   return identityOf(

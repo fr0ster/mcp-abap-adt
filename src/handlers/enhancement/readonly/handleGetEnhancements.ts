@@ -37,14 +37,17 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
   type DetailLevel,
-  identityOf,
-  type Line,
-  type ListedPart,
-  listedText,
-  Written,
+  type Head,
+  marks,
+  type Nested,
+  nest,
+  parts,
+  type RowSchemas,
+  rows,
+  sections,
   wireAnswer,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { ReadVersion } from '../../../lib/handlers/readVersion';
@@ -804,74 +807,70 @@ interface EnhancementsShown {
   readonly detailed: boolean;
 }
 
-/** One object's terse lines: its `# object` line, then its rows. */
-function terseObjectLines(response: EnhancementResponse): Line[] {
-  return [
-    {
-      head: 'object',
-      value: `${response.object_type} ${response.object_name}`,
-    },
-    ...(response.context ? [{ head: 'context', value: response.context }] : []),
-    { head: 'count', value: String(response.enhancements.length) },
-    ...(response.enhancements.length > 0
-      ? [
-          { header: ['name', 'type', 'description'] },
-          ...response.enhancements.map((enh) => ({
-            row: [
-              enh.name,
-              enh.type,
-              (enh.description ?? '').split('\n')[0] ?? '',
-            ],
-          })),
-        ]
-      : []),
-    ...(response.unreadable ?? []).map(
-      (entry): Line => ({ mark: 'unreadable', words: [JSON.stringify(entry)] }),
-    ),
-  ];
-}
+/** One object's heads: its `# object`, its context where SAP gave one, and its count. */
+const objectHeads = (response: EnhancementResponse): Head[] => [
+  { head: 'object', value: `${response.object_type} ${response.object_name}` },
+  ...(response.context ? [{ head: 'context', value: response.context }] : []),
+  { head: 'count', value: String(response.enhancements.length) },
+];
 
-/** Every item one object's read held, as written: its enhancements (name and type) and what it could not read. */
-function heldOf(response: EnhancementResponse): string[] {
-  return [
-    ...response.enhancements.map((enh) => identityOf([enh.name, enh.type])),
-    ...(response.unreadable ?? []).map((entry) =>
-      identityOf(['unreadable', JSON.stringify(entry)]),
-    ),
-  ];
-}
+/** One object's lists: its enhancements as rows (no source), then each probe that was refused. */
+const objectSchemas: RowSchemas<EnhancementResponse> = {
+  enhancements: rows('enhancements', {
+    columns: [
+      { name: 'name', cell: (enh: EnhancementImplementation) => enh.name },
+      { name: 'type', cell: (enh: EnhancementImplementation) => enh.type },
+      {
+        name: 'description',
+        cell: (enh: EnhancementImplementation) =>
+          (enh.description ?? '').split('\n')[0] ?? '',
+      },
+    ],
+    header: 'when-rows',
+  }),
+  unreadable: marks('unreadable', 'unreadable', (entry: FailureEntry) => [
+    JSON.stringify(entry),
+  ]),
+};
 
-/** Every enhancement and every part not read, as the terse text identifies it. */
-const heldTerse = ({ read }: EnhancementsShown) =>
-  read.kind === 'single'
-    ? heldOf(read.response)
-    : [
-        ...read.response.objects.flatMap(heldOf),
-        ...(read.response.includes_unread ?? []).map((unread) =>
-          identityOf(['include_unread', JSON.stringify(unread)]),
-        ),
-      ];
-
-/** The terse text: each object's lines, a nested read under its total. */
-const terseText = ({ read }: EnhancementsShown): Written<string> =>
-  Written.text(
-    read.kind === 'single'
-      ? terseObjectLines(read.response)
-      : [
+/**
+ * The terse listing of a read, written from its own lists: one object's
+ * heads and lists, or — with its includes — the total, each object's
+ * section, and every include whose enhancements could not be read.
+ */
+function terseListing(read: EnhancementsRead): Nested {
+  return read.kind === 'single'
+    ? nest({
+        heads: objectHeads(read.response),
+        reading: read.response,
+        lists: objectSchemas,
+      })
+    : nest({
+        heads: [
           {
             head: 'total',
             value: String(read.response.total_enhancements_found),
           },
-          ...read.response.objects.flatMap(terseObjectLines),
-          ...(read.response.includes_unread ?? []).map(
-            (unread): Line => ({
-              mark: 'include_unread',
-              words: [JSON.stringify(unread)],
-            }),
-          ),
         ],
-    [0, 1],
-  );
+        reading: read.response,
+        lists: {
+          objects: sections('objects', objectHeads, objectSchemas),
+          includes_unread: marks(
+            'includes_unread',
+            'include_unread',
+            (unread: IncludeUnread) => [JSON.stringify(unread)],
+          ),
+        },
+      });
+}
+
+/** The terse text of a read. */
+const terseText = ({ read }: EnhancementsShown): string =>
+  writeListing({
+    heads: [],
+    reading: { read: [read] },
+    lists: { read: parts('read', () => [], terseListing) },
+  }).answer;
 
 /**
  * What `GetEnhancements` answers at each `detail`, selected before the reads
@@ -894,7 +893,7 @@ const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
     return {
       // Every enhancement and every part not read, or nothing
       // (`completeAnswer`).
-      terse: completeAnswer('GetEnhancements', heldTerse, terseText),
+      terse: terseText,
       medium: former,
       full: former,
       raw: former,
@@ -1928,30 +1927,47 @@ function listAnswer(
 
 /** A list call's terse text. */
 function terseList({ objects, results }: ListOf): McpResult {
-  // Every object's text through `Written`: a failure under its escaped
-  // `# object` line and one `# error` line; an answered one as its own
-  // terse writer writes it.
-  const text = listedText(
-    'GetEnhancements',
-    results.map((result, i): ListedPart<EnhancementsShown> => {
-      const asked = objects[i];
-      const read = readsOf.get(result);
-      return result.isError || read === undefined
-        ? {
-            heads: [
-              {
-                head: 'object',
-                value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
-              },
-            ],
-            error: JSON.stringify(payloadOfAnswer(result)),
-          }
-        : { heads: [], read };
-    }),
-    heldTerse,
-    terseText,
-  );
+  // Every object's text written by the listing writer: a failure under its
+  // escaped `# object` line and one `# error` line; an answered one as its
+  // own terse listing.
+  const text = writeListing({
+    heads: [],
+    reading: {
+      answered: results.map((result, i) => ({
+        asked: objects[i],
+        result,
+        read: result.isError ? undefined : readsOf.get(result),
+      })),
+    },
+    lists: {
+      answered: parts(
+        'answered',
+        ({ asked, result, read }: AnsweredObject): Head[] =>
+          read === undefined
+            ? [
+                {
+                  head: 'object',
+                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+                },
+                {
+                  head: 'error',
+                  value: JSON.stringify(payloadOfAnswer(result)),
+                },
+              ]
+            : [],
+        ({ read }: AnsweredObject) =>
+          read === undefined ? undefined : terseListing(read.read),
+      ),
+    },
+  }).answer;
   return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** One object of a list call: what was asked, its answer, and its read when answered. */
+interface AnsweredObject {
+  readonly asked: ListOf['objects'][number] | undefined;
+  readonly result: McpResult;
+  readonly read: EnhancementsShown | undefined;
 }
 
 /** A list call's entries as a JSON array. */

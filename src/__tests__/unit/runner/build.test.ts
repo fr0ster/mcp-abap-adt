@@ -67,7 +67,8 @@ describe('the node:test build', () => {
     );
     assert.equal(
       manifest.scripts['test:build'],
-      'node tools/build-node-tests.mjs',
+      // 4 GB of heap: the program passes a macOS runner's ~2 GB default.
+      'node --max-old-space-size=4096 tools/build-node-tests.mjs',
     );
   });
 

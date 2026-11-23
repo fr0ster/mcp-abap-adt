@@ -164,10 +164,65 @@ describe('completeAnswer over the cells written', () => {
       ],
       [0],
     );
-    assert.equal(written.answer, '# count 1\n# incomplete type=T');
+    assert.equal(written.answer, '# count 1\n# incomplete\ttype=T');
     assert.deepStrictEqual(written.identities, [
       identityOf(['incomplete', 'type=T']),
     ]);
+  });
+
+  // Codex round 8: the writer's guarantees hold for every line it writes.
+  it('two lists of mark words never render alike', () => {
+    const one = Written.text([{ mark: 'm', words: ['a b', 'c'] }], [0]);
+    const two = Written.text([{ mark: 'm', words: ['a', 'b c'] }], [0]);
+    const three = Written.text([{ mark: 'm', words: ['a\tb', 'c'] }], [0]);
+    const four = Written.text([{ mark: 'm', words: ['a', 'b', 'c'] }], [0]);
+    const answers = [one, two, three, four].map((w) => w.answer);
+    assert.equal(new Set(answers).size, 4, answers.join(' | '));
+  });
+
+  it('head labels and header cells are escaped like every value', () => {
+    const written = Written.text(
+      [
+        { head: 'a\nb', value: 'v' },
+        { group: 'g\nh', value: 'v' },
+        { header: ['x\ny', 'z'] },
+      ],
+      [0],
+    );
+    assert.equal(written.answer.split('\n').length, 3, written.answer);
+  });
+
+  it('sections: one root across the whole text, a second refused', () => {
+    const shown = completeAnswer(
+      'Tool',
+      () => [],
+      () =>
+        Written.sections([
+          Written.text([{ root: ['P'], depth: 0 }], [0]),
+          Written.text([{ bulletRoot: 'Q', depth: 0 }], [0]),
+        ]),
+    );
+    assert.throws(() => shown(undefined), IncompleteAnswerError);
+    const one = completeAnswer(
+      'Tool',
+      () => [],
+      () => Written.sections([Written.text([{ root: ['P'], depth: 0 }], [0])]),
+    );
+    assert.equal(one(undefined), 'P');
+  });
+
+  it('nested: the inner answer is set whole, the container cannot replace it', () => {
+    const inner = Written.json({}, { rows: NAMELESS }, ['type', 'name', 'uri']);
+    const nested = Written.nested(
+      { metadata: 'replaced?', other: 1 },
+      'metadata',
+      inner,
+    );
+    assert.deepStrictEqual(nested.answer, {
+      metadata: { rows: NAMELESS },
+      other: 1,
+    });
+    assert.deepStrictEqual(nested.identities, held(NAMELESS));
   });
 });
 

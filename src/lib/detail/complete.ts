@@ -106,9 +106,19 @@ export class Written<A> {
     return #written in value && value.#written;
   }
 
+  /**
+   * Every item the answer holds: its rows, and each root after the first —
+   * a text has one root at most, across every section it is joined from,
+   * so another root is an item no reading holds and the guard refuses it.
+   */
+  get identities(): readonly string[] {
+    return [...this.items, ...this.roots.slice(1)];
+  }
+
   private constructor(
     readonly answer: A,
-    readonly identities: readonly string[],
+    private readonly items: readonly string[],
+    private readonly roots: readonly string[] = [],
   ) {}
 
   /**
@@ -122,21 +132,20 @@ export class Written<A> {
   ): Written<string> {
     const texts: string[] = [];
     const identities: string[] = [];
-    // A text has one root at most: another root is written as an item, which
-    // no reading holds — the guard refuses it.
-    let roots = 0;
+    // Each root's identity: every root after the first is an item.
+    const roots: string[] = [];
     for (const entry of lines) {
       if ('head' in entry) {
-        // The value escaped: SAP's text can add no line.
+        // The label and the value escaped: SAP's text can add no line.
         texts.push(
           entry.value === undefined
-            ? `# ${entry.head}`
-            : `# ${entry.head} ${cell(entry.value)}`,
+            ? `# ${cell(entry.head)}`
+            : `# ${cell(entry.head)} ${cell(entry.value)}`,
         );
       } else if ('group' in entry) {
-        texts.push(`# ${entry.group} ${cell(entry.value)}`);
+        texts.push(`# ${cell(entry.group)} ${cell(entry.value)}`);
       } else if ('header' in entry) {
-        texts.push(entry.header.join('\t'));
+        texts.push(entry.header.map(cell).join('\t'));
       } else if ('row' in entry) {
         texts.push(written(entry.row, entry.depth));
         identities.push(
@@ -144,24 +153,25 @@ export class Written<A> {
         );
       } else if ('root' in entry) {
         texts.push(written(entry.root, entry.depth));
-        roots += 1;
-        if (roots > 1) identities.push(identityOf(['root', ...entry.root]));
+        roots.push(identityOf(['root', ...entry.root]));
       } else if ('mark' in entry) {
-        // The words escaped as cells, and the identity from the same values.
-        texts.push([`# ${entry.mark}`, ...entry.words.map(cell)].join(' '));
+        // The marker and each word a cell, the words tab-separated: a tab
+        // inside a word is escaped, so two lists of words never read alike.
+        texts.push(
+          [`# ${cell(entry.mark)}`, ...entry.words.map(cell)].join('\t'),
+        );
         identities.push(identityOf([entry.mark, ...entry.words]));
       } else if ('bullet' in entry) {
         texts.push(`${'  '.repeat(entry.depth)}- ${cell(entry.bullet)}`);
         identities.push(identityOf(entry.identity));
       } else if ('bulletRoot' in entry) {
         texts.push(`${'  '.repeat(entry.depth)}- ${cell(entry.bulletRoot)}`);
-        roots += 1;
-        if (roots > 1) identities.push(identityOf(['root', entry.bulletRoot]));
+        roots.push(identityOf(['root', entry.bulletRoot]));
       } else {
         texts.push(entry.title);
       }
     }
-    return new Written(texts.join('\n'), identities);
+    return new Written(texts.join('\n'), identities, roots);
   }
 
   /**
@@ -245,9 +255,21 @@ export class Written<A> {
     );
   }
 
-  /** A written answer placed inside a larger one (its container's fields beside it), its items unchanged. */
-  static placed<B, C>(inner: Written<B>, place: (answer: B) => C): Written<C> {
-    return new Written(place(inner.answer), inner.identities);
+  /**
+   * A written answer under `key` of a larger one, the container's own
+   * fields beside it. The inner answer is set last, whole: nothing of the
+   * container can replace it, and its items are the answer's.
+   */
+  static nested<R extends object, B>(
+    rest: R,
+    key: string,
+    inner: Written<B>,
+  ): Written<R & { [key: string]: B }> {
+    return new Written(
+      { ...rest, [key]: inner.answer },
+      inner.items,
+      inner.roots,
+    );
   }
 
   /** JSON answers in a list, each with the items it holds. */
@@ -258,11 +280,16 @@ export class Written<A> {
     );
   }
 
-  /** Written texts as sections of one text, each item kept. */
+  /**
+   * Written texts as sections of one text, each item kept. The text has
+   * one root at most across all its sections: a root after the first is an
+   * item, and the guard refuses it.
+   */
   static sections(parts: readonly Written<string>[]): Written<string> {
     return new Written(
       parts.map((part) => part.answer).join('\n'),
-      parts.flatMap((part) => part.identities),
+      parts.flatMap((part) => part.items),
+      parts.flatMap((part) => part.roots),
     );
   }
 
@@ -284,13 +311,18 @@ export class Written<A> {
   }> {
     return new Written(
       { isError: false, content: [{ type: 'text', text: written.answer }] },
-      written.identities,
+      written.items,
+      written.roots,
     );
   }
 
   /** A written JSON value as its text, its items unchanged. */
   static stringified<A>(written: Written<A>): Written<string> {
-    return new Written(JSON.stringify(written.answer), written.identities);
+    return new Written(
+      JSON.stringify(written.answer),
+      written.items,
+      written.roots,
+    );
   }
 }
 

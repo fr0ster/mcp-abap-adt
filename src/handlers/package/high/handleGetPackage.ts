@@ -63,15 +63,15 @@ function packageAnswers(
     (document: string) => {
       const { sub_packages, ...facts } = packageDetails(document);
       // The sub-packages written as rows, inside the metadata as before.
-      return Written.placed(
-        Written.json(facts, { sub_packages }, ['name']),
-        (metadata) => ({
+      return Written.nested(
+        {
           success: true,
           package_name: packageName,
           version,
           part: 'metadata',
-          metadata,
-        }),
+        },
+        'metadata',
+        Written.json(facts, { sub_packages }, ['name']),
       );
     },
   );

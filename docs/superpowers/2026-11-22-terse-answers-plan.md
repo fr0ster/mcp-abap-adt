@@ -427,9 +427,12 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    - **Where they run.** On the controller's machine over all five `MODELS` after each group
      from (2) on, the result per model written into the PR. In CI, a new job `meaning-vectors` in
      `.github/workflows/ci.yml`: an `ollama/ollama` service container on port 11434; the model
-     `nomic-embed-text` pulled by a step (`ollama pull nomic-embed-text` through the container)
+     `mxbai-embed-large`, its query prefix from `MODELS` (`Represent this sentence for searching
+     relevant passages: `), chosen by the held-out baseline (`heldOutBaseline.json`, 36 queries,
+     failures cosine / hybrid: mxbai-embed-large 0 / 0, bge-large 0 / 0, snowflake 2 / 0,
+     nomic-embed-text 3 / 1, bge-m3 4 / 1) — pulled by a step (the container's `/api/pull`)
      before the tests, its files cached with `actions/cache` under the key
-     `ollama-nomic-embed-text-<the model's digest>` (the digest read from the registry manifest
+     `ollama-mxbai-embed-large-<the model's digest>` (the digest read from the registry manifest
      in the step before the cache, so a new model version is a new key); then the test build and
      `meaning.test.ts` alone, both checks. The job is required: added to the branch ruleset's
      required checks by its exact name. With one model in CI, the CI run compares against that

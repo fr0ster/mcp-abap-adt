@@ -6,7 +6,8 @@
  * compared with the recorded baseline (`meaningBaseline.json`, per model):
  * a new one fails, and so does a recorded one that no longer fails. A model
  * the Ollama does not serve skips with its reason. In CI the job
- * `meaning-vectors` runs this file with `nomic-embed-text`.
+ * `meaning-vectors` runs this file with `mxbai-embed-large` (its query prefix
+ * from `MODELS`).
  */
 
 import assert from 'node:assert/strict';

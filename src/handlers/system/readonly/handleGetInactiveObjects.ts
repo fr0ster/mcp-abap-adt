@@ -14,14 +14,15 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   answered,
-  completeAnswer,
   type DetailTable,
+  entries,
   formatted,
   fullLevel,
-  identityOf,
   rawLevel,
   readingAt,
-  Written,
+  rows,
+  writeJson,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -67,36 +68,35 @@ function refOf(object: IInactiveObject): InactiveObjectRef {
   };
 }
 
-/** The list as the tool answers it at terse and medium. */
+/** An inactive object as read: the reading's own entry. */
+type InactiveObject = IInactiveObjectsResponse['objects'][number];
+
+/** The list as the tool answers it at medium: every object, one entry each. */
 function inactiveAnswer(read: IInactiveObjectsResponse) {
-  const objects = read.objects.map(refOf);
-  // Each object identified by the fields written.
-  return Written.json({ success: true, count: objects.length }, { objects }, [
-    'type',
-    'name',
-    'parentName',
-  ]);
+  return writeJson({ success: true, count: read.objects.length }, read, {
+    objects: entries('objects', refOf),
+  }).answer;
 }
 
-/** An object's identity, as written: its type, name and parent. */
-const refIdentity = (o: { type: string; name: string; parentName?: string }) =>
-  identityOf([o.type, o.name, o.parentName ?? '']);
-
-/** Every object the list held, by its identity. */
-const heldInactive = (read: IInactiveObjectsResponse) =>
-  read.objects.map(refOf).map(refIdentity);
-
 /** The list at terse: a TSV row per object — its type, name and owner. */
-function terseInactive(read: IInactiveObjectsResponse): Written<string> {
-  const objects = read.objects.map(refOf);
-  return Written.text(
-    [
-      { head: 'count', value: String(objects.length) },
-      { header: ['type', 'name', 'parent'] },
-      ...objects.map((o) => ({ row: [o.type, o.name, o.parentName ?? ''] })),
-    ],
-    [0, 1, 2],
-  );
+function terseInactive(read: IInactiveObjectsResponse): string {
+  return writeListing({
+    heads: [{ head: 'count', value: String(read.objects.length) }],
+    reading: read,
+    lists: {
+      objects: rows('objects', {
+        columns: [
+          { name: 'type', cell: (o: InactiveObject) => refOf(o).type },
+          { name: 'name', cell: (o: InactiveObject) => refOf(o).name },
+          {
+            name: 'parent',
+            cell: (o: InactiveObject) => refOf(o).parentName ?? '',
+          },
+        ],
+        header: 'always',
+      }),
+    },
+  }).answer;
 }
 
 /**
@@ -107,17 +107,11 @@ function terseInactive(read: IInactiveObjectsResponse): Written<string> {
  * activation is confirmed off this list), full the parse, raw the document.
  */
 const INACTIVE_READINGS: DetailTable<
-  ReturnType<typeof inactiveAnswer>['answer'] | XmlNode | string
+  ReturnType<typeof inactiveAnswer> | XmlNode | string
 > = {
-  // Every object the list held, or nothing (`completeAnswer`).
-  terse: formatted(
-    utilInactiveObjects,
-    completeAnswer('GetInactiveObjects', heldInactive, terseInactive),
-  ),
-  medium: formatted(
-    utilInactiveObjects,
-    completeAnswer('GetInactiveObjects', heldInactive, inactiveAnswer),
-  ),
+  // Every object the list held, written by the listing writers.
+  terse: formatted(utilInactiveObjects, terseInactive),
+  medium: formatted(utilInactiveObjects, inactiveAnswer),
   full: fullLevel,
   raw: rawLevel,
 };

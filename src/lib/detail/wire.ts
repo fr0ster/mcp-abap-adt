@@ -113,8 +113,8 @@ export async function recordedWire<R>(
 
 /**
  * The statuses of a batch envelope's inner parts: each part's status line,
- * read as the batch client reads it — `HTTP/1.` and a digit, any run of
- * whitespace, a three-digit code, then whitespace or the line's end. Each
+ * read as the batch client reads it — the protocol and its minor version,
+ * any run of whitespace, a three-digit code, then whitespace or the line's end. Each
  * is that read's answer. Plain code, line by line.
  */
 export function partStatuses(body: string): number[] {

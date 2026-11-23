@@ -265,7 +265,7 @@ function writeProperties(actions: readonly AbapGitWriteAction[]) {
     ),
     overwrite: OVERWRITE_FIELD.optional().describe(
       said(actions, {
-        pull: 'cloud: the objects of modified_objects to overwrite with their remote version, each once, by type and name: an object changed in the system or held by another package is overwritten only when named here, and one changed only in the remote is imported either way. Without it the pull overwrites every listed object.',
+        pull: 'cloud: the objects of modified_objects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused. SAP selects by name when its job runs, against the list as it stands then: an object changed in the system or held by another package is overwritten when its name is selected, the others keep their system version, and one changed only in the remote is imported either way. Without it the pull overwrites every listed object.',
       }),
     ),
     comment: COMMENT_FIELD.optional().describe(

@@ -444,13 +444,17 @@ operation is offered where that system's abapGit serves it:
   move; objects held by another package as package warnings. On ABAP Cloud a pull brings every
   listed object to its remote version. `PullAbapGitRepo` (compact `pull`) takes `overwrite`, on the
   cloud only: the listed objects to overwrite, each once, by its type and name as the list answers
-  them. With it, an object changed in the system or held by another package is overwritten only
-  when named, the others keeping their system version; an object changed only in the remote is
-  imported either way (SAP's import drops an unselected entry only when it is changed locally). The
-  server reads the list and sends the named entries as it answered them; an object named twice is
-  refused (`abapgit_overwrite_duplicate`) with nothing sent, one the list does not hold
-  (`abapgit_overwrite_not_listed`) with only the list read. On premise SAP's pull takes no
-  selection and overwrites them all.
+  them. The server reads the list and sends the named entries as it answered them. SAP's job then
+  recomputes the list when it runs and selects by **name** alone: an object changed in the system or
+  held by another package is overwritten when its name is selected, the others keep their system
+  version, and an object changed only in the remote is imported either way (SAP's import drops an
+  unselected entry only when it is changed locally). A change made between the read and the job is
+  judged by SAP the same way, unseen by the server. Refused: `overwrite` on premise
+  (`abapgit_overwrite_not_declared`, nothing sent; SAP's on-premise pull takes no selection and
+  overwrites them all), an object named twice (`abapgit_overwrite_duplicate`, nothing sent), and
+  after the repository list and the modified-objects read, an object the list does not hold
+  (`abapgit_overwrite_not_listed`) or a name it holds under two types (`abapgit_overwrite_ambiguous`:
+  SAP would take both).
 - **A close cuts SAP's dialog mid-import.** Closing an SSE stream or a stdio server logs its
   connections off, a running background run's included, and the logoff ends SAP's dialog where it
   stands: an on-premise link or pull under way leaves a partly imported package. A Streamable HTTP

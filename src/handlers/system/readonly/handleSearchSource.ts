@@ -159,7 +159,15 @@ export function searchSourceRows(result: OrchestratorResult): string {
     // A target SAP listed without a name: never scanned, named by what tells
     // it apart.
     ...(result.incomplete ?? []).map((target) =>
-      `# incomplete ${target.package} ${target.type} ${target.uri ?? target.tech_name ?? ''}`.trimEnd(),
+      [
+        '# incomplete',
+        target.package,
+        target.type,
+        ...(target.tech_name !== undefined
+          ? [`tech_name=${target.tech_name}`]
+          : []),
+        ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
+      ].join(' '),
     ),
   ];
   const first = result.results[0];

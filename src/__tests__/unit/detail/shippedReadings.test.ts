@@ -379,6 +379,42 @@ CASES['GetPackageContents two objects SAP listed without a name'] = async (
     }),
   );
 
+// Codex P1: a subpackage SAP lists without a name is listed, never read (a
+// package without a name answers a 500), and its named sibling is walked.
+const NAMELESS_SUBPACKAGE_ROOT = `${xmlHead}<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/packages/nameless</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><OBJECT_NAME>ZSUB</OBJECT_NAME><TECH_NAME>ZSUB</TECH_NAME><OBJECT_URI>/sap/bc/adt/packages/zsub</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>`;
+const SUBPACKAGE_LEVEL = `${xmlHead}<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT><SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>PROG/P</OBJECT_TYPE><OBJECT_NAME>ZP_IN_SUB</OBJECT_NAME><TECH_NAME>ZP_IN_SUB</TECH_NAME><OBJECT_URI>/sap/bc/adt/programs/programs/zp_in_sub</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT></DATA></asx:values></asx:abap>`;
+const sequentialThen500 = (answers: string[]) => {
+  const context = ctx([
+    ...answers.map((data) => ({ data })),
+    { data: 'a package without a name', status: 500 },
+  ]);
+  const batchAvailability = createBatchAvailability();
+  batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+  return { ...context, batchAvailability };
+};
+CASES['GetPackageContents a subpackage SAP listed without a name'] = async (
+  detail,
+) =>
+  answeredOf(
+    await handleGetPackageContents(
+      sequentialThen500([NAMELESS_SUBPACKAGE_ROOT, SUBPACKAGE_LEVEL]),
+      { package_name: 'ZPKG', include_subpackages: true, detail },
+    ),
+  );
+CASES['GetPackageTree a subpackage SAP listed without a name'] = async (
+  detail,
+) =>
+  answeredOf(
+    await handleGetPackageTree(
+      sequentialThen500([
+        PACKAGE_METADATA,
+        NAMELESS_SUBPACKAGE_ROOT,
+        SUBPACKAGE_LEVEL,
+      ]),
+      { package_name: 'ZPKG', detail },
+    ),
+  );
+
 describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READINGS=1 rewrites the fixture)', () => {
   const answered: Answers = {};
   const expected: Answers =

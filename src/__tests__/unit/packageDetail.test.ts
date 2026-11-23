@@ -85,10 +85,10 @@ async function tree(detail?: Level) {
 describe('GetPackageContents detail', () => {
   it('terse, by default: the rows under their package, the unloaded node one of them', async () => {
     const expected = [
-      'type\tname\ttech_name',
+      'type\tname\ttech_name\turi',
       '# package ZPKG',
-      'VIEW/DV\tnot loaded by SAP\t',
-      'TABL/DT\tZT_ONE\t',
+      'VIEW/DV\tnot loaded by SAP\t\t',
+      'TABL/DT\tZT_ONE\t\t',
     ].join('\n');
     assert.equal(await contents(), expected);
     assert.equal(await contents('terse'), expected);
@@ -98,10 +98,10 @@ describe('GetPackageContents detail', () => {
     assert.equal(
       await contents('terse', true),
       [
-        'type\tname\ttech_name\tdescription',
+        'type\tname\ttech_name\turi\tdescription',
         '# package ZPKG',
-        'VIEW/DV\tnot loaded by SAP\t\t',
-        'TABL/DT\tZT_ONE\t\tA table',
+        'VIEW/DV\tnot loaded by SAP\t\t\t',
+        'TABL/DT\tZT_ONE\t\t\tA table',
       ].join('\n'),
     );
   });
@@ -204,9 +204,11 @@ describe('GetPackageContents terse keeps a technical name that is not the name',
     );
     assert.equal(
       result.content[0]?.text,
-      ['type\tname\ttech_name', '# package ZPKG', 'FUGR/F\tZFG\tSAPLZFG'].join(
-        '\n',
-      ),
+      [
+        'type\tname\ttech_name\turi',
+        '# package ZPKG',
+        'FUGR/F\tZFG\tSAPLZFG\t',
+      ].join('\n'),
     );
   });
 });

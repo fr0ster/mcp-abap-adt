@@ -556,3 +556,73 @@ describe('incomplete objects keep apart by every identity field', () => {
     );
   });
 });
+
+describe('the walk key is case-insensitive on every field, the type too', () => {
+  it('PROG/P and prog/p of one name are one row', async () => {
+    const level =
+      '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+      '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>PROG/P</OBJECT_TYPE><OBJECT_NAME>ZP</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+      '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>prog/p</OBJECT_TYPE><OBJECT_NAME>ZP</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+      '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+    const source: NodeStructureSource = {
+      async fetchNodeStructure(_t, _name, options) {
+        return succeeded(
+          options?.nodeId === undefined ? nodeLevelOfXml(level) : levelOf([]),
+        );
+      },
+    };
+    assert.equal((await walkPackage(source, 'P')).length, 1);
+  });
+});
+
+/**
+ * A subpackage SAP lists without a name is reported, never read: no request
+ * names it (a package without a name answers a 500), and its named sibling
+ * is still walked (Codex P1).
+ */
+describe('a subpackage without a name', () => {
+  const root =
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><OBJECT_URI>/sap/bc/adt/packages/nameless</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>DEVC/K</OBJECT_TYPE><OBJECT_NAME>ZSUB</OBJECT_NAME><TECH_NAME>ZSUB</TECH_NAME><OBJECT_URI>/sap/bc/adt/packages/zsub</OBJECT_URI></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+  const sub =
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>PROG/P</OBJECT_TYPE><OBJECT_NAME>ZP_IN_SUB</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+  const fetched: string[] = [];
+  const source: NodeStructureSource = {
+    async fetchNodeStructure(_t, name, options) {
+      fetched.push(name);
+      if (name === '') throw new Error('500: a package without a name');
+      if (options?.nodeId !== undefined) return succeeded(levelOf([]));
+      return succeeded(nodeLevelOfXml(name === 'P' ? root : sub));
+    },
+  };
+  const read = async (
+    requests: readonly { parentName: string; nodeId?: string }[],
+  ) =>
+    Promise.all(
+      requests.map(async (request) => ({
+        ok: true as const,
+        value: await source.fetchNodeStructure('DEVC/K', request.parentName, {
+          ...(request.nodeId === undefined ? {} : { nodeId: request.nodeId }),
+        }),
+      })),
+    );
+
+  it('is listed, never read; its sibling is walked, package by package and level by level', async () => {
+    fetched.length = 0;
+    const walked = await walkPackage(source, 'P', { includeSubpackages: true });
+    assert.equal(fetched.includes(''), false, fetched.join(', '));
+    assert.ok(walked.some((o) => o.type === 'DEVC/K' && o.name === ''));
+    assert.ok(walked.some((o) => o.name === 'ZP_IN_SUB'));
+    fetched.length = 0;
+    const [answered] = await walkPackages(read, ['P'], {
+      includeSubpackages: true,
+    });
+    assert.ok(answered?.ok);
+    assert.equal(fetched.includes(''), false, fetched.join(', '));
+    assert.ok(answered.value.some((o) => o.name === 'ZP_IN_SUB'));
+  });
+});

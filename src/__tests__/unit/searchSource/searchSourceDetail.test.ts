@@ -142,7 +142,7 @@ describe('SearchSource and an object SAP lists without a name', () => {
       searchSourceRows(result)
         .split('\n')
         .includes(
-          '# incomplete ZPKG PROG/P /sap/bc/adt/programs/programs/znameless',
+          '# incomplete ZPKG PROG/P uri=/sap/bc/adt/programs/programs/znameless',
         ),
     );
   });

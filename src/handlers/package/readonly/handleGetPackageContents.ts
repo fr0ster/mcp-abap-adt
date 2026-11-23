@@ -153,25 +153,25 @@ function contentsRows(
     const rows = groups.get(owner) ?? [];
     // The technical name where it is not the name (a function group's is
     // its main program, SAPL…): what the object's own tools may need.
-    // An object SAP listed without a name and technical name: its URI, what
-    // tells it apart.
+    // The technical name where it is not the name; for an object SAP
+    // listed without a name, every identity field it carries (its technical
+    // name and its URI), what tells it apart.
     const techName =
       item.techName !== undefined && item.techName !== item.name
         ? item.techName
-        : item.name === ''
-          ? (item.uri ?? '')
-          : '';
+        : '';
+    const uri = item.name === '' ? (item.uri ?? '') : '';
     rows.push(
       descriptions
-        ? [item.type, item.name, techName, item.description ?? '']
-        : [item.type, item.name, techName],
+        ? [item.type, item.name, techName, uri, item.description ?? '']
+        : [item.type, item.name, techName, uri],
     );
     groups.set(owner, rows);
   }
   return groupedTsv(
     descriptions
-      ? ['type', 'name', 'tech_name', 'description']
-      : ['type', 'name', 'tech_name'],
+      ? ['type', 'name', 'tech_name', 'uri', 'description']
+      : ['type', 'name', 'tech_name', 'uri'],
     [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
   );
 }
@@ -186,7 +186,7 @@ function mediumItem(packageName: string, item: WalkedItem) {
       ? { description: item.description }
       : {}),
     ...(item.techName !== undefined ? { tech_name: item.techName } : {}),
-    // An object SAP listed without a name: its URI is what tells it apart.
+    // An object SAP listed without a name: its URI, too, tells it apart.
     ...(item.name === '' && item.uri !== undefined ? { uri: item.uri } : {}),
     ...(item.notLoaded === true ? { not_loaded: true } : {}),
   };

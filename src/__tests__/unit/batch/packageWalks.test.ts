@@ -643,7 +643,7 @@ describe('HandlerGet part contents', () => {
     assert.equal(textOf(a), textOf(b));
     // GetPackageContents' terse answer (compact parity).
     assert.equal(
-      textOf(a).startsWith('type\tname\ttech_name\n# package '),
+      textOf(a).startsWith('type\tname\ttech_name\turi\n# package '),
       true,
     );
   });
@@ -690,15 +690,15 @@ describe('HandlerGet part contents', () => {
       textOf(result),
       [
         '# asked ZROOT_A',
-        'type\tname\ttech_name',
+        'type\tname\ttech_name\turi',
         '# package ZROOT_A',
-        'DEVC/K\tZSUB_A\t',
-        'CLAS/OC\tZCL_A\t',
+        'DEVC/K\tZSUB_A\t\t',
+        'CLAS/OC\tZCL_A\t\t',
         '# asked ZROOT_B',
-        'type\tname\ttech_name',
+        'type\tname\ttech_name\turi',
         '# package ZROOT_B',
-        'DEVC/K\tZSUB_B\t',
-        'INTF/OI\tZIF_B\t',
+        'DEVC/K\tZSUB_B\t\t',
+        'INTF/OI\tZIF_B\t\t',
       ].join('\n'),
     );
   });

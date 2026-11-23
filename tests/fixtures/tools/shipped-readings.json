@@ -917,7 +917,7 @@
   },
   "GetPackageContents a root SAP could not load @terse": {
     "isError": false,
-    "text": "type\tname\ttech_name\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t",
+    "text": "type\tname\ttech_name\turi\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t\t",
     "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents a root SAP could not load @medium": {
@@ -969,7 +969,7 @@
   },
   "GetPackageContents a subpackage node SAP could not load @terse": {
     "isError": false,
-    "text": "type\tname\ttech_name\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t",
+    "text": "type\tname\ttech_name\turi\n# package ZPKG\nDEVC/K\tnot loaded by SAP\t\t",
     "requests": [
       "POST /sap/bc/adt/repository/nodestructure",
       "POST /sap/bc/adt/repository/nodestructure"
@@ -1037,7 +1037,7 @@
   },
   "GetPackageContents two objects SAP listed without a name @terse": {
     "isError": false,
-    "text": "type\tname\ttech_name\n# package ZPKG\nTABL/DT\t\t/sap/bc/adt/ddic/tables/a\nTABL/DT\t\t/sap/bc/adt/ddic/tables/b",
+    "text": "type\tname\ttech_name\turi\n# package ZPKG\nTABL/DT\t\t\t/sap/bc/adt/ddic/tables/a\nTABL/DT\t\t\t/sap/bc/adt/ddic/tables/b",
     "requests": ["POST /sap/bc/adt/repository/nodestructure"]
   },
   "GetPackageContents two objects SAP listed without a name @medium": {
@@ -1054,5 +1054,73 @@
     "isError": false,
     "text": "[{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/a\"},{\"name\":\"\",\"type\":\"TABL/DT\",\"kind\":\"table\",\"packageName\":\"ZPKG\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/ddic/tables/b\"}]",
     "requests": ["POST /sap/bc/adt/repository/nodestructure"]
+  },
+  "GetPackageContents a subpackage SAP listed without a name @terse": {
+    "isError": false,
+    "text": "type\tname\ttech_name\turi\n# package ZPKG\nDEVC/K\tZSUB\t\t\nDEVC/K\t\t\t/sap/bc/adt/packages/nameless\n# package ZSUB\nPROG/P\tZP_IN_SUB\t\t",
+    "requests": [
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageContents a subpackage SAP listed without a name @medium": {
+    "isError": false,
+    "text": "[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"tech_name\":\"ZSUB\"},{\"name\":\"\",\"type\":\"DEVC/K\",\"package_name\":\"ZPKG\",\"uri\":\"/sap/bc/adt/packages/nameless\"},{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"package_name\":\"ZSUB\",\"tech_name\":\"ZP_IN_SUB\"}]",
+    "requests": [
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageContents a subpackage SAP listed without a name @full": {
+    "isError": false,
+    "text": "[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true},{\"name\":\"\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"uri\":\"/sap/bc/adt/packages/nameless\"},{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"kind\":\"program\",\"packageName\":\"ZSUB\",\"isPackage\":false}]",
+    "requests": [
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageContents a subpackage SAP listed without a name @raw": {
+    "isError": false,
+    "text": "[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true},{\"name\":\"\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"packageName\":\"ZPKG\",\"isPackage\":true,\"uri\":\"/sap/bc/adt/packages/nameless\"},{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"kind\":\"program\",\"packageName\":\"ZSUB\",\"isPackage\":false}]",
+    "requests": [
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a subpackage SAP listed without a name @terse": {
+    "isError": false,
+    "text": "DEVC/K\tZPKG\n  DEVC/K\tZSUB\n    PROG/P\tZP_IN_SUB\n  DEVC/K\t\t\t/sap/bc/adt/packages/nameless",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a subpackage SAP listed without a name @medium": {
+    "isError": false,
+    "text": "{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\"}]},{\"name\":\"\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/nameless\"}]}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a subpackage SAP listed without a name @full": {
+    "isError": false,
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"uri\":\"/sap/bc/adt/packages/nameless\",\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
+  },
+  "GetPackageTree a subpackage SAP listed without a name @raw": {
+    "isError": false,
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZP_IN_SUB\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"uri\":\"/sap/bc/adt/packages/nameless\",\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}",
+    "requests": [
+      "GET /sap/bc/adt/packages/zpkg?version=active",
+      "POST /sap/bc/adt/repository/nodestructure",
+      "POST /sap/bc/adt/repository/nodestructure"
+    ]
   }
 }

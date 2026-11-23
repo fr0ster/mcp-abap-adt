@@ -420,6 +420,12 @@ export interface PackageNode {
   restoreStatus?: 'ok' | 'not-implemented';
   /** A type node SAP could not load: its row (`NOT_LOADED_BY_SAP`). */
   notLoaded?: true;
+  /**
+   * An object SAP listed without a name: the technical name and URI it
+   * carries, all that tells it apart (present only then).
+   */
+  techName?: string;
+  uri?: string;
   children?: PackageNode[];
 }
 
@@ -592,12 +598,12 @@ function undescribed(object: NodeItem, packageName: string): WalkedItem {
 /**
  * An object's identity within one package: every identity field it carries —
  * its type, its name, its technical name and its URI — so objects SAP lists
- * without a name stay apart; names read as SAP's repository reads them, in
- * any case.
+ * without a name stay apart; every field read as SAP's repository reads it,
+ * in any case.
  */
 function listedKeyOf(object: WalkedItem): string {
   return [
-    object.type,
+    object.type.toUpperCase(),
     object.name.toUpperCase(),
     (object.techName ?? '').toUpperCase(),
     (object.uri ?? '').toLowerCase(),
@@ -783,8 +789,13 @@ export async function walkPackages(
     for (const walk of level) {
       if (!alive(walk) || walk.depth >= limit) continue;
       for (const item of walk.found) {
-        // A not-loaded row is reported, never walked into.
-        if (item.notLoaded === true || kindOf(item.type) !== 'package') {
+        // A not-loaded row, or a package SAP listed without a name, is
+        // reported, never walked into: no request names it.
+        if (
+          item.notLoaded === true ||
+          item.name === '' ||
+          kindOf(item.type) !== 'package'
+        ) {
           continue;
         }
         const name = item.name.toUpperCase();
@@ -891,8 +902,15 @@ export async function walkPackage(
   const limit = options.maxDepth ?? Number.POSITIVE_INFINITY;
   const out = [...found];
   for (const item of found) {
-    // A not-loaded row is reported, never walked into.
-    if (item.notLoaded === true || kindOf(item.type) !== 'package') continue;
+    // A not-loaded row, or a package SAP listed without a name, is reported,
+    // never walked into: no request names it.
+    if (
+      item.notLoaded === true ||
+      item.name === '' ||
+      kindOf(item.type) !== 'package'
+    ) {
+      continue;
+    }
     if (depth >= limit) continue;
     appendAll(
       out,
@@ -1078,6 +1096,10 @@ export function assembleTree(
       ...(o.description ? { description: o.description } : {}),
       isPackage: kind === 'package',
       ...(o.notLoaded === true ? { notLoaded: true as const } : {}),
+      ...(o.name === '' && o.techName !== undefined
+        ? { techName: o.techName }
+        : {}),
+      ...(o.name === '' && o.uri !== undefined ? { uri: o.uri } : {}),
       ...(codeFormat ? { codeFormat } : {}),
       restoreStatus:
         kind && RESTORABLE.has(kind)
@@ -1091,6 +1113,7 @@ export function assembleTree(
       children:
         kind === 'package' &&
         o.notLoaded !== true &&
+        o.name !== '' &&
         !seen.has(o.name.toUpperCase())
           ? (seen.add(o.name.toUpperCase()), childrenOf(o.name.toUpperCase()))
           : [],

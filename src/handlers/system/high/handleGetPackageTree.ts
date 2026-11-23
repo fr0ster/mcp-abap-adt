@@ -398,9 +398,14 @@ function treeRows(
   return [
     {
       depth,
-      cells: descriptions
-        ? [node.type, node.name, node.description ?? '']
-        : [node.type, node.name],
+      // An object SAP listed without a name: its technical name and URI
+      // after its type and empty name, what tells it apart.
+      cells: [
+        node.type,
+        node.name,
+        ...(node.name === '' ? [node.techName ?? '', node.uri ?? ''] : []),
+        ...(descriptions ? [node.description ?? ''] : []),
+      ],
     },
     ...(node.children ?? []).flatMap((child) =>
       treeRows(child, descriptions, depth + 1),
@@ -412,6 +417,8 @@ function treeRows(
 interface MediumNode {
   name: string;
   type: string;
+  tech_name?: string;
+  uri?: string;
   description?: string;
   not_loaded?: true;
   children?: MediumNode[];
@@ -422,6 +429,8 @@ function mediumNode(node: PackageNode): MediumNode {
   return {
     name: node.name,
     type: node.type,
+    ...(node.techName !== undefined ? { tech_name: node.techName } : {}),
+    ...(node.uri !== undefined ? { uri: node.uri } : {}),
     ...(node.description !== undefined
       ? { description: node.description }
       : {}),

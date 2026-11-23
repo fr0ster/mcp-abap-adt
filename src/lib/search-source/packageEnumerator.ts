@@ -156,7 +156,20 @@ export async function enumerateScanTargets(
         notLoaded.push({ package: item.packageName, type: item.type });
         continue;
       }
-      if (item.isPackage) continue;
+      // A subpackage SAP listed without a name: never read, listed.
+      if (item.isPackage) {
+        if (item.name === '') {
+          incomplete.push({
+            package: item.packageName,
+            type: item.type,
+            ...(item.techName !== undefined
+              ? { tech_name: item.techName }
+              : {}),
+            ...(item.uri !== undefined ? { uri: item.uri } : {}),
+          });
+        }
+        continue;
+      }
       const code = scanCodeOf(item.type);
       if (code === undefined) continue;
       const family = FAMILY_OF[code];

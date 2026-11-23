@@ -9,13 +9,12 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import {
   answered,
-  completeAnswer,
   type DetailTable,
   formatted,
-  identityOf,
   rawLevel,
   readingAt,
-  Written,
+  rows,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -151,42 +150,39 @@ export function detailKindOf(entry: IGatewayErrorEntry): string {
 
 /** The list at terse: a TSV row per error. */
 function terseErrors(errors: readonly IGatewayErrorEntry[]): string {
-  return completeAnswer(
-    'RuntimeGetGatewayErrorLog',
-    (held: readonly IGatewayErrorEntry[]) => held.map(errorIdentity),
-    (held: readonly IGatewayErrorEntry[]) =>
-      Written.text(
-        [
-          { head: 'count', value: String(held.length) },
+  return writeListing({
+    heads: [{ head: 'count', value: String(errors.length) }],
+    reading: { errors },
+    lists: {
+      errors: rows('errors', {
+        columns: [
           {
-            header: [
-              'opid',
-              'detail_kind',
-              'dateTime',
-              'type',
-              'shortText',
-              'username',
-            ],
+            name: 'opid',
+            cell: (error: IGatewayErrorEntry) => error.opid ?? '',
           },
-          ...held.map((error) => ({
-            row: [
-              error.opid ?? '',
-              detailKindOf(error),
-              error.dateTime ?? '',
-              error.type ?? '',
-              error.shortText ?? '',
-              error.username ?? '',
-            ],
-          })),
+          { name: 'detail_kind', cell: detailKindOf },
+          {
+            name: 'dateTime',
+            cell: (error: IGatewayErrorEntry) => error.dateTime ?? '',
+          },
+          {
+            name: 'type',
+            cell: (error: IGatewayErrorEntry) => error.type ?? '',
+          },
+          {
+            name: 'shortText',
+            cell: (error: IGatewayErrorEntry) => error.shortText ?? '',
+          },
+          {
+            name: 'username',
+            cell: (error: IGatewayErrorEntry) => error.username ?? '',
+          },
         ],
-        [0, 2],
-      ),
-  )(errors);
+        header: 'always',
+      }),
+    },
+  }).answer;
 }
-
-/** An error's identity: its opid and time. */
-const errorIdentity = (error: IGatewayErrorEntry) =>
-  identityOf([error.opid ?? '', error.dateTime ?? '']);
 
 /**
  * What the list answers at each `detail`: the reading passed to the call

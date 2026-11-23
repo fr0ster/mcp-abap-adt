@@ -121,20 +121,114 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    and cloud, on shared fixtures. It asserts the terse answer carries what the next call needs
    (ids, positions, numbers), and records its size against the measured baseline.
 
+9. **Completeness by construction** (owner, after Codex round 9). The after-the-fact identity
+   guard is replaced by writers that cannot omit an item. Each round of the guard found a column,
+   a root or a section it did not compare; here a terse or medium answer can only be written from
+   the reading's own lists, one row per item, every cell from that item. Sub-steps, in order:
+
+   9.1 **The writer and its types** (`src/lib/detail/listing.ts`, `src/lib/detail/index.ts`).
+   - `Column<I>`: a column name and a function from one item to one raw cell. `Schema<I>`: the
+     ordered columns of one row kind. The header and every row of that kind are read from the
+     same schema, so a row has every column and no cell can be left out or added.
+   - `RowSchemas<R>`: a mapped type over the reading type `R`. It has one required key for every
+     array-valued member of `R` (objects, incomplete objects, not-loaded nodes, unreadable
+     includes, unread candidates, …), and its value is a `Schema` of that array's item type, or
+     a mark schema for a kind written as a `#` line. A reading list without a schema is a missing
+     key, a compile error. A list whose items are a discriminated union (a walk's item that is an
+     object or a not-loaded node) takes one schema per discriminant: a record keyed by the
+     discriminant's literal values, which is again exhaustive by type.
+   - `Listing<R>`: the reading value itself, its heads (typed label and value pairs; a count head
+     is computed by the writer from the lists' lengths, never passed in), an optional grouping
+     key per item (the `# package` group lines), and for a tree the children member, which the
+     writer walks in full, depth first.
+   - `writeListing(listing, schemas)` is the only producer of terse text. It walks every
+     array-valued member of the reading in the schema's order, writes one row or mark line per
+     item, and escapes every cell (tab, every line terminator, a first cell's `#` at every depth).
+     `writeListings(parts)` writes a list call: one section per object, its heads escaped, a
+     failure as its one `# error` cell. Its result is the opaque `Written`, still the only type a
+     terse formatter may return.
+   - `jsonListing(listing, keySchemas)` does the same for medium: one entry per item, its keys from
+     a key schema (`(item) => object`), the lists placed in the answer by the writer.
+   - Pins: a `@ts-expect-error` case for a schema record that misses a reading's list, one for a
+     union list missing a discriminant, and one for a formatter that returns a plain string. Unit
+     tests: generated readings (every kind, nested trees, empty lists) give exactly one line per
+     item, the header equal to the schema's names, and escaping as today. Mutation: the writer
+     skipping one list, or one item, turns the counting test red.
+
+   9.2 **Byte-identical goldens, before any tool moves** (`tests/fixtures/tools/terse-goldens.json`,
+   its writer script under `scripts/`, run by the gate's regeneration).
+   - For every tool below, the existing unit fixtures (shipped readings, the detail tests' recorded
+     documents, the walk models) are run at `terse` and `medium` at the current head, and each
+     answer is stored with its tool, level and fixture name.
+   - One test runs every tool over the same fixtures and asserts each answer equals its golden.
+     A tool whose answer was not complete before (it dropped a list the reading held) gets the new
+     answer recorded by the same writer in the step that changes it, with the difference named in
+     the commit and the CHANGELOG.
+
+   9.3 **Walks and trees**: GetPackageContents, GetPackageTree, GetObjectsList, GetObjectsByType,
+   ListFunctionModules and ListFunctionGroupIncludes (`functionGroupChildren.ts`), GetIncludesList,
+   GetStructuresList, GetEnhancements, SearchSource. One commit per tool. Each tool's terse (and
+   medium) formatter becomes a `Listing` built from its reading plus its schemas. The reading's
+   not-loaded, incomplete and unreadable lists each get a schema, so each is written by type.
+
+   9.4 **Searches**: SearchObject, DescribeByList, GetWhereUsed, GetMainPrograms, GetAllTypes.
+
+   9.5 **Transports**: GetTransport, ReadTransportObjects, ListTransports, ReadTransportActionLog.
+
+   9.6 **Feeds and lists**: RuntimeListFeeds (and compact `HandlerDumpList`),
+   RuntimeListSystemMessages, RuntimeGetGatewayErrorLog, RuntimeListProfilerTraceFiles.
+
+   9.7 **The rest**: GetATCFindings, GetATCResult, GetInactiveObjects, GetObjectVersions,
+   GetObjectOutline, GetObjectStructure, GetTransaction, GetPackage.
+
+   In 9.3–9.7, each tool's commit:
+   - goes red first, on its golden test with the formatter switched to an empty listing;
+   - comes with a pin for every list kind its reading holds, a fixture holding one item of each,
+     with the line count per kind asserted;
+   - has a mutation where removing one list's schema does not compile and dropping an item in the
+     reading-to-listing mapping turns that pin red;
+   - and keeps the answer table: only the terse and medium formatters change.
+
+   9.8 **The guard leaves** (`src/lib/detail/complete.ts`, `src/lib/answer.ts`, `src/lib/utils.ts`,
+   every handler above).
+   - Removed: every `held` function; the identity columns (a `Line`'s `identity`, `Written.text`'s
+     `identityColumns`); `identityOf`, `textIdentity` and `TextKey` where nothing else reads them;
+     `Written.identities` and `rootsValid`; `completeAnswer` at terse and medium; and `listedText`'s
+     per-section comparison, replaced by `writeListings`.
+   - `IncompleteAnswerError` and the `incomplete_answer` mapping in `answer.ts`, `answerThrown` and
+     `return_error` are removed once no caller remains. A source scan proves none does.
+   - The free `Written.text` over hand-built `Line`s stays only for heads-only texts (a list call's
+     `# asked` / `# error` lines). A source scan refuses any `Written.text` call with a row line
+     outside `src/lib/detail`.
+   - The guard's tests are replaced as follows. Root and section probes: the writer's tree and
+     list-call pins of 9.1, where a tree writes exactly one root line per tree and a list call one
+     section per object, by construction. Plain claim and assigned copy: the `@ts-expect-error` and
+     brand pins, which stay. Escaping: unchanged. Per-tool completeness: the per-kind line-count
+     pins of 9.3–9.7 together with the goldens.
+
+   9.9 **Docs.** The README's completeness paragraph and the CHANGELOG's guard entry state the new
+   rule: a terse or medium list is written from the reading's own lists, one row per item, every
+   cell from it; a reading state the writer cannot show (a node SAP could not load, an unreadable
+   include, a failed read) is a typed list of the reading and is written like any other. The all-or-
+   error rule stays at the reading's edge: what a reading cannot read is its typed state, and raw's
+   failed-read rule is unchanged. The tool docs are regenerated.
+
+   9.10 **Gate and review.** The gate runs detached until `DONE fail=0`. Then push, then Codex,
+   which gets this step's text as its scope.
+
 ## Upstream items (adt-strategies, separate)
 
 None left: every site reads with its shipped reading (adt-strategies 0.28.1).
 
 ## Follow-up (outside this PR)
 
-The completeness guard (`src/lib/detail/complete.ts`) covers every list or tree formatter this PR
-changed. Three tools this PR did not change, and which take no `detail`, keep their formatters
-unguarded: `GetObjectsByType`, `GetObjectInfo` and `GetNodeStructureLow`. Putting them under the
-guard is a task of its own. The same holds for `ListATCResults`, `GetTableContents` and
+Step 9 moves every list or tree formatter this PR changed onto `writeListing`, `GetObjectsByType`
+included. Two tools this PR did not change, and which take no `detail`, keep their own formatters:
+`GetObjectInfo` and `GetNodeStructureLow`. Moving them onto the writer is a task of its own. The same holds for `ListATCResults`, `GetTableContents` and
 `GetSqlQuery`, which this PR did not change either.
 
 ## Order and review
 
 One PR, `feat/terse-answers`. Steps 1–2 first, since they touch every answer and lower the risk of
-the rest, then 3–5, then 6–8. Codex reviews after steps 2, 5 and 8. The PR merges before 24.2.0 is
+the rest, then 3–5, then 6–8, then 9 once the owner approves it. Codex reviews after steps 2, 5, 8 and 9. The PR merges before 24.2.0 is
 tagged.

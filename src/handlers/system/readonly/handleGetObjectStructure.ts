@@ -1,5 +1,10 @@
 import * as z from 'zod';
-import { completeAnswer, Written } from '../../../lib/detail';
+import {
+  completeAnswer,
+  identityOf,
+  type Line,
+  Written,
+} from '../../../lib/detail';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving ADT object structure and returning a compact tree.
@@ -204,28 +209,25 @@ export function treeText(
   return `tree:\n${serializeTree(buildNestedTree(nodes, root), withOwner)}`;
 }
 
-/** A node's identity: its type, its owner's name and its own. */
-function nodeIdentity(node: {
-  objecttype?: string | undefined;
-  objectname?: string | undefined;
-  description?: string | undefined;
-}): string {
-  return `${node.objecttype ?? ''}|${node.objectname ?? ''}|${node.description ?? ''}`;
-}
-
-/** The tree as bulleted rows, depth first; the object asked, which SAP did not send, no item. */
-function bulletRows(
+/** The tree as bullets, depth first; the object asked, which SAP did not send, no item. */
+function bulletLines(
   tree: ObjectStructureTreeNode[],
   withOwner: boolean,
   depth = 0,
-): { depth: number; label: string; identity: string }[] {
-  return tree.flatMap((node) => [
-    {
-      depth,
-      label: labelOf(node, withOwner),
-      identity: node.synthetic === true ? '' : nodeIdentity(node),
-    },
-    ...bulletRows(node.children, withOwner, depth + 1),
+): Line[] {
+  return tree.flatMap((node): Line[] => [
+    node.synthetic === true
+      ? { bulletRoot: labelOf(node, withOwner), depth }
+      : {
+          bullet: labelOf(node, withOwner),
+          depth,
+          identity: [
+            node.objecttype ?? '',
+            node.objectname ?? '',
+            node.description ?? '',
+          ],
+        },
+    ...bulletLines(node.children, withOwner, depth + 1),
   ]);
 }
 
@@ -241,16 +243,25 @@ function completeTreeText(
   assertObjectStructurePresent(value);
   return completeAnswer(
     'GetObjectStructure',
-    (nodes: FlatObjectStructureNode[]) => nodes.map(nodeIdentity),
     (nodes: FlatObjectStructureNode[]) =>
-      nodes.length === 0
-        ? Written.lines(['No nodes found in object structure response.'])
-        : Written.lines([
-            'tree:',
-            Written.bulleted(
-              bulletRows(buildNestedTree(nodes, root), withOwner),
-            ),
-          ]),
+      nodes.map((node) =>
+        identityOf([
+          node.objecttype ?? '',
+          node.objectname ?? '',
+          node.description ?? '',
+        ]),
+      ),
+    (nodes: FlatObjectStructureNode[]) =>
+      Written.text(
+        nodes.length === 0
+          ? [{ title: 'No nodes found in object structure response.' }]
+          : [
+              { title: 'tree:' },
+              ...bulletLines(buildNestedTree(nodes, root), withOwner),
+              { title: '' },
+            ],
+        [],
+      ),
   )(flatNodesOf(value));
 }
 

@@ -4,7 +4,7 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  tsv,
+  identityOf,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -178,7 +178,6 @@ import {
   type NodeLevel,
   nodeItemsOf,
   nodeStructureOn,
-  walkedIdentity,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -478,18 +477,34 @@ interface ParentList {
  * One parent's objects as TSV: type, name, the technical name where it
  * differs, and the short description when it was asked for (the default).
  */
+/** An object's identity as a terse row writes it: type, name, the technical name where it differs, a nameless one's URI. */
+const terseIdentity = (o: FlatObject) =>
+  identityOf([
+    o.OBJECT_TYPE,
+    o.OBJECT_NAME,
+    o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
+      ? o.TECH_NAME
+      : '',
+    o.OBJECT_NAME === '' ? (o.OBJECT_URI ?? '') : '',
+  ]);
+
 function parentRows(list: ParentList, descriptions: boolean): Written<string> {
-  return Written.lines([
-    `# parent ${list.parent_type ?? ''} ${list.parent_name ?? ''}`,
-    `# total ${list.objects.length}`,
-    Written.tsv(
-      descriptions
-        ? ['type', 'name', 'tech_name', 'uri', 'description']
-        : ['type', 'name', 'tech_name', 'uri'],
-      list.objects.map((o) => ({
+  return Written.text(
+    [
+      {
+        head: 'parent',
+        value: `${list.parent_type ?? ''} ${list.parent_name ?? ''}`,
+      },
+      { head: 'total', value: String(list.objects.length) },
+      {
+        header: descriptions
+          ? ['type', 'name', 'tech_name', 'uri', 'description']
+          : ['type', 'name', 'tech_name', 'uri'],
+      },
+      ...list.objects.map((o) => ({
         // The technical name where it differs; the URI of an object SAP
         // listed without a name, what tells two such apart.
-        cells: [
+        row: [
           o.OBJECT_TYPE,
           o.OBJECT_NAME,
           o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
@@ -498,36 +513,25 @@ function parentRows(list: ParentList, descriptions: boolean): Written<string> {
           o.OBJECT_NAME === '' ? (o.OBJECT_URI ?? '') : '',
           ...(descriptions ? [o.DESCRIPTION ?? ''] : []),
         ],
-        identity: objectIdentity(o),
       })),
-    ),
-  ]);
+    ],
+    [0, 1, 2, 3],
+  );
 }
-
-/** A listed object's identity: its type and name, a nameless one's technical name and URI. */
-const objectIdentity = (o: FlatObject) =>
-  walkedIdentity({
-    type: o.OBJECT_TYPE,
-    name: o.OBJECT_NAME,
-    techName: o.TECH_NAME,
-    uri: o.OBJECT_URI,
-    notLoaded: o.NOT_LOADED,
-  });
 
 /**
  * What GetObjectsList answers of one parent at each `detail`, selected
  * before the walk (`src/lib/detail`): terse its objects as TSV (type, name,
- * the technical name only where it differs, the description when asked
- * for); medium every field read but the uri; full the answer before
- * `detail`. A walk reads many documents, so
- * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
+ * the technical name only where it differs, a nameless one's URI, the
+ * description when asked for); medium every field read, a nameless one's
+ * URI; full the answer before `detail`. Every object the walk held, or
+ * nothing (`completeAnswer`). Raw never reaches this table: the handler
+ * answers it as the responses (`wireAnswer`).
  */
 function objectsListAnswers(
   descriptions: boolean,
-  held: (list: ParentList) => readonly string[],
 ): AnswerTable<ParentList, string | object> {
-  const every = <A>(render: (list: ParentList) => Written<A>) =>
-    completeAnswer('GetObjectsList', held, render);
+  const TOOL = 'GetObjectsList';
   const full = (list: ParentList) => ({
     parent_name: list.parent_name,
     ...('parent_tech_name' in list
@@ -538,50 +542,69 @@ function objectsListAnswers(
     objects: list.objects,
   });
   return {
-    terse: every((list) => parentRows(list, descriptions)),
-    // The objects read from the answer written.
-    medium: every((list) =>
-      Written.list(
-        mediumOf(
-          list,
-          list.objects.map((o) => ({
-            type: o.OBJECT_TYPE,
-            name: o.OBJECT_NAME,
-            ...(o.TECH_NAME !== undefined ? { tech_name: o.TECH_NAME } : {}),
-            ...(o.OBJECT_URI !== undefined && o.OBJECT_NAME === ''
-              ? { uri: o.OBJECT_URI }
-              : {}),
-            ...(o.DESCRIPTION !== undefined
-              ? { description: o.DESCRIPTION }
-              : {}),
-            ...(o.NOT_LOADED === true ? { not_loaded: true } : {}),
-          })),
-        ),
-        (answer) => answer.objects,
-        (o) =>
-          walkedIdentity({
-            type: o.type,
-            name: o.name,
-            techName: o.tech_name,
-            uri: o.uri,
-            notLoaded: o.not_loaded,
-          }),
-      ),
+    terse: completeAnswer(
+      TOOL,
+      (list: ParentList) => list.objects.map(terseIdentity),
+      (list) => parentRows(list, descriptions),
     ),
-    full: every((list) =>
-      Written.list(full(list), (answer) => answer.objects, objectIdentity),
+    // Each object identified by the fields written.
+    medium: completeAnswer(
+      TOOL,
+      (list: ParentList) =>
+        list.objects.map((o) =>
+          identityOf([
+            o.OBJECT_TYPE,
+            o.OBJECT_NAME,
+            o.TECH_NAME ?? '',
+            o.OBJECT_NAME === '' ? (o.OBJECT_URI ?? '') : '',
+          ]),
+        ),
+      (list) =>
+        Written.json(
+          {
+            parent_name: list.parent_name,
+            parent_type: list.parent_type,
+            total_objects: list.objects.length,
+          },
+          {
+            objects: list.objects.map((o) => ({
+              type: o.OBJECT_TYPE,
+              name: o.OBJECT_NAME,
+              ...(o.TECH_NAME !== undefined ? { tech_name: o.TECH_NAME } : {}),
+              ...(o.OBJECT_URI !== undefined && o.OBJECT_NAME === ''
+                ? { uri: o.OBJECT_URI }
+                : {}),
+              ...(o.DESCRIPTION !== undefined
+                ? { description: o.DESCRIPTION }
+                : {}),
+              ...(o.NOT_LOADED === true ? { not_loaded: true } : {}),
+            })),
+          },
+          ['type', 'name', 'tech_name', 'uri'],
+        ),
+    ),
+    full: completeAnswer(
+      TOOL,
+      (list: ParentList) =>
+        list.objects.map((o) =>
+          identityOf([
+            o.OBJECT_TYPE,
+            o.OBJECT_NAME,
+            o.TECH_NAME ?? '',
+            o.OBJECT_URI ?? '',
+          ]),
+        ),
+      (list) => {
+        const { objects, ...rest } = full(list);
+        return Written.json(rest, { objects }, [
+          'OBJECT_TYPE',
+          'OBJECT_NAME',
+          'TECH_NAME',
+          'OBJECT_URI',
+        ]);
+      },
     ),
     raw: full,
-  };
-}
-
-/** The medium answer of one parent: every field read but the uri. */
-function mediumOf<O>(list: ParentList, objects: O[]) {
-  return {
-    parent_name: list.parent_name,
-    parent_type: list.parent_type,
-    total_objects: list.objects.length,
-    objects,
   };
 }
 
@@ -625,12 +648,7 @@ async function answeredGetObjectsList(
       : true;
   const level = levelOf(args);
   // Every object the parent's walk held, or nothing (`completeAnswer`).
-  const shown = answerAt(
-    objectsListAnswers(withDescriptions, (list) =>
-      list.objects.map(objectIdentity),
-    ),
-    levelOf(args),
-  );
+  const shown = answerAt(objectsListAnswers(withDescriptions), levelOf(args));
 
   if (listed !== undefined && listed.length > 0) {
     const parents: Parent[] = [];

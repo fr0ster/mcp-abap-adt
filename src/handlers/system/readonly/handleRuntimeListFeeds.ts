@@ -34,7 +34,7 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  type ItemRow,
+  identityOf,
   tsv,
   Written,
   wireAnswer,
@@ -281,71 +281,59 @@ type FeedShown =
       readonly answered: FeedPageAnswer<IGatewayErrorEntry>;
     };
 
-/** A page's `#` lines: where to read on, and a second SAP answered in part. */
-function pageLines(answered: {
-  next_to?: string;
-  incomplete_second?: string;
-}): string[] {
-  return [
-    ...(answered.next_to ? [`# next_to ${answered.next_to}`] : []),
-    ...(answered.incomplete_second
-      ? [`# incomplete_second ${answered.incomplete_second}`]
-      : []),
-  ];
-}
-
-/** A row of a feed's terse answer, and the identity of the item it was written of. */
-type FeedRow = ItemRow;
-
-/** A feed's columns and rows: one row per item it holds. */
-function feedRows(shown: FeedShown): { columns: string[]; rows: FeedRow[] } {
+/** A feed's columns, the columns of an item's identity, and a row per item. */
+function feedRows(shown: FeedShown): {
+  columns: string[];
+  identity: number[];
+  rows: string[][];
+} {
   switch (shown.feed) {
     case 'descriptors':
       return {
         columns: ['id', 'title', 'category'],
-        rows: shown.answered.entries.map((e) => ({
-          cells: [e.id, e.title, e.category ?? ''],
-          identity: `feed|${e.id}`,
-        })),
+        identity: [0],
+        rows: shown.answered.entries.map((e) => [
+          e.id,
+          e.title,
+          e.category ?? '',
+        ]),
       };
     case 'variants':
       return {
         columns: ['feed', 'title', 'query', 'is_default'],
+        identity: [0, 1, 2],
         // Every feed: one without variants is a row with none.
         rows: shown.answered.entries.flatMap((feed) =>
           feed.variants.length === 0
-            ? [
-                {
-                  cells: [feed.feed, '', '', ''],
-                  identity: `feed|${feed.feed}`,
-                },
-              ]
-            : feed.variants.map((v) => ({
-                cells: [feed.feed, v.title, v.query, String(v.is_default)],
-                identity: `variant|${feed.feed}|${v.title}|${v.query}`,
-              })),
+            ? [[feed.feed, '', '', '']]
+            : feed.variants.map((v) => [
+                feed.feed,
+                v.title,
+                v.query,
+                String(v.is_default),
+              ]),
         ),
       };
     case 'dumps':
       return {
         columns: ['dump_id', 'updated', 'title'],
-        rows: shown.answered.entries.map((e) => ({
-          cells: [e.dump_id, e.updated, e.title],
-          identity: `dump|${e.dump_id}`,
-        })),
+        identity: [0],
+        rows: shown.answered.entries.map((e) => [
+          e.dump_id,
+          e.updated,
+          e.title,
+        ]),
       };
     case 'system_messages':
       return {
         columns: ['id', 'createdOn', 'author', 'title'],
-        rows: shown.answered.entries.map((e) => ({
-          cells: [
-            e.id ?? e.messageId ?? '',
-            e.createdOn ?? '',
-            e.author ?? e.createdBy ?? '',
-            e.title ?? '',
-          ],
-          identity: `message|${e.id ?? e.messageId ?? ''}`,
-        })),
+        identity: [0],
+        rows: shown.answered.entries.map((e) => [
+          e.id ?? e.messageId ?? '',
+          e.createdOn ?? '',
+          e.author ?? e.createdBy ?? '',
+          e.title ?? '',
+        ]),
       };
     case 'gateway_errors':
       return {
@@ -357,42 +345,38 @@ function feedRows(shown: FeedShown): { columns: string[]; rows: FeedRow[] } {
           'shortText',
           'username',
         ],
-        rows: shown.answered.entries.map((e) => ({
-          cells: [
-            e.opid ?? '',
-            detailKindOf(e),
-            e.dateTime ?? '',
-            e.type ?? '',
-            e.shortText ?? '',
-            e.username ?? '',
-          ],
-          identity: `error|${e.opid ?? ''}`,
-        })),
+        identity: [0],
+        rows: shown.answered.entries.map((e) => [
+          e.opid ?? '',
+          detailKindOf(e),
+          e.dateTime ?? '',
+          e.type ?? '',
+          e.shortText ?? '',
+          e.username ?? '',
+        ]),
       };
   }
 }
 
-/** Every item a feed holds, by its identity: each entry, each variant, a feed without variants. */
+/** Every item a feed holds, as its row identifies it: each entry, each variant, a feed without variants. */
 function heldFeedItems(shown: FeedShown): string[] {
   switch (shown.feed) {
     case 'descriptors':
-      return shown.answered.entries.map((e) => `feed|${e.id}`);
+      return shown.answered.entries.map((e) => identityOf([e.id]));
     case 'variants':
       return shown.answered.entries.flatMap((feed) =>
         feed.variants.length === 0
-          ? [`feed|${feed.feed}`]
-          : feed.variants.map(
-              (v) => `variant|${feed.feed}|${v.title}|${v.query}`,
-            ),
+          ? [identityOf([feed.feed, '', ''])]
+          : feed.variants.map((v) => identityOf([feed.feed, v.title, v.query])),
       );
     case 'dumps':
-      return shown.answered.entries.map((e) => `dump|${e.dump_id}`);
+      return shown.answered.entries.map((e) => identityOf([e.dump_id]));
     case 'system_messages':
-      return shown.answered.entries.map(
-        (e) => `message|${e.id ?? e.messageId ?? ''}`,
+      return shown.answered.entries.map((e) =>
+        identityOf([e.id ?? e.messageId ?? '']),
       );
     case 'gateway_errors':
-      return shown.answered.entries.map((e) => `error|${e.opid ?? ''}`);
+      return shown.answered.entries.map((e) => identityOf([e.opid ?? '']));
   }
 }
 
@@ -404,15 +388,24 @@ const terseFeed = completeAnswer(
   'RuntimeListFeeds',
   heldFeedItems,
   (shown: FeedShown): Written<string> => {
-    const { columns, rows } = feedRows(shown);
-    return Written.lines([
-      `# feed ${shown.feed}`,
-      `# count ${shown.answered.count}`,
-      ...(shown.feed === 'descriptors' || shown.feed === 'variants'
-        ? []
-        : pageLines(shown.answered)),
-      Written.tsv(columns, rows),
-    ]);
+    const { columns, identity, rows } = feedRows(shown);
+    const paged =
+      shown.feed === 'descriptors' || shown.feed === 'variants'
+        ? { next_to: undefined, incomplete_second: undefined }
+        : shown.answered;
+    return Written.text(
+      [
+        { head: 'feed', value: shown.feed },
+        { head: 'count', value: String(shown.answered.count) },
+        ...(paged.next_to ? [{ head: 'next_to', value: paged.next_to }] : []),
+        ...(paged.incomplete_second
+          ? [{ head: 'incomplete_second', value: paged.incomplete_second }]
+          : []),
+        { header: columns },
+        ...rows.map((row) => ({ row })),
+      ],
+      identity,
+    );
   },
 );
 

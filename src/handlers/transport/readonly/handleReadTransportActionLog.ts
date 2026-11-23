@@ -15,7 +15,13 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt, completeAnswer, tsv, Written } from '../../../lib/detail';
+import {
+  answerAt,
+  completeAnswer,
+  identityOf,
+  tsv,
+  Written,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -125,22 +131,20 @@ export async function handleReadTransportActionLog(
         (reading: AdtReading<XmlRead>) =>
           entriesOf(reading.value)
             .filter((entry) => !isSeparator(entry.text))
-            .map((entry) => entry.text),
+            .map((entry) => identityOf([entry.text])),
         (reading: AdtReading<XmlRead>) => {
           const entries = entriesOf(reading.value).filter(
             (entry) => !isSeparator(entry.text),
           );
-          return Written.lines([
-            `# transport ${args.transport_number}`,
-            `# count ${entries.length}`,
-            Written.tsv(
-              ['entry'],
-              entries.map((entry) => ({
-                cells: [entry.text],
-                identity: entry.text,
-              })),
-            ),
-          ]);
+          return Written.text(
+            [
+              { head: 'transport', value: args.transport_number },
+              { head: 'count', value: String(entries.length) },
+              { header: ['entry'] },
+              ...entries.map((entry) => ({ row: [entry.text] })),
+            ],
+            [0],
+          );
         },
       ),
       medium: (reading) => terseLog(reading.value),

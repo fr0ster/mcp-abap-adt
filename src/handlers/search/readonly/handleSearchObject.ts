@@ -13,6 +13,7 @@ import {
   type DetailTable,
   formatted,
   fullLevel,
+  identityOf,
   rawLevel,
   readingAt,
   structuredValue,
@@ -112,21 +113,27 @@ export const TOOL_DEFINITION = {
  * or not; no hit answers nothing.
  */
 function hitLines(hits: readonly ISearchResult[]): Written<string> {
-  if (hits.length === 0) return Written.lines([]);
-  return Written.lines([
-    'name\ttype\tdescription\tpackage',
-    ...hits.map((h) =>
-      Written.row(
-        [h.name, h.type ?? h.unknownType, h.description, h.packageName ?? ''],
-        hitIdentity(h),
-      ),
-    ),
-  ]);
+  return Written.text(
+    hits.length === 0
+      ? []
+      : [
+          { header: ['name', 'type', 'description', 'package'] },
+          ...hits.map((h) => ({
+            row: [
+              h.name,
+              h.type ?? h.unknownType,
+              h.description,
+              h.packageName ?? '',
+            ],
+          })),
+        ],
+    [0, 1],
+  );
 }
 
-/** A hit's identity: its type (the code SAP sent, known or not) and name. */
+/** A hit's identity, as its row writes it: its name and its type (the code SAP sent, known or not). */
 const hitIdentity = (h: ISearchResult) =>
-  `${h.type ?? h.unknownType}|${h.name}`;
+  identityOf([h.name, h.type ?? h.unknownType]);
 
 /**
  * What `SearchObject` answers at each `detail`: the reading the search is

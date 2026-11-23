@@ -19,9 +19,9 @@ import {
   type DetailTable,
   formatted,
   fullLevel,
+  identityOf,
   rawLevel,
   readingAt,
-  tsv,
   Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -151,12 +151,12 @@ export function heldRequests(tree: ITransportTree): string[] {
     const attributes = request.attributes;
     const number = attributes['tm:number'] || attributes['adtcore:name'] || '';
     if (number === '') {
-      held.push(`numberless|${index}`);
+      held.push(identityOf([`numberless ${index}`]));
       return;
     }
     if (numbers.has(number)) return;
     numbers.add(number);
-    held.push(`request|${number}`);
+    held.push(identityOf([number]));
   });
   return held;
 }
@@ -176,7 +176,7 @@ interface ListedAnswer {
 }
 
 /** What `ListTransports` answers: the terse rows, the medium listing, the parse, or the document. */
-type ListAnswer = ListedAnswer | XmlNode | string;
+type ListAnswer = object | XmlNode | string;
 
 /**
  * What `ListTransports` answers at each `detail`: the reading the listing is
@@ -195,12 +195,22 @@ const LIST_READINGS: DetailTable<ListAnswer> = (() => {
       listingOf,
       every((tree) => {
         const transports = listed(tree);
-        return Written.lines([
-          `# count ${transports.length}`,
-          Written.tsv(
-            ['number', 'type', 'status', 'owner', 'target', 'description'],
-            transports.map((t) => ({
-              cells: [
+        // Each request identified by the number written.
+        return Written.text(
+          [
+            { head: 'count', value: String(transports.length) },
+            {
+              header: [
+                'number',
+                'type',
+                'status',
+                'owner',
+                'target',
+                'description',
+              ],
+            },
+            ...transports.map((t) => ({
+              row: [
                 t.number,
                 t.type ?? '',
                 t.status ?? '',
@@ -208,10 +218,10 @@ const LIST_READINGS: DetailTable<ListAnswer> = (() => {
                 t.target ?? '',
                 t.description ?? '',
               ],
-              identity: `request|${t.number}`,
             })),
-          ),
-        ]);
+          ],
+          [0],
+        );
       }),
     ),
     medium: formatted(
@@ -223,11 +233,11 @@ const LIST_READINGS: DetailTable<ListAnswer> = (() => {
           count: transports.length,
           transports,
         };
-        // The requests read from the answer itself.
-        return Written.list(
-          listedAnswer,
-          (written) => written.transports,
-          (t) => `request|${t.number}`,
+        // Each request identified by the number written.
+        return Written.json(
+          { success: listedAnswer.success, count: listedAnswer.count },
+          { transports: listedAnswer.transports },
+          ['number'],
         );
       }),
     ),

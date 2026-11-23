@@ -11,6 +11,7 @@ import {
   completeAnswer,
   type DetailTable,
   formatted,
+  identityOf,
   rawLevel,
   readingAt,
   tsv,
@@ -52,7 +53,7 @@ function mediumEntry(entry: IAbapTraceEntry) {
  */
 /** Every trace the feed held, by its id. */
 const heldTraces = (entries: readonly IAbapTraceEntry[]) =>
-  entries.map((entry) => entry.id);
+  entries.map((entry) => identityOf([entry.id]));
 
 // Every trace the feed held, or nothing (`completeAnswer`).
 const TRACE_READINGS: DetailTable<string | object> = {
@@ -62,22 +63,22 @@ const TRACE_READINGS: DetailTable<string | object> = {
       'RuntimeListProfilerTraceFiles',
       heldTraces,
       (entries: IAbapTraceEntry[]) =>
-        Written.lines([
-          `# count ${entries.length}`,
-          Written.tsv(
-            ['id', 'recordedAt', 'objectName', 'state', 'runtime'],
-            entries.map((entry) => ({
-              cells: [
+        Written.text(
+          [
+            { head: 'count', value: String(entries.length) },
+            { header: ['id', 'recordedAt', 'objectName', 'state', 'runtime'] },
+            ...entries.map((entry) => ({
+              row: [
                 entry.id,
                 entry.recordedAt,
                 entry.objectName,
                 entry.state?.text ?? '',
                 String(entry.runtime),
               ],
-              identity: entry.id,
             })),
-          ),
-        ]),
+          ],
+          [0],
+        ),
     ),
   ),
   medium: formatted(
@@ -86,14 +87,10 @@ const TRACE_READINGS: DetailTable<string | object> = {
       'RuntimeListProfilerTraceFiles',
       heldTraces,
       (entries: IAbapTraceEntry[]) =>
-        Written.list(
-          {
-            success: true,
-            count: entries.length,
-            entries: entries.map(mediumEntry),
-          },
-          (answer) => answer.entries,
-          (entry) => entry.id,
+        Written.json(
+          { success: true, count: entries.length },
+          { entries: entries.map(mediumEntry) },
+          ['id'],
         ),
     ),
   ),

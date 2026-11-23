@@ -41,7 +41,8 @@ import {
   answerAt,
   completeAnswer,
   type DetailLevel,
-  type TreeItemRow,
+  identityOf,
+  type Line,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -322,7 +323,7 @@ interface IncludesRead {
 type IncludesShown = (read: IncludesRead) => string;
 
 /** The tree as indented rows: name, and `cyclic` or `duplicate` where it is so. */
-function includeRows(node: IncludeNode, depth = 0): TreeItemRow[] {
+function includeRows(node: IncludeNode, depth = 0): Line[] {
   const mark =
     node.cyclic === true
       ? 'cyclic'
@@ -330,11 +331,7 @@ function includeRows(node: IncludeNode, depth = 0): TreeItemRow[] {
         ? 'duplicate'
         : '';
   return [
-    {
-      depth,
-      cells: mark === '' ? [node.name] : [node.name, mark],
-      identity: `include|${depth}|${node.name}`,
-    },
+    { depth, row: mark === '' ? [node.name] : [node.name, mark] },
     ...node.children.flatMap((child) => includeRows(child, depth + 1)),
   ];
 }
@@ -367,59 +364,54 @@ function mediumInclude(node: IncludeNode): MediumIncludeNode {
  * `detail`. A tree reads many documents, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
-/** Every node of a tree below and with its root, by name and depth. */
-function treeIdentities<N extends { name: string }>(
-  node: N,
-  childrenOf: (n: N) => readonly N[],
-  depth = 0,
-): string[] {
-  return [
-    `include|${depth}|${node.name}`,
-    ...childrenOf(node).flatMap((child) =>
-      treeIdentities(child, childrenOf, depth + 1),
-    ),
-  ];
+/** Every node of a tree, with and below its root, by its name as written. */
+function treeNames(node: IncludeNode): string[] {
+  return [identityOf([node.name]), ...node.children.flatMap(treeNames)];
 }
 
-/** Every item one object's read held: its tree's nodes and each include it could not read. */
-const heldIncludes = (read: IncludesRead) => [
-  ...treeIdentities(read.tree, (n) => n.children),
-  ...read.unreadable.map((entry) => `unreadable|${String(entry.name ?? '')}`),
+/** An include that could not be read, by its name. */
+const unreadableName = (entry: AnswerObject) => String(entry.name ?? '');
+
+/** Every item one object's read held at terse: its tree's nodes and each include it could not read. */
+const heldTerse = (read: IncludesRead) => [
+  ...treeNames(read.tree),
+  ...read.unreadable.map((entry) =>
+    identityOf(['unreadable', unreadableName(entry)]),
+  ),
 ];
 
-// Every node and unreadable include, or nothing (`completeAnswer`).
+// Every node (and, at terse, every unreadable include), or nothing
+// (`completeAnswer`); each identified by what is written.
 const INCLUDES_ANSWERS: AnswerTable<IncludesRead, string> = {
-  terse: completeAnswer('GetIncludesList', heldIncludes, (read) =>
-    Written.lines([
-      `# object ${read.object_type} ${read.object_name}`,
-      ...read.unreadable.map((entry) => {
-        const name = String(entry.name ?? '');
-        return Written.marked('unreadable', [name], `unreadable|${name}`);
-      }),
-      Written.indented(includeRows(read.tree)),
-    ]),
-  ),
-  // The nodes and the unreadable includes read from the answer written.
-  medium: completeAnswer('GetIncludesList', heldIncludes, (read) =>
-    Written.stringified(
-      Written.list(
-        {
-          object_name: read.object_name,
-          object_type: read.object_type,
-          tree: mediumInclude(read.tree),
-          ...(read.unreadable.length > 0
-            ? { unreadable: read.unreadable }
-            : {}),
-        },
-        (answer) => [
-          ...treeIdentities(answer.tree, (n) => n.children ?? []),
-          ...(answer.unreadable ?? []).map(
-            (entry) => `unreadable|${String(entry.name ?? '')}`,
-          ),
-        ],
-        (identity) => identity,
-      ),
+  terse: completeAnswer('GetIncludesList', heldTerse, (read) =>
+    Written.text(
+      [
+        { head: 'object', value: `${read.object_type} ${read.object_name}` },
+        ...read.unreadable.map(
+          (entry): Line => ({
+            mark: 'unreadable',
+            words: [unreadableName(entry)],
+          }),
+        ),
+        ...includeRows(read.tree),
+      ],
+      [0],
     ),
+  ),
+  medium: completeAnswer(
+    'GetIncludesList',
+    (read: IncludesRead) => treeNames(read.tree),
+    (read) =>
+      Written.stringified(
+        Written.jsonTree(
+          { object_name: read.object_name, object_type: read.object_type },
+          { tree: mediumInclude(read.tree) },
+          (node) => node.children ?? [],
+          ['name'],
+          true,
+          read.unreadable.length > 0 ? { unreadable: read.unreadable } : {},
+        ),
+      ),
   ),
   full: fullIncludes,
   raw: fullIncludes,

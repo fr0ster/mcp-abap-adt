@@ -17,6 +17,7 @@ import {
   type DetailTable,
   formatted,
   fullLevel,
+  identityOf,
   rawLevel,
   readingAt,
   tsv,
@@ -56,18 +57,18 @@ const TYPE_READINGS: DetailTable<INamedItem[] | XmlNode | string> = {
     utilNamedItems,
     completeAnswer(
       'GetAdtTypes',
-      (items: INamedItem[]) => items.map((item) => item.name),
+      (items: INamedItem[]) => items.map((item) => identityOf([item.name])),
       (items: INamedItem[]) =>
-        Written.lines([
-          `# count ${items.length}`,
-          Written.tsv(
-            ['name', 'description'],
-            items.map((item) => ({
-              cells: [item.name, (item.description ?? '').split('\n')[0] ?? ''],
-              identity: item.name,
+        Written.text(
+          [
+            { head: 'count', value: String(items.length) },
+            { header: ['name', 'description'] },
+            ...items.map((item) => ({
+              row: [item.name, (item.description ?? '').split('\n')[0] ?? ''],
             })),
-          ),
-        ]),
+          ],
+          [0],
+        ),
     ),
   ),
   medium: formatted(utilNamedItems, (items) => items),

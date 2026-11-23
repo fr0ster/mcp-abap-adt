@@ -7,7 +7,8 @@ import {
   completeAnswer,
   type DetailLevel,
   groupedTsv,
-  type ItemRow,
+  identityOf,
+  type Line,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -166,21 +167,37 @@ export function searchSourceRows(result: OrchestratorResult): string {
   return completeAnswer('SearchSource', heldHits, renderedRows)(result);
 }
 
-/** A hit's identity: its object, include and line (or count). */
+/** A hit's identity, as its row writes it: its include and its line (or count). */
 function hitIdentity(hit: OrchestratorResult['results'][number]): string {
-  return `hit|${hit.devclass}|${hit.object_type}|${hit.object_name}|${includeColumn(hit)}|${'hits' in hit ? `hits=${hit.hits}` : `line=${hit.line}`}`;
+  return identityOf([
+    includeColumn(hit),
+    'hits' in hit ? String(hit.hits) : String(hit.line),
+  ]);
+}
+
+/** A target SAP listed without a name: the words of its line. */
+function incompleteWords(
+  target: NonNullable<OrchestratorResult['incomplete']>[number],
+): string[] {
+  return [
+    target.package,
+    target.type,
+    ...(target.tech_name !== undefined
+      ? [`tech_name=${target.tech_name}`]
+      : []),
+    ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
+  ];
 }
 
 /** Every item a scan held: its hits, the nodes SAP could not load, the targets it listed without a name. */
 function heldHits(result: OrchestratorResult): string[] {
   return [
     ...result.results.map(hitIdentity),
-    ...(result.not_loaded ?? []).map(
-      (node) => `not-loaded|${node.package}|${node.type}`,
+    ...(result.not_loaded ?? []).map((node) =>
+      identityOf(['not loaded by SAP', node.package, node.type]),
     ),
-    ...(result.incomplete ?? []).map(
-      (target) =>
-        `incomplete|${target.package}|${target.type}|${target.tech_name ?? ''}|${target.uri ?? ''}`,
+    ...(result.incomplete ?? []).map((target) =>
+      identityOf(['incomplete', ...incompleteWords(target)]),
     ),
   ];
 }
@@ -193,55 +210,54 @@ function renderedRows(result: OrchestratorResult): Written<string> {
         ? ['include', 'line', 'snippet']
         : ['include', 'line']
       : ['include', 'hits'];
-  const groups = new Map<string, ItemRow[]>();
+  const groups = new Map<string, Line[]>();
   for (const hit of result.results) {
     const key = `${hit.devclass} ${hit.object_type} ${hit.object_name}`;
     const rows = groups.get(key) ?? [];
     rows.push({
-      cells:
+      row:
         'hits' in hit
           ? [includeColumn(hit), String(hit.hits)]
           : 'snippet' in hit
             ? [includeColumn(hit), String(hit.line), hit.snippet]
             : [includeColumn(hit), String(hit.line)],
-      identity: hitIdentity(hit),
     });
     groups.set(key, rows);
   }
-  return Written.lines([
-    `# scanned objects ${result.scanned.objects} sources ${result.scanned.sources} objects_with_hits ${result.scanned.objects_with_hits}`,
-    ...(result.truncated.by_object_cap ? ['# truncated by_object_cap'] : []),
-    ...(result.truncated.by_max_hits === true
-      ? ['# truncated by_max_hits']
-      : []),
-    ...(result.not_loaded ?? []).map((node) =>
-      Written.marked(
-        'not loaded by SAP',
-        [node.package, node.type],
-        `not-loaded|${node.package}|${node.type}`,
+  return Written.text(
+    [
+      {
+        head: 'scanned',
+        value: `objects ${result.scanned.objects} sources ${result.scanned.sources} objects_with_hits ${result.scanned.objects_with_hits}`,
+      },
+      ...(result.truncated.by_object_cap
+        ? [{ head: 'truncated', value: 'by_object_cap' }]
+        : []),
+      ...(result.truncated.by_max_hits === true
+        ? [{ head: 'truncated', value: 'by_max_hits' }]
+        : []),
+      ...(result.not_loaded ?? []).map(
+        (node): Line => ({
+          mark: 'not loaded by SAP',
+          words: [node.package, node.type],
+        }),
       ),
-    ),
-    // A target SAP listed without a name: never scanned, named by what tells
-    // it apart.
-    ...(result.incomplete ?? []).map((target) =>
-      Written.marked(
-        'incomplete',
-        [
-          target.package,
-          target.type,
-          ...(target.tech_name !== undefined
-            ? [`tech_name=${target.tech_name}`]
-            : []),
-          ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
-        ],
-        `incomplete|${target.package}|${target.type}|${target.tech_name ?? ''}|${target.uri ?? ''}`,
+      // A target SAP listed without a name: never scanned, named by what
+      // tells it apart.
+      ...(result.incomplete ?? []).map(
+        (target): Line => ({
+          mark: 'incomplete',
+          words: incompleteWords(target),
+        }),
       ),
-    ),
-    Written.groupedTsv(
-      columns,
-      [...groups].map(([value, rows]) => ({ field: 'object', value, rows })),
-    ),
-  ]);
+      { header: columns },
+      ...[...groups].flatMap(([value, rows]): Line[] => [
+        { group: 'object', value },
+        ...rows,
+      ]),
+    ],
+    [0, 1],
+  );
 }
 
 /**

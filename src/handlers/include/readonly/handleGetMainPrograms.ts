@@ -9,6 +9,7 @@ import {
   completeAnswer,
   type DetailTable,
   formatted,
+  identityOf,
   rawLevel,
   readingAt,
   tsv,
@@ -93,35 +94,34 @@ function mainProgramReadings(
     mainProgramsOf(rawOf(answer));
   // Every main program the reading held, or nothing (`completeAnswer`).
   const programIdentity = (program: { type: string; name: string }) =>
-    `${program.type}|${program.name}`;
+    identityOf([program.type, program.name]);
   const held = (programs: readonly MainProgram[]) =>
     programs.map(programIdentity);
   return {
     terse: formatted(
       programsOf,
       completeAnswer('GetMainPrograms', held, (programs: MainProgram[]) =>
-        Written.lines([
-          `# include ${includeName}`,
-          Written.tsv(
-            ['type', 'name'],
-            programs.map((program) => ({
-              cells: [program.type, program.name],
-              identity: programIdentity(program),
+        Written.text(
+          [
+            { head: 'include', value: includeName },
+            { header: ['type', 'name'] },
+            ...programs.map((program) => ({
+              row: [program.type, program.name],
             })),
-          ),
-        ]),
+          ],
+          [0, 1],
+        ),
       ),
     ),
     medium: formatted(
       programsOf,
       completeAnswer('GetMainPrograms', held, (programs: MainProgram[]) =>
-        Written.list(
+        Written.json(
+          { include_name: includeName },
           {
-            include_name: includeName,
             main_programs: programs.map(({ uri: _uri, ...fields }) => fields),
           },
-          (answer) => answer.main_programs,
-          programIdentity,
+          ['type', 'name'],
         ),
       ),
     ),

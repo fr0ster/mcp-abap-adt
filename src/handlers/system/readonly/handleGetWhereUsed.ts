@@ -56,7 +56,8 @@ import {
   answerAt,
   completeAnswer,
   type DetailLevel,
-  type ItemRow,
+  identityOf,
+  type Line,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -379,45 +380,54 @@ function fullWhereUsed(result: WhereUsedListResult, args: WhereUsedArgs) {
  * line. Every usage is answered: nothing is cut.
  */
 function whereUsedRows(result: WhereUsedListResult): Written<string> {
-  const groups = new Map<string, ItemRow[]>();
+  const groups = new Map<string, Line[]>();
   for (const reference of result.references) {
     const usage = reference.usage_information;
     if (usage === undefined) continue;
     const pkg = reference.package_name ?? '';
     const rows = groups.get(pkg) ?? [];
     rows.push({
-      cells: [
+      row: [
         reference.type,
         reference.name,
         usage === COMMON_USAGE ? '' : usage,
       ],
-      identity: referenceIdentity(reference),
     });
     groups.set(pkg, rows);
   }
-  return Written.lines([
-    `# total ${result.totalReferences}`,
-    Written.groupedTsv(
-      ['type', 'name', 'usage'],
-      [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
-    ),
-  ]);
+  // Each usage identified by its type and name as written, its package by
+  // the group line it stands under.
+  return Written.text(
+    [
+      { head: 'total', value: String(result.totalReferences) },
+      { header: ['type', 'name', 'usage'] },
+      ...[...groups].flatMap(([value, rows]): Line[] => [
+        { group: 'package', value },
+        ...rows,
+      ]),
+    ],
+    [0, 1],
+  );
 }
 
-/** A reference's identity: its type, name and package (each counted as often as it comes). */
+/** A reference's identity, as written: its type, name and package (each counted as often as it comes). */
 function referenceIdentity(reference: {
   type: string;
   name: string;
   package_name?: string | undefined;
 }): string {
-  return `${reference.type}|${reference.name}|${reference.package_name ?? ''}`;
+  return identityOf([
+    reference.type,
+    reference.name,
+    reference.package_name ?? '',
+  ]);
 }
 
-/** Every usage the list held — a reference SAP gave `usageInformation`. */
+/** Every usage the list held — a reference SAP gave `usageInformation` — by its type and name as a row writes it. */
 const heldUsages = ({ result }: WhereUsedRead) =>
   result.references
     .filter((reference) => reference.usage_information !== undefined)
-    .map(referenceIdentity);
+    .map((reference) => identityOf([reference.type, reference.name]));
 
 /** Every reference the list held, its package and container nodes too. */
 const heldReferences = ({ result }: WhereUsedRead) =>
@@ -439,23 +449,21 @@ const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, string | object> = {
   ),
   // The references read from the answer written.
   medium: completeAnswer('GetWhereUsed', heldReferences, ({ result }) =>
-    Written.list(
+    Written.json(
       {
         total_references: result.totalReferences,
         result_description: result.resultDescription,
+      },
+      {
         references: result.references.map(({ uri: _uri, ...fields }) => fields),
       },
-      (answer) => answer.references,
-      referenceIdentity,
+      ['type', 'name', 'package_name'],
     ),
   ),
-  full: completeAnswer('GetWhereUsed', heldReferences, ({ result, args }) =>
-    Written.list(
-      fullWhereUsed(result, args),
-      (answer) => answer.references,
-      referenceIdentity,
-    ),
-  ),
+  full: completeAnswer('GetWhereUsed', heldReferences, ({ result, args }) => {
+    const { references, ...rest } = fullWhereUsed(result, args);
+    return Written.json(rest, { references }, ['type', 'name', 'package_name']);
+  }),
   raw: ({ result }) => result.document,
 };
 

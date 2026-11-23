@@ -19,6 +19,7 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
+  identityOf,
   tsv,
   Written,
 } from '../../../lib/detail';
@@ -75,9 +76,9 @@ interface VersionsRead {
  * under the object; medium every field of each version; full the answer
  * before `detail`; raw the feed as ADT sent it.
  */
-/** A version's identity: its id and where its content is. */
+/** A version's identity, as its row writes it: its id and where its content is. */
 const versionIdentity = (version: IObjectVersion) =>
-  `${version.versionId}|${version.contentUri}`;
+  identityOf([version.versionId, version.contentUri]);
 
 /** Every version the feed held. */
 const heldVersions = (read: VersionsRead) => read.versions.map(versionIdentity);
@@ -85,22 +86,30 @@ const heldVersions = (read: VersionsRead) => read.versions.map(versionIdentity);
 // Every version the feed held, or nothing (`completeAnswer`).
 const VERSION_ANSWERS: AnswerTable<VersionsRead, string> = {
   terse: completeAnswer('GetObjectVersions', heldVersions, (read) =>
-    Written.lines([
-      `# object ${read.object_type} ${read.object_name}`,
-      Written.tsv(
-        ['versionId', 'author', 'updatedAt', 'transport', 'content_uri'],
-        read.versions.map((version) => ({
-          cells: [
+    Written.text(
+      [
+        { head: 'object', value: `${read.object_type} ${read.object_name}` },
+        {
+          header: [
+            'versionId',
+            'author',
+            'updatedAt',
+            'transport',
+            'content_uri',
+          ],
+        },
+        ...read.versions.map((version) => ({
+          row: [
             version.versionId,
             version.author ?? '',
             version.updatedAt ?? '',
             version.transportRequest ?? '',
             version.contentUri,
           ],
-          identity: versionIdentity(version),
         })),
-      ),
-    ]),
+      ],
+      [0, 4],
+    ),
   ),
   medium: ({ document: _document, ...read }) => JSON.stringify(read),
   full: ({ document: _document, ...read }) =>

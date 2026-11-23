@@ -14,7 +14,9 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  type ItemRow,
+  identityOf,
+  type Line,
+  type TextKey,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -151,66 +153,85 @@ function perPackage<T>(
 }
 
 /** One package's objects as TSV: `# package P` group lines, `type\tname` rows. */
-function contentsRows(
-  packageName: string,
-  items: readonly WalkedItem[],
-  descriptions: boolean,
-): string {
-  return completeAnswer(TOOL, heldItems, (all: readonly WalkedItem[]) =>
-    contentsRendered(packageName, all, descriptions),
-  )(items);
-}
-
 const TOOL = 'GetPackageContents';
 
-/** Every item a package's walk held, each by its identity. */
-const heldItems = (items: readonly WalkedItem[]) => items.map(walkedIdentity);
+/**
+ * An item's identity in the terse rows, as written: its type and name, the
+ * technical name where it differs, the URI of an object SAP listed without
+ * a name.
+ */
+const terseIdentity = (item: WalkedItem) =>
+  identityOf([
+    item.type,
+    item.name,
+    item.techName !== undefined && item.techName !== item.name
+      ? item.techName
+      : '',
+    item.name === '' ? (item.uri ?? '') : '',
+  ]);
 
-/** One package's objects as TSV, and the identity of each row written. */
-function contentsRendered(
+/** An item's identity at medium: its type, name, technical name and a nameless one's URI. */
+const mediumIdentity = (item: WalkedItem) =>
+  identityOf([
+    item.type,
+    item.name,
+    item.techName ?? '',
+    item.name === '' ? (item.uri ?? '') : '',
+  ]);
+
+/** An item's identity at full: its type and name, a nameless one's technical name and URI. */
+const fullIdentity = (item: WalkedItem) =>
+  identityOf([
+    item.type,
+    item.name,
+    item.name === '' ? (item.techName ?? '') : '',
+    item.name === '' ? (item.uri ?? '') : '',
+  ]);
+
+/** Every item the walks held, by `identity`; a refused walk holds none. */
+function heldBy(identity: (item: WalkedItem) => string) {
+  return (read: ContentsRead) =>
+    read.walked.flatMap((result) =>
+      result.ok ? result.value.map(identity) : [],
+    );
+}
+
+/** One package's objects as typed lines: `# package P` group lines, a row per object. */
+function contentsLines(
   packageName: string,
   items: readonly WalkedItem[],
   descriptions: boolean,
-): Written<string> {
-  const groups = new Map<string, ItemRow[]>();
+): Line[] {
+  const groups = new Map<string, Line[]>();
   for (const item of items) {
     const owner = (item.packageName ?? packageName).toUpperCase();
     const rows = groups.get(owner) ?? [];
     // The technical name where it is not the name (a function group's is
-    // its main program, SAPL…): what the object's own tools may need.
-    // The technical name where it is not the name; for an object SAP
-    // listed without a name, every identity field it carries (its technical
-    // name and its URI), what tells it apart.
+    // its main program, SAPL…); for an object SAP listed without a name,
+    // its URI too, what tells it apart.
     const techName =
       item.techName !== undefined && item.techName !== item.name
         ? item.techName
         : '';
     const uri = item.name === '' ? (item.uri ?? '') : '';
     rows.push({
-      cells: descriptions
+      row: descriptions
         ? [item.type, item.name, techName, uri, item.description ?? '']
         : [item.type, item.name, techName, uri],
-      identity: walkedIdentity(item),
     });
     groups.set(owner, rows);
   }
-  return Written.groupedTsv(
-    descriptions
-      ? ['type', 'name', 'tech_name', 'uri', 'description']
-      : ['type', 'name', 'tech_name', 'uri'],
-    [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
-  );
-}
-
-/** Each item through `each`, guarded: every item the walk held, or nothing. */
-function everyItem<A>(
-  each: (item: WalkedItem) => A,
-  identityOf: (answered: A) => string,
-) {
-  // The items read from the list written.
-  return completeAnswer(TOOL, heldItems, (items: readonly WalkedItem[]) =>
-    Written.list(items.map(each), (answer) => answer, identityOf),
-  );
+  return [
+    {
+      header: descriptions
+        ? ['type', 'name', 'tech_name', 'uri', 'description']
+        : ['type', 'name', 'tech_name', 'uri'],
+    },
+    ...[...groups].flatMap(([value, rows]): Line[] => [
+      { group: 'package', value },
+      ...rows,
+    ]),
+  ];
 }
 
 /** Every field the walk read of an object, without its uri. */
@@ -230,67 +251,102 @@ function mediumItem(packageName: string, item: WalkedItem) {
 }
 
 /**
+ * A level's JSON answer of the walks: one package's rows, or each
+ * package's under its name (a refused walk its error), every row written
+ * through `Written`.
+ */
+function perPackageWritten<I extends object>(
+  read: ContentsRead,
+  rowsOf: (packageName: string, items: WalkedItem[]) => I[],
+  identityKeys: readonly TextKey<I>[],
+): Written<string> {
+  if (read.single) {
+    const only = read.walked[0];
+    if (only === undefined || !only.ok) throw only?.error;
+    return Written.stringified(
+      Written.jsonRows(
+        rowsOf(read.packageNames[0] ?? '', only.value),
+        identityKeys,
+      ),
+    );
+  }
+  return Written.stringified(
+    Written.each(
+      read.walked.map((result, i) => {
+        const package_name = read.packageNames[i] ?? '';
+        return result.ok
+          ? Written.json(
+              { package_name },
+              { objects: rowsOf(package_name, result.value) },
+              identityKeys,
+            )
+          : Written.json(
+              {
+                package_name,
+                error: thrownEntry(result.error, 'read package node structure'),
+              },
+              {},
+              identityKeys,
+            );
+      }),
+    ),
+  );
+}
+
+/**
  * What GetPackageContents answers at each `detail`, selected before the
  * walk (`src/lib/detail`): terse the objects as TSV under `# package` group
  * lines (`# asked P` before each package of several, a failed walk as
  * `# error`); medium every field the walk read, no uri; full the list before
- * `detail`. A walk reads many documents, so
- * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
+ * `detail`. Every object the walks held, or nothing (`completeAnswer`).
+ * Raw never reaches this table: the handler answers it as the responses
+ * (`wireAnswer`).
  */
 const CONTENTS_ANSWERS: AnswerTable<ContentsRead, string> = {
-  terse: (read) => {
+  terse: completeAnswer(TOOL, heldBy(terseIdentity), (read) => {
     if (read.single) {
       const only = read.walked[0];
       if (only === undefined || !only.ok) throw only?.error;
-      return contentsRows(
-        read.packageNames[0] ?? '',
-        only.value,
-        read.descriptions,
+      return Written.text(
+        contentsLines(
+          read.packageNames[0] ?? '',
+          only.value,
+          read.descriptions,
+        ),
+        [0, 1, 2, 3],
       );
     }
-    return read.walked
-      .map((result, i) => {
+    return Written.text(
+      read.walked.flatMap((result, i): Line[] => {
         const name = read.packageNames[i] ?? '';
         return result.ok
-          ? `# asked ${name}\n${contentsRows(name, result.value, read.descriptions)}`
-          : `# asked ${name}\n# error ${JSON.stringify(thrownEntry(result.error, 'read package node structure'))}`;
-      })
-      .join('\n');
-  },
-  medium: (read) =>
-    JSON.stringify(
-      perPackage(read, (name, items) =>
-        everyItem(
-          (item) => mediumItem(name, item),
-          (o) =>
-            walkedIdentity({
-              type: o.type,
-              name: o.name,
-              techName: o.tech_name,
-              uri: o.uri,
-              notLoaded: o.not_loaded,
-            }),
-        )(items),
-      ),
+          ? [
+              { head: 'asked', value: name },
+              ...contentsLines(name, result.value, read.descriptions),
+            ]
+          : [
+              { head: 'asked', value: name },
+              {
+                head: 'error',
+                value: JSON.stringify(
+                  thrownEntry(result.error, 'read package node structure'),
+                ),
+              },
+            ];
+      }),
+      [0, 1, 2, 3],
+    );
+  }),
+  medium: completeAnswer(TOOL, heldBy(mediumIdentity), (read) =>
+    perPackageWritten(
+      read,
+      (name, items) => items.map((item) => mediumItem(name, item)),
+      ['type', 'name', 'tech_name', 'uri'],
     ),
-  full: (read) =>
-    JSON.stringify(
-      perPackage(read, (name, items) =>
-        everyItem(
-          (item) => assembleList(name, [item])[0],
-          (o) =>
-            o === undefined
-              ? ''
-              : walkedIdentity({
-                  type: o.type,
-                  name: o.name,
-                  techName: o.name === '' ? o.techName : undefined,
-                  uri: o.uri,
-                  notLoaded: o.notLoaded,
-                }),
-        )(items),
-      ),
-    ),
+  ),
+  full: completeAnswer(TOOL, heldBy(fullIdentity), (read) =>
+    perPackageWritten(read, assembleList, ['type', 'name', 'techName', 'uri']),
+  ),
   raw: (read) => JSON.stringify(perPackage(read, assembleList)),
 };
 

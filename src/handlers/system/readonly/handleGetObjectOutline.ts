@@ -31,7 +31,8 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  type TreeItemRow,
+  identityOf,
+  type Line,
   Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -212,20 +213,15 @@ function definitionOf(component: AnsweredComponent): AnsweredLink | undefined {
  * local include, a module's include).
  */
 /** A component's identity: its depth, name and type. */
-function componentIdentity(component: AnsweredComponent, depth: number) {
-  return `${depth}|${component.name}|${component.type}`;
+function componentIdentity(component: AnsweredComponent) {
+  return identityOf([component.name, component.type]);
 }
 
 /** Every component of a tree, with and below its root. */
-function componentIdentities(
-  component: AnsweredComponent,
-  depth = 0,
-): string[] {
+function componentIdentities(component: AnsweredComponent): string[] {
   return [
-    componentIdentity(component, depth),
-    ...component.children.flatMap((child) =>
-      componentIdentities(child, depth + 1),
-    ),
+    componentIdentity(component),
+    ...component.children.flatMap(componentIdentities),
   ];
 }
 
@@ -233,7 +229,7 @@ function outlineRows(
   component: AnsweredComponent,
   source: string | undefined,
   depth = 0,
-): TreeItemRow[] {
+): Line[] {
   const definition = definitionOf(component);
   const line =
     definition?.start === undefined ? '' : String(definition.start.line);
@@ -244,14 +240,13 @@ function outlineRows(
   return [
     {
       depth,
-      cells: [
+      row: [
         component.name,
         component.type,
         component.visibility ?? '',
         line,
         elsewhere,
       ],
-      identity: componentIdentity(component, depth),
     },
     ...component.children.flatMap((child) =>
       outlineRows(child, source, depth + 1),
@@ -278,24 +273,29 @@ function outlineAnswers(
       : componentOf(outline.base, outline.root);
   return {
     // Every component of the outline, or nothing (`completeAnswer`).
-    terse: completeAnswer(
-      'GetObjectOutline',
-      ({ outline }: OutlineRead) => {
-        const root = outline === undefined ? undefined : components(outline);
-        return root === undefined ? [] : componentIdentities(root);
-      },
-      ({ document, outline }: OutlineRead) => {
-        const root = outline === undefined ? undefined : components(outline);
-        if (root === undefined) return Written.lines([document]);
-        const source = definitionOf(root)?.source;
-        return Written.lines([
-          `# object ${objectType} ${objectName}`,
-          ...(source === undefined ? [] : [`# source ${source}`]),
-          'name\ttype\tvisibility\tline\tsource',
-          Written.indented(outlineRows(root, source)),
-        ]);
-      },
-    ),
+    // No outline read: the document as it came (nothing reshaped).
+    terse: ({ document, outline }: OutlineRead) => {
+      const root = outline === undefined ? undefined : components(outline);
+      if (root === undefined) return document;
+      return completeAnswer(
+        'GetObjectOutline',
+        componentIdentities,
+        (tree: AnsweredComponent) => {
+          const source = definitionOf(tree)?.source;
+          return Written.text(
+            [
+              { head: 'object', value: `${objectType} ${objectName}` },
+              ...(source === undefined
+                ? []
+                : [{ head: 'source', value: source }]),
+              { header: ['name', 'type', 'visibility', 'line', 'source'] },
+              ...outlineRows(tree, source),
+            ],
+            [0, 1],
+          );
+        },
+      )(root);
+    },
     medium: ({ document, outline }) =>
       outline === undefined
         ? document

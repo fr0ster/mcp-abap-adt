@@ -11,6 +11,7 @@ import {
   completeAnswer,
   type DetailTable,
   formatted,
+  identityOf,
   rawLevel,
   readingAt,
   tsv,
@@ -26,7 +27,7 @@ import { ourFeeds } from '../../../lib/strategies/resultSets';
 
 /** A message's identity: its id, and when it was created. */
 const messageIdentity = (m: ISystemMessageEntry) =>
-  `${m.id ?? m.messageId ?? ''}|${m.createdOn ?? ''}|${m.title ?? ''}`;
+  identityOf([m.id ?? m.messageId ?? '', m.createdOn ?? '', m.title ?? '']);
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
@@ -103,21 +104,21 @@ const SYSTEM_MESSAGE_READINGS: DetailTable<string | object> = (() => {
         'RuntimeListSystemMessages',
         (messages: ISystemMessageEntry[]) => messages.map(messageIdentity),
         (messages: ISystemMessageEntry[]) =>
-          Written.lines([
-            `# count ${messages.length}`,
-            Written.tsv(
-              ['id', 'createdOn', 'author', 'title'],
-              messages.map((m) => ({
-                cells: [
+          Written.text(
+            [
+              { head: 'count', value: String(messages.length) },
+              { header: ['id', 'createdOn', 'author', 'title'] },
+              ...messages.map((m) => ({
+                row: [
                   m.id ?? m.messageId ?? '',
                   m.createdOn ?? '',
                   m.author ?? m.createdBy ?? '',
                   m.title ?? '',
                 ],
-                identity: messageIdentity(m),
               })),
-            ),
-          ]),
+            ],
+            [0, 1, 3],
+          ),
       ),
     ),
     medium: every,

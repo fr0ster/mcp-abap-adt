@@ -12,6 +12,7 @@ import {
   completeAnswer,
   type DetailTable,
   formatted,
+  identityOf,
   rawLevel,
   readingAt,
   tsv,
@@ -155,12 +156,21 @@ function terseErrors(errors: readonly IGatewayErrorEntry[]): string {
     'RuntimeGetGatewayErrorLog',
     (held: readonly IGatewayErrorEntry[]) => held.map(errorIdentity),
     (held: readonly IGatewayErrorEntry[]) =>
-      Written.lines([
-        `# count ${held.length}`,
-        Written.tsv(
-          ['opid', 'detail_kind', 'dateTime', 'type', 'shortText', 'username'],
-          held.map((error) => ({
-            cells: [
+      Written.text(
+        [
+          { head: 'count', value: String(held.length) },
+          {
+            header: [
+              'opid',
+              'detail_kind',
+              'dateTime',
+              'type',
+              'shortText',
+              'username',
+            ],
+          },
+          ...held.map((error) => ({
+            row: [
               error.opid ?? '',
               detailKindOf(error),
               error.dateTime ?? '',
@@ -168,16 +178,16 @@ function terseErrors(errors: readonly IGatewayErrorEntry[]): string {
               error.shortText ?? '',
               error.username ?? '',
             ],
-            identity: errorIdentity(error),
           })),
-        ),
-      ]),
+        ],
+        [0, 2],
+      ),
   )(errors);
 }
 
 /** An error's identity: its opid and time. */
 const errorIdentity = (error: IGatewayErrorEntry) =>
-  `${error.opid ?? ''}|${error.dateTime ?? ''}`;
+  identityOf([error.opid ?? '', error.dateTime ?? '']);
 
 /**
  * What the list answers at each `detail`: the reading passed to the call

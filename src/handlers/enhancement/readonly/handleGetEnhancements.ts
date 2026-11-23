@@ -38,6 +38,8 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
+  identityOf,
+  type Line,
   tsv,
   Written,
   wireAnswer,
@@ -801,50 +803,38 @@ interface EnhancementsShown {
 }
 
 /** One object's terse lines: its `# object` line, then its rows. */
-function terseObjectLines(response: EnhancementResponse): Written<string> {
-  return Written.lines([
-    `# object ${response.object_type} ${response.object_name}`,
-    ...(response.context ? [`# context ${response.context}`] : []),
-    `# count ${response.enhancements.length}`,
+function terseObjectLines(response: EnhancementResponse): Line[] {
+  return [
+    {
+      head: 'object',
+      value: `${response.object_type} ${response.object_name}`,
+    },
+    ...(response.context ? [{ head: 'context', value: response.context }] : []),
+    { head: 'count', value: String(response.enhancements.length) },
     ...(response.enhancements.length > 0
       ? [
-          Written.tsv(
-            ['name', 'type', 'description'],
-            response.enhancements.map((enh) => ({
-              cells: [
-                enh.name,
-                enh.type,
-                (enh.description ?? '').split('\n')[0] ?? '',
-              ],
-              identity: enhancementIdentity(response, enh),
-            })),
-          ),
+          { header: ['name', 'type', 'description'] },
+          ...response.enhancements.map((enh) => ({
+            row: [
+              enh.name,
+              enh.type,
+              (enh.description ?? '').split('\n')[0] ?? '',
+            ],
+          })),
         ]
       : []),
-    ...(response.unreadable ?? []).map((entry) =>
-      Written.marked(
-        'unreadable',
-        [JSON.stringify(entry)],
-        `unreadable|${response.object_name}|${JSON.stringify(entry)}`,
-      ),
+    ...(response.unreadable ?? []).map(
+      (entry): Line => ({ mark: 'unreadable', words: [JSON.stringify(entry)] }),
     ),
-  ]);
+  ];
 }
 
-/** An enhancement's identity: the object it enhances, its name and type. */
-function enhancementIdentity(
-  response: EnhancementResponse,
-  enh: EnhancementResponse['enhancements'][number],
-): string {
-  return `enhancement|${response.object_type}|${response.object_name}|${enh.name}|${enh.type}`;
-}
-
-/** Every item one object's read held: its enhancements and what it could not read. */
+/** Every item one object's read held, as written: its enhancements (name and type) and what it could not read. */
 function heldOf(response: EnhancementResponse): string[] {
   return [
-    ...response.enhancements.map((enh) => enhancementIdentity(response, enh)),
-    ...(response.unreadable ?? []).map(
-      (entry) => `unreadable|${response.object_name}|${JSON.stringify(entry)}`,
+    ...response.enhancements.map((enh) => identityOf([enh.name, enh.type])),
+    ...(response.unreadable ?? []).map((entry) =>
+      identityOf(['unreadable', JSON.stringify(entry)]),
     ),
   ];
 }
@@ -877,24 +867,29 @@ const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
             ? heldOf(read.response)
             : [
                 ...read.response.objects.flatMap(heldOf),
-                ...(read.response.includes_unread ?? []).map(
-                  (unread) => `include_unread|${JSON.stringify(unread)}`,
+                ...(read.response.includes_unread ?? []).map((unread) =>
+                  identityOf(['include_unread', JSON.stringify(unread)]),
                 ),
               ],
         ({ read }: EnhancementsShown): Written<string> =>
-          read.kind === 'single'
-            ? terseObjectLines(read.response)
-            : Written.lines([
-                `# total ${read.response.total_enhancements_found}`,
-                ...read.response.objects.map(terseObjectLines),
-                ...(read.response.includes_unread ?? []).map((unread) =>
-                  Written.marked(
-                    'include_unread',
-                    [JSON.stringify(unread)],
-                    `include_unread|${JSON.stringify(unread)}`,
+          Written.text(
+            read.kind === 'single'
+              ? terseObjectLines(read.response)
+              : [
+                  {
+                    head: 'total',
+                    value: String(read.response.total_enhancements_found),
+                  },
+                  ...read.response.objects.flatMap(terseObjectLines),
+                  ...(read.response.includes_unread ?? []).map(
+                    (unread): Line => ({
+                      mark: 'include_unread',
+                      words: [JSON.stringify(unread)],
+                    }),
                   ),
-                ),
-              ]),
+                ],
+            [0, 1],
+          ),
       ),
       medium: former,
       full: former,

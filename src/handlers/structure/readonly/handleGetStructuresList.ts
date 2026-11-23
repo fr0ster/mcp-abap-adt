@@ -23,7 +23,8 @@ import {
   answerAt,
   completeAnswer,
   type DetailLevel,
-  type TreeItemRow,
+  identityOf,
+  type Line,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -284,7 +285,7 @@ interface StructuresRead {
 type StructuresShown = (read: StructuresRead) => string;
 
 /** The tree as indented rows: structure, kind, the component it is under. */
-function structureRows(node: StructureNode, depth = 0): TreeItemRow[] {
+function structureRows(node: StructureNode, depth = 0): Line[] {
   const marks = [
     ...(node.cyclic === true ? ['cyclic'] : []),
     ...(node.error !== undefined ? ['not read'] : []),
@@ -292,8 +293,7 @@ function structureRows(node: StructureNode, depth = 0): TreeItemRow[] {
   return [
     {
       depth,
-      cells: [node.structure, node.kind, node.attribute ?? '', ...marks],
-      identity: `structure|${depth}|${node.structure}|${node.kind}|${node.attribute ?? ''}`,
+      row: [node.structure, node.kind, node.attribute ?? '', ...marks],
     },
     ...node.children.flatMap((child) => structureRows(child, depth + 1)),
   ];
@@ -322,18 +322,18 @@ function fullStructures(read: StructuresRead): string {
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 /** Every node of a structure's tree, with and below its root, by depth and name. */
-function structureIdentities(node: StructureNode, depth = 0): string[] {
+function structureIdentities(node: StructureNode): string[] {
   return [
-    `structure|${depth}|${node.structure}|${node.kind}|${node.attribute ?? ''}`,
-    ...node.children.flatMap((child) => structureIdentities(child, depth + 1)),
+    identityOf([node.structure, node.kind, node.attribute ?? '']),
+    ...node.children.flatMap(structureIdentities),
   ];
 }
 
 /** Every item one structure's read held: its tree's nodes and each candidate not read. */
 const heldStructures = (read: StructuresRead) => [
   ...structureIdentities(read.tree),
-  ...read.append_candidates_unread.map(
-    (unread) => `unread|${unread.candidate}`,
+  ...read.append_candidates_unread.map((unread) =>
+    identityOf(['append_candidate_unread', unread.candidate]),
   ),
 ];
 
@@ -341,19 +341,21 @@ const heldStructures = (read: StructuresRead) => [
 // and full write the tree whole.
 const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
   terse: completeAnswer('GetStructuresList', heldStructures, (read) =>
-    Written.lines([
-      `# structure ${read.structure_name}`,
-      ...(read.appends_unavailable ? ['# appends_unavailable'] : []),
-      // Each candidate SAP refused to read, by name: the one to read again.
-      ...read.append_candidates_unread.map((unread) =>
-        Written.marked(
-          'append_candidate_unread',
-          [unread.candidate],
-          `unread|${unread.candidate}`,
+    Written.text(
+      [
+        { head: 'structure', value: read.structure_name },
+        ...(read.appends_unavailable ? [{ head: 'appends_unavailable' }] : []),
+        // Each candidate SAP refused to read, by name: the one to read again.
+        ...read.append_candidates_unread.map(
+          (unread): Line => ({
+            mark: 'append_candidate_unread',
+            words: [unread.candidate],
+          }),
         ),
-      ),
-      Written.indented(structureRows(read.tree)),
-    ]),
+        ...structureRows(read.tree),
+      ],
+      [0, 1, 2],
+    ),
   ),
   medium: fullStructures,
   full: fullStructures,

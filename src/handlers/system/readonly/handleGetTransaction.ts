@@ -2,7 +2,13 @@ import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt, completeAnswer, tsv, Written } from '../../../lib/detail';
+import {
+  answerAt,
+  completeAnswer,
+  identityOf,
+  tsv,
+  Written,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   DETAIL_SHAPE,
@@ -74,7 +80,7 @@ export function transactionPropertiesOf(value: XmlRead): {
 
 /** A property's identity: its facet, name and text. */
 const propertyIdentity = (property: Record<string, string>) =>
-  `${property.facet ?? ''}|${property.name ?? ''}|${property.text ?? ''}`;
+  identityOf([property.facet ?? '', property.name ?? '', property.text ?? '']);
 
 export async function handleGetTransaction(
   context: HandlerContext,
@@ -113,24 +119,26 @@ export async function handleGetTransaction(
             const { object, properties } = transactionPropertiesOf(
               reading.value,
             );
-            return Written.lines([
-              `# transaction ${name}`,
-              ...(object?.text === undefined ? [] : [`# text ${object.text}`]),
-              ...(object?.package === undefined
-                ? []
-                : [`# package ${object.package}`]),
-              Written.tsv(
-                ['facet', 'name', 'text'],
-                properties.map((property) => ({
-                  cells: [
+            return Written.text(
+              [
+                { head: 'transaction', value: name },
+                ...(object?.text === undefined
+                  ? []
+                  : [{ head: 'text', value: object.text }]),
+                ...(object?.package === undefined
+                  ? []
+                  : [{ head: 'package', value: object.package }]),
+                { header: ['facet', 'name', 'text'] },
+                ...properties.map((property) => ({
+                  row: [
                     property.facet ?? '',
                     property.name ?? '',
                     property.text ?? '',
                   ],
-                  identity: propertyIdentity(property),
                 })),
-              ),
-            ]);
+              ],
+              [0, 1, 2],
+            );
           },
         ),
         medium: (reading) => ({

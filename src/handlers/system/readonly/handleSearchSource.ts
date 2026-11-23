@@ -4,12 +4,12 @@ import { isRfcConnection } from '../../../lib/connectionKind';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
+  type Column,
   type DetailLevel,
-  identityOf,
-  type Line,
-  Written,
+  marks,
+  rows,
   wireAnswer,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -26,7 +26,11 @@ import {
   type OrchestratorResult,
   runSearchSourceWithContext,
 } from '../../../lib/search-source/orchestrator';
-import { SCAN_OBJECT_TYPES } from '../../../lib/search-source/packageEnumerator';
+import {
+  type IncompleteTarget,
+  type NotLoadedNode,
+  SCAN_OBJECT_TYPES,
+} from '../../../lib/search-source/packageEnumerator';
 import {
   skipSapAnswers,
   undecided,
@@ -163,68 +167,8 @@ function includeColumn(hit: OrchestratorResult['results'][number]): string {
  * `include\thits`. Every hit is answered.
  */
 export function searchSourceRows(result: OrchestratorResult): string {
-  return completeAnswer('SearchSource', heldHits, renderedRows)(result);
-}
-
-/** A hit's identity, as its row writes it: its include and its line (or count). */
-function hitIdentity(hit: OrchestratorResult['results'][number]): string {
-  return identityOf([
-    includeColumn(hit),
-    'hits' in hit ? String(hit.hits) : String(hit.line),
-  ]);
-}
-
-/** A target SAP listed without a name: the words of its line. */
-function incompleteWords(
-  target: NonNullable<OrchestratorResult['incomplete']>[number],
-): string[] {
-  return [
-    target.package,
-    target.type,
-    ...(target.tech_name !== undefined
-      ? [`tech_name=${target.tech_name}`]
-      : []),
-    ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
-  ];
-}
-
-/** Every item a scan held: its hits, the nodes SAP could not load, the targets it listed without a name. */
-function heldHits(result: OrchestratorResult): string[] {
-  return [
-    ...result.results.map(hitIdentity),
-    ...(result.not_loaded ?? []).map((node) =>
-      identityOf(['not loaded by SAP', node.package, node.type]),
-    ),
-    ...(result.incomplete ?? []).map((target) =>
-      identityOf(['incomplete', ...incompleteWords(target)]),
-    ),
-  ];
-}
-
-function renderedRows(result: OrchestratorResult): Written<string> {
-  const first = result.results[0];
-  const columns =
-    first === undefined || 'line' in first
-      ? first !== undefined && 'snippet' in first
-        ? ['include', 'line', 'snippet']
-        : ['include', 'line']
-      : ['include', 'hits'];
-  const groups = new Map<string, Line[]>();
-  for (const hit of result.results) {
-    const key = `${hit.devclass} ${hit.object_type} ${hit.object_name}`;
-    const rows = groups.get(key) ?? [];
-    rows.push({
-      row:
-        'hits' in hit
-          ? [includeColumn(hit), String(hit.hits)]
-          : 'snippet' in hit
-            ? [includeColumn(hit), String(hit.line), hit.snippet]
-            : [includeColumn(hit), String(hit.line)],
-    });
-    groups.set(key, rows);
-  }
-  return Written.text(
-    [
+  return writeListing({
+    heads: [
       {
         head: 'scanned',
         value: `objects ${result.scanned.objects} sources ${result.scanned.sources} objects_with_hits ${result.scanned.objects_with_hits}`,
@@ -235,28 +179,74 @@ function renderedRows(result: OrchestratorResult): Written<string> {
       ...(result.truncated.by_max_hits === true
         ? [{ head: 'truncated', value: 'by_max_hits' }]
         : []),
-      ...(result.not_loaded ?? []).map(
-        (node): Line => ({
-          mark: 'not loaded by SAP',
-          words: [node.package, node.type],
-        }),
+    ],
+    reading: result,
+    lists: {
+      not_loaded: marks(
+        'not_loaded',
+        'not loaded by SAP',
+        (node: NotLoadedNode) => [node.package, node.type],
       ),
       // A target SAP listed without a name: never scanned, named by what
       // tells it apart.
-      ...(result.incomplete ?? []).map(
-        (target): Line => ({
-          mark: 'incomplete',
-          words: incompleteWords(target),
-        }),
-      ),
-      { header: columns },
-      ...[...groups].flatMap(([value, rows]): Line[] => [
-        { group: 'object', value },
-        ...rows,
-      ]),
-    ],
-    [0, 1],
-  );
+      incomplete: marks('incomplete', 'incomplete', incompleteWords),
+      results: rows('results', {
+        columns: hitColumns(result.results[0]),
+        header: 'always',
+        groups: [
+          {
+            label: 'object',
+            of: (hit: Hit) =>
+              `${hit.devclass} ${hit.object_type} ${hit.object_name}`,
+            mode: 'gathered',
+          },
+        ],
+      }),
+    },
+  }).answer;
+}
+
+/** One hit of a scan. */
+type Hit = OrchestratorResult['results'][number];
+
+/**
+ * The columns of the hits, by the scan's answer level (its first hit's
+ * shape): `include\tline`, `include\tline\tsnippet`, or `include\thits`.
+ */
+function hitColumns(first: Hit | undefined): Column<Hit>[] {
+  const include: Column<Hit> = { name: 'include', cell: includeColumn };
+  const line: Column<Hit> = {
+    name: 'line',
+    cell: (hit) => ('line' in hit ? String(hit.line) : ''),
+  };
+  if (first === undefined || 'line' in first) {
+    return first !== undefined && 'snippet' in first
+      ? [
+          include,
+          line,
+          {
+            name: 'snippet',
+            cell: (hit) => ('snippet' in hit ? hit.snippet : ''),
+          },
+        ]
+      : [include, line];
+  }
+  return [
+    include,
+    { name: 'hits', cell: (hit) => ('hits' in hit ? String(hit.hits) : '') },
+  ];
+}
+
+/** A target SAP listed without a name: the words of its line. */
+function incompleteWords(target: IncompleteTarget): string[] {
+  return [
+    target.package,
+    target.type,
+    ...(target.tech_name !== undefined
+      ? [`tech_name=${target.tech_name}`]
+      : []),
+    ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
+  ];
 }
 
 /**

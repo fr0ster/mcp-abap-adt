@@ -34,7 +34,7 @@ per request.
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself. Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS, and the parts object_structure, node_structure, virtual_folders.
 - `object_type` — ABAP object type for routed compact operation.
 - `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced). main_programs (INCLUDE): the include's main programs. draft (PROGRAM, INCLUDE, INTERFACE, CLASS, BEHAVIOR_IMPLEMENTATION, FUNCTION_MODULE, FUNCTION_GROUP, DDL, BEHAVIOR_DEFINITION, METADATA_EXTENSION, SERVICE_DEFINITION, TABLE, STRUCTURE, DOMAIN, DATA_ELEMENT, TABLE_TYPE): whether each part of the object holds an unactivated change, and whose.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 - `package_name` — Package name.
 - `package_names` — Several package names (part contents), read together, as GetPackageContents answers them: at detail terse each package's rows under its '# asked' line, else one entry per package, in the order given.
 - `max_results` — Accepted for compatibility (part contents): every member is answered.
@@ -78,7 +78,7 @@ per request.
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself. Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS, and the parts object_structure, node_structure, virtual_folders.
 - `object_type` — ABAP object type for routed compact operation.
 - `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced). draft (INTERFACE, CLASS, BEHAVIOR_IMPLEMENTATION, FUNCTION_MODULE, FUNCTION_GROUP, DDL, BEHAVIOR_DEFINITION, METADATA_EXTENSION, SERVICE_DEFINITION, TABLE, STRUCTURE, DOMAIN, DATA_ELEMENT, TABLE_TYPE): whether each part of the object holds an unactivated change, and whose.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 - `package_name` — Package name.
 - `package_names` — Several package names (part contents), read together, as GetPackageContents answers them: at detail terse each package's rows under its '# asked' line, else one entry per package, in the order given.
 - `max_results` — Accepted for compatibility (part contents): every member is answered.
@@ -143,7 +143,7 @@ per request.
 - `object_type` — search_object: Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class). where_used: Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): CLAS/OC (class), INTF/OI (interface), PROG/P (program), PROG/I (include), FUGR/F (functiongroup), FUGR/FF (function, functionmodule, function_module, func), DEVC/K (package), DDLS/DF (view), VIEW/DV (dbview), TABL/DT (table), TABL/DS (structure, stru), TTYP/DA, DOMA/DD (domain), DTEL/DE (dataelement), DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, MSAG/N, FTG2/FT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB, PROG/PX. A function module is named as object_name says. PROG/PX is a program's or a function group's text elements; container says which. A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class). A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
 - `container` — where_used: with object_type PROG/PX, required: whose text elements they are, program or function_group; taken by PROG/PX alone.
 - `maxResults` — search_object: maximum number of results to return (default 100).
-- `detail` — search_source, search_object, where_used, package_tree, transports, atc_findings, atc_result: How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — search_source, search_object, where_used, package_tree, transports, atc_findings, atc_result: How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 - `objects` — where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.
 - `enable_all_types` — where_used: true selects every object type of the where-used scope (default false, the SAP default scope).
 - `enable_only_types` — where_used: the only ADT object types searched, codes of the object's where-used scope (e.g. 'CLAS/OC', 'DDLS/DF').
@@ -254,7 +254,7 @@ per request.
 - `run_id` (required) — Unit test run id.
 - `with_navigation_uris` — Include ADT navigation URIs in the result payload.
 - `format` — Result format.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerCdsUnitTestStatus
 
@@ -282,7 +282,7 @@ per request.
 - `run_id` (required) — Unit test run id.
 - `with_navigation_uris` — Include ADT navigation URIs in the result payload.
 - `format` — Result format.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerProfileList
 
@@ -294,7 +294,7 @@ per request.
 
 **Parameters:**
 
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerProfileView
 
@@ -327,7 +327,7 @@ per request.
 **Parameters:**
 
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 - `feed_type` — Which runtime feed to list. Default "dumps" (ABAP short dumps). "system_messages" and "gateway_errors" read the other two ADT runtime feeds through the same call.
 - `user` — Entries of this user.
 - `runtime_error` — Dumps whose runtime error contains this text, in any case.
@@ -444,7 +444,7 @@ per request.
 - `binding_variant` — Binding variant (SERVICE_BINDING create); ODATA_V4_UI when absent.
 - `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
 - `implementation_type` — Behavior definition implementation type.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 **On ABAP Cloud (`cloud`):** Creates the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the create request for its type with the given parameters, and answers SAP's result. The object is created inactive. object_type required: PACKAGE(package_name*, super_package), DOMAIN(domain_name*, package_name*), DATA_ELEMENT(data_element_name*, package_name*), TRANSPORT(description*), TABLE(table_name*, package_name*), STRUCTURE(structure_name*, package_name*), TABLE_TYPE(table_type_name*, package_name*), DDL(ddl_name*, package_name*), SERVICE_DEFINITION(service_definition_name*, package_name*), SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*), CLASS(class_name*, package_name*), INTERFACE(interface_name*, package_name*), FUNCTION_GROUP(function_group_name*, package_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*). Optional for every type: description, transport_request.
 
@@ -486,7 +486,7 @@ per request.
 - `binding_variant` — Binding variant (SERVICE_BINDING create); ODATA_V4_UI when absent.
 - `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
 - `implementation_type` — Behavior definition implementation type.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerUpdate
 
@@ -692,7 +692,7 @@ per request.
 - `target_system` — Target system id.
 - `owner` — Transport owner user.
 - `task_type` — Type given to the request's task: S Development/Correction (default), R Repair, X Unclassified.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerTransportSortAndCompress
 
@@ -855,7 +855,7 @@ per request.
 - `watchpoint_id` — abap deleteWatchpoint: the id SAP gave the watchpoint.
 - `request_user` — abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.
 - `debugging_mode` — abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerDebugSession
 
@@ -877,7 +877,7 @@ per request.
 - `settings` — abap setDebuggerSettings: the settings sent; a field left out keeps its value.
 - `request_user` — abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.
 - `debugging_mode` — abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerDebugStep
 
@@ -899,7 +899,7 @@ per request.
 - `parent_name` — For a function module: its function group.
 - `position` — abap setStackPosition: the frame's position in the stack.
 - `debuggee_id` — amdp: the debuggee id of the break event.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerDebugMaintain
 
@@ -921,7 +921,7 @@ per request.
 - `debuggee_id` — amdp getDataPreview: the debuggee id of the break event.
 - `query` — amdp getDataPreview: a SELECT over the table variable; every column when omitted.
 - `row_number` — amdp getDataPreview: how many rows SAP answers; SAP's own count when omitted.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool's whole answer, as JSON; "raw" what SAP sent, as it sent it.
 
 ### HandlerDebugBatch
 

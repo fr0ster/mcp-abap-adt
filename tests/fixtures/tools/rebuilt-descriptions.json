@@ -52,7 +52,7 @@
     "inputSchema.request_user.description": "abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.",
     "inputSchema.debugging_mode.description": "abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.",
     "inputSchema.debugging_mode.enum": ["user", "terminal"],
-    "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default, the fields you need to act), \"medium\" (every field of the reading; currently the same as \"full\"), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.description": "How much of the answer to return, and in what form: \"terse\" (default) what a next call needs, its lists as TSV (a header, then a row per item) under \"#\" lines for the facts beside them; \"medium\" every item of the same lists, as JSON; \"full\" the tool's whole answer, as JSON; \"raw\" what SAP sent, as it sent it.",
     "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
   },
   "HandlerDebugStep": {
@@ -77,7 +77,7 @@
     "inputSchema.parent_name.description": "For a function module: its function group.",
     "inputSchema.position.description": "abap setStackPosition: the frame's position in the stack.",
     "inputSchema.debuggee_id.description": "amdp: the debuggee id of the break event.",
-    "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default, the fields you need to act), \"medium\" (every field of the reading; currently the same as \"full\"), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.description": "How much of the answer to return, and in what form: \"terse\" (default) what a next call needs, its lists as TSV (a header, then a row per item) under \"#\" lines for the facts beside them; \"medium\" every item of the same lists, as JSON; \"full\" the tool's whole answer, as JSON; \"raw\" what SAP sent, as it sent it.",
     "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
   },
   "HandlerDebugBreakpoints": {
@@ -114,7 +114,7 @@
     "inputSchema.request_user.description": "abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.",
     "inputSchema.debugging_mode.description": "abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.",
     "inputSchema.debugging_mode.enum": ["user", "terminal"],
-    "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default, the fields you need to act), \"medium\" (every field of the reading; currently the same as \"full\"), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.description": "How much of the answer to return, and in what form: \"terse\" (default) what a next call needs, its lists as TSV (a header, then a row per item) under \"#\" lines for the facts beside them; \"medium\" every item of the same lists, as JSON; \"full\" the tool's whole answer, as JSON; \"raw\" what SAP sent, as it sent it.",
     "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
   },
   "HandlerDebugMaintain": {
@@ -139,7 +139,7 @@
     "inputSchema.debuggee_id.description": "amdp getDataPreview: the debuggee id of the break event.",
     "inputSchema.query.description": "amdp getDataPreview: a SELECT over the table variable; every column when omitted.",
     "inputSchema.row_number.description": "amdp getDataPreview: how many rows SAP answers; SAP's own count when omitted.",
-    "inputSchema.detail.description": "How much of the answer to return: \"terse\" (default, the fields you need to act), \"medium\" (every field of the reading; currently the same as \"full\"), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.description": "How much of the answer to return, and in what form: \"terse\" (default) what a next call needs, its lists as TSV (a header, then a row per item) under \"#\" lines for the facts beside them; \"medium\" every item of the same lists, as JSON; \"full\" the tool's whole answer, as JSON; \"raw\" what SAP sent, as it sent it.",
     "inputSchema.detail.enum": ["terse", "medium", "full", "raw"]
   },
   "HandlerGetData": {
@@ -192,7 +192,7 @@
     "inputSchema.container.description": "where_used: with object_type PROG/PX, required: whose text elements they are, program or function_group; taken by PROG/PX alone.",
     "inputSchema.container.enum": ["program", "function_group"],
     "inputSchema.maxResults.description": "search_object: maximum number of results to return (default 100).",
-    "inputSchema.detail.description": "search_source, search_object, where_used, package_tree, transports, atc_findings, atc_result: How much of the answer to return: \"terse\" (default, the fields you need to act), \"medium\" (every field of the reading; currently the same as \"full\"), \"full\" (the whole parse), \"raw\" (the document as ADT sent it).",
+    "inputSchema.detail.description": "search_source, search_object, where_used, package_tree, transports, atc_findings, atc_result: How much of the answer to return, and in what form: \"terse\" (default) what a next call needs, its lists as TSV (a header, then a row per item) under \"#\" lines for the facts beside them; \"medium\" every item of the same lists, as JSON; \"full\" the tool's whole answer, as JSON; \"raw\" what SAP sent, as it sent it.",
     "inputSchema.detail.enum": ["terse", "medium", "full", "raw"],
     "inputSchema.objects.description": "where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.",
     "inputSchema.objects[].object_name.description": "Name of the ABAP object; a function module as 'GROUP|FM_NAME'",

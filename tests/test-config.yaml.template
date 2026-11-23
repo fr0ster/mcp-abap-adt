@@ -96,6 +96,7 @@ environment:
   # checks the session's SAP_URL.
   realm_check_url: ""                        # ← CHANGE (RFC): the system's HTTP URL
   connection_type: "http"                    # "http" | "rfc"
+  default_master_system: "SID"                # ← CHANGE: the system id (SID) this config connects to; abapgit.check_repo_fault_system is matched against it
   # RFC (rfc only): the destination states its address, client and language,
   # and no SAP_URL. Each key below sets its SAP_* variable (SAP_ASHOST, ...)
   # over the .env's; leave "" to take the .env's. One address: ashost + sysnr

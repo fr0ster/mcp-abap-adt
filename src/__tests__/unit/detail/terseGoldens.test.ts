@@ -16,6 +16,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
+import { handleListFunctionGroupIncludes } from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
+import { handleListFunctionModules } from '../../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
@@ -254,6 +256,30 @@ CASES['GetObjectsList two parents, one refused'] = async (detail) =>
       } as never,
     ),
   );
+
+/** A function group's root: its child nodes. */
+const GROUP_ROOT = `${xmlHead}<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT/><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>FUGR/FF</OBJECT_TYPE><NODE_ID>000001</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>FUGR/I</OBJECT_TYPE><NODE_ID>000002</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES></DATA></asx:values></asx:abap>`;
+
+for (const [tool, handler] of [
+  ['ListFunctionModules', handleListFunctionModules],
+  ['ListFunctionGroupIncludes', handleListFunctionGroupIncludes],
+] as const) {
+  CASES[`${tool} a group's children`] = async (detail) =>
+    answeredOf(
+      await handler(
+        sequential([
+          {
+            data: corpusBody(
+              'read-metadata-function-group--01-groups-zmcpshrfgrp',
+            ),
+          },
+          { data: GROUP_ROOT },
+          { data: GROUP_LEVEL },
+        ]) as never,
+        { function_group_name: 'ZFG', detail } as never,
+      ),
+    );
+}
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

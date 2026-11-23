@@ -154,5 +154,29 @@
   "GetObjectsList two parents, one refused @full": {
     "isError": false,
     "text": "[{\"parent_name\":\"ZFG\",\"parent_type\":\"FUGR/F\",\"total_objects\":4,\"objects\":[{\"OBJECT_TYPE\":\"FUGR/FF\",\"OBJECT_NAME\":\"Z_FM\",\"TECH_NAME\":\"Z_FM\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\",\"DESCRIPTION\":\"Module\"},{\"OBJECT_TYPE\":\"FUGR/I\",\"OBJECT_NAME\":\"ZFG_TOP\",\"TECH_NAME\":\"LZFGTOP\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/includes/lzfgtop\",\"DESCRIPTION\":\"Top\"},{\"OBJECT_TYPE\":\"FUGR/I\",\"OBJECT_NAME\":\"\",\"OBJECT_URI\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\",\"DESCRIPTION\":\"Nameless\"},{\"OBJECT_TYPE\":\"FUGR/F\",\"OBJECT_NAME\":\"not loaded by SAP\",\"NOT_LOADED\":true}]},{\"parent_name\":\"ZGONE\",\"parent_type\":\"FUGR/F\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read node structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+  },
+  "ListFunctionModules a group's children @terse": {
+    "isError": false,
+    "text": "# function_group ZFG\n# total 4\nname\turi\tdescription\nZ_FM\t\tA module\nZFG_TOP\t\t\n\t/sap/bc/adt/functions/groups/zfg/includes/nameless\t\nnot loaded by SAP\t\t"
+  },
+  "ListFunctionModules a group's children @medium": {
+    "isError": false,
+    "text": "{\"function_group_name\":\"ZFG\",\"total\":4,\"function_modules\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/FF\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
+  },
+  "ListFunctionModules a group's children @full": {
+    "isError": false,
+    "text": "{\"success\":true,\"function_group_name\":\"ZFG\",\"total\":4,\"function_modules\":[\"Z_FM\",\"ZFG_TOP\",\"\",\"not loaded by SAP\"],\"objects\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/lzfgtop\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/FF\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
+  },
+  "ListFunctionGroupIncludes a group's children @terse": {
+    "isError": false,
+    "text": "# function_group ZFG\n# total 4\nname\turi\tdescription\nZ_FM\t\tA module\nZFG_TOP\t\t\n\t/sap/bc/adt/functions/groups/zfg/includes/nameless\t\nnot loaded by SAP\t\t"
+  },
+  "ListFunctionGroupIncludes a group's children @medium": {
+    "isError": false,
+    "text": "{\"function_group_name\":\"ZFG\",\"total\":4,\"includes\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/I\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
+  },
+  "ListFunctionGroupIncludes a group's children @full": {
+    "isError": false,
+    "text": "{\"success\":true,\"function_group_name\":\"ZFG\",\"total\":4,\"includes\":[\"Z_FM\",\"ZFG_TOP\",\"\",\"not loaded by SAP\"],\"objects\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/lzfgtop\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/I\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
   }
 }

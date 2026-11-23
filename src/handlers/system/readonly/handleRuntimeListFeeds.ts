@@ -36,6 +36,7 @@ import { withSystemKindOf } from '../../../lib/connectionFactory';
 import {
   asJsonResult,
   asTextResult,
+  byListing,
   type DetailLevel,
   type Head,
   headLines,
@@ -301,6 +302,26 @@ export type FeedShown =
 /** One variant of a feed. */
 type FeedVariant = FeedVariants['variants'][number];
 
+/** One row of the variants feed: a feed with one of its variants, or with none. */
+interface VariantRow {
+  readonly feed: string;
+  readonly variant: FeedVariant | undefined;
+}
+
+/** The variants feed as its rows: every variant of every feed, a feed without any once. */
+interface VariantRows {
+  readonly rows: readonly VariantRow[];
+}
+
+/** Every variant of every feed; a feed without variants is one row with none. */
+function variantRows(feeds: readonly FeedVariants[]): VariantRow[] {
+  return feeds.flatMap((feed): VariantRow[] =>
+    feed.variants.length === 0
+      ? [{ feed: feed.feed, variant: undefined }]
+      : feed.variants.map((variant) => ({ feed: feed.feed, variant })),
+  );
+}
+
 /** A feed's answer, by its feed. */
 type FeedAnswer<F extends FeedShown['feed']> = Extract<
   FeedShown,
@@ -311,7 +332,7 @@ type FeedAnswer<F extends FeedShown['feed']> = Extract<
 interface FeedTerse {
   readonly heads: readonly Head[];
   readonly descriptors?: FeedAnswer<'descriptors'> | undefined;
-  readonly variants?: FeedAnswer<'variants'> | undefined;
+  readonly variants?: VariantRows | undefined;
   readonly dumps?: FeedAnswer<'dumps'> | undefined;
   readonly system_messages?: FeedAnswer<'system_messages'> | undefined;
   readonly gateway_errors?: FeedAnswer<'gateway_errors'> | undefined;
@@ -324,7 +345,7 @@ function feedTerse(shown: FeedShown): FeedTerse {
     case 'descriptors':
       return { heads, descriptors: shown.answered };
     case 'variants':
-      return { heads, variants: shown.answered };
+      return { heads, variants: { rows: variantRows(shown.answered.entries) } };
     case 'dumps':
       return { heads, dumps: shown.answered };
     case 'system_messages':
@@ -351,43 +372,21 @@ const FEED_SCHEMAS: RowSchemas<FeedTerse> = {
       ],
     }),
   }),
-  variants: within<FeedAnswer<'variants'>, 'variants'>('variants', {
-    // Every feed: one without variants is a row with none (its root).
-    entries: parts(
-      'entries',
-      () => [],
-      (feed: FeedVariants) =>
-        nest({
-          heads: [],
-          reading: feed,
-          root:
-            feed.variants.length === 0
-              ? {
-                  columns: [
-                    { name: 'feed', cell: () => feed.feed },
-                    { name: 'title', cell: () => '' },
-                    { name: 'query', cell: () => '' },
-                    { name: 'is_default', cell: () => '' },
-                  ],
-                }
-              : undefined,
-          lists: {
-            variants: rows('variants', {
-              columns: [
-                { name: 'feed', cell: () => feed.feed },
-                { name: 'title', cell: (v: FeedVariant) => v.title },
-                { name: 'query', cell: (v: FeedVariant) => v.query },
-                {
-                  name: 'is_default',
-                  cell: (v: FeedVariant) => String(v.is_default),
-                },
-              ],
-              header: 'none',
-            }),
-          },
-        }),
-      ['feed', 'title', 'query', 'is_default'],
-    ),
+  variants: within<VariantRows, 'variants'>('variants', {
+    // Every variant of every feed; a feed without variants a row with none.
+    rows: rows('rows', {
+      columns: [
+        { name: 'feed', cell: (row: VariantRow) => row.feed },
+        { name: 'title', cell: (row: VariantRow) => row.variant?.title ?? '' },
+        { name: 'query', cell: (row: VariantRow) => row.variant?.query ?? '' },
+        {
+          name: 'is_default',
+          cell: (row: VariantRow) =>
+            row.variant === undefined ? '' : String(row.variant.is_default),
+        },
+      ],
+      header: 'always',
+    }),
   }),
   dumps: within<FeedAnswer<'dumps'>, 'dumps'>('dumps', {
     entries: rows('entries', {
@@ -1043,7 +1042,7 @@ function terseList({ feedTypes, results }: ListOf): Written<TextResult> {
               ]
             : [],
         'read',
-        (read) => nest(feedListing(read)),
+        byListing(FEED_SCHEMAS, feedListing),
       ),
     },
   });

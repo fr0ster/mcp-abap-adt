@@ -24,6 +24,7 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   asJsonResult,
   asTextResult,
+  byListing,
   type Column,
   type DetailLevel,
   type Head,
@@ -379,6 +380,26 @@ function structuresWhole(read: StructuresRead) {
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
 
+/** The lists a StructuresRead listing writes: what its description states. */
+const STRUCTURES_LISTS: RowSchemas<StructuresRead> = {
+  // Each candidate SAP refused to read, by name — the one to read again —
+  // then each failure of its read.
+  append_candidates_unread: sections(
+    'append_candidates_unread',
+    (unread: StructuresRead['append_candidates_unread'][number]) => [
+      { mark: 'append_candidate_unread', words: [unread.candidate] },
+    ],
+    { failures: failureMarks('failures') },
+  ),
+  // The tree from its root: the root a row, every node below it.
+  tree: node('tree', {
+    columns: structureColumns,
+    header: 'none',
+    tree: true,
+    lists: structureSchemas,
+  }),
+};
+
 /**
  * A structure's terse text, written from its read: its heads, a mark per
  * append candidate SAP refused to read, then the tree from its root.
@@ -389,24 +410,7 @@ const structuresListing = (read: StructuresRead): Listing<StructuresRead> => ({
     ...(read.appends_unavailable ? [{ head: 'appends_unavailable' }] : []),
   ],
   reading: read,
-  lists: {
-    // Each candidate SAP refused to read, by name — the one to read again —
-    // then each failure of its read.
-    append_candidates_unread: sections(
-      'append_candidates_unread',
-      (unread: StructuresRead['append_candidates_unread'][number]) => [
-        { mark: 'append_candidate_unread', words: [unread.candidate] },
-      ],
-      { failures: failureMarks('failures') },
-    ),
-    // The tree from its root: the root a row, every node below it.
-    tree: node('tree', {
-      columns: structureColumns,
-      header: 'none',
-      tree: true,
-      lists: structureSchemas,
-    }),
-  },
+  lists: STRUCTURES_LISTS,
 });
 
 // Every node and unread candidate written from the read by the listing
@@ -1292,7 +1296,7 @@ function terseList({ names, results }: ListOf): Written<TextResult> {
               ]
             : [],
         'read',
-        (read) => nest(structuresListing(read)),
+        byListing(STRUCTURES_LISTS, structuresListing),
       ),
     },
   });

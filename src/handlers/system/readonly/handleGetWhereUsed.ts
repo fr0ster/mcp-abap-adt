@@ -57,6 +57,7 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   asJsonResult,
   asTextResult,
+  byListing,
   type DetailLevel,
   entries,
   type Head,
@@ -66,6 +67,7 @@ import {
   nest,
   omitting,
   partsOf,
+  type RowSchemas,
   rows,
   type TextResult,
   values,
@@ -388,6 +390,45 @@ function fullWhereUsed(result: WhereUsedListResult, args: WhereUsedArgs) {
   };
 }
 
+/** The lists a WhereUsedListResult listing writes: what its description states. */
+const WHERE_USED_LISTS: RowSchemas<WhereUsedListResult> = {
+  references: rows('references', {
+    columns: [
+      {
+        name: 'type',
+        cell: (reference: WhereUsedReference) => reference.type,
+      },
+      {
+        name: 'name',
+        cell: (reference: WhereUsedReference) => reference.name,
+      },
+      { name: 'uri', cell: namelessUri },
+      {
+        name: 'usage',
+        cell: (reference: WhereUsedReference) =>
+          reference.usage_information === COMMON_USAGE
+            ? ''
+            : (reference.usage_information ?? ''),
+      },
+    ],
+    header: 'always',
+    groups: [
+      {
+        label: 'package',
+        of: (reference: WhereUsedReference) => reference.package_name ?? '',
+        mode: 'gathered',
+      },
+    ],
+    // The terse shape (approved): usages only — the package and
+    // container nodes of SAP's tree carry no usage, and leave.
+    omit: omitting(
+      (reference: WhereUsedReference) =>
+        reference.usage_information === undefined ? 'node' : 'usage',
+      { node: 'a package or container node of the tree: no usage' },
+    ),
+  }),
+};
+
 /**
  * The usages as TSV, grouped by package (terse). A reference is a usage when
  * SAP gave it `usageInformation`; the package and container nodes of its
@@ -400,43 +441,7 @@ function whereUsedListing(
   return {
     heads: [{ head: 'total', value: String(result.totalReferences) }],
     reading: result,
-    lists: {
-      references: rows('references', {
-        columns: [
-          {
-            name: 'type',
-            cell: (reference: WhereUsedReference) => reference.type,
-          },
-          {
-            name: 'name',
-            cell: (reference: WhereUsedReference) => reference.name,
-          },
-          { name: 'uri', cell: namelessUri },
-          {
-            name: 'usage',
-            cell: (reference: WhereUsedReference) =>
-              reference.usage_information === COMMON_USAGE
-                ? ''
-                : (reference.usage_information ?? ''),
-          },
-        ],
-        header: 'always',
-        groups: [
-          {
-            label: 'package',
-            of: (reference: WhereUsedReference) => reference.package_name ?? '',
-            mode: 'gathered',
-          },
-        ],
-        // The terse shape (approved): usages only — the package and
-        // container nodes of SAP's tree carry no usage, and leave.
-        omit: omitting(
-          (reference: WhereUsedReference) =>
-            reference.usage_information === undefined ? 'node' : 'usage',
-          { node: 'a package or container node of the tree: no usage' },
-        ),
-      }),
-    },
+    lists: WHERE_USED_LISTS,
   };
 }
 
@@ -970,7 +975,7 @@ function terseList({ objects, targets, results }: ListOf): Written<TextResult> {
             : []),
         ],
         'read',
-        (read) => nest(whereUsedListing(read)),
+        byListing(WHERE_USED_LISTS, whereUsedListing),
       ),
     },
   });

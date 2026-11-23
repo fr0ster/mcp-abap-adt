@@ -42,6 +42,7 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   asJsonResult,
   asTextResult,
+  byListing,
   type Column,
   type DetailLevel,
   entries,
@@ -405,6 +406,20 @@ const mediumSchemas: JsonSchemas<IncludeNode> = {
 /** An include that could not be read, by its name. */
 const unreadableName = (entry: AnswerObject) => String(entry.name ?? '');
 
+/** The lists a IncludesRead listing writes: what its description states. */
+const INCLUDES_LISTS: RowSchemas<IncludesRead> = {
+  unreadable: marks('unreadable', 'unreadable', (entry: AnswerObject) => [
+    unreadableName(entry),
+  ]),
+  // The tree from its root: the root a row, every node below it.
+  tree: node('tree', {
+    columns: includeColumns,
+    header: 'none',
+    tree: true,
+    lists: includeSchemas,
+  }),
+};
+
 /**
  * One object's terse text, written from its read: its `# object` line, a
  * mark per include that could not be read, then the tree from its root.
@@ -412,18 +427,7 @@ const unreadableName = (entry: AnswerObject) => String(entry.name ?? '');
 const includesListing = (read: IncludesRead): Listing<IncludesRead> => ({
   heads: [{ head: 'object', value: `${read.object_type} ${read.object_name}` }],
   reading: read,
-  lists: {
-    unreadable: marks('unreadable', 'unreadable', (entry: AnswerObject) => [
-      unreadableName(entry),
-    ]),
-    // The tree from its root: the root a row, every node below it.
-    tree: node('tree', {
-      columns: includeColumns,
-      header: 'none',
-      tree: true,
-      lists: includeSchemas,
-    }),
-  },
+  lists: INCLUDES_LISTS,
 });
 
 // Every node (and, at terse, every unreadable include), written from the
@@ -1164,7 +1168,7 @@ function terseList({ objects, results }: ListOf): Written<TextResult> {
               ]
             : [],
         'read',
-        (read) => nest(includesListing(read)),
+        byListing(INCLUDES_LISTS, includesListing),
       ),
     },
   });

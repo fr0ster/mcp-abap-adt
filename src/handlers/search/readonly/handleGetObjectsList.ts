@@ -1,6 +1,7 @@
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import {
+  byListing,
   type Column,
   entries,
   type Head,
@@ -548,6 +549,16 @@ function parentListing(
   };
 }
 
+/**
+ * A parent with no objects: its listing's lists are the same for every
+ * parent (they depend on `descriptions` alone), read from it once.
+ */
+const NO_OBJECTS: ParentList = {
+  parent_name: undefined,
+  parent_type: undefined,
+  objects: [],
+};
+
 /** An object at medium: every field read, a nameless one's URI. */
 const mediumObject = (o: FlatObject) => ({
   type: o.OBJECT_TYPE,
@@ -788,7 +799,9 @@ const PARENT_LISTS: ListAnswerTable<ParentLists, string | object> = {
                   { head: 'error', value: JSON.stringify(outcome.error) },
                 ],
           'list',
-          (list) => nest(parentListing(list, false)),
+          byListing(parentListing(NO_OBJECTS, false).lists, (list) =>
+            parentListing(list, false),
+          ),
         ),
       },
     }),

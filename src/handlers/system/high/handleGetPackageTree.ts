@@ -596,8 +596,22 @@ const TREE_LISTS: ListAnswerTable<TreeList, string> = {
               : [{ head: 'error', value: JSON.stringify(failed) }]),
           ],
           'tree',
-          (tree, { includeDescriptions }) =>
-            nest(treeListingOf(tree, includeDescriptions)),
+          {
+            // Each package's tree, its descriptions where the call asked.
+            variants: {
+              plain: {
+                lists: treeSchemas(false),
+                root: { columns: treeColumns(false) },
+              },
+              described: {
+                lists: treeSchemas(true),
+                root: { columns: treeColumns(true) },
+              },
+            },
+            frame: (_tree, { includeDescriptions }) => ({
+              variant: includeDescriptions ? 'described' : 'plain',
+            }),
+          },
         ),
       },
     }),

@@ -40,6 +40,7 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   asJsonResult,
   asTextResult,
+  byListing,
   type DetailLevel,
   entries,
   type Head,
@@ -894,6 +895,12 @@ const terseOf = (read: EnhancementsRead): EnhancementsTerse =>
     ? { single: read.response }
     : { nested: read.response };
 
+/** The lists a EnhancementsTerse listing writes: what its description states. */
+const ENHANCEMENTS_LISTS: RowSchemas<EnhancementsTerse> = {
+  single: within<EnhancementResponse, 'single'>('single', objectSchemas),
+  nested: within<NestedEnhancements, 'nested'>('nested', nestedSchemas),
+};
+
 /**
  * The terse listing of a read, written from its own lists: one object's
  * heads and lists, or — with its includes — the total, each object's
@@ -913,10 +920,7 @@ function terseListing(read: EnhancementsTerse): Listing<EnhancementsTerse> {
             ]
           : [],
     reading: read,
-    lists: {
-      single: within<EnhancementResponse, 'single'>('single', objectSchemas),
-      nested: within<NestedEnhancements, 'nested'>('nested', nestedSchemas),
-    },
+    lists: ENHANCEMENTS_LISTS,
   };
 }
 
@@ -2010,7 +2014,7 @@ function terseList({ objects, results }: ListOf): Written<TextResult> {
               ]
             : [],
         'read',
-        (read) => nest(terseListing(read)),
+        byListing(ENHANCEMENTS_LISTS, terseListing),
       ),
     },
   });

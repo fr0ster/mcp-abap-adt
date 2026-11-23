@@ -62,6 +62,21 @@ export type FailureCode =
   | 'long_session_unavailable'
   | 'connection_provider_failed'
   | 'no_connection'
+  | 'abapgit_not_served'
+  | 'abapgit_import_not_allowed'
+  | 'abapgit_background_not_declared'
+  | 'abapgit_package_required'
+  | 'abapgit_repository_unknown'
+  | 'abapgit_run_log_not_paired'
+  | 'abapgit_run_log_ambiguous'
+  | 'abapgit_run_log_not_served'
+  | 'abapgit_overwrite_duplicate'
+  | 'abapgit_overwrite_not_declared'
+  | 'abapgit_overwrite_ambiguous'
+  | 'abapgit_overwrite_not_listed'
+  | 'abapgit_url_refused'
+  | 'abapgit_endpoint_refused'
+  | 'abapgit_not_admitted'
   | AccessRefusalCode;
 
 /**

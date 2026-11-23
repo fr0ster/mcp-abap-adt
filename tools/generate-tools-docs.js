@@ -153,6 +153,8 @@ const GROUP_LEVELS = {
   BackgroundRunHandlersGroup: 'readonly',
   HighLevelHandlersGroup: 'high',
   RuntimeRunHandlersGroup: 'high',
+  // abapGit's reads sit under readonly/, its writes under high/: the folder decides.
+  AbapGitHandlersGroup: 'high',
   DebugHandlersGroup: 'debug',
   DebugBatchHandlersGroup: 'debug',
   LeftoverSessionHandlersGroup: 'session',
@@ -284,7 +286,23 @@ function documentedTool(definition, groupName, moduleOf) {
   const properties = {};
   for (const [key, stated] of Object.entries(schema.properties || {}))
     properties[key] = listedProperty(stated);
+  const variants = {};
+  for (const [kind, variant] of Object.entries(definition.variants || {})) {
+    const stated = jsonSchemaOf(variant.inputSchema);
+    const variantProperties = {};
+    for (const [key, each] of Object.entries(stated.properties || {}))
+      variantProperties[key] = listedProperty(each);
+    variants[kind] = {
+      description:
+        typeof variant.description === 'string' ? variant.description : '',
+      inputSchema: {
+        properties: variantProperties,
+        required: requiredOf(variant.inputSchema),
+      },
+    };
+  }
   return {
+    variants,
     name: definition.name,
     description:
       typeof definition.description === 'string' ? definition.description : '',
@@ -527,6 +545,33 @@ function generatePromptsMarkdown(listed) {
   return md;
 }
 
+/** The system kinds a tool's variants are shown for, as the page names them. */
+const VARIANT_KINDS = [
+  ['cloud', 'On ABAP Cloud (`cloud`)'],
+  ['onprem', 'On premise (`onprem`)'],
+];
+
+/**
+ * A kind-specific variant that differs from the entry shown (its description
+ * or its parameters): its own description and parameters, so the page shows
+ * every call shape a tool takes.
+ */
+function variantMarkdown(tool) {
+  let md = '';
+  for (const [kind, title] of VARIANT_KINDS) {
+    const variant = tool.variants?.[kind];
+    if (variant === undefined) continue;
+    const same =
+      variant.description === tool.description &&
+      JSON.stringify(variant.inputSchema) === JSON.stringify(tool.inputSchema);
+    if (same) continue;
+    md += `\n**${title}:** ${variant.description || 'No description'}\n\n`;
+    md += `**Parameters (\`${kind}\`):**\n`;
+    md += renderParams(variant);
+  }
+  return md;
+}
+
 function renderParams(tool) {
   const { z } = require('zod');
   const schema =
@@ -700,6 +745,7 @@ function generateMarkdown(tools, surface, listedPrompts) {
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
+        md += variantMarkdown(tool);
         md += `\n---\n\n`;
       }
     }
@@ -764,6 +810,7 @@ function generateLevelMarkdown(
       md += optIn(tool);
       md += `**Parameters:**\n`;
       md += renderParams(tool);
+      md += variantMarkdown(tool);
       md += `\n---\n\n`;
     }
   }
@@ -836,6 +883,7 @@ function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
         md += optIn(tool);
         md += `**Parameters:**\n`;
         md += renderParams(tool);
+        md += variantMarkdown(tool);
         md += `\n---\n\n`;
       }
     }
@@ -946,6 +994,7 @@ module.exports = {
   servedEntries,
   readOnlySetTools,
   renderParams,
+  variantMarkdown,
   loadToolsFromHandlers,
   generateMarkdown,
   generateLevelMarkdown,

@@ -3,7 +3,7 @@
 Generated from the built packages, not from source text: these are the tool
 definitions a client receives.
 
-- Tools: 39
+- Tools: 41
 - Read-only half: `@mcp-abap-adt/compact-readonly-entries`
 - Modifying half: `@mcp-abap-adt/compact-modify`
 - Debugger verbs: `@mcp-abap-adt/compact`, served by the write binaries always, by no `-ro` binary
@@ -15,7 +15,7 @@ definitions a client receives.
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 39 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 41 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 
@@ -34,6 +34,49 @@ per request.
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself. Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS, and the parts object_structure, node_structure, virtual_folders.
 - `object_type` — ABAP object type for routed compact operation.
 - `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced). main_programs (INCLUDE): the include's main programs. draft (PROGRAM, INCLUDE, INTERFACE, CLASS, BEHAVIOR_IMPLEMENTATION, FUNCTION_MODULE, FUNCTION_GROUP, DDL, BEHAVIOR_DEFINITION, METADATA_EXTENSION, SERVICE_DEFINITION, TABLE, STRUCTURE, DOMAIN, DATA_ELEMENT, TABLE_TYPE): whether each part of the object holds an unactivated change, and whose.
+- `package_name` — Package name.
+- `package_names` — Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.
+- `max_results` — Maximum number of members listed per package (part contents).
+- `include_descriptions` — Include each member's description (part contents). The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes.
+- `class_name` — Class name.
+- `interface_name` — Interface name.
+- `program_name` — Program name.
+- `include_name` — Include name.
+- `domain_name` — Domain name.
+- `data_element_name` — Data element name.
+- `table_name` — Table name.
+- `structure_name` — Structure name.
+- `table_type_name` — Table type name.
+- `ddl_name` — DDL source name.
+- `function_module_name` — Function module name: GROUP|MODULE, its function group first, or the module alone with function_group_name.
+- `function_group_name` — Function group name (FUNCTION_GROUP; FUNCTION_MODULE given as the module's name).
+- `behavior_definition_name` — Behavior definition name.
+- `behavior_implementation_name` — Behavior implementation name.
+- `metadata_extension_name` — Metadata extension name.
+- `service_definition_name` — Service definition name.
+- `service_binding_name` — Service binding name.
+- `transport_number` — Transport request or task number (TRANSPORT). A request lists the entries of all its tasks; a task lists its own. With part metadata: the request or task itself.
+- `run_id` — Run id: a unit test run (UNIT_TEST, CDS_UNIT_TEST) or an activation run (parts activation_status, activation_results).
+- `with_long_polling` — With part activation_status: when true, the status read is held by SAP until the activation run ends, and answers its final status.
+- `response_format` — Response format for SERVICE_BINDING reads.
+- `version` — The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+- `object_adt_type` — ADT type code of the object (object_structure) or of the parent node (node_structure).
+- `object_name` — Object name (object_structure) or parent name (node_structure).
+- `node_id` — Node id to expand (node_structure); the root when absent.
+- `with_short_descriptions` — Include short descriptions (node_structure).
+- `object_search_pattern` — Object name pattern (virtual_folders).
+- `preselection` — Facet preselections (virtual_folders).
+- `facet_order` — Facet order (virtual_folders).
+- `with_versions` — Include versions (virtual_folders).
+- `ignore_short_descriptions` — Leave out short descriptions (virtual_folders).
+
+**On ABAP Cloud (`cloud`):** [read-only] Reads one part of the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …). part selects it: source (default) the source alone, in one request; metadata the ADT metadata document alone, in one request; urls (SERVICE_BINDING) the service URL, its $metadata and the browser preview, contents (PACKAGE) the objects the package holds, its walk read level by level in ADT batch envelopes; package_names lists several packages, read together, one entry per package in the order given. A source document answers { part: 'source', source } and a metadata document { part: 'metadata', metadata }, beside the object's name. Parts per type: PACKAGE metadata, contents; DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE metadata; LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST source; TRANSPORT source, metadata; SERVICE_BINDING source, metadata, urls; TABLE_SETTINGS source (the technical settings, in one request); CLASS_TEXT_ELEMENTS source (the text symbols, in one request); PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS source (symbols, selections and headings, one request each); every other type source, metadata. A part outside the type's list is answered with that list. Three parts read the repository by ADT address: object_structure(object_adt_type*, object_name*), node_structure(object_adt_type*, object_name*, node_id, with_short_descriptions; one node level; a package's blank answer is the empty listing with blank stating its two readings: an empty package, or an unknown package name) and virtual_folders(object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by its id, in one request each: activation_status(run_id*) answers { run_id, part, status, document }, the run's status (finished, error, failed, or its progress while it runs) and its status document as SAP answered it; activation_results(run_id*) answers { run_id, part, activated, messages, document }: activated is SAP's verdict as the results state it: true where they say activationExecuted="true" and every message is below error severity, false where they say activationExecuted="false" (a run SAP cancelled, or one whose message list is empty) or carry an error-severity message, null where they leave activationExecuted out; beside the messages the run produced and its results document as SAP answered it. Otherwise object_type required: PACKAGE(package_name*; part contents: package_name* or package_names*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), TABLE_TYPE(table_type_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INCLUDE(include_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name* as GROUP|MODULE, or function_module_name* with function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*), TRANSPORT(transport_number*), TABLE_SETTINGS(table_name*), PROGRAM_TEXT_ELEMENTS(program_name*), FUNCTION_GROUP_TEXT_ELEMENTS(function_group_name*), CLASS_TEXT_ELEMENTS(class_name*). TRANSPORT answers the objects a task holds, each with its position in the task's object list; for a request, every task's entries, each once, with its task number and position. TRANSPORT with part metadata reads the request or task itself, kind saying which: a request's header and its tasks with their object counts; a task's header, its parent request and its objects with their positions. UNIT_TEST and CDS_UNIT_TEST read the run's result in one request and answer { success, run_id, run_result }, run_result the result document SAP answered, parsed. Valid once the status is FINISHED; a finished run's result carries executionTime. draft (INTERFACE, CLASS, BEHAVIOR_IMPLEMENTATION, FUNCTION_MODULE, FUNCTION_GROUP, DDL, BEHAVIOR_DEFINITION, METADATA_EXTENSION, SERVICE_DEFINITION, TABLE, STRUCTURE, DOMAIN, DATA_ELEMENT and TABLE_TYPE) reads the active, inactive and working versions of each part of the object together (main, the source or metadata; for CLASS and BEHAVIOR_IMPLEMENTATION also the includes implementations, definitions, testclasses) and answers { object_type, object_name, has_draft, parts }: per part draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other (null for METADATA_EXTENSION and SERVICE_DEFINITION, whose ETag carries a constant time), and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+
+**Parameters (`cloud`):**
+
+- `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself. Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS, and the parts object_structure, node_structure, virtual_folders.
+- `object_type` — ABAP object type for routed compact operation.
+- `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced). draft (INTERFACE, CLASS, BEHAVIOR_IMPLEMENTATION, FUNCTION_MODULE, FUNCTION_GROUP, DDL, BEHAVIOR_DEFINITION, METADATA_EXTENSION, SERVICE_DEFINITION, TABLE, STRUCTURE, DOMAIN, DATA_ELEMENT, TABLE_TYPE): whether each part of the object holds an unactivated change, and whose.
 - `package_name` — Package name.
 - `package_names` — Several package names (part contents), read together: one entry per package, in the order given, each { package_name, contents } or { package_name, error }.
 - `max_results` — Maximum number of members listed per package (part contents).
@@ -98,7 +141,7 @@ per request.
 - `object_type` — search_object: Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class). where_used: Type of the ABAP object: an ADT type code (either case), or a name standing for one (in brackets after it): CLAS/OC (class), INTF/OI (interface), PROG/P (program), PROG/I (include), FUGR/F (functiongroup), FUGR/FF (function, functionmodule, function_module, func), DEVC/K (package), DDLS/DF (view), VIEW/DV (dbview), TABL/DT (table), TABL/DS (structure, stru), TTYP/DA, DOMA/DD (domain), DTEL/DE (dataelement), DCLS/DL, BDEF/BDO, DDLX/EX, SRVD/SRV, SRVB/SVB, DSFD/SCF, DSFI/SFI, XSLT/VT, MSAG/N, FTG2/FT, AUTH, ENHO/XHH, ENHO/XHB, ENHS/XSB, PROG/PX. A function module is named as object_name says. PROG/PX is a program's or a function group's text elements; container says which. A name is written in lower case: view is a CDS view (DDLS/DF). A value in upper case is a code, a main type or a search name of the system's object types list first, so VIEW is the dictionary views (VIEW/DV); it is a name only when it is none of these (CLASS is class). A main type, the part of a code before its slash, stands for its code when exactly one listed code has it. In upper case, a search name of the system's object types list stands for the listed code its list item has (e.g. STRU for TABL/DS).
 - `container` — where_used: with object_type PROG/PX, required: whose text elements they are, program or function_group; taken by PROG/PX alone.
 - `maxResults` — search_object: maximum number of results to return (default 100).
-- `detail` — search_object, transports, atc_findings, atc_result: How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — search_object, transports, atc_findings, atc_result: How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `objects` — where_used: several objects, read together (give this or object_name and object_type); the type filters apply to every object.
 - `enable_all_types` — where_used: true selects every object type of the where-used scope (default false, the SAP default scope).
 - `enable_only_types` — where_used: the only ADT object types searched, codes of the object's where-used scope (e.g. 'CLAS/OC', 'DDLS/DF').
@@ -128,6 +171,22 @@ per request.
 **Parameters:**
 
 - `object_type` (required) — Object type to validate before create. Supported: CLASS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.
+- `object_name` (required) — Required object name. For SERVICE_BINDING this is the service binding name; a function module is named GROUP|MODULE.
+- `package_name` — Package of the object to validate. Required for BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION and SERVICE_BINDING.
+- `super_package` — Super package of the package to validate (PACKAGE).
+- `superclass` — Superclass of the class to validate (CLASS).
+- `description` — Object description used during validation. Required for FUNCTION_MODULE, BEHAVIOR_DEFINITION and METADATA_EXTENSION.
+- `behavior_definition` — Behavior definition the behavior implementation is for (BEHAVIOR_IMPLEMENTATION).
+- `root_entity` — CDS root entity of the behavior definition to validate. Required for BEHAVIOR_DEFINITION.
+- `implementation_type` — Implementation type of the behavior definition to validate (Managed, Unmanaged, Abstract or Projection). Required for BEHAVIOR_DEFINITION.
+- `service_definition_name` — Required when object_type=SERVICE_BINDING. Service definition paired with the binding.
+- `service_binding_version` — Optional service binding version for SERVICE_BINDING.
+
+**On ABAP Cloud (`cloud`):** [read-only] Validates a new object named by object_type and object_name before it is created. object_type required: CLASS(object_name*, superclass), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name* as GROUP|MODULE, description*), TABLE(object_name*), STRUCTURE(object_name*), TABLE_TYPE(object_name*, description), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*, package_name*, description*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(object_name*, package_name*, behavior_definition), METADATA_EXTENSION(object_name*, description*, package_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*, package_name*). For SERVICE_BINDING the answer is the verdict of SAP's transport check for the binding's name and package: admissible true where SAP answers S, false where it answers E, each with SAP's messages, and any other value as result; creating the binding checks the name, the package and the service definition itself.
+
+**Parameters (`cloud`):**
+
+- `object_type` (required) — Object type to validate before create. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.
 - `object_name` (required) — Required object name. For SERVICE_BINDING this is the service binding name; a function module is named GROUP|MODULE.
 - `package_name` — Package of the object to validate. Required for BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION and SERVICE_BINDING.
 - `super_package` — Super package of the package to validate (PACKAGE).
@@ -193,7 +252,7 @@ per request.
 - `run_id` (required) — Unit test run id.
 - `with_navigation_uris` — Include ADT navigation URIs in the result payload.
 - `format` — Result format.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerCdsUnitTestStatus
 
@@ -221,7 +280,7 @@ per request.
 - `run_id` (required) — Unit test run id.
 - `with_navigation_uris` — Include ADT navigation URIs in the result payload.
 - `format` — Result format.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerProfileList
 
@@ -380,7 +439,49 @@ per request.
 - `binding_variant` — Binding variant (SERVICE_BINDING create); ODATA_V4_UI when absent.
 - `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
 - `implementation_type` — Behavior definition implementation type.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+
+**On ABAP Cloud (`cloud`):** Creates the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the create request for its type with the given parameters, and answers SAP's result. The object is created inactive. object_type required: PACKAGE(package_name*, super_package), DOMAIN(domain_name*, package_name*), DATA_ELEMENT(data_element_name*, package_name*), TRANSPORT(description*), TABLE(table_name*, package_name*), STRUCTURE(structure_name*, package_name*), TABLE_TYPE(table_type_name*, package_name*), DDL(ddl_name*, package_name*), SERVICE_DEFINITION(service_definition_name*, package_name*), SERVICE_BINDING(service_binding_name*, service_definition_name*, package_name*), CLASS(class_name*, package_name*), INTERFACE(interface_name*, package_name*), FUNCTION_GROUP(function_group_name*, package_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*). Optional for every type: description, transport_request.
+
+**Parameters (`cloud`):**
+
+- `object_type` (required) — ABAP object type for routed compact operation.
+- `class_name` — ABAP class name (CLASS, BEHAVIOR_IMPLEMENTATION).
+- `behavior_definition` — Behavior definition the implementation is for (BEHAVIOR_IMPLEMENTATION, required there).
+- `domain_name` — ABAP domain name.
+- `function_module_name` — ABAP function module name.
+- `function_group_name` — ABAP function group name (FUNCTION_GROUP; the group of a FUNCTION_MODULE).
+- `package_name` — ABAP package name.
+- `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
+- `description` — Human-readable object description.
+- `transport_request` — Transport request id (if required by system).
+- `master_language` — Original language of the created object (e.g. EN, DE). Absent, the session language (SAP_LANGUAGE or x-sap-language) is used; with none, SAP's logon language applies.
+- `super_package` — PACKAGE create. Optional: the package this package belongs to, which must exist (SAP creates the package with no super package when the named one is missing). Without one the package is top level, which SAP allows for a structure package or a package in software component LOCAL ($ or TEST names, no transport layer); in an ABAP Cloud software component the top level is a structure package (SAP answers TR 462 to any other).
+- `package_type` — Package type (PACKAGE create).
+- `software_component` — Software component (PACKAGE create).
+- `transport_layer` — Transport layer (PACKAGE create).
+- `record_changes` — Record changes (PACKAGE create).
+- `application_component` — Application component (PACKAGE create).
+- `transport_type` — Transport request type (TRANSPORT create).
+- `target_system` — Target system of the transport request (TRANSPORT create).
+- `owner` — Owner of the transport request (TRANSPORT create).
+- `task_type` — The type given to the request's task (TRANSPORT create): S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.
+- `superclass` — Superclass name (CLASS create).
+- `final` — Mark the class final (CLASS create).
+- `create_protected` — Protected constructor (CLASS create).
+- `table_name` — Table name.
+- `structure_name` — Structure name.
+- `data_element_name` — Data element name.
+- `interface_name` — Interface name.
+- `table_type_name` — Table type name.
+- `service_definition_name` — Service definition name (SERVICE_DEFINITION; the definition a SERVICE_BINDING binds).
+- `service_binding_name` — Service binding name.
+- `service_name` — Service name of the binding (SERVICE_BINDING create); the binding name when absent.
+- `service_version` — Service version of the binding (SERVICE_BINDING create); 0001 when absent.
+- `binding_variant` — Binding variant (SERVICE_BINDING create); ODATA_V4_UI when absent.
+- `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
+- `implementation_type` — Behavior definition implementation type.
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerUpdate
 
@@ -410,6 +511,53 @@ per request.
 - `data_element_name` — Data element name.
 - `interface_name` — Interface name.
 - `include_name` — Include name.
+- `table_type_name` — Table type name.
+- `service_definition_name` — Service definition name.
+- `service_binding_name` — Service binding name.
+- `service_name` — Published service name (SERVICE_BINDING, an OData V2 binding).
+- `service_version` — Published service version (SERVICE_BINDING, an OData V2 binding). Default 0001.
+- `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
+- `ddl_code` — Complete DDL source code (for TABLE/STRUCTURE update).
+- `implementation_code` — Behavior implementation methods source code.
+- `test_class_source` — ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST update).
+- `test_class_code` — Updated source for the local test class.
+- `local_types_code` — Updated source for class local types.
+- `definitions_code` — Updated source for class local definitions.
+- `macros_code` — Updated source for class local macros.
+- `binding_variant` — Service binding variant (service binding update).
+- `desired_publication_state` — Target publication state (service binding update).
+- `data_class` — Data class. The value help lists APPL0 (master data), APPL1 (transaction data), APPL2 (organization and customizing) and DDIM, DFACT, DODS; SAP checks the value when the table is activated.
+- `size_category` — Size category, a digit from 0 to 9.
+- `buffering` — Buffering; each field given replaces the stored one.
+- `storage_type` — Storage type.
+- `sharing_type` — Sharing type.
+- `load_unit` — Load unit.
+- `translation` — Translation value; the translation flags keep their stored values.
+- `logging_enabled` — Whether changes to the table data are logged.
+- `is_writable_by_amdp` — TABLE_SETTINGS on the cloud: true allows AMDP writes; activation then needs buffering N, logging off and no replacement object.
+- `symbols` — The text symbols: the whole list; symbols left out are deleted.
+- `selections` — The selection texts (programs and function groups): the whole list; texts left out are deleted.
+- `headings` — The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
+
+**On ABAP Cloud (`cloud`):** Writes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …) under its lock: sends the write of its type under lock_handle, the lock handle of the object, one request (TABLE_SETTINGS, FUNCTION_GROUP_TEXT_ELEMENTS and CLASS_TEXT_ELEMENTS: as their sentences below say), and answers SAP's result. The write sets the whole content to the one given. lock_handle and object_type required: PACKAGE(package_name*, source_code*, transport_request), DOMAIN(domain_name*, source_code*, transport_request), DATA_ELEMENT(data_element_name*, source_code*, transport_request), TABLE_TYPE(table_type_name*, source_code*, transport_request), FUNCTION_GROUP(function_group_name*, source_code*, transport_request), TABLE(table_name*, ddl_code*, transport_request), STRUCTURE(structure_name*, ddl_code*, transport_request), DDL(ddl_name*, ddl_source*, transport_request), SERVICE_DEFINITION(service_definition_name*, source_code*, transport_request), CLASS(class_name*, source_code*, transport_request), LOCAL_TEST_CLASS(class_name*, test_class_code*, transport_request), LOCAL_TYPES(class_name*, local_types_code*, transport_request), LOCAL_DEFINITIONS(class_name*, definitions_code*, transport_request), LOCAL_MACROS(class_name*, macros_code*, transport_request), UNIT_TEST(class_name*, test_class_source*, transport_request), CDS_UNIT_TEST(class_name*, test_class_source*, transport_request), INTERFACE(interface_name*, source_code*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, source_code*, transport_request), BEHAVIOR_DEFINITION(name*, source_code*, transport_request), BEHAVIOR_IMPLEMENTATION(class_name*, implementation_code*, transport_request), METADATA_EXTENSION(name*, source_code*, transport_request), SERVICE_BINDING(service_binding_name*, desired_publication_state*, binding_variant*, service_name, service_version), TABLE_SETTINGS(table_name*, data_class, size_category, buffering, storage_type, sharing_type, load_unit, translation, logging_enabled, is_writable_by_amdp, transport_request), FUNCTION_GROUP_TEXT_ELEMENTS(function_group_name*, symbols, selections, headings, transport_request), CLASS_TEXT_ELEMENTS(class_name*, symbols, transport_request). For PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, source_code is the whole metadata document, sent as given. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST, CDS_UNIT_TEST and BEHAVIOR_IMPLEMENTATION, lock_handle is the class's lock handle. For TABLE_SETTINGS, lock_handle is the lock handle of TABLE_SETTINGS; the settings document is read and written back with each setting given, at least one, over the stored one, every other setting keeping its stored value: two requests; is_writable_by_amdp is taken on the cloud. For FUNCTION_GROUP_TEXT_ELEMENTS and CLASS_TEXT_ELEMENTS, lock_handle is the lock handle of the same object_type; each of symbols, selections and headings given, at least one, is written as its whole list, one request each. For SERVICE_BINDING the write is its publication request, sent under the lock_handle given, an empty one included; service_name and service_version (default 0001) name the service of an OData V2 binding. transport_request is sent as the write's corrNr. Over Streamable HTTP the write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); the write is sent only under a lock the instance it reaches holds.
+
+**Parameters (`cloud`):**
+
+- `object_type` (required) — ABAP object type for routed compact operation.
+- `lock_handle` (required) — The lock handle of the object (for a class include, of the class): the write is sent under it.
+- `transport_request` — Transport request id, sent as the write's corrNr (the types whose description names it).
+- `class_name` — ABAP class name.
+- `domain_name` — ABAP domain name.
+- `function_module_name` — ABAP function module name.
+- `function_group_name` — ABAP function group name.
+- `package_name` — ABAP package name.
+- `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
+- `source_code` — The content written: the source, or for PACKAGE, DOMAIN, DATA_ELEMENT, FUNCTION_GROUP, TABLE_TYPE and INCLUDE with part metadata the whole metadata document.
+- `ddl_source` — Complete DDL source code (for DDL update).
+- `table_name` — Table name.
+- `structure_name` — Structure name.
+- `data_element_name` — Data element name.
+- `interface_name` — Interface name.
 - `table_type_name` — Table type name.
 - `service_definition_name` — Service definition name.
 - `service_binding_name` — Service binding name.
@@ -470,6 +618,30 @@ per request.
 - `behavior_implementation_name` — Behavior implementation name.
 - `metadata_extension_name` — Metadata extension name.
 
+**On ABAP Cloud (`cloud`):** Deletes the object named by object_type and its name parameter (class_name, program_name, ddl_name, table_name, …): sends the deletion request for its type, and answers SAP's result. object_type required: PACKAGE(package_name*, transport_request), DOMAIN(domain_name*, transport_request), DATA_ELEMENT(data_element_name*, transport_request), TABLE(table_name*, transport_request), STRUCTURE(structure_name*, transport_request), TABLE_TYPE(table_type_name*, transport_request), DDL(ddl_name*, transport_request), SERVICE_DEFINITION(service_definition_name*, transport_request), SERVICE_BINDING(service_binding_name*, transport_request), CLASS(class_name*, transport_request), CDS_UNIT_TEST(class_name*, transport_request), INTERFACE(interface_name*, transport_request), FUNCTION_GROUP(function_group_name*, transport_request), FUNCTION_MODULE(function_module_name*, function_group_name*, transport_request), BEHAVIOR_DEFINITION(behavior_definition_name*, transport_request), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*, transport_request), METADATA_EXTENSION(metadata_extension_name*, transport_request), LOCAL_TEST_CLASS(class_name*, lock_handle*, transport_request), LOCAL_TYPES(class_name*, lock_handle*, transport_request), LOCAL_DEFINITIONS(class_name*, lock_handle*, transport_request), LOCAL_MACROS(class_name*, lock_handle*, transport_request), UNIT_TEST(class_name*, lock_handle*, transport_request). CDS_UNIT_TEST deletes its test class. For LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS and LOCAL_MACROS (the class's local includes) and UNIT_TEST (its test classes include) the include is written empty under lock_handle, the class's lock handle. transport_request is sent with the request. Over Streamable HTTP an include write takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header); it is sent only under a lock the instance it reaches holds.
+
+**Parameters (`cloud`):**
+
+- `object_type` (required) — Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST.
+- `lock_handle` — The lock handle of the class (LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST): the include is written empty under it.
+- `package_name` — ABAP package name.
+- `class_name` — ABAP class name.
+- `domain_name` — ABAP domain name.
+- `function_module_name` — ABAP function module name.
+- `function_group_name` — ABAP function group name.
+- `ddl_name` — DDL source name (CDS view, AMDP table function, etc.).
+- `transport_request` — Transport request id, sent with the deletion (or the include write).
+- `table_name` — Table name.
+- `structure_name` — Structure name.
+- `data_element_name` — Data element name.
+- `interface_name` — Interface name.
+- `table_type_name` — Table type name.
+- `service_definition_name` — Service definition name.
+- `service_binding_name` — Service binding name.
+- `behavior_definition_name` — Behavior definition name.
+- `behavior_implementation_name` — Behavior implementation name.
+- `metadata_extension_name` — Metadata extension name.
+
 ### HandlerActivate
 
 **Half:** `@mcp-abap-adt/compact-modify`
@@ -479,6 +651,18 @@ per request.
 **Available in:** cloud, onprem
 
 **Parameters:**
+
+- `object_type` — ABAP object type for routed compact operation. Names the object's type in the single form.
+- `object_name` — Object name (single form). A function module is named GROUP|MODULE, its function group first, or the module alone with function_group_name.
+- `function_group_name` — A function module's function group (single form, FUNCTION_MODULE).
+- `object_adt_type` — ADT object type code (e.g. CLAS/OC, PROG/P) of the object (single form).
+- `parentName` — With object_adt_type (single form): The function group the object belongs to; its address is built from it. Required for FUGR/FF (function, functionmodule, function_module, func), FUGR/I. With PROG/PX, the function group whose text elements are activated.
+- `objects` — The objects activated together (list form).
+- `preaudit` — Run pre-audit checks before activation.
+
+**On ABAP Cloud (`cloud`):** Activates the object named by object_name and object_type (or object_adt_type), or the objects named by objects, in one request. Single form (object_name*, object_type or object_adt_type*): object_type is enough for CLASS, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION, SERVICE_BINDING, BEHAVIOR_IMPLEMENTATION, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS and CLASS_TEXT_ELEMENTS; FUNCTION_MODULE(object_name* as GROUP|MODULE, or object_name* with function_group_name*) is activated under its function group; any other type takes object_adt_type (e.g. "CLAS/OC"), with parentName for a part of a function group (FUGR/FF, FUGR/I). List form (objects[].name*, objects[].type*, objects[].parentName, objects[].uri); an object of FUGR/FF, FUGR/I is listed with objects[].parentName set to its function group. One object of CLASS, INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION or BEHAVIOR_IMPLEMENTATION (by object_type or its ADT type code) is activated directly and answers the activation verdict. Every other call starts an activation run and answers { run_id }: the id of the accepted run, whose status and messages are read by that id. Where the system's discovery leaves out the activation runs (SAP_BASIS 751, 7.40), that call answers SAP's refusal; a group activation there is ActivateObjects (the full set) or ActivateObjectLow (the low handlers group).
+
+**Parameters (`cloud`):**
 
 - `object_type` — ABAP object type for routed compact operation. Names the object's type in the single form.
 - `object_name` — Object name (single form). A function module is named GROUP|MODULE, its function group first, or the module alone with function_group_name.
@@ -544,6 +728,14 @@ per request.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `super_package` — PACKAGE: accepted for compatibility; the lock uses the package's name.
 
+**On ABAP Cloud (`cloud`):** Lock operation. object_type required: CLASS(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), TABLE_TYPE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*, super_package), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_DEFINITION(object_name*), SERVICE_BINDING(object_name*), TABLE_SETTINGS(object_name*), FUNCTION_GROUP_TEXT_ELEMENTS(object_name*), CLASS_TEXT_ELEMENTS(object_name*). Answers the lock_handle and the state_handle of the server instance that holds the lock; a SERVICE_BINDING open in an editing session answers an empty lock_handle, under which its publication runs. A write, a delete or an unlock under the lock_handle runs on the instance that holds it. Over Streamable HTTP send it as the state_handle argument of every call under this lock, the write and the unlock (or in the x-mcp-state-handle header).
+
+**Parameters (`cloud`):**
+
+- `object_type` (required) — Object type. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, TABLE_SETTINGS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
+- `super_package` — PACKAGE: accepted for compatibility; the lock uses the package's name.
+
 ### HandlerUnlock
 
 **Half:** `@mcp-abap-adt/compact-modify`
@@ -555,6 +747,14 @@ per request.
 **Parameters:**
 
 - `object_type` (required) — Object type. Supported: CLASS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS.
+- `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
+- `lock_handle` (required) — Lock handle returned by lock.
+
+**On ABAP Cloud (`cloud`):** Unlock operation. object_type required: CLASS(object_name*, lock_handle*), INTERFACE(object_name*, lock_handle*), FUNCTION_GROUP(object_name*, lock_handle*), FUNCTION_MODULE(object_name*, lock_handle*), TABLE(object_name*, lock_handle*), STRUCTURE(object_name*, lock_handle*), TABLE_TYPE(object_name*, lock_handle*), DDL(object_name*, lock_handle*), DOMAIN(object_name*, lock_handle*), DATA_ELEMENT(object_name*, lock_handle*), PACKAGE(object_name*, lock_handle*), BEHAVIOR_DEFINITION(object_name*, lock_handle*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*), METADATA_EXTENSION(object_name*, lock_handle*), SERVICE_DEFINITION(object_name*, lock_handle*), SERVICE_BINDING(object_name*, lock_handle*), TABLE_SETTINGS(object_name*, lock_handle*), FUNCTION_GROUP_TEXT_ELEMENTS(object_name*, lock_handle*), CLASS_TEXT_ELEMENTS(object_name*, lock_handle*); an empty lock_handle of a SERVICE_BINDING answers that the binding is already unlocked. The lock_handle is one a lock of this server instance answered; the unlock ends the instance's hold on the lock. Over Streamable HTTP the unlock takes the lock's state_handle: send it as the state_handle argument of every call under the lock (or in the x-mcp-state-handle header).
+
+**Parameters (`cloud`):**
+
+- `object_type` (required) — Object type. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, TABLE_SETTINGS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `lock_handle` (required) — Lock handle returned by lock.
 
@@ -618,6 +818,15 @@ per request.
 - `profiler_id` — The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.
 - `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
 
+**On ABAP Cloud (`cloud`):** Runs a class in one request. Required: target_type*(CLASS) + class_name* for CLASS. Optional: profiler_id (the profiler id of a scheduled trace; given, the run goes under that trace; absent, the run is plain), background. Response: JSON { success, class_name | program_name, output }, plus profile: { profiler_id } for a run under a trace.
+
+**Parameters (`cloud`):**
+
+- `target_type` (required) — Run target kind.
+- `class_name` — Class to run.
+- `profiler_id` — The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.
+- `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
+
 ### HandlerDebugBreakpoints
 
 **Half:** debugger tools of `@mcp-abap-adt/compact` (the write binaries; no `-ro` one)
@@ -640,7 +849,7 @@ per request.
 - `watchpoint_id` — abap deleteWatchpoint: the id SAP gave the watchpoint.
 - `request_user` — abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.
 - `debugging_mode` — abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerDebugSession
 
@@ -662,7 +871,7 @@ per request.
 - `settings` — abap setDebuggerSettings: the settings sent; a field left out keeps its value.
 - `request_user` — abap, user mode: the SAP user whose requests the breakpoints and the listener catch; the connected SAP user when omitted. The first abap call of a debug state fixes it.
 - `debugging_mode` — abap: user (when omitted) catches every request of the request user; terminal catches the requests that carry this debug state's terminal_id and ide_id. The first abap call of a debug state fixes it.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerDebugStep
 
@@ -684,7 +893,7 @@ per request.
 - `parent_name` — For a function module: its function group.
 - `position` — abap setStackPosition: the frame's position in the stack.
 - `debuggee_id` — amdp: the debuggee id of the break event.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerDebugMaintain
 
@@ -706,7 +915,7 @@ per request.
 - `debuggee_id` — amdp getDataPreview: the debuggee id of the break event.
 - `query` — amdp getDataPreview: a SELECT over the table variable; every column when omitted.
 - `row_number` — amdp getDataPreview: how many rows SAP answers; SAP's own count when omitted.
-- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ### HandlerDebugBatch
 
@@ -791,6 +1000,78 @@ per request.
 - `action` (required) — begin: switch into batch mode; end: send the recorded calls and leave batch mode; answers: read the last batch's answers by number (with number or numbers).
 - `number` — answers only: one batch number to read (an integer of at least 1); give this or numbers, not both.
 - `numbers` — answers only: several batch numbers to read, answered in the order given; give this or number, not both.
+
+### HandlerAbapGitGet
+
+**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), always listed; a call on a system whose discovery does not list abapGit is refused `abapgit_not_served`
+
+**Description:** [read-only] Reads abapGit repositories, one read per action: repos(package_name, repository_key, detail) the linked repositories: key, package, branch, remote URL and on cloud the run state (status, status text, run log key); external_repo(url*, detail) the access mode and the branches of the remote repository at url; staging(repository_key*, detail) the unstaged, staged and ignored objects with their files, and the proposed author and committer; checks(repository_key*) SAP's status of the connection to the remote; a refusal with SAP's message key and on cloud the git host's HTTP status; file(repository_key*, filename*, version*) the text of one file, local or remote. Answers facts only. Each argument is described with the actions that take it.
+
+**Available in:** all
+
+**Parameters:**
+
+- `action` (required) — The read: repos (the linked repositories), external_repo (what a remote repository offers), staging (what changed), checks (the repository's connection to its remote), file (one file of the repository).
+- `repository_key` — repos: only the repository with this key. staging: required, the repository. checks: required, the repository. file: required, the repository.
+- `package_name` — repos: only the repository linked to this package.
+- `url` — external_repo: required, the remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+- `filename` — file: required, the file name.
+- `version` — file: required, local (the system's) or remote (the remote branch's).
+- `detail` — repos: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). external_repo: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). staging: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+
+**On ABAP Cloud (`cloud`):** [read-only] Reads abapGit repositories, one read per action: repos(package_name, repository_key, detail) the linked repositories: key, package, branch, remote URL and on cloud the run state (status, status text, run log key); external_repo(url*, detail) the access mode and the branches of the remote repository at url; modified_objects(repository_key*, detail) what a pull would change: every changed object (changed in the remote, in the system or both, added or deleted), the repository's own package left out, and as package warnings the objects whose package in the system differs from the package their path maps to, each with SAP's action (1 add, 2 update: changed only in the remote, 3 overwrite: changed in the system, 4 delete, 5 delete and re-create, 6 package move); SAP leaves a package warning with action 5 out of every selection; staging(repository_key*, detail) the unstaged, staged and ignored objects with their files, and the proposed author and committer; checks(repository_key*) SAP's status of the connection to the remote; a refusal with SAP's message key and on cloud the git host's HTTP status; file(repository_key*, filename*, version*) the text of one file, local or remote; error_log(repository_key*, app_log_key*, detail) each object of the repository's last run with its status and message type. Answers facts only. Each argument is described with the actions that take it.
+
+**Parameters (`cloud`):**
+
+- `action` (required) — The read: repos (the linked repositories), external_repo (what a remote repository offers), modified_objects (what a pull would change), staging (what changed), checks (the repository's connection to its remote), file (one file of the repository), error_log (a run's log).
+- `repository_key` — repos: only the repository with this key. modified_objects: required, the repository. staging: required, the repository. checks: required, the repository. file: required, the repository. error_log: required, the repository.
+- `package_name` — repos: only the repository linked to this package.
+- `url` — external_repo: required, the remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+- `filename` — file: required, the file name.
+- `version` — file: required, local (the system's) or remote (the remote branch's).
+- `app_log_key` — error_log: required, the run log key the repository list answers for the repository's last run.
+- `detail` — repos: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). external_repo: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). modified_objects: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). staging: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). error_log: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+
+### HandlerAbapGit
+
+**Half:** abapGit tools of `@mcp-abap-adt/lib` (`HandlerAbapGitGet` in every compact binary, `HandlerAbapGit` in the write binaries), always listed; a call on a system whose discovery does not list abapGit is refused `abapgit_not_served`
+
+**Description:** Changes abapGit repositories and their remotes, one write per action: link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch; unlink(repository_key*) ends the repository's binding to its package; the objects stay; pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on; on premise it overwrites local changes and objects of other packages, and when the SAP request or its response is lost mid-import (an SSE or stdio close logs the connection off) the outcome is unknown to this server and what SAP does then is unverified (the staging action shows the current differences, whichever writes made them); on cloud SAP runs it as its own job, which runs to its end whatever happens to the connection, its objects are inactive, and it brings every object modified_objects lists to its remote version, a package warning with action 5 (delete and re-create) excepted, or with overwrite selects by name: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job; switch_branch(repository_key*, branch*, create*) switches the branch, creating it in the remote with create true. Answers facts only. Each argument is described with the actions that take it.
+
+**Available in:** all
+
+**Parameters:**
+
+- `action` (required) — The write: link (link a package to a remote repository), unlink (end a repository's binding to its package), pull (import the remote branch), push (commit and push chosen objects), switch_branch (switch or create the repository's branch).
+- `repository_key` — unlink: required, the repository. pull: required, the repository. push: required, the repository. switch_branch: required, the repository.
+- `package_name` — link: required, the package linked.
+- `url` — link: required, the remote repository URL over HTTPS.
+- `branch` — link: required, the branch linked. switch_branch: required, the branch switched to.
+- `transport_request` — link: the transport request that records the objects written. pull: the transport request that records the objects written.
+- `objects` — push: required, the objects and files to commit, as staging with detail "medium" answers them.
+- `comment` — push: required, the commit message.
+- `author` — push: required, the commit author: name and email.
+- `committer` — push: required, the committer: name and email.
+- `create` — switch_branch: required, true creates the branch in the remote when it does not exist.
+- `background` — link: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end. pull: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end. push: When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
+
+**On ABAP Cloud (`cloud`):** Changes abapGit repositories and their remotes, one write per action: link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch; unlink(repository_key*) ends the repository's binding to its package; the objects stay; pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on; on premise it overwrites local changes and objects of other packages, and when the SAP request or its response is lost mid-import (an SSE or stdio close logs the connection off) the outcome is unknown to this server and what SAP does then is unverified (the staging action shows the current differences, whichever writes made them); on cloud SAP runs it as its own job, which runs to its end whatever happens to the connection, its objects are inactive, and it brings every object modified_objects lists to its remote version, a package warning with action 5 (delete and re-create) excepted, or with overwrite selects by name: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job; branch_info(url*, branch*, package_name*, detail) one remote branch with its folder logic; to answer it SAP binds the repository to package_name for the read. Answers facts only. Each argument is described with the actions that take it.
+
+**Parameters (`cloud`):**
+
+- `action` (required) — The write: link (link a package to a remote repository), unlink (end a repository's binding to its package), pull (import the remote branch), push (commit and push chosen objects), branch_info (one remote branch for a package, SAP links and unlinks to answer it).
+- `repository_key` — unlink: required, the repository. pull: required, the repository. push: required, the repository.
+- `package_name` — link: required, the package linked. branch_info: required, the package SAP links to answer.
+- `url` — link: required, the remote repository URL over HTTPS. branch_info: required, the remote repository URL over HTTPS.
+- `branch` — link: required, the branch linked. branch_info: required, the branch read.
+- `transport_request` — link: the transport request that records the objects written. pull: the transport request that records the objects written.
+- `folder_logic` — link: cloud: how folders map to subpackages, FULL or PREFIX.
+- `objects` — push: required, the objects and files to commit, as staging with detail "medium" answers them.
+- `overwrite` — pull: cloud: the objects of modified_objects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused, within one list or across both: SAP matches by name within each list, so a collision inside one list could take an object not named. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every pull. Without it the job takes every other listed object.
+- `comment` — push: required, the commit message.
+- `author` — push: required, the commit author: name and email.
+- `committer` — push: required, the committer: name and email.
+- `detail` — branch_info: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
 
 ## Streamable HTTP Binaries
 

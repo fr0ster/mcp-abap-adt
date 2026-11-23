@@ -30,6 +30,7 @@ import * as z from 'zod';
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 import { givenName } from '../../../lib/givenName';
 import { createArguments } from '../../../lib/handlers/createArguments';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -93,11 +94,11 @@ export const TOOL_DEFINITION = {
       .optional()
       .describe(MASTER_LANGUAGE_DESCRIPTION),
     detail: z
-      .enum(['terse', 'full', 'raw'])
+      .enum(DETAIL_LEVELS)
       .optional()
       .default('terse')
       .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
+        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).',
       ),
   }),
 } as const;

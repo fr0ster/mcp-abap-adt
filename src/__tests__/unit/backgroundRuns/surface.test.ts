@@ -33,9 +33,11 @@ import {
   readBackground,
   withoutBackground,
 } from '../../../lib/backgroundRuns/tools';
+import { compactAbapGitEntries } from '../../../lib/compact/abapGit/group';
 import { compactDebugEntries } from '../../../lib/compact/debug/group';
 import type { HandlerSet } from '../../../lib/config/IServerConfig';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { AbapGitHandlersGroup } from '../../../lib/handlers/groups/AbapGitHandlersGroup';
 import { BackgroundRunHandlersGroup } from '../../../lib/handlers/groups/BackgroundRunHandlersGroup';
 import { DataHandlersGroup } from '../../../lib/handlers/groups/DataHandlersGroup';
 import { DebugHandlersGroup } from '../../../lib/handlers/groups/DebugHandlersGroup';
@@ -670,6 +672,10 @@ describe('which tools take background', () => {
       .getHandlers()
       .map((e) => e.toolDefinition),
     ...compactDebugEntries().map((e) => e.toolDefinition),
+    ...new AbapGitHandlersGroup(noConnectionContext())
+      .getHandlers()
+      .map((e) => e.toolDefinition),
+    ...compactAbapGitEntries('all').map((e) => e.toolDefinition),
   ];
   const declares = (definition: ToolDefinition) => {
     const schema = listedJson(definition.inputSchema);

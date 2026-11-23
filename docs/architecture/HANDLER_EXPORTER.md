@@ -77,6 +77,14 @@ registry handed to a server runs its run tools as the server's own: with `backgr
 given `backgroundRuns` (24.0.0) (its options have no
 `includeDebug`). A server instance (`EmbeddableMcpServer`) serves them.
 
+abapGit tools are served by the MCP server only. Every abapGit call goes through `BaseMcpServer`'s
+admission (the import refusal, the system's discovery, the repository-list pre-read, the package
+check, the approved git endpoints); without it every call is refused `abapgit_not_admitted`. So the
+exporter hands out no abapGit tool (`ListAbapGitRepos` … `GetAbapGitErrorLog`, compact
+`HandlerAbapGitGet` / `HandlerAbapGit`) on `getHandlerEntries()`, `getToolNames()`,
+`createRegistry()` or `registerOnServer`. Serve them with `EmbeddableMcpServer`, adding
+`AbapGitHandlersGroup` from `@mcp-abap-adt/lib/handlers` to its registry.
+
 ### Prompts
 
 The prompt module is `@mcp-abap-adt/lib/prompts` (`src/lib/prompts/`): the nine MCP prompts

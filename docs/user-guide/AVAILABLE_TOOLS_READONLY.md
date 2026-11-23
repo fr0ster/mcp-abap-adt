@@ -5,11 +5,19 @@ Generated from the tool definitions the server builds (not from docs).
 Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there — taken from `fullReadOnlyToolSet`, the set the read-only binaries use. `mcp-abap-adt-sse-ro` serves them without `ListLeftoverSessions`, which is stdio's only, and `mcp-abap-adt-http-ro` the same, with what its [Streamable HTTP section](#streamable-http-binaries) adds. Nothing here changes the system: no high, run, debugger, leftover-session logoff or resume tool; the background-run tools serve the long reads, which run in the background by default. Batch mode is the compact binaries' (`HandlerBatch`, [BATCH_MODE.md](BATCH_MODE.md)): none is served here. `mcp-abap-adt` serves these and more: [all tools](AVAILABLE_TOOLS.md).
 
 - Level: Read-Only
-- Total tools: 75
+- Total tools: 82
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
+  - [Abapgit](#read-only-abapgit)
+    - [ListAbapGitRepos](#listabapgitrepos-read-only-abapgit)
+    - [CheckAbapGitExternalRepo](#checkabapgitexternalrepo-read-only-abapgit)
+    - [GetAbapGitModifiedObjects](#getabapgitmodifiedobjects-read-only-abapgit)
+    - [GetAbapGitStaging](#getabapgitstaging-read-only-abapgit)
+    - [CheckAbapGitRepo](#checkabapgitrepo-read-only-abapgit)
+    - [GetAbapGitFile](#getabapgitfile-read-only-abapgit)
+    - [GetAbapGitErrorLog](#getabapgiterrorlog-read-only-abapgit)
   - [Atc](#read-only-atc)
     - [RunATC](#runatc-read-only-atc)
     - [GetATCRunStatus](#getatcrunstatus-read-only-atc)
@@ -124,6 +132,95 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 <a id="read-only-group"></a>
 ## Read-Only Group
 
+<a id="read-only-abapgit"></a>
+### Read-Only / Abapgit
+
+<a id="listabapgitrepos-read-only-abapgit"></a>
+#### ListAbapGitRepos (Read-Only / Abapgit)
+**Description:** [read-only] Lists the abapGit repositories linked in the system, optionally only the one of package_name or of repository_key. Answers facts only: each repository's key, package, branch and remote URL, and on cloud its run state — the status of its last pull or push (blank initial, R running, S, W, E or A ended), the status text and the key of its run log.
+
+**Source:** `src/handlers/abapgit/readonly/handleListAbapGitRepos.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `package_name` (string, optional) - Only the repository linked to this package.
+- `repository_key` (string, optional) - Only the repository with this key.
+
+---
+
+<a id="checkabapgitexternalrepo-read-only-abapgit"></a>
+#### CheckAbapGitExternalRepo (Read-Only / Abapgit)
+**Description:** [read-only] Reads what the remote repository at url offers before it is linked, as the system reaches it. Answers facts only: its access mode (public or private) and its branches, each with its name, type, whether it is the head and its commit hash.
+
+**Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitExternalRepo.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
+---
+
+<a id="getabapgitmodifiedobjects-read-only-abapgit"></a>
+#### GetAbapGitModifiedObjects (Read-Only / Abapgit)
+**Description:** [read-only] Reads what a pull of the repository would change in the system: every changed object (changed in the remote, in the system or in both, added or deleted on either side), the repository's own package left out, and as package warnings the objects whose package in the system differs from the package their path maps to. Answers facts only: each object with its type, name, package, URI and SAP's action: 1 add, 2 update (changed only in the remote), 3 overwrite (changed in the system), 4 delete, 5 delete and re-create, 6 package move; SAP leaves a package warning with action 5 out of every selection.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitModifiedObjects.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgitstaging-read-only-abapgit"></a>
+#### GetAbapGitStaging (Read-Only / Abapgit)
+**Description:** [read-only] Reads what changed between the system and the remote branch of the repository, to choose what a push commits. Answers facts only: the unstaged, staged and ignored objects, each with its files and their local and remote state, and the author and committer this system proposes. With detail "medium" every field of the objects a push takes is listed.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitStaging.ts`
+
+**Parameters:**
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="checkabapgitrepo-read-only-abapgit"></a>
+#### CheckAbapGitRepo (Read-Only / Abapgit)
+**Description:** [read-only] Checks that the system reaches the repository's remote and is let in. Answers facts only: SAP's status; a refusal answers the status, SAP's message class and number and, on cloud, the git host's HTTP status.
+
+**Source:** `src/handlers/abapgit/readonly/handleCheckAbapGitRepo.ts`
+
+**Parameters:**
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
+<a id="getabapgitfile-read-only-abapgit"></a>
+#### GetAbapGitFile (Read-Only / Abapgit)
+**Description:** [read-only] Reads one file of the repository: the system's version (local) or the remote branch's (remote). Answers the file's text as it is.
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitFile.ts`
+
+**Parameters:**
+- `filename` (string, required) - The file name, as GetAbapGitStaging lists it (for example zcl_demo.clas.abap).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+- `version` (string, required, one of: `local`, `remote`) - Which version of the file: local (the system's) or remote (the remote branch's).
+
+---
+
+<a id="getabapgiterrorlog-read-only-abapgit"></a>
+#### GetAbapGitErrorLog (Read-Only / Abapgit)
+**Description:** [read-only] Reads the log of the repository's last pull or push, by the run log key the repository list answers for it. Answers facts only: each object of the run with its type, name, package, status and SAP's message type (S, I, W, E or A).
+
+**Source:** `src/handlers/abapgit/readonly/handleGetAbapGitErrorLog.ts`
+
+**Parameters:**
+- `app_log_key` (string, required) - The run log key ListAbapGitRepos answers for the repository's last run.
+- `detail` (string, optional, one of: `terse`, `medium`, `full`) - How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+---
+
 <a id="read-only-atc"></a>
 ### Read-Only / Atc
 
@@ -134,6 +231,14 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
 **Parameters:**
+- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
+- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
+- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
+- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
+
+**On ABAP Cloud (`cloud`):** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+
+**Parameters (`cloud`):**
 - `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
 - `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
@@ -160,7 +265,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `worklist_id` (string, required) - Worklist identifier an ATC run answered.
 
 ---
@@ -188,7 +293,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `display_id` (string, required) - Display ID of a stored ATC result.
 
 ---
@@ -315,6 +420,13 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
+
+**On ABAP Cloud (`cloud`):** [read-only] Reads the active, inactive and working versions of each part of the object named by object_type and object_name, together, and tells whether it holds an unactivated change and whose. Answers { object_type, object_name, has_draft, parts }: per part (main, the source or metadata; for CLASS and BEHAVIOR_IMPLEMENTATION also the includes implementations, definitions, testclasses) draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other (null for METADATA_EXTENSION and SERVICE_DEFINITION, whose ETag carries a constant time), and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's
+
+**Parameters (`cloud`):**
+- `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
+- `object_name` (string, required) - Object name.
+- `object_type` (string, required, one of: `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
 
 ---
 
@@ -620,7 +732,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
@@ -674,7 +786,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `get`, `update` prompts ask the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
@@ -711,7 +823,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `maxResults` (number, optional (default: 100)) - [read-only] Maximum number of results to return
 - `object_name` (string, required) - [read-only] Object name or mask (e.g. 'MARA*')
 - `object_type` (string, optional) - [read-only] Optional: restrict the search to one type: a name of the system's object types list — a main type (e.g. CLAS, DEVC, TABL), an alias of one subtype (e.g. STRU for structures, DTAB for database tables, FUNC for function modules) or a group — or an ADT type code, which stands for the name that selects it (e.g. TABL/DS for STRU, FUGR/FF for FUNC, ENHO/XHH for ENHO), either case; or a name standing for a code, written in lower case (e.g. class, structure, table, function), read as its code: view is a CDS view (DDLS), dbview a dictionary view (VIEW). A value in upper case is a search name or a code first, so VIEW is the dictionary views; it is a name only when it is neither (CLASS is class).
@@ -861,7 +973,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetTransaction.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transaction_name` (string, required) - Name of the ABAP transaction
 
 ---
@@ -1017,7 +1129,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetInactiveObjects.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 
 ---
 
@@ -1028,7 +1140,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetAllTypes.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `validate_type` (string, optional) - Type name to validate (optional)
 
 ---
@@ -1040,7 +1152,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetObjectStructure.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `objectname` (string, required) - ADT object name (e.g. /CBY/ACQ_DDL)
 - `objecttype` (string, required) - ADT object type (e.g. DDLS/DF)
 
@@ -1053,9 +1165,17 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Source:** `src/handlers/system/readonly/handleGetObjectOutline.ts`
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `PROG/P`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, PROG/P, FUGR/F (class, interface, program, function group).
+- `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
+
+**On ABAP Cloud (`cloud`):** [read-only] Lists the components of the ABAP object named by object_type and object_name — types, attributes, methods, events, local classes, forms, includes or modules — with their kind, visibility and level, and the source positions SAP's object structure states for each: the include each link points into and, for a class or an interface, its start and end line and column (lines from 1, columns from 0, the end exclusive), the lines a ranged source read (start_line, end_line) answers. Returns the components as a tree.
+
+**Parameters (`cloud`):**
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `object_name` (string, required) - Object name.
+- `object_type` (string, required, one of: `CLAS/OC`, `INTF/OI`, `FUGR/F`) - ADT type of the object: CLAS/OC, INTF/OI, FUGR/F (class, interface, function group).
 - `version` (string, optional (default: active), one of: `active`, `inactive`, `workingArea`) - The version read: "active" (default) the activated version, "inactive" the version saved and awaiting activation, "workingArea" the version in the working area, as ADT answers it.
 
 ---
@@ -1112,7 +1232,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `row_number` (number, optional (default: 100)) - [read-only] Maximum number of rows to return
 - `sql_query` (string, required) - SQL query to execute
 
@@ -1183,7 +1303,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `max_rows` (number, optional) - Maximum number of rows to retrieve
 - `table_name` (string, required) - Name of the ABAP table
 
@@ -1235,7 +1355,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `include_objects` (boolean, optional (default: true)) - With detail terse: list a task's objects (default: true); their count is answered either way.
 - `include_tasks` (boolean, optional (default: true)) - With detail terse: list a request's tasks (default: true); their count is answered either way.
 - `transport_number` (string, required) - Transport request or task number
@@ -1252,7 +1372,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 **Parameters:**
 - `background` (boolean, optional) - Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; GetBackgroundRun answers its result once, and DiscardBackgroundRun cancels it while it runs. false: the call answers the result itself.
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `modifiable_only` (boolean, optional) - Modifiable requests only (true, the default), or modifiable and released requests (false; released ones from SAP's default window of the last 14 days).
 - `user` (string, optional) - The SAP user whose requests to list, sent in upper case. Default: the session's login user.
 
@@ -1267,7 +1387,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A task answers its own entries; a request answers the entries of each of its tasks, each with its `task` number — the task a removal addresses.
 
 ---
@@ -1281,7 +1401,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `transport` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
 
 ---
@@ -1298,7 +1418,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 **Prompt:** the `unit_test` prompt asks the model to call this tool ([PROMPTS.md](PROMPTS.md)).
 
 **Parameters:**
-- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `format` (string, optional, one of: `abapunit`, `junit`) - Result format: abapunit or junit.
 - `run_id` (string, required) - Run id a unit test run answered.
 - `with_navigation_uris` (boolean, optional) - Include navigation URIs in result if supported.
@@ -1331,4 +1451,4 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 ---
 
-*Last updated: 2026-11-22*
+*Last updated: 2026-11-23*

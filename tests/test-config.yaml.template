@@ -96,6 +96,7 @@ environment:
   # checks the session's SAP_URL.
   realm_check_url: ""                        # ← CHANGE (RFC): the system's HTTP URL
   connection_type: "http"                    # "http" | "rfc"
+  default_master_system: "SID"                # ← CHANGE: the system id (SID) this config connects to; abapgit.check_repo_fault_system is matched against it
   # RFC (rfc only): the destination states its address, client and language,
   # and no SAP_URL. Each key below sets its SAP_* variable (SAP_ASHOST, ...)
   # over the .env's; leave "" to take the .env's. One address: ashost + sysnr
@@ -1510,6 +1511,18 @@ create_transported_object:
 # request of the session user (ListTransports, then GetTransport's tasks).
 read_transport:
   task_number: "TASK"                            # ← CHANGE: a transport task of the system
+
+# abapGit (coverage/abapGit.live.test.ts, coverage/abapGitCompact.live.test.ts)
+# Data, no switch. check_repo_fault_system names the on-premise system whose
+# installed abapGit cannot answer the repository checks: its
+# ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory
+# IV_SERVICE at L53; measured). It is matched against
+# environment.default_master_system: on that system the checks case asserts
+# SAP's refusal whole (500, no T100 key); on any other system, onprem or
+# cloud, the checks must answer. onprem: needed only on that system; cloud:
+# not needed. Absent or empty: no system is that one.
+abapgit:
+  check_repo_fault_system: ""                    # ← CHANGE: the system id with the checks fault, or empty
 
 # Service Definition (Service Definition - High-Level)
 # Read by high/serviceDefinition/ServiceDefinitionHighHandlers.test.ts. Object

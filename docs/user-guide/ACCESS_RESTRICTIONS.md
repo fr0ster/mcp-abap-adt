@@ -52,7 +52,7 @@ does not see it and cannot call it. No call checks a deny list.
 |---|---|
 | `Tool` | the tool (`DeleteClass`) |
 | `Prefix*` | every tool whose name starts with `Prefix` (`Delete*`) |
-| `Tool.value` | one value of a compact tool's dispatching argument: `object_type` (HandlerActivate, HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerGet, HandlerLock, HandlerUnlock, HandlerUpdate, HandlerValidate), `target_type` (HandlerProfileRun), `action` (HandlerBatch, HandlerDebugBatch, HandlerSession, HandlerSystem), `operation` (HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints, HandlerDebugMaintain); and `HandlerGetData.sql`, the `sql_query` mode |
+| `Tool.value` | one value of a compact tool's dispatching argument: `object_type` (HandlerActivate, HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerGet, HandlerLock, HandlerUnlock, HandlerUpdate, HandlerValidate), `target_type` (HandlerProfileRun), `action` (HandlerAbapGit, HandlerAbapGitGet, HandlerBatch, HandlerDebugBatch, HandlerSession, HandlerSystem), `operation` (HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints, HandlerDebugMaintain); and `HandlerGetData.sql`, the `sql_query` mode |
 | `Tool.CODE` | on HandlerActivate and HandlerGet, an ADT type code as the ADT tables write it (`HandlerActivate.CLAS/OC`, `HandlerGet.DDLS/DF`) |
 | `Tool.prefix*` | every value (and, on HandlerActivate and HandlerGet, every code) starting with `prefix` (`HandlerDebugSession.get*`; `HandlerActivate.CLAS*` names `CLASS` and `CLAS/OC`) |
 
@@ -114,7 +114,9 @@ list. A call that names several is refused whole when one is outside.
 - Only the tools a binary's `-ro` twin does not serve are checked: **reads are not checked**
   (`GetPackage`, `GetTransport`, `HandlerGet`).
 - An argument not given, or blank, is not checked: the call runs, and SAP may refuse it. The
-  server makes no call to SAP to find an object's package or request.
+  server makes no call to SAP to find an object's package or request — but for the package-tree
+  read below, and the abapGit repository list, which an abapGit call addressed by
+  `repository_key` reads first ([abapGit](#abapgit)).
 - Packages: an exact name (`ZFOO`, `$TMP`), a prefix (`Z*`), or a subtree (`ZFOO/**`: `ZFOO` and
   every package below it; `/ABC/ZFOO/**` in a namespace). Requests: an exact number or a prefix.
   Entries are upper-cased.
@@ -145,6 +147,89 @@ either list is configured, a table argument must be one table name (ASCII letter
 `/` and `$`): an alias, a join or a list of tables is refused `table_not_allowed`. A free SQL
 query (`GetSqlQuery`, `HandlerGetData`'s `sql_query`) is not analysed: deny it as an action
 (`GetSqlQuery`, `HandlerGetData.sql`).
+
+## abapGit
+
+The abapGit tools (full and compact) are checked by the same settings, with one rule of their own
+for the two writes whose reach no package or request entry can bound.
+
+### Link and pull are refused under restrictions
+
+While **any** `allowed-packages` or `allowed-requests` entry is configured, `LinkAbapGitRepo`,
+`PullAbapGitRepo` and compact `HandlerAbapGit` `link` and `pull` are refused
+`abapgit_import_not_allowed`, on premise and on ABAP Cloud, before anything is sent and before any
+credential is looked up. With no restriction configured they are served, and SAP's authorization
+decides. The grounds, read in SAP's code:
+
+- **On premise, link and pull import with every decision set to yes.** The link imports the whole
+  remote right after creating the repository (`ZCL_ABAPGIT_RES_REPOS`, local types,
+  `perform_import` L41–75), and the pull does the same on the linked branch
+  (`ZCL_ABAPGIT_RES_REPO_PULL->post` L60–171): every overwrite and every package-warning decision
+  is `'Y'`, so they write subpackages, overwrite objects changed in the system, and write objects
+  held by other packages.
+- **On ABAP Cloud, a pull's job decides at run time.** The job recomputes its decisions when it
+  runs and matches a selection by object name alone (`CL_ABAPGIT_BG_ACTION_PULL`,
+  `deserialize_checks` L113, decisions L123–154), and deletes the objects whose deletion it
+  confirmed (`delete_unnecessary_objects` L39–72): a selection checked before the submit does not
+  bound what the job writes. Of the unselected entries only a remote-only add or update is
+  imported: a deletion runs only for a selected entry (`delete_unnecessary_objects` L39–72), an
+  unselected package warning is left out whatever its state (`CL_ABAPGIT_OBJECTS->
+  warning_package_adjust` L1858–1897), and an unselected entry changed in the system is left out
+  (`warning_overwrite_adjust` L1791). A selective pull (`overwrite`) is a pull, refused the same way.
+- **On ABAP Cloud, a pull given a request may create a task in it.** When the user has no task in
+  the request, SAP creates one (`CL_ABAPGIT_RES_REPO_PULL->check_and_create_task`,
+  `TR_INSERT_NEW_COMM` L76) — and an entry for a request does not cover its tasks.
+
+### What each tool is checked by
+
+| Tool (compact action) | Checked | From |
+|---|---|---|
+| `LinkAbapGitRepo` (`link`), `PullAbapGitRepo` (`pull`) | refused while any entry is configured | — |
+| `GetAbapGitBranchInfo` (`branch_info`, cloud) | `package_name` against the allowed packages | the argument: the package SAP links into to answer (`CL_ABAPGIT_RES_REPO_BRANCH_EXT->post` L120, the link removed at L184) |
+| `PushAbapGitRepo` (`push`), `UnlinkAbapGitRepo` (`unlink`), `SwitchAbapGitBranch` (`switch_branch`, on premise) | the repository's package against the allowed packages | the repository list's entry for `repository_key` |
+| the reads (`ListAbapGitRepos`, `CheckAbapGitExternalRepo`, `GetAbapGitModifiedObjects`, `GetAbapGitStaging`, `CheckAbapGitRepo`, `GetAbapGitFile`, `GetAbapGitErrorLog`; `HandlerAbapGitGet`) | not checked, as every read | — |
+
+No abapGit tool takes a git credential as an argument; a repository is addressed by
+`repository_key`.
+
+### The repository-list read first
+
+A call addressed by `repository_key` that writes, binds a git credential or reads the run log
+sends one request before anything else: `GET /sap/bc/adt/abapgit/repos`, stateless, with no git
+credential and no wire log. Its entry for the key gives the package checked above, the remote URL
+the credential is bound to, the branch a pull is sent, and the run log's key. This is the one
+exception, beside the package-tree read, to "the server makes no call to SAP to find an object's
+package": for these calls, "before anything is sent" reads "before anything but this list is
+sent". The list is read once per call; a background run gets the call's entry and reads none.
+
+### Fail closed
+
+Each of these refuses the call in fixed words; nothing is sent but the reads its row names — the repository list where it was read, and for the last two `overwrite` rows the modified-objects list as well:
+
+| Case | Code |
+|---|---|
+| link or pull while any `allowed-packages` or `allowed-requests` entry is configured | `abapgit_import_not_allowed` |
+| a blank `package_name` on link or branch info | `abapgit_package_required` |
+| a key the list does not show with a package and a URL, or a list that cannot be read | `abapgit_repository_unknown` |
+| an `app_log_key` that is not the run log the list shows for that repository | `abapgit_run_log_not_paired` |
+| an entry showing more than one run log | `abapgit_run_log_ambiguous` |
+| the run log asked of an on-premise system (its list carries no run log) | `abapgit_run_log_not_served` |
+| a pull's `overwrite` naming one object twice | `abapgit_overwrite_duplicate` |
+| a pull's `overwrite` on premise, whose pull takes no selection | `abapgit_overwrite_not_declared` |
+| a pull's `overwrite` naming an object the modified-objects list does not hold (the repository list and the modified-objects list read, no pull) | `abapgit_overwrite_not_listed` |
+| a pull's `overwrite` naming a name the modified-objects list holds under two types, in one of its two lists or across both: SAP selects by name within each list (the repository list and the modified-objects list read, no pull) | `abapgit_overwrite_ambiguous` |
+| a `url` that is no URL written as the URL parser writes it, or carries a user, a password, a query, a fragment or a dot segment | `abapgit_url_refused` |
+| `x-abapgit-*` headers that state no approved endpoint | `abapgit_endpoint_refused` |
+| a system whose discovery does not list abapGit, or cannot be read | `abapgit_not_served` |
+| `background` on a call that does not take it (cloud, or another action) | `abapgit_background_not_declared` |
+
+### Denied actions
+
+Each full tool is denied by its name (`PushAbapGitRepo`). The compact tools are narrowed by `action`: `HandlerAbapGitGet.repos`,
+`.external_repo`, `.modified_objects`, `.staging`, `.checks`, `.file`, `.error_log`;
+`HandlerAbapGit.link`, `.unlink`, `.pull`, `.push`, `.switch_branch`, `.branch_info`. A denied
+action leaves the tool's `action` enum and its description; a denied action given with
+`background` is refused before anything, as any denied action.
 
 ## Refusals
 

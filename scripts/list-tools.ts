@@ -13,6 +13,7 @@ import {
 } from '@mcp-abap-adt/compact-readonly-entries';
 import * as z from 'zod';
 import {
+  AbapGitHandlersGroup,
   DataHandlersGroup,
   DebugHandlersGroup,
   HighLevelHandlersGroup,
@@ -45,6 +46,8 @@ const groups = {
   runtime: new RuntimeRunHandlersGroup(ctx),
   search: new SearchHandlersGroup(ctx),
   debug: new DebugHandlersGroup(ctx),
+  // abapGit: always listed; served where the system's discovery lists it, decided at call time.
+  abapgit: new AbapGitHandlersGroup(ctx),
 };
 
 type ParamInfo = { name: string; required: 'yes' | 'no' };

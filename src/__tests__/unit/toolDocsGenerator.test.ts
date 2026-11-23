@@ -97,7 +97,7 @@ describe('the tool-docs generator lists the built schema', () => {
   it('lists the spread-in detail property', () => {
     assert.ok(
       renderParams(named('CreateTableType')).includes(
-        '- `detail` (string, optional (default: terse), one of: `terse`, `full`, `raw`)',
+        '- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`)',
       ),
     );
   });

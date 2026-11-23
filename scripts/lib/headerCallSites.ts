@@ -72,6 +72,37 @@ function headersParameter(
   return undefined;
 }
 
+/**
+ * The one exception, the owner's: an abapGit new form's pair, taken straight
+ * from `ABAPGIT_HEADERS` of `src/lib/abapGit/client.ts` (a member of
+ * `DEFAULT_ADT_HEADERS`). `withAdtHeaders` resends on 406/415, which would
+ * replay a request carrying git credentials, so those calls never go
+ * through it.
+ */
+function isAbapGitPair(value: ts.Expression, checker: ts.TypeChecker): boolean {
+  if (
+    !ts.isPropertyAccessExpression(value) ||
+    !ts.isIdentifier(value.expression) ||
+    value.expression.text !== 'ABAPGIT_HEADERS'
+  ) {
+    return false;
+  }
+  const local = checker.getSymbolAtLocation(value.expression);
+  if (local === undefined) return false;
+  const symbol =
+    (local.flags & ts.SymbolFlags.Alias) !== 0
+      ? checker.getAliasedSymbol(local)
+      : local;
+  const declaration = symbol.declarations?.[0];
+  return (
+    declaration !== undefined &&
+    declaration
+      .getSourceFile()
+      .fileName.replaceAll('\\', '/')
+      .endsWith('src/lib/abapGit/client.ts')
+  );
+}
+
 function problemOf(
   call: ts.CallExpression,
   at: number,
@@ -96,6 +127,7 @@ function problemOf(
     break;
   }
   if (value === undefined) return 'no `headers` in its options';
+  if (isAbapGitPair(value, checker)) return undefined;
   if (!ts.isIdentifier(value)) {
     return 'its `headers` is not the pair `withAdtHeaders` hands it';
   }

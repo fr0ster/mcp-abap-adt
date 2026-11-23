@@ -548,11 +548,9 @@ export function detailWiring(
       // alone caught the one corpus defect this migration had only because
       // BOTH of its sites happened to be hardcoded together.
       const projection = call.arguments[2];
-      const projectionResult = classifyProjection(
-        projection,
-        bindingSymbol,
-        checker,
-      );
+      const projectionResult = selectsReadingByLevel(source)
+        ? 'dynamic'
+        : classifyProjection(projection, bindingSymbol, checker);
       if (projectionResult === 'literal' && declares) {
         offenders.push(
           `${file}:${lineOf(source, projection ?? call)} — tool declares detail, the answer() projection does not vary with it`,
@@ -619,6 +617,39 @@ export function toolNameOf(source: ts.SourceFile): string | undefined {
 }
 
 /** Is this expression a call to `detailOf(...)`? */
+/**
+ * Whether the handler selects a reading by the level asked for — a
+ * `readingAt(<table>, levelOf(…))` call (`src/lib/detail`): the reading the
+ * adt-clients call is given then decides the answer, so the projection is
+ * the reading's value and need not name the level itself — or, where the
+ * answer is built from several requests, its formatter: `answerAt(<table>,
+ * levelOf(…))`.
+ */
+function selectsReadingByLevel(source: ts.SourceFile): boolean {
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (found) return;
+    if (
+      ts.isCallExpression(node) &&
+      (node.expression.getText() === 'readingAt' ||
+        node.expression.getText() === 'answerAt')
+    ) {
+      const level = node.arguments[1];
+      if (
+        level !== undefined &&
+        ts.isCallExpression(level) &&
+        level.expression.getText() === 'levelOf'
+      ) {
+        found = true;
+        return;
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return found;
+}
+
 function isDetailOfCall(expr: ts.Expression): boolean {
   return ts.isCallExpression(expr) && expr.expression.getText() === 'detailOf';
 }

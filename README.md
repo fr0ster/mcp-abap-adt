@@ -6,6 +6,7 @@
 **Primary workflows:**
 - **Deep ABAP analysis**: where-used, object metadata, repository navigation, object structure, semantic analysis, dependency and impact exploration.
 - **High-level ABAP development**: rapid CRUD and iterative updates for RAP and classic ABAP artifacts (classes, interfaces, function groups/modules, programs, DDIC, CDS/view/service artifacts), validated through ADT flows.
+- **The git loop with abapGit**: find a package's repository, link it, pull, see what changed, stage, commit and push, and read what went wrong — on premise and on ABAP Cloud, with any git host over HTTPS, the git credential kept out of every argument, log line and answer. See [abapGit](#abapgit-the-git-loop-on-a-package).
 
 **Why teams use it:**
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
@@ -15,6 +16,7 @@
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Several installation variants: the **full** server (`@mcp-abap-adt/core`) or the **compact** one (`@mcp-abap-adt/compact`), each connecting to the system over **HTTP**, **RFC** or **SNC** — see [Installation variants](docs/installation/INSTALLATION.md#installation-variants)
 - Rich tool surface for ABAP objects, metadata, transports, and search
+- **abapGit through ADT**: link, pull, stage, push, branches and checks as tools (full and compact), each where the system's abapGit serves it; any git host over HTTPS; git credentials bound to approved endpoints, never a tool argument; answers are facts only
 
 **Authorization & Destinations (Important):** A *destination* is the filename of a service key stored locally. You place service keys in the service-keys directory, and use `--mcp=<destination>` to select which one to use. This is the primary auth model for on‑prem and BTP systems. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
@@ -31,7 +33,7 @@ You can configure MCP clients either manually (JSON/TOML) or via the configurato
 7. [Terminology](#terminology)
 8. [Authorization & Destinations](#authorization--destinations)
 9. [Registries](#registries)
-10. [Features](#features)
+10. [Features](#features) — [abapGit](#abapgit-the-git-loop-on-a-package)
 11. [Documentation](#documentation)
 12. [Dependencies](#dependencies)
 13. [Running the Server](#running-the-server)
@@ -375,6 +377,124 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destinations))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API; a data tool, off unless enabled — see [The data tools](#the-data-tools-off-unless-enabled)
 
+- **🌿 abapGit**: `ListAbapGitRepos`, `CheckAbapGitExternalRepo`, `GetAbapGitBranchInfo`, `LinkAbapGitRepo`, `UnlinkAbapGitRepo`, `PullAbapGitRepo`, `GetAbapGitModifiedObjects`, `GetAbapGitStaging`, `PushAbapGitRepo`, `CheckAbapGitRepo`, `GetAbapGitFile`, `SwitchAbapGitBranch`, `GetAbapGitErrorLog`; compact `HandlerAbapGitGet` and `HandlerAbapGit` - The git loop on a package, see [abapGit](#abapgit-the-git-loop-on-a-package)
+
+### abapGit: the git loop on a package
+
+The abapGit tools drive the abapGit service SAP serves through ADT (`/sap/bc/adt/abapgit/…`): on
+ABAP Cloud SAP's own, on premise the open-source abapGit ADT backend installed in the system. Each
+operation is offered where that system's abapGit serves it:
+
+| Operation | Full tool | Compact | On premise | ABAP Cloud | In `-ro` |
+|---|---|---|---|---|---|
+| List the linked repositories (key, package, branch, remote URL; on cloud the run state and its log key) | `ListAbapGitRepos` | `HandlerAbapGitGet` `repos` | yes | yes | yes |
+| Check a remote before linking: access mode and branches | `CheckAbapGitExternalRepo` | `HandlerAbapGitGet` `external_repo` | yes | yes | yes |
+| Read one remote branch for a package (SAP links the repository and removes the link to answer it) | `GetAbapGitBranchInfo` | `HandlerAbapGit` `branch_info` | — | yes | no |
+| Link a package to a remote | `LinkAbapGitRepo` | `HandlerAbapGit` `link` | yes, and imports the branch | yes, the link only | no |
+| Unlink (the objects stay) | `UnlinkAbapGitRepo` | `HandlerAbapGit` `unlink` | yes | yes | no |
+| Pull | `PullAbapGitRepo` | `HandlerAbapGit` `pull` | yes, in the call | yes, as SAP's job | no |
+| The objects a pull would change, with SAP's action for each | `GetAbapGitModifiedObjects` | `HandlerAbapGitGet` `modified_objects` | — | yes | yes |
+| Stage: what changed, with its files, and the proposed author and committer | `GetAbapGitStaging` | `HandlerAbapGitGet` `staging` | yes | yes | yes |
+| Commit and push the chosen objects | `PushAbapGitRepo` | `HandlerAbapGit` `push` | yes, in the call | yes, as SAP's job | no |
+| Check that the system reaches the remote | `CheckAbapGitRepo` | `HandlerAbapGitGet` `checks` | yes (see below) | yes | yes |
+| Read one file, local or remote | `GetAbapGitFile` | `HandlerAbapGitGet` `file` | yes | yes | yes |
+| Switch the branch, or create it in the remote | `SwitchAbapGitBranch` | `HandlerAbapGit` `switch_branch` | yes | — | no |
+| Read a pull's or a push's run log | `GetAbapGitErrorLog` | `HandlerAbapGitGet` `error_log` | — | yes | yes |
+
+- **Always listed; served where the system serves abapGit.** `tools/list` lists the abapGit tools
+  without any request to SAP (no logon, no discovery; `--deferred-logon` included). Whether the
+  system serves abapGit is decided when a tool is called: a system whose discovery does not list
+  `/sap/bc/adt/abapgit/repos` (an on-premise system without the abapGit ADT backend, say) answers
+  the call `abapgit_not_served` and nothing else is sent. Discovery is read once per system and
+  kept for the process; a failed read is not kept, and the next call reads it again.
+- **Any git host over HTTPS** — GitHub, GitLab, Bitbucket, Azure DevOps, Gitea, a self-hosted
+  server on a port of its own. SAP's abapGit connects to the host, not this server: it chooses
+  Basic or Digest from the host's answer and sends a token as the password, and the host's
+  certificate must be trusted in the system.
+- **Git credentials come from approved endpoints, never from a tool argument.** An approved
+  endpoint is an exact remote URL with its user and token, and its optional aliases: over stdio
+  the destination's `<name>.abapgit.yaml` beside its `<name>.env`; over Streamable HTTP the
+  request's `x-abapgit-remote`, `x-abapgit-user` and `x-abapgit-token` headers, for that request
+  only; over SSE the same headers on the stream's opening `GET`, for that stream. A credential is
+  attached only to the remote that matches exactly; any other remote is sent without one. The
+  credential reaches SAP's abapGit request and nothing else: no log line, no answer, no error, no
+  background-run record. See
+  [Authentication: abapGit remotes](docs/user-guide/AUTHENTICATION.md#abapgit-remotes-approved-endpoints).
+- **Answers are facts only.** A tool answers the facts SAP's document states — statuses, object
+  lists, SAP's message class and number — never SAP's message texts, bodies or headers, and
+  nothing is cut. The tools that answer lists (`ListAbapGitRepos`, `CheckAbapGitExternalRepo`,
+  `GetAbapGitBranchInfo`, `GetAbapGitModifiedObjects`, `GetAbapGitStaging`,
+  `GetAbapGitErrorLog`; the compact actions alike) take `detail`: `terse` (the default: TSV of
+  the identifiers and a short description), `medium` (TSV of every fact field) or `full` (the
+  whole facts object as JSON); there is no `raw`. A refusal from SAP is its fixed words and its
+  facts (`status`, `messageClass`, `messageNumber`, on cloud `CheckAbapGitRepo`'s
+  `gitHttpStatus`) as JSON.
+- **Long runs end on SAP's answer; nothing runs on the server's clock.** No abapGit tool takes a
+  timeout. On premise, link, pull and push are SAP's synchronous writes: the call ends on SAP's
+  answer, and the caller's cancel does not cut it; with `background: true` (on premise only; full
+  `LinkAbapGitRepo`, `PullAbapGitRepo`, `PushAbapGitRepo`, compact `HandlerAbapGit` `link`, `pull`,
+  `push`) it runs as a [background run](docs/user-guide/README.md#background-runs-of-a-class-or-a-program)
+  on an ABAP session of its own, which `DiscardBackgroundRun` cannot cut; without a background-run
+  store or a fresh connection `background: true` is refused, never run in the call. On ABAP Cloud,
+  pull and push are SAP's own job: the call answers `accepted` at once, no route cancels the job,
+  `ListAbapGitRepos` shows its run state and `GetAbapGitErrorLog` its log.
+- **A cloud pull can overwrite only the objects it names.** `GetAbapGitModifiedObjects` (compact
+  `modified_objects`) lists what a pull would change: every changed object of the repository, its
+  own package left out, with SAP's action — `2` update (changed only in the remote), `3` overwrite
+  (changed in the system), and add, delete, re-create, package move — and as package warnings the
+  objects whose package in the system differs from the one their path maps to. On ABAP Cloud a pull
+  without a selection hands SAP's job the whole list, and the job brings each object to its remote
+  version, a package warning with action `5` excepted (SAP sets it to not imported whatever is
+  selected). `PullAbapGitRepo` (compact `pull`) takes `overwrite`, on the cloud only: the listed
+  objects to overwrite, each once, by its type and name as the list answers them. The server reads
+  the list and sends the named entries as it answered them. SAP's job then recomputes the list when
+  it runs and selects by **name** alone. Of the objects not named, a remote-only add or update is
+  imported, and every other one keeps its system state: a change in the system, a remote deletion
+  (SAP deletes only selected entries) and an object of another package (SAP leaves every unselected
+  package warning out). A package warning with action `5` (delete and re-create) cannot be selected:
+  SAP sets it to not imported. A change made between the read and the job is judged by SAP the same
+  way, unseen by the server. Refused: `overwrite` on premise (`abapgit_overwrite_not_declared`,
+  nothing sent; SAP's on-premise pull takes no selection and overwrites them all), an object named
+  twice (`abapgit_overwrite_duplicate`, nothing sent), and after the repository list and the
+  modified-objects read, an object the list does not hold (`abapgit_overwrite_not_listed`) or a
+  name it holds under two types, in one list or across both (`abapgit_overwrite_ambiguous`: SAP
+  selects by name within each list, the server refuses any collision).
+- **An on-premise import whose SAP request is lost: unverified.** Closing an SSE stream or a stdio
+  server logs its connections off, a running background run's included. When that loses an
+  on-premise link's or pull's SAP request or its response, what SAP does is **unverified**: it has
+  been neither read in SAP's code nor measured, and the server does not learn the outcome. Do not
+  assume the import finished or was rolled back: read the repository's staging with the tool's own
+  read, `GetAbapGitStaging` (compact `HandlerAbapGitGet` `staging`); it shows the current
+  differences and cannot tell which writes came from the interrupted pull (on ABAP Cloud also
+  `GetAbapGitModifiedObjects` and the run log, `GetAbapGitErrorLog`). On ABAP Cloud a pull or push
+  is SAP's job, accepted before the call answers: closing the connection does not stop it. A
+  Streamable HTTP disconnect leaves calls and runs going.
+- **What an import writes** (read in SAP's code): an on-premise link imports the whole remote
+  branch, and an on-premise pull the branch the repository is linked on, both with every overwrite
+  and every "object of another package" decision set to yes — objects changed in the system are
+  overwritten, subpackages are created as the folder logic derives them, and objects held by other
+  packages are written too. A cloud link writes the link only. A cloud pull imports as inactive objects, and, given a transport request, creates a task in it
+  for the user who has none. A push writes a commit in the remote and nothing in the system;
+  `SwitchAbapGitBranch` with `create: true` creates the branch in the remote. A cloud pull given
+  `overwrite` imports, of the listed objects outside the selection, the remote-only adds and updates
+  only (measured for an update; the rest read in SAP's code); see the entry above.
+- **Link and pull are refused under access restrictions.** While any `allowed-packages` or
+  `allowed-requests` entry is configured, link and pull (full and compact) are refused
+  `abapgit_import_not_allowed`, nothing sent: what they write is not bounded by the packages and
+  requests they name. Push, unlink, branch switch and cloud branch info are checked against the
+  repository's package, read from SAP's repository list first. See
+  [Access restrictions: abapGit](docs/user-guide/ACCESS_RESTRICTIONS.md#abapgit).
+- **The run log is cloud's.** On-premise abapGit keeps no run log in its repository list, so
+  `GetAbapGitErrorLog` (compact `error_log`) is cloud only; its `app_log_key` must be the one the
+  repository list shows for that repository.
+- **On premise, `CheckAbapGitRepo` meets SAP's fault.** The on-premise backend answers the check
+  with SAP's runtime error `SYNTAX_ERROR` (measured); the call returns SAP's answer as it is.
+- **Reads in `-ro`, writes outside it.** `GetAbapGitBranchInfo` is a write: SAP links the
+  repository, reads the branch and removes the link, and commits. Each tool and each compact
+  action can be denied with `--deny-actions` (`HandlerAbapGit.push`).
+- The abapGit tools need the MCP server's admission (the repository-list read, the endpoint
+  binding): an embedder's plain registration (`HandlerExporter`) registers none of them.
+
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
 
 ## Documentation
@@ -388,6 +508,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Batch Mode](docs/user-guide/BATCH_MODE.md)** - The compact binaries' `HandlerBatch`: record independent calls, send them together in batch envelopes at the batch's end, read their answers by number; which calls are recorded
 - **[MCP Prompts](docs/user-guide/PROMPTS.md)** - The nine prompts (`create`, `get`, `update`, `delete`, `activate`, `check`, `unit_test`, `where_used`, `transport`) per binary and kind, their `object_type` values, how a client shows them, the refusal
 - **[Tool Search](docs/user-guide/TOOL_SEARCH.md)** - The three texts each listed tool carries — `description` for the model, `keywords` for BM25, `semantic` for vector search — and where a client reads them
+- **[abapGit](#abapgit-the-git-loop-on-a-package)** - The git loop on a package: the tools per system, any git host over HTTPS, approved endpoints per transport ([credentials](docs/user-guide/AUTHENTICATION.md#abapgit-remotes-approved-endpoints)), long runs, what an import writes, the refusal under [access restrictions](docs/user-guide/ACCESS_RESTRICTIONS.md#abapgit)
 - **[Debugger](docs/user-guide/DEBUGGER.md)** - The `debug` set of the write binaries: debug sessions and their handle, the SAP ids, what keeps a session alive on each transport, what ends it
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - The twelve binaries and the tools each serves
 - **Configurator**: `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf)) provides the `mcp-conf` CLI to auto-configure clients

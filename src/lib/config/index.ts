@@ -6,6 +6,15 @@
 
 import '../instance.js';
 
+export type { AbapGitRestrictionSignal } from '../abapGit/admission.js';
+export {
+  type ApprovedEndpoint,
+  ApprovedEndpointError,
+} from '../abapGit/approvedEndpoints.js';
+export {
+  abapGitEndpointsFileOf,
+  readApprovedEndpointsFile,
+} from '../abapGit/endpointSources.js';
 export {
   type EarlierLibCopy,
   type LibCopy,

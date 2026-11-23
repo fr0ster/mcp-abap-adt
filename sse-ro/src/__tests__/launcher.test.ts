@@ -74,9 +74,9 @@ describe('mcp-abap-adt-sse-ro', () => {
     assert.ok(!stderr.join('\n').includes('--exposition=<'));
   });
 
-  it('serves the read-only set without the data tools: 72 tools (no batch tool: the compact binaries serve batch mode), the background-run tools, none of a run or a leftover session', () => {
+  it('serves the read-only set without the data tools: 79 tools (the seven abapGit reads among them; no batch tool: the compact binaries serve batch mode), the background-run tools, none of a run or a leftover session', () => {
     assert.deepStrictEqual(shape(readOnlyToolSet), shape(fullReadOnlyToolSet));
-    assert.equal(shape(readOnlyToolSet).flatMap((g) => g.tools).length, 72);
+    assert.equal(shape(readOnlyToolSet).flatMap((g) => g.tools).length, 79);
     assert.equal(readOnlyToolSet.backgroundRuns, true);
     // The leftover-session tools are stdio's.
     assert.deepStrictEqual(

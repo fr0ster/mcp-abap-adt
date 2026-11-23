@@ -478,5 +478,29 @@
   "GetObjectOutline a function group @full": {
     "isError": false,
     "text": "{\"base\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/source/main\",\"root\":{\"type\":\"FUGR/F\",\"name\":\"ZMCP_D19E25\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/source/main\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/source/main\"}],\"children\":[{\"type\":\"FUGR/I\",\"name\":\"LZMCP_D19E25TOP\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25top/source/main\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25top/source/main\"}],\"children\":[]},{\"type\":\"FUGR/I\",\"name\":\"LZMCP_D19E25UXX\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25uxx/source/main\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/includes/lzmcp_d19e25uxx/source/main\"}],\"children\":[]},{\"unknownType\":\"FUGR/PX\",\"name\":\"SAPLZMCP_D19E25\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/textelements/functiongroups/zmcp_d19e25/source/symbols\",\"source\":\"/sap/bc/adt/textelements/functiongroups/zmcp_d19e25/source/symbols\"}],\"children\":[]},{\"type\":\"FUGR/FF\",\"name\":\"Z_MCP_D1_9E25\",\"constant\":false,\"readOnly\":false,\"final\":false,\"links\":[{\"rel\":\"definitionIdentifier\",\"href\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/fmodules/z_mcp_d1_9e25/source/main\",\"source\":\"/sap/bc/adt/functions/groups/zmcp_d19e25/fmodules/z_mcp_d1_9e25/source/main\"}],\"children\":[]}]}}"
+  },
+  "GetObjectStructure a class @terse": {
+    "isError": false,
+    "text": "tree:\n- CLAS/OC: ZCL_X\n  - CLAS/OA [Attributes]\n    - CLAS/OA: ATTR\n  - CLAS/OM [Methods]\n    - CLAS/OM: RUN\n- CLAS/OC: ZCL_OTHER\n"
+  },
+  "GetObjectStructure a class @medium": {
+    "isError": false,
+    "text": "tree:\n- CLAS/OC: ZCL_X\n  - CLAS/OA [Attributes]\n    - CLAS/OA: ATTR\n  - CLAS/OM [Methods]\n    - CLAS/OM: RUN (ZCL_X========CM001)\n- CLAS/OC: ZCL_OTHER\n"
+  },
+  "GetObjectStructure a class @full": {
+    "isError": false,
+    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"projectexplorer:node\":[{\"@\":{\"nodeid\":\"000002\",\"parentid\":\"000001\",\"objecttype\":\"CLAS/OA\",\"isfolder\":\"true\",\"description\":\"Attributes\"}},{\"@\":{\"nodeid\":\"000003\",\"parentid\":\"000002\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"ATTR\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000004\",\"parentid\":\"000001\",\"objecttype\":\"CLAS/OM\",\"isfolder\":\"true\",\"description\":\"Methods\"}},{\"@\":{\"nodeid\":\"000005\",\"parentid\":\"000004\",\"objecttype\":\"CLAS/OM\",\"objectname\":\"ZCL_X========CM001\",\"description\":\"RUN\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000006\",\"objecttype\":\"CLAS/OC\",\"objectname\":\"ZCL_OTHER\",\"isfolder\":\"false\"}}],\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
+  },
+  "GetObjectStructure an empty structure @terse": {
+    "isError": false,
+    "text": "No nodes found in object structure response."
+  },
+  "GetObjectStructure an empty structure @medium": {
+    "isError": false,
+    "text": "No nodes found in object structure response."
+  },
+  "GetObjectStructure an empty structure @full": {
+    "isError": false,
+    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
   }
 }

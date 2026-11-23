@@ -30,6 +30,7 @@ import { handleGetStructuresList } from '../../../handlers/structure/readonly/ha
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
 import { handleGetObjectOutline } from '../../../handlers/system/readonly/handleGetObjectOutline';
+import { handleGetObjectStructure } from '../../../handlers/system/readonly/handleGetObjectStructure';
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import {
   type FeedShown,
@@ -772,6 +773,46 @@ for (const [label, corpus, type, name] of [
         {
           object_type: type,
           object_name: name,
+          detail,
+        } as never,
+      ),
+    );
+}
+
+const structureNode = (attributes: string) =>
+  `<projectexplorer:node ${attributes}/>`;
+const OBJECT_STRUCTURE = `${xmlHead}<projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/projectexplorer">${[
+  structureNode(
+    'nodeid="000002" parentid="000001" objecttype="CLAS/OA" isfolder="true" description="Attributes"',
+  ),
+  structureNode(
+    'nodeid="000003" parentid="000002" objecttype="CLAS/OA" objectname="ZCL_X" description="ATTR" isfolder="false"',
+  ),
+  structureNode(
+    'nodeid="000004" parentid="000001" objecttype="CLAS/OM" isfolder="true" description="Methods"',
+  ),
+  structureNode(
+    'nodeid="000005" parentid="000004" objecttype="CLAS/OM" objectname="ZCL_X========CM001" description="RUN" isfolder="false"',
+  ),
+  structureNode(
+    'nodeid="000006" objecttype="CLAS/OC" objectname="ZCL_OTHER" isfolder="false"',
+  ),
+].join('')}</projectexplorer:objectstructure>`;
+
+for (const [label, data] of [
+  ['a class', OBJECT_STRUCTURE],
+  [
+    'an empty structure',
+    `${xmlHead}<projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/projectexplorer"/>`,
+  ],
+] as const) {
+  CASES[`GetObjectStructure ${label}`] = async (detail) =>
+    answeredOf(
+      await handleGetObjectStructure(
+        ctx([{ data }]) as never,
+        {
+          objecttype: 'CLAS/OC',
+          objectname: 'ZCL_X',
           detail,
         } as never,
       ),

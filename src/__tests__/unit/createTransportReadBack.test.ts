@@ -22,12 +22,21 @@ const head = '<?xml version="1.0" encoding="utf-8"?>';
 const NUMBER = 'SIDK900011';
 const CREATED = `${head}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest"><tm:request tm:number="${NUMBER}" tm:desc="x" tm:type="K" tm:target="LOCAL"><tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>`;
 /** The raw array of an assembling tool: each response with its status and body. */
+const responsesOf = (
+  ...responses: Array<string | { status: number; body: string }>
+) =>
+  responses.map((r) => (typeof r === 'string' ? { status: 200, body: r } : r));
 const wire = (...responses: Array<string | { status: number; body: string }>) =>
-  JSON.stringify(
-    responses.map((r) =>
-      typeof r === 'string' ? { status: 200, body: r } : r,
-    ),
-  );
+  JSON.stringify(responsesOf(...responses));
+/** A failed read-back at raw: every response read, and the note full explains (Codex round 7). */
+const failedWire = (
+  kind: string,
+  ...responses: Array<string | { status: number; body: string }>
+) =>
+  JSON.stringify({
+    responses: responsesOf(...responses),
+    read_back: READ_BACK_WORDS(kind),
+  });
 
 const READ_BACK_WORDS = (kind: string) =>
   `the request ${NUMBER} was created, but reading it back failed (${kind}): read it with GetTransport, transport_number ${NUMBER}`;
@@ -81,13 +90,16 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
     });
 
     // raw is every response SAP gave (`wireAnswer`), failures too (Codex
-    // round 6, P1-2): a failed read-back is its response, never a gap.
-    it(`${label}: raw is every response — the read-back as SAP answered it`, async () => {
+    // round 6, P1-2), and the read-back's failure beside them (round 7).
+    it(`${label}: raw is every response and the read-back's failure`, async () => {
       const answered = await run(readBack, 'raw');
       assert.equal(answered.isError === true, false, answered.content[0]?.text);
       assert.equal(
         answered.content[0]?.text,
-        wire(CREATED, { status: readBack.status ?? 200, body: readBack.data }),
+        failedWire(kind, CREATED, {
+          status: readBack.status ?? 200,
+          body: readBack.data,
+        }),
       );
     });
 
@@ -121,7 +133,7 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
       ?.text;
     const raw = (await run({ data: `${head}<html/>` }, 'raw')).content[0]?.text;
     assert.notEqual(full, raw);
-    assert.equal(raw, wire(CREATED, `${head}<html/>`));
+    assert.equal(raw, failedWire('malformed', CREATED, `${head}<html/>`));
     assert.ok(!(full ?? '').includes('<tm:root'));
   });
 
@@ -148,10 +160,11 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
       )) as { isError?: boolean; content: Array<{ text?: string }> };
       const text = answered.content[0]?.text ?? '';
       assert.equal(answered.isError === true, false, text);
-      // A refusal the connection raises with no response of SAP's: nothing
-      // to record beside the create.
+      // A refusal the connection raises with no response of SAP's: the
+      // create's response, and the read-back's error beside it — never a
+      // silent success.
       if (detail === 'raw') {
-        assert.equal(text, wire(CREATED));
+        assert.equal(text, failedWire('authentication', CREATED));
         continue;
       }
       assert.ok(text.includes(NUMBER), text);

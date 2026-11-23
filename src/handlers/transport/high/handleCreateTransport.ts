@@ -144,6 +144,9 @@ export async function handleCreateTransport(
         connection: context.connection,
         tool: 'CreateTransport',
         shape: 'assembled',
+        // A failed read-back, the response SAP gave (if any) in the array
+        // and the same note full explains beside it.
+        explainedBy: 'read_back',
       },
       () => answeredCreateTransport(context, { ...args, detail: 'full' }),
     );

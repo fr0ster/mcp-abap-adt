@@ -139,6 +139,28 @@ export interface WireOf {
   readonly connection: IAbapConnection;
   readonly tool: string;
   readonly shape: WireShape;
+  /**
+   * A failure the tool's `full` answer explains in a member of its own (not
+   * an `error`): its name. When the full answer carries it, raw answers the
+   * responses beside it — `{ responses, <member>: … }` — never a silent
+   * success (a read-back that got no response of SAP's).
+   */
+  readonly explainedBy?: string | undefined;
+}
+
+/** The failure a full answer explains in `member`, when it carries one. */
+function explainedFailure(
+  answer: ToolAnswer,
+  member: string,
+): JsonValue | undefined {
+  for (const part of answer.content) {
+    const json = parseJson(part.text);
+    if (json !== null && typeof json === 'object' && !Array.isArray(json)) {
+      const failure = json[member];
+      if (failure !== undefined) return failure;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -153,6 +175,24 @@ export async function wireAnswer(
 ): Promise<ToolAnswer> {
   const { result, documents } = await recordedWire(of.connection, run);
   if (refusesOrExplains(result)) return result;
+  const failure =
+    of.explainedBy === undefined
+      ? undefined
+      : explainedFailure(result, of.explainedBy);
+  if (of.explainedBy !== undefined && failure !== undefined) {
+    return {
+      ...result,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            responses: documents,
+            [of.explainedBy]: failure,
+          }),
+        },
+      ],
+    };
+  }
   if (of.shape === 'one' && documents.length !== 1) {
     return {
       isError: true,

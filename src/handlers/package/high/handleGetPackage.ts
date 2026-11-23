@@ -4,9 +4,10 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
-  identityOf,
-  Written,
+  entries,
+  rows,
+  writeJson,
+  writeListing,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -39,65 +40,71 @@ export const TOOL_DEFINITION = {
 
 type GetPackageArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-/** Every sub-package the document holds, by its name as written. */
-const heldSubPackages = (document: string) =>
-  packageDetails(document).sub_packages.map((sub) =>
-    identityOf([sub.name ?? '']),
-  );
+/** A sub-package as the document lists it. */
+type SubPackage = ReturnType<typeof packageDetails>['sub_packages'][number];
 
 /**
  * What the package answers at each `detail`, selected through a table
  * (`src/lib/detail`): terse the package's facts as `#` lines and its
  * sub-packages as TSV rows, name and description; medium and full the
- * details, each sub-package written as a row; raw the metadata document as
- * SAP sent it, nothing of ours around it. Every sub-package, or nothing
- * (`completeAnswer`).
+ * details, each sub-package an entry; raw the metadata document as SAP
+ * sent it, nothing of ours around it. Every sub-package written by the
+ * listing writers.
  */
 function packageAnswers(
   packageName: string,
   version: string,
 ): AnswerTable<string, string | object> {
-  const details = completeAnswer(
-    'GetPackage',
-    heldSubPackages,
-    (document: string) => {
-      const { sub_packages, ...facts } = packageDetails(document);
-      // The sub-packages written as rows, inside the metadata as before.
-      return Written.nested(
-        {
-          success: true,
-          package_name: packageName,
-          version,
-          part: 'metadata',
-        },
-        'metadata',
-        Written.json(facts, { sub_packages }, ['name']),
-      );
-    },
-  );
+  const details = (document: string) => {
+    const read = packageDetails(document);
+    const { sub_packages: _subPackages, ...facts } = read;
+    // The sub-packages written from the document's own list, inside the
+    // metadata as before.
+    return {
+      success: true,
+      package_name: packageName,
+      version,
+      part: 'metadata',
+      metadata: writeJson(facts, read, {
+        sub_packages: entries('sub_packages', (sub: SubPackage) => sub),
+      }).answer,
+    };
+  };
   return {
-    terse: completeAnswer('GetPackage', heldSubPackages, (document: string) => {
+    terse: (document: string) => {
+      const read = packageDetails(document);
       const {
-        sub_packages,
+        sub_packages: _subPackages,
         sub_package_count: _count,
         ...facts
-      } = packageDetails(document);
-      return Written.text(
-        [
+      } = read;
+      return writeListing({
+        heads: [
           { head: 'package', value: facts.name ?? packageName },
           ...Object.entries(facts).flatMap(([field, value]) =>
             field === 'name' || value === undefined
               ? []
               : [{ head: field, value }],
           ),
-          { header: ['sub_package', 'description'] },
-          ...sub_packages.map((sub) => ({
-            row: [sub.name ?? '', sub.description ?? ''],
-          })),
         ],
-        [0],
-      );
-    }),
+        reading: read,
+        lists: {
+          sub_packages: rows('sub_packages', {
+            columns: [
+              {
+                name: 'sub_package',
+                cell: (sub: SubPackage) => sub.name ?? '',
+              },
+              {
+                name: 'description',
+                cell: (sub: SubPackage) => sub.description ?? '',
+              },
+            ],
+            header: 'always',
+          }),
+        },
+      }).answer;
+    },
     medium: details,
     full: details,
     raw: (document) => document,

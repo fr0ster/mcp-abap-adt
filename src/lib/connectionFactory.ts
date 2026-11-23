@@ -239,6 +239,42 @@ function safeHeaders(headers: Readonly<Record<string, string>>): string {
  * untouched when the switch is off — no wrapper, no cost, no behaviour to
  * explain in production.
  */
+/**
+ * Every body the connection answers as text: bytes (a `Buffer`) decoded as
+ * UTF-8 before anything reads them — an analyser, a reading, the raw
+ * recorder — so an `exc:exception` on a `200` is refused whether it came as
+ * bytes or as a string (Codex round 8). A refusal the connection throws
+ * carries its response's body decoded too.
+ */
+export function withDecodedBodies<T extends IAbapConnection>(connection: T): T {
+  const original = connection.makeAdtRequest.bind(connection);
+  connection.makeAdtRequest = async (
+    options: IAbapRequestOptions,
+  ): Promise<IAdtWireResponse> => {
+    try {
+      const answer = await original(options);
+      return answer.data instanceof Uint8Array
+        ? { ...answer, data: new TextDecoder().decode(answer.data) }
+        : answer;
+    } catch (thrown) {
+      // A thrown value is outside the type system: its response read by
+      // its fields, and its bytes decoded in place.
+      const response =
+        typeof thrown === 'object' && thrown !== null
+          ? Reflect.get(thrown, 'response')
+          : undefined;
+      if (typeof response === 'object' && response !== null) {
+        const data = Reflect.get(response, 'data');
+        if (data instanceof Uint8Array) {
+          Reflect.set(response, 'data', new TextDecoder().decode(data));
+        }
+      }
+      throw thrown;
+    }
+  };
+  return connection;
+}
+
 function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   const { logWire, bodyChars } = httpWireOptions();
   if (!logWire) return connection;
@@ -484,6 +520,7 @@ export function createAbapConnection(
     );
   })();
 
+  withDecodedBodies(built);
   records.set(built, {
     settings,
     credential,

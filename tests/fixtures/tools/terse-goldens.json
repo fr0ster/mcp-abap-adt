@@ -226,5 +226,29 @@
   "GetStructuresList two structures, one refused @full": {
     "isError": false,
     "text": "[{\"success\":true,\"structure_name\":\"ZS\",\"tree\":{\"structure\":\"ZS\",\"attribute\":null,\"kind\":\"root\",\"children\":[]}},{\"structure_name\":\"ZGONE\",\"error\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read structure\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"},{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read table\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]"
+  },
+  "GetEnhancements a class with two enhancements @terse": {
+    "isError": false,
+    "text": "# object class ZCL_E\n# count 2\nname\ttype\tdescription\nZ_FIRST\tENHO/XHH\t\nZ_SECOND\tENHO/XHH\t"
+  },
+  "GetEnhancements a class with two enhancements @medium": {
+    "isError": false,
+    "text": "{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":2,\"enhancements\":[{\"name\":\"Z_FIRST\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_first.\\nENDENHANCEMENT.\"},{\"name\":\"Z_SECOND\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_second.\"}]}"
+  },
+  "GetEnhancements a class with two enhancements @full": {
+    "isError": false,
+    "text": "{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":2,\"enhancements\":[{\"name\":\"Z_FIRST\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_first.\\nENDENHANCEMENT.\"},{\"name\":\"Z_SECOND\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_second.\"}]}"
+  },
+  "GetEnhancements two classes, one refused @terse": {
+    "isError": false,
+    "text": "# object class ZCL_E\n# count 0\n# object class ZCL_GONE\n# error {\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read enhancements\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}"
+  },
+  "GetEnhancements two classes, one refused @medium": {
+    "isError": false,
+    "text": "[{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":0,\"enhancements\":[]},{\"object_name\":\"ZCL_GONE\",\"object_type\":\"class\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read enhancements\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+  },
+  "GetEnhancements two classes, one refused @full": {
+    "isError": false,
+    "text": "[{\"object_name\":\"ZCL_E\",\"object_type\":\"class\",\"detailed\":false,\"total_enhancements\":0,\"enhancements\":[]},{\"object_name\":\"ZCL_GONE\",\"object_type\":\"class\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read enhancements\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
   }
 }

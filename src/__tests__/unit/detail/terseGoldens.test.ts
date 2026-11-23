@@ -16,6 +16,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
+import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleListFunctionGroupIncludes } from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleGetIncludesList } from '../../../handlers/include/readonly/handleGetIncludesList';
@@ -341,6 +342,46 @@ CASES['GetStructuresList two structures, one refused'] = async (detail) =>
       {
         structure_names: ['ZS', 'ZGONE'],
         include_extensions: false,
+        detail,
+      } as never,
+    ),
+  );
+
+const b64 = (text: string) => Buffer.from(text, 'utf-8').toString('base64');
+const implementation = (name: string, source: string) =>
+  `<enh:enhancementImplementations adtcore:name="${name}" adtcore:type="ENHO/XHH" adtcore:version="active">` +
+  `<enh:elements><enh:sourceCodePlugin enh:uri="/x" enh:id="1 " enh:full_name="PR:PEX:P_01EI" enh:mode="static">` +
+  `<enh:source>${b64(source)}</enh:source>` +
+  `</enh:sourceCodePlugin></enh:elements>` +
+  `<enh:enhancedObject adtcore:uri="/p" adtcore:type="CLAS/OC" adtcore:name="ZCL_E"/>` +
+  `</enh:enhancementImplementations>`;
+const ENHANCEMENTS = `<enh:enhancements xmlns:enh="http://www.sap.com/adt/abapsource/enhancements" xmlns:adtcore="http://www.sap.com/adt/core">${implementation(
+  'Z_FIRST',
+  'ENHANCEMENT 1 z_first.\nENDENHANCEMENT.',
+)}${implementation('Z_SECOND', 'ENHANCEMENT 1 z_second.')}</enh:enhancements>`;
+const NO_ENHANCEMENTS =
+  '<enh:enhancements xmlns:enh="http://www.sap.com/adt/enhancements"/>';
+
+CASES['GetEnhancements a class with two enhancements'] = async (detail) =>
+  answeredOf(
+    await handleGetEnhancements(
+      sequential([{ data: ENHANCEMENTS }]) as never,
+      {
+        object_name: 'ZCL_E',
+        object_type: 'class',
+        detail,
+      } as never,
+    ),
+  );
+CASES['GetEnhancements two classes, one refused'] = async (detail) =>
+  answeredOf(
+    await handleGetEnhancements(
+      sequential([{ data: NO_ENHANCEMENTS }, REFUSED]) as never,
+      {
+        objects: [
+          { object_name: 'ZCL_E', object_type: 'class' },
+          { object_name: 'ZCL_GONE', object_type: 'class' },
+        ],
         detail,
       } as never,
     ),

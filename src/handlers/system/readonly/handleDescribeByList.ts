@@ -53,7 +53,10 @@ import {
 import {
   type AnswerTable,
   answerAt,
+  cellsOf,
   completeAnswer,
+  identityOf,
+  type Line,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -62,6 +65,7 @@ import {
   type AnswerValue,
   isAnswerList,
   isAnswerObject,
+  type JsonValue,
   parseJson,
 } from '../../../lib/json';
 import { levelOf } from '../../../lib/strategies/detail';
@@ -84,6 +88,42 @@ function textOf(result: McpResult): string {
 }
 
 /** A search answer the sequential version searches again without the type. */
+/** What a child search is asked at, per level: terse its hit rows, else the whole parse. */
+type ChildSearchLevel = 'terse' | 'full';
+
+const CHILD_SEARCH_LEVELS: AnswerTable<undefined, ChildSearchLevel> = {
+  terse: () => 'terse',
+  medium: () => 'full',
+  full: () => 'full',
+  raw: () => 'full',
+};
+
+/** Whether a JSON value holds an `adtcore:objectReference` (a search's parse with a hit). */
+function holdsReference(value: JsonValue): boolean {
+  if (Array.isArray(value)) return value.some(holdsReference);
+  if (value === null || typeof value !== 'object') return false;
+  return Object.entries(value).some(
+    ([key, member]) =>
+      key === 'adtcore:objectReference' || holdsReference(member),
+  );
+}
+
+/**
+ * Whether a search answered a hit: at terse a hit row under its header, at
+ * full a parse holding an object reference.
+ */
+function holdsHits(res: McpResult): boolean {
+  return res.content.some((item) => {
+    const json = parseJson(item.text);
+    return json !== undefined && typeof json === 'object' && json !== null
+      ? holdsReference(json)
+      : item.text
+          .split('\n')
+          .slice(1)
+          .some((row) => row !== '');
+  });
+}
+
 function emptyOrFailed(res: McpResult | undefined): boolean {
   return res === undefined || res.isError === true || res.content.length === 0;
 }
@@ -125,95 +165,76 @@ interface DescribedItem {
   described: Described & { ends?: undefined };
 }
 
-/** An object asked for, by its name and type. */
-const askedIdentity = ({ obj }: DescribedItem) => `object|${obj.name}`;
-
-/** Every object asked for, by its identity. */
-const heldAsked = (items: readonly DescribedItem[]) => items.map(askedIdentity);
-
 /**
  * One content entry per object asked, in order — its results, its failure,
  * or `found: false` for one no search found — or nothing
- * (`completeAnswer`).
+ * (`completeAnswer`); each entry identified by its text as written.
  */
 const fullDescribed = completeAnswer(
   'DescribeByList',
-  heldAsked,
-  // The objects read from the entries written: each names its object.
+  (items: readonly DescribedItem[]) =>
+    items.map((item) => identityOf([item.described.entry.text])),
   (items: readonly DescribedItem[]): Written<McpResult> =>
-    Written.list(
-      { isError: false, content: items.map((item) => item.described.entry) },
-      (answer) => answer.content,
-      (entry) => {
-        const written = parseJson(entry.text);
-        return written !== null &&
-          typeof written === 'object' &&
-          !Array.isArray(written) &&
-          typeof written.name === 'string'
-          ? `object|${written.name}`
-          : '';
-      },
-    ),
+    Written.content(items.map((item) => item.described.entry)),
 );
+
+/** The hit rows a search answered for an object, read back into their cells. */
+const hitRowsOf = ({ described }: DescribedItem): string[][] =>
+  (described.hits ?? '')
+    .split('\n')
+    .slice(1)
+    .filter((row) => row !== '')
+    .map(cellsOf);
+
+/** An object's failure line: its name and its failure, as written. */
+const failureWords = ({ obj, described }: DescribedItem): string[] => [
+  obj.name,
+  JSON.stringify(described.failure),
+];
+
+/**
+ * Every item SAP answered at terse: each hit row it described an object
+ * with, and each refused search. A name SAP did not describe is no item:
+ * terse does not say what is absent (the owner's rule) — medium and full do.
+ */
+const heldAnswered = (items: readonly DescribedItem[]) =>
+  items.flatMap((item) =>
+    item.described.failure !== undefined
+      ? [identityOf(['error', ...failureWords(item)])]
+      : hitRowsOf(item).map((cells) =>
+          identityOf([cells[0] ?? '', cells[1] ?? '']),
+        ),
+  );
 
 /**
  * What DescribeByList answers at each `detail`, selected before the
  * searches (`src/lib/detail`): terse one TSV — one header, the rows of
  * each object SAP described (name, type, description, package), `# error
  * NAME` and its failure for a refused one, and nothing for a name SAP did
- * not describe (terse lists what SAP returned); medium and
- * full one content entry per object asked ({@link fullDescribed}). The
- * answer is built from several searches, so raw never reaches this table:
- * the handler answers it as the wire documents (`wireAnswer`). Every level
- * answers every object asked, or nothing (`completeAnswer`).
+ * not describe (terse lists what SAP returned); medium and full one content
+ * entry per object asked ({@link fullDescribed}). Every item, or nothing
+ * (`completeAnswer`). Raw never reaches this table: the handler answers it
+ * as the responses (`wireAnswer`).
  */
-/** The hit rows a search answered for an object: SAP's description of it, if any. */
-const hitRowsOf = ({ described }: DescribedItem) =>
-  (described.hits ?? '')
-    .split('\n')
-    .slice(1)
-    .filter((row) => row !== '');
-
-/**
- * Every object SAP answered for at terse: one it described, or one whose
- * search it refused. A name SAP did not describe is no item: terse does not
- * say what is absent (the owner's rule) — medium and full do.
- */
-const heldAnswered = (items: readonly DescribedItem[]) =>
-  items
-    .filter(
-      (item) =>
-        item.described.failure !== undefined || hitRowsOf(item).length > 0,
-    )
-    .map(askedIdentity);
-
 const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
   terse: completeAnswer(
     'DescribeByList',
     heldAnswered,
     (items: readonly DescribedItem[]): Written<McpResult> =>
       Written.asText(
-        Written.lines([
-          'name\ttype\tdescription\tpackage',
-          ...items.flatMap((item) => {
-            const { obj, described } = item;
-            if (described.failure !== undefined) {
-              return [
-                Written.marked(
-                  'error',
-                  [obj.name, JSON.stringify(described.failure)],
-                  askedIdentity(item),
-                ),
-              ];
-            }
-            // The search's own hit rows (SearchObject's guarded writer); an
-            // object SAP did not describe has none, and no line.
-            const [first, ...rest] = hitRowsOf(item);
-            return first === undefined
-              ? []
-              : [Written.block([first, ...rest], askedIdentity(item))];
-          }),
-        ]),
+        Written.text(
+          [
+            { header: ['name', 'type', 'description', 'package'] },
+            ...items.flatMap((item): Line[] =>
+              item.described.failure !== undefined
+                ? [{ mark: 'error', words: failureWords(item) }]
+                : // The search's own hit rows; an object SAP did not
+                  // describe has none, and no line.
+                  hitRowsOf(item).map((row) => ({ row })),
+            ),
+          ],
+          [0, 1],
+        ),
       ),
   ),
   medium: fullDescribed,
@@ -255,10 +276,7 @@ function describedBy(
   }
   // No search found it: the object is answered as not found, at every
   // level — never left out.
-  if (
-    res === undefined ||
-    res.content.every((item) => (item.text ?? '') === '')
-  ) {
+  if (res === undefined || !holdsHits(res)) {
     return {
       entry: {
         type: 'text',
@@ -301,6 +319,7 @@ async function describeOneByOne(
   context: HandlerContext,
   args: DescribeArgs | undefined,
   shown: (items: readonly DescribedItem[]) => McpResult,
+  searchAt: ChildSearchLevel,
 ): Promise<McpResult> {
   const { logger } = context;
   // The schema holds the rule: a non-empty `objects`.
@@ -312,21 +331,20 @@ async function describeOneByOne(
       const first = await handleSearchObject(context, {
         object_name: obj.name,
         object_type: obj.type,
+        detail: searchAt,
       });
       // A credential failure is every object's: the call ends with it as it
       // came, before any second search is sent.
       if (endsDescribe(first)) return first;
       // If the response is empty or flagged as an error, retry without
-      // explicit type; a second search that throws skips the object.
+      // explicit type; a second search that throws is the call's error — no
+      // object is skipped in silence.
       let second: McpResult | undefined;
       if (emptyOrFailed(first)) {
-        try {
-          second = await handleSearchObject(context, {
-            object_name: obj.name,
-          });
-        } catch {
-          continue;
-        }
+        second = await handleSearchObject(context, {
+          object_name: obj.name,
+          detail: searchAt,
+        });
       }
       const described = describedBy(obj, first, second);
       if (described.ends !== undefined) return described.ends;
@@ -352,6 +370,7 @@ async function describeInEnvelopes(
   context: HandlerContext,
   args: DescribeArgs,
   shown: (items: readonly DescribedItem[]) => McpResult,
+  searchAt: ChildSearchLevel,
 ): Promise<McpResult> {
   const { logger } = context;
   const objects = args.objects;
@@ -359,7 +378,7 @@ async function describeInEnvelopes(
   const typed = await runPhase(context, objects, (obj, batch) =>
     handleSearchObject(
       { ...context, connection: batch },
-      { object_name: obj.name, object_type: obj.type },
+      { object_name: obj.name, object_type: obj.type, detail: searchAt },
     ),
   );
   const typedAnswer = (i: number): McpResult | undefined => {
@@ -384,7 +403,7 @@ async function describeInEnvelopes(
   const untypedResults = await runPhase(context, again, (i, batch) =>
     handleSearchObject(
       { ...context, connection: batch },
-      { object_name: objects[i]?.name ?? '' },
+      { object_name: objects[i]?.name ?? '', detail: searchAt },
     ),
   );
   const untyped = new Map<number, PhaseResult<McpResult>>();
@@ -460,9 +479,12 @@ async function answeredDescribeByList(
 ) {
   // The schema holds the rule: a non-empty `objects`.
   const shown = answerAt(DESCRIBE_ANSWERS, levelOf(args));
+  // The child searches read at the level's reading: terse its hit rows,
+  // medium and full the whole parse (each hit's URI kept, no TSV wrapped).
+  const searchAt = answerAt(CHILD_SEARCH_LEVELS, levelOf(args))(undefined);
   return withSequentialFallback<McpResult>(
     context,
-    () => describeInEnvelopes(context, args, shown),
-    () => describeOneByOne(context, args, shown),
+    () => describeInEnvelopes(context, args, shown, searchAt),
+    () => describeOneByOne(context, args, shown, searchAt),
   );
 }

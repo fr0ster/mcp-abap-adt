@@ -66,4 +66,36 @@ describe('DescribeByList detail', () => {
       });
     });
   }
+
+  // Codex round 6, P1-5: the child searches read at the level — full the
+  // whole parse, the hit's URI kept, no TSV wrapped.
+  it('full: the hit as its parse, its URI kept, no TSV', async () => {
+    const result = await describe_('full');
+    const text = result.content[0]?.text ?? '';
+    assert.ok(text.includes('/sap/bc/adt/oo/classes/zcl_a'), text);
+    assert.ok(!text.includes('name\\ttype'), text);
+  });
+
+  // The sequential path never skips an object in silence: a second search
+  // that fails is that object's error, there in the answer.
+  it('a second search that fails: the object answers its error, never skipped', async () => {
+    const connection = recordingConnection([{ status: 500, data: 'refused' }]);
+    declareSystemKind(connection, 'onprem');
+    const answering = connection.makeAdtRequest.bind(connection);
+    let sent = 0;
+    connection.makeAdtRequest = async (request: never) => {
+      sent += 1;
+      if (sent === 1) return answering(request);
+      throw new Error('the second search failed');
+    };
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    const result = await handleDescribeByList(
+      { connection, logger: undefined, batchAvailability },
+      { objects: [{ name: 'ZCL_A', type: 'CLAS' }] },
+    );
+    const text = result.content[0]?.text ?? '';
+    assert.ok(text.includes('# error ZCL_A'), text);
+    assert.ok(text.includes('the second search failed'), text);
+  });
 });

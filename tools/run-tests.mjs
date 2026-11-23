@@ -431,6 +431,10 @@ function runFile(file) {
         // node:test's `mock.module` (helpers/moduleMock.ts): a file may
         // replace a module whose exports map closes its internal files.
         '--experimental-test-module-mocks',
+        // A file that type-checks every project (sources/unknownSweep) holds
+        // the compiler's program: past the ~2 GB a 7 GB macOS runner gives a
+        // process by default (measured: OOM at 2,025 MB, run 45269937223).
+        '--max-old-space-size=4096',
         '--require',
         preload,
         '--require',

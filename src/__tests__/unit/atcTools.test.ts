@@ -42,7 +42,10 @@ import {
 } from '../../handlers/atc/high/handleRunATC';
 import { ATC_OBJECT_TYPES } from '../../lib/adtProjections';
 import { defineTool } from '../../lib/handlers/interfaces';
-import { parseAtcWorklist } from '../../lib/strategies/atcFindings';
+import {
+  findingIdentity,
+  parseAtcWorklist,
+} from '../../lib/strategies/atcFindings';
 import { declareSystemKind } from '../../lib/systemKind';
 import { corpusBody } from '../helpers/adtCorpus';
 import { assertMatchObject } from '../helpers/assertions';
@@ -185,17 +188,14 @@ describe('the fields detail=full adds, from the captured document', () => {
     const terse: any = await handleGetATCFindings(context as any, {
       worklist_id: 'WL1',
     });
-    assert.deepStrictEqual(
-      Object.keys(payload(terse).findings[0]).sort(),
-      [
-        'check',
-        'line',
-        'location',
-        'message',
-        'object',
-        'object_type',
-        'priority',
-      ].sort(),
+    // Terse is TSV (Codex round 7): a row per finding, line and column in it.
+    assert.ok(
+      terse.content[0].text
+        .split('\n')
+        .includes(
+          'object\tobject_type\tlocation\tline\tcolumn\tpriority\tcheck\tmessage',
+        ),
+      terse.content[0].text,
     );
 
     atc = { getFindings: async () => okResponse(WORKLIST) };
@@ -728,11 +728,15 @@ describe('the two readers', () => {
     const terse: any = await handleGetATCFindings(context as any, {
       worklist_id: 'WL1',
     });
-    assertMatchObject(payload(terse), {
-      finding_count: 6,
-      objects_checked: 21,
-      by_priority: { '2': 4, '3': 2 },
-    });
+    const lines = terse.content[0].text.split('\n');
+    for (const line of [
+      '# finding_count 6',
+      '# objects_checked 21',
+      '# priority 2 4',
+      '# priority 3 2',
+    ]) {
+      assert.ok(lines.includes(line), terse.content[0].text);
+    }
 
     atc = { getFindings: async () => okResponse(WORKLIST) };
     const raw: any = await handleGetATCFindings(context as any, {
@@ -767,9 +771,33 @@ describe('the two readers', () => {
       display_id: 'D1',
     });
     assert.equal(terse.isError, false, terse.content[0].text);
-    const answer = payload(terse);
-    assert.equal(answer.findings.length, answer.finding_count);
-    assert.ok(answer.findings.length > 0);
+    const lines: string[] = terse.content[0].text.split('\n');
+    const header = lines.indexOf(
+      'object\tobject_type\tlocation\tline\tcolumn\tpriority\tcheck\tmessage',
+    );
+    const count = lines.find((l) => l.startsWith('# finding_count '));
+    assert.ok(header >= 0 && count !== undefined, terse.content[0].text);
+    assert.equal(lines.length - header - 1, Number(count.split(' ')[2]));
+    assert.ok(lines.length - header - 1 > 0);
+  });
+
+  // Codex round 7: a finding's identity holds its line and column, so two
+  // findings apart only by their position stay two — a row written twice in
+  // place of the other is refused, not counted as both.
+  it('two findings apart only by line or column are two items', () => {
+    const at = (line: number, column: number) =>
+      findingIdentity({
+        object: 'ZCL_X',
+        object_type: 'CLAS',
+        location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+        line,
+        column,
+        priority: 2,
+        check: 'Extended check',
+        message: 'unused',
+      });
+    assert.notEqual(at(9, 0), at(10, 0));
+    assert.notEqual(at(9, 0), at(9, 4));
   });
 
   it('says so when the worklist is empty, rather than reading as clean', async () => {
@@ -786,9 +814,13 @@ describe('the two readers', () => {
     const result: any = await handleGetATCFindings(context as any, {
       worklist_id: 'WL1',
     });
-    const answered = payload(result);
-    assert.equal(answered.finding_count, 0);
-    assert.ok(answered.note.includes('not a clean result'));
+    const lines: string[] = result.content[0].text.split('\n');
+    assert.ok(lines.includes('# finding_count 0'));
+    assert.ok(
+      lines.some(
+        (l) => l.startsWith('# note') && l.includes('not a clean result'),
+      ),
+    );
   });
 
   it('adds no such note when objects were actually checked', async () => {
@@ -796,7 +828,12 @@ describe('the two readers', () => {
     const result: any = await handleGetATCFindings(context as any, {
       worklist_id: 'WL1',
     });
-    assert.equal(payload(result).note, undefined);
+    // Terse is TSV (Codex round 7): no `# note` line.
+    assert.ok(
+      !result.content[0].text
+        .split('\n')
+        .some((l: string) => l.startsWith('# note')),
+    );
   });
 
   it("forwards the worklist read's own refusal", async () => {

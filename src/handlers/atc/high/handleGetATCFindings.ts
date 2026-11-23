@@ -15,10 +15,10 @@ import {
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import {
-  FINDING_KEYS,
+  FINDING_IDENTITY,
   findingIdentity,
+  findingLines,
   parseAtcWorklist,
-  terseFinding,
 } from '../../../lib/strategies/atcFindings';
 import {
   DETAIL_SHAPE,
@@ -112,19 +112,32 @@ function findingsAnswers(
     return { ...head(reading), findings: reading.findings, ...noteOf(reading) };
   };
   return {
+    // A row per finding (TSV), every one, or nothing (`completeAnswer`).
     terse: completeAnswer(
       'GetATCFindings',
       (document: string) =>
-        parseAtcWorklist(document)
-          .findings.map(terseFinding)
-          .map(findingIdentity),
+        parseAtcWorklist(document).findings.map(findingIdentity),
       (document: string) => {
         const reading = parseAtcWorklist(document);
-        return Written.json(
-          head(reading),
-          { findings: reading.findings.map(terseFinding) },
-          FINDING_KEYS,
-          noteOf(reading),
+        const note = noteOf(reading).note;
+        return Written.text(
+          findingLines(
+            [
+              { head: 'worklist', value: worklistId },
+              {
+                head: 'objects_checked',
+                value: String(reading.objects_checked),
+              },
+              {
+                head: 'finding_count',
+                value: String(reading.findings.length),
+              },
+              ...(note === undefined ? [] : [{ head: 'note', value: note }]),
+            ],
+            reading.by_priority,
+            reading.findings,
+          ),
+          FINDING_IDENTITY,
         );
       },
     ),

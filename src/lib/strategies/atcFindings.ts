@@ -32,7 +32,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { identityOf } from '../detail';
+import { identityOf, type Line } from '../detail';
 import { fragmentStart, hrefParts } from '../sourceHref';
 import { parseXml } from '../xml/node';
 
@@ -102,25 +102,61 @@ export interface AtcFindingFull extends AtcFinding {
 }
 
 /** The terse fields of a finding, in the order they were always answered. */
-/** A finding's identity, as its terse row writes it: object, type, location, check and message. */
-export function findingIdentity(finding: AtcFinding): string {
-  return identityOf([
-    finding.object,
-    finding.object_type,
-    finding.location ?? '',
-    finding.check ?? '',
-    finding.message ?? '',
-  ]);
-}
-
-/** The identity keys of a terse finding, in {@link findingIdentity}'s order. */
-export const FINDING_KEYS = [
+/** The terse rows' columns of a finding. */
+export const FINDING_COLUMNS = [
   'object',
   'object_type',
   'location',
+  'line',
+  'column',
+  'priority',
   'check',
   'message',
 ] as const;
+
+/** A finding's cells in a terse row, in {@link FINDING_COLUMNS}' order. */
+export function findingCells(finding: AtcFindingFull): string[] {
+  return [
+    finding.object,
+    finding.object_type,
+    finding.location ?? '',
+    finding.line === undefined ? '' : String(finding.line),
+    finding.column === undefined ? '' : String(finding.column),
+    finding.priority === undefined ? '' : String(finding.priority),
+    finding.check ?? '',
+    finding.message ?? '',
+  ];
+}
+
+/** A finding's identity columns: all but the priority — two findings at other lines or columns stay two. */
+export const FINDING_IDENTITY = [0, 1, 2, 3, 4, 6, 7];
+
+/** A finding's identity, as its terse row writes it. */
+export function findingIdentity(finding: AtcFindingFull): string {
+  const cells = findingCells(finding);
+  return identityOf(FINDING_IDENTITY.map((index) => cells[index] ?? ''));
+}
+
+/**
+ * Findings as terse lines: the run's facts as `#` lines (the counts per
+ * priority as `priority N count` lines), then a row per finding — every
+ * finding, or nothing (the guard).
+ */
+export function findingLines(
+  heads: readonly { head: string; value?: string | undefined }[],
+  byPriority: Record<string, number>,
+  findings: readonly AtcFindingFull[],
+): Line[] {
+  return [
+    ...heads,
+    ...Object.entries(byPriority).map(([priority, count]) => ({
+      head: 'priority',
+      value: `${priority} ${count}`,
+    })),
+    { header: [...FINDING_COLUMNS] },
+    ...findings.map((finding) => ({ row: findingCells(finding) })),
+  ];
+}
 
 export function terseFinding(finding: AtcFindingFull): AtcFinding {
   return {

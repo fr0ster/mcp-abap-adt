@@ -15,9 +15,9 @@ import {
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import {
-  FINDING_KEYS,
+  FINDING_IDENTITY,
   findingIdentity,
-  terseFinding,
+  findingLines,
 } from '../../../lib/strategies/atcFindings';
 import { parseAtcResult } from '../../../lib/strategies/atcResults';
 import {
@@ -95,18 +95,39 @@ const RESULT_ANSWERS: AnswerTable<string, string | object> = (() => {
     return { ...resultHead(reading), findings: reading.findings };
   };
   return {
+    // A row per finding (TSV), every one, or nothing (`completeAnswer`).
     terse: completeAnswer(
       'GetATCResult',
       (document: string) =>
-        parseAtcResult(document)
-          .findings.map(terseFinding)
-          .map(findingIdentity),
+        parseAtcResult(document).findings.map(findingIdentity),
       (document: string) => {
         const reading = parseAtcResult(document);
-        return Written.json(
-          resultHead(reading),
-          { findings: reading.findings.map(terseFinding) },
-          FINDING_KEYS,
+        return Written.text(
+          findingLines(
+            [
+              { head: 'result', value: reading.display_id },
+              ...(reading.title
+                ? [{ head: 'title', value: reading.title }]
+                : []),
+              ...(reading.check_variant
+                ? [{ head: 'check_variant', value: reading.check_variant }]
+                : []),
+              ...(reading.created_at
+                ? [{ head: 'created_at', value: reading.created_at }]
+                : []),
+              {
+                head: 'objects_checked',
+                value: String(reading.objects_checked),
+              },
+              {
+                head: 'finding_count',
+                value: String(reading.findings.length),
+              },
+            ],
+            reading.by_priority,
+            reading.findings,
+          ),
+          FINDING_IDENTITY,
         );
       },
     ),

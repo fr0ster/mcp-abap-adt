@@ -31,10 +31,17 @@ import {
   type AnswerTable,
   answerAt,
   type Column,
+  entries,
+  type JsonSchemas,
+  type ListAnswerTable,
+  listAnswerAt,
   omitted,
   type RowSchemas,
   rows,
+  values,
+  writeJsonRoot,
   writeListing,
+  writeWhole,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -139,10 +146,10 @@ function linkOf(base: string | undefined, link: IOutlineLink): AnsweredLink {
   };
 }
 
-function componentOf(
-  base: string | undefined,
+/** A component's own members as answered, its lists left to the caller. */
+function componentEntry(
   element: IOutlineElement,
-): AnsweredComponent {
+): Omit<AnsweredComponent, 'links' | 'children'> {
   const optional = {
     visibility: element.visibility,
     level: element.level,
@@ -160,9 +167,38 @@ function componentOf(
     ...(element.constant ? { constant: true } : {}),
     ...(element.readOnly ? { read_only: true } : {}),
     ...(element.final ? { final: true } : {}),
+  };
+}
+
+function componentOf(
+  base: string | undefined,
+  element: IOutlineElement,
+): AnsweredComponent {
+  return {
+    ...componentEntry(element),
     links: element.links.map((link) => linkOf(base, link)),
     children: element.children.map((child) => componentOf(base, child)),
   };
+}
+
+/** A component's own members as answered, its lists left to its schemas. */
+
+/**
+ * A component's lists as the JSON writer writes them: every link, every
+ * child — each child with its own lists again.
+ */
+function componentSchemas(
+  base: string | undefined,
+): JsonSchemas<IOutlineElement> {
+  const schemas: JsonSchemas<IOutlineElement> = {
+    links: values('links', (link: IOutlineLink) => linkOf(base, link)),
+    children: entries('children', componentEntry, {
+      get lists() {
+        return schemas;
+      },
+    }),
+  };
+  return schemas;
 }
 
 /** The outline of a document, or the refusal when the document is none. */
@@ -268,7 +304,7 @@ function outlineAnswers(
   objectType: string,
   objectName: string,
   version: string,
-): AnswerTable<OutlineRead, string | object> {
+): ListAnswerTable<OutlineRead, string | object> {
   const components = (outline: IObjectOutline) =>
     outline.root === undefined
       ? undefined
@@ -278,7 +314,7 @@ function outlineAnswers(
     // No outline read: the document as it came (nothing reshaped).
     terse: ({ document, outline }: OutlineRead) => {
       const root = outline === undefined ? undefined : components(outline);
-      if (root === undefined) return document;
+      if (root === undefined) return writeWhole(document);
       const source = definitionOf(root)?.source;
       const { columns, below } = outlineSchemas(source);
       return writeListing({
@@ -295,20 +331,32 @@ function outlineAnswers(
             lists: below,
           }),
         },
-      }).answer;
+      });
     },
     // Every component with its links (the reading's own tree, every
     // component in it); no outline read: the document as it came.
     medium: ({ document, outline }: OutlineRead) => {
-      const root = outline === undefined ? undefined : components(outline);
-      if (outline === undefined) return document;
-      return {
+      // No outline read: the reading's document whole, as it is.
+      if (outline === undefined) {
+        return writeWhole<OutlineRead['document']>(document);
+      }
+      // The reading's tree from its root, every link and child by the JSON
+      // writer.
+      const root = outline.root;
+      return writeWhole<object>({
         success: true,
         object_type: objectType,
         object_name: objectName,
         version,
-        outline: root,
-      };
+        outline:
+          root === undefined
+            ? undefined
+            : writeJsonRoot(
+                root,
+                componentEntry,
+                componentSchemas(outline.base),
+              ).answer,
+      });
     },
     full: ({ document, outline }) => outline ?? document,
     raw: ({ document }) => document,
@@ -333,7 +381,7 @@ export async function handleGetObjectOutline(
   }
   const objectName = object_name.toUpperCase();
   const detail = detailOf(args);
-  const shown = answerAt(
+  const shown = listAnswerAt(
     outlineAnswers(object_type, objectName, version),
     levelOf(args),
   );

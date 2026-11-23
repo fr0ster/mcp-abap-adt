@@ -156,6 +156,39 @@ describe('GetObjectOutline', () => {
     );
   });
 
+  // Codex round 10: medium writes the parse's tree by the JSON writer —
+  // every component and every link of the document, none left out.
+  it('medium: every component and every link the document holds', async () => {
+    const document = corpusBody('read-outline-class--01-objectstructure');
+    const result = await run({
+      tool: 'GetObjectOutline',
+      variant: 'onprem',
+      stand: 'recording',
+      args: {
+        object_type: 'CLAS/OC',
+        object_name: 'ZMCP_D1_9E25_CL',
+        detail: 'medium',
+      },
+      answers: answered('read-outline-class--01-objectstructure'),
+      expected: 'none',
+    });
+    type Node = { links?: unknown[]; children?: Node[] };
+    const count = (node: Node): { nodes: number; links: number } =>
+      (node.children ?? []).map(count).reduce(
+        (sum, child) => ({
+          nodes: sum.nodes + child.nodes,
+          links: sum.links + child.links,
+        }),
+        { nodes: 1, links: node.links?.length ?? 0 },
+      );
+    const occurrences = (text: string, word: string) =>
+      text.split(word).length - 1;
+    assert.deepStrictEqual(count(member(result.payload, 'outline') as Node), {
+      nodes: occurrences(document, '<abapsource:objectStructureElement '),
+      links: occurrences(document, '<atom:link '),
+    });
+  });
+
   it("a class's local components point into its local includes", async () => {
     const result = await run({
       tool: 'GetObjectOutline',

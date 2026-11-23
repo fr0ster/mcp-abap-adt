@@ -116,7 +116,7 @@ export const OVERWRITE_FIELD = z
   .array(OVERWRITE_OBJECT)
   .min(1)
   .describe(
-    'The objects listed by GetAbapGitModifiedObjects that the pull overwrites with their remote version, each once, by type and name.',
+    'The objects listed by GetAbapGitModifiedObjects that the pull overwrites with their remote version, each once, by type and name; the others keep their system version. Without it the pull overwrites every one.',
   );
 
 /** An object a pull overwrites, as the tool takes it. */

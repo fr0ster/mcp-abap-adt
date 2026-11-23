@@ -56,12 +56,15 @@ const IMPORTS =
   'every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too';
 
 /**
- * On the cloud, SAP's pull job imports an object R6 lists — changed in the
- * system, or held by another package — only when the call selects it
- * (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152; Code): `overwrite`.
+ * On the cloud, SAP's pull handler hands its job every object R6 lists —
+ * changed in the system, or held by another package — when the request
+ * selects none (`CL_ABAPGIT_RES_REPO_PULL->post` L234–240), and only the
+ * selected ones with `overwrite` (L230–233); the job leaves every other
+ * entry unimported (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152). Code,
+ * read on the cloud 2026-11-23.
  */
 const CLOUD_IMPORTS =
-  'every object changed only in the remote is imported; of the objects changed in the system or held by another package, the pull overwrites those named in overwrite with their remote version, and the others keep their system version';
+  'every object changed only in the remote is imported; the objects changed in the system or held by another package are overwritten with their remote version — with overwrite, only those it names, the others keeping their system version';
 
 const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 
@@ -130,24 +133,24 @@ export async function handlePullAbapGitRepo(
     async () => {
       const admission = admissionOf(context);
       const repo = admittedRepo(admission);
-      return abapGitClientOf(context.connection, context.logger).pullRepo(
-        {
-          key: repo.key,
-          branchName: repo.branchName,
-          ...(args.transport_request !== undefined
-            ? { transportRequest: args.transport_request }
-            : {}),
-          ...(selection !== undefined ? { selection } : {}),
-        },
-        {
-          ...credentialOption(admission),
-          headers:
-            selection !== undefined
-              ? ABAPGIT_HEADERS.pullSelective
-              : ABAPGIT_HEADERS.pull,
-          analyse: abapGitVerdict,
-        },
-      );
+      const client = abapGitClientOf(context.connection, context.logger);
+      const pull = {
+        key: repo.key,
+        branchName: repo.branchName,
+        ...(args.transport_request !== undefined
+          ? { transportRequest: args.transport_request }
+          : {}),
+      };
+      const options = {
+        ...credentialOption(admission),
+        analyse: abapGitVerdict,
+      };
+      return selection === undefined
+        ? client.pullRepo(pull, { ...options, headers: ABAPGIT_HEADERS.pull })
+        : client.pullRepo(
+            { ...pull, selection },
+            { ...options, headers: ABAPGIT_HEADERS.pullSelective },
+          );
     },
     objectsAnswer,
   );

@@ -3,10 +3,11 @@
  * type and name, matched against the modified-objects read (R6) and handed
  * back as R6 answered them — every field unchanged, in R6's lists.
  *
- * SAP's cloud pull job imports an R6 entry only when the request selects it:
- * it sets every unselected overwrite and package-warning entry to "not
- * imported" (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152; Code, read on
- * the cloud 2026-11-23). adt-clients' live suite measured the selective
+ * Without a selection SAP's cloud pull handler hands its job every R6 entry
+ * (`CL_ABAPGIT_RES_REPO_PULL->post` L234–240); with one, only the selected
+ * entries (L230–233), and the job leaves every other entry unimported
+ * (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152). Code, read on the cloud
+ * 2026-11-23. adt-clients' live suite measured the selective
  * pull in this form (`pull.req.v1`, its ERRATA, 2026-11-22).
  */
 

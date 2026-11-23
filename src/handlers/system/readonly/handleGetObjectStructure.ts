@@ -1,5 +1,11 @@
 import * as z from 'zod';
-import { bullets, type RowSchemas, writeListing } from '../../../lib/detail';
+import {
+  bullets,
+  listAnswerAt,
+  type RowSchemas,
+  type Written,
+  writeListing,
+} from '../../../lib/detail';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving ADT object structure and returning a compact tree.
@@ -9,7 +15,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { answerAt } from '../../../lib/detail';
+
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -20,8 +26,6 @@ import {
   child,
   childAt,
   isList,
-  type XmlList,
-  type XmlNode,
   type XmlRead,
 } from '../../../lib/xml/tree';
 
@@ -233,7 +237,7 @@ function completeTreeText(
   value: XmlRead,
   root: { objecttype: string; objectname: string },
   withOwner: boolean,
-): string {
+): Written<string> {
   assertObjectStructurePresent(value);
   const nodes = flatNodesOf(value);
   if (nodes.length === 0) {
@@ -242,7 +246,7 @@ function completeTreeText(
       reading: {},
       lists: {},
       title: 'No nodes found in object structure response.',
-    }).answer;
+    });
   }
   return writeListing({
     heads: [],
@@ -259,7 +263,7 @@ function completeTreeText(
     },
     title: 'tree:',
     end: '',
-  }).answer;
+  });
 }
 
 export async function handleGetObjectStructure(
@@ -293,7 +297,7 @@ export async function handleGetObjectStructure(
   // (`src/lib/detail`): terse the tree without the include each component's
   // code lives in; medium the tree with it (the former terse); full the
   // parse; raw the document.
-  const shown = answerAt<AdtReading<XmlRead>, XmlRead | string>(
+  const shown = listAnswerAt<AdtReading<XmlRead>, XmlRead | string>(
     {
       terse: (reading) => completeTreeText(reading.value, root, false),
       medium: (reading) => completeTreeText(reading.value, root, true),

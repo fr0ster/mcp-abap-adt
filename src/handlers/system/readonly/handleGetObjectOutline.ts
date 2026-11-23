@@ -35,19 +35,17 @@ import {
   type JsonSchemas,
   type ListAnswerTable,
   listAnswerAt,
+  member,
   omitted,
   type RowSchemas,
   rows,
   values,
-  writeJsonRoot,
+  writeJson,
   writeListing,
   writeWhole,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import {
   DETAIL_SHAPE,
   detailOf,
@@ -310,11 +308,13 @@ function outlineAnswers(
       ? undefined
       : componentOf(outline.base, outline.root);
   return {
-    // Every component of the outline, written by the listing writer.
-    // No outline read: the document as it came (nothing reshaped).
+    // Every component of the outline, written by the listing writer. At
+    // terse and medium the document is always parsed (`OUTLINE_READS`), an
+    // outline without a root refused there; the reading without one is
+    // raw's alone, answered here as the document it holds.
     terse: ({ document, outline }: OutlineRead) => {
       const root = outline === undefined ? undefined : components(outline);
-      if (root === undefined) return writeWhole(document);
+      if (root === undefined) return writeWhole({ document });
       const source = definitionOf(root)?.source;
       const { columns, below } = outlineSchemas(source);
       return writeListing({
@@ -336,27 +336,25 @@ function outlineAnswers(
     // Every component with its links (the reading's own tree, every
     // component in it); no outline read: the document as it came.
     medium: ({ document, outline }: OutlineRead) => {
-      // No outline read: the reading's document whole, as it is.
-      if (outline === undefined) {
-        return writeWhole<OutlineRead['document']>(document);
-      }
+      // No outline read (raw's reading alone): the document it holds.
+      if (outline === undefined) return writeWhole({ document });
       // The reading's tree from its root, every link and child by the JSON
       // writer.
-      const root = outline.root;
-      return writeWhole<object>({
-        success: true,
-        object_type: objectType,
-        object_name: objectName,
-        version,
-        outline:
-          root === undefined
-            ? undefined
-            : writeJsonRoot(
-                root,
-                componentEntry,
-                componentSchemas(outline.base),
-              ).answer,
-      });
+      return writeJson(
+        {
+          success: true,
+          object_type: objectType,
+          object_name: objectName,
+          version,
+        },
+        outline,
+        {
+          root: member('root', componentEntry, {
+            as: 'outline',
+            lists: componentSchemas(outline.base),
+          }),
+        },
+      );
     },
     full: ({ document, outline }) => outline ?? document,
     raw: ({ document }) => document,

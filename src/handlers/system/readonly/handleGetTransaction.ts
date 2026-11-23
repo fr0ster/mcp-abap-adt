@@ -2,7 +2,13 @@ import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt, rows, writeListing } from '../../../lib/detail';
+import {
+  listAnswerAt,
+  rows,
+  values,
+  writeJson,
+  writeListing,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   DETAIL_SHAPE,
@@ -96,7 +102,7 @@ export async function handleGetTransaction(
         .getObjectProperties(transactionUri(name), {
           analyse: analyseObjectProperties,
         }),
-    answerAt<AdtReading<XmlRead>, string | object>(
+    listAnswerAt<AdtReading<XmlRead>, string | object>(
       {
         // Every property the document held, written by the listing writer.
         terse: (reading: AdtReading<XmlRead>) => {
@@ -135,13 +141,22 @@ export async function handleGetTransaction(
                 header: 'always',
               }),
             },
-          }).answer;
+          });
         },
-        medium: (reading) => ({
-          success: true,
-          transaction_name: name,
-          ...transactionPropertiesOf(reading.value),
-        }),
+        // The object and every property, the properties by the JSON writer.
+        medium: (reading) => {
+          const read = transactionPropertiesOf(reading.value);
+          return writeJson(
+            { success: true, transaction_name: name, object: read.object },
+            read,
+            {
+              properties: values(
+                'properties',
+                (property: Record<string, string>) => property,
+              ),
+            },
+          );
+        },
         // `full` adds the document's own parse, so nothing it carries is lost.
         full: (reading) => ({
           success: true,

@@ -5,23 +5,24 @@ import {
   entries,
   type ListAnswerTable,
   listAnswerAt,
+  member,
   rows,
   writeJson,
   writeListing,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  READ_VERSION_FIELD,
-  type ReadVersion,
-} from '../../../lib/handlers/readVersion';
+import { READ_VERSION_FIELD } from '../../../lib/handlers/readVersion';
 import {
   DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
 import { readPackageMetadata } from '../../../lib/strategies/metadataReads';
-import { packageDetails } from '../../../lib/strategies/packageSummary';
+import {
+  type PackageDetails,
+  packageDetails,
+} from '../../../lib/strategies/packageSummary';
 import type { AdtReading } from '../../../lib/strategies/reading';
 
 export const TOOL_DEFINITION = {
@@ -56,18 +57,21 @@ function packageAnswers(
   version: string,
 ): ListAnswerTable<string, string | object> {
   const details = (document: string) => {
-    const read = packageDetails(document);
-    const { sub_packages: _subPackages, ...facts } = read;
     // The sub-packages written from the document's own list, inside the
     // metadata as before.
     return writeJson(
       { success: true, package_name: packageName, version, part: 'metadata' },
-      {},
-      {},
+      { metadata: packageDetails(document) },
       {
-        metadata: writeJson(facts, read, {
-          sub_packages: entries('sub_packages', (sub: SubPackage) => sub),
-        }).answer,
+        metadata: member(
+          'metadata',
+          ({ sub_packages: _subPackages, ...facts }: PackageDetails) => facts,
+          {
+            lists: {
+              sub_packages: entries('sub_packages', (sub: SubPackage) => sub),
+            },
+          },
+        ),
       },
     );
   };

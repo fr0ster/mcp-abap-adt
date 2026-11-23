@@ -55,14 +55,14 @@ import {
   answerAt,
   asContentResult,
   asTextResult,
-  type Column,
   cellsOf,
   entries,
   kinds,
   type ListAnswerTable,
   listAnswerAt,
-  omitted,
+  marks,
   wireAnswer,
+  within,
   writeJsonList,
   writeListing,
 } from '../../../lib/detail';
@@ -185,28 +185,50 @@ const fullDescribed = (items: readonly DescribedItem[]) =>
   );
 
 /** The hit rows a search answered for an object, read back into their cells. */
-const hitRowsOf = ({ described }: DescribedItem): string[][] =>
+const hitRowsOf = ({ described }: DescribedItem): HitCells[] =>
   (described.hits ?? '')
     .split('\n')
     .slice(1)
     .filter((row) => row !== '')
-    .map(cellsOf);
+    .map(cellsOf)
+    .map(([name = '', type = '', description = '', pkg = '', ...extra]) => ({
+      name,
+      type,
+      description,
+      package: pkg,
+      extra,
+    }));
+
+/**
+ * A hit row's cells, by the columns SearchObject writes; any cell past them
+ * kept, written after them.
+ */
+interface HitCells {
+  readonly name: string;
+  readonly type: string;
+  readonly description: string;
+  readonly package: string;
+  readonly extra: readonly string[];
+}
 
 /** An object's failure line: its name and its failure, as written. */
-const failureWords = ({ obj, described }: DescribedItem): string[] => [
-  obj.name,
-  JSON.stringify(described.failure),
+const failureWords = (line: DescribedFailure): string[] => [
+  line.name,
+  JSON.stringify(line.failure),
 ];
 
 /** One line of the terse TSV: a hit row an object was described with, or a refused search. */
 type DescribedLine =
-  | { readonly kind: 'row'; readonly cells: readonly string[] }
-  | {
-      readonly kind: 'error';
-      readonly item: DescribedItem;
-      /** No cells: a refused search is its mark line. */
-      readonly cells?: undefined;
-    };
+  | { readonly kind: 'row'; readonly cells: HitCells }
+  | DescribedFailure;
+
+/** A refused search: the object's name and its failure, its mark line. */
+interface DescribedFailure {
+  readonly kind: 'error';
+  readonly name: string;
+  readonly failure: FailureEntry | undefined;
+  readonly cells?: undefined;
+}
 
 /**
  * The lines of every object SAP answered: each hit row it described an
@@ -217,7 +239,13 @@ type DescribedLine =
 const describedLines = (items: readonly DescribedItem[]): DescribedLine[] =>
   items.flatMap((item): DescribedLine[] =>
     item.described.failure !== undefined
-      ? [{ kind: 'error', item }]
+      ? [
+          {
+            kind: 'error',
+            name: item.obj.name,
+            failure: item.described.failure,
+          },
+        ]
       : hitRowsOf(item).map((cells): DescribedLine => ({ kind: 'row', cells })),
   );
 
@@ -244,29 +272,41 @@ const DESCRIBE_ANSWERS: ListAnswerTable<readonly DescribedItem[], McpResult> = {
             {
               row: {
                 row: {
-                  columns: [0, 1, 2, 3].map(
-                    (i): Column<DescribedLine> => ({
-                      name: String(i),
+                  columns: [
+                    {
+                      name: 'name',
                       cell: (line) =>
-                        line.kind === 'row' ? (line.cells[i] ?? '') : '',
-                      when: (line) =>
-                        line.kind === 'row' && i < line.cells.length,
-                    }),
-                  ),
+                        line.kind === 'row' ? line.cells.name : '',
+                    },
+                    {
+                      name: 'type',
+                      cell: (line) =>
+                        line.kind === 'row' ? line.cells.type : '',
+                    },
+                    {
+                      name: 'description',
+                      cell: (line) =>
+                        line.kind === 'row' ? line.cells.description : '',
+                    },
+                    {
+                      name: 'package',
+                      cell: (line) =>
+                        line.kind === 'row' ? line.cells.package : '',
+                    },
+                  ],
                   header: 'none',
+                  // Any cell past the four, as SAP's row held it: a line each.
                   lists: {
-                    // A hit row's cells are its columns.
-                    cells: omitted<string, 'cells'>(
-                      'cells',
-                      "a hit row's cells, written as its columns",
-                    ),
+                    cells: within<HitCells, 'cells'>('cells', {
+                      extra: marks('extra', 'extra', (cell: string) => [cell]),
+                    }),
                   },
                 },
               },
               error: {
                 mark: 'error',
                 words: (line: DescribedLine) =>
-                  line.kind === 'error' ? failureWords(line.item) : [],
+                  line.kind === 'error' ? failureWords(line) : [],
               },
             },
             ['name', 'type', 'description', 'package'],

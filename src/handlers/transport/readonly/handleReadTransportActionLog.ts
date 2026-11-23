@@ -15,20 +15,20 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt, omitting, rows, writeListing } from '../../../lib/detail';
+import {
+  listAnswerAt,
+  omitting,
+  rows,
+  values,
+  writeJson,
+  writeListing,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import {
-  child,
-  childAt,
-  isList,
-  type XmlList,
-  type XmlNode,
-  type XmlRead,
-} from '../../../lib/xml/tree';
+import { child, childAt, isList, type XmlRead } from '../../../lib/xml/tree';
 
 export const TOOL_DEFINITION = {
   name: 'ReadTransportActionLog',
@@ -77,10 +77,22 @@ const entriesOf = (value: XmlRead): LogEntry[] => {
   const log = child(value, 'log:log') ?? value;
   const raw = child(log, 'log:entry');
   const list = isList(raw) ? raw : raw ? [raw] : [];
-  return list
-    .map((entry) => ({ text: textOf(entry) }))
-    .filter((entry) => entry.text !== '');
+  return list.map((entry) => ({ text: textOf(entry) }));
 };
+
+/**
+ * The kinds of line the answers leave out by definition: one with no text
+ * (nothing to read, at every level) and, at terse, a separator.
+ */
+const kindOfEntry = (entry: LogEntry) =>
+  entry.text === '' ? 'empty' : isSeparator(entry.text) ? 'separator' : 'entry';
+const TERSE_OMITS = omitting(kindOfEntry, {
+  empty: 'a line without text: nothing to read',
+  separator: 'a separator line: no entry',
+});
+const MEDIUM_OMITS = omitting(kindOfEntry, {
+  empty: 'a line without text: nothing to read',
+});
 
 /** A line of the log made of `=` or `-` alone: a separator, nothing to read. */
 function isSeparator(text: string): boolean {
@@ -104,23 +116,31 @@ export async function handleReadTransportActionLog(
 
   const detail = detailOf(args);
 
-  const terseLog = (value: XmlRead) => {
+  // Every line but an empty one, its text, by the JSON writer.
+  const mediumLog = (value: XmlRead) => {
     const entries = entriesOf(value);
-    return {
-      success: true,
-      transport_number: args.transport_number,
-      count: entries.length,
-      entries: entries.map((entry) => entry.text),
-    };
+    return writeJson(
+      {
+        success: true,
+        transport_number: args.transport_number,
+        count: entries.filter((entry) => !MEDIUM_OMITS.omits(entry)).length,
+      },
+      { entries },
+      {
+        entries: values('entries', (entry: LogEntry) => entry.text, {
+          omit: MEDIUM_OMITS,
+        }),
+      },
+    );
   };
 
   // What the log answers at each level, selected before the call
   // (`src/lib/detail`): terse its lines as text, one entry per line, the
   // separator lines (only `=` or `-`) left out — they carry nothing; medium
   // the former terse JSON; full the parse; raw the document.
-  const shown = answerAt<
+  const shown = listAnswerAt<
     AdtReading<XmlRead>,
-    string | XmlRead | ReturnType<typeof terseLog>
+    string | XmlRead | ReturnType<typeof mediumLog>['answer']
   >(
     {
       // Every entry, written by the listing writer: a separator line (only
@@ -134,7 +154,7 @@ export async function handleReadTransportActionLog(
             {
               head: 'count',
               value: String(
-                entries.filter((entry) => !isSeparator(entry.text)).length,
+                entries.filter((entry) => !TERSE_OMITS.omits(entry)).length,
               ),
             },
           ],
@@ -145,16 +165,12 @@ export async function handleReadTransportActionLog(
                 { name: 'entry', cell: (entry: LogEntry) => entry.text },
               ],
               header: 'always',
-              omit: omitting(
-                (entry: LogEntry) =>
-                  isSeparator(entry.text) ? 'separator' : 'entry',
-                { separator: 'a separator line: no entry' },
-              ),
+              omit: TERSE_OMITS,
             }),
           },
-        }).answer;
+        });
       },
-      medium: (reading) => terseLog(reading.value),
+      medium: (reading) => mediumLog(reading.value),
       full: (reading) => reading.value ?? reading.raw,
       raw: (reading) => reading.raw,
     },

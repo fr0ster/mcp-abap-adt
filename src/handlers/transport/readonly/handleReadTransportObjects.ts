@@ -16,9 +16,11 @@ import {
  * document for the number themselves, which is the work the member exists to
  * end.
  *
- * **The entries are adt-strategies' `transportObjectEntries`** (0.28.0):
+ * **The entries are adt-strategies' `transportObjectEntryList`** (0.28.2):
  * each entry once, with its task and its position — a request's aggregate
- * `tm:all_objects` is not read beside its tasks' entries. Each `detail`
+ * `tm:all_objects` is not read beside its tasks' entries — and each entry
+ * SAP lists without a name or a type apart, in `incompleteEntries`, answered
+ * at every level with every identity field it carries. Each `detail`
  * level is the reading passed to the call: terse and medium over those
  * entries, full the parse, raw the document.
  */
@@ -26,8 +28,10 @@ import {
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
+  type ITransportIncompleteEntry,
   type ITransportObjectEntry,
-  transportObjectEntries,
+  type ITransportObjectEntryList,
+  transportObjectEntryList,
 } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -94,11 +98,13 @@ interface Entry {
  */
 function transportRows(
   transportNumber: string,
-  entries: readonly ITransportObjectEntry[],
+  list: ITransportObjectEntryList,
 ): string {
+  const entries = list.entries;
+  const incomplete = list.incompleteEntries ?? [];
   const lines = [
     `# transport ${transportNumber}`,
-    `# count ${entries.length}`,
+    `# count ${entries.length + incomplete.length}`,
     tsv(['type', 'name', 'position'], []),
   ];
   let task: string | undefined;
@@ -117,7 +123,32 @@ function transportRows(
     }
     lines.push(tsvRow([entry.type, entry.name, entry.position ?? '']));
   }
+  // An entry SAP lists without a name or a type: a line of every identity
+  // field it carries, the ones it lacks absent.
+  for (const entry of incomplete) {
+    lines.push(
+      `# incomplete ${incompleteFields(entry)
+        .map(([field, value]) => `${field}=${value}`)
+        .join(' ')}`,
+    );
+  }
   return lines.join('\n');
+}
+
+/** An incomplete entry's identity fields that are present, in a fixed order. */
+function incompleteFields(
+  entry: ITransportIncompleteEntry,
+): Array<[string, string]> {
+  const fields: Array<[string, string | undefined]> = [
+    ['task', entry.task],
+    ['pgmid', entry.pgmid],
+    ['type', entry.type],
+    ['name', entry.name],
+    ['position', entry.position],
+  ];
+  return fields.flatMap(([field, value]) =>
+    value === undefined || value === '' ? [] : [[field, value]],
+  );
 }
 
 export async function handleReadTransportObjects(
@@ -128,11 +159,20 @@ export async function handleReadTransportObjects(
 
   const detail = detailOf(args);
 
-  const terseObjects = (entries: readonly ITransportObjectEntry[]) => {
+  const terseObjects = (list: ITransportObjectEntryList) => {
+    const entries: readonly ITransportObjectEntry[] = list.entries;
+    const incomplete = list.incompleteEntries ?? [];
     return {
       success: true,
       transport_number: args.transport_number,
-      count: entries.length,
+      count: entries.length + incomplete.length,
+      ...(incomplete.length > 0
+        ? {
+            incomplete_objects: incomplete.map((entry) =>
+              Object.fromEntries(incompleteFields(entry)),
+            ),
+          }
+        : {}),
       objects: entries.map(
         (entry): ReadTransportEntry => ({
           pgmid: entry.pgmid ?? 'R3TR',
@@ -152,15 +192,16 @@ export async function handleReadTransportObjects(
 
   // What the entries answer at each level: the reading the slot is given,
   // selected before the call (`src/lib/detail`) — terse and medium over
-  // adt-strategies' `transportObjectEntries` (each entry once, with its task
-  // and position, since 0.28.0), full the parse, raw the document.
+  // adt-strategies' `transportObjectEntryList` (each entry once, with its
+  // task and position; the incomplete ones apart, since 0.28.2), full the
+  // parse, raw the document.
   const readings: DetailTable<
     string | XmlNode | ReturnType<typeof terseObjects>
   > = {
-    terse: formatted(transportObjectEntries, (entries) =>
-      transportRows(args.transport_number, entries),
+    terse: formatted(transportObjectEntryList, (list) =>
+      transportRows(args.transport_number, list),
     ),
-    medium: formatted(transportObjectEntries, terseObjects),
+    medium: formatted(transportObjectEntryList, terseObjects),
     full: fullLevel,
     raw: rawLevel,
   };

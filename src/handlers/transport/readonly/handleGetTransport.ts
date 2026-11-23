@@ -32,6 +32,7 @@ import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
+  type ITransportIncompleteEntry,
   type ITransportItem,
   type ITransportRequestItem,
   type ITransportTaskItem,
@@ -62,7 +63,7 @@ export const TOOL_DEFINITION = {
   name: 'GetTransport',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "[read-only] Reads the transport request or transport task named by transport_number; kind says which: 'request' or 'task'. A transport request answers its header (number, description, type, status, owner, target system) and its tasks, each with number, owner, status, description and object count. A transport task answers its header (number, parent request, description, type, status, owner), its parent request (number, type, status, target system), and its objects, each with pgmid, type, name and position, with their count.",
+    "[read-only] Reads the transport request or transport task named by transport_number; kind says which: 'request' or 'task'. A transport request answers its header (number, description, type, status, owner, target system) and its tasks, each with number, owner, status, description and object count. A transport task answers its header (number, parent request, description, type, status, owner), its parent request (number, type, status, target system), and its objects, each with pgmid, type, name and position, with their count; an object SAP lists without a name or a type is listed apart, under incomplete_objects, with the fields it has, and counted.",
   inputSchema: z.object({
     transport_number: z.string().describe('Transport request or task number'),
     include_objects: z
@@ -140,6 +141,7 @@ function terseTask(item: ITransportTaskItem, options: TerseOptions) {
     name: entry.name,
     position: entry.position,
   }));
+  const incomplete = (item.incompleteEntries ?? []).map(incompleteRow);
   return {
     success: true,
     transport_number: options.number,
@@ -159,7 +161,24 @@ function terseTask(item: ITransportTaskItem, options: TerseOptions) {
       target_system: parent?.target,
     },
     objects: options.includeObjects ? objects : undefined,
-    object_count: objects.length,
+    ...(incomplete.length > 0 && options.includeObjects
+      ? { incomplete_objects: incomplete }
+      : {}),
+    // Every entry SAP lists, one without a name or a type included.
+    object_count: objects.length + incomplete.length,
+  };
+}
+
+/**
+ * An entry SAP lists without a name or a type (`incompleteEntries`, 0.28.2):
+ * every identity field it carries, the ones it lacks absent.
+ */
+function incompleteRow(entry: ITransportIncompleteEntry) {
+  return {
+    ...(entry.pgmid !== undefined ? { pgmid: entry.pgmid } : {}),
+    ...(entry.type !== undefined ? { type: entry.type } : {}),
+    ...(entry.name !== undefined ? { name: entry.name } : {}),
+    ...(entry.position !== undefined ? { position: entry.position } : {}),
   };
 }
 

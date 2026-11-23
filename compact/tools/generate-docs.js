@@ -163,18 +163,16 @@ function variantLines(tool) {
     const own = JSON.stringify(parametersOf(variant.inputSchema));
     if (variant.description === tool.description && own === shown) continue;
     md += `**${title}:** ${variant.description}\n\n`;
-    md += `**Parameters (\`${kind}\`):**\n\n`;
-    md += parameterLines(variant.inputSchema);
-    md += '\n';
+    md += parameterLines(variant.inputSchema, `**Parameters (\`${kind}\`):**`);
   }
   return md;
 }
 
-/** `- name (required) — description` per parameter. */
-function parameterLines(schema) {
+/** `- name (required) — description` per parameter, under `heading`. */
+function parameterLines(schema, heading = '**Parameters:**') {
   const parameters = parametersOf(schema);
-  if (parameters.length === 0) return '**Parameters:** none\n\n';
-  let md = '**Parameters:**\n\n';
+  if (parameters.length === 0) return `${heading} none\n\n`;
+  let md = `${heading}\n\n`;
   for (const parameter of parameters) {
     md += `- \`${parameter.name}\`${parameter.required ? ' (required)' : ''} — ${parameter.description}\n`;
   }

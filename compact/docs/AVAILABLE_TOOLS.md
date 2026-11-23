@@ -74,8 +74,6 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `background` — Default true: the read runs in the background on an ABAP session of its own and the call answers at once with a run_handle; HandlerBackgroundRunGet answers its result once, and HandlerBackgroundRunDiscard cancels it while it runs. false: the call answers the result itself. Applies to the repository reads: object_type PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, PROGRAM, INCLUDE, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, TRANSPORT, TABLE_SETTINGS, PROGRAM_TEXT_ELEMENTS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS, and the parts object_structure, node_structure, virtual_folders.
 - `object_type` — ABAP object type for routed compact operation.
 - `part` — The part to read: source (the source alone), metadata (the ADT metadata document alone), urls (the service and preview URLs), contents (the objects a package holds); each object type answers the parts it has, and a part outside them is answered with the list of its parts. Three parts read the repository by ADT address: object_structure (object_adt_type*, object_name*), node_structure (object_adt_type*, object_name*, node_id, with_short_descriptions) and virtual_folders (object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions). Two parts read an activation run by run_id*: activation_status (its status) and activation_results (the messages it produced). draft (INTERFACE, CLASS, BEHAVIOR_IMPLEMENTATION, FUNCTION_MODULE, FUNCTION_GROUP, DDL, BEHAVIOR_DEFINITION, METADATA_EXTENSION, SERVICE_DEFINITION, TABLE, STRUCTURE, DOMAIN, DATA_ELEMENT, TABLE_TYPE): whether each part of the object holds an unactivated change, and whose.
@@ -114,7 +112,6 @@ per request.
 - `facet_order` — Facet order (virtual_folders).
 - `with_versions` — Include versions (virtual_folders).
 - `ignore_short_descriptions` — Leave out short descriptions (virtual_folders).
-
 
 ### HandlerSystem
 
@@ -189,8 +186,6 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `object_type` (required) — Object type to validate before create. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.
 - `object_name` (required) — Required object name. For SERVICE_BINDING this is the service binding name; a function module is named GROUP|MODULE.
 - `package_name` — Package of the object to validate. Required for BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION and SERVICE_BINDING.
@@ -202,7 +197,6 @@ per request.
 - `implementation_type` — Implementation type of the behavior definition to validate (Managed, Unmanaged, Abstract or Projection). Required for BEHAVIOR_DEFINITION.
 - `service_definition_name` — Required when object_type=SERVICE_BINDING. Service definition paired with the binding.
 - `service_binding_version` — Optional service binding version for SERVICE_BINDING.
-
 
 ### HandlerCheckRun
 
@@ -451,8 +445,6 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `object_type` (required) — ABAP object type for routed compact operation.
 - `class_name` — ABAP class name (CLASS, BEHAVIOR_IMPLEMENTATION).
 - `behavior_definition` — Behavior definition the implementation is for (BEHAVIOR_IMPLEMENTATION, required there).
@@ -490,7 +482,6 @@ per request.
 - `name` — Object name for handlers that require a generic `name` (behavior definition, metadata extension).
 - `implementation_type` — Behavior definition implementation type.
 - `detail` — How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
-
 
 ### HandlerUpdate
 
@@ -552,8 +543,6 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `object_type` (required) — ABAP object type for routed compact operation.
 - `lock_handle` (required) — The lock handle of the object (for a class include, of the class): the write is sent under it.
 - `transport_request` — Transport request id, sent as the write's corrNr (the types whose description names it).
@@ -597,7 +586,6 @@ per request.
 - `selections` — The selection texts (programs and function groups): the whole list; texts left out are deleted.
 - `headings` — The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
 
-
 ### HandlerDelete
 
 **Half:** `@mcp-abap-adt/compact-modify`
@@ -634,8 +622,6 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `object_type` (required) — Object type. Supported: PACKAGE, DOMAIN, DATA_ELEMENT, TABLE, STRUCTURE, TABLE_TYPE, DDL, SERVICE_DEFINITION, SERVICE_BINDING, CLASS, CDS_UNIT_TEST, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST.
 - `lock_handle` — The lock handle of the class (LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, UNIT_TEST): the include is written empty under it.
 - `package_name` — ABAP package name.
@@ -655,7 +641,6 @@ per request.
 - `behavior_definition_name` — Behavior definition name.
 - `behavior_implementation_name` — Behavior implementation name.
 - `metadata_extension_name` — Metadata extension name.
-
 
 ### HandlerActivate
 
@@ -679,8 +664,6 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `object_type` — ABAP object type for routed compact operation. Names the object's type in the single form.
 - `object_name` — Object name (single form). A function module is named GROUP|MODULE, its function group first, or the module alone with function_group_name.
 - `function_group_name` — A function module's function group (single form, FUNCTION_MODULE).
@@ -688,7 +671,6 @@ per request.
 - `parentName` — With object_adt_type (single form): The function group the object belongs to; its address is built from it. Required for FUGR/FF (function, functionmodule, function_module, func), FUGR/I. With PROG/PX, the function group whose text elements are activated.
 - `objects` — The objects activated together (list form).
 - `preaudit` — Run pre-audit checks before activation.
-
 
 ### HandlerTransportCreate
 
@@ -750,12 +732,9 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `object_type` (required) — Object type. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, TABLE_SETTINGS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `super_package` — PACKAGE: accepted for compatibility; the lock uses the package's name.
-
 
 ### HandlerUnlock
 
@@ -775,12 +754,9 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `object_type` (required) — Object type. Supported: CLASS, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, TABLE_TYPE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_DEFINITION, SERVICE_BINDING, TABLE_SETTINGS, FUNCTION_GROUP_TEXT_ELEMENTS, CLASS_TEXT_ELEMENTS.
 - `object_name` (required) — Object name. A function module is named GROUP|MODULE, its function group first.
 - `lock_handle` (required) — Lock handle returned by lock.
-
 
 ### HandlerUnitTestRun
 
@@ -846,13 +822,10 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `target_type` (required) — Run target kind.
 - `class_name` — Class to run.
 - `profiler_id` — The profiler id of a scheduled trace. Given, the run goes under that trace; absent, the run is plain.
 - `background` — When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with HandlerBackgroundRunGet, and remove it with HandlerBackgroundRunDiscard. A started run cannot be stopped. No default: without it the call waits for the run to end.
-
 
 ### HandlerDebugBreakpoints
 
@@ -1050,8 +1023,6 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `action` (required) — The read: repos (the linked repositories), external_repo (what a remote repository offers), modified_objects (what a pull would change), staging (what changed), checks (the repository's connection to its remote), file (one file of the repository), error_log (a run's log).
 - `repository_key` — repos: only the repository with this key. modified_objects: required, the repository. staging: required, the repository. checks: required, the repository. file: required, the repository. error_log: required, the repository.
 - `package_name` — repos: only the repository linked to this package.
@@ -1060,7 +1031,6 @@ per request.
 - `version` — file: required, local (the system's) or remote (the remote branch's).
 - `app_log_key` — error_log: required, the run log key the repository list answers for the repository's last run.
 - `detail` — repos: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). external_repo: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). modified_objects: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). staging: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON). error_log: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
-
 
 ### HandlerAbapGit
 
@@ -1089,8 +1059,6 @@ per request.
 
 **Parameters (`cloud`):**
 
-**Parameters:**
-
 - `action` (required) — The write: link (link a package to a remote repository), unlink (end a repository's binding to its package), pull (import the remote branch), push (commit and push chosen objects), branch_info (one remote branch for a package, SAP links and unlinks to answer it).
 - `repository_key` — unlink: required, the repository. pull: required, the repository. push: required, the repository.
 - `package_name` — link: required, the package linked. branch_info: required, the package SAP links to answer.
@@ -1104,7 +1072,6 @@ per request.
 - `author` — push: required, the commit author: name and email.
 - `committer` — push: required, the committer: name and email.
 - `detail` — branch_info: How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).
-
 
 ## Streamable HTTP Binaries
 

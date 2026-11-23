@@ -438,11 +438,14 @@ operation is offered where that system's abapGit serves it:
   store or a fresh connection `background: true` is refused, never run in the call. On ABAP Cloud,
   pull and push are SAP's own job: the call answers `accepted` at once, no route cancels the job,
   `ListAbapGitRepos` shows its run state and `GetAbapGitErrorLog` its log.
-- **A cloud pull keeps the objects changed in the system.** On ABAP Cloud, SAP's pull job imports
-  an object listed by `GetAbapGitModifiedObjects` (compact `modified_objects`) — changed in the
-  system, or held by another package — only when the call selects it, and `PullAbapGitRepo` (compact
-  `pull`) takes no selection: those objects keep their system version, and every object changed only
-  in the remote is imported. On premise the pull overwrites them.
+- **A cloud pull can overwrite only the objects it names.** On ABAP Cloud a pull overwrites every
+  object `GetAbapGitModifiedObjects` (compact `modified_objects`) lists — changed in the system, or
+  held by another package — with its remote version. `PullAbapGitRepo` (compact `pull`) takes
+  `overwrite`, on the cloud only: the objects of that list to overwrite, each once, by its type and
+  name as the list answers them; the others keep their system version. The server reads the list and sends those entries as it answered them; an object named
+  twice is refused (`abapgit_overwrite_duplicate`) with nothing sent, one the list does not hold
+  (`abapgit_overwrite_not_listed`) with only the list read. Every object changed only in the remote
+  is imported either way. On premise SAP's pull takes no selection and overwrites them all.
 - **A close cuts SAP's dialog mid-import.** Closing an SSE stream or a stdio server logs its
   connections off, a running background run's included, and the logoff ends SAP's dialog where it
   stands: an on-premise link or pull under way leaves a partly imported package. A Streamable HTTP

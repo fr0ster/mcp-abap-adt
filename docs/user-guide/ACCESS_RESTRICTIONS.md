@@ -171,7 +171,7 @@ decides. The grounds, read in SAP's code:
   runs and matches a selection by object name alone (`CL_ABAPGIT_BG_ACTION_PULL`,
   `deserialize_checks` L113, decisions L123–154), and deletes the objects whose deletion it
   confirmed (`delete_unnecessary_objects` L39–72): a selection checked before the submit does not
-  bound what the job writes. No selective pull is offered.
+  bound what the job writes. A selective pull (`overwrite`) is a pull, refused the same way.
 - **On ABAP Cloud, a pull given a request may create a task in it.** When the user has no task in
   the request, SAP creates one (`CL_ABAPGIT_RES_REPO_PULL->check_and_create_task`,
   `TR_INSERT_NEW_COMM` L76) — and an entry for a request does not cover its tasks.
@@ -210,6 +210,8 @@ Each of these refuses the call in fixed words; nothing but the list (where it wa
 | an `app_log_key` that is not the run log the list shows for that repository | `abapgit_run_log_not_paired` |
 | an entry showing more than one run log | `abapgit_run_log_ambiguous` |
 | the run log asked of an on-premise system (its list carries no run log) | `abapgit_run_log_not_served` |
+| a pull's `overwrite` naming one object twice | `abapgit_overwrite_duplicate` |
+| a pull's `overwrite` naming an object the modified-objects list does not hold (that list read, nothing else) | `abapgit_overwrite_not_listed` |
 | a `url` that is no URL written as the URL parser writes it, or carries a user, a password, a query, a fragment or a dot segment | `abapgit_url_refused` |
 | `x-abapgit-*` headers that state no approved endpoint | `abapgit_endpoint_refused` |
 | a system whose discovery does not list abapGit, or cannot be read | `abapgit_not_served` |

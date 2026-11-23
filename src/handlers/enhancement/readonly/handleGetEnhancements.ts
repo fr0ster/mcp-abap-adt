@@ -40,7 +40,8 @@ import {
   completeAnswer,
   identityOf,
   type Line,
-  tsv,
+  type ListedPart,
+  listedText,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -839,6 +840,38 @@ function heldOf(response: EnhancementResponse): string[] {
   ];
 }
 
+/** Every enhancement and every part not read, as the terse text identifies it. */
+const heldTerse = ({ read }: EnhancementsShown) =>
+  read.kind === 'single'
+    ? heldOf(read.response)
+    : [
+        ...read.response.objects.flatMap(heldOf),
+        ...(read.response.includes_unread ?? []).map((unread) =>
+          identityOf(['include_unread', JSON.stringify(unread)]),
+        ),
+      ];
+
+/** The terse text: each object's lines, a nested read under its total. */
+const terseText = ({ read }: EnhancementsShown): Written<string> =>
+  Written.text(
+    read.kind === 'single'
+      ? terseObjectLines(read.response)
+      : [
+          {
+            head: 'total',
+            value: String(read.response.total_enhancements_found),
+          },
+          ...read.response.objects.flatMap(terseObjectLines),
+          ...(read.response.includes_unread ?? []).map(
+            (unread): Line => ({
+              mark: 'include_unread',
+              words: [JSON.stringify(unread)],
+            }),
+          ),
+        ],
+    [0, 1],
+  );
+
 /**
  * What `GetEnhancements` answers at each `detail`, selected before the reads
  * (`src/lib/detail`): the answer is built from several requests, so each
@@ -860,37 +893,7 @@ const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
     return {
       // Every enhancement and every part not read, or nothing
       // (`completeAnswer`).
-      terse: completeAnswer(
-        'GetEnhancements',
-        ({ read }: EnhancementsShown) =>
-          read.kind === 'single'
-            ? heldOf(read.response)
-            : [
-                ...read.response.objects.flatMap(heldOf),
-                ...(read.response.includes_unread ?? []).map((unread) =>
-                  identityOf(['include_unread', JSON.stringify(unread)]),
-                ),
-              ],
-        ({ read }: EnhancementsShown): Written<string> =>
-          Written.text(
-            read.kind === 'single'
-              ? terseObjectLines(read.response)
-              : [
-                  {
-                    head: 'total',
-                    value: String(read.response.total_enhancements_found),
-                  },
-                  ...read.response.objects.flatMap(terseObjectLines),
-                  ...(read.response.includes_unread ?? []).map(
-                    (unread): Line => ({
-                      mark: 'include_unread',
-                      words: [JSON.stringify(unread)],
-                    }),
-                  ),
-                ],
-            [0, 1],
-          ),
-      ),
+      terse: completeAnswer('GetEnhancements', heldTerse, terseText),
       medium: former,
       full: former,
       raw: former,
@@ -899,6 +902,23 @@ const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
 
 /** The answer a read is shown as, at the level asked. */
 type EnhancementsAnswerOf = (shown: EnhancementsShown) => string | object;
+
+/**
+ * Each answered read, by the answer it became: a list call writes every
+ * object's terse text from these through `Written`, never by splicing the
+ * single answers' texts.
+ */
+const readsOf = new WeakMap<McpResult, EnhancementsShown>();
+
+/** A read's answer at the level asked, the read kept for a list call. */
+function shownResult(
+  shown: EnhancementsAnswerOf,
+  read: EnhancementsShown,
+): McpResult {
+  const result = enhancementsResult(shown(read));
+  readsOf.set(result, read);
+  return result;
+}
 
 /** An answer's text: TSV as it is, JSON serialised. */
 function enhancementsResult(answer: string | object): McpResult {
@@ -968,12 +988,10 @@ async function enhancementsOf(
     if (!includeNested) {
       // Return only main object enhancements
       // Apply filtering if not detailed; add the detailed flag for consistency
-      return enhancementsResult(
-        shown({
-          read: { kind: 'single', response: mainEnhancementResponse },
-          detailed: isDetailed,
-        }),
-      );
+      return shownResult(shown, {
+        read: { kind: 'single', response: mainEnhancementResponse },
+        detailed: isDetailed,
+      });
     }
 
     // If include_nested is true, also get enhancements from all nested includes
@@ -1094,12 +1112,10 @@ async function enhancementsOf(
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
 
-    return enhancementsResult(
-      shown({
-        read: { kind: 'nested', response: combinedResponse },
-        detailed: isDetailed,
-      }),
-    );
+    return shownResult(shown, {
+      read: { kind: 'nested', response: combinedResponse },
+      detailed: isDetailed,
+    });
   } catch (error) {
     return return_error(error);
   }
@@ -1677,12 +1693,10 @@ function enhancementsAnswerFrom(
       resolved,
     );
     if (!options.includeNested) {
-      return enhancementsResult(
-        options.shown({
-          read: { kind: 'single', response: mainEnhancementResponse },
-          detailed: options.isDetailed,
-        }),
-      );
+      return shownResult(options.shown, {
+        read: { kind: 'single', response: mainEnhancementResponse },
+        detailed: options.isDetailed,
+      });
     }
     let allEnhancementResponses: EnhancementResponse[];
     const includesUnread: IncludeUnread[] = [];
@@ -1751,12 +1765,10 @@ function enhancementsAnswerFrom(
       objects: allEnhancementResponses,
       ...(includesUnread.length > 0 ? { includes_unread: includesUnread } : {}),
     };
-    return enhancementsResult(
-      options.shown({
-        read: { kind: 'nested', response: combinedResponse },
-        detailed: options.isDetailed,
-      }),
-    );
+    return shownResult(options.shown, {
+      read: { kind: 'nested', response: combinedResponse },
+      detailed: options.isDetailed,
+    });
   } catch (error) {
     return return_error(error);
   }
@@ -1890,16 +1902,29 @@ function listAnswer(
   terse: boolean,
 ): McpResult {
   if (terse) {
-    // Each object's terse answer begins with its own `# object` line; a
-    // failure is named under the object asked, its payload as JSON.
-    const text = results
-      .map((result, i) => {
+    // Every object's text through `Written`: a failure under its escaped
+    // `# object` line and one `# error` line; an answered one as its own
+    // terse writer writes it.
+    const text = listedText(
+      'GetEnhancements',
+      results.map((result, i): ListedPart<EnhancementsShown> => {
         const asked = objects[i];
-        return result.isError
-          ? `# object ${asked?.object_type ?? ''} ${asked?.object_name ?? ''}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
-          : (result.content[0]?.text ?? '');
-      })
-      .join('\n');
+        const read = readsOf.get(result);
+        return result.isError || read === undefined
+          ? {
+              heads: [
+                {
+                  head: 'object',
+                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+                },
+              ],
+              error: JSON.stringify(payloadOfAnswer(result)),
+            }
+          : { heads: [], read };
+      }),
+      heldTerse,
+      terseText,
+    );
     return { isError: false, content: [{ type: 'text', text }] };
   }
   const entries = results.map((result, i) => {

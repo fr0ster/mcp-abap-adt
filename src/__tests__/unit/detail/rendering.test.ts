@@ -136,13 +136,9 @@ describe('the writers escape every value', () => {
     const markOf = (words: readonly string[]) =>
       writeListing({
         heads: [],
-        reading: { marked: [{ words }] },
+        reading: { marked: [words] },
         lists: {
-          marked: marks(
-            'marked',
-            'm',
-            (item: { words: readonly string[] }) => item.words,
-          ),
+          marked: marks('marked', 'm', (item: readonly string[]) => item),
         },
       }).answer;
     const answers = [

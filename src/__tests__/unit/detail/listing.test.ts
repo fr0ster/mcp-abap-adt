@@ -18,16 +18,19 @@ import {
   nest,
   omitting,
   parts,
+  partsOf,
   type RowSchemas,
   rawLevel,
   rows,
   sections,
+  values,
   type Written,
   whole,
   writeJson,
   writeJsonList,
   writeJsonRoot,
   writeListing,
+  writeWhole,
 } from '../../../lib/detail';
 
 interface Obj {
@@ -267,6 +270,105 @@ describe('writeListing: every item of every list, by construction', () => {
 
 // Codex round 10, P1-2 and P1-3: every hole of the schemas is a compile
 // error, or — two outputs under one name — refused when written.
+// Codex round 11: children cannot be dropped through optional options, a
+// list at any depth or in a record needs its schema, an opaque member does
+// not compile, and a JSON name is any name.
+describe('round 11: no item misses the output', () => {
+  type Lost = {
+    readonly a: readonly { readonly children: readonly string[] }[];
+  };
+  const lost: Lost = { a: [{ children: ['lost'] }] };
+
+  it("entries without its item's child lists does not compile", () => {
+    const schemas: JsonSchemas<Lost> = {
+      // @ts-expect-error the items hold `children`, which nothing writes.
+      a: entries('a', () => ({})),
+    };
+    void schemas;
+    // @ts-expect-error the options and their child schema are required.
+    entries('a', (item: Lost['a'][number]) => ({ n: item.children.length }));
+  });
+
+  it('values and marks refuse items holding lists', () => {
+    const json: JsonSchemas<Lost> = {
+      // @ts-expect-error a value writes no list of its item.
+      a: values('a', (item: Lost['a'][number]) => item.children.length),
+    };
+    const terse: RowSchemas<Lost> = {
+      // @ts-expect-error a mark line writes no list of its item.
+      a: marks('a', 'a', (item: Lost['a'][number]) => [
+        String(item.children.length),
+      ]),
+    };
+    void json;
+    void terse;
+  });
+
+  it('a child schema writes every child', () => {
+    const answer = writeJsonList(
+      lost,
+      entries('a', (_item: Lost['a'][number]) => ({}), {
+        lists: { children: values('children', (child: string) => child) },
+      }),
+    ).answer;
+    assert.deepStrictEqual(answer, [{ children: ['lost'] }]);
+  });
+
+  it('a record of lists needs a schema: none can be given', () => {
+    type Grouped = {
+      readonly groups: Readonly<Record<string, readonly { name: string }[]>>;
+    };
+    // @ts-expect-error a record of lists has no schema.
+    const schemas: RowSchemas<Grouped> = {};
+    void schemas;
+  });
+
+  it('a list at any depth needs its schema', () => {
+    type Deep = {
+      readonly outer: {
+        readonly inner: { readonly items: readonly { name: string }[] };
+      };
+    };
+    // @ts-expect-error `outer` holds a list two objects down.
+    const schemas: RowSchemas<Deep> = {};
+    // @ts-expect-error and so for JSON.
+    const json: JsonSchemas<Deep> = {};
+    void schemas;
+    void json;
+  });
+
+  it('a member typed unknown or any does not compile in a listing', () => {
+    type Opaque = {
+      readonly items: readonly { name: string }[];
+      readonly extra: unknown;
+    };
+    // @ts-expect-error a reading holding `unknown` has no schemas at all.
+    const schemas: RowSchemas<Opaque> = {
+      items: rows('items', {
+        columns: [{ name: 'name', cell: (o: { name: string }) => o.name }],
+        header: 'none',
+      }),
+    };
+    void schemas;
+  });
+
+  it('a JSON list named __proto__ is a member like any other', () => {
+    const reading = { a: [{ name: 'x' }] };
+    const answer = writeJson({}, reading, {
+      a: entries('a', (o: { name: string }) => ({ name: o.name }), {
+        as: '__proto__',
+      }),
+    }).answer;
+    assert.equal(JSON.stringify(answer), '{"__proto__":[{"name":"x"}]}');
+    assert.equal(Object.getPrototypeOf(answer), Object.prototype);
+  });
+
+  it('writeWhole takes a reading object, never a primitive', () => {
+    // @ts-expect-error a string is no reading.
+    writeWhole('a document');
+  });
+});
+
 describe('the schemas leave no hole', () => {
   const objects = rows('objects', {
     columns: [{ name: 'name', cell: (o: { name: string }) => o.name }],
@@ -429,8 +531,24 @@ describe('writeJson: every item of every list one entry, by construction', () =>
   });
 
   it('after cannot replace a list', () => {
-    const answer = writeJson({}, reading, { parts }, { packages: [] }).answer;
-    assert.equal(answer.packages?.length, 2);
+    const answer = writeJson(
+      {},
+      reading,
+      { parts },
+      // @ts-expect-error a list beside the lists does not compile at all.
+      { packages: [] },
+    ).answer;
+    assert.ok(Array.isArray(answer.packages));
+  });
+
+  it('no list reaches the answer but through its schema', () => {
+    // @ts-expect-error a list in the facts beside the reading's lists.
+    writeJson({ projected: [{ name: 'A' }] }, reading, { parts });
+    entries(
+      'parts',
+      // @ts-expect-error an entry holding a list of its own making.
+      (part: { name: string }) => ({ name: part.name, kept: [part.name] }),
+    );
   });
 
   it('a list without a JSON schema does not compile', () => {
@@ -474,11 +592,11 @@ describe('nested listings, conditional cells, JSON trees', () => {
         ],
       },
       lists: {
-        asked: parts(
+        asked: partsOf(
           'asked',
           (a: Asked) => [{ head: 'asked', value: a.name }],
-          (a: Asked) =>
-            a.tree === undefined ? undefined : nest(listingOf(a.tree)),
+          'tree',
+          (tree) => nest(listingOf(tree)),
         ),
       },
     }).answer;

@@ -13,6 +13,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   fullLevel,
@@ -49,18 +50,27 @@ export const TOOL_DEFINITION = {
  * 0.28.0 a name as written, an absent description absent).
  */
 const TYPE_READINGS: DetailTable<INamedItem[] | XmlNode | string> = {
-  terse: formatted(utilNamedItems, (items) => {
-    return [
-      `# count ${items.length}`,
-      tsv(
-        ['name', 'description'],
-        items.map((item) => [
+  // Every type the list held, or nothing (`completeAnswer`).
+  terse: formatted(
+    utilNamedItems,
+    completeAnswer(
+      'GetAdtTypes',
+      (items: INamedItem[]) => items.map((item) => item.name),
+      (items: INamedItem[]) => {
+        const rows = items.map((item) => [
           item.name,
           (item.description ?? '').split('\n')[0] ?? '',
-        ]),
-      ),
-    ].join('\n');
-  }),
+        ]);
+        return {
+          answer: [
+            `# count ${items.length}`,
+            tsv(['name', 'description'], rows),
+          ].join('\n'),
+          rendered: rows.map((row) => row[0] ?? ''),
+        };
+      },
+    ),
+  ),
   medium: formatted(utilNamedItems, (items) => items),
   full: fullLevel,
   raw: rawLevel,

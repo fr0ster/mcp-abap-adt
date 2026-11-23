@@ -54,8 +54,10 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
   type DetailLevel,
   groupedTsv,
+  type Rendered,
   wireAnswer,
 } from '../../../lib/detail';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
@@ -370,11 +372,13 @@ function fullWhereUsed(
  * tree carry none, and leave — each usage names its package on the group
  * line. Every usage is answered: nothing is cut.
  */
-function whereUsedRows(result: WhereUsedListResult): string {
+function whereUsedRows(result: WhereUsedListResult): Rendered<string> {
+  const rendered: string[] = [];
   const groups = new Map<string, string[][]>();
   for (const reference of result.references) {
     const usage = reference.usage_information;
     if (usage === undefined) continue;
+    rendered.push(referenceIdentity(reference));
     const pkg = reference.package_name ?? '';
     const rows = groups.get(pkg) ?? [];
     rows.push([
@@ -384,14 +388,36 @@ function whereUsedRows(result: WhereUsedListResult): string {
     ]);
     groups.set(pkg, rows);
   }
-  return [
-    `# total ${result.totalReferences}`,
-    groupedTsv(
-      ['type', 'name', 'usage'],
-      [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
-    ),
-  ].join('\n');
+  return {
+    answer: [
+      `# total ${result.totalReferences}`,
+      groupedTsv(
+        ['type', 'name', 'usage'],
+        [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
+      ),
+    ].join('\n'),
+    rendered,
+  };
 }
+
+/** A reference's identity: its type, name and package (each counted as often as it comes). */
+function referenceIdentity(reference: {
+  type: string;
+  name: string;
+  package_name?: string | undefined;
+}): string {
+  return `${reference.type}|${reference.name}|${reference.package_name ?? ''}`;
+}
+
+/** Every usage the list held — a reference SAP gave `usageInformation`. */
+const heldUsages = ({ result }: WhereUsedRead) =>
+  result.references
+    .filter((reference) => reference.usage_information !== undefined)
+    .map(referenceIdentity);
+
+/** Every reference the list held, its package and container nodes too. */
+const heldReferences = ({ result }: WhereUsedRead) =>
+  result.references.map(referenceIdentity);
 
 /**
  * What GetWhereUsed answers at each `detail`, selected before the requests
@@ -402,16 +428,28 @@ function whereUsedRows(result: WhereUsedListResult): string {
  * kept.
  */
 const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, JsonValue> = {
-  terse: ({ result }) => whereUsedRows(result),
-  medium: ({ result }) =>
-    jsonFields({
-      total_references: result.totalReferences,
-      result_description: result.resultDescription,
-      references: result.references.map(({ uri: _uri, ...fields }) =>
-        jsonFields(fields),
-      ),
-    }),
-  full: ({ result, args }) => fullWhereUsed(result, args),
+  // Every usage (terse) or reference (medium, full), or nothing
+  // (`completeAnswer`).
+  terse: completeAnswer('GetWhereUsed', heldUsages, ({ result }) =>
+    whereUsedRows(result),
+  ),
+  medium: completeAnswer('GetWhereUsed', heldReferences, ({ result }) => {
+    const references = result.references.map(
+      ({ uri: _uri, ...fields }) => fields,
+    );
+    return {
+      answer: jsonFields({
+        total_references: result.totalReferences,
+        result_description: result.resultDescription,
+        references: references.map(jsonFields),
+      }),
+      rendered: references.map(referenceIdentity),
+    };
+  }),
+  full: completeAnswer('GetWhereUsed', heldReferences, ({ result, args }) => ({
+    answer: fullWhereUsed(result, args),
+    rendered: result.references.map(referenceIdentity),
+  })),
   raw: ({ result }) => result.document,
 };
 

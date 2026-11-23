@@ -14,9 +14,11 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   fullLevel,
+  type Rendered,
   rawLevel,
   readingAt,
   tsv,
@@ -68,19 +70,33 @@ function refOf(object: IInactiveObject): InactiveObjectRef {
 /** The list as the tool answers it at terse and medium. */
 function inactiveAnswer(read: IInactiveObjectsResponse) {
   const objects = read.objects.map(refOf);
-  return { success: true, count: objects.length, objects };
+  return {
+    answer: { success: true, count: objects.length, objects },
+    rendered: objects.map(refIdentity),
+  };
 }
 
+/** An object's identity: its type, name and parent. */
+const refIdentity = (o: { type: string; name: string; parentName?: string }) =>
+  `${o.type}|${o.name}|${o.parentName ?? ''}`;
+
+/** Every object the list held, by its identity. */
+const heldInactive = (read: IInactiveObjectsResponse) =>
+  read.objects.map(refOf).map(refIdentity);
+
 /** The list at terse: a TSV row per object — its type, name and owner. */
-function terseInactive(read: IInactiveObjectsResponse): string {
+function terseInactive(read: IInactiveObjectsResponse): Rendered<string> {
   const objects = read.objects.map(refOf);
-  return [
-    `# count ${objects.length}`,
-    tsv(
-      ['type', 'name', 'parent'],
-      objects.map((o) => [o.type, o.name, o.parentName ?? '']),
-    ),
-  ].join('\n');
+  return {
+    answer: [
+      `# count ${objects.length}`,
+      tsv(
+        ['type', 'name', 'parent'],
+        objects.map((o) => [o.type, o.name, o.parentName ?? '']),
+      ),
+    ].join('\n'),
+    rendered: objects.map(refIdentity),
+  };
 }
 
 /**
@@ -91,10 +107,17 @@ function terseInactive(read: IInactiveObjectsResponse): string {
  * activation is confirmed off this list), full the parse, raw the document.
  */
 const INACTIVE_READINGS: DetailTable<
-  ReturnType<typeof inactiveAnswer> | XmlNode | string
+  ReturnType<typeof inactiveAnswer>['answer'] | XmlNode | string
 > = {
-  terse: formatted(utilInactiveObjects, terseInactive),
-  medium: formatted(utilInactiveObjects, inactiveAnswer),
+  // Every object the list held, or nothing (`completeAnswer`).
+  terse: formatted(
+    utilInactiveObjects,
+    completeAnswer('GetInactiveObjects', heldInactive, terseInactive),
+  ),
+  medium: formatted(
+    utilInactiveObjects,
+    completeAnswer('GetInactiveObjects', heldInactive, inactiveAnswer),
+  ),
   full: fullLevel,
   raw: rawLevel,
 };

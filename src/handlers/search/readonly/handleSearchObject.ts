@@ -9,9 +9,11 @@ import { answer } from '../../../lib/answer';
 import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   fullLevel,
+  type Rendered,
   rawLevel,
   readingAt,
   structuredValue,
@@ -109,16 +111,22 @@ export const TOOL_DEFINITION = {
  * migration: a header and one line per hit, the code as SAP sent it, known
  * or not; no hit answers nothing.
  */
-function hitLines(hits: readonly ISearchResult[]): string {
-  if (hits.length === 0) return '';
+function hitLines(hits: readonly ISearchResult[]): Rendered<string> {
+  if (hits.length === 0) return { answer: '', rendered: [] };
   const lines = ['name\ttype\tdescription\tpackage'];
+  const rendered: string[] = [];
   for (const h of hits) {
     lines.push(
       `${h.name}\t${h.type ?? h.unknownType}\t${h.description}\t${h.packageName ?? ''}`,
     );
+    rendered.push(hitIdentity(h));
   }
-  return lines.join('\n');
+  return { answer: lines.join('\n'), rendered };
 }
+
+/** A hit's identity: its type (the code SAP sent, known or not) and name. */
+const hitIdentity = (h: ISearchResult) =>
+  `${h.type ?? h.unknownType}|${h.name}`;
 
 /**
  * What `SearchObject` answers at each `detail`: the reading the search is
@@ -127,7 +135,15 @@ function hitLines(hits: readonly ISearchResult[]): string {
  * references since 0.28.0), written as lines.
  */
 const SEARCH_READINGS: DetailTable<XmlNode | string> = {
-  terse: formatted(utilSearchHits, hitLines),
+  // Every hit, or nothing (`completeAnswer`).
+  terse: formatted(
+    utilSearchHits,
+    completeAnswer(
+      'SearchObject',
+      (hits: readonly ISearchResult[]) => hits.map(hitIdentity),
+      hitLines,
+    ),
+  ),
   medium: fullLevel,
   full: fullLevel,
   raw: rawLevel,

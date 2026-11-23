@@ -8,6 +8,7 @@
 
 import assert from 'node:assert/strict';
 import { after, before, describe, it, mock } from 'node:test';
+import { servedDescription } from '../../../embeddable/BaseMcpServer';
 import { resetProcessLatchForTests } from '../../../lib/activeTools';
 import {
   batchable,
@@ -121,6 +122,21 @@ describe('the description builder', () => {
     assert.ok(text.endsWith(longRunning.text), text);
   });
 
+  it('writes the tag from its flag alone, before the purpose', () => {
+    const text = toolDescription({
+      tag: 'read-only',
+      purpose: purpose('Reads a class.'),
+      returns: [],
+    });
+    assert.equal(text, '[read-only] Reads a class.');
+    assert.equal(
+      toolDescription({ purpose: purpose('Reads a class.'), returns: [] }),
+      'Reads a class.',
+    );
+    // A tag written into the purpose is refused there: it comes from the flag.
+    assert.ok(purposeFaults('[read-only] Reads a class.').includes('says "["'));
+  });
+
   it('generates facts free of every form marker', () => {
     for (const fact of returnsOf({ shapes: [shapesOf<Reading>(schemas)] })) {
       assert.deepStrictEqual(factFaults(fact.text), [], fact.text);
@@ -136,6 +152,28 @@ describe('the description builder', () => {
     const text = toolDescription(parts);
     assert.equal(partsOfDescription(text), parts);
     assert.equal(partsOfDescription('Written whole.'), undefined);
+  });
+});
+
+describe('the batch sentence of an assembled description is its note', () => {
+  const parts = {
+    tag: 'read-only' as const,
+    purpose: purpose('Reads a class.'),
+    returns: [],
+  };
+
+  it('served where batches are recorded: assembled again with its batchable note', () => {
+    const served = servedDescription(toolDescription(parts), 'GetClass', true);
+    assert.equal(
+      served,
+      toolDescription({ ...parts, notes: [batchable('GetClass')] }),
+    );
+    assert.notEqual(partsOfDescription(served), undefined);
+  });
+
+  it('served elsewhere as it was assembled', () => {
+    const text = toolDescription(parts);
+    assert.equal(servedDescription(text, 'GetClass', false), text);
   });
 });
 
@@ -175,6 +213,10 @@ describe('every served tool is assembled, or still listed as not yet', () => {
           continue;
         }
         if (listed) faults.push(`${tool.name}: assembled, still listed`);
+        // Served exactly as assembled: nothing appended at registration.
+        if (toolDescription(parts) !== tool.description) {
+          faults.push(`${tool.name}: served text is not its assembled text`);
+        }
         for (const fault of purposeFaults(parts.purpose.text)) {
           faults.push(`${tool.name}: its purpose ${fault}`);
         }

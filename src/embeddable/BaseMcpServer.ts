@@ -119,6 +119,11 @@ import {
   isDebuggerOwnConnectionTool,
   recordableInDebugBatch,
 } from '../lib/debugger/ownConnectionTools.js';
+import {
+  batchable,
+  partsOfDescription,
+  toolDescription,
+} from '../lib/description';
 import { BackgroundRunHandlersGroup } from '../lib/handlers/groups/BackgroundRunHandlersGroup.js';
 import {
   type HandlerEntry,
@@ -2520,13 +2525,11 @@ export abstract class BaseMcpServer extends McpServer {
           this.registerTool(
             entry.toolDefinition.name,
             {
-              description:
-                sentenced && !runsBesideBatch(entry.toolDefinition.name)
-                  ? withBatchSentence(
-                      listed.description,
-                      entry.toolDefinition.name,
-                    )
-                  : listed.description,
+              description: servedDescription(
+                listed.description,
+                entry.toolDefinition.name,
+                sentenced && !runsBesideBatch(entry.toolDefinition.name),
+              ),
               inputSchema,
               ...listed.search,
             },
@@ -3706,4 +3709,26 @@ function destinationContextOf(
   if (context.masterSystem) stated.masterSystem = context.masterSystem;
   if (context.masterLanguage) stated.masterLanguage = context.masterLanguage;
   return stated;
+}
+
+/**
+ * The description a tool is served with: where the server records batches,
+ * its batch sentence too. An assembled description gets it as its
+ * `batchable` note, assembled again — so what is served is exactly an
+ * assembled text (plan step 10.1); one not yet assembled has it appended,
+ * as before (until its group of step 10.7 moves it).
+ */
+export function servedDescription(
+  description: string,
+  tool: string,
+  batched: boolean,
+): string {
+  if (!batched) return description;
+  const parts = partsOfDescription(description);
+  return parts === undefined
+    ? withBatchSentence(description, tool)
+    : toolDescription({
+        ...parts,
+        notes: [...(parts.notes ?? []), batchable(tool)],
+      });
 }

@@ -909,7 +909,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getobjectslist-read-only-search"></a>
 #### GetObjectsList (Read-Only / Search)
-**Description:** [read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
+**Description:** [read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope, for the identities of the objects. By default (detail terse) TSV of identifier rows (type, name, tech_name, uri), no description. With detail medium or full the description of each object is read from its own metadata in a second ADT batch envelope, where its type has a metadata endpoint. Runs on an ABAP session of its own. By default the call answers at once with a run_handle, whose result is read by that handle; with background false it answers the result in the call.
 
 **Source:** `src/handlers/search/readonly/handleGetObjectsList.ts`
 
@@ -920,7 +920,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `parent_name` (string, optional) - [read-only] Parent object name (with parent_tech_name and parent_type; or give objects)
 - `parent_tech_name` (string, optional) - [read-only] Parent technical name
 - `parent_type` (string, optional) - [read-only] Parent object type (e.g. PROG/P, FUGR)
-- `with_short_descriptions` (boolean, optional) - [read-only] Include short descriptions (default: true)
+- `with_short_descriptions` (boolean, optional) - [read-only] With detail medium or full: read each object's description from its metadata (default: true)
 
 ---
 
@@ -4098,7 +4098,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
 - `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - Table type description. When left out, table_type_name is used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one).
 - `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
 - `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
 - `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).
@@ -4153,7 +4153,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
 - `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - New table type description.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one).
 - `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
 - `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
 - `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).

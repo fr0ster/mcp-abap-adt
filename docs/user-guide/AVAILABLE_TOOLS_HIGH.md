@@ -2844,7 +2844,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
 - `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - Table type description. When left out, table_type_name is used.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one).
 - `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
 - `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
 - `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).
@@ -2899,7 +2899,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `data_type` (string, optional) - Built-in data type of the row (ttyp:builtInType/ttyp:dataType).
 - `decimals` (number, optional) - Decimal places of the built-in row type (ttyp:builtInType/ttyp:decimals).
 - `description` (string, optional) - New table type description.
-- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one).
 - `key_definition` (string, optional, one of: `standard`, `rowType`, `empty`, `notSpecified`) - Definition of the primary key (ttyp:primaryKey/ttyp:definition).
 - `key_kind` (string, optional, one of: `unique`, `nonUnique`, `notSpecified`) - Kind of the primary key (ttyp:primaryKey/ttyp:kind).
 - `length` (number, optional) - Length of the built-in row type (ttyp:builtInType/ttyp:length).

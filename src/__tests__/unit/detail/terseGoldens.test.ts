@@ -861,6 +861,37 @@ CASES['GetPackage a recorded package'] = async (detail) =>
     ),
   );
 
+// GetEnhancements with include_nested: a program, its includes node, two
+// includes — one read, one whose enhancements SAP refused (its probes the
+// only thing it holds).
+const PROGRAM_ROOT = `${xmlHead}<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT/><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>PROG/I</OBJECT_TYPE><NODE_ID>000010</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES></DATA></asx:values></asx:abap>`;
+CASES[
+  'GetEnhancements include_nested, the object holding only refused probes'
+] = async (detail) =>
+  answeredOf(
+    await handleGetEnhancements(
+      sequential([
+        REFUSED,
+        {
+          data: `${xmlHead}<program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZPROG" adtcore:type="PROG/P"/>`,
+        },
+        { data: NO_ENHANCEMENTS },
+        { data: PROGRAM_ROOT },
+        { data: level(node('PROG/I', 'ZINC_OK')) },
+        {
+          data: `${xmlHead}<include:abapInclude xmlns:include="http://www.sap.com/adt/programs/includes" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZINC_OK"><include:contextRef adtcore:uri="/sap/bc/adt/programs/programs/zprog" adtcore:type="PROG/P" adtcore:name="ZPROG"/></include:abapInclude>`,
+        },
+        { data: ENHANCEMENTS },
+      ]) as never,
+      {
+        object_name: 'ZPROG',
+        object_type: 'unknown-kind',
+        include_nested: true,
+        detail,
+      } as never,
+    ),
+  );
+
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';
   const expected: Record<string, Answered> = fs.existsSync(FIXTURE_SOURCE)

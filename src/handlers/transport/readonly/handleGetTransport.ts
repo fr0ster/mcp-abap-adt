@@ -43,14 +43,13 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
-  completeAnswer,
   type DetailTable,
+  entries,
   formatted,
   fullLevel,
-  identityOf,
   rawLevel,
   readingAt,
-  Written,
+  writeJson,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -105,15 +104,9 @@ interface TerseOptions {
  */
 function terseRequest(item: ITransportRequestItem, options: TerseOptions) {
   const request = item.header;
-  const tasks = item.tasks.map((task) => ({
-    number: task.header.number,
-    owner: task.header.owner,
-    status: task.header.status,
-    description: task.header.description,
-    object_count: task.objectCount,
-  }));
-  // The tasks, each identified by the number written.
-  return Written.json(
+  // Every task, one row each, written from the request's own list — none
+  // when the caller asked for their count alone.
+  return writeJson(
     {
       success: true,
       transport_number: options.number,
@@ -127,10 +120,21 @@ function terseRequest(item: ITransportRequestItem, options: TerseOptions) {
         target_system: request.target,
       },
     },
-    options.includeTasks ? { tasks } : {},
-    ['number'],
-    { task_count: tasks.length },
-  );
+    options.includeTasks ? { tasks: item.tasks } : {},
+    {
+      tasks: entries(
+        'tasks',
+        (task: ITransportRequestItem['tasks'][number]) => ({
+          number: task.header.number,
+          owner: task.header.owner,
+          status: task.header.status,
+          description: task.header.description,
+          object_count: task.objectCount,
+        }),
+      ),
+    },
+    { task_count: item.tasks.length },
+  ).answer;
 }
 
 /** An object row of a task, written or held: pgmid, type, name and position. */
@@ -141,10 +145,6 @@ interface ObjectRow {
   position?: string | undefined;
 }
 
-/** A row's identity: its pgmid, type, name and position. */
-const objectIdentity = (o: ObjectRow) =>
-  identityOf([o.pgmid ?? '', o.type ?? '', o.name ?? '', o.position ?? '']);
-
 /**
  * A task's terse answer: its header from `tm:task`, never the parent's, the
  * parent's header apart, and its objects as rows of pgmid, type, name and
@@ -154,18 +154,10 @@ const objectIdentity = (o: ObjectRow) =>
 function terseTask(item: ITransportTaskItem, options: TerseOptions) {
   const task = item.header;
   const parent = item.parent;
-  const objects: ObjectRow[] = item.objects.map((entry) => ({
-    pgmid: entry.pgmid,
-    type: entry.type,
-    name: entry.name,
-    position: entry.position,
-  }));
-  const incomplete: ObjectRow[] = (item.incompleteEntries ?? []).map(
-    incompleteRow,
-  );
-  // The objects and the incomplete ones, each identified by the fields
-  // written.
-  return Written.json(
+  const incompleteCount = (item.incompleteEntries ?? []).length;
+  // The objects and the incomplete ones, one entry each, written from the
+  // task's own lists — none when the caller asked for their count alone.
+  return writeJson(
     {
       success: true,
       transport_number: options.number,
@@ -185,33 +177,27 @@ function terseTask(item: ITransportTaskItem, options: TerseOptions) {
         target_system: parent?.target,
       },
     },
-    !options.includeObjects
-      ? {}
-      : incomplete.length > 0
-        ? { objects, incomplete_objects: incomplete }
-        : { objects },
-    ['pgmid', 'type', 'name', 'position'],
+    options.includeObjects
+      ? { objects: item.objects, incompleteEntries: item.incompleteEntries }
+      : {},
+    {
+      objects: entries(
+        'objects',
+        (entry: ITransportTaskItem['objects'][number]): ObjectRow => ({
+          pgmid: entry.pgmid,
+          type: entry.type,
+          name: entry.name,
+          position: entry.position,
+        }),
+      ),
+      incompleteEntries: entries('incompleteEntries', incompleteRow, {
+        as: 'incomplete_objects',
+        omitEmpty: true,
+      }),
+    },
     // Every entry SAP lists, one without a name or a type included.
-    { object_count: objects.length + incomplete.length },
-  );
-}
-
-/**
- * Every item a transport's answer must list: a request's tasks, or a task's
- * objects and the entries it lists without a name or a type — none when
- * the caller asked for their count alone (`include_tasks` or
- * `include_objects` false).
- */
-function heldItems(item: ITransportItem, options: TerseOptions): string[] {
-  if (item.kind === 'request') {
-    if (!options.includeTasks) return [];
-    return item.tasks.map((task) => identityOf([task.header.number]));
-  }
-  if (!options.includeObjects) return [];
-  return [
-    ...item.objects.map(objectIdentity),
-    ...(item.incompleteEntries ?? []).map(objectIdentity),
-  ];
+    { object_count: item.objects.length + incompleteCount },
+  ).answer;
 }
 
 /**
@@ -271,14 +257,9 @@ function transportReadings(options: TerseOptions): DetailTable<TransportRead> {
       shown:
         item === undefined
           ? undefined
-          : completeAnswer(
-              'GetTransport',
-              (held: ITransportItem) => heldItems(held, options),
-              (held: ITransportItem): Written<object> =>
-                held.kind === 'task'
-                  ? terseTask(held, options)
-                  : terseRequest(held, options),
-            )(item),
+          : item.kind === 'task'
+            ? terseTask(item, options)
+            : terseRequest(item, options),
     })),
     medium: formatted(read, ({ item, answer }) => ({
       item,

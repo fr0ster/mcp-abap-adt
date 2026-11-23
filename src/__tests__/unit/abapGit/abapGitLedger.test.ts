@@ -12,6 +12,7 @@
  */
 
 import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
 import { once } from 'node:events';
 import {
   existsSync,
@@ -22,7 +23,12 @@ import {
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, it } from 'node:test';
+import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { promisify } from 'node:util';
+
+// The module object itself (not a namespace copy), so mock.method reaches the helper's calls.
+import fsModule = require('node:fs');
+
 import {
   AbapGitLedger,
   acquireRunLock,
@@ -567,7 +573,10 @@ describe("the system's identity", () => {
 });
 
 describe("the runner's stop request", () => {
-  it('aborts the wait signal when the stop file appears, and at once when it is there', async () => {
+  // Bounded: a missed stop file must fail the case, never hang the run.
+  it('aborts the wait signal when the stop file appears, and at once when it is there', {
+    timeout: 10_000,
+  }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
     try {
       const stopFile = join(dir, 'stop');
@@ -579,6 +588,62 @@ describe("the runner's stop request", () => {
       stop.close();
       assert.equal(stopSignalOf(stopFile).signal.aborted, true);
       assert.equal(stopSignalOf(undefined).signal.aborted, false);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("the runner's stop request: polling, no FSEvents", () => {
+  it('a stop file already there aborts at once', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
+    try {
+      const stopFile = join(dir, 'stop');
+      writeFileSync(stopFile, 'interrupted');
+      const stop = stopSignalOf(stopFile);
+      assert.equal(stop.signal.aborted, true);
+      stop.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('watches the file by stat polling, and close stops it', () => {
+    const watched = mock.method(fsModule, 'watchFile');
+    const unwatched = mock.method(fsModule, 'unwatchFile');
+    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
+    try {
+      const stopFile = join(dir, 'stop');
+      const stop = stopSignalOf(stopFile);
+      assert.equal(watched.mock.callCount(), 1);
+      assert.equal(watched.mock.calls[0]?.arguments[0], stopFile);
+      stop.close();
+      assert.equal(unwatched.mock.callCount(), 1);
+      assert.equal(unwatched.mock.calls[0]?.arguments[0], stopFile);
+      assert.equal(
+        unwatched.mock.calls[0]?.arguments.at(-1),
+        watched.mock.calls[0]?.arguments.at(-1),
+      );
+    } finally {
+      watched.mock.restore();
+      unwatched.mock.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('an open watch keeps no process alive: a node that opens one and returns exits by itself', {
+    timeout: 20_000,
+  }, async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
+    try {
+      const helper = require.resolve('../../integration/helpers/abapGitLedger');
+      const script = `const { stopSignalOf } = require(${JSON.stringify(helper)}); stopSignalOf(${JSON.stringify(join(dir, 'stop'))}); process.stdout.write('opened');`;
+      const { stdout } = await promisify(execFile)(
+        process.execPath,
+        ['-e', script],
+        { timeout: 15_000 },
+      );
+      assert.equal(stdout, 'opened');
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

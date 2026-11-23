@@ -47,7 +47,8 @@ import {
   readFileSync,
   renameSync,
   unlinkSync,
-  watch,
+  unwatchFile,
+  watchFile,
   writeFileSync,
 } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -536,11 +537,16 @@ export function isRouteRefusal(answer: {
   );
 }
 
+/** How often the stop file is polled: short, and the poll keeps no process alive. */
+const STOP_POLL_MS = 100;
+
 /**
  * A signal the runner's stop request aborts (its stop file, `file`, written
  * on the first interrupt): aborted at once when the file is there, else when
- * it appears in its directory (`fs.watch`, no timer). `close` stops
- * watching. Without a stop file the signal never aborts.
+ * a stat poll sees it (`fs.watchFile`, unreferenced, the same on every OS —
+ * `fs.watch` rides FSEvents on macOS, whose stream starts asynchronously
+ * and can miss a file created right after it returns). `close` stops the
+ * poll. Without a stop file the signal never aborts.
  */
 export function stopSignalOf(file: string | undefined): {
   readonly signal: AbortSignal;
@@ -554,13 +560,17 @@ export function stopSignalOf(file: string | undefined): {
     controller.abort();
     return { signal: controller.signal, close: () => {} };
   }
-  const watcher = watch(dirname(file), () => {
+  const listener = () => {
     if (existsSync(file)) {
+      unwatchFile(file, listener);
       controller.abort();
-      watcher.close();
     }
-  });
-  return { signal: controller.signal, close: () => watcher.close() };
+  };
+  watchFile(file, { interval: STOP_POLL_MS, persistent: false }, listener);
+  return {
+    signal: controller.signal,
+    close: () => unwatchFile(file, listener),
+  };
 }
 
 /** What cleaning up one ledger entry needs, injected by the suite. */

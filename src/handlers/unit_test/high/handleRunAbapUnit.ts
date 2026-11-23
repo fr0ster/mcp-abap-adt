@@ -1,5 +1,6 @@
 import * as z from 'zod';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { wireAnswer } from '../../../lib/detail';
+import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { WAIT_FIELD } from '../shared/runner';
 import { RUN_TARGET_FIELD } from '../shared/runTarget';
 /**
@@ -106,7 +107,23 @@ export const TOOL_DEFINITION = {
   }),
 } as const;
 
+/**
+ * The tool's answer; at `raw` what ADT sent: the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleRunAbapUnit(
+  context: HandlerContext,
+  args: z.output<typeof TOOL_DEFINITION.inputSchema>,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredRunAbapUnit(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredRunAbapUnit(context, args);
+}
+
+async function answeredRunAbapUnit(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {

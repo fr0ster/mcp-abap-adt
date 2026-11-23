@@ -1,9 +1,14 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { wireAnswer } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { readGivenRun, unfinishedRun } from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
@@ -32,7 +37,23 @@ export const TOOL_DEFINITION = {
 
 type GetCdsUnitTestResultArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent: the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetCdsUnitTestResult(
+  context: HandlerContext,
+  args: GetCdsUnitTestResultArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetCdsUnitTestResult(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetCdsUnitTestResult(context, args);
+}
+
+async function answeredGetCdsUnitTestResult(
   context: HandlerContext,
   args: GetCdsUnitTestResultArgs,
 ) {
@@ -66,8 +87,7 @@ export async function handleGetCdsUnitTestResult(
             success: true,
             run_id,
             finished: true,
-            run_result:
-              detail === 'raw' ? outcome.result.raw : outcome.result.value,
+            run_result: outcome.result.value,
           },
   );
 }

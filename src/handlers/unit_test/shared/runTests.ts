@@ -160,8 +160,8 @@ export async function waitForRun(
  * What a run tool answers: the result of a run SAP answered `FINISHED`; the
  * run id and SAP's status for a run a long-polled read answered
  * `NOT_STARTED`; the run id
- * alone for a run it did not wait for. `raw` answers the wire document,
- * `terse` and `full` the parse — no fixture proves a further reduction of a
+ * alone for a run it did not wait for. Every level reached here answers
+ * the parse (`raw` is the run's wire documents, `wireAnswer`) — no fixture proves a further reduction of a
  * test-run result is safe.
  */
 export function projectRun(detail: 'terse' | 'full' | 'raw') {
@@ -173,7 +173,7 @@ export function projectRun(detail: 'terse' | 'full' | 'raw') {
       success: true,
       run_id: run.runId,
       finished: true,
-      run_result: detail === 'raw' ? waited.result.raw : waited.result.value,
+      run_result: waited.result.value,
     };
   };
 }

@@ -1,10 +1,19 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { type AnswerTable, answerAt, wireAnswer } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
-import { readGivenRun, unfinishedRun } from '../shared/pollRun';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
+import {
+  type RunOutcome,
+  readGivenRun,
+  unfinishedRun,
+} from '../shared/pollRun';
 import { type ResultOnceArgs, readResultOnce } from '../shared/resultOnce';
 import { testRunner } from '../shared/runTests';
 
@@ -31,7 +40,23 @@ export const TOOL_DEFINITION = {
 
 type GetUnitTestResultArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent: the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetUnitTestResult(
+  context: HandlerContext,
+  args: GetUnitTestResultArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetUnitTestResult(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetUnitTestResult(context, args);
+}
+
+async function answeredGetUnitTestResult(
   context: HandlerContext,
   args: GetUnitTestResultArgs,
 ) {
@@ -61,23 +86,28 @@ export async function handleGetUnitTestResult(
             format,
           }),
       ),
-    // Task 28 fix round 1: `getResult`'s slot (`result`) is `structured` in
-    // `READING_BY_SLOT`, so `outcome.result` is a real `AdtReading`, not a
-    // bare value — `detail` was owed and missing. `raw` answers the wire
-    // document; `terse`/`full` both answer the parse (no fixture proves a
-    // safe further reduction of a test-run result — see this tool's own
-    // description above), so `raw` is where the parameter genuinely differs.
-    (outcome) =>
-      !outcome.finished
-        ? unfinishedRun(run_id, outcome.runStatus)
-        : {
-            success: true,
-            run_id,
-            finished: true,
-            run_result:
-              detail === 'raw' ? outcome.result.raw : outcome.result.value,
-          },
+    answerAt(resultAnswers(run_id), levelOf(args)),
   );
+}
+
+/**
+ * The run's answer per level: every level reached answers the parse (no
+ * fixture proves a safe further reduction of a test-run result); `raw`
+ * never reaches this table — its documents are answered by `wireAnswer`.
+ */
+function resultAnswers<T>(
+  runId: string,
+): AnswerTable<RunOutcome<{ value: T }>, object> {
+  const parsed = (outcome: RunOutcome<{ value: T }>) =>
+    !outcome.finished
+      ? unfinishedRun(runId, outcome.runStatus)
+      : {
+          success: true,
+          run_id: runId,
+          finished: true,
+          run_result: outcome.result.value,
+        };
+  return { terse: parsed, medium: parsed, full: parsed, raw: parsed };
 }
 
 /**

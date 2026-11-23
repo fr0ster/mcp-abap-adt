@@ -194,7 +194,8 @@ describe('compact unit-test results are read once', () => {
           UNFINISHED_RESULT,
         );
         assert.deepStrictEqual(raw.sent, [RESULT_GET]);
-        assert.equal(jsonOf(raw.answer).run_result, UNFINISHED_RESULT);
+        // raw is what ADT sent: the one result document, nothing around it.
+        assert.equal(raw.answer?.content?.[0]?.text, UNFINISHED_RESULT);
       });
     });
   }

@@ -1,5 +1,6 @@
 import * as z from 'zod';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { wireAnswer } from '../../../lib/detail';
+import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { RUNNER_FIELD, SCOPE_FIELD, WAIT_FIELD } from '../shared/runner';
 /**
  * RunProgramUnitTest — run every ABAP Unit test of a report, in its source or
@@ -35,7 +36,25 @@ export const TOOL_DEFINITION = {
 
 type RunProgramUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent: the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleRunProgramUnitTest(
+  context: HandlerContext,
+  args: RunProgramUnitTestArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      context.connection,
+      args?.runner === 'sync' ? 'one' : 'assembled',
+      () => answeredRunProgramUnitTest(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredRunProgramUnitTest(context, args);
+}
+
+async function answeredRunProgramUnitTest(
   context: HandlerContext,
   args: RunProgramUnitTestArgs,
 ) {

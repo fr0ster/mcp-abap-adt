@@ -1,8 +1,13 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
+import { wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_SHAPE, detailOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_SHAPE,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
 import { readGivenRun, unfinishedRun } from '../shared/pollRun';
 import { testRunner } from '../shared/runTests';
@@ -20,7 +25,23 @@ export const TOOL_DEFINITION = {
 
 type GetCdsUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent — the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleGetCdsUnitTest(
+  context: HandlerContext,
+  args: GetCdsUnitTestArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredGetCdsUnitTest(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredGetCdsUnitTest(context, args);
+}
+
+async function answeredGetCdsUnitTest(
   context: HandlerContext,
   args: GetCdsUnitTestArgs,
 ) {
@@ -48,8 +69,7 @@ export async function handleGetCdsUnitTest(
         run_id,
         () => cdsUnitTest.getResult(run_id, { analyse: analyseException }),
       ),
-    // Task 28 fix round 1 — same finding, same fix as `GetUnitTest`: both
-    // readings behind this answer are `structured`, and `detail` was owed.
+    // As `GetUnitTest`: the parse of both readings; `raw` is answered above.
     (outcome) =>
       !outcome.finished
         ? unfinishedRun(run_id, outcome.runStatus)
@@ -57,10 +77,8 @@ export async function handleGetCdsUnitTest(
             success: true,
             run_id,
             finished: true,
-            run_status:
-              detail === 'raw' ? outcome.status.raw : outcome.status.value,
-            run_result:
-              detail === 'raw' ? outcome.result.raw : outcome.result.value,
+            run_status: outcome.status.value,
+            run_result: outcome.result.value,
           },
   );
 }

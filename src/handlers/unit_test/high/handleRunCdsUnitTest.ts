@@ -1,5 +1,6 @@
 import * as z from 'zod';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { wireAnswer } from '../../../lib/detail';
+import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { WAIT_FIELD } from '../shared/runner';
 /**
  * RunCdsUnitTest — run the ABAP Unit tests of a CDS view (the tests in its
@@ -27,7 +28,23 @@ export const TOOL_DEFINITION = {
 
 type RunCdsUnitTestArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent: the documents the call's
+ * reads answered, read with the tool at full (`wireAnswer`).
+ */
 export async function handleRunCdsUnitTest(
+  context: HandlerContext,
+  args: RunCdsUnitTestArgs,
+) {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(context.connection, 'assembled', () =>
+      answeredRunCdsUnitTest(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredRunCdsUnitTest(context, args);
+}
+
+async function answeredRunCdsUnitTest(
   context: HandlerContext,
   args: RunCdsUnitTestArgs,
 ) {

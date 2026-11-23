@@ -291,7 +291,8 @@ describe('Run* tools with runner sync: one request, the finished result', () => 
       detail: 'raw',
     });
 
-    assert.equal(payload(result).run_result, RESULT.data);
+    // One request, one document: raw is it, nothing of ours around it.
+    assert.equal(result.content[0].text, RESULT.data);
   });
 
   it("SAP's refusal is an error, with the step", async () => {

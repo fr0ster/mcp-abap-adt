@@ -183,4 +183,38 @@ describe('GetWhereUsed detail', () => {
     assert.equal(lines.filter((line) => line.startsWith('# object')).length, 2);
     assert.ok(lines.includes('# object CLAS/OC ZCL_Y'));
   });
+
+  // Codex round 8: an empty usageInformation is still a usage — the
+  // attribute's presence decides, never its value.
+  it('a nameless usage with usageInformation="" reaches terse by its uri', async () => {
+    const EMPTY = DOCUMENT.replace(
+      '</usagereferences:referencedObjects>',
+      `${ref('/sap/bc/adt/oo/classes/empty', 'CLAS/OC', '', 'ZPKG', '')}</usagereferences:referencedObjects>`,
+    );
+    for (const detail of ['terse', 'medium', 'full'] as const) {
+      const text = await whereUsed(detail, [EMPTY]);
+      assert.ok(text.includes('/sap/bc/adt/oo/classes/empty'), text);
+    }
+  });
+
+  // Codex round 8: several objects' text is written through `Written` —
+  // a name holding a line break adds no row.
+  it('several objects: a name with a line break adds no row', async () => {
+    const forged = 'ZCL_Y\nCLAS/OC\tZFORGED\t\t';
+    const text = await whereUsed(
+      'terse',
+      [DOCUMENT, DOCUMENT],
+      [
+        { object_name: 'ZCL_X', object_type: 'CLAS/OC' },
+        { object_name: forged, object_type: 'CLAS/OC' },
+      ],
+    );
+    const lines = text.split('\n');
+    assert.equal(
+      lines.filter((line) => line.startsWith('CLAS/OC\tZFORGED')).length,
+      0,
+      text,
+    );
+    assert.equal(lines.filter((line) => line.startsWith('# object')).length, 2);
+  });
 });

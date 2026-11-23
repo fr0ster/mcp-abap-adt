@@ -591,6 +591,7 @@ async function whereUsedOf(
         isError: false,
         content: [{ type: 'json', json: fullWhereUsedJson(result, typedArgs) }],
       });
+      readsOf.set(args, { result, args: typedArgs });
       return shown({ result, args: typedArgs });
     },
   );
@@ -708,6 +709,7 @@ async function whereUsedFromAnswers(
         isError: false,
         content: [{ type: 'json', json: fullWhereUsedJson(result, typedArgs) }],
       });
+      readsOf.set(given, { result, args: typedArgs });
       return shown({ result, args: typedArgs });
     },
   );
@@ -902,6 +904,13 @@ async function whereUsedInEnvelopes(
 
 const WHERE_USED_CONTEXT = { tool: 'GetWhereUsed', detail: 'terse' } as const;
 
+/**
+ * Each object's list as its single answer read it, by the target it was
+ * asked as: a list call writes every object's usages from these through
+ * `Written`, never by splicing the single answers' texts.
+ */
+const readsOf = new WeakMap<WhereUsedArgs, WhereUsedRead>();
+
 /** An answer's payload: its JSON, else its text. */
 function payloadOfAnswer(result: McpResult): JsonValue {
   return jsonOrText(result.content[0]?.text ?? '');
@@ -923,20 +932,55 @@ function listAnswer(
     readonly object_name: string;
     readonly object_type: string;
   }>,
+  targets: readonly WhereUsedArgs[],
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
   if (level === 'terse') {
-    const text = results
-      .map((result, i) => {
-        const asked = objects[i];
-        const head = `# object ${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`;
-        const body = result.content[0]?.text ?? '';
-        return result.isError
-          ? `${head}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
-          : `${head}\n${body}`;
-      })
-      .join('\n');
+    // Every object's text written through `Written`: its name escaped in
+    // its `# object` line, its usages as the single answer's rows, a
+    // failure as one escaped `# error` line — a name cannot add a row.
+    const reads = targets.map((target) => readsOf.get(target));
+    const answered = (i: number): WhereUsedRead | undefined =>
+      results[i]?.isError === true ? undefined : reads[i];
+    const text = completeAnswer(
+      'GetWhereUsed',
+      () =>
+        results.flatMap((_result, i) => {
+          const read = answered(i);
+          return read === undefined ? [] : heldUsages(read);
+        }),
+      () =>
+        Written.sections(
+          results.flatMap((result, i) => {
+            const asked = objects[i];
+            const read = answered(i);
+            const head = Written.text(
+              [
+                {
+                  head: 'object',
+                  value: `${asked?.object_type ?? ''} ${asked?.object_name ?? ''}`,
+                },
+              ],
+              [],
+            );
+            return [
+              head,
+              read === undefined
+                ? Written.text(
+                    [
+                      {
+                        head: 'error',
+                        value: JSON.stringify(payloadOfAnswer(result)),
+                      },
+                    ],
+                    [],
+                  )
+                : whereUsedRows(read.result),
+            ];
+          }),
+        ),
+    )(undefined);
     return { isError: false, content: [{ type: 'text', text }] };
   }
   const entries = results.map((result, i) => {
@@ -1046,7 +1090,7 @@ async function answeredGetWhereUsed(
       const outcome = await whereUsedInEnvelopes(context, targets, args);
       return 'ended' in outcome
         ? outcome.ended
-        : listAnswer(objects, outcome.answers, levelOf(args));
+        : listAnswer(objects, targets, outcome.answers, levelOf(args));
     },
     async () => {
       // One object after another, each as the single call reads it; a
@@ -1057,7 +1101,7 @@ async function answeredGetWhereUsed(
         if (endsList(result)) return result;
         results.push(result);
       }
-      return listAnswer(objects, results, levelOf(args));
+      return listAnswer(objects, targets, results, levelOf(args));
     },
   );
 }

@@ -149,13 +149,14 @@ export const whereUsedListReading = (
 ): WhereUsedListRead => {
   const read = utilWhereUsedReferences(answer);
   // A reference SAP lists without a name is kept when it carries an address
-  // and a usage — an object that uses the one asked, its URI what tells it
-  // apart (Codex round 7); one with neither is no reference.
+  // and a usage attribute — an object that uses the one asked, its URI what
+  // tells it apart (Codex round 7). The attribute's presence decides, never
+  // its value: `usageInformation=""` is a usage too (Codex round 8).
   const references: WhereUsedReference[] = read.references
     .filter(
       (reference) =>
         reference.name !== '' ||
-        (reference.uri !== '' && reference.usageInformation !== ''),
+        (reference.uri !== '' && reference.usageInformation !== undefined),
     )
     .map((reference) => ({
       name: reference.name,
@@ -163,7 +164,8 @@ export const whereUsedListReading = (
       uri: reference.uri || undefined,
       package_name: reference.packageName || undefined,
       responsible: reference.responsible || undefined,
-      usage_information: reference.usageInformation || undefined,
+      // As SAP sent it: an empty attribute stays a usage, `''`.
+      usage_information: reference.usageInformation,
     }));
   return {
     totalReferences: read.totalReferences,

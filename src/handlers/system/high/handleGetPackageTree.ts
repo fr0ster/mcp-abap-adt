@@ -30,7 +30,7 @@ import {
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { withLongToolAdvice } from '../../../lib/longTools';
 import {
-  DETAIL_SHAPE,
+  ASSEMBLED_DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
@@ -93,7 +93,7 @@ const FIELDS = {
     .describe(
       'Include diagnostic metadata in response (counts, types, hierarchy info). Default: false',
     ),
-  ...DETAIL_SHAPE,
+  ...ASSEMBLED_DETAIL_SHAPE,
 };
 
 /** Exactly one of `package_name` and a non-empty `package_names`. */
@@ -528,8 +528,13 @@ export async function handleGetPackageTree(
   args: GetPackageTreeArgs,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredGetPackageTree(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetPackageTree',
+        shape: 'assembled',
+      },
+      () => answeredGetPackageTree(context, { ...args, detail: 'full' }),
     );
   }
   return answeredGetPackageTree(context, args);

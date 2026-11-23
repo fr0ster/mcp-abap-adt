@@ -5,7 +5,7 @@ import { type AnswerTable, answerAt, wireAnswer } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  DETAIL_SHAPE,
+  ASSEMBLED_DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
       .enum(['abapunit', 'junit'])
       .optional()
       .describe('Result format: abapunit or junit.'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -49,8 +49,13 @@ export async function handleGetUnitTestResult(
   args: GetUnitTestResultArgs,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredGetUnitTestResult(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetUnitTestResult',
+        shape: 'assembled',
+      },
+      () => answeredGetUnitTestResult(context, { ...args, detail: 'full' }),
     );
   }
   return answeredGetUnitTestResult(context, args);

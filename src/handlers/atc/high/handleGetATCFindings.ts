@@ -59,9 +59,7 @@ export async function handleGetATCFindings(
       // `raw` is the document, which is the whole point of having the level:
       // a caller needing an attribute neither reading keeps (the finding's
       // own uri, its checksum, its processor) has it there.
-      if (detail === 'raw') {
-        return { success: true, worklist_id: worklistId, worklist: document };
-      }
+      if (detail === 'raw') return document;
       const reading = parseAtcWorklist(String(document ?? ''));
       return {
         success: true,

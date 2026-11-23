@@ -1,6 +1,9 @@
 import * as z from 'zod';
 import { wireAnswer } from '../../../lib/detail';
-import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { WAIT_FIELD } from '../shared/runner';
 import { RUN_TARGET_FIELD } from '../shared/runTarget';
 /**
@@ -103,7 +106,7 @@ export const TOOL_DEFINITION = {
       .optional()
       .describe('Durations the run accepts.'),
     wait: WAIT_FIELD,
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -116,8 +119,13 @@ export async function handleRunAbapUnit(
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredRunAbapUnit(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'RunAbapUnit',
+        shape: 'assembled',
+      },
+      () => answeredRunAbapUnit(context, { ...args, detail: 'full' }),
     );
   }
   return answeredRunAbapUnit(context, args);

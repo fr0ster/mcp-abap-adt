@@ -51,9 +51,8 @@ export async function handleGetATCResult(
     { tool: 'GetATCResult', detail },
     () => atc.getResult(displayId, { analyse: analyseException }),
     (document) => {
-      if (detail === 'raw') {
-        return { success: true, display_id: displayId, result: document };
-      }
+      // raw: the result document as SAP sent it, nothing of ours around it.
+      if (detail === 'raw') return document;
       const reading = parseAtcResult(String(document ?? ''));
       return {
         success: true,

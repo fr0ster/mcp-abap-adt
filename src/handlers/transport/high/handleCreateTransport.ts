@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import { createArguments } from '../../../lib/handlers/createArguments';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * CreateTransport Handler - Create ABAP Transport Request
  *
@@ -34,12 +34,14 @@ import {
   failureEntry,
   isCredentialFailure,
   isCredentialPayload,
+  type McpResult,
 } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   type DetailTable,
   type LevelReading,
   readingAt,
+  wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -121,16 +123,38 @@ export const TOOL_DEFINITION = {
       .describe(
         "The type given to the request's task: S — Development/Correction (default), R — Repair, X — Unclassified, as SAP creates it.",
       ),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
 type CreateTransportArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
+/**
+ * The tool's answer; at `raw` what ADT sent (`wireAnswer`): the documents
+ * the call's requests answered — the create's, and the request read back,
+ * so a failed read-back shows as the missing document.
+ */
 export async function handleCreateTransport(
   context: HandlerContext,
   args: CreateTransportArgs,
-) {
+): Promise<McpResult> {
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'CreateTransport',
+        shape: 'assembled',
+      },
+      () => answeredCreateTransport(context, { ...args, detail: 'full' }),
+    );
+  }
+  return answeredCreateTransport(context, args);
+}
+
+async function answeredCreateTransport(
+  context: HandlerContext,
+  args: CreateTransportArgs,
+): Promise<McpResult> {
   const { connection, logger } = context;
 
   if (!args?.description) {
@@ -205,8 +229,7 @@ export async function handleCreateTransport(
       (created) => (settled) => terseCreatedTransport(created, settled),
     ),
     // full the parse of the create's answer, a failed read-back's note
-    // beside it; raw what ADT sent — the create's document and the request
-    // read back, so a failed read-back shows as the missing document.
+    // beside it.
     full: createdAt((created, raw) => (settled) => {
       const parsed = parseStructure(raw) ?? raw;
       return settled.readBackFailed === undefined
@@ -219,12 +242,9 @@ export async function handleCreateTransport(
             ),
           };
     }),
-    raw: createdAt(
-      (_created, raw) => (settled) =>
-        JSON.stringify(
-          settled.readBack === undefined ? [raw] : [raw, settled.readBack],
-        ),
-    ),
+    // Never reached: raw is what ADT sent, recorded by `wireAnswer` (the
+    // handler, above).
+    raw: createdAt((created) => (settled) => terseNumbers(created, settled)),
   };
   type Terse =
     | ReturnType<typeof terseCreatedTransport>

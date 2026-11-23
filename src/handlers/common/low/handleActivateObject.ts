@@ -213,7 +213,7 @@ function activateObjectSchema(variant: ProjectionVariant) {
       .default('terse')
       .optional()
       .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it). For a group activation (more than one object, or a type this tool cannot map to a single family) run in the background: terse its verdict and messages, medium the run with its id and status, full also the objects sent; raw the JSON array of the documents its reads answered, in read order.',
+        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one). For a group activation (more than one object, or a type this tool cannot map to a single family) run in the background: terse its verdict and messages, medium the run with its id and status, full also the objects sent.',
       ),
   });
 }
@@ -664,16 +664,17 @@ export async function handleActivateObject(
 
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);
 
-  if ('single' in plan)
-    return activateSingle(context, plan.single, detail, preaudit, tool);
-
-  // A group activation assembles several reads (discovery, the run, its
-  // results): at `raw` the documents, as SAP sent them, in read order.
+  // An activation assembles its reads (a group's discovery, its run and
+  // results; one object's activation): at `raw` the documents, as SAP sent
+  // them, in read order — the tool's shape, whichever path the call takes.
   if (detail === 'raw') {
-    return wireAnswer(connection, 'assembled', () =>
+    return wireAnswer({ connection, tool, shape: 'assembled' }, () =>
       handleActivateObject(context, { ...params, detail: 'full' }, tool),
     );
   }
+
+  if ('single' in plan)
+    return activateSingle(context, plan.single, detail, preaudit, tool);
 
   // Group activation: multiple objects, or a single object of a type this
   // dispatcher does not map to a family client. The endpoint is the system's

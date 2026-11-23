@@ -24,7 +24,7 @@ import { createAdtClient } from '../../../lib/clients';
 import { answerAt, wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  DETAIL_SHAPE,
+  ASSEMBLED_DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
     '[read-only] List the includes (TOP, custom) of an ABAP function group, read at its active version.',
   inputSchema: z.object({
     function_group_name: z.string().describe('Function group name.'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -58,8 +58,14 @@ export async function handleListFunctionGroupIncludes(
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredListFunctionGroupIncludes(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'ListFunctionGroupIncludes',
+        shape: 'assembled',
+      },
+      () =>
+        answeredListFunctionGroupIncludes(context, { ...args, detail: 'full' }),
     );
   }
   return answeredListFunctionGroupIncludes(context, args);

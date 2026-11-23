@@ -19,7 +19,7 @@ import {
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import {
-  DETAIL_SHAPE,
+  ASSEMBLED_DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
@@ -58,7 +58,7 @@ const FIELDS = {
     .boolean()
     .optional()
     .describe('[read-only] Include short descriptions (default: true)'),
-  ...DETAIL_SHAPE,
+  ...ASSEMBLED_DETAIL_SHAPE,
 };
 
 type ObjectsListFields = z.output<z.ZodObject<typeof FIELDS>>;
@@ -566,8 +566,13 @@ export async function handleGetObjectsList(
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredGetObjectsList(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetObjectsList',
+        shape: 'assembled',
+      },
+      () => answeredGetObjectsList(context, { ...args, detail: 'full' }),
     );
   }
   return answeredGetObjectsList(context, args);

@@ -30,7 +30,7 @@ import { createAdtClient } from '../../../lib/clients';
 import { answerAt, wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  DETAIL_SHAPE,
+  ASSEMBLED_DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
@@ -51,7 +51,7 @@ export const TOOL_DEFINITION = {
     '[read-only] List the function modules of an ABAP function group, read at its active version.',
   inputSchema: z.object({
     function_group_name: z.string().describe('Function group name.'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -64,8 +64,13 @@ export async function handleListFunctionModules(
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredListFunctionModules(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'ListFunctionModules',
+        shape: 'assembled',
+      },
+      () => answeredListFunctionModules(context, { ...args, detail: 'full' }),
     );
   }
   return answeredListFunctionModules(context, args);

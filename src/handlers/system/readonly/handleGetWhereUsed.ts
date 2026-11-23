@@ -70,7 +70,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type JsonValue, jsonFields, jsonOrText } from '../../../lib/json';
 import { withLongToolAdvice } from '../../../lib/longTools';
 import {
-  DETAIL_SHAPE,
+  ASSEMBLED_DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
@@ -298,7 +298,7 @@ function whereUsedFields(variant: ProjectionVariant) {
       .describe(
         "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
       ),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   };
 }
 
@@ -949,10 +949,16 @@ export async function handleGetWhereUsed(
   context: HandlerContext,
   args: WhereUsedArgs,
 ) {
-  // One object is one usage read, answered as it came by its own `raw`.
-  if (levelOf(args) === 'raw' && args.objects !== undefined) {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredGetWhereUsed(context, { ...args, detail: 'full' }),
+  // Every call assembles reads — the scope with the usages, or several
+  // objects: at `raw` the array of the documents, whatever the call.
+  if (levelOf(args) === 'raw') {
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetWhereUsed',
+        shape: 'assembled',
+      },
+      () => answeredGetWhereUsed(context, { ...args, detail: 'full' }),
     );
   }
   return answeredGetWhereUsed(context, args);

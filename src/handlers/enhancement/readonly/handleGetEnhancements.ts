@@ -50,7 +50,10 @@ import {
   type JsonValue,
   jsonOrText,
 } from '../../../lib/json';
-import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { includeContextUriOf } from '../../../lib/strategies/metadataFields';
 import {
   childNodesOf,
@@ -166,7 +169,7 @@ export const TOOL_DEFINITION = {
       .describe(
         '[read-only] With include_nested: how many includes are read (default 50)',
       ),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -1939,8 +1942,13 @@ export async function handleGetEnhancements(
   args: GetEnhancementsArgs,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredGetEnhancements(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetEnhancements',
+        shape: 'assembled',
+      },
+      () => answeredGetEnhancements(context, { ...args, detail: 'full' }),
     );
   }
   return answeredGetEnhancements(context, args);

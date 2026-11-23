@@ -52,7 +52,7 @@ import {
 } from '../../../lib/longTools';
 import { afterLast } from '../../../lib/plainText';
 import {
-  DETAIL_SHAPE,
+  ASSEMBLED_DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
@@ -155,7 +155,7 @@ const FIELDS = {
     .describe(
       'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
     ),
-  ...DETAIL_SHAPE,
+  ...ASSEMBLED_DETAIL_SHAPE,
 };
 
 /**
@@ -630,8 +630,9 @@ export async function handleRuntimeListFeedPage(
 ) {
   // One page is one read: at `raw` its document, as SAP sent it.
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'one', () =>
-      answeredFeedPage(context, { ...args, detail: 'full' }, tool),
+    return wireAnswer(
+      { connection: context.connection, tool: tool, shape: 'one' },
+      () => answeredFeedPage(context, { ...args, detail: 'full' }, tool),
     );
   }
   return answeredFeedPage(context, args, tool);
@@ -944,10 +945,11 @@ export async function handleRuntimeListFeeds(
 ) {
   if (levelOf(args) === 'raw') {
     return wireAnswer(
-      context.connection,
-      args?.feed_types !== undefined || PAGED_FEEDS.has(String(args?.feed_type))
-        ? 'assembled'
-        : 'one',
+      {
+        connection: context.connection,
+        tool: 'RuntimeListFeeds',
+        shape: 'assembled',
+      },
       () => answeredRuntimeListFeeds(context, { ...args, detail: 'full' }),
     );
   }

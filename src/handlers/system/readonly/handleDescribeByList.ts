@@ -4,7 +4,7 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
+import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
 
 /** The refusal of a call without objects. */
 const OBJECTS_REQUIRED =
@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
       .refine((objects) => objects.length > 0, {
         message: OBJECTS_REQUIRED,
       }),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -419,8 +419,13 @@ export async function handleDescribeByList(
   args: DescribeArgs,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredDescribeByList(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'DescribeByList',
+        shape: 'assembled',
+      },
+      () => answeredDescribeByList(context, { ...args, detail: 'full' }),
     );
   }
   return answeredDescribeByList(context, args);

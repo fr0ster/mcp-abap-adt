@@ -1,6 +1,9 @@
 import * as z from 'zod';
 import { wireAnswer } from '../../../lib/detail';
-import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { WAIT_FIELD } from '../shared/runner';
 /**
  * RunCdsUnitTest — run the ABAP Unit tests of a CDS view (the tests in its
@@ -22,7 +25,7 @@ export const TOOL_DEFINITION = {
   inputSchema: z.object({
     class_name: z.string().describe('Test class of the CDS view.'),
     wait: WAIT_FIELD,
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -37,8 +40,13 @@ export async function handleRunCdsUnitTest(
   args: RunCdsUnitTestArgs,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredRunCdsUnitTest(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'RunCdsUnitTest',
+        shape: 'assembled',
+      },
+      () => answeredRunCdsUnitTest(context, { ...args, detail: 'full' }),
     );
   }
   return answeredRunCdsUnitTest(context, args);

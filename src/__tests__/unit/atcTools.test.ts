@@ -34,6 +34,7 @@ mockModuleExports(require.resolve('@mcp-abap-adt/adt-clients'), {
 });
 
 import { handleGetATCFindings } from '../../handlers/atc/high/handleGetATCFindings';
+import { handleGetATCResult } from '../../handlers/atc/high/handleGetATCResult';
 import { handleGetATCRunStatus } from '../../handlers/atc/high/handleGetATCRunStatus';
 import {
   handleRunATC,
@@ -738,7 +739,21 @@ describe('the two readers', () => {
       worklist_id: 'WL1',
       detail: 'raw',
     });
-    assert.equal(payload(raw).worklist, WORKLIST);
+    // raw: the worklist as SAP sent it, nothing of ours around it.
+    assert.equal(raw.content[0].text, WORKLIST);
+  });
+
+  // One read, one document: GetATCResult's raw is the result document as
+  // SAP sent it, no JSON of ours around it (Codex round 5, P1-3).
+  it('GetATCResult hands back the result document as is on raw', async () => {
+    const RESULT_DOCUMENT = '<?xml version="1.0"?><atcresult:result/>';
+    atc = { getResult: async () => okResponse(RESULT_DOCUMENT) };
+    const raw: any = await handleGetATCResult(context as any, {
+      display_id: 'D1',
+      detail: 'raw',
+    });
+    assert.equal(raw.isError, false);
+    assert.equal(raw.content[0].text, RESULT_DOCUMENT);
   });
 
   it('says so when the worklist is empty, rather than reading as clean', async () => {

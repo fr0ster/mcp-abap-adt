@@ -144,8 +144,11 @@ describe('GetWhereUsed detail', () => {
     assert.equal(answer.references[3].uri, '/sap/bc/adt/oo/classes/zcl_user');
   });
 
-  it('raw: the document as SAP sent it', async () => {
-    assert.equal(await whereUsed('raw'), DOCUMENT);
+  // GetWhereUsed assembles reads (the scope beside the usages, several
+  // objects), so its raw is the array of the documents, whatever the call
+  // (Codex round 5, P1-3): one object's call too.
+  it('raw: the array of the documents as SAP sent them, one object too', async () => {
+    assert.equal(await whereUsed('raw'), JSON.stringify([DOCUMENT]));
   });
 
   it('several objects at terse: one text, each under its object line', async () => {

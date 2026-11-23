@@ -1,6 +1,9 @@
 import * as z from 'zod';
 import { wireAnswer } from '../../../lib/detail';
-import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { RUNNER_FIELD, SCOPE_FIELD, WAIT_FIELD } from '../shared/runner';
 /**
  * RunFunctionGroupUnitTest — run every ABAP Unit test of a function group and
@@ -30,7 +33,7 @@ export const TOOL_DEFINITION = {
     runner: RUNNER_FIELD,
     wait: WAIT_FIELD,
     scope: SCOPE_FIELD,
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -48,8 +51,11 @@ export async function handleRunFunctionGroupUnitTest(
 ) {
   if (levelOf(args) === 'raw') {
     return wireAnswer(
-      context.connection,
-      args?.runner === 'sync' ? 'one' : 'assembled',
+      {
+        connection: context.connection,
+        tool: 'RunFunctionGroupUnitTest',
+        shape: 'assembled',
+      },
       () =>
         answeredRunFunctionGroupUnitTest(context, { ...args, detail: 'full' }),
     );

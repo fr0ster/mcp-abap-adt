@@ -2,6 +2,7 @@ import * as z from 'zod';
 import {
   answerCaught,
   type FailureEntry,
+  type McpResult,
   thrownEntry,
 } from '../../../lib/answer';
 import {
@@ -24,7 +25,7 @@ import {
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import {
-  DETAIL_SHAPE,
+  ASSEMBLED_DETAIL_SHAPE,
   detailOf,
   levelOf,
 } from '../../../lib/strategies/detail';
@@ -70,7 +71,7 @@ const FIELDS = {
     .describe(
       "Include each object's description in the response. The walk's levels are then read as single requests, several at a time, rather than in ADT batch envelopes (default: false)",
     ),
-  ...DETAIL_SHAPE,
+  ...ASSEMBLED_DETAIL_SHAPE,
 };
 
 /** Exactly one of `package_name` and a non-empty `package_names`. */
@@ -304,8 +305,13 @@ export async function handleGetPackageContents(
   args: GetPackageContentsArgs,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredGetPackageContents(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetPackageContents',
+        shape: 'assembled',
+      },
+      () => answeredGetPackageContents(context, { ...args, detail: 'full' }),
     );
   }
   return answeredGetPackageContents(context, args);
@@ -314,7 +320,7 @@ export async function handleGetPackageContents(
 async function answeredGetPackageContents(
   context: HandlerContext,
   args: GetPackageContentsArgs,
-) {
+): Promise<McpResult> {
   const { connection, logger } = context;
   const shown = answerAt(CONTENTS_ANSWERS, levelOf(args));
   try {

@@ -58,7 +58,10 @@ import {
 } from '../../../lib/longTools';
 import { linesOf } from '../../../lib/plainText';
 import { includeNameOf } from '../../../lib/strategies/abapIncludeStatement';
-import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import {
   type FunctionGroupNodeSource,
   fetchFunctionGroupChildren,
@@ -180,7 +183,7 @@ function includesListFields(variant: ProjectionVariant) {
       .describe(
         '[read-only] If true, returns structured JSON with metadata and raw XML.',
       ),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   };
 }
 
@@ -1135,8 +1138,13 @@ export async function handleGetIncludesList(
   args: IncludesListArgs,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredGetIncludesList(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetIncludesList',
+        shape: 'assembled',
+      },
+      () => answeredGetIncludesList(context, { ...args, detail: 'full' }),
     );
   }
   return answeredGetIncludesList(context, args);

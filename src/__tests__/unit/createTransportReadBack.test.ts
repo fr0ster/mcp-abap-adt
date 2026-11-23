@@ -3,9 +3,9 @@
  * terse answers): a read-back that fails — refused, or an answer that is not
  * the request created — is answered as a success carrying the number, with
  * fixed words naming how to read it again, at terse, medium and full;
- * `full` is the parse of the create's answer. `raw` is what ADT sent: the
- * create's document and the request read back, so a failed read-back shows
- * as the missing document (the coordinator's ruling, Codex round 4).
+ * `full` is the parse of the create's answer. `raw` is what ADT sent
+ * (`wireAnswer`): every document SAP answered, so a refused read-back shows
+ * as the missing document.
  */
 
 import assert from 'node:assert/strict';
@@ -72,10 +72,17 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
       assert.equal(body.note, READ_BACK_WORDS(kind));
     });
 
-    it(`${label}: raw is the create's document alone — the read-back missing`, async () => {
+    // raw is every document SAP answered (`wireAnswer`): a refused
+    // read-back is missing; one SAP answered that is not the request is a
+    // document it sent, and is there.
+    it(`${label}: raw is the documents SAP answered — a refused read-back missing`, async () => {
       const answered = await run(readBack, 'raw');
       assert.equal(answered.isError === true, false, answered.content[0]?.text);
-      assert.equal(answered.content[0]?.text, JSON.stringify([CREATED]));
+      const refused = readBack.status !== undefined;
+      assert.equal(
+        answered.content[0]?.text,
+        JSON.stringify(refused ? [CREATED] : [CREATED, readBack.data]),
+      );
     });
 
     for (const detail of ['medium', 'full'] as const) {
@@ -108,7 +115,7 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
       ?.text;
     const raw = (await run({ data: `${head}<html/>` }, 'raw')).content[0]?.text;
     assert.notEqual(full, raw);
-    assert.equal(raw, JSON.stringify([CREATED]));
+    assert.equal(raw, JSON.stringify([CREATED, `${head}<html/>`]));
     assert.ok(!(full ?? '').includes('<tm:root'));
   });
 

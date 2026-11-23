@@ -48,7 +48,10 @@ import {
   linesOf,
   wordAt,
 } from '../../../lib/plainText';
-import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { endsTheCall } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { carryingFailure } from '../../../lib/strategies/step';
@@ -81,7 +84,7 @@ const FIELDS = {
     .describe(
       '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
     ),
-  ...DETAIL_SHAPE,
+  ...ASSEMBLED_DETAIL_SHAPE,
 };
 
 /**
@@ -1222,8 +1225,13 @@ export async function handleGetStructuresList(
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredGetStructuresList(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'GetStructuresList',
+        shape: 'assembled',
+      },
+      () => answeredGetStructuresList(context, { ...args, detail: 'full' }),
     );
   }
   return answeredGetStructuresList(context, args);

@@ -12,16 +12,36 @@ export type { AnswerDetail };
  * the answer is noise on a surface callers read to decide what to call. It
  * shapes the SUCCESS answer only; a failure carries everything at every level.
  */
-const DETAIL_WORDS =
-  'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: the document, or for a tool that assembles several reads a JSON array of the documents in read order).';
+const LEVEL_WORDS =
+  'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), ';
 
-/** The `detail` field of a tool's zod input schema. */
+/** `detail` of a tool that reads one document: raw is that document. */
+const DETAIL_WORDS = `${LEVEL_WORDS}"raw" (the document as ADT sent it).`;
+
+/** `detail` of a tool that assembles reads: raw is the array of them, one read too. */
+const ASSEMBLED_DETAIL_WORDS = `${LEVEL_WORDS}"raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one).`;
+
+/**
+ * The `detail` field of a tool's zod input schema — a tool that reads one
+ * document: its raw is that document. The raw shape is the tool's
+ * (`src/lib/detail/wire.ts`): a tool that assembles reads takes
+ * {@link ASSEMBLED_DETAIL_SHAPE}.
+ */
 export const DETAIL_SHAPE = {
   detail: z
     .enum(DETAIL_LEVELS)
     .default('terse')
     .optional()
     .describe(DETAIL_WORDS),
+};
+
+/** The `detail` field of a tool that assembles reads: its raw is the array of the documents. */
+export const ASSEMBLED_DETAIL_SHAPE = {
+  detail: z
+    .enum(DETAIL_LEVELS)
+    .default('terse')
+    .optional()
+    .describe(ASSEMBLED_DETAIL_WORDS),
 };
 
 /** What a tool's arguments say of the detail: the field `DETAIL_SHAPE` adds. */

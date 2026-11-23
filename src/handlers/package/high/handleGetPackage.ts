@@ -48,17 +48,19 @@ export async function handleGetPackage(
   return answer(
     { tool: 'GetPackage', detail },
     () => readPackageMetadata(client, { packageName }, version),
-    (metadata: AdtReading<string>) => ({
-      success: true,
-      package_name: packageName,
-      version,
-      part: 'metadata',
-      metadata:
-        detail === 'raw'
-          ? metadata.raw
-          : detail === 'full'
-            ? packageDetails(metadata.raw)
-            : packageSummary(metadata.raw),
-    }),
+    // raw: the metadata document as SAP sent it, nothing of ours around it.
+    (metadata: AdtReading<string>) =>
+      detail === 'raw'
+        ? metadata.raw
+        : {
+            success: true,
+            package_name: packageName,
+            version,
+            part: 'metadata',
+            metadata:
+              detail === 'full'
+                ? packageDetails(metadata.raw)
+                : packageSummary(metadata.raw),
+          },
   );
 }

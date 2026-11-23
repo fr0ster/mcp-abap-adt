@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import type { McpResult } from '../../../lib/answer';
 import { isRfcConnection } from '../../../lib/connectionKind';
 import {
   type AnswerTable,
@@ -29,7 +30,10 @@ import {
   skipSapAnswers,
   undecided,
 } from '../../../lib/search-source/readFailure';
-import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
+import {
+  ASSEMBLED_DETAIL_SHAPE,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -111,7 +115,7 @@ export const TOOL_DEFINITION = {
       .enum(['active', 'inactive', 'workingArea'])
       .optional()
       .describe('The version every source is read at. Default active.'),
-    ...DETAIL_SHAPE,
+    ...ASSEMBLED_DETAIL_SHAPE,
   }),
 } as const;
 
@@ -265,8 +269,13 @@ export async function handleSearchSource(
   args: SearchSourceArgs,
 ) {
   if (levelOf(args) === 'raw') {
-    return wireAnswer(context.connection, 'assembled', () =>
-      answeredSearchSource(context, { ...args, detail: 'full' }),
+    return wireAnswer(
+      {
+        connection: context.connection,
+        tool: 'SearchSource',
+        shape: 'assembled',
+      },
+      () => answeredSearchSource(context, { ...args, detail: 'full' }),
     );
   }
   return answeredSearchSource(context, args);
@@ -275,7 +284,7 @@ export async function handleSearchSource(
 async function answeredSearchSource(
   context: HandlerContext,
   args: SearchSourceArgs,
-) {
+): Promise<McpResult> {
   const { logger } = context;
   const level = levelOf(args);
   const shown = answerAt(SEARCH_SOURCE_ANSWERS, levelOf(args));

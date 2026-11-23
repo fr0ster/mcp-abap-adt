@@ -249,15 +249,19 @@ row SAP answered is answered. `detail` has four levels:
   package, a task, an object). An item's details come from that item's own tool.
 - `medium`: every field the reading read, without the document's leftovers (URIs, namespaces).
 - `full`: the whole parse, the answer as it was before `detail` where a tool did not take it.
-- `raw`: what ADT sent. A tool that makes one read answers that document as is. A tool that
-  assembles several reads — package contents and tree, the other repository walks, `SearchSource`,
+- `raw`: what ADT sent. The shape is the tool's, not the call's, and each tool's `detail`
+  description names it. A tool that reads one document answers that document as is. A tool that
+  assembles reads — package contents and tree, the other repository walks, `SearchSource`,
   `DescribeByList`, the include, structure and function group lists, `GetEnhancements`,
-  `GetWhereUsed` for several `objects`, `GetUnitTest`, `GetCdsUnitTest`, the paged runtime feeds
-  and several `feed_types` — answers a JSON array of the wire documents, in the order they were
-  read, each as ADT sent it: no parse, no projection, nothing of ours mixed in. `full` is the
-  whole parse, and the two levels never give the same answer. `CreateTransport` answers the
-  create's document and the request read back: at raw a failed read-back shows as the missing
-  document, and the note naming the failure is at `terse`, `medium` and `full`.
+  `GetWhereUsed`, `GetUnitTest`, `GetCdsUnitTest`, `GetUnitTestResult`, `GetCdsUnitTestResult`, the
+  unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `ActivateObjectLow` — always answers a JSON
+  array of the documents SAP answered to the call's requests, in read order, each as ADT sent it,
+  an array even when the call read one: no parse, no projection, nothing of ours mixed in. A
+  refused request's body is no document, so a refused read shows as the document missing — at
+  `CreateTransport`, a failed read-back. A body the connection hands over as an object is its JSON
+  text. Raw never hides an error: a call `full` refuses, or answers with an error explained in it,
+  is answered at `raw` exactly as at `full`. `full` is the whole parse, and the two levels never
+  give the same answer.
 
 An answer is the complete result or an error, never a partial one. Each formatter that reshapes
 a reading reports the items it wrote, by the reading's own identity, and they are compared with every

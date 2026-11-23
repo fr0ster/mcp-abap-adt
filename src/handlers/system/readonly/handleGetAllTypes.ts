@@ -13,14 +13,13 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   answered,
-  completeAnswer,
   type DetailTable,
   formatted,
   fullLevel,
-  identityOf,
   rawLevel,
   readingAt,
-  Written,
+  rows,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -51,24 +50,27 @@ export const TOOL_DEFINITION = {
  * 0.28.0 a name as written, an absent description absent).
  */
 const TYPE_READINGS: DetailTable<INamedItem[] | XmlNode | string> = {
-  // Every type the list held, or nothing (`completeAnswer`).
+  // Every type the list held, written by the listing writer.
   terse: formatted(
     utilNamedItems,
-    completeAnswer(
-      'GetAdtTypes',
-      (items: INamedItem[]) => items.map((item) => identityOf([item.name])),
-      (items: INamedItem[]) =>
-        Written.text(
-          [
-            { head: 'count', value: String(items.length) },
-            { header: ['name', 'description'] },
-            ...items.map((item) => ({
-              row: [item.name, (item.description ?? '').split('\n')[0] ?? ''],
-            })),
-          ],
-          [0],
-        ),
-    ),
+    (items: INamedItem[]) =>
+      writeListing({
+        heads: [{ head: 'count', value: String(items.length) }],
+        reading: { items },
+        lists: {
+          items: rows('items', {
+            columns: [
+              { name: 'name', cell: (item: INamedItem) => item.name },
+              {
+                name: 'description',
+                cell: (item: INamedItem) =>
+                  (item.description ?? '').split('\n')[0] ?? '',
+              },
+            ],
+            header: 'always',
+          }),
+        },
+      }).answer,
   ),
   medium: formatted(utilNamedItems, (items) => items),
   full: fullLevel,

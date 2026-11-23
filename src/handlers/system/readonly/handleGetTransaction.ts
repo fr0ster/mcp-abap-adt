@@ -2,12 +2,7 @@ import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import {
-  answerAt,
-  completeAnswer,
-  identityOf,
-  Written,
-} from '../../../lib/detail';
+import { answerAt, rows, writeListing } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   DETAIL_SHAPE,
@@ -77,10 +72,6 @@ export function transactionPropertiesOf(value: XmlRead): {
   };
 }
 
-/** A property's identity: its facet, name and text. */
-const propertyIdentity = (property: Record<string, string>) =>
-  identityOf([property.facet ?? '', property.name ?? '', property.text ?? '']);
-
 export async function handleGetTransaction(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
@@ -107,39 +98,45 @@ export async function handleGetTransaction(
         }),
     answerAt<AdtReading<XmlRead>, string | object>(
       {
-        // Every property the document held, or nothing (`completeAnswer`).
-        terse: completeAnswer(
-          'GetTransaction',
-          (reading: AdtReading<XmlRead>) =>
-            transactionPropertiesOf(reading.value).properties.map(
-              propertyIdentity,
-            ),
-          (reading: AdtReading<XmlRead>) => {
-            const { object, properties } = transactionPropertiesOf(
-              reading.value,
-            );
-            return Written.text(
-              [
-                { head: 'transaction', value: name },
-                ...(object?.text === undefined
-                  ? []
-                  : [{ head: 'text', value: object.text }]),
-                ...(object?.package === undefined
-                  ? []
-                  : [{ head: 'package', value: object.package }]),
-                { header: ['facet', 'name', 'text'] },
-                ...properties.map((property) => ({
-                  row: [
-                    property.facet ?? '',
-                    property.name ?? '',
-                    property.text ?? '',
-                  ],
-                })),
-              ],
-              [0, 1, 2],
-            );
-          },
-        ),
+        // Every property the document held, written by the listing writer.
+        terse: (reading: AdtReading<XmlRead>) => {
+          const read = transactionPropertiesOf(reading.value);
+          const { object } = read;
+          return writeListing({
+            heads: [
+              { head: 'transaction', value: name },
+              ...(object?.text === undefined
+                ? []
+                : [{ head: 'text', value: object.text }]),
+              ...(object?.package === undefined
+                ? []
+                : [{ head: 'package', value: object.package }]),
+            ],
+            reading: read,
+            lists: {
+              properties: rows('properties', {
+                columns: [
+                  {
+                    name: 'facet',
+                    cell: (property: Record<string, string>) =>
+                      property.facet ?? '',
+                  },
+                  {
+                    name: 'name',
+                    cell: (property: Record<string, string>) =>
+                      property.name ?? '',
+                  },
+                  {
+                    name: 'text',
+                    cell: (property: Record<string, string>) =>
+                      property.text ?? '',
+                  },
+                ],
+                header: 'always',
+              }),
+            },
+          }).answer;
+        },
         medium: (reading) => ({
           success: true,
           transaction_name: name,

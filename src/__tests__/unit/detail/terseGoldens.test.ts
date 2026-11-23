@@ -48,6 +48,7 @@ import type { DetailLevel } from '../../../lib/detail';
 import { substringLineMatch } from '../../../lib/search-source/lineScanner';
 import { runSearchSource } from '../../../lib/search-source/orchestrator';
 import { skipSapAnswers } from '../../../lib/search-source/readFailure';
+import { assembleTree } from '../../../lib/strategies/packageWalk';
 import { declareSystemKind } from '../../../lib/systemKind';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { recordingConnection } from '../../helpers/recordingConnection';
@@ -891,6 +892,21 @@ CASES[
       } as never,
     ),
   );
+
+// The package tree the writers write (`assembleTree`): an object of a
+// package the tree never reaches goes under the root — every walked object
+// in it (plan 9.3).
+CASES['assembleTree an object of a package the tree does not reach'] =
+  async () => ({
+    isError: false,
+    text: JSON.stringify(
+      assembleTree('P', [
+        { name: 'SUB', type: 'DEVC/K', packageName: 'P' },
+        { name: 'ZA', type: 'CLAS/OC', packageName: 'SUB' },
+        { name: 'ZORPHAN', type: 'PROG/P', packageName: 'ELSEWHERE' },
+      ]),
+    ),
+  });
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

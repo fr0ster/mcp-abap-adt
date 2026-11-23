@@ -538,5 +538,17 @@
   "GetEnhancements include_nested, the object holding only refused probes @full": {
     "isError": false,
     "text": "{\"main_object\":{\"name\":\"ZPROG\",\"type\":\"program\"},\"include_nested\":true,\"total_objects_analyzed\":2,\"total_enhancements_found\":2,\"objects\":[{\"object_name\":\"ZPROG\",\"object_type\":\"program\",\"enhancements\":[],\"unreadable\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read class metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]},{\"object_name\":\"ZINC_OK\",\"object_type\":\"include\",\"enhancements\":[{\"name\":\"Z_FIRST\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_first.\\nENDENHANCEMENT.\"},{\"name\":\"Z_SECOND\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_second.\"}]}],\"detailed\":false,\"total_objects_with_enhancements\":2,\"filtered_out\":0}"
+  },
+  "assembleTree an object of a package the tree does not reach @terse": {
+    "isError": false,
+    "text": "{\"name\":\"P\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"SUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZA\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"ZORPHAN\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]}"
+  },
+  "assembleTree an object of a package the tree does not reach @medium": {
+    "isError": false,
+    "text": "{\"name\":\"P\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"SUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZA\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"ZORPHAN\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]}"
+  },
+  "assembleTree an object of a package the tree does not reach @full": {
+    "isError": false,
+    "text": "{\"name\":\"P\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"SUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZA\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"ZORPHAN\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]}"
   }
 }

@@ -658,6 +658,31 @@ describe('GetIncludesList', () => {
     ]);
   });
 
+  // Codex round 9: a read full reports unreadable makes raw an error, on
+  // both paths — full's report, never the documents as a success.
+  it('raw with an include full reports unreadable: an error, on both paths', async () => {
+    const model = {
+      answers: {
+        'src:incl:ZINC_B': {
+          status: 403,
+          statusText: 'Forbidden',
+          body: '',
+        },
+      },
+    };
+    const { a, b } = await bothWays(
+      handleGetIncludesList,
+      { object_name: 'ZPROG', object_type: 'PROG/P', detail: 'raw' },
+      model,
+    );
+    for (const raw of [a, b]) {
+      assert.equal((raw as { isError?: boolean }).isError, true, textOf(raw));
+      assertMatchObject(payloadOf(raw).unreadable, [
+        { name: 'ZINC_B', status: 403 },
+      ]);
+    }
+  });
+
   it('a 401 SAP answered to an include ends the call as it came; no later level is read', async () => {
     const model = { answers: { 'src:incl:ZINC_A': UNAUTHORIZED } };
     const { a, b, batched } = await bothWays(

@@ -75,6 +75,13 @@ export async function recordedWire<R>(
   // Requests that failed with no response of SAP's (a timeout, an abort, a
   // refusal of the connection's own).
   let unanswered = 0;
+  // A batch envelope's parts answered outside `2xx`, counted.
+  const countFailedParts = (url: string, body: string) => {
+    if (!url.endsWith('/batch')) return;
+    failedParts += partStatuses(body).filter(
+      (status) => status < 200 || status >= 300,
+    ).length;
+  };
   const own = Object.hasOwn(connection, 'makeAdtRequest');
   const original = connection.makeAdtRequest;
   connection.makeAdtRequest = async (...request) => {
@@ -82,20 +89,18 @@ export async function recordedWire<R>(
     try {
       answered = await original.apply(connection, request);
     } catch (thrown) {
-      // A refusal the connection throws: its response, as it came.
+      // A refusal the connection throws: its response, as it came — and,
+      // for an envelope, its parts' own statuses too.
       const response = thrownResponse(thrown);
-      if (response !== undefined) documents.push(response);
-      else unanswered += 1;
+      if (response !== undefined) {
+        documents.push(response);
+        countFailedParts(request[0]?.url ?? '', response.body);
+      } else unanswered += 1;
       throw thrown;
     }
     const body = recordedBody(answered.data);
     documents.push({ status: answered.status, body });
-    const url = request[0]?.url ?? '';
-    if (url.endsWith('/batch')) {
-      failedParts += partStatuses(body).filter(
-        (status) => status < 200 || status >= 300,
-      ).length;
-    }
+    countFailedParts(request[0]?.url ?? '', body);
     return answered;
   };
   try {
@@ -107,20 +112,36 @@ export async function recordedWire<R>(
 }
 
 /**
- * The statuses of a batch envelope's inner parts: each part's status line
- * (the protocol name, a space, a three-digit code), read line by line. Each
- * is that read's answer.
+ * The statuses of a batch envelope's inner parts: each part's status line,
+ * read as the batch client reads it — `HTTP/1.` and a digit, any run of
+ * whitespace, a three-digit code, then whitespace or the line's end. Each
+ * is that read's answer. Plain code, line by line.
  */
 export function partStatuses(body: string): number[] {
   const statuses: number[] = [];
-  for (const line of body.split('\n')) {
-    const [protocol = '', code = ''] = line.split(' ');
-    if (!protocol.toLowerCase().startsWith('http')) continue;
-    if (code.length === 3 && Number.isInteger(Number(code))) {
-      statuses.push(Number(code));
+  for (const raw of body.split('\n')) {
+    const text = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
+    const version = text.slice(0, 7).toLowerCase();
+    if (version !== 'http/1.' || !isDigit(text[7])) continue;
+    const rest = text.slice(8);
+    const code = rest.trimStart();
+    if (code.length === rest.length) continue;
+    const digits = code.slice(0, 3);
+    const after = code[3];
+    if (
+      digits.length === 3 &&
+      [...digits].every(isDigit) &&
+      (after === undefined || after.trim() === '')
+    ) {
+      statuses.push(Number(digits));
     }
   }
   return statuses;
+}
+
+/** Whether one character is an ASCII digit. */
+function isDigit(character: string | undefined): boolean {
+  return character !== undefined && character >= '0' && character <= '9';
 }
 
 /** A tool's raw shape: one document, or the array of the documents it assembles. */
@@ -147,13 +168,28 @@ interface ToolAnswer {
   content: Array<{ type: 'text'; text: string }>;
 }
 
-/** Whether a JSON value explains an error inside it: a member `error`, or a non-empty `failures`. */
+/**
+ * The members a full answer reports a failed or unreadable read in, when
+ * they hold one: a list of what could not be read.
+ */
+const UNREAD_MEMBERS = new Set([
+  'failures',
+  'unreadable',
+  'append_candidates_unread',
+  'includes_unread',
+]);
+
+/**
+ * Whether a JSON value reports a failed read inside it: a member `error`,
+ * a non-empty list of what could not be read, or `appends_unavailable`.
+ */
 function explainsError(value: JsonValue): boolean {
   if (Array.isArray(value)) return value.some(explainsError);
   if (value === null || typeof value !== 'object') return false;
   for (const [key, member] of Object.entries(value)) {
     if (key === 'error') return true;
-    if (key === 'failures' && Array.isArray(member) && member.length > 0) {
+    if (key === 'appends_unavailable' && member === true) return true;
+    if (UNREAD_MEMBERS.has(key) && Array.isArray(member) && member.length > 0) {
       return true;
     }
     if (explainsError(member)) return true;
@@ -224,7 +260,11 @@ export async function wireAnswer(
       (document) => document.status < 200 || document.status >= 300,
     );
   const parseFailed = result.isError && !exchangeFailed && documents.length > 0;
-  if (!parseFailed && refusesOrExplains(result)) return result;
+  // A read full reports as failed or unreadable makes raw an error: full's
+  // answer, as an error (Codex round 9).
+  if (!parseFailed && refusesOrExplains(result)) {
+    return { ...result, isError: true };
+  }
   const failure =
     of.explainedBy === undefined
       ? undefined

@@ -257,15 +257,16 @@ row SAP answered is answered. `detail` has four levels:
   unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `CreateTransportTask`, `CreateTableType`,
   `UpdateTableType`, `ActivateObjectLow` — always answers a JSON array of every response the call got, in read order, each as
   `{ "status", "body" }` as ADT sent it, an array even when the call read one: no parse, no
-  projection, nothing of ours mixed in. A failed read is there as its failed response, never as a
-  gap; `CreateTransport` answers a read-back that failed — with SAP's response or with none — as
-  `{ "responses", "read_back" }`, the responses beside the same note `full` gives. A body the
-  connection hands over as an object is its JSON text, bytes their UTF-8 text. `raw` and `full`
-  give the same error when the exchange itself failed (a refusal, no response, a part of a batch
-  envelope answered outside `2xx` whatever the envelope's own status), or `full` explains
-  an error inside its answer; on a parse failure — every exchange answered, our reading refused it
-  — `raw` still gives the documents, while `full` gives the parse's error. Otherwise the two differ:
-  `full` is the whole parse, `raw` what ADT sent.
+  projection, nothing of ours mixed in. A body the connection hands over as an object is its JSON
+  text, bytes their UTF-8 text. When `full` is an error, or reports a read that failed or could not
+  be read — an `error` member, a non-empty `failures`, `unreadable`, `append_candidates_unread` or
+  `includes_unread`, or `appends_unavailable: true` — `raw` answers `full`'s answer as an error. A
+  parse failure is the one exception: `full` an error while every exchange was answered `2xx` (every
+  part of a batch envelope included) and our reading refused what came — then `raw` still gives the
+  documents. `CreateTransport` answers a read-back that failed — with SAP's response or with none —
+  as `{ "responses", "read_back" }`, the responses beside the same note `full` gives. Otherwise `raw`
+  is the documents, and a failed exchange `full` neither refuses nor reports (the probe of a batch
+  endpoint a destination does not serve) is there as its failed response, never as a gap.
 
 An answer is the complete result or an error, never a partial one. A formatter that reshapes a
 reading writes through shared writers that take typed rows and read each item's identity from the

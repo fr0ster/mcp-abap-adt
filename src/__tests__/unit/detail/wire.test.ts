@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   notOneDocumentWords,
+  partStatuses,
   recordedBody,
   recordedWire,
   wireAnswer,
@@ -114,7 +115,7 @@ describe('raw is what ADT sent', () => {
       isError: true,
       content: [{ type: 'text' as const, text: '{"error":"refused"}' }],
     };
-    assert.equal(await wireAnswer(of, async () => failure), failure);
+    assert.deepStrictEqual(await wireAnswer(of, async () => failure), failure);
   });
 
   // Raw never hides an error (Codex round 5, P1-4): an answer that explains
@@ -127,6 +128,23 @@ describe('raw is what ADT sent', () => {
     [
       'a non-empty failures list',
       '{"objects":[],"failures":[{"step":"read"}]}',
+    ],
+    // Codex round 9: what full reports unreadable is a failed read too.
+    [
+      'an include that could not be read',
+      '{"tree":{},"unreadable":[{"name":"ZI"}]}',
+    ],
+    [
+      'an append candidate that could not be read',
+      '{"tree":{},"append_candidates_unread":[{"candidate":"ZA"}]}',
+    ],
+    [
+      'an include walk not read',
+      '{"objects":[],"includes_unread":[{"name":"ZI"}]}',
+    ],
+    [
+      'appends that could not be determined',
+      '{"tree":{},"appends_unavailable":true}',
     ],
   ] as const) {
     it(`${label}: answered as full answers it, not as the documents`, async () => {
@@ -142,7 +160,7 @@ describe('raw is what ADT sent', () => {
           return explained;
         },
       );
-      assert.equal(answered, explained);
+      assert.deepStrictEqual(answered, { ...explained, isError: true });
     });
   }
 
@@ -180,7 +198,7 @@ describe('raw is what ADT sent', () => {
         return failure;
       },
     );
-    assert.equal(answered, failure);
+    assert.deepStrictEqual(answered, failure);
   });
 
   it('a one-read tool whose call read two documents: an error, not the first', async () => {
@@ -206,6 +224,41 @@ describe('raw is what ADT sent', () => {
 
   // The body as the connection gives it (Codex round 5): an object as its
   // JSON text, never `[object Object]`; bytes as UTF-8.
+  // Codex round 9: a part's status line read as the batch client reads it.
+  it('reads every part status, whatever whitespace stands before the code', () => {
+    const body = [
+      '--b',
+      'HTTP/1.1 200 OK',
+      '--b',
+      'HTTP/1.1\t\t500 Internal',
+      '--b',
+      'HTTP/1.0   404\r',
+      '--b',
+      'HTTP/1.1 2000 no',
+      'http/1.1 403',
+    ].join('\n');
+    assert.deepStrictEqual(partStatuses(body), [200, 500, 404, 403]);
+  });
+
+  it('a thrown envelope: its parts answered outside 2xx are failed reads', async () => {
+    const connection = recordingConnection([]);
+    connection.makeAdtRequest = async () => {
+      throw Object.assign(new Error('Request failed with status code 400'), {
+        response: {
+          status: 400,
+          headers: {},
+          data: '--b\nHTTP/1.1  500 Internal\n--b--',
+        },
+      });
+    };
+    const { failedParts } = await recordedWire(connection, async () => {
+      await assert.rejects(
+        connection.makeAdtRequest(get('/sap/bc/adt/communication/batch')),
+      );
+    });
+    assert.equal(failedParts, 1);
+  });
+
   it('records an object body as its JSON text, bytes as UTF-8', () => {
     assert.equal(
       recordedBody({ userName: 'U', n: 1 }),

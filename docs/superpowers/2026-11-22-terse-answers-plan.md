@@ -220,7 +220,14 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    - a column's or head's callback chooses an item's fields (never which items are written);
    - the full and raw formatters are free functions;
    - a list whose items are themselves lists of objects is not looked into;
-   - a record of JSON values is one value, written whole.
+   - a record of JSON values is one value, written whole;
+   - a member that may be any JSON value (string, number, boolean, null and arrays) is one value,
+     written whole: the general type does not chase it (Codex round 12). Every reading that
+     reaches a writer is checked instead: such a member holding an array of items that are not
+     themselves any JSON value does not compile, naming the reading;
+   - the schema types look 8 objects deep (Codex round 12): a reading nesting deeper does not
+     compile rather than going unchecked; a type met again on the way down (a tree's node) is
+     checked where it was first met.
    DescribeByList's terse still reads SearchObject's terse text back into cells, any cell past
    the four columns kept as an `# extra` line; it is named here for the owner's decision.
 

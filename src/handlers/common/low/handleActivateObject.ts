@@ -1,5 +1,5 @@
 import * as z from 'zod';
-import { type AnswerTable, answerAt } from '../../../lib/detail';
+import { type AnswerTable, answerAt, wireAnswer } from '../../../lib/detail';
 import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 /**
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
@@ -110,7 +110,7 @@ import {
   namesItsParent,
   notAccepted,
 } from '../../../lib/adtTypeCode';
-import { answer } from '../../../lib/answer';
+import { answer, type McpResult } from '../../../lib/answer';
 import {
   createAdtClient,
   createOnPremAdtClient,
@@ -213,7 +213,7 @@ function activateObjectSchema(variant: ProjectionVariant) {
       .default('terse')
       .optional()
       .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it). For a group activation (more than one object, or a type this tool cannot map to a single family) run in the background: terse its verdict and messages, medium the run with its id and status, full also the objects sent; there is no single document, so raw is full.',
+        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it). For a group activation (more than one object, or a type this tool cannot map to a single family) run in the background: terse its verdict and messages, medium the run with its id and status, full also the objects sent; raw the JSON array of the documents its reads answered, in read order.',
       ),
   });
 }
@@ -609,7 +609,7 @@ export async function handleActivateObject(
   context: HandlerContext,
   params: ActivateObjectArgs,
   tool: string = TOOL_DEFINITION.name,
-) {
+): Promise<McpResult> {
   const { connection, logger } = context;
   const args = params;
 
@@ -666,6 +666,14 @@ export async function handleActivateObject(
 
   if ('single' in plan)
     return activateSingle(context, plan.single, detail, preaudit, tool);
+
+  // A group activation assembles several reads (discovery, the run, its
+  // results): at `raw` the documents, as SAP sent them, in read order.
+  if (detail === 'raw') {
+    return wireAnswer(connection, 'assembled', () =>
+      handleActivateObject(context, { ...params, detail: 'full' }, tool),
+    );
+  }
 
   // Group activation: multiple objects, or a single object of a type this
   // dispatcher does not map to a family client. The endpoint is the system's
@@ -833,6 +841,7 @@ function runAnswers(
       return answered;
     },
     full,
+    // Never reached: a group's `raw` is its wire documents (`wireAnswer`).
     raw: full,
   };
 }

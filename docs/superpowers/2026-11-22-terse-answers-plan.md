@@ -383,6 +383,49 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    (`toolRetrievalVectors.test.ts`, local Ollama) is run by the controller once after the last
    group, its result in the PR.
 
+   10.8a **Vector checks of meaning** (owner; `src/__tests__/unit/descriptions/meaning.test.ts`,
+   through the existing helper `src/__tests__/unit/descriptions/ollama.ts`: `MODELS`,
+   `servedModels`, `embed`). A model the local Ollama does not serve skips with its reason, as
+   `toolRetrievalVectors.test.ts` does. Both checks compare ranks among the tools, never an
+   absolute similarity.
+   - **The function text** of a tool is its purpose sentence and its generated information
+     facts, joined; for a compact action, the action's purpose and facts. It is embedded as a
+     document (the model's document prefix).
+   - **Description against function.** Every tool's assembled description is embedded as a
+     query and compared with every tool's function text by cosine. The tool's own function text
+     must rank first. A tool that does not is named in the failure with the tool whose function
+     text ranked above its own: a copied or generic description, or a pair of tools that cannot
+     be told apart.
+   - **Name against function.** A tool's name turned into words — split on case changes,
+     underscores and digits, lower-cased (`GetPackageContents` → `get package contents`); for a
+     compact action, the handler's words and the action's (`HandlerGet` with `class` → `handler
+     get class`) — is embedded as a query; its own tool's function text must rank first among
+     all tools. A failure names the tool and the one ranked above it: a name that says something
+     other than what the tool does.
+   - **Baseline.** The first run over the assembled tools records every failure, per model, in
+     `src/__tests__/unit/descriptions/meaningBaseline.json` (tool, check, the tool it was
+     confused with). The test fails on a failure not in the baseline, and on a baseline entry
+     that no longer fails (the baseline only shrinks). Each baselined failure is resolved in the
+     group that moves its tool, as the owner decides per entry: the tool renamed (a breaking
+     change, named in the CHANGELOG with its migration), its purpose rewritten, or the pair
+     accepted as close, which stays in the baseline with the owner's reason beside it. The list of
+     entries and the decision for each goes into the PR body.
+   - **Where they run.** On the controller's machine over all five `MODELS` after each group
+     from (2) on, the result per model written into the PR. In CI, a new job `meaning-vectors` in
+     `.github/workflows/ci.yml`: an `ollama/ollama` service container on port 11434; the model
+     `nomic-embed-text` pulled by a step (`ollama pull nomic-embed-text` through the container)
+     before the tests, its files cached with `actions/cache` under the key
+     `ollama-nomic-embed-text-<the model's digest>` (the digest read from the registry manifest
+     in the step before the cache, so a new model version is a new key); then the test build and
+     `meaning.test.ts` alone, both checks. The job is required: added to the branch ruleset's
+     required checks by its exact name. With one model in CI, the CI run compares against that
+     model's baseline only.
+   - Tests of the checks themselves, each with a mutation: the name-to-words split (a fixture of
+     names and their words); the ranking (a fixture of vectors where the second tool is nearer
+     fails, naming both); the baseline comparison (a new failure fails, a resolved entry left in
+     the baseline fails).
+   - Nothing in 10.8a changes the BM25 or vector retrieval tests of 10.8.
+
    10.9 **Review.** Each group's commits list the old and the new description of every tool they
    move, side by side, in the PR, so the owner can read the change in words. Codex reviews after
    group (1) (the builder, the tests and the marker set), after group (2) (the tools on the

@@ -263,12 +263,15 @@ row SAP answered is answered. `detail` has four levels:
   is answered at `raw` exactly as at `full`. `full` is the whole parse, and the two levels never
   give the same answer.
 
-An answer is the complete result or an error, never a partial one. Each formatter that reshapes
-a reading reports the items it wrote, by the reading's own identity, and they are compared with every
-item the reading held — its entries, and the incomplete entries, not-loaded nodes and incomplete
-objects beside them. On any difference the call answers the error `incomplete_answer`, in fixed
-words that name the tool and ask for `detail: 'full'`, which gives the whole parse; `raw` gives the
-documents as ADT sent them.
+An answer is the complete result or an error, never a partial one. A formatter that reshapes a
+reading writes through shared serializers that return the text and the identity of every item in it,
+both from the same rows, and those are compared with every item the reading held — its entries, and
+the incomplete entries, not-loaded nodes and incomplete objects beside them. On any difference the
+call answers the error `incomplete_answer`, in fixed words that name the tool and ask for
+`detail: 'full'`, which gives the whole parse; `raw` gives the documents as ADT sent them. Terse
+lists what SAP returned: no row says that something asked for is absent — a consumer reads that with
+its own call, or asks `medium` or `full` where a tool states it — while what SAP itself returned stays,
+incomplete objects and nodes SAP could not load included.
 
 JSON answers are minified. A compact tool answers as the full tool it reads through, at every
 level.

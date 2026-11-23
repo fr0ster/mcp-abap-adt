@@ -14,12 +14,14 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   answered,
   type DetailTable,
-  formatted,
   fullLevel,
+  type ListDetailTable,
   rawLevel,
   readingAt,
   rows,
   writeListing,
+  writeWhole,
+  written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -49,30 +51,29 @@ export const TOOL_DEFINITION = {
  * raw the document. The items are adt-strategies' `utilNamedItems` (since
  * 0.28.0 a name as written, an absent description absent).
  */
-const TYPE_READINGS: DetailTable<INamedItem[] | XmlNode | string> = {
+const TYPE_READINGS: ListDetailTable<INamedItem[] | XmlNode | string> = {
   // Every type the list held, written by the listing writer.
-  terse: formatted(
-    utilNamedItems,
-    (items: INamedItem[]) =>
-      writeListing({
-        heads: [{ head: 'count', value: String(items.length) }],
-        reading: { items },
-        lists: {
-          items: rows('items', {
-            columns: [
-              { name: 'name', cell: (item: INamedItem) => item.name },
-              {
-                name: 'description',
-                cell: (item: INamedItem) =>
-                  (item.description ?? '').split('\n')[0] ?? '',
-              },
-            ],
-            header: 'always',
-          }),
-        },
-      }).answer,
+  terse: written(utilNamedItems, (items: INamedItem[]) =>
+    writeListing({
+      heads: [{ head: 'count', value: String(items.length) }],
+      reading: { items },
+      lists: {
+        items: rows('items', {
+          columns: [
+            { name: 'name', cell: (item: INamedItem) => item.name },
+            {
+              name: 'description',
+              cell: (item: INamedItem) =>
+                (item.description ?? '').split('\n')[0] ?? '',
+            },
+          ],
+          header: 'always',
+        }),
+      },
+    }),
   ),
-  medium: formatted(utilNamedItems, (items) => items),
+  // The named items whole, as read.
+  medium: written(utilNamedItems, (items) => writeWhole(items)),
   full: fullLevel,
   raw: rawLevel,
 };

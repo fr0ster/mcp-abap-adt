@@ -11,13 +11,15 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import {
-  type AnswerTable,
-  answerAt,
   type Column,
   entries,
   type Head,
+  jsonText,
+  type ListAnswerTable,
+  listAnswerAt,
   rows,
   sections,
+  type Written,
   wireAnswer,
   writeJsonList,
   writeListing,
@@ -231,13 +233,11 @@ type EntryOf = (item: WalkedItem) => object;
  * one package's entries, or each package's under its name (a refused walk
  * its error).
  */
-function contentsJson(read: ContentsRead, entry: EntryOf): string {
+function contentsJson(read: ContentsRead, entry: EntryOf): Written<string> {
   if (read.single) {
-    return JSON.stringify(
-      writeJsonList(onlyPart(read), entries('items', entry)).answer,
-    );
+    return jsonText(writeJsonList(onlyPart(read), entries('items', entry)));
   }
-  return JSON.stringify(
+  return jsonText(
     writeJsonList(
       { parts: partsOf(read) },
       entries(
@@ -248,7 +248,7 @@ function contentsJson(read: ContentsRead, entry: EntryOf): string {
             : { package_name: part.name, error: part.error },
         { lists: { items: entries('items', entry, { as: 'objects' }) } },
       ),
-    ).answer,
+    ),
   );
 }
 
@@ -262,14 +262,14 @@ function contentsJson(read: ContentsRead, entry: EntryOf): string {
  * Raw never reaches this table: the handler answers it as the responses
  * (`wireAnswer`).
  */
-const CONTENTS_ANSWERS: AnswerTable<ContentsRead, string> = {
+const CONTENTS_ANSWERS: ListAnswerTable<ContentsRead, string> = {
   terse: (read) => {
     if (read.single) {
       return writeListing({
         heads: [],
         reading: onlyPart(read),
         lists: { items: contentsRows(read.descriptions) },
-      }).answer;
+      });
     }
     return writeListing({
       heads: [],
@@ -286,7 +286,7 @@ const CONTENTS_ANSWERS: AnswerTable<ContentsRead, string> = {
           { items: contentsRows(read.descriptions) },
         ),
       },
-    }).answer;
+    });
   },
   medium: (read) =>
     contentsJson(read, (item) => mediumItem(item.packageName ?? '', item)),
@@ -294,7 +294,7 @@ const CONTENTS_ANSWERS: AnswerTable<ContentsRead, string> = {
     contentsJson(
       read,
       (item) => assembleList(item.packageName ?? '', [item])[0] ?? {},
-    ),
+    ).answer,
   raw: (read) =>
     JSON.stringify(
       read.single
@@ -336,7 +336,7 @@ async function answeredGetPackageContents(
   args: GetPackageContentsArgs,
 ): Promise<McpResult> {
   const { connection, logger } = context;
-  const shown = answerAt(CONTENTS_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(CONTENTS_ANSWERS, levelOf(args));
   try {
     // The schema holds the rule: exactly one of the two forms.
     const single = stated(args.package_name) ? args.package_name : undefined;

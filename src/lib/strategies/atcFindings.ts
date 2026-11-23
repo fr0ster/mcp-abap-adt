@@ -32,7 +32,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { type Column, rows, writeListing } from '../detail';
+import { type Column, rows, type Written, writeListing } from '../detail';
 import { fragmentStart, hrefParts } from '../sourceHref';
 import { parseXml } from '../xml/node';
 
@@ -131,13 +131,13 @@ export function findingCells(finding: AtcFindingFull): string[] {
 /**
  * Findings as terse lines: the run's facts as `#` lines (the counts per
  * priority as `priority N count` lines), then a row per finding — every
- * finding, or nothing (the guard).
+ * finding, by the listing writer.
  */
 export function findingsText(
   heads: readonly { head: string; value?: string | undefined }[],
   byPriority: Record<string, number>,
   findings: readonly AtcFindingFull[],
-): string {
+): Written<string> {
   return writeListing({
     heads: [
       ...heads,
@@ -158,7 +158,7 @@ export function findingsText(
         header: 'always',
       }),
     },
-  }).answer;
+  });
 }
 
 export function terseFinding(finding: AtcFindingFull): AtcFinding {

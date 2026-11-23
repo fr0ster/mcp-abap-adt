@@ -1,17 +1,19 @@
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import {
-  type AnswerTable,
-  answerAt,
   type Column,
   entries,
   type Head,
+  type ListAnswerTable,
   type Listing,
+  listAnswerAt,
   nest,
   parts,
   rows,
+  values,
   wireAnswer,
   writeJson,
+  writeJsonList,
   writeListing,
 } from '../../../lib/detail';
 import {
@@ -564,7 +566,7 @@ const mediumObject = (o: FlatObject) => ({
  * writers, one row or entry per object. Raw never reaches this table: the
  * handler answers it as the responses (`wireAnswer`).
  */
-function objectsListAnswers(): AnswerTable<ParentList, string | object> {
+function objectsListAnswers(): ListAnswerTable<ParentList, string | object> {
   const full = (list: ParentList) => ({
     parent_name: list.parent_name,
     ...('parent_tech_name' in list
@@ -576,7 +578,7 @@ function objectsListAnswers(): AnswerTable<ParentList, string | object> {
   });
   return {
     // Identifier rows: no description at terse (pass 2 reads none there).
-    terse: (list) => writeListing(parentListing(list, false)).answer,
+    terse: (list) => writeListing(parentListing(list, false)),
     medium: (list) =>
       writeJson(
         {
@@ -586,7 +588,7 @@ function objectsListAnswers(): AnswerTable<ParentList, string | object> {
         },
         list,
         { objects: entries('objects', mediumObject) },
-      ).answer,
+      ),
     // The whole parse, as it is.
     full,
     raw: full,
@@ -750,8 +752,11 @@ interface ParentLists {
 
 /** A list call's entries. */
 const jsonParents = ({ outcomes, shown }: ParentLists) =>
-  outcomes.map((outcome) =>
-    'list' in outcome ? shown(outcome.list) : outcome,
+  writeJsonList(
+    { outcomes },
+    values('outcomes', (outcome: ParentOutcome) =>
+      'list' in outcome ? shown(outcome.list) : outcome,
+    ),
   );
 
 /**
@@ -760,7 +765,7 @@ const jsonParents = ({ outcomes, shown }: ParentLists) =>
  * walk under its escaped `# parent` line and one `# error` line; the other
  * levels the entries.
  */
-const PARENT_LISTS: AnswerTable<ParentLists, string | object> = {
+const PARENT_LISTS: ListAnswerTable<ParentLists, string | object> = {
   terse: ({ outcomes }) =>
     writeListing({
       heads: [],
@@ -784,10 +789,10 @@ const PARENT_LISTS: AnswerTable<ParentLists, string | object> = {
               : undefined,
         ),
       },
-    }).answer,
+    }),
   medium: jsonParents,
-  full: jsonParents,
-  raw: jsonParents,
+  full: (lists) => jsonParents(lists).answer,
+  raw: (lists) => jsonParents(lists).answer,
 };
 
 /**
@@ -830,7 +835,7 @@ async function answeredGetObjectsList(
       : true;
   const level = levelOf(args);
   // Every object the parent's walk held, written by the listing writers.
-  const shown = answerAt(objectsListAnswers(), levelOf(args));
+  const shown = listAnswerAt(objectsListAnswers(), levelOf(args));
   // Pass 2 at medium and full: every object's description from its own
   // metadata; at terse — or with descriptions declined — only the types
   // SAP left out.
@@ -899,7 +904,7 @@ async function answeredGetObjectsList(
             : { ...asked, error: failureOfWalk(walk) };
         });
         // Through the list table, like every other answer.
-        return answerAt(PARENT_LISTS, level)({ outcomes, shown });
+        return listAnswerAt(PARENT_LISTS, level)({ outcomes, shown });
       },
     );
   }

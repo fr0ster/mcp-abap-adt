@@ -2,9 +2,9 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
-  type AnswerTable,
-  answerAt,
   entries,
+  type ListAnswerTable,
+  listAnswerAt,
   rows,
   writeJson,
   writeListing,
@@ -54,21 +54,22 @@ type SubPackage = ReturnType<typeof packageDetails>['sub_packages'][number];
 function packageAnswers(
   packageName: string,
   version: string,
-): AnswerTable<string, string | object> {
+): ListAnswerTable<string, string | object> {
   const details = (document: string) => {
     const read = packageDetails(document);
     const { sub_packages: _subPackages, ...facts } = read;
     // The sub-packages written from the document's own list, inside the
     // metadata as before.
-    return {
-      success: true,
-      package_name: packageName,
-      version,
-      part: 'metadata',
-      metadata: writeJson(facts, read, {
-        sub_packages: entries('sub_packages', (sub: SubPackage) => sub),
-      }).answer,
-    };
+    return writeJson(
+      { success: true, package_name: packageName, version, part: 'metadata' },
+      {},
+      {},
+      {
+        metadata: writeJson(facts, read, {
+          sub_packages: entries('sub_packages', (sub: SubPackage) => sub),
+        }).answer,
+      },
+    );
   };
   return {
     terse: (document: string) => {
@@ -103,10 +104,10 @@ function packageAnswers(
             header: 'always',
           }),
         },
-      }).answer;
+      });
     },
     medium: details,
-    full: details,
+    full: (document) => details(document).answer,
     raw: (document) => document,
   };
 }
@@ -129,7 +130,7 @@ export async function handleGetPackage(
     { tool: 'GetPackage', detail },
     () => readPackageMetadata(client, { packageName }, version),
     (metadata: AdtReading<string>) =>
-      answerAt(
+      listAnswerAt(
         packageAnswers(packageName, version),
         levelOf(args),
       )(metadata.raw),

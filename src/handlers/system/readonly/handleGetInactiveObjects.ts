@@ -16,13 +16,15 @@ import {
   answered,
   type DetailTable,
   entries,
-  formatted,
   fullLevel,
+  type ListDetailTable,
   rawLevel,
   readingAt,
   rows,
+  type Written,
   writeJson,
   writeListing,
+  written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -75,11 +77,11 @@ type InactiveObject = IInactiveObjectsResponse['objects'][number];
 function inactiveAnswer(read: IInactiveObjectsResponse) {
   return writeJson({ success: true, count: read.objects.length }, read, {
     objects: entries('objects', refOf),
-  }).answer;
+  });
 }
 
 /** The list at terse: a TSV row per object — its type, name and owner. */
-function terseInactive(read: IInactiveObjectsResponse): string {
+function terseInactive(read: IInactiveObjectsResponse): Written<string> {
   return writeListing({
     heads: [{ head: 'count', value: String(read.objects.length) }],
     reading: read,
@@ -96,7 +98,7 @@ function terseInactive(read: IInactiveObjectsResponse): string {
         header: 'always',
       }),
     },
-  }).answer;
+  });
 }
 
 /**
@@ -106,12 +108,12 @@ function terseInactive(read: IInactiveObjectsResponse): string {
  * every object of an entry, and a document of another kind refused, since an
  * activation is confirmed off this list), full the parse, raw the document.
  */
-const INACTIVE_READINGS: DetailTable<
-  ReturnType<typeof inactiveAnswer> | XmlNode | string
+const INACTIVE_READINGS: ListDetailTable<
+  ReturnType<typeof inactiveAnswer>['answer'] | XmlNode | string
 > = {
   // Every object the list held, written by the listing writers.
-  terse: formatted(utilInactiveObjects, terseInactive),
-  medium: formatted(utilInactiveObjects, inactiveAnswer),
+  terse: written(utilInactiveObjects, terseInactive),
+  medium: written(utilInactiveObjects, inactiveAnswer),
   full: fullLevel,
   raw: rawLevel,
 };

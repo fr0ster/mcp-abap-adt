@@ -419,7 +419,8 @@ function factoryOf(
  * adapter that reads it.
  *
  * **Out of scope, as the minify scan's alias forms are.** The check reads
- * the forms the handlers use: a selection (`readingAt` / `answerAt` with
+ * the forms the handlers use: a selection (`readingAt` / `answerAt` /
+ * `listAnswerAt` with
  * `levelOf(args)`) in the function that makes the `answer()` call, or in the
  * exported handler that hands it on. A selector bound through a closure, a
  * handler that scans its arguments some other way, or a delegate that
@@ -662,7 +663,8 @@ function selectsReadingByLevel(call: ts.CallExpression): boolean {
     if (
       ts.isCallExpression(node) &&
       (node.expression.getText() === 'readingAt' ||
-        node.expression.getText() === 'answerAt')
+        node.expression.getText() === 'answerAt' ||
+        node.expression.getText() === 'listAnswerAt')
     ) {
       const level = node.arguments[1];
       if (
@@ -701,7 +703,8 @@ function handlerSelectsAnswer(source: ts.SourceFile): boolean {
       if (found) return;
       if (
         ts.isCallExpression(node) &&
-        node.expression.getText() === 'answerAt'
+        (node.expression.getText() === 'answerAt' ||
+          node.expression.getText() === 'listAnswerAt')
       ) {
         const level = node.arguments[1];
         if (

@@ -2,7 +2,11 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import { type AnswerTable, answerAt } from '../../../lib/detail';
+import {
+  type ListAnswerTable,
+  listAnswerAt,
+  writeWhole,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -61,7 +65,7 @@ export async function handleGetATCFindings(
     { tool: 'GetATCFindings', detail },
     () => atc.getFindings(worklistId, { analyse: analyseException }),
     (document) =>
-      answerAt(
+      listAnswerAt(
         findingsAnswers(worklistId),
         levelOf(args),
       )(String(document ?? '')),
@@ -78,7 +82,7 @@ export async function handleGetATCFindings(
  */
 function findingsAnswers(
   worklistId: string,
-): AnswerTable<string, string | object> {
+): ListAnswerTable<string, string | object> {
   const head = (reading: ReturnType<typeof parseAtcWorklist>) => ({
     success: true,
     worklist_id: worklistId,
@@ -126,7 +130,8 @@ function findingsAnswers(
         reading.findings,
       );
     },
-    medium: whole,
+    // The reading whole, as full gives it: complete by construction.
+    medium: (document: string) => writeWhole(whole(document)),
     full: whole,
     raw: (document) => document,
   };

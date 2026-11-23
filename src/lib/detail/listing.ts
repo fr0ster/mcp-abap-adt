@@ -615,7 +615,7 @@ export function parts<I, K extends string>(
 }
 
 /** A JSON schema bound to the list `K` of a reading `R`: one entry per item it holds, or nothing when it is absent; only `entries` makes one. */
-export interface JsonBound<R, K, E extends object = object> {
+export interface JsonBound<R, K, E = object> {
   readonly [binding]: true;
   readonly key: K;
   /** The member the entries are written under in the answer. */
@@ -629,7 +629,7 @@ export interface JsonBound<R, K, E extends object = object> {
  * compile error, and a reading holding a Map or a Set does not compile.
  */
 export type JsonSchemas<R> = {
-  readonly [K in ListKeys<R>]: JsonBound<R, K>;
+  readonly [K in ListKeys<R>]: JsonBound<R, K, unknown>;
 } & { readonly [K in CollectionKeys<R>]: never };
 
 /** An item's own lists in its JSON entry: required when it holds any, absent when it holds none. */
@@ -677,6 +677,24 @@ export function entries<I, K extends string, E extends object>(
 }
 
 /**
+ * The list `key` written as JSON values, one per item, each the value
+ * `value` makes of it — a value that holds no lists of its own (a list
+ * call's answers, each as its single call answered it).
+ */
+export function values<I, K extends string, V>(
+  key: K,
+  value: (item: I) => V,
+): JsonBound<Holding<K, I>, K, V> {
+  return {
+    [binding]: true,
+    key,
+    as: key,
+    write: (reading) =>
+      present(reading, key) ? itemsOf(reading, key).map(value) : undefined,
+  };
+}
+
+/**
  * Every list of `value` as its JSON member, in its schemas' order; an
  * absent one writes none. Two bindings written under one name would
  * replace one another: refused when written (no type can tell two
@@ -685,10 +703,10 @@ export function entries<I, K extends string, E extends object>(
 function jsonMembers<R>(
   value: R,
   schemas: JsonSchemas<R>,
-): Record<string, readonly object[]> {
-  const members: Record<string, readonly object[]> = {};
-  const bound: readonly JsonBound<R, ListKeys<R>>[] =
-    Object.values<JsonBound<R, ListKeys<R>>>(schemas);
+): Record<string, readonly unknown[]> {
+  const members: Record<string, readonly unknown[]> = {};
+  const bound: readonly JsonBound<R, ListKeys<R>, unknown>[] =
+    Object.values<JsonBound<R, ListKeys<R>, unknown>>(schemas);
   const names = new Set<string>();
   for (const schema of bound) {
     if (names.has(schema.as)) {
@@ -712,7 +730,7 @@ export function writeJson<R, A extends object, B extends object>(
   reading: R,
   lists: JsonSchemas<R>,
   after?: B | undefined,
-): Written<A & Partial<B> & Record<string, readonly object[]>> {
+): Written<A & Partial<B> & Record<string, readonly unknown[]>> {
   const members = jsonMembers(reading, lists);
   return new Written(mint, { ...rest, ...members, ...after, ...members });
 }
@@ -721,7 +739,7 @@ export function writeJson<R, A extends object, B extends object>(
  * The only writer of a JSON array answer: one entry per item of the
  * reading's one list — a reading holding another list does not compile.
  */
-export function writeJsonList<R, K extends ListKeys<R>, E extends object>(
+export function writeJsonList<R, K extends ListKeys<R>, E>(
   reading: [Exclude<ListKeys<R>, K>] extends [never] ? R : never,
   list: JsonBound<NoInfer<R>, K, E>,
 ): Written<readonly E[]> {
@@ -738,4 +756,47 @@ export function writeJsonRoot<R>(
     ...entry(reading),
     ...jsonMembers(reading, lists),
   });
+}
+
+/** A tool's text answer, as the answer boundary hands it back. */
+export interface TextResult {
+  readonly isError: false;
+  readonly content: Array<{ type: 'text'; text: string }>;
+}
+
+/** A written text as a tool's text answer, written still. */
+export function asTextResult(text: Written<string>): Written<TextResult> {
+  return new Written(mint, {
+    isError: false,
+    content: [{ type: 'text', text: text.answer }],
+  });
+}
+
+/** A written JSON answer as a tool's text answer, written still. */
+export function asJsonResult<A>(json: Written<A>): Written<TextResult> {
+  return asTextResult(new Written(mint, JSON.stringify(json.answer)));
+}
+
+/** A written JSON answer as its text, written still. */
+export function jsonText<A>(json: Written<A>): Written<string> {
+  return new Written(mint, JSON.stringify(json.answer));
+}
+
+/** Written content entries as a tool's answer of several text entries, written still. */
+export function asContentResult(
+  content: Written<readonly { type: 'text'; text: string }[]>,
+): Written<TextResult> {
+  return new Written(mint, { isError: false, content: [...content.answer] });
+}
+
+/**
+ * A written answer shown beside facts of its reading (a transport read: the
+ * item it answers for, and what is shown of it), written still; none when
+ * the reading had nothing to write.
+ */
+export function shownBeside<E extends object, A>(
+  extra: E,
+  shown: Written<A> | undefined,
+): Written<E & { readonly shown: A | undefined }> {
+  return new Written(mint, { ...extra, shown: shown?.answer });
 }

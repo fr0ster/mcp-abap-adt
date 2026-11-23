@@ -10,10 +10,13 @@ import {
   answered,
   type DetailTable,
   formatted,
+  type ListDetailTable,
   rawLevel,
   readingAt,
   rows,
+  whole,
   writeListing,
+  written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -81,7 +84,7 @@ export async function handleRuntimeListSystemMessages(
  * field adt-strategies read (`feedSystemMessages`); raw the feed as ADT sent
  * it.
  */
-const SYSTEM_MESSAGE_READINGS: DetailTable<string | object> = (() => {
+const SYSTEM_MESSAGE_READINGS: ListDetailTable<string | object> = (() => {
   const every = formatted(
     feedSystemMessages,
     (messages: ISystemMessageEntry[]) => ({
@@ -92,39 +95,37 @@ const SYSTEM_MESSAGE_READINGS: DetailTable<string | object> = (() => {
   );
   return {
     // Every message the feed held, written by the listing writer.
-    terse: formatted(
-      feedSystemMessages,
-      (messages: ISystemMessageEntry[]) =>
-        writeListing({
-          heads: [{ head: 'count', value: String(messages.length) }],
-          reading: { messages },
-          lists: {
-            messages: rows('messages', {
-              columns: [
-                {
-                  name: 'id',
-                  cell: (m: ISystemMessageEntry) => m.id ?? m.messageId ?? '',
-                },
-                {
-                  name: 'createdOn',
-                  cell: (m: ISystemMessageEntry) => m.createdOn ?? '',
-                },
-                {
-                  name: 'author',
-                  cell: (m: ISystemMessageEntry) =>
-                    m.author ?? m.createdBy ?? '',
-                },
-                {
-                  name: 'title',
-                  cell: (m: ISystemMessageEntry) => m.title ?? '',
-                },
-              ],
-              header: 'always',
-            }),
-          },
-        }).answer,
+    terse: written(feedSystemMessages, (messages: ISystemMessageEntry[]) =>
+      writeListing({
+        heads: [{ head: 'count', value: String(messages.length) }],
+        reading: { messages },
+        lists: {
+          messages: rows('messages', {
+            columns: [
+              {
+                name: 'id',
+                cell: (m: ISystemMessageEntry) => m.id ?? m.messageId ?? '',
+              },
+              {
+                name: 'createdOn',
+                cell: (m: ISystemMessageEntry) => m.createdOn ?? '',
+              },
+              {
+                name: 'author',
+                cell: (m: ISystemMessageEntry) => m.author ?? m.createdBy ?? '',
+              },
+              {
+                name: 'title',
+                cell: (m: ISystemMessageEntry) => m.title ?? '',
+              },
+            ],
+            header: 'always',
+          }),
+        },
+      }),
     ),
-    medium: every,
+    // The feed's messages whole, as read.
+    medium: whole(every),
     full: every,
     raw: rawLevel,
   };

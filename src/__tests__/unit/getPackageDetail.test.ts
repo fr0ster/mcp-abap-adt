@@ -1,7 +1,7 @@
 /**
  * GetPackage at each level (Codex round 7): terse its facts as `#` lines
- * and its sub-packages as TSV rows, name and description — every one, or
- * the call's error (the guard); medium and full each sub-package written as
+ * and its sub-packages as TSV rows, name and description — every one, by
+ * the listing writer; medium and full each sub-package written as
  * a row under the metadata.
  */
 

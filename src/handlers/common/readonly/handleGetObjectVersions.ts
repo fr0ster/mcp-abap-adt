@@ -16,9 +16,12 @@ import {
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
-  type AnswerTable,
-  answerAt,
+  entries,
+  jsonText,
+  type ListAnswerTable,
+  listAnswerAt,
   rows,
+  writeJson,
   writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -75,7 +78,7 @@ interface VersionsRead {
  * before `detail`; raw the feed as ADT sent it.
  */
 // Every version the feed held, written by the listing writer.
-const VERSION_ANSWERS: AnswerTable<VersionsRead, string> = {
+const VERSION_ANSWERS: ListAnswerTable<VersionsRead, string> = {
   terse: (read) =>
     writeListing({
       heads: [
@@ -109,8 +112,15 @@ const VERSION_ANSWERS: AnswerTable<VersionsRead, string> = {
           header: 'always',
         }),
       },
-    }).answer,
-  medium: ({ document: _document, ...read }) => JSON.stringify(read),
+    }),
+  medium: (read) =>
+    jsonText(
+      writeJson(
+        { object_type: read.object_type, object_name: read.object_name },
+        read,
+        { versions: entries('versions', (version: IObjectVersion) => version) },
+      ),
+    ),
   full: ({ document: _document, ...read }) =>
     JSON.stringify({ success: true, ...read }),
   raw: (read) => read.document,
@@ -123,7 +133,7 @@ export async function handleGetObjectVersions(
   args: GetObjectVersionsArgs,
 ) {
   const { connection, logger } = context;
-  const shown = answerAt(VERSION_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(VERSION_ANSWERS, levelOf(args));
   try {
     const { object_name, function_group_name } = args;
     if (!args.object_type || !object_name) {

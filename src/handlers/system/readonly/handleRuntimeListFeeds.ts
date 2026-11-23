@@ -31,17 +31,24 @@ import {
 } from '../../../lib/batch/phases';
 import { withSystemKindOf } from '../../../lib/connectionFactory';
 import {
-  type AnswerTable,
-  answerAt,
+  asJsonResult,
+  asTextResult,
   type Column,
   type DetailLevel,
   type Head,
+  type ListAnswerTable,
+  listAnswerAt,
   type Nested,
   nest,
   parts,
   rows,
+  type TextResult,
+  values,
+  type Written,
   wireAnswer,
+  writeJsonList,
   writeListing,
+  writeWhole,
 } from '../../../lib/detail';
 import {
   DUMP_FILTERS,
@@ -455,12 +462,12 @@ function feedHeads(shown: FeedShown): Head[] {
 }
 
 /** A feed's terse text: TSV under its `# feed` and `# count` lines, every entry a row. */
-export function terseFeedText(shown: FeedShown): string {
+export function terseFeedText(shown: FeedShown): Written<string> {
   return writeListing({
     heads: [],
     reading: { feed: [shown] },
     lists: { feed: parts('feed', () => [], feedListing) },
-  }).answer;
+  });
 }
 
 /**
@@ -468,9 +475,10 @@ export function terseFeedText(shown: FeedShown): string {
  * before the reads (`src/lib/detail`): terse a feed's rows as TSV, medium,
  * full and raw the former JSON, every field.
  */
-const FEED_ANSWERS: AnswerTable<FeedShown, string | object> = {
+const FEED_ANSWERS: ListAnswerTable<FeedShown, string | object> = {
   terse: terseFeedText,
-  medium: (shown) => shown.answered,
+  // The feed's answer whole, as it is: complete by construction.
+  medium: (shown) => writeWhole(shown.answered),
   full: (shown) => shown.answered,
   raw: (shown) => shown.answered,
 };
@@ -727,7 +735,7 @@ async function answeredFeedPage(
   const feeds = pagedFeeds(connection, logger);
   // The page at the level asked, as RuntimeListFeeds answers a feed (compact
   // parity): terse its rows, medium and full the JSON.
-  const atLevel = answerAt(FEED_ANSWERS, levelOf(args));
+  const atLevel = listAnswerAt(FEED_ANSWERS, levelOf(args));
   const shown = <T>(read: FeedPage<T>) => {
     const answered: FeedPageAnswer<T> = {
       success: true,
@@ -970,11 +978,11 @@ interface ListOf {
  * every other answer: terse one text written by the listing writer, the other
  * levels a JSON array of the entries.
  */
-const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+const LIST_ANSWERS: ListAnswerTable<ListOf, McpResult> = {
   terse: terseList,
   medium: jsonList,
-  full: jsonList,
-  raw: jsonList,
+  full: (list) => jsonList(list).answer,
+  raw: (list) => jsonList(list).answer,
 };
 
 /** A list call's answer: one entry per asked, in the order asked, at the level asked. */
@@ -983,11 +991,11 @@ function listAnswer(
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
-  return answerAt(LIST_ANSWERS, level)({ feedTypes, results });
+  return listAnswerAt(LIST_ANSWERS, level)({ feedTypes, results });
 }
 
 /** A list call's terse text. */
-function terseList({ feedTypes, results }: ListOf): McpResult {
+function terseList({ feedTypes, results }: ListOf): Written<TextResult> {
   // Every feed's text written by the listing writer: a failure under its
   // escaped `# feed` line and one `# error` line; an answered one as its
   // own terse listing.
@@ -1017,8 +1025,8 @@ function terseList({ feedTypes, results }: ListOf): McpResult {
           read === undefined ? undefined : feedListing(read),
       ),
     },
-  }).answer;
-  return { isError: false, content: [{ type: 'text', text }] };
+  });
+  return asTextResult(text);
 }
 
 /** One feed of a list call: its type, its answer, and its read when answered. */
@@ -1029,16 +1037,19 @@ interface AnsweredFeed {
 }
 
 /** A list call's entries as a JSON array. */
-function jsonList({ feedTypes, results }: ListOf): McpResult {
-  const entries = results.map((result, i) =>
-    result.isError
-      ? { feed_type: feedTypes[i], error: payloadOfAnswer(result) }
-      : payloadOfAnswer(result),
+function jsonList({ feedTypes, results }: ListOf): Written<TextResult> {
+  // Every answer one entry, written by the listing writer.
+  return asJsonResult(
+    writeJsonList(
+      { answered: results.map((result, i) => ({ result, i })) },
+      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
+        ((result, i) =>
+          result.isError
+            ? { feed_type: feedTypes[i], error: payloadOfAnswer(result) }
+            : payloadOfAnswer(result))(result, i),
+      ),
+    ),
   );
-  return {
-    isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries) }],
-  };
 }
 
 /** The feeds read page by page: more than one request a call. */
@@ -1075,7 +1086,7 @@ async function answeredRuntimeListFeeds(
   args: RuntimeListFeedsArgs,
 ) {
   const ctx = { tool: 'RuntimeListFeeds', detail: detailOf(args) };
-  const shown = answerAt(FEED_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(FEED_ANSWERS, levelOf(args));
   const listed = args?.feed_types;
   if (listed === undefined) {
     if (!PAGED_FEEDS.has(String(args?.feed_type))) {

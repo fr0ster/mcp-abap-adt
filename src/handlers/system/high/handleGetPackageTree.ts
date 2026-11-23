@@ -20,18 +20,22 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import {
-  type AnswerTable,
   answerAt,
   type Column,
   entries,
   type Head,
   type JsonSchemas,
+  jsonText,
+  type ListAnswerTable,
   type Listing,
+  listAnswerAt,
   nest,
   parts,
   type RowSchemas,
   rows,
+  values,
   wireAnswer,
+  writeJsonList,
   writeJsonRoot,
   writeListing,
 } from '../../../lib/detail';
@@ -486,13 +490,16 @@ const treeListing = ({
 
 // Every level written from the assembled tree, every node of the walk in
 // it (`assembleTree`): the writers write one row or entry per node.
-const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
+const TREE_ANSWERS: ListAnswerTable<TreeAnswerRead, TreeAnswer> = {
   // With include_descriptions, each row's description beside its type and
   // name; the package's own row is the root, the rows below it its nodes.
-  terse: (read) => writeListing(treeListing(read)).answer,
+  terse: (read) => writeListing(treeListing(read)),
   medium: ({ packageName, walked }) =>
-    writeJsonRoot(assembleTree(packageName, walked), mediumEntry, mediumSchemas)
-      .answer,
+    writeJsonRoot(
+      assembleTree(packageName, walked),
+      mediumEntry,
+      mediumSchemas,
+    ),
   // The whole parse, as it is.
   full: ({ packageName, walked, options }) => ({
     package_name: packageName,
@@ -527,9 +534,12 @@ interface TreeList {
 
 /** A list call's entries as a JSON array. */
 const jsonTrees = ({ outcomes, shown }: TreeList) =>
-  JSON.stringify(
-    outcomes.map((outcome) =>
-      'read' in outcome ? shown(outcome.read) : outcome,
+  jsonText(
+    writeJsonList(
+      { outcomes },
+      values('outcomes', (outcome: TreeOutcome) =>
+        'read' in outcome ? shown(outcome.read) : outcome,
+      ),
     ),
   );
 
@@ -538,7 +548,7 @@ const jsonTrees = ({ outcomes, shown }: TreeList) =>
  * every other answer: terse one text written by the listing writer, each tree
  * under its escaped `# asked` line; the other levels a JSON array.
  */
-const TREE_LISTS: AnswerTable<TreeList, string> = {
+const TREE_LISTS: ListAnswerTable<TreeList, string> = {
   terse: ({ packageNames, outcomes }) =>
     writeListing({
       heads: [],
@@ -561,10 +571,10 @@ const TREE_LISTS: AnswerTable<TreeList, string> = {
             'read' in outcome ? nest(treeListing(outcome.read)) : undefined,
         ),
       },
-    }).answer,
+    }),
   medium: jsonTrees,
-  full: jsonTrees,
-  raw: jsonTrees,
+  full: (list) => jsonTrees(list).answer,
+  raw: (list) => jsonTrees(list).answer,
 };
 
 /**
@@ -595,7 +605,7 @@ async function answeredGetPackageTree(
   args: GetPackageTreeArgs,
 ) {
   const { logger } = context;
-  const shown = answerAt(TREE_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(TREE_ANSWERS, levelOf(args));
   try {
     // The schema holds the rule: exactly one of the two forms.
     const single = stated(args.package_name) ? args.package_name : undefined;
@@ -694,7 +704,7 @@ async function answeredGetPackageTree(
     });
     // Through the list table, like every other answer.
     return return_response({
-      data: answerAt(
+      data: listAnswerAt(
         TREE_LISTS,
         levelOf(args),
       )({ packageNames, outcomes, shown }),

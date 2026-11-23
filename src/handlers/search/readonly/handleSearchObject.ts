@@ -10,13 +10,16 @@ import { adtClientOf, type ServerAdtClient } from '../../../lib/clients';
 import {
   answered,
   type DetailTable,
-  formatted,
   fullLevel,
+  type ListDetailTable,
   rawLevel,
   readingAt,
   rows,
   structuredValue,
+  type Written,
+  whole,
   writeListing,
+  written,
 } from '../../../lib/detail';
 import {
   onEveryVariant,
@@ -111,7 +114,7 @@ export const TOOL_DEFINITION = {
  * migration: a header and one line per hit, the code as SAP sent it, known
  * or not; no hit answers nothing.
  */
-function hitLines(hits: readonly ISearchResult[]): string {
+function hitLines(hits: readonly ISearchResult[]): Written<string> {
   return writeListing({
     heads: [],
     reading: { hits },
@@ -126,7 +129,7 @@ function hitLines(hits: readonly ISearchResult[]): string {
         header: 'when-rows',
       }),
     },
-  }).answer;
+  });
 }
 
 /**
@@ -135,10 +138,11 @@ function hitLines(hits: readonly ISearchResult[]): string {
  * as adt-strategies reads them (`utilSearchHits`, which decodes character
  * references since 0.28.0), written as lines.
  */
-const SEARCH_READINGS: DetailTable<XmlNode | string> = {
+const SEARCH_READINGS: ListDetailTable<XmlNode | string> = {
   // Every hit, written by the listing writer.
-  terse: formatted(utilSearchHits, hitLines),
-  medium: fullLevel,
+  terse: written(utilSearchHits, hitLines),
+  // The parse whole, as it is.
+  medium: whole(fullLevel),
   full: fullLevel,
   raw: rawLevel,
 };

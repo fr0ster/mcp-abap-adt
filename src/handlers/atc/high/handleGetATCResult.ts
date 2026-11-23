@@ -2,7 +2,11 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import { type AnswerTable, answerAt } from '../../../lib/detail';
+import {
+  type ListAnswerTable,
+  listAnswerAt,
+  writeWhole,
+} from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -56,7 +60,7 @@ export async function handleGetATCResult(
     { tool: 'GetATCResult', detail },
     () => atc.getResult(displayId, { analyse: analyseException }),
     (document) =>
-      answerAt(RESULT_ANSWERS, levelOf(args))(String(document ?? '')),
+      listAnswerAt(RESULT_ANSWERS, levelOf(args))(String(document ?? '')),
   );
 }
 
@@ -80,7 +84,7 @@ function resultHead(reading: ReturnType<typeof parseAtcResult>) {
  * a row per finding, written by the listing writer), medium and full the whole parse, raw the
  * result document as SAP sent it, nothing of ours around it.
  */
-const RESULT_ANSWERS: AnswerTable<string, string | object> = (() => {
+const RESULT_ANSWERS: ListAnswerTable<string, string | object> = (() => {
   const whole = (document: string) => {
     const reading = parseAtcResult(document);
     return { ...resultHead(reading), findings: reading.findings };
@@ -112,7 +116,8 @@ const RESULT_ANSWERS: AnswerTable<string, string | object> = (() => {
         reading.findings,
       );
     },
-    medium: whole,
+    // The reading whole, as full gives it: complete by construction.
+    medium: (document: string) => writeWhole(whole(document)),
     full: whole,
     raw: (document: string) => document,
   };

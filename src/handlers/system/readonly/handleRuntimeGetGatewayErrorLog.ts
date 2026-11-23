@@ -11,10 +11,14 @@ import {
   answered,
   type DetailTable,
   formatted,
+  type ListDetailTable,
   rawLevel,
   readingAt,
   rows,
+  type Written,
   writeListing,
+  writeWhole,
+  written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -149,7 +153,7 @@ export function detailKindOf(entry: IGatewayErrorEntry): string {
 }
 
 /** The list at terse: a TSV row per error. */
-function terseErrors(errors: readonly IGatewayErrorEntry[]): string {
+function terseErrors(errors: readonly IGatewayErrorEntry[]): Written<string> {
   return writeListing({
     heads: [{ head: 'count', value: String(errors.length) }],
     reading: { errors },
@@ -181,7 +185,7 @@ function terseErrors(errors: readonly IGatewayErrorEntry[]): string {
         header: 'always',
       }),
     },
-  }).answer;
+  });
 }
 
 /**
@@ -192,12 +196,15 @@ function terseErrors(errors: readonly IGatewayErrorEntry[]): string {
  * username; medium and full every field the reading read; raw the Atom
  * document as ADT sent it.
  */
-const GATEWAY_ERROR_READINGS: DetailTable<string | object> = {
-  terse: formatted(feedGatewayErrors, terseErrors),
-  medium: formatted(feedGatewayErrors, (errors) => ({
-    count: errors.length,
-    errors,
-  })),
+const GATEWAY_ERROR_READINGS: ListDetailTable<string | object> = {
+  terse: written(feedGatewayErrors, terseErrors),
+  // The feed's errors whole, as read.
+  medium: written(feedGatewayErrors, (errors) =>
+    writeWhole({
+      count: errors.length,
+      errors,
+    }),
+  ),
   full: formatted(feedGatewayErrors, (errors) => ({
     success: true,
     mode: 'list',

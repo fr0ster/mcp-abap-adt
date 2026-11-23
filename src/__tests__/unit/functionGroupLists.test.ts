@@ -6,6 +6,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
+import { listAnswerAt } from '../../lib/detail';
 import {
   fetchFunctionGroupChildren,
   functionGroupListAnswers,
@@ -47,7 +48,7 @@ describe('a function group list', () => {
   it('terse: two nameless includes stay apart by their URI', async () => {
     const terse = functionGroupListAnswers('ZFG', 'includes').terse(
       await children(),
-    );
+    ).answer;
     const lines = String(terse).split('\n');
     assert.ok(lines.includes('\t/sap/bc/adt/x/one\t'), lines.join('\n'));
     assert.ok(lines.includes('\t/sap/bc/adt/x/two\t'), lines.join('\n'));
@@ -55,9 +56,10 @@ describe('a function group list', () => {
 
   for (const level of ['terse', 'medium', 'full'] as const) {
     it(`${level}: the node SAP could not load is in the answer`, async () => {
-      const answered = functionGroupListAnswers('ZFG', 'includes')[level](
-        await children(),
-      );
+      const answered = listAnswerAt(
+        functionGroupListAnswers('ZFG', 'includes'),
+        level,
+      )(await children());
       const text =
         typeof answered === 'string' ? answered : JSON.stringify(answered);
       assert.ok(text.includes('not loaded by SAP'), text);

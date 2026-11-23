@@ -43,13 +43,16 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
-  type DetailTable,
   entries,
   formatted,
   fullLevel,
+  type ListDetailTable,
   rawLevel,
   readingAt,
+  shownBeside,
+  whole,
   writeJson,
+  written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -134,7 +137,7 @@ function terseRequest(item: ITransportRequestItem, options: TerseOptions) {
       ),
     },
     { task_count: item.tasks.length },
-  ).answer;
+  );
 }
 
 /** An object row of a task, written or held: pgmid, type, name and position. */
@@ -197,7 +200,7 @@ function terseTask(item: ITransportTaskItem, options: TerseOptions) {
     },
     // Every entry SAP lists, one without a name or a type included.
     { object_count: item.objects.length + incompleteCount },
-  ).answer;
+  );
 }
 
 /**
@@ -244,26 +247,32 @@ interface TransportRead {
  * every level; terse then answers the item's rows, medium and full the
  * parse, raw the document.
  */
-function transportReadings(options: TerseOptions): DetailTable<TransportRead> {
+function transportReadings(
+  options: TerseOptions,
+): ListDetailTable<TransportRead> {
   const read = (answer: IAdtWireResponse) => ({
     item: itemOf(answer, options.number),
     answer,
   });
   return {
     // Every task or object the transport holds, by the listing writer.
-    terse: formatted(read, ({ item }) => ({
-      item,
-      shown:
+    terse: written(read, ({ item }) =>
+      shownBeside<{ item: ITransportItem | undefined }, object>(
+        { item },
         item === undefined
           ? undefined
           : item.kind === 'task'
             ? terseTask(item, options)
             : terseRequest(item, options),
-    })),
-    medium: formatted(read, ({ item, answer }) => ({
-      item,
-      shown: fullLevel(answer).value,
-    })),
+      ),
+    ),
+    // The document's parse whole, as it is.
+    medium: whole(
+      formatted(read, ({ item, answer }) => ({
+        item,
+        shown: fullLevel(answer).value,
+      })),
+    ),
     full: formatted(read, ({ item, answer }) => ({
       item,
       shown: fullLevel(answer).value,

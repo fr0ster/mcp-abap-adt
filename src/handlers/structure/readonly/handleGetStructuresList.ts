@@ -19,20 +19,28 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import {
-  type AnswerTable,
-  answerAt,
+  asJsonResult,
+  asTextResult,
   type Column,
   type DetailLevel,
   type Head,
+  jsonText,
+  type ListAnswerTable,
   type Listing,
+  listAnswerAt,
   marks,
   nest,
   omitted,
   parts,
   type RowSchemas,
   rows,
+  type TextResult,
+  values,
+  type Written,
   wireAnswer,
+  writeJsonList,
   writeListing,
+  writeWhole,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -340,7 +348,12 @@ const structureSchemas: RowSchemas<StructureNode> = {
 
 /** The answer before `detail` (full). */
 function fullStructures(read: StructuresRead): string {
-  return JSON.stringify({
+  return JSON.stringify(structuresWhole(read));
+}
+
+/** The answer before `detail`: the tree whole, what could not be read beside it. */
+function structuresWhole(read: StructuresRead) {
+  return {
     success: true,
     structure_name: read.structure_name,
     ...(read.appends_unavailable ? { appends_unavailable: true } : {}),
@@ -348,7 +361,7 @@ function fullStructures(read: StructuresRead): string {
       ? { append_candidates_unread: read.append_candidates_unread }
       : {}),
     tree: read.tree,
-  });
+  };
 }
 
 /**
@@ -399,9 +412,10 @@ const structuresListing = (read: StructuresRead): Listing<StructuresTerse> => ({
 
 // Every node and unread candidate written from the read by the listing
 // writer; medium and full write the tree whole.
-const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
-  terse: (read) => writeListing(structuresListing(read)).answer,
-  medium: fullStructures,
+const STRUCTURES_ANSWERS: ListAnswerTable<StructuresRead, string> = {
+  terse: (read) => writeListing(structuresListing(read)),
+  // The tree whole, as full gives it: complete by construction.
+  medium: (read) => jsonText(writeWhole(structuresWhole(read))),
   full: fullStructures,
   raw: fullStructures,
 };
@@ -1235,11 +1249,11 @@ interface ListOf {
  * every other answer: terse one text written by the listing writer, the other
  * levels a JSON array of the entries.
  */
-const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+const LIST_ANSWERS: ListAnswerTable<ListOf, McpResult> = {
   terse: terseList,
   medium: jsonList,
-  full: jsonList,
-  raw: jsonList,
+  full: (list) => jsonList(list).answer,
+  raw: (list) => jsonList(list).answer,
 };
 
 /** A list call's answer: one entry per asked, in the order asked, at the level asked. */
@@ -1248,11 +1262,11 @@ function listAnswer(
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
-  return answerAt(LIST_ANSWERS, level)({ names, results });
+  return listAnswerAt(LIST_ANSWERS, level)({ names, results });
 }
 
 /** A list call's terse text. */
-function terseList({ names, results }: ListOf): McpResult {
+function terseList({ names, results }: ListOf): Written<TextResult> {
   // Every structure's text written by the listing writer: a failure under
   // its escaped `# structure` line and one `# error` line; an answered one
   // as its own terse listing.
@@ -1282,8 +1296,8 @@ function terseList({ names, results }: ListOf): McpResult {
           read === undefined ? undefined : nest(structuresListing(read)),
       ),
     },
-  }).answer;
-  return { isError: false, content: [{ type: 'text', text }] };
+  });
+  return asTextResult(text);
 }
 
 /** One structure of a list call: its name, its answer, and its read when answered. */
@@ -1294,16 +1308,19 @@ interface AnsweredStructure {
 }
 
 /** A list call's entries as a JSON array. */
-function jsonList({ names, results }: ListOf): McpResult {
-  const entries = results.map((result, i) =>
-    result.isError
-      ? { structure_name: names[i], error: payloadOfAnswer(result) }
-      : payloadOfAnswer(result),
+function jsonList({ names, results }: ListOf): Written<TextResult> {
+  // Every answer one entry, written by the listing writer.
+  return asJsonResult(
+    writeJsonList(
+      { answered: results.map((result, i) => ({ result, i })) },
+      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
+        ((result, i) =>
+          result.isError
+            ? { structure_name: names[i], error: payloadOfAnswer(result) }
+            : payloadOfAnswer(result))(result, i),
+      ),
+    ),
   );
-  return {
-    isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries) }],
-  };
 }
 
 /**
@@ -1337,7 +1354,7 @@ async function answeredGetStructuresList(
   const version = args?.version ?? 'active';
   const includeExtensions = args?.include_extensions !== false;
   const level = levelOf(args);
-  const shown = answerAt(STRUCTURES_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(STRUCTURES_ANSWERS, levelOf(args));
   const sequential = (structure_name: string) => {
     const { structure_names: _list, ...rest } = args;
     return structuresListOf(context, { ...rest, structure_name }, shown);

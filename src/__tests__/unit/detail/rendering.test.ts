@@ -3,8 +3,7 @@
  * through `./listing`): every value escaped — a tab or any line terminator
  * in SAP's text adds no column and no line, a first cell starting with `#`
  * is escaped at every depth, mark words are tab-separated cells — and a
- * written answer is made by the writers alone (plan 9.8: the guard's tests
- * are replaced by these and by `listing.test.ts`).
+ * written answer is made by the writers alone (with `listing.test.ts`).
  */
 
 import assert from 'node:assert/strict';

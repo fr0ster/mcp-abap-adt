@@ -37,21 +37,28 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
-  type AnswerTable,
-  answerAt,
+  asJsonResult,
+  asTextResult,
   type Column,
   type DetailLevel,
   entries,
   type Head,
   type JsonSchemas,
+  jsonText,
+  type ListAnswerTable,
   type Listing,
+  listAnswerAt,
   marks,
   nest,
   parts,
   type RowSchemas,
   rows,
+  type TextResult,
+  values,
+  type Written,
   wireAnswer,
   writeJson,
+  writeJsonList,
   writeJsonRoot,
   writeListing,
 } from '../../../lib/detail';
@@ -426,10 +433,10 @@ interface IncludesTerse {
 
 // Every node (and, at terse, every unreadable include), written from the
 // read by the listing writers: one row, line or entry each.
-const INCLUDES_ANSWERS: AnswerTable<IncludesRead, string> = {
-  terse: (read) => writeListing(includesListing(read)).answer,
+const INCLUDES_ANSWERS: ListAnswerTable<IncludesRead, string> = {
+  terse: (read) => writeListing(includesListing(read)),
   medium: (read) =>
-    JSON.stringify(
+    jsonText(
       writeJson(
         {
           object_name: read.object_name,
@@ -442,7 +449,7 @@ const INCLUDES_ANSWERS: AnswerTable<IncludesRead, string> = {
             omitEmpty: true,
           }),
         },
-      ).answer,
+      ),
     ),
   full: fullIncludes,
   raw: fullIncludes,
@@ -1117,11 +1124,11 @@ interface ListOf {
  * every other answer: terse one text written by the listing writer, the other
  * levels a JSON array of the entries.
  */
-const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+const LIST_ANSWERS: ListAnswerTable<ListOf, McpResult> = {
   terse: terseList,
   medium: jsonList,
-  full: jsonList,
-  raw: jsonList,
+  full: (list) => jsonList(list).answer,
+  raw: (list) => jsonList(list).answer,
 };
 
 /** A list call's answer: one entry per asked, in the order asked, at the level asked. */
@@ -1130,11 +1137,11 @@ function listAnswer(
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
-  return answerAt(LIST_ANSWERS, level)({ objects, results });
+  return listAnswerAt(LIST_ANSWERS, level)({ objects, results });
 }
 
 /** A list call's terse text. */
-function terseList({ objects, results }: ListOf): McpResult {
+function terseList({ objects, results }: ListOf): Written<TextResult> {
   // Every object's text written by the listing writer: a failure under its
   // escaped `# object` line and one `# error` line; an answered one as its
   // own terse listing.
@@ -1167,8 +1174,8 @@ function terseList({ objects, results }: ListOf): McpResult {
           read === undefined ? undefined : nest(includesListing(read)),
       ),
     },
-  }).answer;
-  return { isError: false, content: [{ type: 'text', text }] };
+  });
+  return asTextResult(text);
 }
 
 /** One object of a list call: what was asked, its answer, and its read when answered. */
@@ -1179,21 +1186,25 @@ interface AnsweredObject {
 }
 
 /** A list call's entries as a JSON array. */
-function jsonList({ objects, results }: ListOf): McpResult {
-  const entries = results.map((result, i) => {
-    const asked = objects[i];
-    return result.isError
-      ? {
-          object_name: asked.object_name,
-          object_type: asked.object_type,
-          error: payloadOfAnswer(result),
-        }
-      : payloadOfAnswer(result);
-  });
-  return {
-    isError: false,
-    content: [{ type: 'text', text: JSON.stringify(entries) }],
-  };
+function jsonList({ objects, results }: ListOf): Written<TextResult> {
+  // Every answer one entry, written by the listing writer.
+  return asJsonResult(
+    writeJsonList(
+      { answered: results.map((result, i) => ({ result, i })) },
+      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
+        ((result, i) => {
+          const asked = objects[i];
+          return result.isError
+            ? {
+                object_name: asked.object_name,
+                object_type: asked.object_type,
+                error: payloadOfAnswer(result),
+              }
+            : payloadOfAnswer(result);
+        })(result, i),
+      ),
+    ),
+  );
 }
 
 /**
@@ -1223,7 +1234,7 @@ async function answeredGetIncludesList(
 ) {
   // The schema holds the rule: one object, or a non-empty `objects`.
   const { logger } = context;
-  const shown = answerAt(INCLUDES_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(INCLUDES_ANSWERS, levelOf(args));
   const listed = args?.objects;
   if (listed === undefined) {
     const parent =

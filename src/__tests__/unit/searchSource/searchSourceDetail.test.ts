@@ -74,7 +74,7 @@ describe('SearchSource detail', () => {
 
   it('terse at lines: the hits under their object, include and line', async () => {
     assert.equal(
-      searchSourceRows(await scanned('lines')),
+      searchSourceRows(await scanned('lines')).answer,
       [
         '# scanned objects 1 sources 1 objects_with_hits 1',
         '# not loaded by SAP\tZPKG\tCLAS/OC',
@@ -87,13 +87,13 @@ describe('SearchSource detail', () => {
   });
 
   it('terse at snippets: a snippet column', async () => {
-    const rows = searchSourceRows(await scanned('snippets')).split('\n');
+    const rows = searchSourceRows(await scanned('snippets')).answer.split('\n');
     assert.equal(rows[2], 'include\tline\tsnippet');
     assert.equal(rows[4], 'ZPROG\t1\tone hit');
   });
 
   it('terse at objects: the hits counted per object and include', async () => {
-    const rows = searchSourceRows(await scanned('objects')).split('\n');
+    const rows = searchSourceRows(await scanned('objects')).answer.split('\n');
     assert.equal(rows[2], 'include\thits');
     assert.equal(rows[4], 'ZPROG\t2');
   });
@@ -140,7 +140,7 @@ describe('SearchSource and an object SAP lists without a name', () => {
     ]);
     assert.ok(
       searchSourceRows(result)
-        .split('\n')
+        .answer.split('\n')
         .includes(
           '# incomplete\tZPKG\tPROG/P\turi=/sap/bc/adt/programs/programs/znameless',
         ),

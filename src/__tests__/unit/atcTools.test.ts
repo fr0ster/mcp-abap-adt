@@ -761,7 +761,7 @@ describe('the two readers', () => {
   });
 
   // Codex round 6, P1-5: GetATCResult's terse findings go through the
-  // guarded writer — every finding the result holds, each to act on.
+  // listing writer — every finding the result holds, each to act on.
   it('GetATCResult terse: a finding per finding the result holds', async () => {
     const DOCUMENT = corpusBody(
       'atc-result-by-display-id-objects--01-results-e6ac99b2161f1fe1b5a26b71db975628',
@@ -795,7 +795,7 @@ describe('the two readers', () => {
       message: 'unused',
     });
     const rows = findingsText([], {}, [at(9, 0), at(10, 0), at(9, 4)])
-      .split('\n')
+      .answer.split('\n')
       .slice(1);
     assert.equal(new Set(rows).size, 3, rows.join('\n'));
   });

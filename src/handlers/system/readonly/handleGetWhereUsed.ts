@@ -52,18 +52,24 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
-  type AnswerTable,
-  answerAt,
+  asJsonResult,
+  asTextResult,
   type DetailLevel,
   entries,
   type Head,
+  type ListAnswerTable,
   type Listing,
+  listAnswerAt,
   nest,
   omitting,
   parts,
   rows,
+  type TextResult,
+  values,
+  type Written,
   wireAnswer,
   writeJson,
+  writeJsonList,
   writeListing,
 } from '../../../lib/detail';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
@@ -444,10 +450,10 @@ function namelessUri(reference: { name: string; uri?: string | undefined }) {
  * `utilWhereUsedReferences` (the util set's where-used slot), package nodes
  * kept.
  */
-const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, string | object> = {
+const WHERE_USED_ANSWERS: ListAnswerTable<WhereUsedRead, string | object> = {
   // Every usage (terse) or reference (medium, full), written from the
   // list's own references by the listing writers.
-  terse: ({ result }) => writeListing(whereUsedListing(result)).answer,
+  terse: ({ result }) => writeListing(whereUsedListing(result)),
   medium: ({ result }) =>
     writeJson(
       {
@@ -466,7 +472,7 @@ const WHERE_USED_ANSWERS: AnswerTable<WhereUsedRead, string | object> = {
               : fields,
         ),
       },
-    ).answer,
+    ),
   // The answer before `detail`, as it is.
   full: ({ result, args }) => fullWhereUsed(result, args),
   raw: ({ result }) => result.document,
@@ -545,7 +551,7 @@ async function whereUsedOf(
     }
   }
 
-  const shown = answerAt(WHERE_USED_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(WHERE_USED_ANSWERS, levelOf(args));
   return answer(
     { tool: 'GetWhereUsed', detail: detailOf(args) },
     () =>
@@ -655,7 +661,7 @@ async function whereUsedFromAnswers(
     const unknown = unsearchable(typedArgs, scopeResponse);
     if (unknown !== undefined) return return_error(unknown);
   }
-  const shown = answerAt(WHERE_USED_ANSWERS, levelOf(given));
+  const shown = listAnswerAt(WHERE_USED_ANSWERS, levelOf(given));
   return answer(
     { tool: 'GetWhereUsed', detail: detailOf(given) },
     () =>
@@ -907,11 +913,11 @@ interface ListOf {
  * every other answer: terse one text written by the listing writer, the other
  * levels a JSON array of the entries.
  */
-const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {
+const LIST_ANSWERS: ListAnswerTable<ListOf, McpResult> = {
   terse: terseList,
   medium: jsonList,
-  full: jsonList,
-  raw: jsonList,
+  full: (list) => jsonList(list).answer,
+  raw: (list) => jsonList(list).answer,
 };
 
 /** A list call's answer: one entry per asked, in the order asked, at the level asked. */
@@ -924,11 +930,11 @@ function listAnswer(
   results: readonly McpResult[],
   level: DetailLevel,
 ): McpResult {
-  return answerAt(LIST_ANSWERS, level)({ objects, targets, results });
+  return listAnswerAt(LIST_ANSWERS, level)({ objects, targets, results });
 }
 
 /** A list call's terse text. */
-function terseList({ objects, targets, results }: ListOf): McpResult {
+function terseList({ objects, targets, results }: ListOf): Written<TextResult> {
   // Every object's text written by the listing writer: its name escaped in
   // its `# object` line, its usages as its own terse listing, a failure as
   // one escaped `# error` line — a name cannot add a row.
@@ -962,8 +968,8 @@ function terseList({ objects, targets, results }: ListOf): McpResult {
           read === undefined ? undefined : nest(whereUsedListing(read.result)),
       ),
     },
-  }).answer;
-  return { isError: false, content: [{ type: 'text', text }] };
+  });
+  return asTextResult(text);
 }
 
 /** One object of a list call: what was asked, its answer, and its read when answered. */
@@ -974,21 +980,25 @@ interface AnsweredObject {
 }
 
 /** A list call's entries as a JSON array. */
-function jsonList({ objects, targets, results }: ListOf): McpResult {
-  const answers = results.map((result, i) => {
-    const asked = objects[i];
-    return result.isError
-      ? {
-          object_name: asked.object_name,
-          object_type: asked.object_type,
-          error: payloadOfAnswer(result),
-        }
-      : payloadOfAnswer(result);
-  });
-  return {
-    isError: false,
-    content: [{ type: 'text', text: JSON.stringify(answers) }],
-  };
+function jsonList({ objects, targets, results }: ListOf): Written<TextResult> {
+  // Every answer one entry, written by the listing writer.
+  return asJsonResult(
+    writeJsonList(
+      { answered: results.map((result, i) => ({ result, i })) },
+      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
+        ((result, i) => {
+          const asked = objects[i];
+          return result.isError
+            ? {
+                object_name: asked.object_name,
+                object_type: asked.object_type,
+                error: payloadOfAnswer(result),
+              }
+            : payloadOfAnswer(result);
+        })(result, i),
+      ),
+    ),
+  );
 }
 
 /**

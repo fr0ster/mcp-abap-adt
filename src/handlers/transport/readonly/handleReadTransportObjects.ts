@@ -39,14 +39,16 @@ import {
   answered,
   type DetailTable,
   entries,
-  formatted,
   fullLevel,
+  type ListDetailTable,
   marks,
   rawLevel,
   readingAt,
   rows,
+  type Written,
   writeJson,
   writeListing,
+  written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -106,7 +108,7 @@ const incompleteWords = (entry: ITransportIncompleteEntry) =>
 function transportRows(
   transportNumber: string,
   list: ITransportObjectEntryList,
-): string {
+): Written<string> {
   const incomplete = list.incompleteEntries ?? [];
   return writeListing({
     heads: [
@@ -145,7 +147,7 @@ function transportRows(
         incompleteWords,
       ),
     },
-  }).answer;
+  });
 }
 
 /** An incomplete entry as the medium answer writes it: the fields it carries. */
@@ -212,7 +214,7 @@ export async function handleReadTransportObjects(
         }),
         { as: 'objects' },
       ),
-    }).answer;
+    });
   };
 
   // What the entries answer at each level: the reading the slot is given,
@@ -221,13 +223,13 @@ export async function handleReadTransportObjects(
   // task and position; the incomplete ones apart, since 0.28.2), full the
   // parse, raw the document.
   // Each level writes every entry it was given, by the listing writers.
-  const readings: DetailTable<
-    string | XmlNode | ReturnType<typeof mediumObjects>
+  const readings: ListDetailTable<
+    string | XmlNode | ReturnType<typeof mediumObjects>['answer']
   > = {
-    terse: formatted(transportObjectEntryList, (list) =>
+    terse: written(transportObjectEntryList, (list) =>
       transportRows(args.transport_number, list),
     ),
-    medium: formatted(transportObjectEntryList, mediumObjects),
+    medium: written(transportObjectEntryList, mediumObjects),
     full: fullLevel,
     raw: rawLevel,
   };

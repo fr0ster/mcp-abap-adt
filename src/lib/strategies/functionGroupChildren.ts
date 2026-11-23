@@ -6,8 +6,8 @@ import type {
 
 import type { AdtCodes } from '../adtProjections';
 import {
-  type AnswerTable,
   entries,
+  type ListAnswerTable,
   rows,
   writeJson,
   writeListing,
@@ -114,7 +114,7 @@ export async function fetchFunctionGroupChildren(
 export function functionGroupListAnswers(
   functionGroupName: string,
   listKey: 'function_modules' | 'includes',
-): AnswerTable<GroupChild[], string | object> {
+): ListAnswerTable<GroupChild[], string | object> {
   // The answer before `detail`, and every field the node structure read
   // beside it: full carries no less than medium.
   const full = (objects: GroupChild[]) => ({
@@ -149,7 +149,7 @@ export function functionGroupListAnswers(
             header: 'always',
           }),
         },
-      }).answer,
+      }),
     // Every field the node structure read but the uri — kept for a child
     // SAP listed without a name, what tells it apart.
     medium: (objects: GroupChild[]) =>
@@ -166,7 +166,7 @@ export function functionGroupListAnswers(
             { as: listKey },
           ),
         },
-      ).answer,
+      ),
     // The whole parse, as it is.
     full,
     raw: full,

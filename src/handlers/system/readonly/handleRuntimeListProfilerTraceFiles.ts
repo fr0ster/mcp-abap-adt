@@ -11,11 +11,13 @@ import {
   type DetailTable,
   entries,
   formatted,
+  type ListDetailTable,
   rawLevel,
   readingAt,
   rows,
   writeJson,
   writeListing,
+  written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -53,49 +55,45 @@ function mediumEntry(entry: IAbapTraceEntry) {
  */
 /** Every trace the feed held, by its id. */
 // Every trace the feed held, written by the listing writers.
-const TRACE_READINGS: DetailTable<string | object> = {
-  terse: formatted(
-    profilerTraceEntries,
-    (entries: IAbapTraceEntry[]) =>
-      writeListing({
-        heads: [{ head: 'count', value: String(entries.length) }],
-        reading: { entries },
-        lists: {
-          entries: rows('entries', {
-            columns: [
-              { name: 'id', cell: (entry: IAbapTraceEntry) => entry.id },
-              {
-                name: 'recordedAt',
-                cell: (entry: IAbapTraceEntry) => entry.recordedAt,
-              },
-              {
-                name: 'objectName',
-                cell: (entry: IAbapTraceEntry) => entry.objectName,
-              },
-              {
-                name: 'state',
-                cell: (entry: IAbapTraceEntry) => entry.state?.text ?? '',
-              },
-              {
-                name: 'runtime',
-                cell: (entry: IAbapTraceEntry) => String(entry.runtime),
-              },
-            ],
-            header: 'always',
-          }),
-        },
-      }).answer,
+const TRACE_READINGS: ListDetailTable<string | object> = {
+  terse: written(profilerTraceEntries, (entries: IAbapTraceEntry[]) =>
+    writeListing({
+      heads: [{ head: 'count', value: String(entries.length) }],
+      reading: { entries },
+      lists: {
+        entries: rows('entries', {
+          columns: [
+            { name: 'id', cell: (entry: IAbapTraceEntry) => entry.id },
+            {
+              name: 'recordedAt',
+              cell: (entry: IAbapTraceEntry) => entry.recordedAt,
+            },
+            {
+              name: 'objectName',
+              cell: (entry: IAbapTraceEntry) => entry.objectName,
+            },
+            {
+              name: 'state',
+              cell: (entry: IAbapTraceEntry) => entry.state?.text ?? '',
+            },
+            {
+              name: 'runtime',
+              cell: (entry: IAbapTraceEntry) => String(entry.runtime),
+            },
+          ],
+          header: 'always',
+        }),
+      },
+    }),
   ),
-  medium: formatted(
-    profilerTraceEntries,
-    (traces: IAbapTraceEntry[]) =>
-      writeJson(
-        { success: true, count: traces.length },
-        { entries: traces },
-        {
-          entries: entries('entries', mediumEntry),
-        },
-      ).answer,
+  medium: written(profilerTraceEntries, (traces: IAbapTraceEntry[]) =>
+    writeJson(
+      { success: true, count: traces.length },
+      { entries: traces },
+      {
+        entries: entries('entries', mediumEntry),
+      },
+    ),
   ),
   full: formatted(profilerTraceEntries, (entries: IAbapTraceEntry[]) => ({
     success: true,

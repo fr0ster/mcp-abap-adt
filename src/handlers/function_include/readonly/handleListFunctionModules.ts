@@ -27,7 +27,7 @@ import * as z from 'zod';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt, wireAnswer } from '../../../lib/detail';
+import { listAnswerAt, wireAnswer } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   ASSEMBLED_DETAIL_SHAPE,
@@ -110,7 +110,7 @@ async function answeredListFunctionModules(
           ),
         ),
       ),
-    answerAt(
+    listAnswerAt(
       functionGroupListAnswers(functionGroupName, 'function_modules'),
       levelOf(args),
     ),

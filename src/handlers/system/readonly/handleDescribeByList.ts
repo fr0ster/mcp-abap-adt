@@ -53,10 +53,14 @@ import {
 import {
   type AnswerTable,
   answerAt,
+  asContentResult,
+  asTextResult,
   type Column,
   cellsOf,
   entries,
   kinds,
+  type ListAnswerTable,
+  listAnswerAt,
   omitted,
   wireAnswer,
   writeJsonList,
@@ -172,15 +176,13 @@ interface DescribedItem {
  * or `found: false` for one no search found — written by the listing
  * writer from the items, one entry each.
  */
-const fullDescribed = (items: readonly DescribedItem[]): McpResult => ({
-  isError: false,
-  content: [
-    ...writeJsonList(
+const fullDescribed = (items: readonly DescribedItem[]) =>
+  asContentResult(
+    writeJsonList(
       { items },
       entries('items', (item: DescribedItem) => item.described.entry),
-    ).answer,
-  ],
-});
+    ),
+  );
 
 /** The hit rows a search answered for an object, read back into their cells. */
 const hitRowsOf = ({ described }: DescribedItem): string[][] =>
@@ -229,57 +231,53 @@ const describedLines = (items: readonly DescribedItem[]): DescribedLine[] =>
  * listing writers. Raw never reaches this table: the handler answers it
  * as the responses (`wireAnswer`).
  */
-const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
-  terse: (items) => ({
-    isError: false,
-    content: [
-      {
-        type: 'text',
-        text: writeListing({
-          heads: [],
-          reading: { lines: describedLines(items) },
-          lists: {
-            lines: kinds<DescribedLine, 'lines', 'kind'>(
-              'lines',
-              'kind',
-              {
+const DESCRIBE_ANSWERS: ListAnswerTable<readonly DescribedItem[], McpResult> = {
+  terse: (items) =>
+    asTextResult(
+      writeListing({
+        heads: [],
+        reading: { lines: describedLines(items) },
+        lists: {
+          lines: kinds<DescribedLine, 'lines', 'kind'>(
+            'lines',
+            'kind',
+            {
+              row: {
                 row: {
-                  row: {
-                    columns: [0, 1, 2, 3].map(
-                      (i): Column<DescribedLine> => ({
-                        name: String(i),
-                        cell: (line) =>
-                          line.kind === 'row' ? (line.cells[i] ?? '') : '',
-                        when: (line) =>
-                          line.kind === 'row' && i < line.cells.length,
-                      }),
+                  columns: [0, 1, 2, 3].map(
+                    (i): Column<DescribedLine> => ({
+                      name: String(i),
+                      cell: (line) =>
+                        line.kind === 'row' ? (line.cells[i] ?? '') : '',
+                      when: (line) =>
+                        line.kind === 'row' && i < line.cells.length,
+                    }),
+                  ),
+                  header: 'none',
+                  lists: {
+                    // A hit row's cells are its columns.
+                    cells: omitted<string, 'cells'>(
+                      'cells',
+                      "a hit row's cells, written as its columns",
                     ),
-                    header: 'none',
-                    lists: {
-                      // A hit row's cells are its columns.
-                      cells: omitted<string, 'cells'>(
-                        'cells',
-                        "a hit row's cells, written as its columns",
-                      ),
-                    },
                   },
                 },
-                error: {
-                  mark: 'error',
-                  words: (line: DescribedLine) =>
-                    line.kind === 'error' ? failureWords(line.item) : [],
-                },
               },
-              ['name', 'type', 'description', 'package'],
-            ),
-          },
-        }).answer,
-      },
-    ],
-  }),
+              error: {
+                mark: 'error',
+                words: (line: DescribedLine) =>
+                  line.kind === 'error' ? failureWords(line.item) : [],
+              },
+            },
+            ['name', 'type', 'description', 'package'],
+          ),
+        },
+      }),
+    ),
+
   medium: fullDescribed,
-  full: fullDescribed,
-  raw: fullDescribed,
+  full: (items) => fullDescribed(items).answer,
+  raw: (items) => fullDescribed(items).answer,
 };
 
 /**
@@ -518,7 +516,7 @@ async function answeredDescribeByList(
   args: DescribeArgs,
 ) {
   // The schema holds the rule: a non-empty `objects`.
-  const shown = answerAt(DESCRIBE_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(DESCRIBE_ANSWERS, levelOf(args));
   // The child searches read at the level's reading: terse its hit rows,
   // medium and full the whole parse (each hit's URI kept, no TSV wrapped).
   const searchAt = answerAt(CHILD_SEARCH_LEVELS, levelOf(args))(undefined);

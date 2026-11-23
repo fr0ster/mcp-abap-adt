@@ -9,16 +9,21 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   entries,
+  formatted,
   type JsonSchemas,
   kinds,
+  type ListAnswerTable,
+  type ListDetailTable,
   marks,
   nest,
   omitting,
   parts,
   type RowSchemas,
+  rawLevel,
   rows,
   sections,
   type Written,
+  whole,
   writeJson,
   writeJsonList,
   writeJsonRoot,
@@ -355,6 +360,29 @@ describe('the schemas leave no hole', () => {
     // @ts-expect-error `Written` is nominal.
     const forged: Written<string> = { answer: 'plain' };
     void forged;
+  });
+
+  it('a list table takes no plain answer at terse or medium', () => {
+    const table: ListAnswerTable<string, string> = {
+      // @ts-expect-error a plain string is no written answer.
+      terse: (value: string) => value,
+      // @ts-expect-error nor at medium.
+      medium: (value: string) => value,
+      full: (value: string) => value,
+      raw: (value: string) => value,
+    };
+    const readings: ListDetailTable<string> = {
+      // @ts-expect-error a formatter's own value is no written level.
+      terse: formatted(
+        (answer) => String(answer.data),
+        (value) => value,
+      ),
+      medium: whole(rawLevel),
+      full: rawLevel,
+      raw: rawLevel,
+    };
+    void table;
+    void readings;
   });
 
   it("a kind is the item's own discriminant, never a constant", () => {

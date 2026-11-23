@@ -33,6 +33,8 @@ import { withSystemKindOf } from '../../../lib/connectionFactory';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
+  type Rendered,
   tsv,
   wireAnswer,
 } from '../../../lib/detail';
@@ -291,77 +293,138 @@ function pageLines(answered: {
   ];
 }
 
-/** A feed's terse answer: TSV under its `# feed` and `# count` lines. */
-function terseFeed(shown: FeedShown): string {
-  const head = [`# feed ${shown.feed}`, `# count ${shown.answered.count}`];
+/** A row of a feed's terse answer, and the identity of the item it was written of. */
+interface FeedRow {
+  readonly cells: string[];
+  readonly identity: string;
+}
+
+/** A feed's columns and rows: one row per item it holds. */
+function feedRows(shown: FeedShown): { columns: string[]; rows: FeedRow[] } {
   switch (shown.feed) {
     case 'descriptors':
-      return [
-        ...head,
-        tsv(
-          ['id', 'title', 'category'],
-          shown.answered.entries.map((e) => [e.id, e.title, e.category ?? '']),
-        ),
-      ].join('\n');
+      return {
+        columns: ['id', 'title', 'category'],
+        rows: shown.answered.entries.map((e) => ({
+          cells: [e.id, e.title, e.category ?? ''],
+          identity: `feed|${e.id}`,
+        })),
+      };
     case 'variants':
-      return [
-        ...head,
-        tsv(
-          ['feed', 'title', 'query', 'is_default'],
-          // Every feed: one without variants is a row with none.
-          shown.answered.entries.flatMap((feed) =>
-            feed.variants.length === 0
-              ? [[feed.feed, '', '', '']]
-              : feed.variants.map((v) => [
-                  feed.feed,
-                  v.title,
-                  v.query,
-                  String(v.is_default),
-                ]),
-          ),
+      return {
+        columns: ['feed', 'title', 'query', 'is_default'],
+        // Every feed: one without variants is a row with none.
+        rows: shown.answered.entries.flatMap((feed) =>
+          feed.variants.length === 0
+            ? [
+                {
+                  cells: [feed.feed, '', '', ''],
+                  identity: `feed|${feed.feed}`,
+                },
+              ]
+            : feed.variants.map((v) => ({
+                cells: [feed.feed, v.title, v.query, String(v.is_default)],
+                identity: `variant|${feed.feed}|${v.title}|${v.query}`,
+              })),
         ),
-      ].join('\n');
+      };
     case 'dumps':
-      return [
-        ...head,
-        ...pageLines(shown.answered),
-        tsv(
-          ['dump_id', 'updated', 'title'],
-          shown.answered.entries.map((e) => [e.dump_id, e.updated, e.title]),
-        ),
-      ].join('\n');
+      return {
+        columns: ['dump_id', 'updated', 'title'],
+        rows: shown.answered.entries.map((e) => ({
+          cells: [e.dump_id, e.updated, e.title],
+          identity: `dump|${e.dump_id}`,
+        })),
+      };
     case 'system_messages':
-      return [
-        ...head,
-        ...pageLines(shown.answered),
-        tsv(
-          ['id', 'createdOn', 'author', 'title'],
-          shown.answered.entries.map((e) => [
+      return {
+        columns: ['id', 'createdOn', 'author', 'title'],
+        rows: shown.answered.entries.map((e) => ({
+          cells: [
             e.id ?? e.messageId ?? '',
             e.createdOn ?? '',
             e.author ?? e.createdBy ?? '',
             e.title ?? '',
-          ]),
-        ),
-      ].join('\n');
+          ],
+          identity: `message|${e.id ?? e.messageId ?? ''}`,
+        })),
+      };
     case 'gateway_errors':
-      return [
-        ...head,
-        ...pageLines(shown.answered),
-        tsv(
-          ['opid', 'detail_kind', 'dateTime', 'type', 'shortText', 'username'],
-          shown.answered.entries.map((e) => [
+      return {
+        columns: [
+          'opid',
+          'detail_kind',
+          'dateTime',
+          'type',
+          'shortText',
+          'username',
+        ],
+        rows: shown.answered.entries.map((e) => ({
+          cells: [
             e.opid ?? '',
             detailKindOf(e),
             e.dateTime ?? '',
             e.type ?? '',
             e.shortText ?? '',
             e.username ?? '',
-          ]),
-        ),
-      ].join('\n');
+          ],
+          identity: `error|${e.opid ?? ''}`,
+        })),
+      };
   }
 }
+
+/** Every item a feed holds, by its identity: each entry, each variant, a feed without variants. */
+function heldFeedItems(shown: FeedShown): string[] {
+  switch (shown.feed) {
+    case 'descriptors':
+      return shown.answered.entries.map((e) => `feed|${e.id}`);
+    case 'variants':
+      return shown.answered.entries.flatMap((feed) =>
+        feed.variants.length === 0
+          ? [`feed|${feed.feed}`]
+          : feed.variants.map(
+              (v) => `variant|${feed.feed}|${v.title}|${v.query}`,
+            ),
+      );
+    case 'dumps':
+      return shown.answered.entries.map((e) => `dump|${e.dump_id}`);
+    case 'system_messages':
+      return shown.answered.entries.map(
+        (e) => `message|${e.id ?? e.messageId ?? ''}`,
+      );
+    case 'gateway_errors':
+      return shown.answered.entries.map((e) => `error|${e.opid ?? ''}`);
+  }
+}
+
+/**
+ * A feed's terse answer: TSV under its `# feed` and `# count` lines — every
+ * item the feed holds, or nothing (`completeAnswer`).
+ */
+const terseFeed = completeAnswer(
+  'RuntimeListFeeds',
+  heldFeedItems,
+  (shown: FeedShown): Rendered<string> => {
+    const { columns, rows } = feedRows(shown);
+    const head = [`# feed ${shown.feed}`, `# count ${shown.answered.count}`];
+    const paged =
+      shown.feed === 'descriptors' || shown.feed === 'variants'
+        ? []
+        : pageLines(shown.answered);
+    return {
+      answer: [
+        ...head,
+        ...paged,
+        tsv(
+          columns,
+          rows.map((row) => row.cells),
+        ),
+      ].join('\n'),
+      rendered: rows.map((row) => row.identity),
+    };
+  },
+);
 
 /**
  * What `RuntimeListFeeds` answers at each `detail`, selected by the handler

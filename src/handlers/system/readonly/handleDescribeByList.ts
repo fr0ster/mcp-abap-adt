@@ -50,7 +50,13 @@ import {
   runPhase,
   withSequentialFallback,
 } from '../../../lib/batch/phases';
-import { type AnswerTable, answerAt, wireAnswer } from '../../../lib/detail';
+import {
+  type AnswerTable,
+  answerAt,
+  completeAnswer,
+  type Rendered,
+  wireAnswer,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AnswerValue,
@@ -128,26 +134,45 @@ interface DescribedItem {
  * answer is built from several searches, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
+/** An object asked for, by its name and type. */
+const askedIdentity = ({ obj }: DescribedItem) =>
+  `object|${obj.name}|${obj.type ?? ''}`;
+
 const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
-  terse: (items) => {
-    const lines = ['name\ttype\tdescription\tpackage'];
-    for (const { obj, described } of items) {
-      if (described.failure !== undefined) {
-        lines.push(`# error ${obj.name} ${JSON.stringify(described.failure)}`);
-        continue;
+  // Every object asked for — its hits, its not-found row or its failure —
+  // or nothing (`completeAnswer`).
+  terse: completeAnswer(
+    'DescribeByList',
+    (items: readonly DescribedItem[]) => items.map(askedIdentity),
+    (items: readonly DescribedItem[]): Rendered<McpResult> => {
+      const lines = ['name\ttype\tdescription\tpackage'];
+      const rendered: string[] = [];
+      for (const item of items) {
+        const { obj, described } = item;
+        if (described.failure !== undefined) {
+          lines.push(
+            `# error ${obj.name} ${JSON.stringify(described.failure)}`,
+          );
+          rendered.push(askedIdentity(item));
+          continue;
+        }
+        const rows = (described.hits ?? '')
+          .split('\n')
+          .slice(1)
+          .filter((row) => row !== '');
+        if (rows.length === 0) lines.push(`${obj.name}\t-\t\t`);
+        else lines.push(...rows);
+        rendered.push(askedIdentity(item));
       }
-      const rows = (described.hits ?? '')
-        .split('\n')
-        .slice(1)
-        .filter((row) => row !== '');
-      if (rows.length === 0) lines.push(`${obj.name}\t-\t\t`);
-      else lines.push(...rows);
-    }
-    return {
-      isError: false,
-      content: [{ type: 'text', text: lines.join('\n') }],
-    };
-  },
+      return {
+        answer: {
+          isError: false,
+          content: [{ type: 'text', text: lines.join('\n') }],
+        },
+        rendered,
+      };
+    },
+  ),
   medium: fullDescribed,
   full: fullDescribed,
   raw: fullDescribed,

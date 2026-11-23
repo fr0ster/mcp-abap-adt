@@ -37,6 +37,8 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
+  type Rendered,
   tsv,
   wireAnswer,
 } from '../../../lib/detail';
@@ -796,7 +798,10 @@ interface EnhancementsShown {
 }
 
 /** One object's terse lines: its `# object` line, then its rows. */
-function terseObjectLines(response: EnhancementResponse): string[] {
+function terseObjectLines(
+  response: EnhancementResponse,
+  rendered: string[],
+): string[] {
   const lines = [
     `# object ${response.object_type} ${response.object_name}`,
     ...(response.context ? [`# context ${response.context}`] : []),
@@ -806,18 +811,42 @@ function terseObjectLines(response: EnhancementResponse): string[] {
     lines.push(
       tsv(
         ['name', 'type', 'description'],
-        response.enhancements.map((enh) => [
-          enh.name,
-          enh.type,
-          (enh.description ?? '').split('\n')[0] ?? '',
-        ]),
+        response.enhancements.map((enh) => {
+          rendered.push(enhancementIdentity(response, enh));
+          return [
+            enh.name,
+            enh.type,
+            (enh.description ?? '').split('\n')[0] ?? '',
+          ];
+        }),
       ),
     );
   }
   for (const entry of response.unreadable ?? []) {
     lines.push(`# unreadable ${JSON.stringify(entry)}`);
+    rendered.push(
+      `unreadable|${response.object_name}|${JSON.stringify(entry)}`,
+    );
   }
   return lines;
+}
+
+/** An enhancement's identity: the object it enhances, its name and type. */
+function enhancementIdentity(
+  response: EnhancementResponse,
+  enh: EnhancementResponse['enhancements'][number],
+): string {
+  return `enhancement|${response.object_type}|${response.object_name}|${enh.name}|${enh.type}`;
+}
+
+/** Every item one object's read held: its enhancements and what it could not read. */
+function heldOf(response: EnhancementResponse): string[] {
+  return [
+    ...response.enhancements.map((enh) => enhancementIdentity(response, enh)),
+    ...(response.unreadable ?? []).map(
+      (entry) => `unreadable|${response.object_name}|${JSON.stringify(entry)}`,
+    ),
+  ];
 }
 
 /**
@@ -839,19 +868,41 @@ const ENHANCEMENT_ANSWERS: AnswerTable<EnhancementsShown, string | object> =
           ? { ...read.response, detailed: true }
           : filterMinimalNested(read.response);
     return {
-      terse: ({ read }) => {
-        if (read.kind === 'single') {
-          return terseObjectLines(read.response).join('\n');
-        }
-        const nested = read.response;
-        return [
-          `# total ${nested.total_enhancements_found}`,
-          ...nested.objects.flatMap(terseObjectLines),
-          ...(nested.includes_unread ?? []).map(
-            (unread) => `# include_unread ${JSON.stringify(unread)}`,
-          ),
-        ].join('\n');
-      },
+      // Every enhancement and every part not read, or nothing
+      // (`completeAnswer`).
+      terse: completeAnswer(
+        'GetEnhancements',
+        ({ read }: EnhancementsShown) =>
+          read.kind === 'single'
+            ? heldOf(read.response)
+            : [
+                ...read.response.objects.flatMap(heldOf),
+                ...(read.response.includes_unread ?? []).map(
+                  (unread) => `include_unread|${JSON.stringify(unread)}`,
+                ),
+              ],
+        ({ read }: EnhancementsShown): Rendered<string> => {
+          const rendered: string[] = [];
+          if (read.kind === 'single') {
+            return {
+              answer: terseObjectLines(read.response, rendered).join('\n'),
+              rendered,
+            };
+          }
+          const nested = read.response;
+          const answer = [
+            `# total ${nested.total_enhancements_found}`,
+            ...nested.objects.flatMap((object) =>
+              terseObjectLines(object, rendered),
+            ),
+            ...(nested.includes_unread ?? []).map((unread) => {
+              rendered.push(`include_unread|${JSON.stringify(unread)}`);
+              return `# include_unread ${JSON.stringify(unread)}`;
+            }),
+          ].join('\n');
+          return { answer, rendered };
+        },
+      ),
       medium: former,
       full: former,
       raw: former,

@@ -3,8 +3,10 @@ import { isRfcConnection } from '../../../lib/connectionKind';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
   type DetailLevel,
   groupedTsv,
+  type Rendered,
   wireAnswer,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -156,19 +158,48 @@ function includeColumn(hit: OrchestratorResult['results'][number]): string {
  * `include\thits`. Every hit is answered.
  */
 export function searchSourceRows(result: OrchestratorResult): string {
+  return completeAnswer('SearchSource', heldHits, renderedRows)(result);
+}
+
+/** A hit's identity: its object, include and line (or count). */
+function hitIdentity(hit: OrchestratorResult['results'][number]): string {
+  return `hit|${hit.devclass}|${hit.object_type}|${hit.object_name}|${includeColumn(hit)}|${'hits' in hit ? `hits=${hit.hits}` : `line=${hit.line}`}`;
+}
+
+/** Every item a scan held: its hits, the nodes SAP could not load, the targets it listed without a name. */
+function heldHits(result: OrchestratorResult): string[] {
+  return [
+    ...result.results.map(hitIdentity),
+    ...(result.not_loaded ?? []).map(
+      (node) => `not-loaded|${node.package}|${node.type}`,
+    ),
+    ...(result.incomplete ?? []).map(
+      (target) =>
+        `incomplete|${target.package}|${target.type}|${target.tech_name ?? ''}|${target.uri ?? ''}`,
+    ),
+  ];
+}
+
+function renderedRows(result: OrchestratorResult): Rendered<string> {
+  // The identity of each item, recorded where its line is written.
+  const rendered: string[] = [];
   const head = [
     `# scanned objects ${result.scanned.objects} sources ${result.scanned.sources} objects_with_hits ${result.scanned.objects_with_hits}`,
     ...(result.truncated.by_object_cap ? ['# truncated by_object_cap'] : []),
     ...(result.truncated.by_max_hits === true
       ? ['# truncated by_max_hits']
       : []),
-    ...(result.not_loaded ?? []).map(
-      (node) => `# not loaded by SAP ${node.package} ${node.type}`,
-    ),
+    ...(result.not_loaded ?? []).map((node) => {
+      rendered.push(`not-loaded|${node.package}|${node.type}`);
+      return `# not loaded by SAP ${node.package} ${node.type}`;
+    }),
     // A target SAP listed without a name: never scanned, named by what tells
     // it apart.
-    ...(result.incomplete ?? []).map((target) =>
-      [
+    ...(result.incomplete ?? []).map((target) => {
+      rendered.push(
+        `incomplete|${target.package}|${target.type}|${target.tech_name ?? ''}|${target.uri ?? ''}`,
+      );
+      return [
         '# incomplete',
         target.package,
         target.type,
@@ -176,8 +207,8 @@ export function searchSourceRows(result: OrchestratorResult): string {
           ? [`tech_name=${target.tech_name}`]
           : []),
         ...(target.uri !== undefined ? [`uri=${target.uri}`] : []),
-      ].join(' '),
-    ),
+      ].join(' ');
+    }),
   ];
   const first = result.results[0];
   const columns =
@@ -197,15 +228,19 @@ export function searchSourceRows(result: OrchestratorResult): string {
           ? [includeColumn(hit), String(hit.line), hit.snippet]
           : [includeColumn(hit), String(hit.line)],
     );
+    rendered.push(hitIdentity(hit));
     groups.set(key, rows);
   }
-  return [
-    ...head,
-    groupedTsv(
-      columns,
-      [...groups].map(([value, rows]) => ({ field: 'object', value, rows })),
-    ),
-  ].join('\n');
+  return {
+    answer: [
+      ...head,
+      groupedTsv(
+        columns,
+        [...groups].map(([value, rows]) => ({ field: 'object', value, rows })),
+      ),
+    ].join('\n'),
+    rendered,
+  };
 }
 
 /**

@@ -460,9 +460,13 @@ operation is offered where that system's abapGit serves it:
   name it holds under two types, in one list or across both (`abapgit_overwrite_ambiguous`: SAP
   selects by name within each list, the server refuses any collision).
 - **A close cuts SAP's dialog mid-import.** Closing an SSE stream or a stdio server logs its
-  connections off, a running background run's included, and the logoff ends SAP's dialog where it
-  stands: an on-premise link or pull under way leaves a partly imported package. A Streamable HTTP
-  disconnect leaves calls and runs going.
+  connections off, a running background run's included. What SAP does with an on-premise link or
+  pull under way when its client or connection goes away is **unverified**: it has been neither read
+  in SAP's code nor measured, and the server does not learn the outcome. Do not assume the import
+  finished or was rolled back: check what was done with `GetAbapGitStaging` (on ABAP Cloud also
+  `GetAbapGitModifiedObjects` and the run log, `GetAbapGitErrorLog`). On ABAP Cloud a pull or push
+  is SAP's job, accepted before the call answers: closing the connection does not stop it. A
+  Streamable HTTP disconnect leaves calls and runs going.
 - **What an import writes** (read in SAP's code): an on-premise link imports the whole remote
   branch, and an on-premise pull the branch the repository is linked on, both with every overwrite
   and every "object of another package" decision set to yes — objects changed in the system are

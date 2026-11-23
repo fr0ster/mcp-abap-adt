@@ -65,7 +65,7 @@ const IMPORTS =
 const CLOUD_IMPORTS =
   'the job takes every object the modified-objects read lists and brings it to its remote version, a package warning with action 5 (delete and re-create) excepted: SAP leaves it out; given overwrite, SAP selects by name against the list as it stands when its job runs: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state';
 
-const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
+const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. When the client or its connection goes away mid-import, the outcome is unknown to this server and what SAP does then is unverified (unread in SAP's code, unmeasured): the repository's staging shows what the pull left. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 
 export const TOOL_DEFINITION: KindToolDefinition<
   typeof ONPREM_SCHEMA,
@@ -79,7 +79,7 @@ export const TOOL_DEFINITION: KindToolDefinition<
     inputSchema: ONPREM_SCHEMA,
   },
   cloud: {
-    description: `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${CLOUD_IMPORTS}. SAP accepts it as its own job, which runs to its end; the objects it imports are inactive, and the repository list shows its run state. Answers facts only: SAP's status and accepted.`,
+    description: `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${CLOUD_IMPORTS}. SAP accepts it as its own job, which runs to its end whatever happens to the client or its connection after the call; the objects it imports are inactive, and the repository list shows its run state. Answers facts only: SAP's status and accepted.`,
     inputSchema: CLOUD_SCHEMA,
   },
 };

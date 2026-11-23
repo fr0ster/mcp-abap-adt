@@ -11,11 +11,15 @@ import { readFileSync } from 'node:fs';
 import { describe, it } from 'node:test';
 import ts from 'typescript';
 import { globSync } from '../../helpers/platform';
-import { NOT_YET_ASSEMBLED } from '../descriptions/notYetAssembled';
+import {
+  NOT_YET_ASSEMBLED,
+  NOT_YET_ASSEMBLED_MOST,
+} from '../descriptions/notYetAssembled';
 
 /** The files that define tools: the handlers, and the compact sets' handlers. */
 const DEFINING = [
   ...globSync('src/handlers/**/*.ts'),
+  ...globSync('src/lib/compact/**/*.ts'),
   ...globSync('compact-*/src/handlers/**/*.ts'),
 ].filter((file) => !file.includes('__tests__'));
 
@@ -27,13 +31,20 @@ interface Defined {
   readonly made: string;
 }
 
-/** The text of a property's name, when it is a plain identifier or string. */
+/** The text of a property's name: a plain identifier, a string, or a computed literal (`['description']`). */
 function propertyName(
   property: ts.ObjectLiteralElementLike,
 ): string | undefined {
   const name = property.name;
   if (name === undefined) return undefined;
   if (ts.isIdentifier(name) || ts.isStringLiteral(name)) return name.text;
+  if (
+    ts.isComputedPropertyName(name) &&
+    (ts.isStringLiteral(name.expression) ||
+      ts.isNoSubstitutionTemplateLiteral(name.expression))
+  ) {
+    return name.expression.text;
+  }
   return undefined;
 }
 
@@ -58,12 +69,19 @@ function descriptionsIn(node: ts.Node): ts.Expression[] {
 
 /** Every tool definition of a file: an object literal with a literal `name` and a `description`. */
 function definitionsOf(file: string): Defined[] {
-  const source = ts.createSourceFile(
+  return definitionsOfSource(
     file,
-    readFileSync(file, 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
+    ts.createSourceFile(
+      file,
+      readFileSync(file, 'utf8'),
+      ts.ScriptTarget.Latest,
+      true,
+    ),
   );
+}
+
+/** Every tool definition of a parsed file. */
+function definitionsOfSource(file: string, source: ts.SourceFile): Defined[] {
   const defined: Defined[] = [];
   const visit = (node: ts.Node): void => {
     if (ts.isObjectLiteralExpression(node)) {
@@ -106,6 +124,30 @@ function definitionsOf(file: string): Defined[] {
 
 describe('every tool description is assembled, or its tool still listed as not yet', () => {
   const defined = DEFINING.flatMap(definitionsOf);
+
+  it('the not-yet list only shrinks: no longer than its committed most', () => {
+    assert.ok(
+      NOT_YET_ASSEMBLED.size <= NOT_YET_ASSEMBLED_MOST,
+      `${NOT_YET_ASSEMBLED.size} listed, at most ${NOT_YET_ASSEMBLED_MOST}`,
+    );
+  });
+
+  it("reads a computed ['description'] key as the description", () => {
+    const file = 'computed.ts';
+    const source = ts.createSourceFile(
+      file,
+      "export const T = { name: 'ToolX', ['description']: 'Written whole.' };",
+      ts.ScriptTarget.Latest,
+      true,
+    );
+    assert.deepStrictEqual(
+      definitionsOfSource(file, source).map((each) => [
+        each.name,
+        each.assembled,
+      ]),
+      [['ToolX', false]],
+    );
+  });
 
   it('finds the tool definitions, so the scan is not vacuous', () => {
     assert.ok(defined.length > 200, String(defined.length));

@@ -121,7 +121,10 @@ the tests needs Node 22.15 or later (CI takes the latest 22 and 24).
   bound fires — every process still under the file's, whatever group or session it is in; a
   descendant reparented away before then (its launcher exited) is not reached —, is named with
   the last test it started, and fails the run, while the other files run on. A tree that cannot
-  be ended is listed `kill failed` and fails the run at once. The slowest file measured in CI was 194.5 s
+  be ended is listed `kill failed` and fails the run at once. A file's output is the runner's
+  own stdout and stderr (inherited, not piped), so a process that survives the bound keeps them
+  open after the runner exits: a caller that waits for the end of that output waits until the
+  process ends. The slowest file measured in CI was 194.5 s
   (`unknownSweep.test.ts`, macOS, 2026-11-23); change the bound with
   `npm test -- --file-timeout <seconds>` (the last one wins). Without the option there is no
   bound, so the other scripts (`test:install`, `test:retrieval`, …) run unbounded unless given

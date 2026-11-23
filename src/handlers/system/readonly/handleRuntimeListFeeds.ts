@@ -257,7 +257,7 @@ function pagedFeeds(
 }
 
 /** What a feed read answered, by feed: the payload each level formats. */
-type FeedShown =
+export type FeedShown =
   | {
       readonly feed: 'descriptors';
       readonly answered: { count: number; entries: readonly IFeedDescriptor[] };
@@ -393,7 +393,7 @@ const terseFeed = completeAnswer(
 );
 
 /** A feed's terse text: its `# feed`, `# count` and paging lines, then its rows. */
-function terseFeedText(shown: FeedShown): Written<string> {
+export function terseFeedText(shown: FeedShown): Written<string> {
   const { columns, identity, rows } = feedRows(shown);
   const paged =
     shown.feed === 'descriptors' || shown.feed === 'variants'

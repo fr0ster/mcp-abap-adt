@@ -28,6 +28,10 @@ import { handleGetStructuresList } from '../../../handlers/structure/readonly/ha
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
 import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
+import {
+  type FeedShown,
+  terseFeedText,
+} from '../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { searchSourceRows } from '../../../handlers/system/readonly/handleSearchSource';
 import {
   createBatchAvailability,
@@ -558,6 +562,96 @@ CASES['GetMainPrograms two programs and a group'] = async (detail) =>
       { include_name: 'zinc', detail } as never,
     ),
   );
+
+// RuntimeListFeeds' terse text of each feed (`terseFeedText`), from what a read answered.
+const FEEDS: readonly FeedShown[] = [
+  {
+    feed: 'descriptors',
+    answered: {
+      count: 2,
+      entries: [
+        { id: 'dumps', title: 'Short Dumps', url: '/d', category: 'runtime' },
+        { id: 'messages', title: 'System\tMessages', url: '/m' },
+      ],
+    },
+  },
+  {
+    feed: 'variants',
+    answered: {
+      count: 2,
+      entries: [
+        {
+          feed: 'dumps',
+          title: 'Short Dumps',
+          variants: [
+            { title: 'Mine', query: 'q1', is_default: true },
+            { title: 'All', query: 'q2', is_default: false },
+          ],
+        },
+        { feed: 'messages', title: 'System Messages', variants: [] },
+      ],
+    },
+  },
+  {
+    feed: 'dumps',
+    answered: {
+      success: true,
+      feed_type: 'dumps',
+      count: 2,
+      entries: [
+        {
+          dump_id: 'ID1',
+          updated: '2026-11-22T10:00:00Z',
+          title: 'DBSQL_SQL_ERROR',
+        },
+        { dump_id: 'ID2', updated: '2026-11-22T11:00:00Z', title: '#RAISE' },
+      ],
+      next_to: '20261122100000',
+      incomplete_second: '20261122110000',
+    },
+  },
+  {
+    feed: 'system_messages',
+    answered: {
+      success: true,
+      feed_type: 'system_messages',
+      count: 2,
+      entries: [
+        {
+          id: 'M1',
+          createdOn: '2026-11-22',
+          author: 'SAPUSER01',
+          title: 'Downtime',
+        },
+        { messageId: 'M2', createdBy: 'SAPUSER02' },
+      ],
+    },
+  },
+  {
+    feed: 'gateway_errors',
+    answered: {
+      success: true,
+      feed_type: 'gateway_errors',
+      count: 1,
+      entries: [
+        {
+          opid: 'OP1',
+          kind: 'Frontend',
+          dateTime: '2026-11-22T10:00:00Z',
+          type: 'E',
+          shortText: 'failed',
+          username: 'SAPUSER01',
+        },
+      ],
+    },
+  },
+];
+for (const shown of FEEDS) {
+  CASES[`RuntimeListFeeds terse ${shown.feed}`] = async () => ({
+    isError: false,
+    text: terseFeedText(shown).answer,
+  });
+}
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

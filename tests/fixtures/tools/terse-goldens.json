@@ -334,5 +334,65 @@
   "GetMainPrograms two programs and a group @full": {
     "isError": false,
     "text": "{\"success\":true,\"include_name\":\"ZINC\",\"main_programs\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog\"},{\"name\":\"#ZPROG2\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog2\"},{\"name\":\"ZFG\",\"type\":\"FUGR/F\",\"uri\":\"/sap/bc/adt/functions/groups/zfg\"}]}"
+  },
+  "RuntimeListFeeds terse descriptors @terse": {
+    "isError": false,
+    "text": "# feed descriptors\n# count 2\nid\ttitle\tcategory\ndumps\tShort Dumps\truntime\nmessages\tSystem\\tMessages\t"
+  },
+  "RuntimeListFeeds terse descriptors @medium": {
+    "isError": false,
+    "text": "# feed descriptors\n# count 2\nid\ttitle\tcategory\ndumps\tShort Dumps\truntime\nmessages\tSystem\\tMessages\t"
+  },
+  "RuntimeListFeeds terse descriptors @full": {
+    "isError": false,
+    "text": "# feed descriptors\n# count 2\nid\ttitle\tcategory\ndumps\tShort Dumps\truntime\nmessages\tSystem\\tMessages\t"
+  },
+  "RuntimeListFeeds terse variants @terse": {
+    "isError": false,
+    "text": "# feed variants\n# count 2\nfeed\ttitle\tquery\tis_default\ndumps\tMine\tq1\ttrue\ndumps\tAll\tq2\tfalse\nmessages\t\t\t"
+  },
+  "RuntimeListFeeds terse variants @medium": {
+    "isError": false,
+    "text": "# feed variants\n# count 2\nfeed\ttitle\tquery\tis_default\ndumps\tMine\tq1\ttrue\ndumps\tAll\tq2\tfalse\nmessages\t\t\t"
+  },
+  "RuntimeListFeeds terse variants @full": {
+    "isError": false,
+    "text": "# feed variants\n# count 2\nfeed\ttitle\tquery\tis_default\ndumps\tMine\tq1\ttrue\ndumps\tAll\tq2\tfalse\nmessages\t\t\t"
+  },
+  "RuntimeListFeeds terse dumps @terse": {
+    "isError": false,
+    "text": "# feed dumps\n# count 2\n# next_to 20261122100000\n# incomplete_second 20261122110000\ndump_id\tupdated\ttitle\nID1\t2026-11-22T10:00:00Z\tDBSQL_SQL_ERROR\nID2\t2026-11-22T11:00:00Z\t#RAISE"
+  },
+  "RuntimeListFeeds terse dumps @medium": {
+    "isError": false,
+    "text": "# feed dumps\n# count 2\n# next_to 20261122100000\n# incomplete_second 20261122110000\ndump_id\tupdated\ttitle\nID1\t2026-11-22T10:00:00Z\tDBSQL_SQL_ERROR\nID2\t2026-11-22T11:00:00Z\t#RAISE"
+  },
+  "RuntimeListFeeds terse dumps @full": {
+    "isError": false,
+    "text": "# feed dumps\n# count 2\n# next_to 20261122100000\n# incomplete_second 20261122110000\ndump_id\tupdated\ttitle\nID1\t2026-11-22T10:00:00Z\tDBSQL_SQL_ERROR\nID2\t2026-11-22T11:00:00Z\t#RAISE"
+  },
+  "RuntimeListFeeds terse system_messages @terse": {
+    "isError": false,
+    "text": "# feed system_messages\n# count 2\nid\tcreatedOn\tauthor\ttitle\nM1\t2026-11-22\tSAPUSER01\tDowntime\nM2\t\tSAPUSER02\t"
+  },
+  "RuntimeListFeeds terse system_messages @medium": {
+    "isError": false,
+    "text": "# feed system_messages\n# count 2\nid\tcreatedOn\tauthor\ttitle\nM1\t2026-11-22\tSAPUSER01\tDowntime\nM2\t\tSAPUSER02\t"
+  },
+  "RuntimeListFeeds terse system_messages @full": {
+    "isError": false,
+    "text": "# feed system_messages\n# count 2\nid\tcreatedOn\tauthor\ttitle\nM1\t2026-11-22\tSAPUSER01\tDowntime\nM2\t\tSAPUSER02\t"
+  },
+  "RuntimeListFeeds terse gateway_errors @terse": {
+    "isError": false,
+    "text": "# feed gateway_errors\n# count 1\nopid\tdetail_kind\tdateTime\ttype\tshortText\tusername\nOP1\t\t2026-11-22T10:00:00Z\tE\tfailed\tSAPUSER01"
+  },
+  "RuntimeListFeeds terse gateway_errors @medium": {
+    "isError": false,
+    "text": "# feed gateway_errors\n# count 1\nopid\tdetail_kind\tdateTime\ttype\tshortText\tusername\nOP1\t\t2026-11-22T10:00:00Z\tE\tfailed\tSAPUSER01"
+  },
+  "RuntimeListFeeds terse gateway_errors @full": {
+    "isError": false,
+    "text": "# feed gateway_errors\n# count 1\nopid\tdetail_kind\tdateTime\ttype\tshortText\tusername\nOP1\t\t2026-11-22T10:00:00Z\tE\tfailed\tSAPUSER01"
   }
 }

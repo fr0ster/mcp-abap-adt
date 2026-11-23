@@ -4,8 +4,8 @@ import {
   type AnswerTable,
   answerAt,
   completeAnswer,
-  type Rendered,
   tsv,
+  Written,
   wireAnswer,
 } from '../../../lib/detail';
 import {
@@ -173,6 +173,8 @@ import {
   batchReader,
   childNodesOf,
   endsTheCall,
+  isNotLoaded,
+  NOT_LOADED_BY_SAP,
   type NodeLevel,
   nodeItemsOf,
   nodeStructureOn,
@@ -202,20 +204,34 @@ interface FlatObject {
   OBJECT_URI?: string;
   /** The short description, where SAP gave one (asked for by default). */
   DESCRIPTION?: string;
+  /** A node SAP could not load (`utilNodeContents`' `notLoaded`): its row, named {@link NOT_LOADED_BY_SAP}. */
+  NOT_LOADED?: true;
 }
 
 function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
   return succeeded(objects);
 }
 
-function flatObjects(level: NodeLevel): FlatObject[] {
-  return nodeItemsOf(level).map((o) => ({
+/**
+ * A level's objects, its nameless ones included; a level SAP could not
+ * load is its row, of the node's type — never an empty success.
+ */
+function flatObjects(level: NodeLevel, nodeType: string): FlatObject[] {
+  const objects: FlatObject[] = nodeItemsOf(level).map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
     ...(o.techName ? { TECH_NAME: o.techName } : {}),
     ...(o.uri ? { OBJECT_URI: o.uri } : {}),
     ...(o.description ? { DESCRIPTION: o.description } : {}),
   }));
+  if (isNotLoaded(level)) {
+    objects.push({
+      OBJECT_TYPE: nodeType,
+      OBJECT_NAME: NOT_LOADED_BY_SAP,
+      NOT_LOADED: true,
+    });
+  }
+  return objects;
 }
 
 /**
@@ -235,6 +251,7 @@ async function collectValidObjects(
   nodeId: string,
   withShortDescriptions: boolean,
   visited: Set<string>,
+  nodeType: string = parentType,
 ): Promise<IAdtResponse<FlatObject[], IAdtError>> {
   if (visited.has(nodeId)) return ok([]);
   visited.add(nodeId);
@@ -253,7 +270,7 @@ async function collectValidObjects(
   if (!response.ok) return response;
 
   const level = response.getResult().value;
-  let objects: FlatObject[] = flatObjects(level);
+  let objects: FlatObject[] = flatObjects(level, nodeType);
 
   for (const child of childNodesOf(level)) {
     const childResult = await collectValidObjects(
@@ -264,6 +281,7 @@ async function collectValidObjects(
       child.nodeId,
       withShortDescriptions,
       visited,
+      child.type,
     );
     if (!childResult.ok) return childResult;
     objects = objects.concat(childResult.getResult().value);
@@ -282,6 +300,8 @@ interface Parent {
 interface ListNode {
   root: number;
   nodeId: string;
+  /** The node's type: the parent's at the root, the child node's below. */
+  type: string;
   objects: FlatObject[];
   children: ListNode[];
 }
@@ -346,9 +366,10 @@ async function walkParentsBatched(
   });
   const failures = new Map<number, IAdtFailure | Thrown>();
   const visited = parents.map(() => new Set<string>(['000000']));
-  const roots: ListNode[] = parents.map((_, root) => ({
+  const roots: ListNode[] = parents.map((parent, root) => ({
     root,
     nodeId: '000000',
+    type: parent.type,
     objects: [],
     children: [],
   }));
@@ -376,7 +397,7 @@ async function walkParentsBatched(
         continue;
       }
       const found = response.getResult().value;
-      node.objects = flatObjects(found);
+      node.objects = flatObjects(found, node.type);
       const seen = visited[node.root];
       for (const child of childNodesOf(found)) {
         if (seen.has(child.nodeId)) continue;
@@ -384,6 +405,7 @@ async function walkParentsBatched(
         const sub: ListNode = {
           root: node.root,
           nodeId: child.nodeId,
+          type: child.type,
           objects: [],
           children: [],
         };
@@ -456,31 +478,30 @@ interface ParentList {
  * One parent's objects as TSV: type, name, the technical name where it
  * differs, and the short description when it was asked for (the default).
  */
-function parentRows(list: ParentList, descriptions: boolean): Rendered<string> {
-  // The identity of each object, recorded where its row is written.
-  const rendered: string[] = [];
-  const rows = list.objects.map((o) => {
-    rendered.push(objectIdentity(o));
-    return [
-      o.OBJECT_TYPE,
-      o.OBJECT_NAME,
-      o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
-        ? o.TECH_NAME
-        : '',
-      ...(descriptions ? [o.DESCRIPTION ?? ''] : []),
-    ];
-  });
-  const answer = [
+function parentRows(list: ParentList, descriptions: boolean): Written<string> {
+  return Written.lines([
     `# parent ${list.parent_type ?? ''} ${list.parent_name ?? ''}`,
     `# total ${list.objects.length}`,
-    tsv(
+    Written.tsv(
       descriptions
-        ? ['type', 'name', 'tech_name', 'description']
-        : ['type', 'name', 'tech_name'],
-      rows,
+        ? ['type', 'name', 'tech_name', 'uri', 'description']
+        : ['type', 'name', 'tech_name', 'uri'],
+      list.objects.map((o) => ({
+        // The technical name where it differs; the URI of an object SAP
+        // listed without a name, what tells two such apart.
+        cells: [
+          o.OBJECT_TYPE,
+          o.OBJECT_NAME,
+          o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
+            ? o.TECH_NAME
+            : '',
+          o.OBJECT_NAME === '' ? (o.OBJECT_URI ?? '') : '',
+          ...(descriptions ? [o.DESCRIPTION ?? ''] : []),
+        ],
+        identity: objectIdentity(o),
+      })),
     ),
-  ].join('\n');
-  return { answer, rendered };
+  ]);
 }
 
 /** A listed object's identity: its type and name, a nameless one's technical name and URI. */
@@ -490,6 +511,7 @@ const objectIdentity = (o: FlatObject) =>
     name: o.OBJECT_NAME,
     techName: o.TECH_NAME,
     uri: o.OBJECT_URI,
+    notLoaded: o.NOT_LOADED,
   });
 
 /**
@@ -504,7 +526,7 @@ function objectsListAnswers(
   descriptions: boolean,
   held: (list: ParentList) => readonly string[],
 ): AnswerTable<ParentList, string | object> {
-  const every = <A>(render: (list: ParentList) => Rendered<A>) =>
+  const every = <A>(render: (list: ParentList) => Written<A>) =>
     completeAnswer('GetObjectsList', held, render);
   const full = (list: ParentList) => ({
     parent_name: list.parent_name,
@@ -517,38 +539,44 @@ function objectsListAnswers(
   });
   return {
     terse: every((list) => parentRows(list, descriptions)),
-    medium: every((list) => {
-      const objects = list.objects.map((o) => ({
-        type: o.OBJECT_TYPE,
-        name: o.OBJECT_NAME,
-        ...(o.TECH_NAME !== undefined ? { tech_name: o.TECH_NAME } : {}),
-        ...(o.OBJECT_URI !== undefined && o.OBJECT_NAME === ''
-          ? { uri: o.OBJECT_URI }
-          : {}),
-        ...(o.DESCRIPTION !== undefined ? { description: o.DESCRIPTION } : {}),
-      }));
-      return {
-        rendered: objects.map((o) =>
+    // The objects read from the answer written.
+    medium: every((list) =>
+      Written.list(
+        mediumOf(
+          list,
+          list.objects.map((o) => ({
+            type: o.OBJECT_TYPE,
+            name: o.OBJECT_NAME,
+            ...(o.TECH_NAME !== undefined ? { tech_name: o.TECH_NAME } : {}),
+            ...(o.OBJECT_URI !== undefined && o.OBJECT_NAME === ''
+              ? { uri: o.OBJECT_URI }
+              : {}),
+            ...(o.DESCRIPTION !== undefined
+              ? { description: o.DESCRIPTION }
+              : {}),
+            ...(o.NOT_LOADED === true ? { not_loaded: true } : {}),
+          })),
+        ),
+        (answer) => answer.objects,
+        (o) =>
           walkedIdentity({
             type: o.type,
             name: o.name,
             techName: o.tech_name,
             uri: o.uri,
+            notLoaded: o.not_loaded,
           }),
-        ),
-        answer: mediumOf(list, objects),
-      };
-    }),
-    full: every((list) => ({
-      answer: full(list),
-      rendered: full(list).objects.map(objectIdentity),
-    })),
+      ),
+    ),
+    full: every((list) =>
+      Written.list(full(list), (answer) => answer.objects, objectIdentity),
+    ),
     raw: full,
   };
 }
 
 /** The medium answer of one parent: every field read but the uri. */
-function mediumOf(list: ParentList, objects: object[]) {
+function mediumOf<O>(list: ParentList, objects: O[]) {
   return {
     parent_name: list.parent_name,
     parent_type: list.parent_type,

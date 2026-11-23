@@ -12,19 +12,33 @@ export type { AnswerDetail };
  * the answer is noise on a surface callers read to decide what to call. It
  * shapes the SUCCESS answer only; a failure carries everything at every level.
  */
-const LEVEL_WORDS =
-  'How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool\'s whole answer, as JSON; "raw" what SAP sent, as it sent it.';
+/**
+ * What each level holds, in words that are true for every tool — no syntax
+ * named (the owner's option A): the shared text of every tool's `detail`,
+ * each tool listing the levels it offers.
+ */
+export const LEVEL_SENTENCES = {
+  terse:
+    '"terse" (default) what a next call needs: the identifiers and a short description',
+  medium: '"medium" every item the tool read, with its main properties',
+  full: '"full" the tool\'s whole answer',
+  raw: '"raw" what SAP sent',
+} as const;
+
+/** The shared text over the levels a tool offers, in their order. */
+export function levelWords(
+  levels: readonly (keyof typeof LEVEL_SENTENCES)[],
+): string {
+  return `How much of the answer to return: ${levels.map((level) => LEVEL_SENTENCES[level]).join('; ')}.`;
+}
+
+const LEVEL_WORDS = levelWords(['terse', 'medium', 'full', 'raw']);
 
 /** `detail`: one text, the same on every tool (plan step 10.3). */
 export const DETAIL_WORDS = LEVEL_WORDS;
 
-/**
- * `detail` of a tool that assembles reads and is not yet assembled from its
- * parts (plan step 10.7): the shared text, then what its raw is — which an
- * assembled tool states as a fact of its own (`rawReturns`). Removed when
- * the last such tool moves.
- */
-const ASSEMBLED_DETAIL_WORDS = `${LEVEL_WORDS} At raw: everything SAP sent for the call, in the order it was read.`;
+/** `detail` of a tool that assembles reads: the same shared text. */
+const ASSEMBLED_DETAIL_WORDS = LEVEL_WORDS;
 
 /**
  * The `detail` field of a tool's zod input schema — a tool that reads one

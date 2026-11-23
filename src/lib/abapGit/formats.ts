@@ -43,6 +43,7 @@ import {
   writeJson,
   writeListing,
 } from '../detail';
+import { levelWords } from '../strategies/detail';
 
 /** The levels an abapGit read offers. */
 export const ABAPGIT_DETAIL_LEVELS = ['terse', 'medium', 'full'] as const;
@@ -52,9 +53,8 @@ export const ABAPGIT_DETAIL_SHAPE = {
   detail: z
     .enum(ABAPGIT_DETAIL_LEVELS)
     .optional()
-    .describe(
-      'How much of the facts to answer: "terse" (default: TSV of the identifiers and a short description), "medium" (TSV of every fact field), "full" (the whole facts object as JSON).',
-    ),
+    // The shared text over the levels an abapGit read offers (no raw).
+    .describe(levelWords(ABAPGIT_DETAIL_LEVELS)),
 };
 
 /** A table whose `raw` writes as `full`: no abapGit tool offers `raw`. */

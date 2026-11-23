@@ -10,7 +10,7 @@ import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import { detailOf } from '../../../lib/strategies/detail';
+import { DETAIL_WORDS, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import type { SqlQueryResponse } from '../../system/readonly/handleGetSqlQuery';
@@ -41,9 +41,7 @@ export const TOOL_DEFINITION = {
       .enum(DETAIL_LEVELS)
       .optional()
       .default('terse')
-      .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).',
-      ),
+      .describe(DETAIL_WORDS),
   }),
 } as const;
 

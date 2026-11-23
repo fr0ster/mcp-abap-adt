@@ -125,7 +125,11 @@ import {
   awaitActivationRun,
   isRefusal,
 } from '../../../lib/strategies/activationRun';
-import { detailOf, levelOf } from '../../../lib/strategies/detail';
+import {
+  DETAIL_WORDS,
+  detailOf,
+  levelOf,
+} from '../../../lib/strategies/detail';
 import { checkModuleReferences } from '../../../lib/strategies/functionModuleGroup';
 import { projectActivation } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -212,9 +216,7 @@ function activateObjectSchema(variant: ProjectionVariant) {
       .enum(DETAIL_LEVELS)
       .default('terse')
       .optional()
-      .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one). For a group activation (more than one object, or a type this tool cannot map to a single family) run in the background: terse its verdict and messages, medium the run with its id and status, full also the objects sent.',
-      ),
+      .describe(DETAIL_WORDS),
   });
 }
 

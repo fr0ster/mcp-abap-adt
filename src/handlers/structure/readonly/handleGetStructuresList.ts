@@ -27,6 +27,7 @@ import {
   type Listing,
   marks,
   nest,
+  omitted,
   parts,
   type RowSchemas,
   rows,
@@ -322,6 +323,12 @@ const structureColumns: Column<StructureNode>[] = [
 
 /** Every node below a node, one level deeper. */
 const structureSchemas: RowSchemas<StructureNode> = {
+  // The approved terse shape: a node not read is its `not read` cell; the
+  // failures of its read are full's.
+  error: omitted<FailureEntry, 'error'>(
+    'error',
+    'the failures of a node not read: its `not read` cell, full holds them',
+  ),
   children: rows('children', {
     columns: structureColumns,
     header: 'none',

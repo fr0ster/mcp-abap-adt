@@ -285,11 +285,6 @@ export type FeedShown =
       readonly answered: FeedPageAnswer<IGatewayErrorEntry>;
     };
 
-/** Rows of a feed's entries, the header first, its cells from `columns`. */
-function entryRows<I>(columns: Column<I>[]) {
-  return rows('entries', { columns, header: 'always' });
-}
-
 /** A feed's entries as written: one row per entry — a feed without variants one row with none. */
 function feedListing(shown: FeedShown): Nested {
   const heads = feedHeads(shown);
@@ -299,11 +294,17 @@ function feedListing(shown: FeedShown): Nested {
         heads,
         reading: shown.answered,
         lists: {
-          entries: entryRows<IFeedDescriptor>([
-            { name: 'id', cell: (e) => e.id },
-            { name: 'title', cell: (e) => e.title },
-            { name: 'category', cell: (e) => e.category ?? '' },
-          ]),
+          entries: rows('entries', {
+            header: 'always',
+            columns: [
+              { name: 'id', cell: (e: IFeedDescriptor) => e.id },
+              { name: 'title', cell: (e: IFeedDescriptor) => e.title },
+              {
+                name: 'category',
+                cell: (e: IFeedDescriptor) => e.category ?? '',
+              },
+            ],
+          }),
         },
       });
     case 'variants':
@@ -352,11 +353,14 @@ function feedListing(shown: FeedShown): Nested {
         heads,
         reading: shown.answered,
         lists: {
-          entries: entryRows<DumpEntry>([
-            { name: 'dump_id', cell: (e) => e.dump_id },
-            { name: 'updated', cell: (e) => e.updated },
-            { name: 'title', cell: (e) => e.title },
-          ]),
+          entries: rows('entries', {
+            header: 'always',
+            columns: [
+              { name: 'dump_id', cell: (e: DumpEntry) => e.dump_id },
+              { name: 'updated', cell: (e: DumpEntry) => e.updated },
+              { name: 'title', cell: (e: DumpEntry) => e.title },
+            ],
+          }),
         },
       });
     case 'system_messages':
@@ -364,12 +368,27 @@ function feedListing(shown: FeedShown): Nested {
         heads,
         reading: shown.answered,
         lists: {
-          entries: entryRows<ISystemMessageEntry>([
-            { name: 'id', cell: (e) => e.id ?? e.messageId ?? '' },
-            { name: 'createdOn', cell: (e) => e.createdOn ?? '' },
-            { name: 'author', cell: (e) => e.author ?? e.createdBy ?? '' },
-            { name: 'title', cell: (e) => e.title ?? '' },
-          ]),
+          entries: rows('entries', {
+            header: 'always',
+            columns: [
+              {
+                name: 'id',
+                cell: (e: ISystemMessageEntry) => e.id ?? e.messageId ?? '',
+              },
+              {
+                name: 'createdOn',
+                cell: (e: ISystemMessageEntry) => e.createdOn ?? '',
+              },
+              {
+                name: 'author',
+                cell: (e: ISystemMessageEntry) => e.author ?? e.createdBy ?? '',
+              },
+              {
+                name: 'title',
+                cell: (e: ISystemMessageEntry) => e.title ?? '',
+              },
+            ],
+          }),
         },
       });
     case 'gateway_errors':
@@ -377,14 +396,29 @@ function feedListing(shown: FeedShown): Nested {
         heads,
         reading: shown.answered,
         lists: {
-          entries: entryRows<IGatewayErrorEntry>([
-            { name: 'opid', cell: (e) => e.opid ?? '' },
-            { name: 'detail_kind', cell: detailKindOf },
-            { name: 'dateTime', cell: (e) => e.dateTime ?? '' },
-            { name: 'type', cell: (e) => e.type ?? '' },
-            { name: 'shortText', cell: (e) => e.shortText ?? '' },
-            { name: 'username', cell: (e) => e.username ?? '' },
-          ]),
+          entries: rows('entries', {
+            header: 'always',
+            columns: [
+              { name: 'opid', cell: (e: IGatewayErrorEntry) => e.opid ?? '' },
+              {
+                name: 'detail_kind',
+                cell: (e: IGatewayErrorEntry) => detailKindOf(e),
+              },
+              {
+                name: 'dateTime',
+                cell: (e: IGatewayErrorEntry) => e.dateTime ?? '',
+              },
+              { name: 'type', cell: (e: IGatewayErrorEntry) => e.type ?? '' },
+              {
+                name: 'shortText',
+                cell: (e: IGatewayErrorEntry) => e.shortText ?? '',
+              },
+              {
+                name: 'username',
+                cell: (e: IGatewayErrorEntry) => e.username ?? '',
+              },
+            ],
+          }),
         },
       });
   }

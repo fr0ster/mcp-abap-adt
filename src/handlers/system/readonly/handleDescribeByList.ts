@@ -57,6 +57,7 @@ import {
   cellsOf,
   entries,
   kinds,
+  omitted,
   wireAnswer,
   writeJsonList,
   writeListing,
@@ -198,7 +199,12 @@ const failureWords = ({ obj, described }: DescribedItem): string[] => [
 /** One line of the terse TSV: a hit row an object was described with, or a refused search. */
 type DescribedLine =
   | { readonly kind: 'row'; readonly cells: readonly string[] }
-  | { readonly kind: 'error'; readonly item: DescribedItem };
+  | {
+      readonly kind: 'error';
+      readonly item: DescribedItem;
+      /** No cells: a refused search is its mark line. */
+      readonly cells?: undefined;
+    };
 
 /**
  * The lines of every object SAP answered: each hit row it described an
@@ -233,9 +239,9 @@ const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
           heads: [],
           reading: { lines: describedLines(items) },
           lists: {
-            lines: kinds(
+            lines: kinds<DescribedLine, 'lines', 'kind'>(
               'lines',
-              (line: DescribedLine) => line.kind,
+              'kind',
               {
                 row: {
                   row: {
@@ -249,6 +255,13 @@ const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
                       }),
                     ),
                     header: 'none',
+                    lists: {
+                      // A hit row's cells are its columns.
+                      cells: omitted<string, 'cells'>(
+                        'cells',
+                        "a hit row's cells, written as its columns",
+                      ),
+                    },
                   },
                 },
                 error: {

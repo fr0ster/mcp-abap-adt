@@ -31,6 +31,23 @@ export {
   readingAt,
   structuredValue,
 } from './levels';
+export {
+  type Bound,
+  type Column,
+  type Group,
+  type Head,
+  type KindSpec,
+  kinds,
+  type Listing,
+  type ListKeys,
+  marks,
+  type Root,
+  type RowSchemas,
+  type RowSpec,
+  rows,
+  sections,
+  writeListing,
+} from './listing';
 export { cellsOf } from './tsvCells';
 export {
   notOneDocumentWords,

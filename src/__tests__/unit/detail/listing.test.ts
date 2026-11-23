@@ -13,6 +13,7 @@ import {
   kinds,
   marks,
   nest,
+  omitting,
   parts,
   type RowSchemas,
   rows,
@@ -368,5 +369,49 @@ describe('nested listings, conditional cells, JSON trees', () => {
       ).answer,
       { name: 'R', children: [{ name: 'a' }, { name: 'b' }] },
     );
+  });
+});
+
+describe('omit: a kind the shape leaves out, stated with its reason', () => {
+  type R = { readonly name: string; readonly usage?: string | undefined };
+  const reading = {
+    refs: [
+      { name: 'NODE' },
+      { name: 'A', usage: '' },
+      { name: 'B', usage: 'x' },
+    ],
+  };
+  it('rows: every item visited, only the omitted kind writes no row', () => {
+    const text = writeListing({
+      heads: [],
+      reading,
+      lists: {
+        refs: rows('refs', {
+          columns: [{ name: 'name', cell: (r: R) => r.name }],
+          header: 'none',
+          omit: omitting((r: R) => (r.usage === undefined ? 'node' : 'usage'), {
+            node: 'no usage',
+          }),
+        }),
+      },
+    }).answer;
+    assert.equal(text, 'A\nB');
+  });
+  it('kinds: an omit spec writes nothing for its kind', () => {
+    const text = writeListing({
+      heads: [],
+      reading,
+      lists: {
+        refs: kinds(
+          'refs',
+          (r: R) => (r.usage === undefined ? 'node' : 'usage'),
+          {
+            node: { omit: 'no usage' },
+            usage: { mark: 'ref', words: (r: R) => [r.name] },
+          },
+        ),
+      },
+    }).answer;
+    assert.equal(text, '# ref\tA\n# ref\tB');
   });
 });

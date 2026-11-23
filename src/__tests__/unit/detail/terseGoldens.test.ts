@@ -23,6 +23,7 @@ import { handleListFunctionGroupIncludes } from '../../../handlers/function_incl
 import { handleListFunctionModules } from '../../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleGetIncludesList } from '../../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetMainPrograms } from '../../../handlers/include/readonly/handleGetMainPrograms';
+import { handleGetPackage } from '../../../handlers/package/high/handleGetPackage';
 import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
@@ -846,6 +847,17 @@ CASES['GetObjectStructure a cycle of parents and a repeated id'] = async (
         },
       ]) as never,
       { objecttype: 'CLAS/OC', objectname: 'ZCL_X', detail } as never,
+    ),
+  );
+
+CASES['GetPackage a recorded package'] = async (detail) =>
+  answeredOf(
+    await handleGetPackage(
+      ctx([{ data: PACKAGE_METADATA }]) as never,
+      {
+        package_name: 'ZMCP_SHR_PKG',
+        detail,
+      } as never,
     ),
   );
 

@@ -514,5 +514,17 @@
   "GetObjectStructure a cycle of parents and a repeated id @full": {
     "isError": false,
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"projectexplorer:node\":[{\"@\":{\"nodeid\":\"000010\",\"parentid\":\"000011\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"A\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000011\",\"parentid\":\"000010\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"B\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000012\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"C\",\"isfolder\":\"false\"}},{\"@\":{\"nodeid\":\"000012\",\"objecttype\":\"CLAS/OA\",\"objectname\":\"ZCL_X\",\"description\":\"D\",\"isfolder\":\"false\"}}],\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
+  },
+  "GetPackage a recorded package @terse": {
+    "isError": false,
+    "text": "# package ZMCP_SHR_PKG\n# description Shared test dependencies package\n# package_type development\n# super_package ZADT_BLD_PKG03\n# software_component ZLOCAL\n# language_version 5\n# responsible SAPUSER01\nsub_package\tdescription"
+  },
+  "GetPackage a recorded package @medium": {
+    "isError": false,
+    "text": "{\"success\":true,\"package_name\":\"ZMCP_SHR_PKG\",\"version\":\"active\",\"part\":\"metadata\",\"metadata\":{\"name\":\"ZMCP_SHR_PKG\",\"description\":\"Shared test dependencies package\",\"package_type\":\"development\",\"super_package\":\"ZADT_BLD_PKG03\",\"software_component\":\"ZLOCAL\",\"language_version\":\"5\",\"responsible\":\"SAPUSER01\",\"sub_package_count\":0,\"sub_packages\":[]}}"
+  },
+  "GetPackage a recorded package @full": {
+    "isError": false,
+    "text": "{\"success\":true,\"package_name\":\"ZMCP_SHR_PKG\",\"version\":\"active\",\"part\":\"metadata\",\"metadata\":{\"name\":\"ZMCP_SHR_PKG\",\"description\":\"Shared test dependencies package\",\"package_type\":\"development\",\"super_package\":\"ZADT_BLD_PKG03\",\"software_component\":\"ZLOCAL\",\"language_version\":\"5\",\"responsible\":\"SAPUSER01\",\"sub_package_count\":0,\"sub_packages\":[]}}"
   }
 }

@@ -717,6 +717,24 @@
       "{\"unstaged\":[{\"wbkey\":\"CLASZCL_DEMO\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/oo/classes/zcl_demo\",\"type\":\"CLAS/OC\",\"name\":\"ZCL_DEMO\",\"packageName\":\"ZPKG\",\"files\":[{\"name\":\"zcl_demo.clas.abap\",\"path\":\"/src/\",\"localState\":\"M\",\"remoteState\":\"\"}]}],\"staged\":[],\"ignored\":[],\"author\":{\"name\":\"Ada Author\",\"email\":\"ada@example.invalid\"},\"committer\":{\"name\":\"Carl Committer\",\"email\":\"carl@example.invalid\"}}"
     ]
   },
+  "GetAbapGitStaging every list filled @terse": {
+    "isError": false,
+    "parts": [
+      "# author Ada Author <ada@example.invalid>\n# committer Carl Committer <carl@example.invalid>\n# list unstaged\ntype\tname\tpackage_name\tfile\tlocal_state\tremote_state\nCLAS/OC\tZCL_DEMO\tZPKG\tzcl_demo.clas.abap\tM\t\n# list staged\ntype\tname\tpackage_name\tfile\tlocal_state\tremote_state\nPROG/P\tZSTAGED\tZPKG\tzstaged.prog.abap\tM\t\nPROG/P\tZSTAGED\tZPKG\tzstaged.prog.xml\tA\tD\n# list ignored\ntype\tname\tpackage_name\tfile\tlocal_state\tremote_state\nDEVC/K\tZIGNORED\tZPKG\t\t\t"
+    ]
+  },
+  "GetAbapGitStaging every list filled @medium": {
+    "isError": false,
+    "parts": [
+      "# author Ada Author <ada@example.invalid>\n# committer Carl Committer <carl@example.invalid>\n# list unstaged\nwbkey\tversion\turi\ttype\tname\tpackage_name\tfile\tpath\tlocal_state\tremote_state\nCLASZCL_DEMO\tactive\t/sap/bc/adt/oo/classes/zcl_demo\tCLAS/OC\tZCL_DEMO\tZPKG\tzcl_demo.clas.abap\t/src/\tM\t\n# list staged\nwbkey\tversion\turi\ttype\tname\tpackage_name\tfile\tpath\tlocal_state\tremote_state\nPROGZSTAGED\tactive\t/sap/bc/adt/programs/programs/zstaged\tPROG/P\tZSTAGED\tZPKG\tzstaged.prog.abap\t/src/\tM\t\nPROGZSTAGED\tactive\t/sap/bc/adt/programs/programs/zstaged\tPROG/P\tZSTAGED\tZPKG\tzstaged.prog.xml\t/src/\tA\tD\n# list ignored\nwbkey\tversion\turi\ttype\tname\tpackage_name\tfile\tpath\tlocal_state\tremote_state\nDEVCZIGNORED\tactive\t/sap/bc/adt/packages/zignored\tDEVC/K\tZIGNORED\tZPKG\t\t\t\t"
+    ]
+  },
+  "GetAbapGitStaging every list filled @full": {
+    "isError": false,
+    "parts": [
+      "{\"unstaged\":[{\"wbkey\":\"CLASZCL_DEMO\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/oo/classes/zcl_demo\",\"type\":\"CLAS/OC\",\"name\":\"ZCL_DEMO\",\"packageName\":\"ZPKG\",\"files\":[{\"name\":\"zcl_demo.clas.abap\",\"path\":\"/src/\",\"localState\":\"M\",\"remoteState\":\"\"}]}],\"staged\":[{\"wbkey\":\"PROGZSTAGED\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/programs/programs/zstaged\",\"type\":\"PROG/P\",\"name\":\"ZSTAGED\",\"packageName\":\"ZPKG\",\"files\":[{\"name\":\"zstaged.prog.abap\",\"path\":\"/src/\",\"localState\":\"M\",\"remoteState\":\"\"},{\"name\":\"zstaged.prog.xml\",\"path\":\"/src/\",\"localState\":\"A\",\"remoteState\":\"D\"}]}],\"ignored\":[{\"wbkey\":\"DEVCZIGNORED\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/packages/zignored\",\"type\":\"DEVC/K\",\"name\":\"ZIGNORED\",\"packageName\":\"ZPKG\",\"files\":[]}],\"author\":{\"name\":\"Ada Author\",\"email\":\"ada@example.invalid\"},\"committer\":{\"name\":\"Carl Committer\",\"email\":\"carl@example.invalid\"}}"
+    ]
+  },
   "GetAbapGitErrorLog a run's log @terse": {
     "isError": false,
     "parts": ["type\tname\tmessage_type\nCLAS\tZCL_DEMO\tE"]

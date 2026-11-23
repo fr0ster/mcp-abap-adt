@@ -220,8 +220,7 @@ export async function handleReadTransportObjects(
   // adt-strategies' `transportObjectEntryList` (each entry once, with its
   // task and position; the incomplete ones apart, since 0.28.2), full the
   // parse, raw the document.
-  // Each formatter answers every entry it was given, or nothing
-  // (`completeAnswer`).
+  // Each level writes every entry it was given, by the listing writers.
   const readings: DetailTable<
     string | XmlNode | ReturnType<typeof mediumObjects>
   > = {

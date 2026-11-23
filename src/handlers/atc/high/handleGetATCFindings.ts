@@ -71,7 +71,7 @@ export async function handleGetATCFindings(
 /**
  * What the worklist answers at each `detail`, selected through a table
  * (`src/lib/detail`): terse the findings to act on (every finding, or
- * nothing: `completeAnswer`), medium and full the whole parse, raw the
+ * a row per finding, written by the listing writer), medium and full the whole parse, raw the
  * document — which is the whole point of having the level: a caller
  * needing an attribute neither reading keeps (the finding's own uri, its
  * checksum, its processor) has it there.
@@ -105,7 +105,7 @@ function findingsAnswers(
     return { ...head(reading), findings: reading.findings, ...noteOf(reading) };
   };
   return {
-    // A row per finding (TSV), every one, or nothing (`completeAnswer`).
+    // A row per finding (TSV), every one, written by the listing writer.
     terse: (document: string) => {
       const reading = parseAtcWorklist(document);
       const note = noteOf(reading).note;

@@ -250,8 +250,7 @@ function transportReadings(options: TerseOptions): DetailTable<TransportRead> {
     answer,
   });
   return {
-    // Every task or object the transport holds, or nothing
-    // (`completeAnswer`).
+    // Every task or object the transport holds, by the listing writer.
     terse: formatted(read, ({ item }) => ({
       item,
       shown:

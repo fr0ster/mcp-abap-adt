@@ -904,7 +904,7 @@ interface ListOf {
 
 /**
  * A list call's answer at each `detail`, selected through the table like
- * every other answer: terse one text written through `Written`, the other
+ * every other answer: terse one text written by the listing writer, the other
  * levels a JSON array of the entries.
  */
 const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {

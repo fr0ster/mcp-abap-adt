@@ -219,8 +219,8 @@ const describedLines = (items: readonly DescribedItem[]): DescribedLine[] =>
  * each object SAP described (name, type, description, package), `# error
  * NAME` and its failure for a refused one, and nothing for a name SAP did
  * not describe (terse lists what SAP returned); medium and full one content
- * entry per object asked ({@link fullDescribed}). Every item, or nothing
- * (`completeAnswer`). Raw never reaches this table: the handler answers it
+ * entry per object asked ({@link fullDescribed}). Every item written by the
+ * listing writers. Raw never reaches this table: the handler answers it
  * as the responses (`wireAnswer`).
  */
 const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {

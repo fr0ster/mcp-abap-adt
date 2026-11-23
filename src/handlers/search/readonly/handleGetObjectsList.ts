@@ -756,7 +756,7 @@ const jsonParents = ({ outcomes, shown }: ParentLists) =>
 
 /**
  * A list call's answer at each `detail`, selected through the table like
- * every other answer: terse one text written through `Written`, a failed
+ * every other answer: terse one text written by the listing writer, a failed
  * walk under its escaped `# parent` line and one `# error` line; the other
  * levels the entries.
  */
@@ -829,7 +829,7 @@ async function answeredGetObjectsList(
       ? Boolean(with_short_descriptions)
       : true;
   const level = levelOf(args);
-  // Every object the parent's walk held, or nothing (`completeAnswer`).
+  // Every object the parent's walk held, written by the listing writers.
   const shown = answerAt(objectsListAnswers(), levelOf(args));
   // Pass 2 at medium and full: every object's description from its own
   // metadata; at terse — or with descriptions declined — only the types

@@ -443,7 +443,7 @@ const FEED_ANSWERS: AnswerTable<FeedShown, string | object> = {
 
 /**
  * Each answered feed's read, by the answer it became: a list call writes
- * every feed's terse text from these through `Written`, never by splicing
+ * every feed's terse text from these by the listing writer, never by splicing
  * the single answers' texts.
  */
 const readsOf = new WeakMap<McpResult, FeedShown>();
@@ -933,7 +933,7 @@ interface ListOf {
 
 /**
  * A list call's answer at each `detail`, selected through the table like
- * every other answer: terse one text written through `Written`, the other
+ * every other answer: terse one text written by the listing writer, the other
  * levels a JSON array of the entries.
  */
 const LIST_ANSWERS: AnswerTable<ListOf, McpResult> = {

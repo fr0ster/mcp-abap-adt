@@ -535,7 +535,7 @@ const jsonTrees = ({ outcomes, shown }: TreeList) =>
 
 /**
  * A list call's answer at each `detail`, selected through the table like
- * every other answer: terse one text written through `Written`, each tree
+ * every other answer: terse one text written by the listing writer, each tree
  * under its escaped `# asked` line; the other levels a JSON array.
  */
 const TREE_LISTS: AnswerTable<TreeList, string> = {

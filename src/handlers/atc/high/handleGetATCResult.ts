@@ -77,7 +77,7 @@ function resultHead(reading: ReturnType<typeof parseAtcResult>) {
 /**
  * What the stored result answers at each `detail`, selected through a table
  * (`src/lib/detail`): terse the findings to act on (every finding, or
- * nothing: `completeAnswer`), medium and full the whole parse, raw the
+ * a row per finding, written by the listing writer), medium and full the whole parse, raw the
  * result document as SAP sent it, nothing of ours around it.
  */
 const RESULT_ANSWERS: AnswerTable<string, string | object> = (() => {
@@ -86,7 +86,7 @@ const RESULT_ANSWERS: AnswerTable<string, string | object> = (() => {
     return { ...resultHead(reading), findings: reading.findings };
   };
   return {
-    // A row per finding (TSV), every one, or nothing (`completeAnswer`).
+    // A row per finding (TSV), every one, written by the listing writer.
     terse: (document: string) => {
       const reading = parseAtcResult(document);
       return findingsText(

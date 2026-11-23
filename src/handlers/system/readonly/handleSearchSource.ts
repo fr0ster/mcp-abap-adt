@@ -6,10 +6,15 @@ import {
   answerAt,
   type Column,
   type DetailLevel,
+  jsonText,
+  type ListAnswerTable,
+  listAnswerAt,
   marks,
   rows,
+  type Written,
   wireAnswer,
   writeListing,
+  writeWhole,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -166,7 +171,7 @@ function includeColumn(hit: OrchestratorResult['results'][number]): string {
  * `include\tline`, at snippets `include\tline\tsnippet`, at objects
  * `include\thits`. Every hit is answered.
  */
-export function searchSourceRows(result: OrchestratorResult): string {
+export function searchSourceRows(result: OrchestratorResult): Written<string> {
   return writeListing({
     heads: [
       {
@@ -203,7 +208,7 @@ export function searchSourceRows(result: OrchestratorResult): string {
         ],
       }),
     },
-  }).answer;
+  });
 }
 
 /** One hit of a scan. */
@@ -255,9 +260,11 @@ function incompleteWords(target: IncompleteTarget): string[] {
  * answer before `detail`. A scan reads many documents, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
-const SEARCH_SOURCE_ANSWERS: AnswerTable<OrchestratorResult, string> = {
+const SEARCH_SOURCE_ANSWERS: ListAnswerTable<OrchestratorResult, string> = {
   terse: searchSourceRows,
-  medium: (result) => JSON.stringify(result),
+  // The scan whole, as it is — typed as the reading itself, so no
+  // projection of it passes for it.
+  medium: (result) => jsonText(writeWhole<OrchestratorResult>(result)),
   full: (result) => JSON.stringify(result),
   raw: (result) => JSON.stringify(result),
 };
@@ -289,7 +296,7 @@ async function answeredSearchSource(
 ): Promise<McpResult> {
   const { logger } = context;
   const level = levelOf(args);
-  const shown = answerAt(SEARCH_SOURCE_ANSWERS, levelOf(args));
+  const shown = listAnswerAt(SEARCH_SOURCE_ANSWERS, levelOf(args));
   const asked = {
     ...args,
     answer: searchSourceAnswerLevel(level, args.answer),

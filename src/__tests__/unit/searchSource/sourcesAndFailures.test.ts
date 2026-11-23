@@ -204,6 +204,18 @@ const sourceReads = (fake: Fake) =>
     .filter((url) => !url.includes('/repository/nodestructure'))
     .sort();
 
+// Codex round 10: medium is the scan whole, as it is — the same answer as
+// full, nothing of it projected away.
+describe('SearchSource medium: the scan whole', () => {
+  it('answers what full answers, every hit in it', async () => {
+    const medium = await searchAll(standOn(ALL), false, { detail: 'medium' });
+    const full = await searchAll(standOn(ALL), false, { detail: 'full' });
+    assert.equal(isError(medium), false);
+    assert.ok(payloadOf(full).results.length > 0);
+    assert.deepStrictEqual(payloadOf(medium), payloadOf(full));
+  });
+});
+
 describe('SearchSource: every source-bearing type, at the asked version', () => {
   for (const [batch] of PATHS) {
     it(

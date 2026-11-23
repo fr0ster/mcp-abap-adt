@@ -15,6 +15,7 @@ import {
   assertAnonymousFileT100,
   assertOnpremChecksFault,
   branchNamesOf,
+  checksFaultHere,
   json,
   list,
   member,
@@ -170,10 +171,10 @@ liveSuite(['onprem', 'cloud'], 'abapGit, compact', () => {
       action: 'checks',
       repository_key: run.key(),
     });
-    // On premise SAP's handler ends in SYNTAX_ERROR (measured): its refusal,
-    // asserted whole; the ledger covers this key there by that reason. On
-    // the cloud the checks answer.
-    if (run.backend === 'onprem') assertOnpremChecksFault(checks);
+    // On the onprem system abapgit.check_repo_fault_system names, SAP's
+    // handler ends in SYNTAX_ERROR (measured): its refusal, asserted whole.
+    // On any other system, onprem or cloud, the checks answer.
+    if (checksFaultHere(run.backend)) assertOnpremChecksFault(checks);
     else assert.equal(checks.isError, false, checks.text);
     const local = await liveCall('HandlerAbapGitGet', {
       action: 'file',

@@ -81,6 +81,7 @@ import { getTestDestination } from '../helpers/authHelpers';
 import {
   configuredSystemKind,
   getSharedDependenciesConfig,
+  loadTestConfig,
   resolvePackageName,
 } from '../helpers/configHelpers';
 import {
@@ -183,7 +184,21 @@ export function assertAnonymousFileT100(answer: LiveAnswer): void {
 }
 
 /**
- * On premise, the checks are SAP's handler fault: every call ends in
+ * Whether this run's system is the one whose abapGit cannot answer the
+ * checks: on premise, and the system `abapgit.check_repo_fault_system`
+ * names, matched against `environment.default_master_system`. Anywhere else
+ * the checks must answer.
+ */
+export function checksFaultHere(backend: AbapGitBackend): boolean {
+  const config = loadTestConfig();
+  const fault = (config.abapgit?.check_repo_fault_system ?? '').trim();
+  const system = (config.environment?.default_master_system ?? '').trim();
+  return backend === 'onprem' && fault !== '' && fault === system;
+}
+
+/**
+ * On the system `checksFaultHere` names, the checks are SAP's handler
+ * fault: every call ends in
  * SYNTAX_ERROR in `ZCL_ABAPGIT_RES_REPO_CHECKS` (no value for the mandatory
  * `IV_SERVICE` at L53; measured 2026-11-22, adt-clients ERRATA), answered
  * 500 with no T100 key. The answer is asserted whole — the fixed refused

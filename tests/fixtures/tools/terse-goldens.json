@@ -408,12 +408,12 @@
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"log:log\":{\"log:entry\":[{\"log:message\":{\"log:messageText\":{\"#text\":\"========\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"Export started\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"--------\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"Object ZCL_A\\texported\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"#Done\",\"@\":{\"key\":\"TK(188)\"}}}}],\"@\":{\"xmlns:log\":\"http://www.sap.com/cts/adt/log\"}}}"
   },
   "ListTransports a repeat, a number repeated with other content, a request without a number @terse": {
-    "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"ListTransports\",\"detail\":\"terse\",\"message\":\"ListTransports: the compact answer could not represent every item the reading held, so nothing is answered; ask detail: 'full'\",\"step\":\"list\"}"
+    "isError": false,
+    "text": "# count 4\nnumber\ttype\tstatus\towner\ttarget\tdescription\nSIDK900001\tK\tD\tSAPUSER01\t/QAS/\tOne\n\tK\tD\tSAPUSER01\t\tWithout a number\nSIDK900002\tK\tD\tSAPUSER01\t\tTwo\nSIDK900002\tK\tD\tSAPUSER02\t\tTwo, another text"
   },
   "ListTransports a repeat, a number repeated with other content, a request without a number @medium": {
-    "isError": true,
-    "text": "{\"error\":\"client_threw\",\"tool\":\"ListTransports\",\"detail\":\"full\",\"message\":\"ListTransports: the compact answer could not represent every item the reading held, so nothing is answered; ask detail: 'full'\",\"step\":\"list\"}"
+    "isError": false,
+    "text": "{\"success\":true,\"count\":4,\"transports\":[{\"number\":\"SIDK900001\",\"description\":\"One\",\"type\":\"K\",\"status\":\"D\",\"owner\":\"SAPUSER01\",\"target\":\"/QAS/\"},{\"number\":\"\",\"description\":\"Without a number\",\"type\":\"K\",\"status\":\"D\",\"owner\":\"SAPUSER01\",\"target\":\"\"},{\"number\":\"SIDK900002\",\"description\":\"Two\",\"type\":\"K\",\"status\":\"D\",\"owner\":\"SAPUSER01\",\"target\":\"\"},{\"number\":\"SIDK900002\",\"description\":\"Two, another text\",\"type\":\"K\",\"status\":\"D\",\"owner\":\"SAPUSER02\",\"target\":\"\"}]}"
   },
   "ListTransports a repeat, a number repeated with other content, a request without a number @full": {
     "isError": false,

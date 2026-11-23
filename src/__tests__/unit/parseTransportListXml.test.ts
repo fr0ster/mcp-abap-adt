@@ -176,8 +176,28 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
     assert.deepStrictEqual(parseTransportListXml(CAPTURED_NO_TRANSPORTS), []);
   });
 
-  it('collapses a request reachable through more than one branch', () => {
-    const duplicated = `<?xml version="1.0" encoding="utf-8"?>
+  // Plan step 9 (owner): a repeat is the same request again — number,
+  // content and tasks alike — and is listed once; the same number with
+  // other content is written again, nothing it carries vanishing.
+  it('lists an exact repeat once', () => {
+    const repeated = `<?xml version="1.0" encoding="utf-8"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">
+  <tm:workbench><tm:modifiable>
+    <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D"/>
+  </tm:modifiable></tm:workbench>
+  <tm:workbench><tm:modifiable>
+    <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D"/>
+  </tm:modifiable></tm:workbench>
+</tm:root>`;
+
+    const parsed = parseTransportListXml(repeated);
+
+    assert.equal(parsed.length, 1);
+    assert.equal(parsed[0]?.description, 'Once');
+  });
+
+  it('writes the same number with other content again', () => {
+    const differing = `<?xml version="1.0" encoding="utf-8"?>
 <tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">
   <tm:workbench><tm:modifiable>
     <tm:request tm:number="SIDK900002" tm:desc="Once" tm:status="D"/>
@@ -187,9 +207,22 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
   </tm:modifiable></tm:workbench>
 </tm:root>`;
 
-    const parsed = parseTransportListXml(duplicated);
+    assert.deepStrictEqual(
+      parseTransportListXml(differing).map((t) => t.description),
+      ['Once', 'Twice'],
+    );
+  });
 
-    assert.equal(parsed.length, 1);
-    assert.equal(parsed[0].description, 'Once');
+  it('lists a request without a number, its number empty', () => {
+    const numberless = `<?xml version="1.0" encoding="utf-8"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm">
+  <tm:workbench><tm:modifiable>
+    <tm:request tm:desc="No number" tm:status="D"/>
+  </tm:modifiable></tm:workbench>
+</tm:root>`;
+
+    assertMatchObject(parseTransportListXml(numberless), [
+      { number: '', description: 'No number' },
+    ]);
   });
 });

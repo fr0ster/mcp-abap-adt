@@ -409,6 +409,8 @@ export function entries<I, K extends string, E extends object>(
     readonly lists?: JsonSchemas<I> | undefined;
     /** An empty list writes no member, as an absent one (a tree's leaf, medium). */
     readonly omitEmpty?: boolean | undefined;
+    /** Kinds of item the answer's approved shape leaves out (`omitting`): visited, no entry. */
+    readonly omit?: Omitting<I> | undefined;
   },
 ): JsonBound<Holding<K, I>, K, E> {
   return {
@@ -418,7 +420,10 @@ export function entries<I, K extends string, E extends object>(
       const list = reading[key];
       if (list === undefined) return undefined;
       if (options?.omitEmpty === true && list.length === 0) return undefined;
-      return list.map((item) =>
+      const omit = options?.omit;
+      const written =
+        omit === undefined ? list : list.filter((item) => !omit.omits(item));
+      return written.map((item) =>
         options?.lists === undefined
           ? entry(item)
           : { ...entry(item), ...jsonMembers(item, options.lists) },

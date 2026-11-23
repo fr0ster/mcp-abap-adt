@@ -15,14 +15,16 @@ import { answer, type McpResult } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import {
   answered,
-  completeAnswer,
   type DetailTable,
+  entries,
   formatted,
   fullLevel,
-  identityOf,
+  omitting,
   rawLevel,
   readingAt,
-  Written,
+  rows,
+  writeJson,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -111,68 +113,70 @@ function listingOf(answer: IAdtWireResponse): ITransportTree {
   }
 }
 
-/**
- * The requests of a listing, one entry each: a request reached through more
- * than one branch is listed once, its first occurrence winning.
- */
-export function listedTransports(tree: ITransportTree): TransportEntry[] {
-  const seen = new Set<string>();
-  const listed: TransportEntry[] = [];
-  for (const request of tree.requests) {
-    const attributes = request.attributes;
-    const number = attributes['tm:number'] || attributes['adtcore:name'] || '';
-    if (!number || seen.has(number)) continue;
-    seen.add(number);
-    const containerStatus = request.containers.reduce(
-      (status, container) => STATUS_BY_CONTAINER[container.element] ?? status,
-      '',
-    );
-    listed.push({
-      number,
-      description: attributes['tm:desc'] || attributes['tm:description'] || '',
-      type: attributes['tm:type'] ?? '',
-      status: attributes['tm:status'] || containerStatus || '',
-      owner: attributes['tm:owner'] ?? '',
-      target: attributes['tm:target'] ?? '',
-    });
-  }
-  return listed;
+/** A request as a row reads it. */
+function entryOf(request: ITransportTree['requests'][number]): TransportEntry {
+  const attributes = request.attributes;
+  const containerStatus = request.containers.reduce(
+    (status, container) => STATUS_BY_CONTAINER[container.element] ?? status,
+    '',
+  );
+  return {
+    number: attributes['tm:number'] || attributes['adtcore:name'] || '',
+    description: attributes['tm:desc'] || attributes['tm:description'] || '',
+    type: attributes['tm:type'] ?? '',
+    status: attributes['tm:status'] || containerStatus || '',
+    owner: attributes['tm:owner'] ?? '',
+    target: attributes['tm:target'] ?? '',
+  };
+}
+
+/** A request listed, and whether it repeats one listed before it. */
+interface ListedRequest {
+  readonly entry: TransportEntry;
+  /** The same request again through another branch: the same number, the same content and tasks. */
+  readonly repeat: boolean;
 }
 
 /**
- * Every request a listing holds, once each by its number: one SAP lists
- * through several branches is one request; one with no number is an item
- * all the same, which no answer can name (`completeAnswer` refuses it).
+ * Every request of a listing, in order, each with its row's fields. A
+ * request SAP lists through several branches is a repeat only when it is
+ * the same request again — its number, every field and its tasks alike;
+ * the same number with other content is written again. A request without
+ * a number is a request all the same: its row has an empty number.
  */
-export function heldRequests(tree: ITransportTree): string[] {
-  const numbers = new Set<string>();
-  const held: string[] = [];
-  tree.requests.forEach((request, index) => {
-    const attributes = request.attributes;
-    const number = attributes['tm:number'] || attributes['adtcore:name'] || '';
-    if (number === '') {
-      held.push(identityOf([`numberless ${index}`]));
-      return;
-    }
-    if (numbers.has(number)) return;
-    numbers.add(number);
-    held.push(identityOf([number]));
+export function listedRequests(tree: ITransportTree): ListedRequest[] {
+  const seen = new Set<string>();
+  return tree.requests.map((request) => {
+    const entry = entryOf(request);
+    const content = JSON.stringify([
+      entry,
+      request.longDesc ?? null,
+      request.tasks,
+    ]);
+    const repeat = entry.number !== '' && seen.has(content);
+    seen.add(content);
+    return { entry, repeat };
   });
-  return held;
 }
+
+/** Every request a listing holds, a repeat once (`listedRequests`). */
+export function listedTransports(tree: ITransportTree): TransportEntry[] {
+  return listedRequests(tree).flatMap(({ entry, repeat }) =>
+    repeat ? [] : [entry],
+  );
+}
+
+/** A repeat of a request listed before: the kind the answer's shape leaves out. */
+const REPEATS = omitting(
+  (listed: ListedRequest) => (listed.repeat ? 'repeat' : 'request'),
+  { repeat: 'a branch repeating a request already listed' },
+);
 
 /** A listing document's requests — for the #168 regression guard, which asserts against raw XML. */
 export function parseTransportListXml(xmlData: string): TransportEntry[] {
   return listedTransports(
     listingOf({ status: 200, statusText: 'OK', headers: {}, data: xmlData }),
   );
-}
-
-/** The terse answer: the requests listed. */
-interface ListedAnswer {
-  success: true;
-  count: number;
-  transports: TransportEntry[];
 }
 
 /** What `ListTransports` answers: the terse rows, the medium listing, the parse, or the document. */
@@ -186,61 +190,56 @@ type ListAnswer = object | XmlNode | string;
  * reads the answer and nothing else, the logger included.
  */
 const LIST_READINGS: DetailTable<ListAnswer> = (() => {
-  const listed = listedTransports;
-  // Every request the listing holds, or nothing (`completeAnswer`).
-  const every = <A>(render: (tree: ITransportTree) => Written<A>) =>
-    completeAnswer('ListTransports', heldRequests, render);
+  /** The requests a listing writes, a repeat counted once. */
+  const counted = (requests: readonly ListedRequest[]) =>
+    requests.filter((listed) => !REPEATS.omits(listed)).length;
   return {
-    terse: formatted(
-      listingOf,
-      every((tree) => {
-        const transports = listed(tree);
-        // Each request identified by the number written.
-        return Written.text(
-          [
-            { head: 'count', value: String(transports.length) },
-            {
-              header: [
-                'number',
-                'type',
-                'status',
-                'owner',
-                'target',
-                'description',
-              ],
-            },
-            ...transports.map((t) => ({
-              row: [
-                t.number,
-                t.type ?? '',
-                t.status ?? '',
-                t.owner ?? '',
-                t.target ?? '',
-                t.description ?? '',
-              ],
-            })),
-          ],
-          [0],
-        );
-      }),
-    ),
-    medium: formatted(
-      listingOf,
-      every((tree) => {
-        const transports = listed(tree);
-        const listedAnswer: ListedAnswer = {
-          success: true,
-          count: transports.length,
-          transports,
-        };
-        // Each request identified by the number written.
-        return Written.json(
-          { success: listedAnswer.success, count: listedAnswer.count },
-          { transports: listedAnswer.transports },
-          ['number'],
-        );
-      }),
-    ),
+    terse: formatted(listingOf, (tree) => {
+      const requests = listedRequests(tree);
+      return writeListing({
+        heads: [{ head: 'count', value: String(counted(requests)) }],
+        reading: { requests },
+        lists: {
+          requests: rows('requests', {
+            columns: [
+              { name: 'number', cell: (l: ListedRequest) => l.entry.number },
+              { name: 'type', cell: (l: ListedRequest) => l.entry.type ?? '' },
+              {
+                name: 'status',
+                cell: (l: ListedRequest) => l.entry.status ?? '',
+              },
+              {
+                name: 'owner',
+                cell: (l: ListedRequest) => l.entry.owner ?? '',
+              },
+              {
+                name: 'target',
+                cell: (l: ListedRequest) => l.entry.target ?? '',
+              },
+              {
+                name: 'description',
+                cell: (l: ListedRequest) => l.entry.description ?? '',
+              },
+            ],
+            header: 'always',
+            omit: REPEATS,
+          }),
+        },
+      }).answer;
+    }),
+    medium: formatted(listingOf, (tree) => {
+      const requests = listedRequests(tree);
+      return writeJson(
+        { success: true, count: counted(requests) },
+        { requests },
+        {
+          requests: entries('requests', (l: ListedRequest) => l.entry, {
+            as: 'transports',
+            omit: REPEATS,
+          }),
+        },
+      ).answer;
+    }),
     full: fullLevel,
     raw: rawLevel,
   };

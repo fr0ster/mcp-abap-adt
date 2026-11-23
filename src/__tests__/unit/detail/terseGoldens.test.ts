@@ -18,12 +18,14 @@ import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
+import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import {
   createBatchAvailability,
   NO_BATCH_ENDPOINT_STATUS,
 } from '../../../lib/batch/availability';
 import type { DetailLevel } from '../../../lib/detail';
 import { declareSystemKind } from '../../../lib/systemKind';
+import { corpusBody } from '../../helpers/adtCorpus';
 import { recordingConnection } from '../../helpers/recordingConnection';
 import { repositoryRoot } from '../../helpers/repoRoot';
 
@@ -156,6 +158,49 @@ for (const descriptions of [false, true]) {
         {
           package_names: ['ZSUB', 'ZGONE'],
           include_descriptions: descriptions,
+          detail,
+        } as never,
+      ),
+    );
+}
+
+const PACKAGE_METADATA = corpusBody(
+  'read-metadata-package--01-packages-zmcpshrpkg',
+);
+
+for (const descriptions of [false, true]) {
+  CASES[
+    `GetPackageTree one package, a subpackage${descriptions ? ', descriptions' : ''}`
+  ] = async (detail) =>
+    answeredOf(
+      await handleGetPackageTree(
+        sequential([
+          { data: PACKAGE_METADATA },
+          { data: ROOT_P },
+          { data: ROOT_SUB },
+        ]) as never,
+        {
+          package_name: 'ZPKG',
+          include_descriptions: descriptions,
+          background: false,
+          detail,
+        } as never,
+      ),
+    );
+  CASES[
+    `GetPackageTree two packages, one refused${descriptions ? ', descriptions' : ''}`
+  ] = async (detail) =>
+    answeredOf(
+      await handleGetPackageTree(
+        sequential([
+          { data: PACKAGE_METADATA },
+          { data: ROOT_SUB },
+          REFUSED,
+        ]) as never,
+        {
+          package_names: ['ZSUB', 'ZGONE'],
+          include_descriptions: descriptions,
+          background: false,
           detail,
         } as never,
       ),

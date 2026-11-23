@@ -82,5 +82,53 @@
   "GetPackageContents two packages, one refused, descriptions @full": {
     "isError": false,
     "text": "[{\"package_name\":\"ZSUB\",\"objects\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"description\":\"Program\",\"packageName\":\"ZSUB\",\"isPackage\":false}]},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+  },
+  "GetPackageTree one package, a subpackage @terse": {
+    "isError": false,
+    "text": "DEVC/K\tZPKG\n  DEVC/K\tnot loaded by SAP\n  CLAS/OC\tZCL_A\n  DEVC/K\tZSUB\n    PROG/P\tZPROG\n  PROG/P\t\t\t/sap/bc/adt/programs/programs/nameless"
+  },
+  "GetPackageTree one package, a subpackage @medium": {
+    "isError": false,
+    "text": "{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"not_loaded\":true},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\"},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\"}]},{\"name\":\"\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/nameless\"}]}"
+  },
+  "GetPackageTree one package, a subpackage @full": {
+    "isError": false,
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/programs/programs/nameless\",\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}}"
+  },
+  "GetPackageTree two packages, one refused @terse": {
+    "isError": false,
+    "text": "# asked ZSUB\nDEVC/K\tZSUB\n  PROG/P\tZPROG\n# asked ZGONE\n# error {\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}}"
+  },
+  "GetPackageTree two packages, one refused @medium": {
+    "isError": false,
+    "text": "[{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\"}]},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+  },
+  "GetPackageTree two packages, one refused @full": {
+    "isError": false,
+    "text": "[{\"package_name\":\"ZSUB\",\"tree\":{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":false}},{\"package_name\":\"ZGONE\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+  },
+  "GetPackageTree one package, a subpackage, descriptions @terse": {
+    "isError": false,
+    "text": "DEVC/K\tZPKG\t\n  DEVC/K\tnot loaded by SAP\t\n  CLAS/OC\tZCL_A\tClass A\n  DEVC/K\tZSUB\tSub\n    PROG/P\tZPROG\tProgram\n  PROG/P\t\t\t/sap/bc/adt/programs/programs/nameless\t"
+  },
+  "GetPackageTree one package, a subpackage, descriptions @medium": {
+    "isError": false,
+    "text": "{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"not_loaded\":true},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"description\":\"Class A\"},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"description\":\"Sub\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"description\":\"Program\"}]},{\"name\":\"\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/nameless\"}]}"
+  },
+  "GetPackageTree one package, a subpackage, descriptions @full": {
+    "isError": false,
+    "text": "{\"package_name\":\"ZPKG\",\"tree\":{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"not loaded by SAP\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"notLoaded\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]},{\"name\":\"ZCL_A\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"description\":\"Class A\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]},{\"name\":\"ZSUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"description\":\"Sub\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"kind\":\"program\",\"description\":\"Program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"uri\":\"/sap/bc/adt/programs/programs/nameless\",\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":true}}"
+  },
+  "GetPackageTree two packages, one refused, descriptions @terse": {
+    "isError": false,
+    "text": "# asked ZSUB\n# error {\"package_name\":\"ZSUB\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\\\"1.0\\\\\" encoding=\\\\\"utf-8\\\\\"?><exc:exception xmlns:exc=\\\\\"http://www.sap.com/abapxml/types/communicationframework\\\\\"><namespace id=\\\\\"com.sap.adt\\\\\"/><type id=\\\\\"ExceptionNotAuthorized\\\\\"/><message lang=\\\\\"EN\\\\\">no authorization</message></exc:exception>\"}}\n# asked ZGONE\nDEVC/K\tZGONE\t"
+  },
+  "GetPackageTree two packages, one refused, descriptions @medium": {
+    "isError": false,
+    "text": "[{\"package_name\":\"ZSUB\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}},{\"name\":\"ZGONE\",\"type\":\"DEVC/K\"}]"
+  },
+  "GetPackageTree two packages, one refused, descriptions @full": {
+    "isError": false,
+    "text": "[{\"package_name\":\"ZSUB\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read package node structure\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}},{\"package_name\":\"ZGONE\",\"tree\":{\"name\":\"ZGONE\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[]},\"metadata\":{\"include_subpackages\":true,\"max_depth\":5,\"include_descriptions\":true}}]"
   }
 }

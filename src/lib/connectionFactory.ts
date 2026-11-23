@@ -239,7 +239,7 @@ function safeHeaders(headers: Readonly<Record<string, string>>): string {
  * untouched when the switch is off — no wrapper, no cost, no behaviour to
  * explain in production.
  */
-function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
+export function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   const { logWire, bodyChars } = httpWireOptions();
   if (!logWire) return connection;
   const original = connection.makeAdtRequest.bind(connection);
@@ -249,6 +249,10 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
   ): Promise<IAdtWireResponse> => {
     n += 1;
     const id = n;
+    // `noLog` (spec §3.4): the method, the path without its query, the
+    // integer status and the byte count — nothing of the request or the
+    // answer beside, on either branch.
+    if (options.noLog === true) return quietExchange(id, options, original);
     process.stderr.write(
       `[WIRE ${id}] ${String(options.method ?? '?')} ${String(options.url ?? '?')}\n`,
     );
@@ -291,6 +295,68 @@ function withHttpWireLog<T extends IAbapConnection>(connection: T): T {
     }
   };
   return connection;
+}
+
+/** A `noLog` exchange's wire lines: method and path, then the integer status and the bytes. */
+async function quietExchange(
+  id: number,
+  options: IAbapRequestOptions,
+  send: (options: IAbapRequestOptions) => Promise<IAdtWireResponse>,
+): Promise<IAdtWireResponse> {
+  process.stderr.write(
+    `[WIRE ${id}] ${String(options.method ?? '?')} ${pathnameOf(String(options.url ?? ''))}\n`,
+  );
+  try {
+    const answer = await send(options);
+    const count = byteCountOf(answer.data);
+    const bytes = count === undefined ? '' : ` ${count} bytes`;
+    process.stderr.write(
+      `[WIRE ${id}] → ${integerOr(answer.status)}${bytes}\n`,
+    );
+    return answer;
+  } catch (error: unknown) {
+    process.stderr.write(
+      `[WIRE ${id}] → threw ${integerOr(childAt(error, 'response', 'status'))}\n`,
+    );
+    throw error;
+  }
+}
+
+/**
+ * The pathname of a request URL, parsed (a relative one against a dummy
+ * base): never its authority, userinfo, query or fragment; `?` when it is
+ * no URL.
+ */
+function pathnameOf(url: string): string {
+  try {
+    return new URL(url, 'http://wire.invalid').pathname;
+  } catch {
+    return '?';
+  }
+}
+
+/**
+ * An answer body's byte count: a text's UTF-8 length, the byte length of an
+ * `ArrayBuffer`, a `DataView` or any typed-array view; `undefined` for
+ * anything else. The body itself is read for nothing more.
+ * A byte length that throws leaves the line without a count; the request's own result is untouched.
+ */
+function byteCountOf(data: unknown): number | undefined {
+  try {
+    if (typeof data === 'string') return Buffer.byteLength(data);
+    if (ArrayBuffer.isView(data)) return data.byteLength;
+    if (data instanceof ArrayBuffer) return data.byteLength;
+  } catch {
+    return undefined;
+  }
+  return undefined;
+}
+
+/** A status as an integer, else `?`. */
+function integerOr(status: unknown): string {
+  return typeof status === 'number' && Number.isInteger(status)
+    ? String(status)
+    : '?';
 }
 
 /** How a connection was built, so a sibling can be opened exactly like it. */

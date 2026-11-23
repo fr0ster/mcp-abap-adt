@@ -43,6 +43,21 @@ export type ServerRefusalCode =
   | 'long_session_unavailable'
   | 'connection_provider_failed'
   | 'no_connection'
+  | 'abapgit_not_served'
+  | 'abapgit_import_not_allowed'
+  | 'abapgit_background_not_declared'
+  | 'abapgit_package_required'
+  | 'abapgit_repository_unknown'
+  | 'abapgit_run_log_not_paired'
+  | 'abapgit_run_log_ambiguous'
+  | 'abapgit_run_log_not_served'
+  | 'abapgit_overwrite_duplicate'
+  | 'abapgit_overwrite_not_declared'
+  | 'abapgit_overwrite_ambiguous'
+  | 'abapgit_overwrite_not_listed'
+  | 'abapgit_url_refused'
+  | 'abapgit_endpoint_refused'
+  | 'abapgit_not_admitted'
   | AccessRefusalCode;
 
 /**
@@ -54,6 +69,69 @@ export type AccessRefusalCode =
   | 'package_tree_unreadable'
   | 'request_not_allowed'
   | 'table_not_allowed';
+
+/**
+ * An abapGit call on a system whose discovery does not list
+ * `/sap/bc/adt/abapgit/repos`, or could not be read (spec §4.5).
+ */
+export const ABAPGIT_NOT_SERVED_WORDS =
+  'abapGit is not served by this system: its discovery does not list it, or could not be read; nothing was sent';
+
+/** Link or pull while an allowed-packages or allowed-requests entry is configured (spec §4.3). */
+export const ABAPGIT_IMPORT_NOT_ALLOWED_WORDS =
+  'linking or pulling a repository writes objects that the allowed packages and requests cannot bound, so it is refused while access restrictions are configured';
+
+/** `background` on an abapGit call whose schema does not declare it (spec §4.6). */
+export const ABAPGIT_BACKGROUND_NOT_DECLARED_WORDS =
+  'background is taken only by an on-premise link, pull or push of a repository; this call does not take it, and nothing was sent';
+
+/** A blank `package_name` on link or branch info (spec §4.4). */
+export const ABAPGIT_PACKAGE_REQUIRED_WORDS =
+  'package_name is required and may not be blank to link a repository or read its branch; nothing was sent';
+
+/** A key the repository list does not show with a package and a URL, or an unreadable list (spec §4.4). */
+export const ABAPGIT_REPOSITORY_UNKNOWN_WORDS =
+  'the repository list does not show repository_key with its package and URL, or could not be read, so the call is not checked; nothing but the list was sent';
+
+/** A run-log key the repository list does not show for that repository (spec §4.1). */
+export const ABAPGIT_RUN_LOG_NOT_PAIRED_WORDS =
+  'app_log_key is not the run log the repository list shows for repository_key; nothing but the list was sent';
+
+/** An R1 entry carrying more than one log_link: which run it names is not known (spec §4.1). */
+export const ABAPGIT_RUN_LOG_AMBIGUOUS_WORDS =
+  'the repository list shows more than one run log for repository_key, so which one app_log_key names is not known; nothing but the list was sent';
+
+/** The run log asked of an on-premise system, whose R1 carries no log_link (measured 2026-11-22). */
+export const ABAPGIT_RUN_LOG_NOT_SERVED_WORDS =
+  'on premise abapGit keeps no run log in its repository list, so no run log can be read there; nothing was sent';
+
+/** A pull's `overwrite` naming one object twice. */
+export const ABAPGIT_OVERWRITE_DUPLICATE_WORDS =
+  'overwrite names one object twice: name each object once, by its type and name as GetAbapGitModifiedObjects answers them; nothing was sent';
+
+/** A pull's `overwrite` naming an object the modified-objects read (R6) does not list. */
+export const ABAPGIT_OVERWRITE_NOT_LISTED_WORDS =
+  'overwrite names an object the modified-objects read does not list for repository_key: name objects by their type and name as GetAbapGitModifiedObjects answers them; the repository list and the modified-objects read were sent, no pull';
+
+/** A pull's `overwrite` on a system whose pull takes no selection (on premise). */
+export const ABAPGIT_OVERWRITE_NOT_DECLARED_WORDS =
+  'overwrite is taken by the pull on ABAP Cloud only: on premise SAP pulls every changed object; nothing was sent';
+
+/** A selected name R6 lists under another type too: SAP's job matches by name alone. */
+export const ABAPGIT_OVERWRITE_AMBIGUOUS_WORDS =
+  'overwrite names an object whose name the modified-objects read lists under another type too, and SAP selects by name within each of its two lists, so a collision inside one list could take an object not named; the server refuses a collision inside one list and across both lists alike; the repository list and the modified-objects read were sent, no pull';
+
+/** A `url` argument that is no URL, or carries userinfo, a query, a fragment or a dot segment (spec §5.1). */
+export const ABAPGIT_URL_REFUSED_WORDS =
+  'url is not an absolute URL written as the URL parser writes it, or carries a user or a password, a query, a fragment or a dot segment: give the remote URL alone — the credential comes from the approved endpoints; nothing was sent';
+
+/** A request whose `x-abapgit-*` headers state no endpoint that can be one (spec §5.2). */
+export const ABAPGIT_ENDPOINT_REFUSED_WORDS =
+  'the x-abapgit-remote, x-abapgit-user and x-abapgit-token headers state no approved endpoint: an https URL without a user, a password, a query or a fragment, with a user and a token; nothing was sent';
+
+/** An abapGit tool reached without the server's admission (a registry path that bypasses its dispatch). */
+export const ABAPGIT_NOT_ADMITTED_WORDS =
+  "the abapGit call reached its tool without the server's admission (the repository list read, the endpoint binding), so it is not sent; nothing was sent";
 
 /** Inspection-only mode: stdio started without a destination. */
 export const INSPECTION_ONLY_WORDS =
@@ -375,6 +453,21 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   batch_unsplit: BATCH_UNSPLIT_WORDS,
   long_session_unavailable: LONG_SESSION_UNAVAILABLE_WORDS,
   connection_provider_failed: CONNECTION_PROVIDER_FAILED_WORDS,
+  abapgit_not_served: ABAPGIT_NOT_SERVED_WORDS,
+  abapgit_import_not_allowed: ABAPGIT_IMPORT_NOT_ALLOWED_WORDS,
+  abapgit_background_not_declared: ABAPGIT_BACKGROUND_NOT_DECLARED_WORDS,
+  abapgit_package_required: ABAPGIT_PACKAGE_REQUIRED_WORDS,
+  abapgit_repository_unknown: ABAPGIT_REPOSITORY_UNKNOWN_WORDS,
+  abapgit_run_log_not_paired: ABAPGIT_RUN_LOG_NOT_PAIRED_WORDS,
+  abapgit_run_log_ambiguous: ABAPGIT_RUN_LOG_AMBIGUOUS_WORDS,
+  abapgit_run_log_not_served: ABAPGIT_RUN_LOG_NOT_SERVED_WORDS,
+  abapgit_overwrite_duplicate: ABAPGIT_OVERWRITE_DUPLICATE_WORDS,
+  abapgit_overwrite_not_declared: ABAPGIT_OVERWRITE_NOT_DECLARED_WORDS,
+  abapgit_overwrite_ambiguous: ABAPGIT_OVERWRITE_AMBIGUOUS_WORDS,
+  abapgit_overwrite_not_listed: ABAPGIT_OVERWRITE_NOT_LISTED_WORDS,
+  abapgit_url_refused: ABAPGIT_URL_REFUSED_WORDS,
+  abapgit_endpoint_refused: ABAPGIT_ENDPOINT_REFUSED_WORDS,
+  abapgit_not_admitted: ABAPGIT_NOT_ADMITTED_WORDS,
 };
 
 /** What the reader knows of a refusal: recorded at construction. */

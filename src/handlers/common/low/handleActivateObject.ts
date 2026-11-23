@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { DETAIL_LEVELS } from '../../../lib/detail/levels';
 /**
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  *
@@ -207,11 +208,11 @@ function activateObjectSchema(variant: ProjectionVariant) {
       ),
     preaudit: z.boolean().optional().describe(preauditDescription(variant)),
     detail: z
-      .enum(['terse', 'full', 'raw'])
+      .enum(DETAIL_LEVELS)
       .default('terse')
       .optional()
       .describe(
-        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored when a group activation (more than one object, or a type this tool cannot map to a single family) runs in the background: that path answers a run and its messages, with no single document behind them.',
+        'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored when a group activation (more than one object, or a type this tool cannot map to a single family) runs in the background: that path answers a run and its messages, with no single document behind them.',
       ),
   });
 }

@@ -45,6 +45,7 @@ import {
 } from '../../lib/config/index';
 import type { YamlConfig } from '../../lib/config/yamlConfig';
 import {
+  AbapGitHandlersGroup,
   BackgroundRunHandlersGroup,
   DebugBatchHandlersGroup,
   DebugHandlersGroup,
@@ -129,6 +130,7 @@ describe('the four tool sets', () => {
         new SearchHandlersGroup(context),
         new LeftoverSessionHandlersGroup(context),
         new DebugBatchHandlersGroup(context),
+        new AbapGitHandlersGroup(context),
       ]),
     );
   });
@@ -140,6 +142,7 @@ describe('the four tool sets', () => {
         new ReadOnlyHandlersGroup(context),
         new SystemHandlersGroup(context),
         new SearchHandlersGroup(context),
+        new AbapGitHandlersGroup(context, 'reads'),
         new BackgroundRunHandlersGroup(context),
         new LeftoverSessionListHandlersGroup(context),
       ]),
@@ -168,6 +171,10 @@ describe('the four tool sets', () => {
         },
         { group: 'CompactDebugBatchHandlers', tools: ['HandlerDebugBatch'] },
         {
+          group: 'CompactAbapGitHandlers',
+          tools: ['HandlerAbapGitGet', 'HandlerAbapGit'],
+        },
+        {
           group: 'CompactBackgroundRunHandlers',
           tools: [
             'HandlerBackgroundRunGet',
@@ -192,6 +199,7 @@ describe('the four tool sets', () => {
       shape(compactRo.groups(context, 'stdio', { dataTools: false })),
       [
         { group: 'CompactReadOnlyHandlers', tools: half },
+        { group: 'CompactAbapGitHandlers', tools: ['HandlerAbapGitGet'] },
         {
           group: 'CompactBackgroundRunHandlers',
           tools: [

@@ -138,3 +138,7 @@ src/__tests__/unit/sources/__fixtures__/typeGate/node_modules/external-contracts
 !src/__tests__/unit/sources/__fixtures__/typeGate/node_modules/no-manifest/
 src/__tests__/unit/sources/__fixtures__/typeGate/node_modules/no-manifest/*
 !src/__tests__/unit/sources/__fixtures__/typeGate/node_modules/no-manifest/index.d.ts
+
+# abapGit live run: its recovery ledger and run lock (beside the test config)
+tests/abapgit-live.ledger.json
+tests/abapgit-live.lock

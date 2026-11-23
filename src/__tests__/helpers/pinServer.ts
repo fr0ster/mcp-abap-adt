@@ -28,6 +28,8 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { InMemoryBackgroundRuns } from '../../../background-runs-memory/src/InMemoryBackgroundRuns';
 import { compactToolSet } from '../../../compact/src/launcher';
 import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
+import type { AbapGitRestrictionSignal } from '../../lib/abapGit/admission';
+import type { ApprovedEndpoint } from '../../lib/abapGit/approvedEndpoints';
 import type { IAccessChecks } from '../../lib/access/accessChecks';
 import type { DeniedActions } from '../../lib/access/deniedActions';
 import { withoutDenied } from '../../lib/access/withoutDenied';
@@ -80,6 +82,12 @@ export type PinSetup = 'leftover-session';
 export interface ServerRestriction {
   readonly deniedActions?: DeniedActions | undefined;
   readonly accessChecks?: IAccessChecks | undefined;
+  /** The approved git endpoints the server attaches credentials for (abapGit). */
+  readonly abapGitEndpoints?: readonly ApprovedEndpoint[] | undefined;
+  /** The restriction signal the launcher would compute (abapGit's import refusal). */
+  readonly abapGitRestrictions?: AbapGitRestrictionSignal | undefined;
+  /** The tool sets the server serves; absent: the full and the compact set. */
+  readonly toolSets?: readonly ToolSet[] | undefined;
 }
 
 export interface PinServer {
@@ -269,12 +277,20 @@ export async function inProcessServer(
     ...(restriction.accessChecks !== undefined
       ? { accessChecks: restriction.accessChecks }
       : {}),
+    ...(restriction.abapGitEndpoints !== undefined
+      ? { abapGitEndpoints: restriction.abapGitEndpoints }
+      : {}),
+    ...(restriction.abapGitRestrictions !== undefined
+      ? { abapGitRestrictions: restriction.abapGitRestrictions }
+      : {}),
   });
   server.use(source);
   server.register(
     new CompositeHandlersRegistry(
       withoutDenied(
-        [...groupsOf(fullToolSet), ...groupsOf(compactToolSet)],
+        (restriction.toolSets ?? [fullToolSet, compactToolSet]).flatMap(
+          groupsOf,
+        ),
         restriction.deniedActions ?? [],
       ),
     ),

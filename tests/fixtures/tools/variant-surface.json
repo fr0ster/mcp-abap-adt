@@ -27,6 +27,8 @@
         "AmdpDebugStep",
         "AmdpDebugStop",
         "AmdpDebugWait",
+        "CheckAbapGitExternalRepo",
+        "CheckAbapGitRepo",
         "CheckBehaviorDefinition",
         "CheckClass",
         "CheckDataElement",
@@ -123,6 +125,8 @@
         "GetATCFindings",
         "GetATCResult",
         "GetATCRunStatus",
+        "GetAbapGitFile",
+        "GetAbapGitStaging",
         "GetAdtTypes",
         "GetBackgroundRun",
         "GetBehaviorDefinition",
@@ -207,7 +211,9 @@
         "GetTypeInfo",
         "GetUnitTestResult",
         "GetWhereUsed",
+        "LinkAbapGitRepo",
         "ListATCResults",
+        "ListAbapGitRepos",
         "ListBackgroundRuns",
         "ListFunctionGroupIncludes",
         "ListFunctionModules",
@@ -219,6 +225,8 @@
         "MemorySnapshotGet",
         "MemorySnapshotList",
         "MoveTransportObjects",
+        "PullAbapGitRepo",
+        "PushAbapGitRepo",
         "ReadTransportActionLog",
         "ReadTransportObjects",
         "RemoveTransportObject",
@@ -242,6 +250,8 @@
         "SearchObject",
         "SearchSource",
         "SortAndCompressTransportTask",
+        "SwitchAbapGitBranch",
+        "UnlinkAbapGitRepo",
         "UpdateBehaviorDefinition",
         "UpdateBehaviorImplementation",
         "UpdateCdsUnitTest",
@@ -386,11 +396,15 @@
     },
     "core-ro": {
       "tools": [
+        "CheckAbapGitExternalRepo",
+        "CheckAbapGitRepo",
         "DescribeByList",
         "DiscardBackgroundRun",
         "GetATCFindings",
         "GetATCResult",
         "GetATCRunStatus",
+        "GetAbapGitFile",
+        "GetAbapGitStaging",
         "GetAdtTypes",
         "GetBackgroundRun",
         "GetBehaviorDefinition",
@@ -444,6 +458,7 @@
         "GetUnitTestResult",
         "GetWhereUsed",
         "ListATCResults",
+        "ListAbapGitRepos",
         "ListBackgroundRuns",
         "ListFunctionGroupIncludes",
         "ListFunctionModules",
@@ -565,6 +580,8 @@
     },
     "compact": {
       "tools": [
+        "HandlerAbapGit",
+        "HandlerAbapGitGet",
         "HandlerActivate",
         "HandlerBackgroundRunDiscard",
         "HandlerBackgroundRunGet",
@@ -1078,6 +1095,7 @@
     },
     "compact-ro": {
       "tools": [
+        "HandlerAbapGitGet",
         "HandlerBackgroundRunDiscard",
         "HandlerBackgroundRunGet",
         "HandlerBackgroundRunList",
@@ -1294,6 +1312,8 @@
         "AmdpDebugStep",
         "AmdpDebugStop",
         "AmdpDebugWait",
+        "CheckAbapGitExternalRepo",
+        "CheckAbapGitRepo",
         "CheckBehaviorDefinition",
         "CheckClass",
         "CheckDataElement",
@@ -1385,6 +1405,11 @@
         "GetATCFindings",
         "GetATCResult",
         "GetATCRunStatus",
+        "GetAbapGitBranchInfo",
+        "GetAbapGitErrorLog",
+        "GetAbapGitFile",
+        "GetAbapGitModifiedObjects",
+        "GetAbapGitStaging",
         "GetAdtTypes",
         "GetBackgroundRun",
         "GetBehaviorDefinition",
@@ -1467,7 +1492,9 @@
         "GetTypeInfo",
         "GetUnitTestResult",
         "GetWhereUsed",
+        "LinkAbapGitRepo",
         "ListATCResults",
+        "ListAbapGitRepos",
         "ListBackgroundRuns",
         "ListFunctionGroupIncludes",
         "ListFunctionModules",
@@ -1479,6 +1506,8 @@
         "MemorySnapshotGet",
         "MemorySnapshotList",
         "MoveTransportObjects",
+        "PullAbapGitRepo",
+        "PushAbapGitRepo",
         "ReadTransportActionLog",
         "ReadTransportObjects",
         "RemoveTransportObject",
@@ -1500,6 +1529,7 @@
         "SearchObject",
         "SearchSource",
         "SortAndCompressTransportTask",
+        "UnlinkAbapGitRepo",
         "UpdateBehaviorDefinition",
         "UpdateBehaviorImplementation",
         "UpdateCdsUnitTest",
@@ -1640,11 +1670,17 @@
     },
     "core-ro": {
       "tools": [
+        "CheckAbapGitExternalRepo",
+        "CheckAbapGitRepo",
         "DescribeByList",
         "DiscardBackgroundRun",
         "GetATCFindings",
         "GetATCResult",
         "GetATCRunStatus",
+        "GetAbapGitErrorLog",
+        "GetAbapGitFile",
+        "GetAbapGitModifiedObjects",
+        "GetAbapGitStaging",
         "GetAdtTypes",
         "GetBackgroundRun",
         "GetBehaviorDefinition",
@@ -1696,6 +1732,7 @@
         "GetUnitTestResult",
         "GetWhereUsed",
         "ListATCResults",
+        "ListAbapGitRepos",
         "ListBackgroundRuns",
         "ListFunctionGroupIncludes",
         "ListFunctionModules",
@@ -1816,6 +1853,8 @@
     },
     "compact": {
       "tools": [
+        "HandlerAbapGit",
+        "HandlerAbapGitGet",
         "HandlerActivate",
         "HandlerBackgroundRunDiscard",
         "HandlerBackgroundRunGet",
@@ -2302,6 +2341,7 @@
     },
     "compact-ro": {
       "tools": [
+        "HandlerAbapGitGet",
         "HandlerBackgroundRunDiscard",
         "HandlerBackgroundRunGet",
         "HandlerBackgroundRunList",
@@ -2493,11 +2533,20 @@
   "legacy": {
     "core": {
       "tools": [
+        "CheckAbapGitExternalRepo",
+        "CheckAbapGitRepo",
         "DiscardBackgroundRun",
+        "GetAbapGitFile",
+        "GetAbapGitStaging",
         "GetBackgroundRun",
+        "LinkAbapGitRepo",
+        "ListAbapGitRepos",
         "ListBackgroundRuns",
         "ListLeftoverSessions",
-        "LogoffLeftoverSession"
+        "LogoffLeftoverSession",
+        "PullAbapGitRepo",
+        "PushAbapGitRepo",
+        "UnlinkAbapGitRepo"
       ],
       "members": {},
       "argumentDescriptions": {},
@@ -2506,8 +2555,13 @@
     },
     "core-ro": {
       "tools": [
+        "CheckAbapGitExternalRepo",
+        "CheckAbapGitRepo",
         "DiscardBackgroundRun",
+        "GetAbapGitFile",
+        "GetAbapGitStaging",
         "GetBackgroundRun",
+        "ListAbapGitRepos",
         "ListBackgroundRuns",
         "ListLeftoverSessions"
       ],
@@ -2518,6 +2572,8 @@
     },
     "compact": {
       "tools": [
+        "HandlerAbapGit",
+        "HandlerAbapGitGet",
         "HandlerBackgroundRunDiscard",
         "HandlerBackgroundRunGet",
         "HandlerBackgroundRunList",
@@ -2532,6 +2588,7 @@
     },
     "compact-ro": {
       "tools": [
+        "HandlerAbapGitGet",
         "HandlerBackgroundRunDiscard",
         "HandlerBackgroundRunGet",
         "HandlerBackgroundRunList",

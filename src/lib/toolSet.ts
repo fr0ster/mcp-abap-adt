@@ -43,6 +43,7 @@
  * parameter, naming the binary its words asked for.
  */
 
+import type { AbapGitRestrictionSignal } from './abapGit/admission.js';
 import './instance.js';
 import type { IAccessChecks } from './access/accessChecks';
 import type { AccessRestrictions } from './access/accessLists';
@@ -52,6 +53,7 @@ import { accessChecksFor } from './access/packageTreeAccessChecks';
 import { accessStartLine } from './access/startLine';
 import { unmatchedEntries, withoutDenied } from './access/withoutDenied';
 
+import { CompactAbapGitHandlersGroup } from './compact/abapGit/group';
 import { CompactBackgroundRunHandlersGroup } from './compact/backgroundRuns/group';
 import { CompactBatchHandlersGroup } from './compact/batch/group';
 import {
@@ -74,6 +76,7 @@ import {
   type ServedTransport,
   type ToolSetKind,
 } from './config/binaries';
+import { AbapGitHandlersGroup } from './handlers/groups/AbapGitHandlersGroup.js';
 import { BackgroundRunHandlersGroup } from './handlers/groups/BackgroundRunHandlersGroup.js';
 import { DataHandlersGroup } from './handlers/groups/DataHandlersGroup.js';
 import { DebugBatchHandlersGroup } from './handlers/groups/DebugBatchHandlersGroup.js';
@@ -358,6 +361,8 @@ export const fullToolSet: ToolSet = {
     // The debugger batch beside the debugger; batch mode is the compact
     // sets' (HandlerBatch).
     new DebugBatchHandlersGroup(context),
+    // abapGit, always listed; served where the system's discovery lists it, decided at call time.
+    new AbapGitHandlersGroup(context),
     // The long session, on Streamable HTTP alone.
     ...(servesLongSession(transport)
       ? [new LongSessionHandlersGroup(context)]
@@ -405,6 +410,8 @@ export const fullReadOnlyToolSet: ToolSet = {
     // The data tools, opt-in.
     ...(served.dataTools ? [new DataHandlersGroup(context)] : []),
     new SearchHandlersGroup(context),
+    // abapGit's reads, always listed; served where the system's discovery lists it, decided at call time.
+    new AbapGitHandlersGroup(context, 'reads'),
     // The background runs of the long reads: read, listed and cancelled.
     new BackgroundRunHandlersGroup(context),
     ...(servesLeftoverSessions(transport)
@@ -482,6 +489,8 @@ export function compactToolSetOf(halves: CompactHalves): ToolSet {
       ]),
       new CompactDebugHandlersGroup(context),
       new CompactDebugBatchHandlersGroup(context),
+      // abapGit, always listed; served where the system's discovery lists it, decided at call time.
+      new CompactAbapGitHandlersGroup(context),
       // Beside the run tool (HandlerProfileRun): its background runs, read,
       // listed and discarded.
       new CompactBackgroundRunHandlersGroup(context),
@@ -535,6 +544,8 @@ export function compactReadOnlyToolSetOf(half: CompactReadOnlyHalf): ToolSet {
         [half.readOnly, ...(served.dataTools ? [half.data] : [])],
         'CompactReadOnlyHandlers',
       ),
+      // abapGit's reads, always listed; served where the system's discovery lists it, decided at call time.
+      new CompactAbapGitHandlersGroup(context, 'reads'),
       // The background runs of the long reads: read, listed and cancelled.
       new CompactBackgroundRunHandlersGroup(context),
       ...(servesLeftoverSessions(transport)
@@ -588,6 +599,11 @@ export interface RestrictedStart {
   readonly accessChecks: IAccessChecks | undefined;
   /** The start line (`accessStartLine`), written once per process. */
   readonly startLine: string;
+  /**
+   * Which lists are configured, for the abapGit admission (spec §4.3): the
+   * lists themselves stay here.
+   */
+  readonly abapGitRestrictions: AbapGitRestrictionSignal;
 }
 
 /**
@@ -617,5 +633,9 @@ export function restrictedStart(
     ),
     accessChecks: accessChecksFor(restrictions.lists),
     startLine: accessStartLine(restrictions, unmatched, tree),
+    abapGitRestrictions: {
+      packages: (restrictions.lists.allowedPackages?.length ?? 0) > 0,
+      requests: (restrictions.lists.allowedRequests?.length ?? 0) > 0,
+    },
   };
 }

@@ -6,7 +6,9 @@
  *
  * The list is exactly the code-running tools whose run may write and run
  * long: `RuntimeRunClass`, `RuntimeRunProgram` and compact's
- * `HandlerProfileRun` — `background` without a default. The listed long
+ * `HandlerProfileRun`, and on premise abapGit's link, pull and push
+ * (`LinkAbapGitRepo`, `PullAbapGitRepo`, `PushAbapGitRepo`, compact's
+ * `HandlerAbapGit`) — `background` without a default. The listed long
  * tools (`longTools.ts`) declare their own `background`, defaulting to
  * `true`. A source test keeps every tool's schema equal to the two lists: a
  * listed tool without the parameter, or a tool outside both with it, fails.
@@ -27,6 +29,15 @@ export const BACKGROUND_TOOLS: Readonly<
     discard: 'DiscardBackgroundRun',
   },
   HandlerProfileRun: {
+    get: 'HandlerBackgroundRunGet',
+    discard: 'HandlerBackgroundRunDiscard',
+  },
+  // On premise, SAP's link, pull and push are synchronous imports and
+  // commits (spec §4.6): their on-premise schemas alone declare it.
+  LinkAbapGitRepo: { get: 'GetBackgroundRun', discard: 'DiscardBackgroundRun' },
+  PullAbapGitRepo: { get: 'GetBackgroundRun', discard: 'DiscardBackgroundRun' },
+  PushAbapGitRepo: { get: 'GetBackgroundRun', discard: 'DiscardBackgroundRun' },
+  HandlerAbapGit: {
     get: 'HandlerBackgroundRunGet',
     discard: 'HandlerBackgroundRunDiscard',
   },
@@ -223,16 +234,48 @@ export function readObjectOf(args: ToolArgs): string {
   return '';
 }
 
-/** What a run tool's call runs: its class or program, upper case; `''` when none is named. */
-export function backgroundObjectOf(args: ToolArgs): string {
+/** The abapGit writes that run in the background, by the argument naming their object. */
+const ABAPGIT_RUN_OBJECTS: Readonly<
+  Record<string, 'package_name' | 'repository_key'>
+> = {
+  LinkAbapGitRepo: 'package_name',
+  PullAbapGitRepo: 'repository_key',
+  PushAbapGitRepo: 'repository_key',
+};
+
+/** `HandlerAbapGit`'s background actions, by the argument naming their object. */
+const ABAPGIT_ACTION_OBJECTS: Readonly<
+  Record<string, 'package_name' | 'repository_key'>
+> = {
+  link: 'package_name',
+  pull: 'repository_key',
+  push: 'repository_key',
+};
+
+/**
+ * What a run tool's call runs, upper case, chosen by `tool` (and its
+ * `action`): for an abapGit link its `package_name`, for a pull or a push
+ * its `repository_key` — never whichever is present; otherwise its class or
+ * program. `''` when none is named.
+ */
+export function backgroundObjectOf(tool: string, args: ToolArgs): string {
+  const action = args.action;
+  const abapGit =
+    tool === 'HandlerAbapGit'
+      ? typeof action === 'string'
+        ? ABAPGIT_ACTION_OBJECTS[action]
+        : undefined
+      : ABAPGIT_RUN_OBJECTS[tool];
   const targetType = args.target_type;
   const className = args.class_name;
   const programName = args.program_name;
   const pick =
-    targetType === 'PROGRAM'
-      ? programName
-      : targetType === 'CLASS'
-        ? className
-        : (className ?? programName);
+    abapGit !== undefined
+      ? args[abapGit]
+      : targetType === 'PROGRAM'
+        ? programName
+        : targetType === 'CLASS'
+          ? className
+          : (className ?? programName);
   return typeof pick === 'string' ? pick.trim().toUpperCase() : '';
 }

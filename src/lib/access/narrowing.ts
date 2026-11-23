@@ -25,6 +25,12 @@ import {
   TABLE_CODES,
 } from '../adtProjections';
 import {
+  ABAPGIT_GET_ON,
+  ABAPGIT_WRITE_ON,
+  handlerAbapGitDefinitionFor,
+  handlerAbapGitGetDefinitionFor,
+} from '../compact/abapGit/definitions';
+import {
   BATCH_ACTIONS,
   handlerBatchDefinition,
 } from '../compact/batch/handleHandlerBatch';
@@ -303,6 +309,23 @@ const NARROWING_LIST: readonly Narrowing[] = [
     values: () => SYSTEM_ACTIONS,
     definition: (variant, values) =>
       handlerSystemDefinitionFor(variant, keptOf(SYSTEM_ACTIONS, values)),
+  },
+  // The abapGit actions differ by kind: each variant's enum holds what that
+  // system serves.
+  {
+    tool: 'HandlerAbapGitGet',
+    values: (variant) => ABAPGIT_GET_ON[variant],
+    definition: (variant, values) =>
+      handlerAbapGitGetDefinitionFor(keptOf(ABAPGIT_GET_ON[variant], values)),
+  },
+  {
+    tool: 'HandlerAbapGit',
+    values: (variant) => ABAPGIT_WRITE_ON[variant],
+    definition: (variant, values) =>
+      handlerAbapGitDefinitionFor(
+        variant,
+        keptOf(ABAPGIT_WRITE_ON[variant], values),
+      ),
   },
   fixed('HandlerGetData', ['sql'], (values) =>
     handlerGetDataDefinition(values.includes('sql')),

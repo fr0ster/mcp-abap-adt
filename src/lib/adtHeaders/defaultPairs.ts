@@ -37,6 +37,12 @@ export const DEFAULT_ADT_HEADERS = Object.freeze({
     'application/abapgit.adt.repo.v3+xml',
     'application/abapgit.adt.repo.v3+xml',
   ),
+  // `pullRepo` with a selection (cloud): the `pull.req.v1` document, the pair
+  // adt-clients' live suite measured (its ERRATA, 2026-11-22).
+  'abapGit.pullSelective': pair(
+    'application/abapgit.adt.repo.v3+xml',
+    'application/abapgit.adt.repo.pull.req.v1+xml',
+  ),
   'accessControl.activate': pair('application/xml', 'application/xml'),
   'accessControl.check': pair(
     'application/vnd.sap.adt.checkmessages+xml',

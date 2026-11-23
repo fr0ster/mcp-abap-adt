@@ -1,7 +1,7 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt-ro",
-  "description": "Read-only MCP server for SAP ABAP ADT over HTTP, RFC or SNC: the readonly, system and search tools",
+  "description": "Read-only MCP server for SAP ABAP ADT over HTTP, RFC or SNC: readonly, search and abapGit reads",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"

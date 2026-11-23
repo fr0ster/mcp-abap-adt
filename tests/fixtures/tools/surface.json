@@ -1708,5 +1708,83 @@
     "name": "UpdateTextElements",
     "inputs": "object_kind*, object_name*, symbols, selections, headings, transport_request, activate*, detail",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "abapgit",
+    "name": "ListAbapGitRepos",
+    "inputs": "package_name, repository_key, detail",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "CheckAbapGitExternalRepo",
+    "inputs": "url*, detail",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "GetAbapGitModifiedObjects",
+    "inputs": "repository_key*, detail",
+    "available_in": "cloud"
+  },
+  {
+    "group": "abapgit",
+    "name": "GetAbapGitStaging",
+    "inputs": "repository_key*, detail",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "CheckAbapGitRepo",
+    "inputs": "repository_key*",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "GetAbapGitFile",
+    "inputs": "repository_key*, filename*, version*",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "GetAbapGitErrorLog",
+    "inputs": "repository_key*, app_log_key*, detail",
+    "available_in": "cloud"
+  },
+  {
+    "group": "abapgit",
+    "name": "GetAbapGitBranchInfo",
+    "inputs": "url*, branch*, package_name*, detail",
+    "available_in": "cloud"
+  },
+  {
+    "group": "abapgit",
+    "name": "LinkAbapGitRepo",
+    "inputs": "package_name*, url*, branch*, transport_request, background",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "UnlinkAbapGitRepo",
+    "inputs": "repository_key*",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "PullAbapGitRepo",
+    "inputs": "repository_key*, transport_request, background",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "PushAbapGitRepo",
+    "inputs": "repository_key*, objects*, comment*, author*, committer*, background",
+    "available_in": "(everywhere)"
+  },
+  {
+    "group": "abapgit",
+    "name": "SwitchAbapGitBranch",
+    "inputs": "repository_key*, branch*, create*",
+    "available_in": "onprem"
   }
 ]

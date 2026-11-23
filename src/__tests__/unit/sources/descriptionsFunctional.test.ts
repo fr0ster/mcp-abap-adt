@@ -168,6 +168,15 @@ const CHANGES_THE_SYSTEM: ReadonlySet<string> = new Set([
   'HandlerDebugMaintain',
   'HandlerDebugSession',
   'HandlerDebugStep',
+  // abapGit: a link, its removal, a pull, a push, a branch switch, and the
+  // read of a branch SAP answers by linking and unlinking the repository.
+  'LinkAbapGitRepo',
+  'UnlinkAbapGitRepo',
+  'PullAbapGitRepo',
+  'PushAbapGitRepo',
+  'SwitchAbapGitBranch',
+  'GetAbapGitBranchInfo',
+  'HandlerAbapGit',
 ]);
 
 /** Whether `name` begins with the word `word`: the next letter, if any, starts a new word. */

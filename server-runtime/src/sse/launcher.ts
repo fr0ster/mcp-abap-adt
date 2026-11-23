@@ -182,6 +182,7 @@ export async function launch(
     ...(restricted.accessChecks !== undefined && {
       accessChecks: restricted.accessChecks,
     }),
+    abapGitRestrictions: restricted.abapGitRestrictions,
     version: options.version,
     stateIdleMinutes: config.stateIdleMinutes,
     sessionKeepAliveMs:

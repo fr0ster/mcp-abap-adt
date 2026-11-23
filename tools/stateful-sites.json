@@ -36,6 +36,24 @@
     "whose": "server"
   },
   {
+    "file": "src/lib/abapGit/admission.ts",
+    "function": "AnswerKeepingConnection.setSessionType",
+    "site": "setSessionType(type: SessionType)",
+    "count": 1,
+    "window": "none of its own: the declaration of the member of the connection the abapGit R1 pre-read goes through, which forwards to the instance's connection",
+    "stateless": "the pre-read (listReposQuiet) sends its one request with stateless: true and calls no session switch",
+    "whose": "server"
+  },
+  {
+    "file": "src/lib/abapGit/admission.ts",
+    "function": "AnswerKeepingConnection.setSessionType",
+    "site": "setSessionType(type)",
+    "count": 1,
+    "window": "none of its own: forwards a caller's session type to the instance's connection unchanged",
+    "stateless": "the pre-read (listReposQuiet) sends its one request with stateless: true and calls no session switch",
+    "whose": "server"
+  },
+  {
     "file": "src/lib/batch/lateBound.ts",
     "function": "LateBoundConnection.setSessionType",
     "site": "setSessionType(type: Session)",

@@ -310,6 +310,97 @@ without credentials. Each request (HTTP) or connection (SSE) builds its own cred
 stored, shared or cached across them. Over SSE a `POST` is routed by its `sessionId` alone: its own
 `x-sap-*` headers are not read.
 
+## abapGit remotes: approved endpoints
+
+The abapGit tools ([README](../../README.md#abapgit-the-git-loop-on-a-package)) work on remote
+git repositories. **SAP's abapGit connects to the git host, not this server**: the server hands
+SAP's abapGit request a user and a password or token, and SAP presents them to the host (Basic or
+Digest, as the host's answer asks; a token goes as the password). No tool argument carries a git
+credential. The server attaches one only when the remote is an **approved endpoint**, and it
+reaches that request and nothing else: no log line, no answer, no error, no background-run record.
+
+**Any git host over HTTPS.** abapGit parses any host, with or without `.git`, and no host decides
+anything in the server: GitHub, GitLab, Bitbucket, Azure DevOps, Gitea, a self-hosted server on a
+port of its own.
+
+| Host | An approved endpoint's `url` |
+|---|---|
+| GitHub | `https://github.com/acme/zabap.git` |
+| GitLab | `https://gitlab.com/acme/abap/zabap.git` |
+| Azure DevOps | `https://dev.azure.com/acme/sap/_git/zabap` |
+| A self-hosted server with a port | `https://git.example.internal:8443/team/zabap.git` |
+
+### An endpoint
+
+An approved endpoint is an exact remote URL with its `user` and `token` (a password or a token,
+whatever the host takes), and optional `aliases`:
+
+- **Exact.** Scheme `https`; the host compared without letter case; a non-default port part of
+  it; the path as written, letter case included. No `.git` and no trailing `/` is merged:
+  `…/zabap`, `…/zabap/` and `…/zabap.git` are three endpoints. A URL with a user or a password in
+  it, a query, a fragment or a dot segment, or one written otherwise than the URL parser writes it,
+  is not an endpoint: in a configuration it stops the start, in a tool's `url` argument the call is
+  refused `abapgit_url_refused`, nothing sent.
+- **Which URL is compared.** On a tool that takes `url` (`CheckAbapGitExternalRepo`,
+  `GetAbapGitBranchInfo`, `LinkAbapGitRepo`), the argument. On a tool addressed by
+  `repository_key`, the URL SAP's repository list keeps for that key, read first — never a URL
+  of the arguments.
+- **The alias rule.** An alias is another exact URL by which the same remote is reached. On a
+  `url` tool, an argument that matches an alias gets the endpoint's credential, and **the
+  configured `url` is what SAP is sent**. On a key-addressed tool, a list URL that matches an alias
+  gets the credential; no URL is sent there (SAP pulls from the one it keeps). Configuring an alias
+  states that the credential may go to that URL. The first matching endpoint wins.
+- **No match:** the request goes without a credential. SAP answers as for a public repository; a
+  private one fails with SAP's own refusal (its status and message key).
+
+### Per transport
+
+- **stdio** (`mcp-abap-adt`, `-compact`, their `-ro`): the destination's endpoints file,
+  `<name>.abapgit.yaml` beside its `<name>.env` — beside the `--env-path` file, or
+  `sessions/<name>.abapgit.yaml` for `--mcp=<name>` and `--env=<name>` — read once at the start.
+  No file: no endpoint. A file that cannot be read or holds an entry that cannot be an endpoint
+  stops the start, naming the entry, never a value ([CLI_OPTIONS](CLI_OPTIONS.md#abapgit-endpoints-file)).
+- **Streamable HTTP** (`mcp-abap-adt-http` and its siblings): per request, the headers
+  `x-abapgit-remote` (the URL), `x-abapgit-user` and `x-abapgit-token` — one endpoint, no alias,
+  for that request only: a later request on the same `state_handle` without them sends no
+  credential.
+- **SSE** (`mcp-abap-adt-sse` and its siblings): the same headers on the `GET` that opens the
+  stream, held by that stream's instance and dropped with it; a `POST`'s own headers are not read.
+- Headers that state no endpoint that can be one (a URL refused as above, a user or token
+  missing) refuse the call `abapgit_endpoint_refused`, nothing sent.
+
+A credential for a remote not on GitHub, in a stdio endpoints file
+(`~/.config/mcp-abap-adt/sessions/DEV.abapgit.yaml` for `--mcp=DEV`):
+
+```yaml
+endpoints:
+  - url: https://gitlab.com/acme/abap/zabap.git
+    user: <the user the host takes>
+    token: <its access token or password>
+    aliases:
+      - https://gitlab.com/acme/abap/zabap
+  - url: https://git.example.internal:8443/team/zabap.git
+    user: <user>
+    token: <token>
+```
+
+The same remote for one Streamable HTTP request:
+
+```
+x-abapgit-remote: https://dev.azure.com/acme/sap/_git/zabap
+x-abapgit-user: <user>
+x-abapgit-token: <token>
+```
+
+### TLS trust
+
+The git host's certificate is SAP's to trust: abapGit's HTTPS client uses one fixed SSL identity
+of the system, not one per host (read in its code: `ANONYM` in the on-premise backend's
+`ZCL_ABAPGIT_HTTP_ADT`, `<client>_CA` on ABAP Cloud), so the host's CA must be trusted there.
+`NODE_EXTRA_CA_CERTS` in the server's environment trusts the CA of the **SAP system** this server
+connects to ([HTTPS certificates](../installation/INSTALLATION.md#https-certificates)); it plays no part in SAP's
+connection to the git host.
+
 ## Syntax checks after session loss
 
 Starting with 24.1.1, a standalone syntax check sent to the ADT `checkruns`

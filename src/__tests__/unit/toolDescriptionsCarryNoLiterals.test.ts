@@ -75,6 +75,13 @@ const INCIDENTAL = [
     name: 'a transport number (SIDK905635, ER121235)',
     pattern: /\b[A-Z0-9]{3}K9\d{5}\b|\b[A-Z]{2,4}\d{6,}\b/,
   },
+  {
+    // abapGit reaches any git host over HTTPS (spec §5.4): a description that
+    // names one ranks the abapGit tools for that host alone.
+    name: 'a git host name (GitHub, GitLab, Bitbucket, Azure DevOps, Gitea, CodeCommit)',
+    pattern:
+      /\b(?:[Gg]it[Hh]ub|[Gg]it[Ll]ab|[Bb]itbucket|[Aa]zure|[Vv]isual[Ss]tudio|[Gg]itea|[Cc]ode[Cc]ommit)\b/,
+  },
 ];
 
 /** A date or time format built from its own letters names no object. */
@@ -173,6 +180,10 @@ describe('descriptions carry no incidental literals', () => {
       'include LZOK_FG_MCP01F01',
       'transport SIDK905635',
       'transport ER121235',
+      'a repository on GitHub',
+      'any gitlab remote',
+      'Azure DevOps',
+      'a Bitbucket server',
     ]) {
       assert.deepStrictEqual(
         [literal, literalsIn(literal).length > 0],
@@ -193,6 +204,8 @@ describe('descriptions carry no incidental literals', () => {
       'refused with CTS_WBO_API 020',
       'measured on BASIS 816',
       'answers TK127 on premise',
+      'any git host over HTTPS',
+      'the remote git repository',
     ]) {
       assert.deepStrictEqual([generic, literalsIn(generic)], [generic, []]);
     }

@@ -5,6 +5,7 @@
  * one the `-ro` twin does not serve; tables on the tools that read a table's
  * rows by its name.
  */
+import { isAbapGitTool } from '../abapGit/tools';
 import {
   ACTIVATION_CODES,
   ACTIVATION_NAMES,
@@ -163,6 +164,10 @@ export function checkedArgumentsOf(
   definition: ToolDefinition,
   readOnly: ReadonlySet<string>,
 ): CheckedArguments | undefined {
+  // An abapGit tool is checked by its own admission (spec §4.3, §4.4):
+  // link and pull refused under any restriction, the rest against the
+  // repository's package — never by its arguments here.
+  if (isAbapGitTool(definition.name)) return undefined;
   const declared = declaredArguments(definition);
   const changes = !readOnly.has(definition.name);
   const packages = changes

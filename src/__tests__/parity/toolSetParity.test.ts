@@ -968,7 +968,8 @@ for (const transportName of [
         // (BatchBegin, BatchEnd, BatchAnswers left), three fewer; the debugger
         // batch reads its answers with DebugBatchAnswers, one more.
         // A table's technical settings and the text elements: four more.
-        assert.equal(full.tools.length, onStdio ? 271 : onHttp ? 271 : 269);
+        // abapGit on premise, always listed: ten more.
+        assert.equal(full.tools.length, onStdio ? 281 : onHttp ? 281 : 279);
         {
           const actual = full.tools;
           for (const expected of [
@@ -988,7 +989,8 @@ for (const transportName of [
         // leftover-session list; on http SessionOpen and SessionClose); no
         // write, run, debugger, logoff, resume or batch mode.
         // A table's technical settings and the text elements: two more.
-        assert.equal(fullRo.tools.length, onStdio ? 73 : onHttp ? 74 : 72);
+        // The abapGit reads on premise, always listed: five more.
+        assert.equal(fullRo.tools.length, onStdio ? 78 : onHttp ? 79 : 77);
         for (const name of [
           'GetBackgroundRun',
           'ListBackgroundRuns',
@@ -1046,10 +1048,11 @@ for (const transportName of [
         // compact: the 28, the four debugger tools, HandlerDebugBatch, the
         // three background-run tools beside the run tool, HandlerBatch, and on
         // stdio the leftover-session list and logoff (no set serves a resume);
-        // without --enable-data-tools, not HandlerGetData: 27 of the 28.
+        // without --enable-data-tools, not HandlerGetData: 27 of the 28;
+        // HandlerAbapGitGet and HandlerAbapGit, always listed.
         assert.equal(
           compact.tools.length,
-          27 + 4 + 1 + 3 + 1 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
+          27 + 4 + 1 + 3 + 1 + 2 + (onStdio ? 2 : 0) + (onHttp ? 1 : 0),
         );
         {
           const actual = compact.tools;
@@ -1065,10 +1068,10 @@ for (const transportName of [
         // compact-ro: the 16 that change nothing, the three background-run
         // tools of the long reads, HandlerBatch, and on stdio the
         // leftover-session list; without --enable-data-tools, not
-        // HandlerGetData: 15 of the 16.
+        // HandlerGetData: 15 of the 16; HandlerAbapGitGet, always listed.
         assert.equal(
           compactRo.tools.length,
-          15 + 3 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
+          15 + 3 + 1 + 1 + (onStdio ? 1 : 0) + (onHttp ? 1 : 0),
         );
         assert.ok(compactRo.tools.includes('HandlerBackgroundRunGet'));
         assert.ok(compactRo.tools.includes('HandlerGet'));

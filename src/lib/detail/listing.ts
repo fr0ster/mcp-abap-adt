@@ -87,6 +87,8 @@ export interface RowSpec<I> {
   readonly header: 'always' | 'when-rows' | 'none';
   readonly groups?: readonly Group<I>[] | undefined;
   readonly lists?: RowSchemas<I> | undefined;
+  /** The list is a tree's top: its rows at depth 0, their own lists one level deeper each. */
+  readonly tree?: boolean | undefined;
 }
 
 /** The items of the list `key` of a reading. */
@@ -202,8 +204,9 @@ function listLines<R>(
 function rowLines<I>(
   items: readonly I[],
   spec: RowSpec<I>,
-  depth: number | undefined,
+  outerDepth: number | undefined,
 ): Line[] {
+  const depth = spec.tree === true && outerDepth === undefined ? 0 : outerDepth;
   const lines: Line[] = [];
   if (
     spec.header === 'always' ||

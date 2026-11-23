@@ -54,6 +54,11 @@ export function writeWhole<R extends object>(reading: R): Written<R> {
  */
 export interface Column<I> {
   readonly name: string;
+  /**
+   * What the cell tells, in domain words (`its type`, `its package`): what a
+   * tool's description names of the column — never its name or its form.
+   */
+  readonly means?: string | undefined;
   readonly cell: (item: I) => string;
   readonly when?: ((item: I) => boolean) | undefined;
 }
@@ -267,8 +272,137 @@ export type Writable<R, T> = [R] extends [readonly unknown[]]
     ? never
     : T;
 
+/**
+ * What a schema writes, as data: the list it reads, how each item is written
+ * (its columns, its mark, its kinds) and its items' own lists — read by the
+ * description builder (`src/lib/description`), so a tool's description
+ * states what its writer writes, and nothing else.
+ */
+export type ListShape = ShapeOf & {
+  /** What the list holds, in domain words (`about`); none until stated. */
+  readonly about?: string | undefined;
+};
+
+/** What each kind of schema writes, as data. */
+type ShapeOf =
+  | {
+      readonly kind: 'rows' | 'node';
+      readonly list: string;
+      readonly columns: readonly string[];
+      readonly means: readonly (string | undefined)[];
+      readonly tree: boolean;
+      readonly omits: Readonly<Record<string, string>>;
+      readonly lists: () => readonly ListShape[];
+    }
+  | {
+      readonly kind: 'marks' | 'whole-marks';
+      readonly list: string;
+      readonly mark: string;
+    }
+  | { readonly kind: 'heads'; readonly list: string }
+  | { readonly kind: 'omitted'; readonly list: string; readonly reason: string }
+  | {
+      readonly kind: 'bullets' | 'sections' | 'within';
+      readonly list: string;
+      readonly lists: () => readonly ListShape[];
+    }
+  | {
+      readonly kind: 'kinds';
+      readonly list: string;
+      readonly discriminant: string;
+      readonly kinds: readonly KindShape[];
+    }
+  | {
+      readonly kind: 'parts';
+      readonly list: string;
+      readonly member?: string | undefined;
+    }
+  | {
+      readonly kind: 'entries' | 'member';
+      readonly list: string;
+      readonly as: string;
+      readonly omits?: Readonly<Record<string, string>> | undefined;
+      readonly lists: () => readonly ListShape[];
+    }
+  | {
+      readonly kind: 'values' | 'written-values' | 'whole-entries';
+      readonly list: string;
+      readonly as: string;
+      readonly omits?: Readonly<Record<string, string>> | undefined;
+    };
+
+/** One kind of a list of several kinds, as data. */
+export type KindShape =
+  | {
+      readonly kind: string;
+      readonly row: readonly string[];
+      readonly lists: () => readonly ListShape[];
+    }
+  | { readonly kind: string; readonly omit: string }
+  | { readonly kind: string; readonly mark: string }
+  | { readonly kind: string; readonly lists: () => readonly ListShape[] };
+
+/** A rows schema's shape: its columns, whether a tree, its left-out kinds and its items' lists. */
+function rowsShape<I>(
+  list: string,
+  spec: RowSpec<I>,
+  kind: 'rows' | 'node',
+): ListShape {
+  return {
+    kind,
+    list,
+    columns: spec.columns.map((column) => column.name),
+    means: spec.columns.map((column) => column.means),
+    tree: spec.tree === true || kind === 'node',
+    omits: spec.omit?.reasons ?? {},
+    lists: () => rowShapes(spec.lists),
+  };
+}
+
+/** A kinds schema's shape: each kind with how it is written. */
+function kindsShape<I>(
+  list: string,
+  discriminant: PropertyKey,
+  table: Readonly<Record<string, KindSpec<I, never> | undefined>>,
+): ListShape {
+  return {
+    kind: 'kinds',
+    list,
+    discriminant: String(discriminant),
+    kinds: Object.entries(table).flatMap(([kind, spec]): KindShape[] =>
+      spec === undefined
+        ? []
+        : 'omit' in spec
+          ? [{ kind, omit: spec.omit }]
+          : 'row' in spec
+            ? [
+                {
+                  kind,
+                  row: spec.row.columns.map((column) => column.name),
+                  lists: () => rowShapes(spec.row.lists),
+                },
+              ]
+            : 'mark' in spec
+              ? [{ kind, mark: spec.mark }]
+              : [{ kind, lists: () => rowShapes(spec.lists) }],
+    ),
+  };
+}
+
 /** Only this module mints a binding. */
 const binding: unique symbol = Symbol('binding');
+
+/**
+ * A schema with what its list holds, in domain words (`each object`, `the
+ * objects SAP could not load`): what a tool's description says of the list
+ * — never its form. The schema is otherwise the one given.
+ */
+export function about<B extends { readonly shape: ListShape }>(
+  noun: string,
+  schema: B,
+): B {
+  return { ...schema, shape: { ...schema.shape, about: noun } };
+}
 
 /**
  * A schema bound to the member `K` of a reading `R`; only this module's
@@ -279,6 +413,8 @@ const binding: unique symbol = Symbol('binding');
 export interface Bound<R, K, C extends PropertyKey = never> {
   readonly [binding]: true;
   readonly key: K;
+  /** What it writes, as data: what a tool's description states of the list. */
+  readonly shape: ListShape;
   readonly write: (reading: R, depth: number | undefined) => Line[];
   readonly covers?: ((members: C) => void) | undefined;
 }
@@ -411,6 +547,7 @@ export function rows<I, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: rowsShape(key, spec, 'rows'),
     // An absent list writes nothing, its header neither; an empty one its
     // header where the spec asks for it.
     write: (reading, depth) =>
@@ -436,6 +573,7 @@ export function omitted<I, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'omitted', list: key, reason },
     reason,
     write: (reading) => {
       for (const _item of itemsOf(reading, key)) {
@@ -462,6 +600,11 @@ export function bullets<I, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: {
+      kind: 'bullets',
+      list: key,
+      lists: () => rowShapes(options.lists),
+    },
     write: (reading, outerDepth) => {
       const depth = outerDepth ?? 0;
       return itemsOf(reading, key).flatMap((item): Line[] => [
@@ -488,6 +631,7 @@ export function marks<I, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'marks', list: key, mark },
     write: (reading) =>
       itemsOf(reading, key).map((item): Line => ({ mark, words: words(item) })),
   };
@@ -500,6 +644,7 @@ export function headLines<K extends string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'heads', list: key },
     write: (reading) => itemsOf(reading, key).map((head): Line => head),
   };
 }
@@ -515,6 +660,7 @@ export function wholeMarks<I, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'whole-marks', list: key, mark },
     write: (reading) =>
       itemsOf(reading, key).map(
         (item): Line => ({ mark, words: [JSON.stringify(item)] }),
@@ -531,6 +677,7 @@ export function sections<I, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'sections', list: key, lists: () => rowShapes(lists) },
     write: (reading, depth) =>
       itemsOf(reading, key).flatMap((item): Line[] => [
         ...heads(item),
@@ -550,6 +697,7 @@ export function node<O, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: rowsShape(key, spec, 'node'),
     write: (reading, depth) => {
       const value: O | undefined = reading[key];
       return value === undefined ? [] : rowLines([value], spec, depth);
@@ -568,6 +716,7 @@ export function within<O, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'within', list: key, lists: () => rowShapes(lists) },
     write: (reading, depth) => {
       const value: O | undefined = reading[key];
       return value === undefined ? [] : listLines<O>(value, lists, depth);
@@ -638,6 +787,7 @@ export function kinds<I, K extends string, D extends Discriminant<I>>(
   return {
     [binding]: true,
     key,
+    shape: kindsShape<I>(key, discriminant, specs),
     write: (reading, depth) => {
       const items = itemsOf(reading, key);
       const lines: Line[] = header === undefined ? [] : [{ header }];
@@ -676,6 +826,36 @@ function listLines<R>(
   const bound: readonly Bound<R, SchemaKeys<R>>[] =
     Object.values<Bound<R, SchemaKeys<R>>>(schemas);
   return bound.flatMap((schema) => schema.write(value, depth));
+}
+
+/** The shapes of a terse schemas record, in its order; none for no record. */
+function rowShapes<R>(
+  schemas: RowSchemas<R> | undefined,
+): readonly ListShape[] {
+  if (schemas === undefined) return [];
+  return Object.values<Bound<R, SchemaKeys<R>>>(schemas).map(
+    (schema) => schema.shape,
+  );
+}
+
+/** The shapes of a JSON schemas record, in its order; none for no record. */
+function jsonShapes<R>(
+  schemas: JsonSchemas<R> | undefined,
+): readonly ListShape[] {
+  if (schemas === undefined) return [];
+  return Object.values<JsonBound<R, SchemaKeys<R>>>(schemas).map(
+    (schema) => schema.shape,
+  );
+}
+
+/** What a tool's terse schemas write, as data: what its description states. */
+export function shapesOf<R>(schemas: RowSchemas<R>): readonly ListShape[] {
+  return rowShapes(schemas);
+}
+
+/** What a tool's medium schemas write, as data: what its description states. */
+export function jsonShapesOf<R>(schemas: JsonSchemas<R>): readonly ListShape[] {
+  return jsonShapes(schemas);
 }
 
 /** Rows, with their header, group lines and each item's own lists. */
@@ -830,6 +1010,7 @@ export function parts<I, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'parts', list: key },
     // One header before the first part, where asked.
     write: (reading) => [
       ...(header === undefined ? [] : [{ header }]),
@@ -860,6 +1041,7 @@ export function partsOf<I, K extends string, M extends keyof I & string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'parts', list: key, member },
     write: (reading) => [
       ...(header === undefined ? [] : [{ header }]),
       ...itemsOf(reading, key).flatMap((item): Line[] => {
@@ -908,6 +1090,8 @@ function defined<V>(value: V): value is Exclude<V, undefined> {
 export interface JsonBound<R, K, E = unknown, C extends PropertyKey = never> {
   readonly [binding]: true;
   readonly key: K;
+  /** What it writes, as data: what a tool's description states of the list. */
+  readonly shape: ListShape;
   /** The member it is written under in the answer. */
   readonly as: string;
   readonly write: (reading: R) => E | undefined;
@@ -965,6 +1149,13 @@ export function entries<I, K extends string, E extends object>(
   return {
     [binding]: true,
     key,
+    shape: {
+      kind: 'entries',
+      list: key,
+      as: options?.as ?? key,
+      lists: () => jsonShapes(options?.lists),
+      omits: options?.omit?.reasons ?? {},
+    },
     as: options?.as ?? key,
     write: (reading) => {
       if (!present(reading, key)) return undefined;
@@ -997,6 +1188,12 @@ export function member<O, K extends string, E extends object>(
   return {
     [binding]: true,
     key,
+    shape: {
+      kind: 'member',
+      list: key,
+      as: options.as ?? key,
+      lists: () => jsonShapes(options.lists),
+    },
     as: options.as ?? key,
     write: (reading) => {
       const value: O | undefined = reading[key];
@@ -1019,6 +1216,7 @@ export function wholeEntries<I, K extends string>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'whole-entries', list: key, as: key },
     as: key,
     write: (reading) =>
       present(reading, key) ? itemsOf(reading, key) : undefined,
@@ -1042,6 +1240,12 @@ export function values<I, K extends string, V>(
   return {
     [binding]: true,
     key,
+    shape: {
+      kind: 'values',
+      list: key,
+      as: key,
+      omits: options?.omit?.reasons ?? {},
+    },
     as: key,
     write: (reading) => {
       if (!present(reading, key)) return undefined;
@@ -1066,6 +1270,7 @@ export function writtenValues<I, K extends string, V>(
   return {
     [binding]: true,
     key,
+    shape: { kind: 'written-values', list: key, as: key },
     as: key,
     write: (reading) =>
       present(reading, key)

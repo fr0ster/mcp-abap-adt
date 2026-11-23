@@ -22,6 +22,7 @@ import { handleGetIncludesList } from '../../../handlers/include/readonly/handle
 import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
+import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import {
   createBatchAvailability,
@@ -309,6 +310,37 @@ CASES['GetIncludesList two programs, one refused'] = async (detail) =>
           { object_name: 'ZPROG', object_type: 'PROG/P' },
           { object_name: 'ZGONE', object_type: 'PROG/P' },
         ],
+        detail,
+      } as never,
+    ),
+  );
+
+const STRUCTURE = (name: string, ...includes: string[]) =>
+  `@EndUserText.label : '${name}'\ndefine structure ${name} {\n  a : abap.char(1);\n${includes
+    .map((include) => `  include ${include};\n`)
+    .join('')}}\n`;
+
+CASES['GetStructuresList a structure, an include, one not read'] = async (
+  detail,
+) =>
+  answeredOf(
+    await handleGetStructuresList(
+      sequential([
+        { data: STRUCTURE('zs', 'zinc', 'zgone') },
+        { data: STRUCTURE('zinc', 'zs') },
+        REFUSED,
+        REFUSED,
+      ]) as never,
+      { structure_name: 'ZS', include_extensions: false, detail } as never,
+    ),
+  );
+CASES['GetStructuresList two structures, one refused'] = async (detail) =>
+  answeredOf(
+    await handleGetStructuresList(
+      sequential([{ data: STRUCTURE('zs') }, REFUSED, REFUSED]) as never,
+      {
+        structure_names: ['ZS', 'ZGONE'],
+        include_extensions: false,
         detail,
       } as never,
     ),

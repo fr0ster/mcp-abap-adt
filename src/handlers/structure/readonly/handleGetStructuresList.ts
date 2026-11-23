@@ -21,14 +21,17 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
+  type Column,
   type DetailLevel,
-  identityOf,
-  type Line,
-  type ListedPart,
-  listedText,
-  Written,
+  type Head,
+  type Listing,
+  marks,
+  nest,
+  parts,
+  type RowSchemas,
+  rows,
   wireAnswer,
+  writeListing,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -300,20 +303,33 @@ function readAnswer(shown: StructuresShown, read: StructuresRead): McpResult {
   return result;
 }
 
-/** The tree as indented rows: structure, kind, the component it is under. */
-function structureRows(node: StructureNode, depth = 0): Line[] {
-  const marks = [
-    ...(node.cyclic === true ? ['cyclic'] : []),
-    ...(node.error !== undefined ? ['not read'] : []),
-  ];
-  return [
-    {
-      depth,
-      row: [node.structure, node.kind, node.attribute ?? '', ...marks],
+/** A node's row: its structure, kind and attribute, then `cyclic` or `not read` where it is so. */
+const structureColumns: Column<StructureNode>[] = [
+  { name: 'structure', cell: (node) => node.structure },
+  { name: 'kind', cell: (node) => node.kind },
+  { name: 'attribute', cell: (node) => node.attribute ?? '' },
+  {
+    name: 'cyclic',
+    cell: () => 'cyclic',
+    when: (node) => node.cyclic === true,
+  },
+  {
+    name: 'not_read',
+    cell: () => 'not read',
+    when: (node) => node.error !== undefined,
+  },
+];
+
+/** Every node below a node, one level deeper. */
+const structureSchemas: RowSchemas<StructureNode> = {
+  children: rows('children', {
+    columns: structureColumns,
+    header: 'none',
+    get lists() {
+      return structureSchemas;
     },
-    ...node.children.flatMap((child) => structureRows(child, depth + 1)),
-  ];
-}
+  }),
+};
 
 /** The answer before `detail` (full). */
 function fullStructures(read: StructuresRead): string {
@@ -337,44 +353,47 @@ function fullStructures(read: StructuresRead): string {
  * before `detail`. A tree reads many documents, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
-/** Every node of a structure's tree, with and below its root, by depth and name. */
-function structureIdentities(node: StructureNode): string[] {
-  return [
-    identityOf([node.structure, node.kind, node.attribute ?? '']),
-    ...node.children.flatMap(structureIdentities),
-  ];
+/** What one structure's terse text writes: the candidates not read, and the tree from its root. */
+interface StructuresTerse {
+  readonly append_candidates_unread: StructuresRead['append_candidates_unread'];
+  readonly tree: readonly StructureNode[];
 }
 
-/** Every item one structure's read held: its tree's nodes and each candidate not read. */
-const heldStructures = (read: StructuresRead) => [
-  ...structureIdentities(read.tree),
-  ...read.append_candidates_unread.map((unread) =>
-    identityOf(['append_candidate_unread', unread.candidate]),
-  ),
-];
+/**
+ * A structure's terse text, written from its read: its heads, a mark per
+ * append candidate SAP refused to read, then the tree from its root.
+ */
+const structuresListing = (read: StructuresRead): Listing<StructuresTerse> => ({
+  heads: [
+    { head: 'structure', value: read.structure_name },
+    ...(read.appends_unavailable ? [{ head: 'appends_unavailable' }] : []),
+  ],
+  reading: {
+    append_candidates_unread: read.append_candidates_unread,
+    tree: [read.tree],
+  },
+  lists: {
+    // Each candidate SAP refused to read, by name: the one to read again.
+    append_candidates_unread: marks(
+      'append_candidates_unread',
+      'append_candidate_unread',
+      (unread: StructuresRead['append_candidates_unread'][number]) => [
+        unread.candidate,
+      ],
+    ),
+    tree: rows('tree', {
+      columns: structureColumns,
+      header: 'none',
+      tree: true,
+      lists: structureSchemas,
+    }),
+  },
+});
 
-/** A structure's terse text: its heads, unread candidates and node rows. */
-const terseStructures = (read: StructuresRead) =>
-  Written.text(
-    [
-      { head: 'structure', value: read.structure_name },
-      ...(read.appends_unavailable ? [{ head: 'appends_unavailable' }] : []),
-      // Each candidate SAP refused to read, by name: the one to read again.
-      ...read.append_candidates_unread.map(
-        (unread): Line => ({
-          mark: 'append_candidate_unread',
-          words: [unread.candidate],
-        }),
-      ),
-      ...structureRows(read.tree),
-    ],
-    [0, 1, 2],
-  );
-
-// Every node and unread candidate, or nothing (`completeAnswer`); medium
-// and full write the tree whole.
+// Every node and unread candidate written from the read by the listing
+// writer; medium and full write the tree whole.
 const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
-  terse: completeAnswer('GetStructuresList', heldStructures, terseStructures),
+  terse: (read) => writeListing(structuresListing(read)).answer,
   medium: fullStructures,
   full: fullStructures,
   raw: fullStructures,
@@ -1227,24 +1246,44 @@ function listAnswer(
 
 /** A list call's terse text. */
 function terseList({ names, results }: ListOf): McpResult {
-  // Every structure's text through `Written`: a failure under its escaped
-  // `# structure` line and one `# error` line; an answered one as its own
-  // terse writer writes it.
-  const text = listedText(
-    'GetStructuresList',
-    results.map((result, i): ListedPart<StructuresRead> => {
-      const read = readsOf.get(result);
-      return result.isError || read === undefined
-        ? {
-            heads: [{ head: 'structure', value: names[i] ?? '' }],
-            error: JSON.stringify(payloadOfAnswer(result)),
-          }
-        : { heads: [], read };
-    }),
-    heldStructures,
-    terseStructures,
-  );
+  // Every structure's text written by the listing writer: a failure under
+  // its escaped `# structure` line and one `# error` line; an answered one
+  // as its own terse listing.
+  const text = writeListing({
+    heads: [],
+    reading: {
+      answered: results.map((result, i) => ({
+        name: names[i] ?? '',
+        result,
+        read: result.isError ? undefined : readsOf.get(result),
+      })),
+    },
+    lists: {
+      answered: parts(
+        'answered',
+        ({ name, result, read }: AnsweredStructure): Head[] =>
+          read === undefined
+            ? [
+                { head: 'structure', value: name },
+                {
+                  head: 'error',
+                  value: JSON.stringify(payloadOfAnswer(result)),
+                },
+              ]
+            : [],
+        ({ read }: AnsweredStructure) =>
+          read === undefined ? undefined : nest(structuresListing(read)),
+      ),
+    },
+  }).answer;
   return { isError: false, content: [{ type: 'text', text }] };
+}
+
+/** One structure of a list call: its name, its answer, and its read when answered. */
+interface AnsweredStructure {
+  readonly name: string;
+  readonly result: McpResult;
+  readonly read: StructuresRead | undefined;
 }
 
 /** A list call's entries as a JSON array. */

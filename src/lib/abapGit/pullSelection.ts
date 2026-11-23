@@ -22,9 +22,9 @@
  *
  * So a selected name R6 lists under another type too is refused. SAP
  * matches by name within each list (L124 overwrite, L139 package warnings):
- * a collision inside one list would take an object not named. The server
- * refuses a collision across the two lists as well, which SAP would not
- * confuse — stricter than SAP, since telling the two cases apart buys the
+ * only a collision inside one list could take an object not named. The
+ * server refuses a collision across the two lists as well, which SAP keeps
+ * apart — stricter than SAP, since telling the two cases apart buys the
  * caller nothing and a refusal leaves nothing changed. adt-clients' live suite measured the selective pull in this
  * form (`pull.req.v1`, its ERRATA, 2026-11-22). Duplicates in `overwrite`
  * are refused before any connection (`admission.ts`, step 2a).

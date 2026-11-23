@@ -265,7 +265,7 @@ function writeProperties(actions: readonly AbapGitWriteAction[]) {
     ),
     overwrite: OVERWRITE_FIELD.optional().describe(
       said(actions, {
-        pull: 'cloud: the objects of modified_objects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every pull. Without it the job takes every other listed object.',
+        pull: 'cloud: the objects of modified_objects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused, within one list or across both: SAP matches by name within each list, so a collision inside one list could take an object not named. SAP selects by name when its job runs, against the list as it stands then: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state; SAP leaves a package warning with action 5 (delete and re-create) out of every pull. Without it the job takes every other listed object.',
       }),
     ),
     comment: COMMENT_FIELD.optional().describe(
@@ -359,7 +359,7 @@ const ACTION_SENTENCES_WRITE: Readonly<Record<AbapGitWriteAction, string>> = {
   link: 'link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch',
   unlink:
     "unlink(repository_key*) ends the repository's binding to its package; the objects stay",
-  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job, its objects are inactive, and it brings every object modified_objects lists to its remote version, a package warning with action 5 (delete and re-create) excepted, or with overwrite selects by name: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state',
+  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on; on premise it overwrites local changes and objects of other packages; on cloud SAP runs it as its own job, its objects are inactive, and it brings every object modified_objects lists to its remote version, a package warning with action 5 (delete and re-create) excepted, or with overwrite selects by name: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state',
   push: 'push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job',
   switch_branch:
     'switch_branch(repository_key*, branch*, create*) switches the branch, creating it in the remote with create true',

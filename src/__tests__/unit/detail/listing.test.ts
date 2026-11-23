@@ -18,6 +18,7 @@ import {
   type RowSchemas,
   rows,
   sections,
+  type Written,
   writeJson,
   writeJsonList,
   writeJsonRoot,
@@ -183,21 +184,21 @@ describe('writeListing: every item of every list, by construction', () => {
 
   it('sections and kinds: each item by its own spec', () => {
     type Part = {
-      readonly ok: boolean;
+      readonly kind: 'answered' | 'failed';
       readonly name: string;
       readonly rows: readonly string[];
     };
-    const reading = {
+    const reading: { parts: readonly Part[] } = {
       parts: [
-        { ok: true, name: 'A', rows: ['a1', 'a2'] },
-        { ok: false, name: 'B', rows: [] },
+        { kind: 'answered', name: 'A', rows: ['a1', 'a2'] },
+        { kind: 'failed', name: 'B', rows: [] },
       ],
     };
     const text = writeListing({
       heads: [],
       reading,
       lists: {
-        parts: kinds('parts', (p: Part) => (p.ok ? 'answered' : 'failed'), {
+        parts: kinds<Part, 'parts', 'kind'>('parts', 'kind', {
           answered: {
             heads: (p: Part) => [{ head: 'asked', value: p.name }],
             lists: {
@@ -207,7 +208,10 @@ describe('writeListing: every item of every list, by construction', () => {
               }),
             },
           },
-          failed: { mark: 'error', words: (p: Part) => [p.name] },
+          failed: {
+            mark: 'error',
+            words: (p: Part) => [p.name],
+          },
         }),
       },
     }).answer;
@@ -248,10 +252,115 @@ describe('writeListing: every item of every list, by construction', () => {
   });
 
   it('a kind left without its spec does not compile', () => {
+    type P = { readonly kind: 'answered' | 'failed' };
     // @ts-expect-error `failed` has no spec.
-    kinds('parts', (p: { ok: boolean }) => (p.ok ? 'answered' : 'failed'), {
+    kinds<P, 'parts', 'kind'>('parts', 'kind', {
       answered: { mark: 'ok', words: () => [] },
     });
+  });
+});
+
+// Codex round 10, P1-2 and P1-3: every hole of the schemas is a compile
+// error, or — two outputs under one name — refused when written.
+describe('the schemas leave no hole', () => {
+  const objects = rows('objects', {
+    columns: [{ name: 'name', cell: (o: { name: string }) => o.name }],
+    header: 'none',
+  });
+
+  it('a list beside false needs its schema', () => {
+    const reading: {
+      objects: readonly { name: string }[];
+      more: readonly { name: string }[] | false;
+    } = { objects: [], more: false };
+    // @ts-expect-error `more` is a list (or false) and has no schema.
+    writeListing({ heads: [], reading, lists: { objects } });
+  });
+
+  it('a list on one arm of a union needs its schema', () => {
+    type Arms =
+      | { kind: 'a'; objects: readonly { name: string }[] }
+      | { kind: 'b'; others: readonly { name: string }[] };
+    const armOf = (): Arms => ({ kind: 'a', objects: [] });
+    const reading = armOf();
+    // @ts-expect-error `others` is a list on one arm and has no schema.
+    writeListing({ heads: [], reading, lists: { objects } });
+  });
+
+  it('a list under a nested object needs its schema', () => {
+    const reading: {
+      objects: readonly { name: string }[];
+      inner: { deeper: readonly { name: string }[] };
+    } = { objects: [], inner: { deeper: [] } };
+    // @ts-expect-error `inner` holds a list and has no schema.
+    writeListing({ heads: [], reading, lists: { objects } });
+  });
+
+  it('a Map or a Set cannot be written at all', () => {
+    const reading: {
+      objects: readonly { name: string }[];
+      byName: Map<string, string>;
+    } = { objects: [], byName: new Map() };
+    // @ts-expect-error a Map has no schema that writes it.
+    writeListing({ heads: [], reading, lists: { objects } });
+  });
+
+  it("a tree item's child list is required", () => {
+    type N = { readonly name: string; readonly children: readonly N[] };
+    // @ts-expect-error `lists` is required: the item holds `children`.
+    rows('children', {
+      columns: [{ name: 'name', cell: (n: N) => n.name }],
+      header: 'none',
+    });
+    entries(
+      'children',
+      (n: N) => ({ name: n.name }),
+      // @ts-expect-error `lists` is required in a JSON entry too.
+      {},
+    );
+  });
+
+  it('writeJsonList takes the one list of its reading', () => {
+    const reading = { a: [{ n: 'x' }], b: [{ n: 'y' }] };
+    writeJsonList(
+      // @ts-expect-error the reading holds two lists.
+      reading,
+      entries('a', (i: { n: string }) => i),
+    );
+  });
+
+  it('two JSON lists under one name are refused when written', () => {
+    const reading = { a: [{ n: 'x' }], b: [{ n: 'y' }] };
+    assert.throws(
+      () =>
+        writeJson({}, reading, {
+          a: entries('a', (i: { n: string }) => i, { as: 'same' }),
+          b: entries('b', (i: { n: string }) => i, { as: 'same' }),
+        }),
+      /one name/,
+    );
+  });
+
+  it('a binding is made by the factories alone', () => {
+    const reading = { objects: [{ name: 'A' }] };
+    writeListing({
+      heads: [],
+      reading,
+      // @ts-expect-error a plain object is no binding: it could write nothing.
+      lists: { objects: { key: 'objects', write: () => [] } },
+    });
+  });
+
+  it('a plain answer is no written answer', () => {
+    // @ts-expect-error `Written` is nominal.
+    const forged: Written<string> = { answer: 'plain' };
+    void forged;
+  });
+
+  it("a kind is the item's own discriminant, never a constant", () => {
+    type P = { readonly name: string };
+    // @ts-expect-error `name` is any string, no discriminant.
+    kinds<P, 'parts', 'name'>('parts', 'name', {});
   });
 });
 
@@ -398,18 +507,22 @@ describe('omit: a kind the shape leaves out, stated with its reason', () => {
     assert.equal(text, 'A\nB');
   });
   it('kinds: an omit spec writes nothing for its kind', () => {
+    type K = { readonly kind: 'node' | 'usage'; readonly name: string };
+    const kinded: { refs: readonly K[] } = {
+      refs: [
+        { kind: 'node', name: 'NODE' },
+        { kind: 'usage', name: 'A' },
+        { kind: 'usage', name: 'B' },
+      ],
+    };
     const text = writeListing({
       heads: [],
-      reading,
+      reading: kinded,
       lists: {
-        refs: kinds(
-          'refs',
-          (r: R) => (r.usage === undefined ? 'node' : 'usage'),
-          {
-            node: { omit: 'no usage' },
-            usage: { mark: 'ref', words: (r: R) => [r.name] },
-          },
-        ),
+        refs: kinds<K, 'refs', 'kind'>('refs', 'kind', {
+          node: { omit: 'no usage' },
+          usage: { mark: 'ref', words: (r: K) => [r.name] },
+        }),
       },
     }).answer;
     assert.equal(text, '# ref\tA\n# ref\tB');

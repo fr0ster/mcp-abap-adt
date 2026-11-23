@@ -24,12 +24,25 @@ const mint: unique symbol = Symbol('written');
  * a token this module does not export.
  */
 export class Written<A> {
+  /** Makes the type nominal: a plain `{ answer }` is no written answer. */
+  readonly #written = true;
+
   constructor(
     token: typeof mint,
     readonly answer: A,
   ) {
     void token;
+    void this.#written;
   }
+}
+
+/**
+ * A reading passed whole, unchanged — complete by construction (the
+ * medium of a tool whose reading is its answer): typed as the reading
+ * itself, no reshaping.
+ */
+export function writeWhole<R>(reading: R): Written<R> {
+  return new Written(mint, reading);
 }
 
 /**
@@ -56,26 +69,107 @@ export interface Head {
   readonly value?: string | undefined;
 }
 
-/** The list members of `R`: every member whose value is an array (or absent). */
-export type ListKeys<R> = {
-  [K in keyof R]-?: NonNullable<R[K]> extends readonly unknown[] ? K : never;
+/** A value that is no list and no object: what a list member may be beside its list. */
+type Plain = string | number | boolean | bigint | symbol | null | undefined;
+
+/** The list part of a member's type. */
+type ListPart<T> = Extract<T, readonly unknown[]>;
+
+/** The object part of a member's type: neither a list, a plain value nor a function. */
+type ObjectPart<T> = Exclude<
+  T,
+  readonly unknown[] | Plain | ((...args: never[]) => unknown)
+>;
+
+/** A keyed collection a reading cannot hold: no schema writes one. */
+type Collection = ReadonlyMap<unknown, unknown> | ReadonlySet<unknown>;
+
+/**
+ * A member is a list when any part of its type is an array — `X[] | false`
+ * included. An index signature (an opaque JSON record, written whole) is
+ * no member here.
+ */
+type ArmListKeys<R> = {
+  [K in keyof R]-?: string extends K
+    ? never
+    : number extends K
+      ? never
+      : [ListPart<R[K]>] extends [never]
+        ? never
+        : K;
 }[keyof R];
 
-/** A schema bound to the list `K` of a reading `R`: the lines of every item it holds. */
+/** A member holding a Map or a Set. */
+type ArmCollectionKeys<R> = {
+  [K in keyof R]-?: [Extract<ObjectPart<R[K]>, Collection>] extends [never]
+    ? never
+    : K;
+}[keyof R];
+
+/** A member holding an object with lists of its own. */
+type ArmNestedKeys<R> = {
+  [K in keyof R]-?: [ObjectPart<R[K]>] extends [never]
+    ? never
+    : [Extract<ObjectPart<R[K]>, Collection>] extends [never]
+      ? [ListKeys<ObjectPart<R[K]>>] extends [never]
+        ? never
+        : K
+      : never;
+}[keyof R];
+
+/** The list members of `R`, on any arm of a union. */
+export type ListKeys<R> = R extends Plain
+  ? never
+  : R extends unknown
+    ? ArmListKeys<R>
+    : never;
+
+/** The members of `R` holding an object with lists, on any arm of a union. */
+export type NestedKeys<R> = R extends Plain
+  ? never
+  : R extends unknown
+    ? ArmNestedKeys<R>
+    : never;
+
+/** The members of `R` holding a Map or a Set, on any arm of a union. */
+type CollectionKeys<R> = R extends Plain
+  ? never
+  : R extends unknown
+    ? ArmCollectionKeys<R>
+    : never;
+
+/** Every member of `R` a schema must account for: its lists and its objects holding lists. */
+export type SchemaKeys<R> = ListKeys<R> | NestedKeys<R>;
+
+/** Only this module mints a binding. */
+const binding: unique symbol = Symbol('binding');
+
+/** A schema bound to the member `K` of a reading `R`; only this module's factories make one. */
 export interface Bound<R, K> {
+  readonly [binding]: true;
   readonly key: K;
   readonly write: (reading: R, depth: number | undefined) => Line[];
 }
 
 /**
- * One schema for every list of `R`, each bound to its own key, written in
- * the order of the record: a list without one is a compile error.
+ * One schema for every list of `R` — on any arm of a union, `X[] | false`
+ * included — and for every member holding an object with lists of its
+ * own (`within`), each bound to its own key, written in the order of the
+ * record: a member without one is a compile error. A member holding a Map
+ * or a Set cannot be given one, so a reading holding one does not compile.
  */
-export type RowSchemas<R> = { readonly [K in ListKeys<R>]: Bound<R, K> };
+export type RowSchemas<R> = {
+  readonly [K in SchemaKeys<R>]: Bound<R, K>;
+} & { readonly [K in CollectionKeys<R>]: never };
 
 /** A value holding the list `K` of items `I`: what a schema of that list reads. */
 type Holding<K extends string, I> = {
-  readonly [P in K]?: readonly I[] | undefined;
+  readonly [P in K]?: readonly I[] | Plain;
+};
+
+/** A value holding the object `K` of type `O`: what a nested schema reads. */
+type HoldingObject<K extends string, O> = {
+  readonly [P in K]?: O | undefined;
 };
 
 /**
@@ -99,11 +193,21 @@ export interface Group<I> {
  * an absent list writes nothing. In a tree each row is indented by its depth
  * and the item's own lists (`lists`) follow it, one level deeper.
  */
-export interface RowSpec<I> {
+export type RowSpec<I> = RowSpecBase<I> & ChildLists<I>;
+
+/**
+ * An item's own lists: required when it holds any (a tree item's
+ * children), absent when it holds none.
+ */
+export type ChildLists<I> = [SchemaKeys<I>] extends [never]
+  ? { readonly lists?: undefined }
+  : { readonly lists: RowSchemas<I> };
+
+/** What a row spec states beside an item's own lists. */
+export interface RowSpecBase<I> {
   readonly columns: readonly Column<I>[];
   readonly header: 'always' | 'when-rows' | 'none';
   readonly groups?: readonly Group<I>[] | undefined;
-  readonly lists?: RowSchemas<I> | undefined;
   /** The list is a tree's top: its rows at depth 0, their own lists one level deeper each. */
   readonly tree?: boolean | undefined;
   /**
@@ -146,7 +250,14 @@ function itemsOf<K extends string, I>(
   reading: Holding<K, I>,
   key: K,
 ): readonly I[] {
-  return reading[key] ?? [];
+  const list = reading[key];
+  return typeof list === 'object' && list !== null ? list : [];
+}
+
+/** Whether the list `key` of a reading is present: an array, not a plain value. */
+function present<K extends string, I>(reading: Holding<K, I>, key: K): boolean {
+  const list = reading[key];
+  return typeof list === 'object' && list !== null;
 }
 
 /** The list `key` written as rows, one per item. */
@@ -155,13 +266,12 @@ export function rows<I, K extends string>(
   spec: RowSpec<I>,
 ): Bound<Holding<K, I>, K> {
   return {
+    [binding]: true,
     key,
     // An absent list writes nothing, its header neither; an empty one its
     // header where the spec asks for it.
-    write: (reading, depth) => {
-      const list = reading[key];
-      return list === undefined ? [] : rowLines(list, spec, depth);
-    },
+    write: (reading, depth) =>
+      present(reading, key) ? rowLines(itemsOf(reading, key), spec, depth) : [],
   };
 }
 
@@ -176,6 +286,7 @@ export function omitted<I, K extends string>(
   reason: string,
 ): Bound<Holding<K, I>, K> & { readonly reason: string } {
   return {
+    [binding]: true,
     key,
     reason,
     write: (reading) => {
@@ -198,10 +309,10 @@ export function bullets<I, K extends string>(
   label: (item: I) => string,
   options: {
     readonly synthetic?: ((item: I) => boolean) | undefined;
-    readonly lists?: RowSchemas<I> | undefined;
-  },
+  } & ChildLists<I>,
 ): Bound<Holding<K, I>, K> {
   return {
+    [binding]: true,
     key,
     write: (reading, outerDepth) => {
       const depth = outerDepth ?? 0;
@@ -224,6 +335,7 @@ export function marks<I, K extends string>(
   words: (item: I) => readonly string[],
 ): Bound<Holding<K, I>, K> {
   return {
+    [binding]: true,
     key,
     write: (reading) =>
       itemsOf(reading, key).map((item): Line => ({ mark, words: words(item) })),
@@ -237,6 +349,7 @@ export function sections<I, K extends string>(
   lists: RowSchemas<I>,
 ): Bound<Holding<K, I>, K> {
   return {
+    [binding]: true,
     key,
     write: (reading, depth) =>
       itemsOf(reading, key).flatMap((item): Line[] => [
@@ -245,6 +358,40 @@ export function sections<I, K extends string>(
       ]),
   };
 }
+
+/**
+ * The member `key` holding an object with lists of its own: its lists
+ * written through its own schemas, at the depth of its holder.
+ */
+export function within<O, K extends string>(
+  key: K,
+  lists: RowSchemas<O>,
+): Bound<HoldingObject<K, O>, K> {
+  return {
+    [binding]: true,
+    key,
+    write: (reading, depth) => {
+      const value: O | undefined = reading[key];
+      return value === undefined ? [] : listLines<O>(value, lists, depth);
+    },
+  };
+}
+
+/**
+ * A member of `I` that names its kind: a union of string literals (`'row' |
+ * 'error'`), never `string` — so a schema exists for every kind it can be,
+ * and no constant selector stands in for the item's own.
+ */
+export type Discriminant<I> = {
+  [K in keyof I]-?: I[K] extends string
+    ? string extends I[K]
+      ? never
+      : K
+    : never;
+}[keyof I];
+
+/** The kinds the discriminant `D` of `I` can be. */
+export type KindOf<I, D extends Discriminant<I>> = I[D] & string;
 
 /** How one item of a list of several kinds is written: a row, a mark line, or a section. */
 export type KindSpec<I> =
@@ -262,19 +409,23 @@ export type KindSpec<I> =
  * kind's spec — one for every kind, by the record's type. A header is
  * written once, before the first item, when a row kind asks for it.
  */
-export function kinds<I, K extends string, T extends string>(
+export function kinds<I, K extends string, D extends Discriminant<I>>(
   key: K,
-  kind: (item: I) => T,
-  specs: { readonly [P in T]: KindSpec<I> },
+  discriminant: D,
+  specs: { readonly [P in KindOf<I, D>]: KindSpec<I> },
   header?: readonly string[] | undefined,
 ): Bound<Holding<K, I>, K> {
   return {
+    [binding]: true,
     key,
     write: (reading, depth) => {
       const items = itemsOf(reading, key);
       const lines: Line[] = header === undefined ? [] : [{ header }];
+      const table: Readonly<Record<string, KindSpec<I> | undefined>> = specs;
       for (const item of items) {
-        const spec: KindSpec<I> = specs[kind(item)];
+        // Every kind the discriminant can be has a spec, by `specs`' type.
+        const spec = table[String(item[discriminant])];
+        if (spec === undefined) continue;
         if ('omit' in spec) {
           // Visited, and left out by the shape: nothing written.
         } else if ('row' in spec) {
@@ -450,6 +601,7 @@ export function parts<I, K extends string>(
   header?: readonly string[] | undefined,
 ): Bound<Holding<K, I>, K> {
   return {
+    [binding]: true,
     key,
     // One header before the first part, where asked.
     write: (reading) => [
@@ -462,54 +614,74 @@ export function parts<I, K extends string>(
   };
 }
 
-/** A JSON schema bound to the list `K` of a reading `R`: one entry per item it holds, or nothing when it is absent. */
+/** A JSON schema bound to the list `K` of a reading `R`: one entry per item it holds, or nothing when it is absent; only `entries` makes one. */
 export interface JsonBound<R, K, E extends object = object> {
+  readonly [binding]: true;
   readonly key: K;
   /** The member the entries are written under in the answer. */
   readonly as: string;
   readonly write: (reading: R) => readonly E[] | undefined;
 }
 
-/** One JSON schema for every list of `R`, each bound to its own key: a list without one is a compile error. */
-export type JsonSchemas<R> = { readonly [K in ListKeys<R>]: JsonBound<R, K> };
+/**
+ * One JSON schema for every list of `R` — on any arm of a union, `X[] |
+ * false` included — each bound to its own key: a list without one is a
+ * compile error, and a reading holding a Map or a Set does not compile.
+ */
+export type JsonSchemas<R> = {
+  readonly [K in ListKeys<R>]: JsonBound<R, K>;
+} & { readonly [K in CollectionKeys<R>]: never };
+
+/** An item's own lists in its JSON entry: required when it holds any, absent when it holds none. */
+export type ChildJsonLists<I> = [ListKeys<I>] extends [never]
+  ? { readonly lists?: undefined }
+  : { readonly lists: JsonSchemas<I> };
 
 /**
  * The list `key` written as JSON entries, one per item: the item's own
- * members from `entry`, then its own lists (`lists`), each under its name.
- * An absent list writes no member; an empty one, `[]`.
+ * members from `entry`, then its own lists (`lists`, required when it
+ * holds any), each under its name. An absent list writes no member; an
+ * empty one, `[]`.
  */
 export function entries<I, K extends string, E extends object>(
   key: K,
   entry: (item: I) => E,
   options?: {
     readonly as?: string | undefined;
-    readonly lists?: JsonSchemas<I> | undefined;
     /** An empty list writes no member, as an absent one (a tree's leaf, medium). */
     readonly omitEmpty?: boolean | undefined;
     /** Kinds of item the answer's approved shape leaves out (`omitting`): visited, no entry. */
     readonly omit?: Omitting<I> | undefined;
-  },
+  } & ChildJsonLists<I>,
 ): JsonBound<Holding<K, I>, K, E> {
   return {
+    [binding]: true,
     key,
     as: options?.as ?? key,
     write: (reading) => {
-      const list = reading[key];
-      if (list === undefined) return undefined;
+      if (!present(reading, key)) return undefined;
+      const list = itemsOf(reading, key);
       if (options?.omitEmpty === true && list.length === 0) return undefined;
       const omit = options?.omit;
       const written =
         omit === undefined ? list : list.filter((item) => !omit.omits(item));
+      // Read when written: a tree's schemas name themselves.
+      const lists: JsonSchemas<I> | undefined = options?.lists;
       return written.map((item) =>
-        options?.lists === undefined
+        lists === undefined
           ? entry(item)
-          : { ...entry(item), ...jsonMembers(item, options.lists) },
+          : { ...entry(item), ...jsonMembers(item, lists) },
       );
     },
   };
 }
 
-/** Every list of `value` as its JSON member, in its schemas' order; an absent one writes none. */
+/**
+ * Every list of `value` as its JSON member, in its schemas' order; an
+ * absent one writes none. Two bindings written under one name would
+ * replace one another: refused when written (no type can tell two
+ * strings apart at construction).
+ */
 function jsonMembers<R>(
   value: R,
   schemas: JsonSchemas<R>,
@@ -517,7 +689,12 @@ function jsonMembers<R>(
   const members: Record<string, readonly object[]> = {};
   const bound: readonly JsonBound<R, ListKeys<R>>[] =
     Object.values<JsonBound<R, ListKeys<R>>>(schemas);
+  const names = new Set<string>();
   for (const schema of bound) {
+    if (names.has(schema.as)) {
+      throw new Error(`two lists are written under one name: ${schema.as}`);
+    }
+    names.add(schema.as);
     const written = schema.write(value);
     if (written !== undefined) members[schema.as] = written;
   }
@@ -540,10 +717,13 @@ export function writeJson<R, A extends object, B extends object>(
   return new Written(mint, { ...rest, ...members, ...after, ...members });
 }
 
-/** The only writer of a JSON array answer: one entry per item of the reading's list. */
+/**
+ * The only writer of a JSON array answer: one entry per item of the
+ * reading's one list — a reading holding another list does not compile.
+ */
 export function writeJsonList<R, K extends ListKeys<R>, E extends object>(
-  reading: R,
-  list: JsonBound<R, K, E>,
+  reading: [Exclude<ListKeys<R>, K>] extends [never] ? R : never,
+  list: JsonBound<NoInfer<R>, K, E>,
 ): Written<readonly E[]> {
   return new Written(mint, list.write(reading) ?? []);
 }

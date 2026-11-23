@@ -1,0 +1,38 @@
+{
+  "GetObjectsByType objects, a nameless one, two nodes not loaded, descriptions @terse": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 5\ntype\tname\ttech_name\turi\tdescription\nCLAS/OC\tZCL_A\t\t\tFirst\\ttab\nFUGR/FF\tZ_FM\tSAPLZFG\t\t\nCLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\t\n# not loaded by SAP\n# not loaded by SAP"
+  },
+  "GetObjectsByType objects, a nameless one, two nodes not loaded, descriptions @medium": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 5\ntype\tname\ttech_name\turi\tdescription\nCLAS/OC\tZCL_A\t\t\tFirst\\ttab\nFUGR/FF\tZ_FM\tSAPLZFG\t\t\nCLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\t\n# not loaded by SAP\n# not loaded by SAP"
+  },
+  "GetObjectsByType objects, a nameless one, two nodes not loaded, descriptions @full": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 5\ntype\tname\ttech_name\turi\tdescription\nCLAS/OC\tZCL_A\t\t\tFirst\\ttab\nFUGR/FF\tZ_FM\tSAPLZFG\t\t\nCLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\t\n# not loaded by SAP\n# not loaded by SAP"
+  },
+  "GetObjectsByType objects without descriptions @terse": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 1\ntype\tname\ttech_name\turi\nCLAS/OC\t#ZCL_B\t\t"
+  },
+  "GetObjectsByType objects without descriptions @medium": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 1\ntype\tname\ttech_name\turi\nCLAS/OC\t#ZCL_B\t\t"
+  },
+  "GetObjectsByType objects without descriptions @full": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 1\ntype\tname\ttech_name\turi\nCLAS/OC\t#ZCL_B\t\t"
+  },
+  "GetObjectsByType an empty level @terse": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 0\ntype\tname\ttech_name\turi\tdescription"
+  },
+  "GetObjectsByType an empty level @medium": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 0\ntype\tname\ttech_name\turi\tdescription"
+  },
+  "GetObjectsByType an empty level @full": {
+    "isError": false,
+    "text": "# parent DEVC/K ZPKG\n# node_id 000029\n# count 0\ntype\tname\ttech_name\turi\tdescription"
+  }
+}

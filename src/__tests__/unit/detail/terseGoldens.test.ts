@@ -1,0 +1,131 @@
+/**
+ * Byte-identical goldens for the move to completeness by construction (plan
+ * step 9.2): each tool's answer at terse, medium and full, on fixed
+ * documents, recorded by the code before the tool moved onto
+ * `writeListing` (`npm test -- --env WRITE_TERSE_GOLDENS=1 <this file>`,
+ * refused under CI) and reviewed in its diff. Every later change must leave
+ * each answer equal; a change of an answer is recorded in the step that
+ * makes it, named in its commit.
+ *
+ * Each case runs the handler over a recording connection — real adt-clients
+ * code, no SAP. The tools already pinned at every level by
+ * `shippedReadings.test.ts` are pinned there.
+ */
+
+import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { after, describe, it } from 'node:test';
+import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
+import type { DetailLevel } from '../../../lib/detail';
+import { declareSystemKind } from '../../../lib/systemKind';
+import { recordingConnection } from '../../helpers/recordingConnection';
+import { repositoryRoot } from '../../helpers/repoRoot';
+
+const FIXTURE_SOURCE = path.join(
+  repositoryRoot(__dirname),
+  'tests',
+  'fixtures',
+  'tools',
+  'terse-goldens.json',
+);
+
+const DETAILS: readonly DetailLevel[] = ['terse', 'medium', 'full'];
+
+/** What a handler answered: its error flag and its text. */
+interface Answered {
+  isError: boolean;
+  text: string;
+}
+
+function answeredOf(result: {
+  isError?: boolean | undefined;
+  content: Array<{ type: string; text?: string }>;
+}): Answered {
+  return {
+    isError: result.isError === true,
+    text: result.content.map((part) => part.text ?? '').join('\n'),
+  };
+}
+
+const ctx = (
+  answers: Array<{ data: string; status?: number }>,
+  kind: 'onprem' | 'cloud' = 'onprem',
+) => {
+  const connection = recordingConnection(answers);
+  declareSystemKind(connection, kind);
+  return { connection, logger: undefined };
+};
+
+const xmlHead = '<?xml version="1.0" encoding="utf-8"?>';
+
+/** A node structure level of the given entries. */
+const level = (...entries: string[]) =>
+  `${xmlHead}<asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT>${entries
+    .map(
+      (inner) =>
+        `<SEU_ADT_REPOSITORY_OBJ_NODE>${inner}</SEU_ADT_REPOSITORY_OBJ_NODE>`,
+    )
+    .join('')}</TREE_CONTENT></DATA></asx:values></asx:abap>`;
+
+/** Every case: its name, and how to run it at one detail. */
+const CASES: Record<string, (detail: DetailLevel) => Promise<Answered>> = {};
+
+// GetObjectsByType takes no `detail`: its one answer, at each level the same.
+for (const [label, descriptions, data] of [
+  [
+    'objects, a nameless one, two nodes not loaded, descriptions',
+    true,
+    level(
+      '<OBJECT_TYPE>CLAS/OC</OBJECT_TYPE><OBJECT_NAME>ZCL_A</OBJECT_NAME><TECH_NAME>ZCL_A</TECH_NAME><OBJECT_URI>/sap/bc/adt/oo/classes/zcl_a</OBJECT_URI><DESCRIPTION>First\ttab</DESCRIPTION>',
+      '<OBJECT_TYPE>FUGR/FF</OBJECT_TYPE><OBJECT_NAME>Z_FM</OBJECT_NAME><TECH_NAME>SAPLZFG</TECH_NAME>',
+      '<OBJECT_TYPE>CLAS/OC</OBJECT_TYPE><OBJECT_NAME/><OBJECT_URI>/sap/bc/adt/oo/classes/nameless</OBJECT_URI>',
+      '<OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME>',
+      '<OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME>',
+    ),
+  ],
+  [
+    'objects without descriptions',
+    false,
+    level(
+      '<OBJECT_TYPE>CLAS/OC</OBJECT_TYPE><OBJECT_NAME>#ZCL_B</OBJECT_NAME><DESCRIPTION>kept out</DESCRIPTION>',
+    ),
+  ],
+  ['an empty level', true, level()],
+] as const) {
+  CASES[`GetObjectsByType ${label}`] = async () =>
+    answeredOf(
+      await handleGetObjectsByType(ctx([{ data }]) as never, {
+        parent_name: 'ZPKG',
+        parent_tech_name: 'ZPKG',
+        parent_type: 'DEVC/K',
+        node_id: '000029',
+        with_short_descriptions: descriptions,
+      }),
+    );
+}
+
+describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
+  const writing = process.env.WRITE_TERSE_GOLDENS === '1';
+  const expected: Record<string, Answered> = fs.existsSync(FIXTURE_SOURCE)
+    ? JSON.parse(fs.readFileSync(FIXTURE_SOURCE, 'utf8'))
+    : {};
+  const answered: Record<string, Answered> = { ...expected };
+
+  for (const [name, run] of Object.entries(CASES)) {
+    for (const detail of DETAILS) {
+      const key = `${name} @${detail}`;
+      it(key, async () => {
+        const answer = await run(detail);
+        answered[key] = answer;
+        if (!writing) assert.deepStrictEqual(answer, expected[key]);
+      });
+    }
+  }
+
+  after(() => {
+    if (!writing) return;
+    if (process.env.CI) throw new Error('the goldens are not written under CI');
+    fs.writeFileSync(FIXTURE_SOURCE, `${JSON.stringify(answered, null, 2)}\n`);
+  });
+});

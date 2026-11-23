@@ -97,7 +97,7 @@ function abapGitGroup(runs: string[]): IHandlerGroup {
     standIn(
       'HandlerAbapGit',
       z.object({
-        action: z.enum(['unlink']),
+        action: z.enum(['unlink', 'pull']),
         repository_key: z.string().optional(),
       }),
       runs,
@@ -210,6 +210,72 @@ describe('the seam: the raw steps before the SDK validates', () => {
       assert.equal(answer.isError, true);
       assert.match(textOf(answer), /abapgit_background_not_declared/);
       assert.deepEqual(runs, []);
+      assert.equal(sap.requests.length, 0);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('on premise an overwrite is refused before the SDK strips it, full and compact pull alike, nothing sent', async () => {
+    const runs: string[] = [];
+    const s = await stdio(sap, runs, { systemType: 'onprem' });
+    try {
+      const overwrite = [{ type: 'INTF', name: 'ZIF_A' }];
+      const full = await s.call('PullAbapGitRepo', {
+        repository_key: '000001',
+        overwrite,
+      });
+      const compact = await s.call('HandlerAbapGit', {
+        action: 'pull',
+        repository_key: '000001',
+        overwrite,
+      });
+      for (const answer of [full, compact]) {
+        assert.equal(answer.isError, true);
+        assert.match(textOf(answer), /abapgit_overwrite_not_declared/);
+      }
+      assert.deepEqual(runs, []);
+      assert.equal(sap.requests.length, 0);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('on the cloud an overwrite naming one object twice is refused before any connection, nothing sent', async () => {
+    const runs: string[] = [];
+    const s = await stdio(sap, runs, { systemType: 'cloud' });
+    try {
+      const answer = await s.call('PullAbapGitRepo', {
+        repository_key: '000001',
+        overwrite: [
+          { type: 'INTF', name: 'ZIF_A' },
+          { type: 'INTF', name: 'ZIF_A' },
+        ],
+      });
+      assert.equal(answer.isError, true);
+      assert.match(textOf(answer), /abapgit_overwrite_duplicate/);
+      assert.deepEqual(runs, []);
+      assert.equal(sap.requests.length, 0);
+    } finally {
+      await s.close();
+    }
+  });
+
+  it('the import refusal comes before the duplicate refusal', async () => {
+    const runs: string[] = [];
+    const s = await stdio(sap, runs, {
+      systemType: 'cloud',
+      abapGitRestrictions: { packages: true, requests: false },
+    });
+    try {
+      const answer = await s.call('PullAbapGitRepo', {
+        repository_key: '000001',
+        overwrite: [
+          { type: 'INTF', name: 'ZIF_A' },
+          { type: 'INTF', name: 'ZIF_A' },
+        ],
+      });
+      assert.match(textOf(answer), /abapgit_import_not_allowed/);
       assert.equal(sap.requests.length, 0);
     } finally {
       await s.close();

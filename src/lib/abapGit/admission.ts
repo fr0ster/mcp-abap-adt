@@ -221,6 +221,27 @@ function stringArg(args: ToolArgs, name: string): string | undefined {
   return typeof value === 'string' ? value : undefined;
 }
 
+/**
+ * Whether a raw `overwrite` names one object (type and name) twice. Read
+ * from the request as it came, before the SDK validates it: an entry of
+ * another shape is left to that validation.
+ */
+function namesOneObjectTwice(overwrite: unknown): boolean {
+  if (!Array.isArray(overwrite)) return false;
+  const entries: readonly unknown[] = overwrite;
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    if (typeof entry !== 'object' || entry === null) continue;
+    const type: unknown = Reflect.get(entry, 'type');
+    const name: unknown = Reflect.get(entry, 'name');
+    if (typeof type !== 'string' || typeof name !== 'string') continue;
+    const key = JSON.stringify([type, name]);
+    if (seen.has(key)) return true;
+    seen.add(key);
+  }
+  return false;
+}
+
 /** What the raw steps read beside the call. */
 export interface RawAdmissionContext {
   /** The system kind the instance serves; `undefined` when none is stated. */
@@ -256,6 +277,15 @@ export function rawAbapGitRefusal(
   ) {
     return new ServerRefusal('abapgit_background_not_declared');
   }
+  // 1c. `overwrite` where the schema does not declare it: cloud's pull
+  // alone (on premise SAP's pull reads no selection,
+  // `ZCL_ABAPGIT_RES_REPO_PULL->post`).
+  if (
+    'overwrite' in call.args &&
+    !(context.kind === 'cloud' && operation === 'pull')
+  ) {
+    return new ServerRefusal('abapgit_overwrite_not_declared');
+  }
   if (operation === undefined) return undefined;
   // 1b. On premise no run log is served: its R1 carries no log_link
   // (measured 2026-11-22, 53 entries), so R8 is cloud's alone.
@@ -268,6 +298,10 @@ export function rawAbapGitRefusal(
     (restrictions.packages || restrictions.requests)
   ) {
     return new ServerRefusal('abapgit_import_not_allowed');
+  }
+  // 2a. A pull's `overwrite` naming one object twice: before any connection.
+  if (operation === 'pull' && namesOneObjectTwice(call.args.overwrite)) {
+    return new ServerRefusal('abapgit_overwrite_duplicate');
   }
   // 3. A blank package on link and branch info.
   if (operation === 'link' || operation === 'branch_info') {

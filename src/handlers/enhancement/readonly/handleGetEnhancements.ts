@@ -740,7 +740,7 @@ interface IncludeUnread {
 }
 
 /** The answer with `include_nested`: every object read, the main one first. */
-interface NestedEnhancements {
+export interface NestedEnhancements {
   main_object: { name: string; type: EnhancementResponse['object_type'] };
   include_nested: true;
   total_objects_analyzed: number;
@@ -762,13 +762,18 @@ function minimalEnhancement(enh: EnhancementImplementation) {
  * Filters a nested enhancement response to show minimal information: the
  * objects with enhancements, each enhancement short.
  */
-function filterMinimalNested(response: NestedEnhancements) {
+export function filterMinimalNested(response: NestedEnhancements) {
+  // Only objects with enhancements — and every object with a probe SAP
+  // refused, with its probes: the detail of a failed read is never dropped.
   const filteredObjects = response.objects
-    .filter((obj) => obj.enhancements.length > 0) // Only objects with enhancements
+    .filter(
+      (obj) => obj.enhancements.length > 0 || (obj.unreadable ?? []).length > 0,
+    )
     .map((obj) => ({
       object_name: obj.object_name,
       object_type: obj.object_type,
       enhancements: obj.enhancements.map(minimalEnhancement),
+      ...(obj.unreadable ? { unreadable: obj.unreadable } : {}),
     }));
 
   return {

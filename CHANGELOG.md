@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`GetEnhancements` at medium with `include_nested` keeps every object with a probe SAP refused** (with `detailed: false`), its `unreadable` probes beside it, where an object without enhancements was left out with them: the detail of a failed read is never dropped. An object with neither enhancements nor a refused probe still leaves.
 - **Dependency: `@mcp-abap-adt/connection` `^25.2.1`** (`@mcp-abap-adt/lib` and `server-runtime`; was `^25.2.0`), from the registry: the connection that carries sap-rfc-lite `^0.4.1`, so the tree holds one copy of it.
 - **Dependency: the optional `@mcp-abap-adt/sap-rfc-lite` `^0.4.1`** (`@mcp-abap-adt/lib`; was `^0.4.0`), from the registry: an RFC client no longer stays locked forever after a failed call, and its unlock no longer runs on another thread (undefined behaviour in 0.4.0).
 - **A task number read through `GetTransport` showed the parent request's type and target, with no objects.** SAP answers a task's number with the task's document, whose `tm:request` holds the parent request's header, and `GetTransport` read that element as the item read (measured on premise and on the cloud, 2026-11-22). A task is now read from `tm:task`; the parent is answered only as `parent_request`.

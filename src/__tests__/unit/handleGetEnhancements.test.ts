@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  filterMinimalNested,
   handleGetEnhancements as handleGetEnhancementsOf,
   parseEnhancementsFromXml,
 } from '../../handlers/enhancement/readonly/handleGetEnhancements';
@@ -466,4 +467,47 @@ describe('GetEnhancements answers every source whole at medium, full and raw', (
       });
     }
   }
+});
+
+// Owner, step 9: medium with include_nested keeps every object with a probe
+// SAP refused, its probes beside it — the detail of a failed read is never
+// dropped; an object with neither enhancements nor refused probes leaves.
+describe('GetEnhancements medium, nested', () => {
+  it('keeps an object whose probes SAP refused, with them', () => {
+    const refusedProbe = {
+      message: 'no authorization',
+      step: 'read enhancements',
+      status: 403,
+    };
+    const minimal = filterMinimalNested({
+      main_object: { name: 'ZPROG', type: 'program' },
+      include_nested: true,
+      total_objects_analyzed: 3,
+      total_enhancements_found: 1,
+      objects: [
+        {
+          object_name: 'ZPROG',
+          object_type: 'program',
+          enhancements: [{ name: 'Z_E', type: 'ENHO/XHH' }],
+        },
+        { object_name: 'ZINC_EMPTY', object_type: 'include', enhancements: [] },
+        {
+          object_name: 'ZINC_REFUSED',
+          object_type: 'include',
+          enhancements: [],
+          unreadable: [refusedProbe],
+        },
+      ],
+    });
+    assert.deepStrictEqual(
+      minimal.objects.map((o) => o.object_name),
+      ['ZPROG', 'ZINC_REFUSED'],
+    );
+    assert.deepStrictEqual(minimal.objects[1], {
+      object_name: 'ZINC_REFUSED',
+      object_type: 'include',
+      enhancements: [],
+      unreadable: [refusedProbe],
+    });
+  });
 });

@@ -143,7 +143,7 @@ export const TOOL_DEFINITION = {
   available_in: ['onprem', 'cloud'] as const,
   ...onEveryVariant(
     withLongToolAdvice(
-      '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope, for the identities of the objects. By default (detail terse) TSV of identifier rows (type, name, tech_name, uri), no description. With detail medium or full the description of each object is read from its own metadata in a second ADT batch envelope, where its type has a metadata endpoint.',
+      '[read-only] Recursively lists every child repository object of the program (PROG), function group (FUGR), class (CLAS), package (DEVC) or other composite object named by parent_name, parent_tech_name and parent_type, nested includes and subcomponents included. Takes parent_name, parent_tech_name and parent_type (one parent: its list) or objects (several parents: one entry per parent, in the order given, each { parent_name, parent_type, total_objects, objects } or { parent_name, parent_type, error }). Each level of the node tree is read in one ADT batch envelope, for the identities of the objects. By default (detail terse) TSV of identifier rows: type, name, tech_name, uri. With detail medium or full the description of each object is read from its own metadata in a second ADT batch envelope, where its type has a metadata endpoint.',
     ),
     schemaOn,
   ),
@@ -675,7 +675,7 @@ function typedRead(
 function secondReads(
   context: HandlerContext,
   lists: readonly {
-    parentType: string;
+    parentType: AdtTypeCode;
     parentName: string;
     objects: readonly FlatObject[];
   }[],
@@ -716,7 +716,7 @@ function secondReads(
 async function secondPass(
   context: HandlerContext,
   lists: readonly {
-    parentType: string;
+    parentType: AdtTypeCode;
     parentName: string;
     objects: readonly FlatObject[];
   }[],
@@ -837,18 +837,19 @@ async function answeredGetObjectsList(
           return read.ended;
         }
         // Pass 2 over every parent read, in one envelope.
-        const walked = read.walks.flatMap((walk, i) =>
-          walk.ok
+        const walked = read.walks.flatMap((walk, i) => {
+          const parent = parents[i];
+          return walk.ok && parent !== undefined
             ? [
                 {
                   i,
-                  parentType: parents[i]?.type ?? '',
-                  parentName: parents[i]?.name ?? '',
+                  parentType: parent.type,
+                  parentName: parent.name,
                   objects: walk.getResult().value,
                 },
               ]
-            : [],
-        );
+            : [];
+        });
         const second = await secondPass(context, walked, pass);
         if (!second.ok) return second;
         const lists = second.getResult().value;

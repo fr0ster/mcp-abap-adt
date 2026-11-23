@@ -176,10 +176,13 @@ describe('compact HandlerGet: one part, one request', () => {
       });
 
       it('metadata answers the metadata only', async () => {
+        // A package's terse is TSV (its sub-packages as rows): its JSON is
+        // medium's.
         const { answer } = await run('document', {
           object_type,
           ...names,
           part: 'metadata',
+          ...(object_type === 'PACKAGE' ? { detail: 'medium' } : {}),
         });
         assert.notEqual(answer?.isError, true);
         const body = jsonOf(answer);

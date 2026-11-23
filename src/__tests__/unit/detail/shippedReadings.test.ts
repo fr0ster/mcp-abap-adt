@@ -475,8 +475,17 @@ describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READ
       } catch {
         responses = undefined;
       }
-      const bodies = Array.isArray(responses)
-        ? responses.map((r) =>
+      // A failed read-back (CreateTransport): the responses beside the note.
+      const list =
+        typeof responses === 'object' &&
+        responses !== null &&
+        !Array.isArray(responses) &&
+        Array.isArray(Reflect.get(responses, 'responses')) &&
+        typeof Reflect.get(responses, 'read_back') === 'string'
+          ? Reflect.get(responses, 'responses')
+          : responses;
+      const bodies = Array.isArray(list)
+        ? list.map((r) =>
             typeof r === 'object' && r !== null ? Reflect.get(r, 'body') : r,
           )
         : undefined;

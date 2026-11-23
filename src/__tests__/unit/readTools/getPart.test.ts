@@ -362,7 +362,13 @@ describe('Get<Type>: one request per call, only the part asked for (a function m
     ([tool]) => tool !== 'GetMessageClassMessage',
   )) {
     it(format('%s answers { part: "metadata", metadata }', tool), async () => {
-      const ran = await run(tool, args, 'document');
+      // GetPackage's terse is TSV (its sub-packages as rows): its JSON is
+      // medium's.
+      const ran = await run(
+        tool,
+        tool === 'GetPackage' ? { ...args, detail: 'medium' } : args,
+        'document',
+      );
       assert.equal(ran.answer?.isError, false);
       const payload = payloadOf(ran.answer?.content?.[0]?.text);
       assert.equal(payload.part, 'metadata');

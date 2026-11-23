@@ -120,7 +120,7 @@ liveSuite(['onprem', 'cloud'], 'abapGit, the full tools', () => {
     marker = await run.changeRemote();
   });
 
-  it('4b. on the cloud: reads what a pull would overwrite; the run interface is not changed locally', async (t) => {
+  it('4b. on the cloud: reads what a pull would change; the run interface is listed as update (changed only in the remote)', async (t) => {
     if (run.skippedUnless(t, 'cloud')) return;
     const answer = await liveCall('GetAbapGitModifiedObjects', {
       repository_key: run.key(),

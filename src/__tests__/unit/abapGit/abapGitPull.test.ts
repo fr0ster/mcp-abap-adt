@@ -7,9 +7,9 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
+  actionsOf,
   interfaceSource,
   overwriteOf,
-  overwrittenNames,
   succeeded,
   swapMarker,
 } from '../../integration/helpers/abapGitPull';
@@ -39,17 +39,7 @@ describe('the run interface and its remote change', () => {
   });
 });
 
-describe("R6's locally changed objects", () => {
-  it('names the overwrite entries only, not the package warnings', () => {
-    assert.deepEqual(
-      overwrittenNames({
-        overwriteObjects: [{ name: 'ZAGS_I1', type: 'INTF' }],
-        packageWarningObjects: [{ name: 'ZAGS_I2', type: 'INTF' }],
-      }),
-      ['ZAGS_I1'],
-    );
-  });
-
+describe("R6's entries", () => {
   it("overwrite names R6's overwrite entries of one name by their type and name as R6 answered them", () => {
     assert.deepEqual(
       overwriteOf(
@@ -66,11 +56,24 @@ describe("R6's locally changed objects", () => {
     );
   });
 
-  it('none listed is none', () => {
+  it("the actions R6's overwrite entries of one name carry, as R6 answered them", () => {
     assert.deepEqual(
-      overwrittenNames({ overwriteObjects: [], packageWarningObjects: [] }),
-      [],
+      actionsOf(
+        {
+          overwriteObjects: [
+            { name: 'ZAGS_I1', type: 'INTF', action: 2 },
+            { name: 'ZAGS_I3', type: 'INTF', action: 3 },
+          ],
+          packageWarningObjects: [{ name: 'ZAGS_I1', type: 'INTF', action: 1 }],
+        },
+        'ZAGS_I1',
+      ),
+      [2],
     );
+  });
+
+  it('none listed is none', () => {
+    assert.deepEqual(actionsOf({ overwriteObjects: [] }, 'ZAGS_I1'), []);
   });
 });
 

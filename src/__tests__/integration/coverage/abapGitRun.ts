@@ -72,12 +72,17 @@ import {
   waitForRun,
 } from '../helpers/abapGitLedger';
 import {
+  actionsOf,
   interfaceSource,
   overwriteOf,
-  overwrittenNames,
   succeeded,
   swapMarker,
 } from '../helpers/abapGitPull';
+
+/** `IF_ABAPGIT_OBJECTS=>c_deserialize_action` (cloud, read 2026-11-23). */
+const ACTION_UPDATE = 2;
+const ACTION_OVERWRITE = 3;
+
 import {
   GitHubFixtures,
   GitHubRefusal,
@@ -623,31 +628,31 @@ export class AbapGitRun {
   }
 
   /**
-   * R6's facts (`detail: "full"`) list no run interface as changed
-   * locally: the interface was activated before its push and the change is
-   * the remote's only (`abapGitPull.ts`).
+   * R6's facts (`detail: "full"`) list the run interface once, with the
+   * action `update` (2): changed only in the remote
+   * (`CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find` L161–178, `' M'`;
+   * `abapGitPull.ts`).
    */
   assertRemoteOnly(facts: unknown): void {
     assert.deepEqual(
-      overwrittenNames(facts).filter((name) => name === this.interfaceName),
-      [],
-      'R6 lists the run interface as changed locally after a remote-only change',
+      actionsOf(facts, this.interfaceName),
+      [ACTION_UPDATE],
+      'R6 lists the run interface once as update (changed only in the remote)',
     );
   }
 
   /**
-   * R6's facts (`detail: "full"`) list the run interface as changed
-   * locally; answers the `overwrite` that selects it, its type and name as
-   * R6 answered them.
+   * R6's facts (`detail: "full"`) list the run interface once, with the
+   * action `overwrite` (3): changed locally (`'MM'`, L161–178); answers the
+   * `overwrite` that selects it, its type and name as R6 answered them.
    */
   overwriteChangedLocally(facts: unknown): { type: string; name: string }[] {
-    const overwrite = overwriteOf(facts, this.interfaceName);
-    assert.equal(
-      overwrite.length,
-      1,
-      'R6 lists the run interface once as changed locally after its local change',
+    assert.deepEqual(
+      actionsOf(facts, this.interfaceName),
+      [ACTION_OVERWRITE],
+      'R6 lists the run interface once as overwrite (changed locally)',
     );
-    return overwrite;
+    return overwriteOf(facts, this.interfaceName);
   }
 
   /** Writes the interface in SAP at `l1` and activates it: a local change. */

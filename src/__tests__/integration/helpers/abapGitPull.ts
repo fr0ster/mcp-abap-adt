@@ -1,19 +1,29 @@
 /**
  * The abapGit live suite's pull: the run interface's source, the remote
- * change, what R6 lists as changed locally, and a succeeded job.
+ * change, what R6 lists and with which action, and a succeeded job.
  *
- * **What a pull imports** (cloud, Code read on the cloud 2026-11-23).
- * Without a selection (`repo.v3`) the handler hands the job every object
- * R6 lists at submit time (`CL_ABAPGIT_RES_REPO_PULL->post` L234–240,
- * `get_all_modified_objects`); with one (`pull.req.v1`, `overwrite`) only
- * the selected entries (L230–233). The job sets every R6 entry it was not
- * handed to `N`, not imported (`CL_ABAPGIT_BG_ACTION_PULL->execute`
- * L123–152). R6's overwrite entries are the objects changed locally since
- * the last push (`CL_ABAPGIT_OBJECTS->warning_overwrite_find`: `lstate`
- * set); a change made only in the remote is imported either way. The run's
- * interface is written and activated before its push, so the first remote
- * change is the remote's only and R6 does not list it; the later local
- * change makes R6 list it, and a pull selecting it overwrites it.
+ * **What R6 lists** (cloud, Code read on the cloud 2026-11-23). Its
+ * overwrite entries are `CL_ABAPGIT_OBJECTS_CHECK=>warning_overwrite_find`
+ * (L140–210) over the file status: every object with any change, its
+ * action from `lstate`/`rstate` — `' M'` changed only in the remote is
+ * `update` (2), `'M '`/`'MM'` changed locally is `overwrite` (3), adds,
+ * deletes and package moves their own (`IF_ABAPGIT_OBJECTS=>
+ * c_deserialize_action`); only an unchanged object is left out. R6's
+ * resource answers each with that action (`CL_ABAPGIT_RES_PULL_MOD_OBJS->
+ * get_all_modified_objects`).
+ *
+ * **What a pull imports.** Without a selection (`repo.v3`) the handler
+ * hands the job every R6 entry (`CL_ABAPGIT_RES_REPO_PULL->post`
+ * L234–240); with one (`pull.req.v1`, `overwrite`) only the selected
+ * entries (L230–233). The job sets every entry it was not handed to `N`
+ * (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152), and the import drops an
+ * `N` entry only when it is changed locally (`CL_ABAPGIT_OBJECTS->
+ * warning_overwrite_find` L1833: `lstate` set; `warning_overwrite_adjust`
+ * L1791): a change made only in the remote is imported whether selected or
+ * not, a local change only when selected. The run's interface is activated
+ * before its push, so the first remote change is listed `update` and the
+ * pull imports it; the later local change makes it `overwrite`, and a pull
+ * selecting it overwrites it.
  *
  * The change replaces a constant's value inside the interface, as
  * adt-clients' suite does, never a line after `ENDINTERFACE`.
@@ -41,14 +51,15 @@ const entries = (value: unknown, key: string): readonly unknown[] => {
   return Array.isArray(field) ? field : [];
 };
 
-/** The names R6's facts list as overwrite entries: the objects changed locally. */
-export function overwrittenNames(facts: unknown): string[] {
+/** The actions R6's overwrite entries named `name` carry. */
+export function actionsOf(facts: unknown, name: string): number[] {
   return entries(facts, 'overwriteObjects').flatMap((entry) => {
-    const name =
+    const read = (key: string) =>
       typeof entry === 'object' && entry !== null
-        ? Reflect.get(entry, 'name')
+        ? Reflect.get(entry, key)
         : undefined;
-    return typeof name === 'string' ? [name] : [];
+    const action = read('action');
+    return typeof action === 'number' && read('name') === name ? [action] : [];
   });
 }
 

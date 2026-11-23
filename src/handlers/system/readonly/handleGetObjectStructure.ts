@@ -1,10 +1,5 @@
 import * as z from 'zod';
-import {
-  completeAnswer,
-  identityOf,
-  type Line,
-  Written,
-} from '../../../lib/detail';
+import { bullets, type RowSchemas, writeListing } from '../../../lib/detail';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving ADT object structure and returning a compact tree.
@@ -101,27 +96,61 @@ function buildNestedTree(
   flatNodes: FlatObjectStructureNode[],
   root?: { objecttype: string; objectname: string },
 ): ObjectStructureTreeNode[] {
-  const nodeMap: Record<string, ObjectStructureTreeNode> = {};
-  flatNodes.forEach((node) => {
-    nodeMap[String(node.nodeid)] = {
+  // Every node of the document is one node of the tree: by its place in the
+  // document, so two sharing an id stay two; a parent is the first node of
+  // its id, taken only when that makes no cycle — a node whose parents loop
+  // back to it is a root — so every node is reached from a root (plan 9.7).
+  const nodes = flatNodes.map(
+    (node): ObjectStructureTreeNode => ({
       objecttype: node.objecttype,
       objectname: node.objectname,
       description: node.description,
       isfolder: node.isfolder,
       children: [],
-    };
+    }),
+  );
+  const byId = new Map<string, number>();
+  flatNodes.forEach((node, index) => {
+    const id = String(node.nodeid);
+    if (!byId.has(id)) byId.set(id, index);
   });
+  const parentOf = new Map<number, number>();
+  const ancestors = (index: number): Set<number> => {
+    const seen = new Set<number>();
+    for (
+      let at = parentOf.get(index);
+      at !== undefined;
+      at = parentOf.get(at)
+    ) {
+      if (seen.has(at)) break;
+      seen.add(at);
+    }
+    return seen;
+  };
   const roots: ObjectStructureTreeNode[] = [];
   const synthetic: ObjectStructureTreeNode | undefined = root
     ? { ...root, isfolder: false, children: [], synthetic: true }
     : undefined;
-  flatNodes.forEach((node) => {
-    if (node.parentid && nodeMap[node.parentid]) {
-      nodeMap[node.parentid].children.push(nodeMap[String(node.nodeid)]);
-    } else if (node.parentid && synthetic) {
-      synthetic.children.push(nodeMap[String(node.nodeid)]);
+  flatNodes.forEach((node, index) => {
+    const own = nodes[index];
+    if (own === undefined) return;
+    const parent =
+      node.parentid === undefined || node.parentid === ''
+        ? undefined
+        : byId.get(node.parentid);
+    const parentNode = parent === undefined ? undefined : nodes[parent];
+    if (
+      parent !== undefined &&
+      parentNode !== undefined &&
+      parent !== index &&
+      !ancestors(parent).has(index)
+    ) {
+      parentOf.set(index, parent);
+      parentNode.children.push(own);
+    } else if (node.parentid && parent === undefined && synthetic) {
+      synthetic.children.push(own);
     } else {
-      roots.push(nodeMap[String(node.nodeid)]);
+      roots.push(own);
     }
   });
   if (synthetic && synthetic.children.length > 0) roots.unshift(synthetic);
@@ -177,31 +206,28 @@ export function assertObjectStructurePresent(value: XmlRead): void {
   }
 }
 
-/** The tree as bullets, depth first; the object asked, which SAP did not send, no item. */
-function bulletLines(
-  tree: ObjectStructureTreeNode[],
+/** The tree's nodes below a node, as bullets one level deeper. */
+function bulletSchemas(
   withOwner: boolean,
-  depth = 0,
-): Line[] {
-  return tree.flatMap((node): Line[] => [
-    node.synthetic === true
-      ? { bulletRoot: labelOf(node, withOwner), depth }
-      : {
-          bullet: labelOf(node, withOwner),
-          depth,
-          identity: [
-            node.objecttype ?? '',
-            node.objectname ?? '',
-            node.description ?? '',
-          ],
+): RowSchemas<ObjectStructureTreeNode> {
+  const schemas: RowSchemas<ObjectStructureTreeNode> = {
+    children: bullets(
+      'children',
+      (node: ObjectStructureTreeNode) => labelOf(node, withOwner),
+      {
+        get lists() {
+          return schemas;
         },
-    ...bulletLines(node.children, withOwner, depth + 1),
-  ]);
+      },
+    ),
+  };
+  return schemas;
 }
 
 /**
- * {@link treeText}, guarded: every node of the document, or nothing
- * (`completeAnswer`).
+ * {@link treeText}, written by the listing writer: every node of the
+ * document a bullet, depth first; the object asked, which SAP did not
+ * send, the root and no item.
  */
 function completeTreeText(
   value: XmlRead,
@@ -209,28 +235,31 @@ function completeTreeText(
   withOwner: boolean,
 ): string {
   assertObjectStructurePresent(value);
-  return completeAnswer(
-    'GetObjectStructure',
-    (nodes: FlatObjectStructureNode[]) =>
-      nodes.map((node) =>
-        identityOf([
-          node.objecttype ?? '',
-          node.objectname ?? '',
-          node.description ?? '',
-        ]),
+  const nodes = flatNodesOf(value);
+  if (nodes.length === 0) {
+    return writeListing({
+      heads: [],
+      reading: {},
+      lists: {},
+      title: 'No nodes found in object structure response.',
+    }).answer;
+  }
+  return writeListing({
+    heads: [],
+    reading: { tree: buildNestedTree(nodes, root) },
+    lists: {
+      tree: bullets(
+        'tree',
+        (node: ObjectStructureTreeNode) => labelOf(node, withOwner),
+        {
+          synthetic: (node: ObjectStructureTreeNode) => node.synthetic === true,
+          lists: bulletSchemas(withOwner),
+        },
       ),
-    (nodes: FlatObjectStructureNode[]) =>
-      Written.text(
-        nodes.length === 0
-          ? [{ title: 'No nodes found in object structure response.' }]
-          : [
-              { title: 'tree:' },
-              ...bulletLines(buildNestedTree(nodes, root), withOwner),
-              { title: '' },
-            ],
-        [],
-      ),
-  )(flatNodesOf(value));
+    },
+    title: 'tree:',
+    end: '',
+  }).answer;
 }
 
 export async function handleGetObjectStructure(

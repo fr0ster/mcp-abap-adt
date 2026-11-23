@@ -170,6 +170,36 @@ export function omitted<I, K extends string>(
   };
 }
 
+/**
+ * The list `key` written as a bullet tree, `- label` per item indented by
+ * its depth, depth first: an item `synthetic` says is no node of the
+ * reading (the object asked, which SAP did not send) is written as the
+ * tree's root and is no item; its own lists one level deeper.
+ */
+export function bullets<I, K extends string>(
+  key: K,
+  label: (item: I) => string,
+  options: {
+    readonly synthetic?: ((item: I) => boolean) | undefined;
+    readonly lists?: RowSchemas<I> | undefined;
+  },
+): Bound<Holding<K, I>, K> {
+  return {
+    key,
+    write: (reading, outerDepth) => {
+      const depth = outerDepth ?? 0;
+      return itemsOf(reading, key).flatMap((item): Line[] => [
+        options.synthetic?.(item) === true
+          ? { bulletRoot: label(item), depth }
+          : { bullet: label(item), depth, identity: [] },
+        ...(options.lists === undefined
+          ? []
+          : listLines(item, options.lists, depth + 1)),
+      ]);
+    },
+  };
+}
+
 /** The list `key` written as mark lines, `# mark words…`, one per item. */
 export function marks<I, K extends string>(
   key: K,
@@ -341,6 +371,12 @@ export interface Listing<R> {
   readonly lists: RowSchemas<R>;
   /** A tree's root row before the lists, at depth 0; its lists then one level deeper. */
   readonly root?: Root<R> | undefined;
+  /** A fixed title line before the lists, and one after them (`''`: the text ends with a line feed). */
+  readonly title?:
+    | 'tree:'
+    | 'No nodes found in object structure response.'
+    | undefined;
+  readonly end?: '' | undefined;
 }
 
 /**
@@ -355,6 +391,7 @@ export function writeListing<R>(listing: Listing<R>): Written<string> {
 /** A listing's lines: its heads, a tree's root row, then every list of the reading. */
 function listingLines<R>(listing: Listing<R>): Line[] {
   const lines: Line[] = [...listing.heads];
+  if (listing.title !== undefined) lines.push({ title: listing.title });
   if (listing.root !== undefined) {
     lines.push({
       root: cellsOf(listing.root.columns, listing.reading),
@@ -368,6 +405,7 @@ function listingLines<R>(listing: Listing<R>): Line[] {
       listing.root === undefined ? undefined : 1,
     ),
   );
+  if (listing.end !== undefined) lines.push({ title: listing.end });
   return lines;
 }
 

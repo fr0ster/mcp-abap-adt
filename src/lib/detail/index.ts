@@ -33,6 +33,7 @@ export {
 } from './levels';
 export {
   type Bound,
+  bullets,
   type Column,
   entries,
   type Group,

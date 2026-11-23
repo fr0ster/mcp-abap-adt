@@ -45,6 +45,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`GetObjectStructure` answers every node of the document**: a node whose parents loop back to it is a root of the tree, and two nodes sharing an id are two — where the call answered `incomplete_answer`.
 - **`GetEnhancements` at medium with `include_nested` keeps every object with a probe SAP refused** (with `detailed: false`), its `unreadable` probes beside it, where an object without enhancements was left out with them: the detail of a failed read is never dropped. An object with neither enhancements nor a refused probe still leaves.
 - **Dependency: `@mcp-abap-adt/connection` `^25.2.1`** (`@mcp-abap-adt/lib` and `server-runtime`; was `^25.2.0`), from the registry: the connection that carries sap-rfc-lite `^0.4.1`, so the tree holds one copy of it.
 - **Dependency: the optional `@mcp-abap-adt/sap-rfc-lite` `^0.4.1`** (`@mcp-abap-adt/lib`; was `^0.4.0`), from the registry: an RFC client no longer stays locked forever after a failed call, and its unlock no longer runs on another thread (undefined behaviour in 0.4.0).

@@ -504,12 +504,12 @@
     "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"projectexplorer:objectstructure\":{\"@\":{\"xmlns:projectexplorer\":\"http://www.sap.com/adt/projectexplorer\"}}}"
   },
   "GetObjectStructure a cycle of parents and a repeated id @terse": {
-    "isError": true,
-    "text": "{\"error\":\"incomplete_answer\",\"tool\":\"GetObjectStructure\",\"detail\":\"terse\",\"message\":\"GetObjectStructure: the compact answer could not represent every item the reading held, so nothing is answered; ask detail: 'full'\"}"
+    "isError": false,
+    "text": "tree:\n- CLAS/OA: B\n  - CLAS/OA: A\n- CLAS/OA: C\n- CLAS/OA: D\n"
   },
   "GetObjectStructure a cycle of parents and a repeated id @medium": {
-    "isError": true,
-    "text": "{\"error\":\"incomplete_answer\",\"tool\":\"GetObjectStructure\",\"detail\":\"full\",\"message\":\"GetObjectStructure: the compact answer could not represent every item the reading held, so nothing is answered; ask detail: 'full'\"}"
+    "isError": false,
+    "text": "tree:\n- CLAS/OA: B\n  - CLAS/OA: A\n- CLAS/OA: C\n- CLAS/OA: D\n"
   },
   "GetObjectStructure a cycle of parents and a repeated id @full": {
     "isError": false,

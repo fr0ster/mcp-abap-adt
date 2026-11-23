@@ -18,9 +18,8 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
-  identityOf,
-  Written,
+  rows,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
@@ -75,41 +74,42 @@ interface VersionsRead {
  * under the object; medium every field of each version; full the answer
  * before `detail`; raw the feed as ADT sent it.
  */
-/** A version's identity, as its row writes it: its id and where its content is. */
-const versionIdentity = (version: IObjectVersion) =>
-  identityOf([version.versionId, version.contentUri]);
-
-/** Every version the feed held. */
-const heldVersions = (read: VersionsRead) => read.versions.map(versionIdentity);
-
-// Every version the feed held, or nothing (`completeAnswer`).
+// Every version the feed held, written by the listing writer.
 const VERSION_ANSWERS: AnswerTable<VersionsRead, string> = {
-  terse: completeAnswer('GetObjectVersions', heldVersions, (read) =>
-    Written.text(
-      [
+  terse: (read) =>
+    writeListing({
+      heads: [
         { head: 'object', value: `${read.object_type} ${read.object_name}` },
-        {
-          header: [
-            'versionId',
-            'author',
-            'updatedAt',
-            'transport',
-            'content_uri',
-          ],
-        },
-        ...read.versions.map((version) => ({
-          row: [
-            version.versionId,
-            version.author ?? '',
-            version.updatedAt ?? '',
-            version.transportRequest ?? '',
-            version.contentUri,
-          ],
-        })),
       ],
-      [0, 4],
-    ),
-  ),
+      reading: read,
+      lists: {
+        versions: rows('versions', {
+          columns: [
+            {
+              name: 'versionId',
+              cell: (version: IObjectVersion) => version.versionId,
+            },
+            {
+              name: 'author',
+              cell: (version: IObjectVersion) => version.author ?? '',
+            },
+            {
+              name: 'updatedAt',
+              cell: (version: IObjectVersion) => version.updatedAt ?? '',
+            },
+            {
+              name: 'transport',
+              cell: (version: IObjectVersion) => version.transportRequest ?? '',
+            },
+            {
+              name: 'content_uri',
+              cell: (version: IObjectVersion) => version.contentUri,
+            },
+          ],
+          header: 'always',
+        }),
+      },
+    }).answer,
   medium: ({ document: _document, ...read }) => JSON.stringify(read),
   full: ({ document: _document, ...read }) =>
     JSON.stringify({ success: true, ...read }),

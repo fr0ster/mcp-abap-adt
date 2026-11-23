@@ -192,6 +192,8 @@ interface FlatObject {
   OBJECT_NAME: string;
   TECH_NAME?: string;
   OBJECT_URI?: string;
+  /** The short description, where SAP gave one (asked for by default). */
+  DESCRIPTION?: string;
 }
 
 function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
@@ -204,6 +206,7 @@ function flatObjects(level: NodeLevel): FlatObject[] {
     OBJECT_NAME: o.name,
     ...(o.techName ? { TECH_NAME: o.techName } : {}),
     ...(o.uri ? { OBJECT_URI: o.uri } : {}),
+    ...(o.description ? { DESCRIPTION: o.description } : {}),
   }));
 }
 
@@ -441,19 +444,25 @@ interface ParentList {
   objects: FlatObject[];
 }
 
-/** One parent's objects as TSV: type, name, and the technical name where it differs. */
-function parentRows(list: ParentList): string {
+/**
+ * One parent's objects as TSV: type, name, the technical name where it
+ * differs, and the short description when it was asked for (the default).
+ */
+function parentRows(list: ParentList, descriptions: boolean): string {
   return [
     `# parent ${list.parent_type ?? ''} ${list.parent_name ?? ''}`,
     `# total ${list.objects.length}`,
     tsv(
-      ['type', 'name', 'tech_name'],
+      descriptions
+        ? ['type', 'name', 'tech_name', 'description']
+        : ['type', 'name', 'tech_name'],
       list.objects.map((o) => [
         o.OBJECT_TYPE,
         o.OBJECT_NAME,
         o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
           ? o.TECH_NAME
           : '',
+        ...(descriptions ? [o.DESCRIPTION ?? ''] : []),
       ]),
     ),
   ].join('\n');
@@ -462,23 +471,14 @@ function parentRows(list: ParentList): string {
 /**
  * What GetObjectsList answers of one parent at each `detail`, selected
  * before the walk (`src/lib/detail`): terse its objects as TSV (type, name,
- * the technical name only where it differs); medium every field read but
- * the uri; full the answer before `detail`. A walk reads many documents, so
- * raw is the full answer.
+ * the technical name only where it differs, the description when asked
+ * for); medium every field read but the uri; full the answer before
+ * `detail`. A walk reads many documents, so raw is the full answer.
  */
-const OBJECTS_LIST_ANSWERS: AnswerTable<ParentList, string | object> = {
-  terse: parentRows,
-  medium: (list) => ({
-    parent_name: list.parent_name,
-    parent_type: list.parent_type,
-    total_objects: list.objects.length,
-    objects: list.objects.map((o) => ({
-      type: o.OBJECT_TYPE,
-      name: o.OBJECT_NAME,
-      ...(o.TECH_NAME !== undefined ? { tech_name: o.TECH_NAME } : {}),
-    })),
-  }),
-  full: (list) => ({
+function objectsListAnswers(
+  descriptions: boolean,
+): AnswerTable<ParentList, string | object> {
+  const full = (list: ParentList) => ({
     parent_name: list.parent_name,
     ...('parent_tech_name' in list
       ? { parent_tech_name: list.parent_tech_name }
@@ -486,9 +486,24 @@ const OBJECTS_LIST_ANSWERS: AnswerTable<ParentList, string | object> = {
     parent_type: list.parent_type,
     total_objects: list.objects.length,
     objects: list.objects,
-  }),
-  raw: (list) => OBJECTS_LIST_ANSWERS.full(list),
-};
+  });
+  return {
+    terse: (list) => parentRows(list, descriptions),
+    medium: (list) => ({
+      parent_name: list.parent_name,
+      parent_type: list.parent_type,
+      total_objects: list.objects.length,
+      objects: list.objects.map((o) => ({
+        type: o.OBJECT_TYPE,
+        name: o.OBJECT_NAME,
+        ...(o.TECH_NAME !== undefined ? { tech_name: o.TECH_NAME } : {}),
+        ...(o.DESCRIPTION !== undefined ? { description: o.DESCRIPTION } : {}),
+      })),
+    }),
+    full,
+    raw: full,
+  };
+}
 
 export async function handleGetObjectsList(
   context: HandlerContext,
@@ -508,7 +523,7 @@ export async function handleGetObjectsList(
       ? Boolean(with_short_descriptions)
       : true;
   const level = levelOf(args);
-  const shown = answerAt(OBJECTS_LIST_ANSWERS, levelOf(args));
+  const shown = answerAt(objectsListAnswers(withDescriptions), levelOf(args));
 
   if (listed !== undefined && listed.length > 0) {
     const parents: Parent[] = [];

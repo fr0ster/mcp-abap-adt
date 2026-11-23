@@ -59,6 +59,7 @@ function formatObjects(
     OBJECT_NAME: o.name,
     ...(o.techName ? { TECH_NAME: o.techName } : {}),
     ...(o.uri ? { OBJECT_URI: o.uri } : {}),
+    ...(o.description ? { DESCRIPTION: o.description } : {}),
   }));
 
   if (objects.length === 0) {

@@ -758,6 +758,7 @@ describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row 
       OBJECT_NAME: 'ZMCP_SHR_FGRP',
       TECH_NAME: 'SAPLZMCP_SHR_FGRP',
       OBJECT_URI: FUGR_URI,
+      DESCRIPTION: 'Shared FUGR for include/FM tests',
     };
     assert.deepStrictEqual(byTypeRow, expected);
     assert.deepStrictEqual(listRow, expected);

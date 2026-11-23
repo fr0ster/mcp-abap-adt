@@ -459,11 +459,13 @@ operation is offered where that system's abapGit serves it:
   modified-objects read, an object the list does not hold (`abapgit_overwrite_not_listed`) or a
   name it holds under two types, in one list or across both (`abapgit_overwrite_ambiguous`: SAP
   selects by name within each list, the server refuses any collision).
-- **A close cuts SAP's dialog mid-import.** Closing an SSE stream or a stdio server logs its
-  connections off, a running background run's included. What SAP does with an on-premise link or
-  pull under way when its client or connection goes away is **unverified**: it has been neither read
-  in SAP's code nor measured, and the server does not learn the outcome. Do not assume the import
-  finished or was rolled back: check what was done with `GetAbapGitStaging` (on ABAP Cloud also
+- **An on-premise import whose SAP request is lost: unverified.** Closing an SSE stream or a stdio
+  server logs its connections off, a running background run's included. When that loses an
+  on-premise link's or pull's SAP request or its response, what SAP does is **unverified**: it has
+  been neither read in SAP's code nor measured, and the server does not learn the outcome. Do not
+  assume the import finished or was rolled back: read the repository's staging with the tool's own
+  read, `GetAbapGitStaging` (compact `HandlerAbapGitGet` `staging`); it shows the current
+  differences and cannot tell which writes came from the interrupted pull (on ABAP Cloud also
   `GetAbapGitModifiedObjects` and the run log, `GetAbapGitErrorLog`). On ABAP Cloud a pull or push
   is SAP's job, accepted before the call answers: closing the connection does not stop it. A
   Streamable HTTP disconnect leaves calls and runs going.

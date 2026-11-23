@@ -65,7 +65,7 @@ const IMPORTS =
 const CLOUD_IMPORTS =
   'the job takes every object the modified-objects read lists and brings it to its remote version, a package warning with action 5 (delete and re-create) excepted: SAP leaves it out; given overwrite, SAP selects by name against the list as it stands when its job runs: of the objects outside the selection, the remote-only adds and updates are imported, and every other one (changes in the system, remote deletions, objects of other packages) keeps its system state';
 
-const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. When the client or its connection goes away mid-import, the outcome is unknown to this server and what SAP does then is unverified (unread in SAP's code, unmeasured): the repository's staging shows what the pull left. Answers facts only: SAP's status, done, and the objects SAP lists.`;
+const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. When SAP's request or its response is lost mid-import (an SSE or stdio close logs the connection off), the outcome is unknown to this server and what SAP does then is unverified (unread in SAP's code, unmeasured): the repository's staging read shows the current differences, whichever writes made them. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 
 export const TOOL_DEFINITION: KindToolDefinition<
   typeof ONPREM_SCHEMA,

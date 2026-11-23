@@ -1634,7 +1634,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="pullabapgitrepo-high-level-abapgit"></a>
 #### PullAbapGitRepo (High-Level / Abapgit)
-**Description:** Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too. Ends on SAP's answer, or with background true runs on an ABAP session of its own. When the client or its connection goes away mid-import, the outcome is unknown to this server and what SAP does then is unverified (unread in SAP's code, unmeasured): the repository's staging shows what the pull left. Answers facts only: SAP's status, done, and the objects SAP lists.
+**Description:** Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: every object changed in the remote is imported, objects changed in the system are overwritten, and objects held by other packages are written too. Ends on SAP's answer, or with background true runs on an ABAP session of its own. When SAP's request or its response is lost mid-import (an SSE or stdio close logs the connection off), the outcome is unknown to this server and what SAP does then is unverified (unread in SAP's code, unmeasured): the repository's staging read shows the current differences, whichever writes made them. Answers facts only: SAP's status, done, and the objects SAP lists.
 
 **Source:** `src/handlers/abapgit/high/handlePullAbapGitRepo.ts`
 

@@ -13,12 +13,14 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  completeAnswer,
-  identityOf,
-  type Line,
-  type TextKey,
-  Written,
+  type Column,
+  entries,
+  type Head,
+  rows,
+  sections,
   wireAnswer,
+  writeJsonList,
+  writeListing,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -41,7 +43,6 @@ import {
   readNode,
   rootByRoot,
   type WalkedItem,
-  walkedIdentity,
   walkPackage,
   walkPackages,
 } from '../../../lib/strategies/packageWalk';
@@ -126,112 +127,84 @@ interface ContentsRead {
   walked: readonly PhaseResult<WalkedItem[]>[];
 }
 
-/** Each asked package's answer as `listOf` makes it, or the failure of its walk. */
-function perPackage<T>(
-  read: ContentsRead,
-  listOf: (packageName: string, items: WalkedItem[]) => T,
-):
-  | T
-  | Array<
-      | { package_name: string; objects: T }
-      | { package_name: string; error: FailureEntry }
-    > {
-  if (read.single) {
-    const only = read.walked[0];
-    if (only === undefined || !only.ok) throw only?.error;
-    return listOf(read.packageNames[0] ?? '', only.value);
-  }
-  return read.walked.map((result, i) => {
-    const package_name = read.packageNames[i] ?? '';
+/** One package asked: its name, and its walk's objects or the walk's failure. */
+interface ContentsPart {
+  readonly name: string;
+  readonly items?: readonly WalkedItem[] | undefined;
+  readonly error?: FailureEntry | undefined;
+}
+
+/** What a list call writes: each package asked, in the order asked. */
+interface ContentsParts {
+  readonly parts: readonly ContentsPart[];
+}
+
+/**
+ * Each package asked, its objects' own package filled in (the package
+ * asked, where the walk left it to the root's) — every walked object kept.
+ */
+function partsOf(read: ContentsRead): ContentsPart[] {
+  return read.walked.map((result, i): ContentsPart => {
+    const name = read.packageNames[i] ?? '';
     return result.ok
-      ? { package_name, objects: listOf(package_name, result.value) }
+      ? {
+          name,
+          items: result.value.map((item) => ({
+            ...item,
+            packageName: (item.packageName ?? name).toUpperCase(),
+          })),
+        }
       : {
-          package_name,
+          name,
           error: thrownEntry(result.error, 'read package node structure'),
         };
   });
 }
 
-/** One package's objects as TSV: `# package P` group lines, `type\tname` rows. */
+/** The one package of a call by `package_name`: its walk, or the walk's failure thrown. */
+function onlyPart(read: ContentsRead): ContentsPart {
+  const only = read.walked[0];
+  if (only === undefined || !only.ok) throw only?.error;
+  const [part] = partsOf(read);
+  return part ?? { name: read.packageNames[0] ?? '' };
+}
+
 const TOOL = 'GetPackageContents';
 
 /**
- * An item's identity in the terse rows, as written: its type and name, the
- * technical name where it differs, the URI of an object SAP listed without
- * a name.
+ * One package's objects as TSV: the type, the name, the technical name
+ * where it differs, the URI of an object SAP listed without a name, the
+ * description where asked — each under its own package's group line.
  */
-const terseIdentity = (item: WalkedItem) =>
-  identityOf([
-    item.type,
-    item.name,
-    item.techName !== undefined && item.techName !== item.name
-      ? item.techName
-      : '',
-    item.name === '' ? (item.uri ?? '') : '',
-  ]);
-
-/** An item's identity at medium: its type, name, technical name and a nameless one's URI. */
-const mediumIdentity = (item: WalkedItem) =>
-  identityOf([
-    item.type,
-    item.name,
-    item.techName ?? '',
-    item.name === '' ? (item.uri ?? '') : '',
-  ]);
-
-/** An item's identity at full: its type and name, a nameless one's technical name and URI. */
-const fullIdentity = (item: WalkedItem) =>
-  identityOf([
-    item.type,
-    item.name,
-    item.name === '' ? (item.techName ?? '') : '',
-    item.name === '' ? (item.uri ?? '') : '',
-  ]);
-
-/** Every item the walks held, by `identity`; a refused walk holds none. */
-function heldBy(identity: (item: WalkedItem) => string) {
-  return (read: ContentsRead) =>
-    read.walked.flatMap((result) =>
-      result.ok ? result.value.map(identity) : [],
-    );
-}
-
-/** One package's objects as typed lines: `# package P` group lines, a row per object. */
-function contentsLines(
-  packageName: string,
-  items: readonly WalkedItem[],
-  descriptions: boolean,
-): Line[] {
-  const groups = new Map<string, Line[]>();
-  for (const item of items) {
-    const owner = (item.packageName ?? packageName).toUpperCase();
-    const rows = groups.get(owner) ?? [];
-    // The technical name where it is not the name (a function group's is
-    // its main program, SAPL…); for an object SAP listed without a name,
-    // its URI too, what tells it apart.
-    const techName =
-      item.techName !== undefined && item.techName !== item.name
-        ? item.techName
-        : '';
-    const uri = item.name === '' ? (item.uri ?? '') : '';
-    rows.push({
-      row: descriptions
-        ? [item.type, item.name, techName, uri, item.description ?? '']
-        : [item.type, item.name, techName, uri],
-    });
-    groups.set(owner, rows);
-  }
-  return [
+function contentsRows(descriptions: boolean) {
+  const columns: Column<WalkedItem>[] = [
+    { name: 'type', cell: (item) => item.type },
+    { name: 'name', cell: (item) => item.name },
     {
-      header: descriptions
-        ? ['type', 'name', 'tech_name', 'uri', 'description']
-        : ['type', 'name', 'tech_name', 'uri'],
+      name: 'tech_name',
+      cell: (item) =>
+        item.techName !== undefined && item.techName !== item.name
+          ? item.techName
+          : '',
     },
-    ...[...groups].flatMap(([value, rows]): Line[] => [
-      { group: 'package', value },
-      ...rows,
-    ]),
+    { name: 'uri', cell: (item) => (item.name === '' ? (item.uri ?? '') : '') },
   ];
+  return rows('items', {
+    columns: descriptions
+      ? [
+          ...columns,
+          { name: 'description', cell: (item) => item.description ?? '' },
+        ]
+      : columns,
+    header: 'always',
+    groups: [
+      {
+        label: 'package',
+        of: (item: WalkedItem) => item.packageName ?? '',
+        mode: 'gathered',
+      },
+    ],
+  });
 }
 
 /** Every field the walk read of an object, without its uri. */
@@ -250,46 +223,32 @@ function mediumItem(packageName: string, item: WalkedItem) {
   };
 }
 
+/** A level's JSON entry of one object, from the object alone. */
+type EntryOf = (item: WalkedItem) => object;
+
 /**
- * A level's JSON answer of the walks: one package's rows, or each
- * package's under its name (a refused walk its error), every row written
- * through `Written`.
+ * A level's JSON answer of the walks, written from the walks' own lists:
+ * one package's entries, or each package's under its name (a refused walk
+ * its error).
  */
-function perPackageWritten<I extends object>(
-  read: ContentsRead,
-  rowsOf: (packageName: string, items: WalkedItem[]) => I[],
-  identityKeys: readonly TextKey<I>[],
-): Written<string> {
+function contentsJson(read: ContentsRead, entry: EntryOf): string {
   if (read.single) {
-    const only = read.walked[0];
-    if (only === undefined || !only.ok) throw only?.error;
-    return Written.stringified(
-      Written.jsonRows(
-        rowsOf(read.packageNames[0] ?? '', only.value),
-        identityKeys,
-      ),
+    return JSON.stringify(
+      writeJsonList(onlyPart(read), entries('items', entry)).answer,
     );
   }
-  return Written.stringified(
-    Written.each(
-      read.walked.map((result, i) => {
-        const package_name = read.packageNames[i] ?? '';
-        return result.ok
-          ? Written.json(
-              { package_name },
-              { objects: rowsOf(package_name, result.value) },
-              identityKeys,
-            )
-          : Written.json(
-              {
-                package_name,
-                error: thrownEntry(result.error, 'read package node structure'),
-              },
-              {},
-              identityKeys,
-            );
-      }),
-    ),
+  return JSON.stringify(
+    writeJsonList(
+      { parts: partsOf(read) },
+      entries(
+        'parts',
+        (part: ContentsPart) =>
+          part.error === undefined
+            ? { package_name: part.name }
+            : { package_name: part.name, error: part.error },
+        { lists: { items: entries('items', entry, { as: 'objects' }) } },
+      ),
+    ).answer,
   );
 }
 
@@ -298,56 +257,57 @@ function perPackageWritten<I extends object>(
  * walk (`src/lib/detail`): terse the objects as TSV under `# package` group
  * lines (`# asked P` before each package of several, a failed walk as
  * `# error`); medium every field the walk read, no uri; full the list before
- * `detail`. Every object the walks held, or nothing (`completeAnswer`).
+ * `detail`. Every level is written by the listing writers from the walks'
+ * own lists (`writeListing`, `writeJsonList`): one row or entry per object.
  * Raw never reaches this table: the handler answers it as the responses
  * (`wireAnswer`).
  */
 const CONTENTS_ANSWERS: AnswerTable<ContentsRead, string> = {
-  terse: completeAnswer(TOOL, heldBy(terseIdentity), (read) => {
+  terse: (read) => {
     if (read.single) {
-      const only = read.walked[0];
-      if (only === undefined || !only.ok) throw only?.error;
-      return Written.text(
-        contentsLines(
-          read.packageNames[0] ?? '',
-          only.value,
-          read.descriptions,
-        ),
-        [0, 1, 2, 3],
-      );
+      return writeListing({
+        heads: [],
+        reading: onlyPart(read),
+        lists: { items: contentsRows(read.descriptions) },
+      }).answer;
     }
-    return Written.text(
-      read.walked.flatMap((result, i): Line[] => {
-        const name = read.packageNames[i] ?? '';
-        return result.ok
-          ? [
-              { head: 'asked', value: name },
-              ...contentsLines(name, result.value, read.descriptions),
-            ]
-          : [
-              { head: 'asked', value: name },
-              {
-                head: 'error',
-                value: JSON.stringify(
-                  thrownEntry(result.error, 'read package node structure'),
-                ),
-              },
-            ];
-      }),
-      [0, 1, 2, 3],
-    );
-  }),
-  medium: completeAnswer(TOOL, heldBy(mediumIdentity), (read) =>
-    perPackageWritten(
+    return writeListing({
+      heads: [],
+      reading: { parts: partsOf(read) } satisfies ContentsParts,
+      lists: {
+        parts: sections(
+          'parts',
+          (part: ContentsPart): Head[] => [
+            { head: 'asked', value: part.name },
+            ...(part.error === undefined
+              ? []
+              : [{ head: 'error', value: JSON.stringify(part.error) }]),
+          ],
+          { items: contentsRows(read.descriptions) },
+        ),
+      },
+    }).answer;
+  },
+  medium: (read) =>
+    contentsJson(read, (item) => mediumItem(item.packageName ?? '', item)),
+  full: (read) =>
+    contentsJson(
       read,
-      (name, items) => items.map((item) => mediumItem(name, item)),
-      ['type', 'name', 'tech_name', 'uri'],
+      (item) => assembleList(item.packageName ?? '', [item])[0] ?? {},
     ),
-  ),
-  full: completeAnswer(TOOL, heldBy(fullIdentity), (read) =>
-    perPackageWritten(read, assembleList, ['type', 'name', 'techName', 'uri']),
-  ),
-  raw: (read) => JSON.stringify(perPackage(read, assembleList)),
+  raw: (read) =>
+    JSON.stringify(
+      read.single
+        ? assembleList(onlyPart(read).name, [...(onlyPart(read).items ?? [])])
+        : partsOf(read).map((part) =>
+            part.error === undefined
+              ? {
+                  package_name: part.name,
+                  objects: assembleList(part.name, [...(part.items ?? [])]),
+                }
+              : { package_name: part.name, error: part.error },
+          ),
+    ),
 };
 
 /**

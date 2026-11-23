@@ -65,8 +65,9 @@ export interface Group<I> {
 
 /**
  * Rows of one list: one per item, its cells from `columns`. The header —
- * the columns' names — is written before the list's first line: `always`,
- * only `when-rows`, or `none`. In a tree each row is indented by its depth
+ * the columns' names — is written before the list's first line: `always`
+ * (whenever the list is present, empty too), only `when-rows`, or `none`;
+ * an absent list writes nothing. In a tree each row is indented by its depth
  * and the item's own lists (`lists`) follow it, one level deeper.
  */
 export interface RowSpec<I> {
@@ -91,7 +92,12 @@ export function rows<I, K extends string>(
 ): Bound<Holding<K, I>, K> {
   return {
     key,
-    write: (reading, depth) => rowLines(itemsOf(reading, key), spec, depth),
+    // An absent list writes nothing, its header neither; an empty one its
+    // header where the spec asks for it.
+    write: (reading, depth) => {
+      const list = reading[key];
+      return list === undefined ? [] : rowLines(list, spec, depth);
+    },
   };
 }
 

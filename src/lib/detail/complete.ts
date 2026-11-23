@@ -245,6 +245,11 @@ export class Written<A> {
     );
   }
 
+  /** A written answer placed inside a larger one (its container's fields beside it), its items unchanged. */
+  static placed<B, C>(inner: Written<B>, place: (answer: B) => C): Written<C> {
+    return new Written(place(inner.answer), inner.identities);
+  }
+
   /** JSON answers in a list, each with the items it holds. */
   static each<A>(parts: readonly Written<A>[]): Written<A[]> {
     return new Written(

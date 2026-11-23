@@ -296,16 +296,31 @@ function outlineAnswers(
         },
       )(root);
     },
-    medium: ({ document, outline }) =>
-      outline === undefined
-        ? document
-        : {
-            success: true,
-            object_type: objectType,
-            object_name: objectName,
-            version,
-            outline: components(outline),
-          },
+    // Every component, each identified by its name and type as written, or
+    // nothing (`completeAnswer`); no outline read: the document as it came.
+    medium: ({ document, outline }: OutlineRead) => {
+      const root = outline === undefined ? undefined : components(outline);
+      if (outline === undefined) return document;
+      const rest = {
+        success: true,
+        object_type: objectType,
+        object_name: objectName,
+        version,
+      };
+      if (root === undefined) return { ...rest, outline: undefined };
+      return completeAnswer(
+        'GetObjectOutline',
+        componentIdentities,
+        (tree: AnsweredComponent) =>
+          Written.jsonTree(
+            rest,
+            { outline: tree },
+            (node) => node.children,
+            ['name', 'type'],
+            true,
+          ),
+      )(root);
+    },
     full: ({ document, outline }) => outline ?? document,
     raw: ({ document }) => document,
   };

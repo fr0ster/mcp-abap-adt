@@ -13,13 +13,18 @@ export type { AnswerDetail };
  * shapes the SUCCESS answer only; a failure carries everything at every level.
  */
 const LEVEL_WORDS =
-  'How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), ';
+  'How much of the answer to return, and in what form: "terse" (default) what a next call needs, its lists as TSV (a header, then a row per item) under "#" lines for the facts beside them; "medium" every item of the same lists, as JSON; "full" the tool\'s whole answer, as JSON; "raw" what SAP sent, as it sent it.';
 
-/** `detail` of a tool that reads one document: raw is that document. */
-const DETAIL_WORDS = `${LEVEL_WORDS}"raw" (the document as ADT sent it).`;
+/** `detail`: one text, the same on every tool (plan step 10.3). */
+export const DETAIL_WORDS = LEVEL_WORDS;
 
-/** `detail` of a tool that assembles reads: raw is the array of them, one read too. */
-const ASSEMBLED_DETAIL_WORDS = `${LEVEL_WORDS}"raw" (what ADT sent: a JSON array of the documents the call read, in read order, an array even for one).`;
+/**
+ * `detail` of a tool that assembles reads and is not yet assembled from its
+ * parts (plan step 10.7): the shared text, then what its raw is — which an
+ * assembled tool states as a fact of its own (`rawReturns`). Removed when
+ * the last such tool moves.
+ */
+const ASSEMBLED_DETAIL_WORDS = `${LEVEL_WORDS} At raw: everything SAP sent for the call, in the order it was read.`;
 
 /**
  * The `detail` field of a tool's zod input schema — a tool that reads one

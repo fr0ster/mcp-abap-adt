@@ -22,6 +22,7 @@ import {
 } from './auth/answerFailure';
 import { failureOf } from './auth/failures';
 import { callTransportRequest } from './callTransport';
+import { IncompleteAnswerError } from './detail/complete';
 import {
   type AnswerObject,
   type AnswerValue,
@@ -605,6 +606,11 @@ export function answerThrown(
   if (thrown instanceof SystemContextMissingError) {
     return local('system_context_missing', ctx, thrown.message);
   }
+  // A formatter of ours rendered other items than its reading held: no
+  // partial answer (`src/lib/detail/complete.ts`).
+  if (thrown instanceof IncompleteAnswerError) {
+    return local('incomplete_answer', ctx, thrown.message);
+  }
   return local('client_threw', ctx, messageOf(thrown), thrown);
 }
 
@@ -637,6 +643,9 @@ export async function answer<T, R>(
     // getError(), building the failure payload and serialising it — everything
     // the adapter does after the call returns. Naming it projection_threw would
     // point a reader at the projection for a defect that may be in any of them.
+    if (thrown instanceof IncompleteAnswerError) {
+      return local('incomplete_answer', ctx, thrown.message);
+    }
     return local('adapter_threw', ctx, messageOf(thrown), thrown);
   }
 }

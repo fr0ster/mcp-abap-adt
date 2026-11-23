@@ -29,6 +29,7 @@ import {
   systemKindOf,
 } from './connectionFactory.js';
 import { credentialFromSapConfig } from './credentialSources.js';
+import { IncompleteAnswerError } from './detail/complete';
 import type { SapEnvironment } from './handlers/interfaces';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
@@ -378,6 +379,23 @@ export function return_error(error: unknown): FailureAnswer {
   // the same payload the `answer()` path gives.
   const carried = methodFailureOf(error);
   if (carried !== undefined) return answerFailure(carried);
+  // A formatter of ours rendered other items than its reading held: the
+  // fixed words, no partial answer (`src/lib/detail/complete.ts`).
+  if (error instanceof IncompleteAnswerError) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            error: 'incomplete_answer',
+            tool: error.tool,
+            message: error.message,
+          }),
+        },
+      ],
+    };
+  }
   // A throw that carries its whole answer (several failures, each as it is).
   const payload = payloadCarriedBy(error);
   if (payload !== undefined) {

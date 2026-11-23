@@ -216,6 +216,152 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    9.10 **Gate and review.** The gate runs detached until `DONE fail=0`. Then push, then Codex,
    which gets this step's text as its scope.
 
+10. **Descriptions by construction** (owner, after Codex round 11). A tool's description has
+   drifted from what the tool returns whenever the code changed, and with `detail` any shape a
+   description states is wrong at the other levels. As step 9 did for completeness, the
+   description is assembled from parts the code already holds, and tests tie it to the output.
+
+   10.1 **The builder** (`src/lib/description/`, exported through `src/lib/description/index.ts`).
+   - `toolDescription({ purpose, returns, notes? })` is the only producer of a tool's
+     `description`. It joins the purpose sentence, the Returns facts (one sentence per fact, in
+     the order given) and the notes that apply to the tool, and nothing else. `TOOL_DEFINITION`
+     takes its result; a plain string literal for `description` is refused by a source scan
+     (10.6).
+   - `purpose` is the only free text: one sentence of what the tool does, written by hand, typed
+     as a branded `Purpose` made only by `purpose('…')`, which the purpose test checks (10.4).
+   - `returns` is a list of `ReturnsFact` values made only by the factories of 10.2; no free text
+     reaches it.
+   - `notes` are the existing shared sentences, each a typed note rather than a string appended
+     by hand: `withLongToolAdvice` (`src/lib/longTools.ts`) becomes the note `longRunning`,
+     `withBatchSentence` (`src/lib/batch/sentence.ts`) the note `batchable(tool)`. Their words stay
+     as they are; the two wrappers are removed once no caller remains, a source scan proving it.
+     Helpers that compute variant words (`activationParentDescription`,
+     `whereUsedTypeDescription`) stay, and are used by parameter descriptions only.
+   - The parameters stay in the input schema, described by zod as today. The description names no
+     parameter's shape; the generated docs list them from the schema.
+
+   10.2 **Returns from the writers' schemas** (`src/lib/description/returns.ts`, reading
+   `src/lib/detail/listing.ts`).
+   - Every binding factory of `listing.ts` (`rows`, `node`, `marks`, `sections`, `kinds`,
+     `within`, `bullets`, `parts`, `partsOf`, `headLines`, `wholeMarks`, `omitted`) and of the
+     JSON side (`entries`, `member`, `values`, `writtenValues`, `wholeEntries`) records, beside
+     its `write`, what it writes: the list's name, its kind (rows, mark lines, sections, a tree,
+     entries, values), its columns' names, the kinds and their specs, the child lists, and the
+     `omit` kinds with their reasons. A binding carries this as data, so the description and the
+     writer read one value.
+   - `returnsOf(schemas)` walks a tool's `RowSchemas` / `JsonSchemas` record and makes one fact
+     per list: "each <list> a row: <columns>", "each <kind> a `# <mark>` line", "a tree, each
+     node indented below its parent: <columns>", "<omitted kind>: left out at terse (<reason>)".
+     A tool states its schemas once, as a value both the writer and the description read; a
+     table whose schemas are built per call (from the reading's options: a description column,
+     a source column) states the variants as named schema records, and the description lists
+     each with the option that selects it.
+   - The heads a listing writes are typed too: each head label is declared beside the schemas
+     (`heads: ['package', 'count']`), and the description names them.
+   - The levels are not described per tool. One shared sentence (10.3) says what each level is;
+     a tool's Returns says only what its terse and medium lists hold.
+
+   10.3 **One text for `detail`** (`src/lib/strategies/detail.ts`).
+   - `DETAIL_WORDS` and `ASSEMBLED_DETAIL_WORDS` become one text, the same on every tool: terse
+     the lists as TSV under their `#` lines, medium the same lists as JSON, full the answer of
+     the tool before `detail`, raw what ADT sent. What raw is for a tool (one document, or every
+     document of the call in read order) is a Returns fact generated from the tool's wire kind
+     (`src/lib/detail/wire.ts`), not words on the parameter.
+   - The tools without `detail` carry no level words at all.
+
+   10.4 **The purpose sentence is checked** (`src/__tests__/unit/descriptions/purpose.test.ts`).
+   - Every registered tool's purpose (full, read-only and compact sets) is one sentence: it ends
+     with a single full stop and holds no other sentence end.
+   - It is at most 160 characters long.
+   - It holds none of the shape or mechanism markers, compared case-insensitively on word
+     boundaries: `{`, `}`, `[`, `]`, `` ` ``, `json`, `tsv`, `xml`, `list of`, `flat`, `tree`,
+     `array`, `row`, `column`, `entry`, `entries`, `batch`, `envelope`, `request`, `requests`,
+     `node structure`, `nodestructure`, `endpoint`, `parse`, `document`, `field`, `fields`,
+     `returns`, `answers`. The set lives in the test as one constant; adding a marker is a
+     reviewed change.
+   - A purpose may name the domain: object kinds, SAP terms, what the user gets (`the source of a
+     class`, `the objects of a package`, `where an object is used`).
+   - The compact descriptions (`src/lib/compact/compactDescriptions.ts`,
+     `handlerSystemDescription`) follow the same rule: each compact action's purpose is a
+     `Purpose`, and its Returns comes from the full tool it maps to.
+   - Mutation: a purpose holding `flat` or `{`, or of 161 characters, turns the test red.
+
+   10.5 **Description and output are tied** (`src/__tests__/unit/descriptions/returnsMatch.test.ts`).
+   - For every tool on the writers, the test runs its golden fixtures (`terse-goldens.json`,
+     `shipped-readings.json`) at terse and medium and reads what was written: the header columns,
+     the `#` heads and marks, the JSON member names. Every one of them is named in the tool's
+     generated Returns, and the Returns names nothing that no fixture of the tool writes.
+   - A fixture set that does not reach a list or a kind the schemas declare fails the test,
+     naming the list: the fixtures must cover every declared list.
+   - Mutations: a column added to a writer and not to its schemas does not compile; a column
+     removed from a schema leaves its description, and a fixture still writing it turns the test
+     red; a description fact added by hand does not compile (no factory makes one).
+
+   10.6 **Every tool assembled** (source scan in `src/__tests__/unit/sources/descriptions.test.ts`).
+   - No `TOOL_DEFINITION.description` (and no compact action description) is a string literal or
+     a template; each is a `toolDescription(…)` call.
+   - The tools not on the writers get the assembled form with a Returns built as follows; each
+     group's Returns factory lives in `src/lib/description/` and reads a typed value, never words:
+     - **Source readers** (GetClass, GetProgram, GetInterface, GetInclude, GetFunctionModule,
+       GetFunctionInclude, GetDdl, GetBehaviorDefinition, GetBehaviorImplementation,
+       GetMetadataExtension, GetServiceDefinition, GetLocal* of a class, GetEnhancementImpl,
+       GetObjectDraft, GetObjectVersionSource, GetTextElements): from the source-read result type
+       (`sourceReturns`): the source text, and the version read.
+     - **Metadata readers** (GetDomain, GetDataElement, GetStructure, GetTable, GetTableType,
+       GetTableSettings, GetFunctionGroup, GetMessageClass, GetMessageClassMessage,
+       GetServiceBinding, GetEnhancementSpot, GetTypeInfo, GetObjectInfo,
+       GetObjectNodeFromCache, GetNodeStructureLow, GetVirtualFoldersLow,
+       GetServiceBindingPreviewUrl, ListServiceBindingTypes, GetObjectVersionDiff): from each
+       reader's result interface: its members' names, as the JSON writer's facts are named.
+     - **Create, Update, Delete** (every `Create*`, `Update*`, `Delete*` and the `*Low` writes):
+       from the CRUD result type of `src/lib/answer.ts` (`crudReturns`): the object named, its
+       state after the write, the lock and transport facts it reports.
+     - **Check, Validate, Activate** (every `Check*`, `Validate*`, `Activate*`, the `*Low`
+       variants, ActivateObjects): from the check and activation result types: the verdict and
+       each message.
+     - **Runs and results** (RunUnitTest and the other unit-test runs, Get*UnitTestResult and
+       Status, RunATC, GetATCRunStatus, ListATCResults, RuntimeRunClass, RuntimeRunProgram, the
+       profiler tools, RuntimeGetDumpById): from each run's result type.
+     - **Sessions and transports** (SessionOpen, SessionClose, ListLeftoverSessions,
+       LogoffLeftoverSession, the background runs, AddTransportObject, CreateTransport,
+       CreateTransportTask, MoveTransportObjects, RemoveTransportObject,
+       SortAndCompressTransportTask): from their result types.
+     - **Debugger** (every `Debug*`, `Amdp*`, `MemorySnapshot*`): from the debugger answer types.
+     - **No typed result** (GetSqlQuery, GetTableContents, where the answer is SAP's data as it
+       came): Returns is the fixed fact "SAP's data as it answers it", and the plan's follow-up
+       types their results before their next change. Any other tool found without a typed result
+       while 10.7 runs is listed in the PR and gets the same fixed fact until it is typed; none is
+       given free words.
+   - Mutation: a description written as a literal turns the scan red.
+
+   10.7 **Migration, group by group.** One commit series per group, each with its tests first:
+   (1) the builder, the shared `detail` text and the tests of 10.4–10.6 with an allowlist of the
+   tools not yet moved, shrinking with each group; (2) the tools on the writers, in the order of
+   9.3–9.7; (3) source readers; (4) metadata readers; (5) CRUD; (6) check, validate and activate;
+   (7) runs and results; (8) sessions and transports; (9) debugger; (10) compact; (11) the
+   allowlist removed. Each group regenerates the tool docs (`npm run docs:tools`:
+   AVAILABLE_TOOLS and the compact docs), the listed-schemas fixtures
+   (`tests/fixtures/tools/listed-schemas.json`, `rebuilt-descriptions.json`) and the goldens
+   through their writers, and names the regenerated files in its commit.
+
+   10.8 **Retrieval stays as good.** Tool selection does not read the description alone: the
+   search texts (`tools/tool-search.json`: keywords and semantic sentences) are unchanged by this
+   step. The purpose sentence keeps the domain words of the description it replaces (the object
+   kinds, the SAP terms), which a reviewer checks per group against the old text. The BM25
+   retrieval test and the held-out baseline (`src/__tests__/unit/descriptions/toolRetrieval.test.ts`)
+   run in every group's gate; a held-out query getting worse fails it. The vector retrieval test
+   (`toolRetrievalVectors.test.ts`, local Ollama) is run by the controller once after the last
+   group, its result in the PR.
+
+   10.9 **Review.** Each group's commits list the old and the new description of every tool they
+   move, side by side, in the PR, so the owner can read the change in words. Codex reviews after
+   group (1) (the builder, the tests and the marker set), after group (2) (the tools on the
+   writers), and after group (11), each time with this step's text as its scope. The CHANGELOG
+   entry states that descriptions are assembled from the writers' schemas and what a consumer
+   reading a description's shape should read instead (`detail` and the Returns facts).
+
+   10.10 **Gate.** The gate runs detached until `DONE fail=0` after each group, then push.
+
 ## Upstream items (adt-strategies, separate)
 
 None left: every site reads with its shipped reading (adt-strategies 0.28.1).
@@ -230,5 +376,5 @@ included. Two tools this PR did not change, and which take no `detail`, keep the
 ## Order and review
 
 One PR, `feat/terse-answers`. Steps 1–2 first, since they touch every answer and lower the risk of
-the rest, then 3–5, then 6–8, then 9 once the owner approves it. Codex reviews after steps 2, 5, 8 and 9. The PR merges before 24.2.0 is
+the rest, then 3–5, then 6–8, then 9 once the owner approves it, then 10 once the owner approves it. Codex reviews after steps 2, 5, 8 and 9, and within step 10 as 10.9 states. The PR merges before 24.2.0 is
 tagged.

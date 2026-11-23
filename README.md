@@ -255,7 +255,9 @@ row SAP answered is answered. `detail` has four levels:
   `GetWhereUsed` for several `objects`, `GetUnitTest`, `GetCdsUnitTest`, the paged runtime feeds
   and several `feed_types` — answers a JSON array of the wire documents, in the order they were
   read, each as ADT sent it: no parse, no projection, nothing of ours mixed in. `full` is the
-  whole parse, and the two levels never give the same answer.
+  whole parse, and the two levels never give the same answer. `CreateTransport` answers the
+  create's document and the request read back: at raw a failed read-back shows as the missing
+  document, and the note naming the failure is at `terse`, `medium` and `full`.
 
 JSON answers are minified. A compact tool answers as the full tool it reads through, at every
 level.

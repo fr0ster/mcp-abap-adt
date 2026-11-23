@@ -203,13 +203,13 @@ describe('the coverage ledger guard', () => {
         key: 'CheckAbapGitRepo',
         kind: 'onprem',
         reason:
-          "SAP's on-premise abapGit handler cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); the live case asserts that refusal whole, 500 with no T100 key",
+          'on the onprem system named by abapgit.check_repo_fault_system, whose abapGit cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); there the live case asserts that refusal whole, 500 with no T100 key, and on any other system it must answer — the ledger cannot name a system, so this row stands for every onprem run',
       },
       {
         key: 'HandlerAbapGitGet#checks',
         kind: 'onprem',
         reason:
-          "SAP's on-premise abapGit handler cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); the live case asserts that refusal whole, 500 with no T100 key",
+          'on the onprem system named by abapgit.check_repo_fault_system, whose abapGit cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); there the live case asserts that refusal whole, 500 with no T100 key, and on any other system it must answer — the ledger cannot name a system, so this row stands for every onprem run',
       },
       {
         key: 'HandlerActivate#PROGRAM_TEXT_ELEMENTS',

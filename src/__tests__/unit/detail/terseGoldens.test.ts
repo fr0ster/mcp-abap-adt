@@ -20,6 +20,7 @@ import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/ha
 import { handleListFunctionGroupIncludes } from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleGetIncludesList } from '../../../handlers/include/readonly/handleGetIncludesList';
+import { handleGetMainPrograms } from '../../../handlers/include/readonly/handleGetMainPrograms';
 import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
@@ -543,6 +544,18 @@ CASES['GetWhereUsed two objects, one refused'] = async (detail) =>
         ],
         detail,
       } as never,
+    ),
+  );
+
+CASES['GetMainPrograms two programs and a group'] = async (detail) =>
+  answeredOf(
+    await handleGetMainPrograms(
+      ctx([
+        {
+          data: `${xmlHead}<adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:objectReference adtcore:uri="/sap/bc/adt/programs/programs/zprog" adtcore:type="PROG/P" adtcore:name="ZPROG"/><adtcore:objectReference adtcore:uri="/sap/bc/adt/programs/programs/zprog2" adtcore:type="PROG/P" adtcore:name="#ZPROG2"/><adtcore:objectReference adtcore:uri="/sap/bc/adt/functions/groups/zfg" adtcore:type="FUGR/F" adtcore:name="ZFG"/></adtcore:objectReferences>`,
+        },
+      ]) as never,
+      { include_name: 'zinc', detail } as never,
     ),
   );
 

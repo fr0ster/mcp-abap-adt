@@ -322,5 +322,17 @@
   "GetWhereUsed two objects, one refused @full": {
     "isError": false,
     "text": "[{\"object_name\":\"ZCL_X\",\"object_type\":\"CLAS/OC\",\"enable_all_types\":false,\"total_references\":4,\"result_description\":\"Where-Used List: ZCL_X (Class)\",\"references\":[{\"name\":\"ZPKG\",\"type\":\"DEVC/K\",\"uri\":\"/sap/bc/adt/packages/zpkg\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\"},{\"name\":\"ZCL_USER\",\"type\":\"CLAS/OC\",\"uri\":\"/sap/bc/adt/oo/classes/zcl_user\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeProductive\"},{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog\",\"package_name\":\"ZPKG\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect,includeTest\"},{\"name\":\"ZIF_X\",\"type\":\"INTF/OI\",\"uri\":\"/sap/bc/adt/oo/interfaces/zif_x\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"\"},{\"name\":\"\",\"type\":\"CLAS/OC\",\"uri\":\"/sap/bc/adt/oo/classes/nameless\",\"package_name\":\"ZOTHER\",\"responsible\":\"SAPUSER01\",\"usage_information\":\"gradeDirect\"}]},{\"object_name\":\"ZCL_GONE\",\"object_type\":\"CLAS/OC\",\"error\":{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read where-used\",\"status\":403,\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}}]"
+  },
+  "GetMainPrograms two programs and a group @terse": {
+    "isError": false,
+    "text": "# include ZINC\ntype\tname\nPROG/P\tZPROG\nPROG/P\t#ZPROG2\nFUGR/F\tZFG"
+  },
+  "GetMainPrograms two programs and a group @medium": {
+    "isError": false,
+    "text": "{\"include_name\":\"ZINC\",\"main_programs\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\"},{\"name\":\"#ZPROG2\",\"type\":\"PROG/P\"},{\"name\":\"ZFG\",\"type\":\"FUGR/F\"}]}"
+  },
+  "GetMainPrograms two programs and a group @full": {
+    "isError": false,
+    "text": "{\"success\":true,\"include_name\":\"ZINC\",\"main_programs\":[{\"name\":\"ZPROG\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog\"},{\"name\":\"#ZPROG2\",\"type\":\"PROG/P\",\"uri\":\"/sap/bc/adt/programs/programs/zprog2\"},{\"name\":\"ZFG\",\"type\":\"FUGR/F\",\"uri\":\"/sap/bc/adt/functions/groups/zfg\"}]}"
   }
 }

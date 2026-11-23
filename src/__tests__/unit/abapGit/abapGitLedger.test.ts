@@ -24,6 +24,7 @@ import {
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, it, mock } from 'node:test';
+import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 
 // The module object itself (not a namespace copy), so mock.method reaches the helper's calls.
@@ -573,18 +574,22 @@ describe("the system's identity", () => {
 });
 
 describe("the runner's stop request", () => {
-  // Bounded: a missed stop file must fail the case, never hang the run.
-  it('aborts the wait signal when the stop file appears, and at once when it is there', {
-    timeout: 10_000,
-  }, async () => {
+  it('aborts the wait signal when the stop file appears, and at once when it is there', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
     try {
       const stopFile = join(dir, 'stop');
       const stop = stopSignalOf(stopFile);
       assert.equal(stop.signal.aborted, false);
-      const aborted = once(stop.signal, 'abort');
+      // Bounded by the case itself: a missed stop file fails it, never hangs the run.
+      const bound = new AbortController();
+      const aborted = once(stop.signal, 'abort').then(() => 'aborted');
       writeFileSync(stopFile, 'interrupted');
-      await aborted;
+      const first = await Promise.race([
+        aborted,
+        delay(10_000, 'missed', { signal: bound.signal }).catch(() => 'missed'),
+      ]);
+      bound.abort();
+      assert.equal(first, 'aborted', 'the stop file was missed');
       stop.close();
       assert.equal(stopSignalOf(stopFile).signal.aborted, true);
       assert.equal(stopSignalOf(undefined).signal.aborted, false);
@@ -631,9 +636,7 @@ describe("the runner's stop request: polling, no FSEvents", () => {
     }
   });
 
-  it('an open watch keeps no process alive: a node that opens one and returns exits by itself', {
-    timeout: 20_000,
-  }, async () => {
+  it('an open watch keeps no process alive: a node that opens one and returns exits by itself', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
     try {
       const helper = require.resolve('../../integration/helpers/abapGitLedger');

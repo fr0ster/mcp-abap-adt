@@ -35,7 +35,8 @@ import {
   answerAt,
   completeAnswer,
   identityOf,
-  tsv,
+  type ListedPart,
+  listedText,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -387,27 +388,30 @@ function heldFeedItems(shown: FeedShown): string[] {
 const terseFeed = completeAnswer(
   'RuntimeListFeeds',
   heldFeedItems,
-  (shown: FeedShown): Written<string> => {
-    const { columns, identity, rows } = feedRows(shown);
-    const paged =
-      shown.feed === 'descriptors' || shown.feed === 'variants'
-        ? { next_to: undefined, incomplete_second: undefined }
-        : shown.answered;
-    return Written.text(
-      [
-        { head: 'feed', value: shown.feed },
-        { head: 'count', value: String(shown.answered.count) },
-        ...(paged.next_to ? [{ head: 'next_to', value: paged.next_to }] : []),
-        ...(paged.incomplete_second
-          ? [{ head: 'incomplete_second', value: paged.incomplete_second }]
-          : []),
-        { header: columns },
-        ...rows.map((row) => ({ row })),
-      ],
-      identity,
-    );
-  },
+  (shown: FeedShown) => terseFeedText(shown),
 );
+
+/** A feed's terse text: its `# feed`, `# count` and paging lines, then its rows. */
+function terseFeedText(shown: FeedShown): Written<string> {
+  const { columns, identity, rows } = feedRows(shown);
+  const paged =
+    shown.feed === 'descriptors' || shown.feed === 'variants'
+      ? { next_to: undefined, incomplete_second: undefined }
+      : shown.answered;
+  return Written.text(
+    [
+      { head: 'feed', value: shown.feed },
+      { head: 'count', value: String(shown.answered.count) },
+      ...(paged.next_to ? [{ head: 'next_to', value: paged.next_to }] : []),
+      ...(paged.incomplete_second
+        ? [{ head: 'incomplete_second', value: paged.incomplete_second }]
+        : []),
+      { header: columns },
+      ...rows.map((row) => ({ row })),
+    ],
+    identity,
+  );
+}
 
 /**
  * What `RuntimeListFeeds` answers at each `detail`, selected by the handler
@@ -421,7 +425,31 @@ const FEED_ANSWERS: AnswerTable<FeedShown, string | object> = {
   raw: (shown) => shown.answered,
 };
 
+/**
+ * Each answered feed's read, by the answer it became: a list call writes
+ * every feed's terse text from these through `Written`, never by splicing
+ * the single answers' texts.
+ */
+const readsOf = new WeakMap<McpResult, FeedShown>();
+
+/** One feed's answer at its level, its read kept for a list call. */
 async function feedsOf(
+  context: HandlerContext,
+  args: RuntimeListFeedsArgs,
+  shown: (feed: FeedShown) => string | object,
+): Promise<McpResult> {
+  const seen: { read?: FeedShown } = {};
+  const result = await feedOf(context, args, (feed) => {
+    seen.read = feed;
+    return shown(feed);
+  });
+  if (seen.read !== undefined && !result.isError) {
+    readsOf.set(result, seen.read);
+  }
+  return result;
+}
+
+async function feedOf(
   context: HandlerContext,
   args: RuntimeListFeedsArgs,
   shown: (feed: FeedShown) => string | object,
@@ -888,15 +916,23 @@ function listAnswer(
   terse: boolean,
 ): McpResult {
   if (terse) {
-    // Each feed's terse answer begins with its own `# feed` line; a failure
-    // is named under the feed asked, its payload as JSON.
-    const text = results
-      .map((result, i) =>
-        result.isError
-          ? `# feed ${feedTypes[i] ?? ''}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
-          : (result.content[0]?.text ?? ''),
-      )
-      .join('\n');
+    // Every feed's text through `Written`: a failure under its escaped
+    // `# feed` line and one `# error` line; an answered one as its own
+    // terse writer writes it.
+    const text = listedText(
+      'RuntimeListFeeds',
+      results.map((result, i): ListedPart<FeedShown> => {
+        const read = readsOf.get(result);
+        return result.isError || read === undefined
+          ? {
+              heads: [{ head: 'feed', value: feedTypes[i] ?? '' }],
+              error: JSON.stringify(payloadOfAnswer(result)),
+            }
+          : { heads: [], read };
+      }),
+      heldFeedItems,
+      terseFeedText,
+    );
     return { isError: false, content: [{ type: 'text', text }] };
   }
   const entries = results.map((result, i) =>

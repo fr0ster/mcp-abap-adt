@@ -217,7 +217,7 @@ Each of these refuses the call in fixed words; nothing is sent but the reads its
 | a pull's `overwrite` naming one object twice | `abapgit_overwrite_duplicate` |
 | a pull's `overwrite` on premise, whose pull takes no selection | `abapgit_overwrite_not_declared` |
 | a pull's `overwrite` naming an object the modified-objects list does not hold (the repository list and the modified-objects list read, no pull) | `abapgit_overwrite_not_listed` |
-| a pull's `overwrite` naming a name the modified-objects list holds under two types: SAP selects by name (the repository list and the modified-objects list read, no pull) | `abapgit_overwrite_ambiguous` |
+| a pull's `overwrite` naming a name the modified-objects list holds under two types, in one of its two lists or across both: SAP selects by name within each list (the repository list and the modified-objects list read, no pull) | `abapgit_overwrite_ambiguous` |
 | a `url` that is no URL written as the URL parser writes it, or carries a user, a password, a query, a fragment or a dot segment | `abapgit_url_refused` |
 | `x-abapgit-*` headers that state no approved endpoint | `abapgit_endpoint_refused` |
 | a system whose discovery does not list abapGit, or cannot be read | `abapgit_not_served` |

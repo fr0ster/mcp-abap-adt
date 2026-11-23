@@ -444,7 +444,8 @@ operation is offered where that system's abapGit serves it:
   (changed in the system), and add, delete, re-create, package move — and as package warnings the
   objects whose package in the system differs from the one their path maps to. On ABAP Cloud a pull
   without a selection hands SAP's job the whole list, and the job brings each object to its remote
-  version. `PullAbapGitRepo` (compact `pull`) takes `overwrite`, on the cloud only: the listed
+  version, a package warning with action `5` excepted (SAP sets it to not imported whatever is
+  selected). `PullAbapGitRepo` (compact `pull`) takes `overwrite`, on the cloud only: the listed
   objects to overwrite, each once, by its type and name as the list answers them. The server reads
   the list and sends the named entries as it answered them. SAP's job then recomputes the list when
   it runs and selects by **name** alone. Of the objects not named, a remote-only add or update is
@@ -456,7 +457,8 @@ operation is offered where that system's abapGit serves it:
   nothing sent; SAP's on-premise pull takes no selection and overwrites them all), an object named
   twice (`abapgit_overwrite_duplicate`, nothing sent), and after the repository list and the
   modified-objects read, an object the list does not hold (`abapgit_overwrite_not_listed`) or a
-  name it holds under two types (`abapgit_overwrite_ambiguous`: SAP could take both).
+  name it holds under two types, in one list or across both (`abapgit_overwrite_ambiguous`: SAP
+  selects by name within each list, the server refuses any collision).
 - **A close cuts SAP's dialog mid-import.** Closing an SSE stream or a stdio server logs its
   connections off, a running background run's included, and the logoff ends SAP's dialog where it
   stands: an on-premise link or pull under way leaves a partly imported package. A Streamable HTTP
@@ -465,12 +467,11 @@ operation is offered where that system's abapGit serves it:
   branch, and an on-premise pull the branch the repository is linked on, both with every overwrite
   and every "object of another package" decision set to yes — objects changed in the system are
   overwritten, subpackages are created as the folder logic derives them, and objects held by other
-  packages are written too. A cloud link writes the link only. A cloud pull imports every object
-  changed in the remote, as inactive objects, and, given a transport request, creates a task in it
+  packages are written too. A cloud link writes the link only. A cloud pull imports as inactive objects, and, given a transport request, creates a task in it
   for the user who has none. A push writes a commit in the remote and nothing in the system;
-  `SwitchAbapGitBranch` with `create: true` creates the branch in the remote. SAP's selective pull
-  decides only for objects changed in the system: a change made only in the remote is always
-  imported (measured). No selective pull is offered.
+  `SwitchAbapGitBranch` with `create: true` creates the branch in the remote. A cloud pull given
+  `overwrite` imports, of the listed objects outside the selection, the remote-only adds and updates
+  only (measured for an update; the rest read in SAP's code); see the entry above.
 - **Link and pull are refused under access restrictions.** While any `allowed-packages` or
   `allowed-requests` entry is configured, link and pull (full and compact) are refused
   `abapgit_import_not_allowed`, nothing sent: what they write is not bounded by the packages and

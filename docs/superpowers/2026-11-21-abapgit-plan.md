@@ -533,7 +533,7 @@ batch (owner, 2026-11-22).
 arguments, no credential argument, functional descriptions; `ListAbapGitRepos` with §9.2 (a)
 filters. Test `abapGitTools.test.ts`: schemas per variant, `-ro` set, deny entries, each handler's
 request; answers as the reading's JSON; **R1's branch passed to pull** (`PullAbapGitRepo` sends the
-entry's `branchName`, and its request carries no selection — `repo.v3`, never `pull.req.v1`); **the server never selects a legacy form** (a recording client stand-in:
+entry's `branchName`; without `overwrite` its request carries no selection — `repo.v3` — and on the cloud with `overwrite` it sends `pull.req.v1`, superseding the earlier "never `pull.req.v1`" (owner, 2026-11-23)); **the server never selects a legacy form** (a recording client stand-in:
 only new forms and `unlink`, `link` / `checkExternalRepo` always with a `credentials` key, object or
 `null`); cloud pull/push "accepted" after one request, onprem "done" in the call. First failure:
 tools absent. Mutations: send a fixed branch → red; add `SwitchAbapGitBranch` to cloud → red.

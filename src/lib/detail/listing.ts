@@ -336,11 +336,11 @@ export function parts<I, K extends string>(
 }
 
 /** A JSON schema bound to the list `K` of a reading `R`: one entry per item it holds, or nothing when it is absent. */
-export interface JsonBound<R, K> {
+export interface JsonBound<R, K, E extends object = object> {
   readonly key: K;
   /** The member the entries are written under in the answer. */
   readonly as: string;
-  readonly write: (reading: R) => readonly object[] | undefined;
+  readonly write: (reading: R) => readonly E[] | undefined;
 }
 
 /** One JSON schema for every list of `R`, each bound to its own key: a list without one is a compile error. */
@@ -351,16 +351,16 @@ export type JsonSchemas<R> = { readonly [K in ListKeys<R>]: JsonBound<R, K> };
  * members from `entry`, then its own lists (`lists`), each under its name.
  * An absent list writes no member; an empty one, `[]`.
  */
-export function entries<I, K extends string>(
+export function entries<I, K extends string, E extends object>(
   key: K,
-  entry: (item: I) => object,
+  entry: (item: I) => E,
   options?: {
     readonly as?: string | undefined;
     readonly lists?: JsonSchemas<I> | undefined;
     /** An empty list writes no member, as an absent one (a tree's leaf, medium). */
     readonly omitEmpty?: boolean | undefined;
   },
-): JsonBound<Holding<K, I>, K> {
+): JsonBound<Holding<K, I>, K, E> {
   return {
     key,
     as: options?.as ?? key,
@@ -409,10 +409,10 @@ export function writeJson<R, A extends object, B extends object>(
 }
 
 /** The only writer of a JSON array answer: one entry per item of the reading's list. */
-export function writeJsonList<R, K extends ListKeys<R>>(
+export function writeJsonList<R, K extends ListKeys<R>, E extends object>(
   reading: R,
-  list: JsonBound<R, K>,
-): Written<readonly object[]> {
+  list: JsonBound<R, K, E>,
+): Written<readonly E[]> {
   return Written.answerOf(list.write(reading) ?? []);
 }
 

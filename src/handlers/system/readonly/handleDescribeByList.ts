@@ -53,12 +53,13 @@ import {
 import {
   type AnswerTable,
   answerAt,
+  type Column,
   cellsOf,
-  completeAnswer,
-  identityOf,
-  type Line,
-  Written,
+  entries,
+  kinds,
   wireAnswer,
+  writeJsonList,
+  writeListing,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -167,16 +168,18 @@ interface DescribedItem {
 
 /**
  * One content entry per object asked, in order — its results, its failure,
- * or `found: false` for one no search found — or nothing
- * (`completeAnswer`); each entry identified by its text as written.
+ * or `found: false` for one no search found — written by the listing
+ * writer from the items, one entry each.
  */
-const fullDescribed = completeAnswer(
-  'DescribeByList',
-  (items: readonly DescribedItem[]) =>
-    items.map((item) => identityOf([item.described.entry.text])),
-  (items: readonly DescribedItem[]): Written<McpResult> =>
-    Written.content(items.map((item) => item.described.entry)),
-);
+const fullDescribed = (items: readonly DescribedItem[]): McpResult => ({
+  isError: false,
+  content: [
+    ...writeJsonList(
+      { items },
+      entries('items', (item: DescribedItem) => item.described.entry),
+    ).answer,
+  ],
+});
 
 /** The hit rows a search answered for an object, read back into their cells. */
 const hitRowsOf = ({ described }: DescribedItem): string[][] =>
@@ -192,18 +195,22 @@ const failureWords = ({ obj, described }: DescribedItem): string[] => [
   JSON.stringify(described.failure),
 ];
 
+/** One line of the terse TSV: a hit row an object was described with, or a refused search. */
+type DescribedLine =
+  | { readonly kind: 'row'; readonly cells: readonly string[] }
+  | { readonly kind: 'error'; readonly item: DescribedItem };
+
 /**
- * Every item SAP answered at terse: each hit row it described an object
- * with, and each refused search. A name SAP did not describe is no item:
- * terse does not say what is absent (the owner's rule) — medium and full do.
+ * The lines of every object SAP answered: each hit row it described an
+ * object with, and each refused search. A name SAP did not describe has no
+ * line: terse does not say what is absent (the owner's rule) — medium and
+ * full do.
  */
-const heldAnswered = (items: readonly DescribedItem[]) =>
-  items.flatMap((item) =>
+const describedLines = (items: readonly DescribedItem[]): DescribedLine[] =>
+  items.flatMap((item): DescribedLine[] =>
     item.described.failure !== undefined
-      ? [identityOf(['error', ...failureWords(item)])]
-      : hitRowsOf(item).map((cells) =>
-          identityOf([cells[0] ?? '', cells[1] ?? '']),
-        ),
+      ? [{ kind: 'error', item }]
+      : hitRowsOf(item).map((cells): DescribedLine => ({ kind: 'row', cells })),
   );
 
 /**
@@ -217,26 +224,46 @@ const heldAnswered = (items: readonly DescribedItem[]) =>
  * as the responses (`wireAnswer`).
  */
 const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
-  terse: completeAnswer(
-    'DescribeByList',
-    heldAnswered,
-    (items: readonly DescribedItem[]): Written<McpResult> =>
-      Written.asText(
-        Written.text(
-          [
-            { header: ['name', 'type', 'description', 'package'] },
-            ...items.flatMap((item): Line[] =>
-              item.described.failure !== undefined
-                ? [{ mark: 'error', words: failureWords(item) }]
-                : // The search's own hit rows; an object SAP did not
-                  // describe has none, and no line.
-                  hitRowsOf(item).map((row) => ({ row })),
+  terse: (items) => ({
+    isError: false,
+    content: [
+      {
+        type: 'text',
+        text: writeListing({
+          heads: [],
+          reading: { lines: describedLines(items) },
+          lists: {
+            lines: kinds(
+              'lines',
+              (line: DescribedLine) => line.kind,
+              {
+                row: {
+                  row: {
+                    columns: [0, 1, 2, 3].map(
+                      (i): Column<DescribedLine> => ({
+                        name: String(i),
+                        cell: (line) =>
+                          line.kind === 'row' ? (line.cells[i] ?? '') : '',
+                        when: (line) =>
+                          line.kind === 'row' && i < line.cells.length,
+                      }),
+                    ),
+                    header: 'none',
+                  },
+                },
+                error: {
+                  mark: 'error',
+                  words: (line: DescribedLine) =>
+                    line.kind === 'error' ? failureWords(line.item) : [],
+                },
+              },
+              ['name', 'type', 'description', 'package'],
             ),
-          ],
-          [0, 1],
-        ),
-      ),
-  ),
+          },
+        }).answer,
+      },
+    ],
+  }),
   medium: fullDescribed,
   full: fullDescribed,
   raw: fullDescribed,

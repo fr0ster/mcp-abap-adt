@@ -179,4 +179,48 @@ describe('a list call at terse: every line through Written', () => {
     assert.equal(result.isError, false, result.content[0]?.text);
     assertWritten(result);
   });
+
+  // Codex round 9: every entry SAP's level holds is a row or a line —
+  // incomplete objects and nodes not loaded included — with its
+  // description where asked; the text is pinned whole.
+  it('GetObjectsByType: every entry of the level, descriptions included', async () => {
+    const node = (inner: string) =>
+      `<SEU_ADT_REPOSITORY_OBJ_NODE>${inner}</SEU_ADT_REPOSITORY_OBJ_NODE>`;
+    const LEVEL = `<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT>${[
+      node(
+        '<OBJECT_TYPE>CLAS/OC</OBJECT_TYPE><OBJECT_NAME>ZCL_A</OBJECT_NAME><TECH_NAME>ZCL_A</TECH_NAME><OBJECT_URI>/sap/bc/adt/oo/classes/zcl_a</OBJECT_URI><DESCRIPTION>First</DESCRIPTION>',
+      ),
+      node(
+        '<OBJECT_TYPE>CLAS/OC</OBJECT_TYPE><OBJECT_NAME/><OBJECT_URI>/sap/bc/adt/oo/classes/nameless</OBJECT_URI>',
+      ),
+      node('<OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME>'),
+      node('<OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME>'),
+    ].join('')}</TREE_CONTENT></DATA></asx:values></asx:abap>`;
+    const connection = recordingConnection([{ data: LEVEL }]);
+    declareSystemKind(connection, 'onprem');
+    const result = await handleGetObjectsByType(
+      { connection, logger: undefined } as never,
+      {
+        parent_name: 'ZPKG',
+        parent_tech_name: 'ZPKG',
+        parent_type: 'DEVC/K',
+        node_id: '000029',
+        with_short_descriptions: true,
+      } as never,
+    );
+    assert.equal(result.isError, false, result.content[0]?.text);
+    assert.equal(
+      result.content[0]?.text,
+      [
+        '# parent DEVC/K ZPKG',
+        '# node_id 000029',
+        '# count 4',
+        'type\tname\ttech_name\turi\tdescription',
+        'CLAS/OC\tZCL_A\t\t\tFirst',
+        'CLAS/OC\t\t\t/sap/bc/adt/oo/classes/nameless\t',
+        '# not loaded by SAP',
+        '# not loaded by SAP',
+      ].join('\n'),
+    );
+  });
 });

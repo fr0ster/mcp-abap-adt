@@ -5,7 +5,7 @@ export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and, for an object listed by its uri alone, that uri.',
+    '[read-only] Lists the objects of one type (classes, tables, programs, interfaces, etc.), the type whose node in the object tree is named by node_id, under the package or composite object named by parent_name, parent_tech_name and parent_type. Answers TSV under `# parent`, `# node_id` and `# count` lines: a row per object, its type, name, the technical name where it differs from the name and, for an object listed by its uri alone, that uri — with with_short_descriptions, its description too; a node SAP could not load is its `# not loaded by SAP` line.',
   inputSchema: z.object({
     parent_name: z.string().describe('[read-only] Parent object name'),
     parent_tech_name: z.string().describe('[read-only] Parent technical name'),
@@ -15,12 +15,14 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on the node reading below.",
+        "[read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility and answers the same TSV.",
       ),
     with_short_descriptions: z
       .boolean()
       .optional()
-      .describe('[read-only] Include short descriptions'),
+      .describe(
+        '[read-only] Include short descriptions (default true): a description column on each row',
+      ),
   }),
 } as const;
 
@@ -39,6 +41,7 @@ import {
 } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
+  NOT_LOADED_BY_SAP,
   type NodeItem,
   type NodeLevel,
   nodeItemsOf,
@@ -58,6 +61,7 @@ function formatObjects(
   nodeId: string,
   parentType: string,
   parentName: string,
+  descriptions: boolean,
 ): { text: string; cached: CachedObject[] } {
   const objects = nodeItemsOf(level);
   const cached = objects.map((o) => ({
@@ -68,39 +72,68 @@ function formatObjects(
     ...(o.description ? { DESCRIPTION: o.description } : {}),
   }));
 
-  // Every object SAP listed under the node, as TSV through `Written`:
-  // names escaped, each row an item the guard counts.
+  // Every entry SAP listed under the node — its objects, complete or not,
+  // and each node it could not load — as TSV through `Written`: names
+  // escaped, each row an item the guard counts against the level as SAP
+  // answered it (`heldOf`), its description included where asked.
+  const notLoaded = level.notLoaded ?? [];
+  const columns = descriptions ? 5 : 4;
   const text = completeAnswer(
     'GetObjectsByType',
-    () => objects.map(itemIdentity),
+    () => heldOf(level, descriptions),
     () =>
       Written.text(
         [
           { head: 'parent', value: `${parentType} ${parentName}` },
           { head: 'node_id', value: nodeId },
-          { head: 'count', value: String(objects.length) },
-          { header: ['type', 'name', 'tech_name', 'uri'] },
-          ...objects.map((o): Line => ({ row: itemCells(o) })),
+          { head: 'count', value: String(objects.length + notLoaded.length) },
+          {
+            header: descriptions
+              ? ['type', 'name', 'tech_name', 'uri', 'description']
+              : ['type', 'name', 'tech_name', 'uri'],
+          },
+          ...objects.map((o): Line => ({ row: itemCells(o, descriptions) })),
+          ...notLoaded.map(
+            (): Line => ({ mark: NOT_LOADED_BY_SAP, words: [] }),
+          ),
         ],
-        [0, 1, 2, 3],
+        Array.from({ length: columns }, (_, i) => i),
       ),
   )(undefined);
   return { text, cached };
 }
 
-/** A row's cells: the technical name where it is not the name, the URI of a nameless object. */
-function itemCells(o: NodeItem): string[] {
-  return [
+/** A row's cells: the technical name where it is not the name, the URI of a nameless object, the description where asked. */
+function itemCells(o: NodeItem, descriptions: boolean): string[] {
+  const cells = [
     o.type,
     o.name,
     o.techName !== undefined && o.techName !== o.name ? o.techName : '',
     o.name === '' ? (o.uri ?? '') : '',
   ];
+  return descriptions ? [...cells, o.description ?? ''] : cells;
 }
 
-/** An object's identity, as its row writes it. */
-function itemIdentity(o: NodeItem): string {
-  return identityOf(itemCells(o));
+/**
+ * Every entry the level holds, read from SAP's lists themselves — objects,
+ * incomplete objects, nodes not loaded — each as its row writes it.
+ */
+function heldOf(level: NodeLevel, descriptions: boolean): string[] {
+  const listed = [...level.objects, ...(level.incompleteObjects ?? [])];
+  return [
+    ...listed.map((object) => {
+      const name = object.objectName ?? '';
+      const techName = object.techName || undefined;
+      return identityOf([
+        object.type ?? object.unknownType,
+        name,
+        techName !== undefined && techName !== name ? techName : '',
+        name === '' ? (object.objectUri ?? '') : '',
+        ...(descriptions ? [object.description ?? ''] : []),
+      ]);
+    }),
+    ...(level.notLoaded ?? []).map(() => identityOf([NOT_LOADED_BY_SAP])),
+  ];
 }
 
 export async function handleGetObjectsByType(
@@ -188,6 +221,7 @@ export async function handleGetObjectsByType(
         node_id,
         parent_type,
         parent_name,
+        withDescriptions,
       );
       const listing = {
         isError: false,

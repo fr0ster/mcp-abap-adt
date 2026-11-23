@@ -751,7 +751,7 @@ export async function walkPackages(
       // A package's own level SAP could not load is a row, never an empty
       // package.
       appendUnlisted(walk.found, [
-        ...notLoadedRow(root, 'DEVC/K', walk.name),
+        ...notLoadedRow(root, PACKAGE_CODE, walk.name),
         ...nodeItemsOf(root).map((o) => objectOf(o, walk.name)),
       ]);
       for (const child of childNodesOf(root)) {
@@ -858,7 +858,7 @@ export async function walkPackage(
   // A package's own level SAP could not load is a row, never an empty
   // package.
   appendUnlisted(found, [
-    ...notLoadedRow(root, 'DEVC/K', pkg),
+    ...notLoadedRow(root, PACKAGE_CODE, pkg),
     ...nodeItemsOf(root).map(owned),
   ]);
   for (const child of childNodesOf(root)) {

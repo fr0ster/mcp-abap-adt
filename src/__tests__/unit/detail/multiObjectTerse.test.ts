@@ -223,4 +223,28 @@ describe('a list call at terse: every line through Written', () => {
       ].join('\n'),
     );
   });
+
+  // Plan 9.3: every list of the level is written — a child node SAP lists
+  // under the folder too, where it was dropped.
+  it('GetObjectsByType: a child node of the folder is its line', async () => {
+    const LEVEL = `<?xml version="1.0" encoding="utf-8"?><asx:abap xmlns:asx="http://www.sap.com/abapxml" version="1.0"><asx:values><DATA><TREE_CONTENT/><OBJECT_TYPES><SEU_ADT_OBJECT_TYPE_INFO><OBJECT_TYPE>PROG/I</OBJECT_TYPE><NODE_ID>000007</NODE_ID></SEU_ADT_OBJECT_TYPE_INFO></OBJECT_TYPES></DATA></asx:values></asx:abap>`;
+    const connection = recordingConnection([{ data: LEVEL }]);
+    declareSystemKind(connection, 'onprem');
+    const result = await handleGetObjectsByType(
+      { connection, logger: undefined } as never,
+      {
+        parent_name: 'ZPKG',
+        parent_tech_name: 'ZPKG',
+        parent_type: 'DEVC/K',
+        node_id: '000029',
+        with_short_descriptions: false,
+      } as never,
+    );
+    assert.ok(
+      (result.content[0]?.text ?? '')
+        .split('\n')
+        .includes('# child_node\tPROG/I\t000007'),
+      result.content[0]?.text,
+    );
+  });
 });

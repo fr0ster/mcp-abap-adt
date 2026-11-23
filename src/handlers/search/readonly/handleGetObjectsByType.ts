@@ -1,4 +1,8 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  type IRepositoryNodeChild,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtAnsweredObject } from '@mcp-abap-adt/interfaces-adt';
 import * as z from 'zod';
 import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 export const TOOL_DEFINITION = {
@@ -29,12 +33,7 @@ export const TOOL_DEFINITION = {
 import { withAdtHeaders } from '../../../lib/adtHeaders/withAdtHeaders';
 import { answer } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import {
-  completeAnswer,
-  identityOf,
-  type Line,
-  Written,
-} from '../../../lib/detail';
+import { type Column, marks, rows, writeListing } from '../../../lib/detail';
 import {
   type CachedObject,
   objectsListCache,
@@ -42,7 +41,6 @@ import {
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   NOT_LOADED_BY_SAP,
-  type NodeItem,
   type NodeLevel,
   nodeItemsOf,
 } from '../../../lib/strategies/packageWalk';
@@ -73,67 +71,72 @@ function formatObjects(
   }));
 
   // Every entry SAP listed under the node — its objects, complete or not,
-  // and each node it could not load — as TSV through `Written`: names
-  // escaped, each row an item the guard counts against the level as SAP
-  // answered it (`heldOf`), its description included where asked.
+  // each node it could not load, each child node — written by the writer
+  // from the level's own lists (`writeListing`): one row or line each, no
+  // list left without a schema.
   const notLoaded = level.notLoaded ?? [];
-  const columns = descriptions ? 5 : 4;
-  const text = completeAnswer(
-    'GetObjectsByType',
-    () => heldOf(level, descriptions),
-    () =>
-      Written.text(
-        [
-          { head: 'parent', value: `${parentType} ${parentName}` },
-          { head: 'node_id', value: nodeId },
-          { head: 'count', value: String(objects.length + notLoaded.length) },
-          {
-            header: descriptions
-              ? ['type', 'name', 'tech_name', 'uri', 'description']
-              : ['type', 'name', 'tech_name', 'uri'],
-          },
-          ...objects.map((o): Line => ({ row: itemCells(o, descriptions) })),
-          ...notLoaded.map(
-            (): Line => ({ mark: NOT_LOADED_BY_SAP, words: [] }),
-          ),
+  const text = writeListing({
+    heads: [
+      { head: 'parent', value: `${parentType} ${parentName}` },
+      { head: 'node_id', value: nodeId },
+      { head: 'count', value: String(objects.length + notLoaded.length) },
+    ],
+    reading: level,
+    lists: {
+      objects: rows('objects', {
+        columns: columnsOf(descriptions),
+        header: 'always',
+      }),
+      incompleteObjects: rows('incompleteObjects', {
+        columns: columnsOf(descriptions),
+        header: 'none',
+      }),
+      notLoaded: marks('notLoaded', NOT_LOADED_BY_SAP, () => []),
+      childNodes: marks(
+        'childNodes',
+        'child_node',
+        (node: IRepositoryNodeChild) => [
+          node.type ?? node.unknownType,
+          node.nodeId,
         ],
-        Array.from({ length: columns }, (_, i) => i),
       ),
-  )(undefined);
+    },
+  }).answer;
   return { text, cached };
 }
 
-/** A row's cells: the technical name where it is not the name, the URI of a nameless object, the description where asked. */
-function itemCells(o: NodeItem, descriptions: boolean): string[] {
-  const cells = [
-    o.type,
-    o.name,
-    o.techName !== undefined && o.techName !== o.name ? o.techName : '',
-    o.name === '' ? (o.uri ?? '') : '',
-  ];
-  return descriptions ? [...cells, o.description ?? ''] : cells;
-}
+/** An entry of a level, complete or not: what a row reads. */
+type LevelEntry = IAdtAnsweredObject & {
+  readonly objectName?: string | undefined;
+  readonly techName?: string | undefined;
+  readonly objectUri?: string | undefined;
+  readonly description?: string | undefined;
+};
 
 /**
- * Every entry the level holds, read from SAP's lists themselves — objects,
- * incomplete objects, nodes not loaded — each as its row writes it.
+ * The columns of a row: the type, the name, the technical name where it is
+ * not the name, the URI of a nameless object, the description where asked.
  */
-function heldOf(level: NodeLevel, descriptions: boolean): string[] {
-  const listed = [...level.objects, ...(level.incompleteObjects ?? [])];
-  return [
-    ...listed.map((object) => {
-      const name = object.objectName ?? '';
-      const techName = object.techName || undefined;
-      return identityOf([
-        object.type ?? object.unknownType,
-        name,
-        techName !== undefined && techName !== name ? techName : '',
-        name === '' ? (object.objectUri ?? '') : '',
-        ...(descriptions ? [object.description ?? ''] : []),
-      ]);
-    }),
-    ...(level.notLoaded ?? []).map(() => identityOf([NOT_LOADED_BY_SAP])),
+function columnsOf(descriptions: boolean): Column<LevelEntry>[] {
+  const name = (o: LevelEntry) => o.objectName ?? '';
+  const columns: Column<LevelEntry>[] = [
+    { name: 'type', cell: (o) => o.type ?? o.unknownType },
+    { name: 'name', cell: name },
+    {
+      name: 'tech_name',
+      cell: (o) => {
+        const techName = o.techName || undefined;
+        return techName !== undefined && techName !== name(o) ? techName : '';
+      },
+    },
+    {
+      name: 'uri',
+      cell: (o) => (name(o) === '' ? (o.objectUri ?? '') : ''),
+    },
   ];
+  return descriptions
+    ? [...columns, { name: 'description', cell: (o) => o.description ?? '' }]
+    : columns;
 }
 
 export async function handleGetObjectsByType(

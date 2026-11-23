@@ -143,6 +143,33 @@ function parametersOf(schema) {
 
 const HTTP_HEADING = 'Streamable HTTP Binaries';
 
+/** The system kinds a tool's variants are shown for, as the page names them. */
+const VARIANT_KINDS = [
+  ['cloud', 'On ABAP Cloud (`cloud`)'],
+  ['onprem', 'On premise (`onprem`)'],
+];
+
+/**
+ * A kind-specific variant that differs from the entry shown (its
+ * description or its parameters): its own description and parameters, so
+ * the page shows every call shape and action a tool takes.
+ */
+function variantLines(tool) {
+  let md = '';
+  for (const [kind, title] of VARIANT_KINDS) {
+    const variant = tool.variants?.[kind];
+    if (variant === undefined) continue;
+    const shown = JSON.stringify(parametersOf(tool.inputSchema));
+    const own = JSON.stringify(parametersOf(variant.inputSchema));
+    if (variant.description === tool.description && own === shown) continue;
+    md += `**${title}:** ${variant.description}\n\n`;
+    md += `**Parameters (\`${kind}\`):**\n\n`;
+    md += parameterLines(variant.inputSchema);
+    md += '\n';
+  }
+  return md;
+}
+
 /** `- name (required) — description` per parameter. */
 function parameterLines(schema) {
   const parameters = parametersOf(schema);
@@ -249,6 +276,7 @@ function page(entries, surfaces) {
       md += `- \`${parameter.name}\`${parameter.required ? ' (required)' : ''} — ${parameter.description}\n`;
     }
     md += '\n';
+    md += variantLines(tool);
   }
   void context;
   md += httpSection(surfaces);

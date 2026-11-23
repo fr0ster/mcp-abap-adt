@@ -272,6 +272,15 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 - `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
 
+**On ABAP Cloud (`cloud`):** Links package_name to the remote repository at url on branch, and links only: a pull imports the objects. folder_logic says how folders map to subpackages. Answers facts only: SAP's status, done, and the objects SAP lists.
+
+**Parameters (`cloud`):**
+- `branch` (string, required) - The branch, as CheckAbapGitExternalRepo lists it (for example refs/heads/main).
+- `folder_logic` (string, optional, one of: `FULL`, `PREFIX`) - How the repository's folders map to subpackages: FULL or PREFIX (SAP's default FULL).
+- `package_name` (string, required) - The ABAP package the repository is linked to.
+- `transport_request` (string, optional) - The transport request that records the objects written.
+- `url` (string, required) - The remote repository URL over HTTPS, without a user, a password, a query or a fragment.
+
 ---
 
 <a id="pullabapgitrepo-high-level-abapgit"></a>
@@ -282,6 +291,13 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 **Parameters:**
 - `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+- `transport_request` (string, optional) - The transport request that records the objects written.
+
+**On ABAP Cloud (`cloud`):** Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: every object the modified-objects read lists is brought to its remote version; with overwrite, SAP selects by name against the list as it stands when its job runs: the objects changed in the system or held by another package are overwritten when overwrite names them, the others keeping their system version, and the objects changed only in the remote are imported either way. SAP accepts it as its own job, which runs to its end; the objects it imports are inactive, and the repository list shows its run state. Answers facts only: SAP's status and accepted.
+
+**Parameters (`cloud`):**
+- `overwrite` (array, optional) - The objects listed by GetAbapGitModifiedObjects to overwrite with their remote version, each once, by type and name; a name the list holds under two types is refused. SAP selects by name when its job runs, against the list as it stands then: an object changed in the system or held by another package is overwritten when its name is selected, the others keep their system version, and one changed only in the remote is imported either way. Without it the pull overwrites every listed object.
 - `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
 - `transport_request` (string, optional) - The transport request that records the objects written.
 
@@ -296,6 +312,15 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Parameters:**
 - `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
 - `background` (boolean, optional) - When true, the run goes on in the background on an ABAP session of its own and the call answers at once with a run_handle; read its answer later with GetBackgroundRun, and remove it with DiscardBackgroundRun. A started run cannot be stopped. No default: without it the call waits for the run to end.
+- `comment` (string, required) - The commit message.
+- `committer` (object, required) - The committer: name and email (GetAbapGitStaging answers the proposal of this system).
+- `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
+- `repository_key` (string, required) - The key of a linked repository, as ListAbapGitRepos answers it.
+
+**On ABAP Cloud (`cloud`):** Commits the objects and files chosen from the staging with comment, author and committer, and pushes the commit to the remote branch of the repository repository_key. SAP accepts it as its own job, which runs to its end; the repository list shows its run state. Answers facts only: SAP's status and accepted.
+
+**Parameters (`cloud`):**
+- `author` (object, required) - The commit author: name and email (GetAbapGitStaging answers the proposal of this system).
 - `comment` (string, required) - The commit message.
 - `committer` (object, required) - The committer: name and email (GetAbapGitStaging answers the proposal of this system).
 - `objects` (array, required) - The objects and files to commit, each as GetAbapGitStaging with detail "medium" answers it.
@@ -389,6 +414,14 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Source:** `src/handlers/atc/high/handleRunATC.ts`
 
 **Parameters:**
+- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
+- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
+- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
+- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
+
+**On ABAP Cloud (`cloud`):** [read-only] Runs the ABAP Test Cockpit (ATC) checks of the check variant named by check_variant over the objects named by objects. Each object is a name and a type: class, interface, function_group, package, ddl_source, table, behavior_definition, function_include (with function_group, the include's function group), class_include (with include_kind: definitions, implementations, macros or testclasses; name is the class). Creates a worklist for the check variant, then starts the run. Answers worklist_id always — the run's findings are read by it, for either value of wait. With wait=false it also answers run_id, which the run's status is read by; with wait=true the server holds the request until the checks finish and answers the finding counts.
+
+**Parameters (`cloud`):**
 - `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
 - `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
@@ -878,6 +911,12 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 **Parameters:**
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, PROG/P, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, program, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
+
+**On ABAP Cloud (`cloud`):** Activates the repository objects named by objects (each a name and a type) together, in one activation: any object type, related objects such as domains, data elements and tables at once. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.
+
+**Parameters (`cloud`):**
+- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type', and 'parentName' where its type needs one.
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Sent as preauditRequested on both paths, single-object activation and group activation. With true a system may answer the objects still inactive and activate nothing; sending them again with false is the next call. These codes and kinds (either case) and names (lower case) take single-object activation: CLAS/OC, INTF/OI, FUGR/F, TABL/DT, TABL/DS, DDLS/DF, DOMA/DD, DTEL/DE, BDEF/BDO, DDLX/EX, function_group, ddl, data_element, behavior_definition, metadata_extension, class, functiongroup, interface, table, structure, domain, dataelement, view, stru. So does a main type or a search name standing for one of these codes; any other call is a group activation.
 
 ---
 
@@ -2887,6 +2926,23 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `translation` (string, optional) - Translation value; the translation flags keep their stored values.
 - `transport_request` (string, optional) - Transport request number, not a task. Optional if the table is local or already in a transport request.
 
+**On ABAP Cloud (`cloud`):** Writes technical settings of the existing database table named by table_name: each setting given is written over the stored one, every other setting keeps its stored value. Locks the settings, writes them, unlocks them, and activates the table when activate is true. Answers whether SAP saved the settings and, when activated, whether SAP activated the table, with its messages.
+
+**Parameters (`cloud`):**
+- `activate` (boolean, required) - true activates the table after the settings are written; false leaves them inactive.
+- `buffering` (object, optional) - Buffering; each field given replaces the stored one.
+- `data_class` (string, optional) - Data class. The value help lists APPL0 (master data), APPL1 (transaction data), APPL2 (organization and customizing) and DDIM, DFACT, DODS; SAP checks the value when the table is activated.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `is_writable_by_amdp` (boolean, optional) - true allows AMDP writes; activation then needs buffering N, logging off and no replacement object.
+- `load_unit` (string, optional) - Load unit.
+- `logging_enabled` (boolean, optional) - Whether changes to the table data are logged.
+- `sharing_type` (string, optional) - Sharing type.
+- `size_category` (string, optional) - Size category, a digit from 0 to 9.
+- `storage_type` (string, optional) - Storage type.
+- `table_name` (string, required) - Table name. The table must already exist.
+- `translation` (string, optional) - Translation value; the translation flags keep their stored values.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if the table is local or already in a transport request.
+
 ---
 
 <a id="high-level-table-type"></a>
@@ -3014,6 +3070,18 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 - `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
 - `headings` (object, optional) - The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
 - `object_kind` (string, required, one of: `program`, `function_group`, `class`) - Kind of object: program, function_group, class.
+- `object_name` (string, required) - Name of the program, function group or class.
+- `selections` (array, optional) - The selection texts (programs and function groups): the whole list; texts left out are deleted.
+- `symbols` (array, optional) - The text symbols: the whole list; symbols left out are deleted.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if the object is local or already in a transport request.
+
+**On ABAP Cloud (`cloud`):** Writes the text elements of the existing program, function group or class named by object_kind and object_name, in the object's original language. Each part given is written as that part's whole list: entries left out of it are deleted. A class has text symbols only. Locks the text elements, writes each part given, unlocks them, and activates the object together with its text elements when activate is true. Answers parts: each part SAP saved with SAP's answer, the list saved; when activated, whether SAP activated them, with its messages, beside the parts. A part SAP refuses ends the writes: the answer is SAP's failure, beside the parts saved before it (inactive).
+
+**Parameters (`cloud`):**
+- `activate` (boolean, required) - true activates the object together with its text elements after the write; false leaves them inactive.
+- `detail` (string, optional (default: terse), one of: `terse`, `medium`, `full`, `raw`) - How much of the answer to return: "terse" (default, the fields you need to act), "medium" (every field of the reading; currently the same as "full"), "full" (the whole parse), "raw" (the document as ADT sent it).
+- `headings` (object, optional) - The list header and four column headers (programs and function groups); a heading given empty or left out is deleted.
+- `object_kind` (string, required, one of: `function_group`, `class`) - Kind of object: function_group, class.
 - `object_name` (string, required) - Name of the program, function group or class.
 - `selections` (array, optional) - The selection texts (programs and function groups): the whole list; texts left out are deleted.
 - `symbols` (array, optional) - The text symbols: the whole list; symbols left out are deleted.

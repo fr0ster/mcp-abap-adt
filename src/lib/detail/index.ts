@@ -1,7 +1,8 @@
 /**
  * The detail mechanism every handler shares: `./levels` maps each level of
  * `detail` to the reading passed into the adt-clients member (selected before
- * the call), and `./tsv` writes the terse list format.
+ * the call), `./tsv` writes the terse list format, and `./wire` answers
+ * `raw` as what ADT sent.
  */
 
 export {
@@ -26,3 +27,9 @@ export {
   tsv,
   tsvRow,
 } from './tsv';
+export {
+  recordedWire,
+  type WireShape,
+  wireAnswer,
+  wireText,
+} from './wire';

@@ -26,6 +26,7 @@ import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGe
 import { handleGetStructuresList } from '../../../handlers/structure/readonly/handleGetStructuresList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import { handleDescribeByList } from '../../../handlers/system/readonly/handleDescribeByList';
+import { handleGetWhereUsed } from '../../../handlers/system/readonly/handleGetWhereUsed';
 import { searchSourceRows } from '../../../handlers/system/readonly/handleSearchSource';
 import {
   createBatchAvailability,
@@ -471,6 +472,74 @@ CASES['DescribeByList a described object, one not found, one refused'] = async (
           { name: 'ZCL_A', type: 'CLAS/OC' },
           { name: 'ZNONE', type: 'CLAS/OC' },
           { name: 'ZREF', type: 'CLAS/OC' },
+        ],
+        detail,
+      } as never,
+    ),
+  );
+
+const reference = (
+  uri: string,
+  type: string,
+  name: string,
+  pkg: string,
+  usage?: string,
+) =>
+  `<usagereferences:referencedObject uri="${uri}" isResult="false" canHaveChildren="true"${usage === undefined ? '' : ` usageInformation="${usage}"`}><usagereferences:adtObject adtcore:responsible="SAPUSER01" adtcore:name="${name}" adtcore:type="${type}" xmlns:adtcore="http://www.sap.com/adt/core"><adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/${pkg.toLowerCase()}" adtcore:type="DEVC/K" adtcore:name="${pkg}"/></usagereferences:adtObject></usagereferences:referencedObject>`;
+/** Usages in two packages, a package node, a nameless usage, an empty usage attribute. */
+const WHERE_USED = `${xmlHead}<usagereferences:usageReferenceResult numberOfResults="4" resultDescription="Where-Used List: ZCL_X (Class)" xmlns:usagereferences="http://www.sap.com/adt/ris/usageReferences"><usagereferences:referencedObjects>${[
+  reference('/sap/bc/adt/packages/zpkg', 'DEVC/K', 'ZPKG', 'ZPKG'),
+  reference(
+    '/sap/bc/adt/oo/classes/zcl_user',
+    'CLAS/OC',
+    'ZCL_USER',
+    'ZPKG',
+    'gradeDirect,includeProductive',
+  ),
+  reference(
+    '/sap/bc/adt/programs/programs/zprog',
+    'PROG/P',
+    'ZPROG',
+    'ZPKG',
+    'gradeDirect,includeTest',
+  ),
+  reference(
+    '/sap/bc/adt/oo/interfaces/zif_x',
+    'INTF/OI',
+    'ZIF_X',
+    'ZOTHER',
+    '',
+  ),
+  reference(
+    '/sap/bc/adt/oo/classes/nameless',
+    'CLAS/OC',
+    '',
+    'ZOTHER',
+    'gradeDirect',
+  ),
+].join(
+  '',
+)}</usagereferences:referencedObjects></usagereferences:usageReferenceResult>`;
+
+CASES['GetWhereUsed one object'] = async (detail) =>
+  answeredOf(
+    await handleGetWhereUsed(
+      sequential([{ data: WHERE_USED }]) as never,
+      {
+        object_name: 'ZCL_X',
+        object_type: 'CLAS/OC',
+        detail,
+      } as never,
+    ),
+  );
+CASES['GetWhereUsed two objects, one refused'] = async (detail) =>
+  answeredOf(
+    await handleGetWhereUsed(
+      sequential([{ data: WHERE_USED }, REFUSED]) as never,
+      {
+        objects: [
+          { object_name: 'ZCL_X', object_type: 'CLAS/OC' },
+          { object_name: 'ZCL_GONE', object_type: 'CLAS/OC' },
         ],
         detail,
       } as never,

@@ -6,13 +6,14 @@ import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import {
   answered,
-  completeAnswer,
   type DetailTable,
+  entries,
   formatted,
-  identityOf,
   rawLevel,
   readingAt,
-  Written,
+  rows,
+  writeJson,
+  writeListing,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -91,38 +92,39 @@ function mainProgramReadings(
 ): DetailTable<string | object> {
   const programsOf = (answer: Parameters<typeof rawOf>[0]) =>
     mainProgramsOf(rawOf(answer));
-  // Every main program the reading held, or nothing (`completeAnswer`).
-  const programIdentity = (program: { type: string; name: string }) =>
-    identityOf([program.type, program.name]);
-  const held = (programs: readonly MainProgram[]) =>
-    programs.map(programIdentity);
+  // Every main program the reading held, written by the listing writers.
   return {
     terse: formatted(
       programsOf,
-      completeAnswer('GetMainPrograms', held, (programs: MainProgram[]) =>
-        Written.text(
-          [
-            { head: 'include', value: includeName },
-            { header: ['type', 'name'] },
-            ...programs.map((program) => ({
-              row: [program.type, program.name],
-            })),
-          ],
-          [0, 1],
-        ),
-      ),
+      (programs: MainProgram[]) =>
+        writeListing({
+          heads: [{ head: 'include', value: includeName }],
+          reading: { programs },
+          lists: {
+            programs: rows('programs', {
+              columns: [
+                { name: 'type', cell: (program: MainProgram) => program.type },
+                { name: 'name', cell: (program: MainProgram) => program.name },
+              ],
+              header: 'always',
+            }),
+          },
+        }).answer,
     ),
     medium: formatted(
       programsOf,
-      completeAnswer('GetMainPrograms', held, (programs: MainProgram[]) =>
-        Written.json(
+      (programs: MainProgram[]) =>
+        writeJson(
           { include_name: includeName },
+          { programs },
           {
-            main_programs: programs.map(({ uri: _uri, ...fields }) => fields),
+            programs: entries(
+              'programs',
+              ({ uri: _uri, ...fields }: MainProgram) => fields,
+              { as: 'main_programs' },
+            ),
           },
-          ['type', 'name'],
-        ),
-      ),
+        ).answer,
     ),
     full: formatted(programsOf, (programs) => ({
       success: true,

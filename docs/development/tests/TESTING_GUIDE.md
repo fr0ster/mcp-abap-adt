@@ -116,12 +116,14 @@ the tests needs Node 22.15 or later (CI takes the latest 22 and 24).
   `2` (a developer machine), and CI passes its own per cell after it
   (`npm test -- --concurrency <N>`; given twice, the last one wins) — `2` on every runner
   kind, from `ci.yml`'s matrix, and `2` in `release.yml`. The figures are below.
-- **A bound per file, in the unit run only.** `npm test` passes `--file-timeout 600` (seconds):
-  a file still running then has its process tree ended, is named with the last test it started,
-  and fails the run, while the other files run on. The slowest file measured in CI was 194.5 s
+- **A bound per file, given by the script.** `npm test` passes `--file-timeout 600` (seconds;
+  at most 2147483): a file still running then has its whole process tree ended, is named with
+  the last test it started, and fails the run, while the other files run on. The slowest file measured in CI was 194.5 s
   (`unknownSweep.test.ts`, macOS, 2026-11-23); change the bound with
   `npm test -- --file-timeout <seconds>` (the last one wins). Without the option there is no
-  bound, and a live npm script refuses it.
+  bound, so the other scripts (`test:install`, `test:retrieval`, …) run unbounded unless given
+  it; the runner refuses it under a live npm script and for any file under
+  `__tests__/integration` or `__tests__/admin`, by its place on disk.
 - **Variables without a shell.** `--env NAME=VALUE` sets a variable for the run on every
   platform.
 - **Selecting files.** `npm test -- <path>.test.ts …` runs the named files, by their source

@@ -556,17 +556,18 @@ export function stopSignalOf(file: string | undefined): {
   if (file === undefined || file === '') {
     return { signal: controller.signal, close: () => {} };
   }
-  if (existsSync(file)) {
+  const stop = () => {
+    unwatchFile(file, listener);
     controller.abort();
-    return { signal: controller.signal, close: () => {} };
-  }
-  const listener = () => {
-    if (existsSync(file)) {
-      unwatchFile(file, listener);
-      controller.abort();
-    }
   };
+  const listener = () => {
+    if (existsSync(file)) stop();
+  };
+  // Register first, check after: a file written before the poll's first stat
+  // becomes that stat's baseline and fires no change, so only a check made
+  // after registering sees it (libuv `fs-poll.c`).
   watchFile(file, { interval: STOP_POLL_MS, persistent: false }, listener);
+  if (existsSync(file)) stop();
   return {
     signal: controller.signal,
     close: () => unwatchFile(file, listener),

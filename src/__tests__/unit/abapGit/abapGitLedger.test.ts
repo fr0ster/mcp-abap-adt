@@ -636,6 +636,64 @@ describe("the runner's stop request: polling, no FSEvents", () => {
     }
   });
 
+  it('a stop file written between the first check and the first poll still aborts', async () => {
+    const real = fsModule.watchFile;
+    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
+    const stopFile = join(dir, 'stop');
+    // The file appears inside the watch's registration, before the real
+    // poll takes its first stat: that stat is its baseline, so only a check
+    // made after registering can see the file.
+    const watched = mock.method(
+      fsModule,
+      'watchFile',
+      (...args: Parameters<typeof fsModule.watchFile>) => {
+        writeFileSync(stopFile, 'interrupted');
+        return Reflect.apply(real, fsModule, args);
+      },
+    );
+    try {
+      const stop = stopSignalOf(stopFile);
+      const bound = new AbortController();
+      const first = await Promise.race([
+        stop.signal.aborted
+          ? 'aborted'
+          : once(stop.signal, 'abort').then(() => 'aborted'),
+        delay(2_000, 'missed', { signal: bound.signal }).catch(() => 'missed'),
+      ]);
+      bound.abort();
+      stop.close();
+      assert.equal(watched.mock.callCount(), 1);
+      assert.equal(first, 'aborted', 'the stop file was missed');
+    } finally {
+      watched.mock.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('the abort alone removes the watch, before any close', async () => {
+    const unwatched = mock.method(fsModule, 'unwatchFile');
+    const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
+    try {
+      const stopFile = join(dir, 'stop');
+      const stop = stopSignalOf(stopFile);
+      assert.equal(unwatched.mock.callCount(), 0);
+      const bound = new AbortController();
+      const aborted = once(stop.signal, 'abort').then(() => 'aborted');
+      writeFileSync(stopFile, 'interrupted');
+      const first = await Promise.race([
+        aborted,
+        delay(10_000, 'missed', { signal: bound.signal }).catch(() => 'missed'),
+      ]);
+      bound.abort();
+      assert.equal(first, 'aborted');
+      assert.equal(unwatched.mock.callCount(), 1);
+      assert.equal(unwatched.mock.calls[0]?.arguments[0], stopFile);
+    } finally {
+      unwatched.mock.restore();
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it('an open watch keeps no process alive: a node that opens one and returns exits by itself', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
     try {

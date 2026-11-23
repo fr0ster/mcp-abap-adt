@@ -178,5 +178,29 @@
   "ListFunctionGroupIncludes a group's children @full": {
     "isError": false,
     "text": "{\"success\":true,\"function_group_name\":\"ZFG\",\"total\":4,\"includes\":[\"Z_FM\",\"ZFG_TOP\",\"\",\"not loaded by SAP\"],\"objects\":[{\"name\":\"Z_FM\",\"type\":\"FUGR/FF\",\"description\":\"A module\",\"techName\":\"Z_FM\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/fmodules/z_fm\"},{\"name\":\"ZFG_TOP\",\"type\":\"FUGR/I\",\"techName\":\"LZFGTOP\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/lzfgtop\"},{\"name\":\"\",\"type\":\"FUGR/I\",\"uri\":\"/sap/bc/adt/functions/groups/zfg/includes/nameless\"},{\"type\":\"FUGR/I\",\"name\":\"not loaded by SAP\",\"notLoaded\":true}]}"
+  },
+  "GetIncludesList a program, one include read, one refused @terse": {
+    "isError": false,
+    "text": "# object PROG/P ZPROG\n# unreadable\tZINC_C\nZPROG\n  ZINC_A\n    ZINC_C\n  ZINC_B"
+  },
+  "GetIncludesList a program, one include read, one refused @medium": {
+    "isError": false,
+    "text": "{\"object_name\":\"ZPROG\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZPROG\",\"children\":[{\"name\":\"ZINC_A\",\"children\":[{\"name\":\"ZINC_C\"}]},{\"name\":\"ZINC_B\"}]},\"unreadable\":[{\"name\":\"ZINC_C\",\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read source\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}"
+  },
+  "GetIncludesList a program, one include read, one refused @full": {
+    "isError": false,
+    "text": "{\"object_name\":\"ZPROG\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZPROG\",\"children\":[{\"name\":\"ZINC_A\",\"children\":[{\"name\":\"ZINC_C\",\"children\":[]}]},{\"name\":\"ZINC_B\",\"children\":[]}]},\"unreadable\":[{\"name\":\"ZINC_C\",\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read source\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}"
+  },
+  "GetIncludesList two programs, one refused @terse": {
+    "isError": false,
+    "text": "# object PROG/P ZPROG\nZPROG\n  ZINC_A\n# object PROG/P ZGONE\n# unreadable\tprogram ZGONE\nZGONE"
+  },
+  "GetIncludesList two programs, one refused @medium": {
+    "isError": false,
+    "text": "[{\"object_name\":\"ZPROG\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZPROG\",\"children\":[{\"name\":\"ZINC_A\"}]}},{\"object_name\":\"ZGONE\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZGONE\"},\"unreadable\":[{\"name\":\"program ZGONE\",\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read source\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]"
+  },
+  "GetIncludesList two programs, one refused @full": {
+    "isError": false,
+    "text": "[{\"object_name\":\"ZPROG\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZPROG\",\"children\":[{\"name\":\"ZINC_A\",\"children\":[]}]}},{\"object_name\":\"ZGONE\",\"object_type\":\"PROG/P\",\"tree\":{\"name\":\"ZGONE\",\"children\":[]},\"unreadable\":[{\"name\":\"program ZGONE\",\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read source\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]}]"
   }
 }

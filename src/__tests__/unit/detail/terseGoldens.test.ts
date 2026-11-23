@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { handleListFunctionGroupIncludes } from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../../handlers/function_include/readonly/handleListFunctionModules';
+import { handleGetIncludesList } from '../../../handlers/include/readonly/handleGetIncludesList';
 import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
@@ -280,6 +281,38 @@ for (const [tool, handler] of [
       ),
     );
 }
+
+CASES['GetIncludesList a program, one include read, one refused'] = async (
+  detail,
+) =>
+  answeredOf(
+    await handleGetIncludesList(
+      sequential([
+        { data: 'REPORT zprog.\nINCLUDE zinc_a.\nINCLUDE zinc_b.\n' },
+        { data: 'INCLUDE zinc_c.\n' },
+        REFUSED,
+        { data: '* leaf\n' },
+      ]) as never,
+      { object_name: 'ZPROG', object_type: 'PROG/P', detail } as never,
+    ),
+  );
+CASES['GetIncludesList two programs, one refused'] = async (detail) =>
+  answeredOf(
+    await handleGetIncludesList(
+      sequential([
+        { data: 'REPORT zprog.\nINCLUDE zinc_a.\n' },
+        { data: '* leaf\n' },
+        REFUSED,
+      ]) as never,
+      {
+        objects: [
+          { object_name: 'ZPROG', object_type: 'PROG/P' },
+          { object_name: 'ZGONE', object_type: 'PROG/P' },
+        ],
+        detail,
+      } as never,
+    ),
+  );
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

@@ -16,6 +16,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
+import { handleGetATCFindings } from '../../../handlers/atc/high/handleGetATCFindings';
+import { handleGetATCResult } from '../../../handlers/atc/high/handleGetATCResult';
 import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
 import { handleListFunctionGroupIncludes } from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../../handlers/function_include/readonly/handleListFunctionModules';
@@ -712,6 +714,33 @@ CASES[
         user: 'SAPUSER01',
         detail,
       } as never,
+    ),
+  );
+
+CASES['GetATCFindings a recorded worklist'] = async (detail) =>
+  answeredOf(
+    await handleGetATCFindings(
+      ctx([
+        {
+          data: corpusBody(
+            'atc-findings-worklist--01-worklists-2aaa2806861e1fd1ad9bd28dca5c37ed',
+          ),
+        },
+      ]) as never,
+      { worklist_id: '2AAA2806861E1FD1AD9BD28DCA5C37ED', detail } as never,
+    ),
+  );
+CASES['GetATCResult a recorded result'] = async (detail) =>
+  answeredOf(
+    await handleGetATCResult(
+      ctx([
+        {
+          data: corpusBody(
+            'atc-result-by-display-id--01-results-e6ac99b2161f1fe1b5a1e9b68e5cd628',
+          ),
+        },
+      ]) as never,
+      { display_id: 'E6AC99B2161F1FE1B5A1E9B68E5CD628', detail } as never,
     ),
   );
 

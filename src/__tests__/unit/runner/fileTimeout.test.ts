@@ -196,7 +196,7 @@ describe('the per-file bound', () => {
         both,
       );
     }
-    const header = `run-tests: 2 files ran past the bound of ${BOUND} s and were stopped:\n`;
+    const header = `run-tests: 2 files ran past the bound of ${BOUND} s:\n`;
     const at = stderr.indexOf(header);
     assert.ok(at >= 0, both);
     assert.deepEqual(
@@ -205,7 +205,7 @@ describe('the per-file bound', () => {
         .split('\n')
         .filter(Boolean)
         .sort(),
-      [`  ${HANGS_A}`, `  ${HANGS_B}`],
+      [`  stopped: ${HANGS_A}`, `  stopped: ${HANGS_B}`],
       both,
     );
     // The runner's words are on stderr alone; the reports on stdout.
@@ -326,6 +326,114 @@ describe('the per-file bound', () => {
         '--file-timeout is refused for a live or integration file',
       ),
       run.stderr,
+    );
+    assert.deepEqual(recorded(record), []);
+  });
+  it('reports a file whose tree could not be ended as kill failed, without waiting on it', {
+    skip:
+      process.platform === 'win32'
+        ? 'POSIX only: the failure is a process table that cannot be read (a fake ps on PATH); no safe failing taskkill exists to fake on Windows'
+        : false,
+  }, () => {
+    // Its grandchild ends at once: the group kill alone ends the file.
+    const repo = built('unkillable', {
+      [HANGS_A]: hangsSource('a'),
+      'grandchild.cjs': '',
+    });
+    // The only `ps` on the path fails: the group is still killed, but the
+    // tree cannot be known whole, so the kill failed.
+    const fakes = path.join(scratch.dir, 'fake-ps');
+    fs.mkdirSync(fakes, { recursive: true });
+    fs.writeFileSync(path.join(fakes, 'ps'), '#!/bin/sh\nexit 1\n', {
+      mode: 0o755,
+    });
+    const record = path.join(scratch.dir, 'unkillable.record');
+    const run = runner(
+      [
+        '--repo',
+        repo,
+        '--concurrency',
+        '1',
+        '--file-timeout',
+        String(BOUND),
+        '--test-reporter=tap',
+      ],
+      {
+        RECORD: record,
+        PATH: fakes,
+        GRANDCHILD: path.join(repo, 'grandchild.cjs'),
+      },
+    );
+    const both = `stdout:\n${run.stdout}\nstderr:\n${run.stderr}`;
+    assert.equal(run.status, 1, both);
+    assert.ok(
+      run.stderr.includes(
+        `run-tests: ${HANGS_A} ran past the bound of ${BOUND} s and could not be stopped: ps exited 1`,
+      ),
+      both,
+    );
+    assert.ok(
+      run.stderr.includes(
+        `run-tests: 1 file ran past the bound of ${BOUND} s:\n  kill failed: ${HANGS_A}\n`,
+      ),
+      both,
+    );
+    assert.equal(run.stderr.includes('\n  stopped: '), false, both);
+  });
+
+  it('refuses a live file named in another case on Windows, with or without the bound', {
+    skip:
+      process.platform === 'win32'
+        ? false
+        : 'Windows only: its file system names one file in any case',
+  }, () => {
+    const live = 'src/__tests__/integration/x.test.ts';
+    const repo = built('cased', { [live]: nodeTestSource('cased', 'NEVER') });
+    const record = path.join(scratch.dir, 'cased.record');
+    const source = path.join(
+      repo,
+      'SRC',
+      '__TESTS__',
+      'INTEGRATION',
+      'x.test.ts',
+    );
+    const unbounded = runner(['--concurrency', '1', source], {
+      RECORD: record,
+    });
+    assert.equal(unbounded.status, 1, unbounded.stdout + unbounded.stderr);
+    assert.ok(
+      unbounded.stderr.includes(
+        'a live suite runs only under a live npm script',
+      ),
+      unbounded.stderr,
+    );
+    const compiled = path.join(
+      repo,
+      '.TEST-BUILD',
+      'Tree',
+      'Src',
+      '__Tests__',
+      'Integration',
+      'x.test.js',
+    );
+    const bounded = runner(
+      [
+        '--repo',
+        path.dirname(repo),
+        '--concurrency',
+        '1',
+        '--file-timeout',
+        '60',
+        compiled,
+      ],
+      { RECORD: record },
+    );
+    assert.equal(bounded.status, 1, bounded.stdout + bounded.stderr);
+    assert.ok(
+      bounded.stderr.includes(
+        '--file-timeout is refused for a live or integration file',
+      ),
+      bounded.stderr,
     );
     assert.deepEqual(recorded(record), []);
   });

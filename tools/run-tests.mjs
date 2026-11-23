@@ -65,14 +65,15 @@
 //
 // - `--file-timeout <seconds>` (1 to 2147483; the last one given wins)
 //   bounds each file's process (`tools/file-bound.mjs`): a file still
-//   running when it expires has its whole process tree ended (`endTree`:
-//   every descendant, whatever group or session it moved to), and once its
+//   running when it expires has its process tree ended as it is then
+//   (`endTree`: every descendant still under it, whatever group or session
+//   it is in; one reparented away before is not reached), and once its
 //   close is seen it is named on stderr with the last test it started (the
 //   preload `runningTestPreload.ts` writes each starting test's name to the
 //   file's own `MCP_ABAP_ADT_STARTED_FILE`; no file inherits one) and fails
 //   the run. A tree that cannot be ended is a failure at once, its file not
 //   waited for. The other files run on, and the run's end lists every file
-//   stopped. A file that exits first, or exits `0` while being stopped, has
+//   past the bound, `stopped` or `kill failed`. A file that exits first, or exits `0` while being stopped, has
 //   passed. Without the option there is no bound; it is refused under a live
 //   npm script and for any file under a live root by its place on disk
 //   (`__tests__/integration`, `__tests__/admin`), so a live run is never
@@ -109,6 +110,7 @@ import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import {
   endTree,
   isLiveFile,
+  isLiveSource as isLiveSourceIn,
   MAX_BOUND_SECONDS,
   watchFile,
   writeFlushed,
@@ -234,7 +236,7 @@ function inRoots(dirs, file) {
 
 /** Whether `source` (a repository source path) is a live suite's file. */
 function isLiveSource(source) {
-  return LIVE_ROOTS.some((root) => source.startsWith(`${root}/`));
+  return isLiveSourceIn(source, LIVE_ROOTS);
 }
 
 /** The compiled module `parts` of this repository's build, required. */
@@ -486,8 +488,11 @@ process.on('SIGINT', () => {
   for (const child of running.values()) endChildTree(child);
 });
 
-/** The files stopped by the bound, as their source paths. */
-const stoppedByBound = [];
+/**
+ * The files that ran past the bound: their source path, and `stopped` or
+ * `kill failed` (their tree could not be ended whole).
+ */
+const pastBound = [];
 let startedFiles = 0;
 
 /** The variable naming where a file's process writes each test it starts. */
@@ -544,8 +549,8 @@ async function runFile(file, source) {
     console.error(`run-tests: node --test did not start: ${result.error}`);
     return 1;
   }
-  stoppedByBound.push(source);
   if (result.outcome === 'unkillable') {
+    pastBound.push({ source, how: 'kill failed' });
     console.error(
       `run-tests: ${source} ran past the bound of ${fileTimeout} s and could not be stopped: ${result.reason}`,
     );
@@ -557,6 +562,7 @@ async function runFile(file, source) {
   } catch {
     // No test started.
   }
+  pastBound.push({ source, how: 'stopped' });
   console.error(
     `run-tests: ${source} ran past the bound of ${fileTimeout} s and was stopped; the last test started: ${last}`,
   );
@@ -574,18 +580,15 @@ async function runAll() {
     }
   };
   await Promise.all(Array.from({ length: Number(concurrency) }, () => lane()));
-  if (stoppedByBound.length > 0) {
+  if (pastBound.length > 0) {
     const count =
-      stoppedByBound.length === 1
-        ? '1 file ran'
-        : `${stoppedByBound.length} files ran`;
-    const verb = stoppedByBound.length === 1 ? 'was' : 'were';
+      pastBound.length === 1 ? '1 file ran' : `${pastBound.length} files ran`;
     // Flushed before the exit: a pipe's write is asynchronous on macOS and
     // Windows, and an exit right after it can cut the summary.
     await writeFlushed(
       process.stderr,
-      `run-tests: ${count} past the bound of ${fileTimeout} s and ${verb} stopped:\n${stoppedByBound
-        .map((source) => `  ${source}`)
+      `run-tests: ${count} past the bound of ${fileTimeout} s:\n${pastBound
+        .map(({ source, how }) => `  ${how}: ${source}`)
         .join('\n')}\n`,
     );
   }

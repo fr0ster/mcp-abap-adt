@@ -43,7 +43,7 @@ import {
 import { ATC_OBJECT_TYPES } from '../../lib/adtProjections';
 import { defineTool } from '../../lib/handlers/interfaces';
 import {
-  findingIdentity,
+  findingsText,
   parseAtcWorklist,
 } from '../../lib/strategies/atcFindings';
 import { declareSystemKind } from '../../lib/systemKind';
@@ -781,23 +781,23 @@ describe('the two readers', () => {
     assert.ok(lines.length - header - 1 > 0);
   });
 
-  // Codex round 7: a finding's identity holds its line and column, so two
-  // findings apart only by their position stay two — a row written twice in
-  // place of the other is refused, not counted as both.
-  it('two findings apart only by line or column are two items', () => {
-    const at = (line: number, column: number) =>
-      findingIdentity({
-        object: 'ZCL_X',
-        object_type: 'CLAS',
-        location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
-        line,
-        column,
-        priority: 2,
-        check: 'Extended check',
-        message: 'unused',
-      });
-    assert.notEqual(at(9, 0), at(10, 0));
-    assert.notEqual(at(9, 0), at(9, 4));
+  // A finding is one row, its line and column written: two findings apart
+  // only by their position are two rows (step 9: written by construction).
+  it('two findings apart only by line or column are two rows', () => {
+    const at = (line: number, column: number) => ({
+      object: 'ZCL_X',
+      object_type: 'CLAS',
+      location: '/sap/bc/adt/oo/classes/zcl_x/source/main',
+      line,
+      column,
+      priority: 2,
+      check: 'Extended check',
+      message: 'unused',
+    });
+    const rows = findingsText([], {}, [at(9, 0), at(10, 0), at(9, 4)])
+      .split('\n')
+      .slice(1);
+    assert.equal(new Set(rows).size, 3, rows.join('\n'));
   });
 
   it('says so when the worklist is empty, rather than reading as clean', async () => {

@@ -2,12 +2,7 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import {
-  type AnswerTable,
-  answerAt,
-  completeAnswer,
-  Written,
-} from '../../../lib/detail';
+import { type AnswerTable, answerAt } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -15,9 +10,7 @@ import {
   withLongToolAdvice,
 } from '../../../lib/longTools';
 import {
-  FINDING_IDENTITY,
-  findingIdentity,
-  findingLines,
+  findingsText,
   parseAtcWorklist,
 } from '../../../lib/strategies/atcFindings';
 import {
@@ -113,34 +106,26 @@ function findingsAnswers(
   };
   return {
     // A row per finding (TSV), every one, or nothing (`completeAnswer`).
-    terse: completeAnswer(
-      'GetATCFindings',
-      (document: string) =>
-        parseAtcWorklist(document).findings.map(findingIdentity),
-      (document: string) => {
-        const reading = parseAtcWorklist(document);
-        const note = noteOf(reading).note;
-        return Written.text(
-          findingLines(
-            [
-              { head: 'worklist', value: worklistId },
-              {
-                head: 'objects_checked',
-                value: String(reading.objects_checked),
-              },
-              {
-                head: 'finding_count',
-                value: String(reading.findings.length),
-              },
-              ...(note === undefined ? [] : [{ head: 'note', value: note }]),
-            ],
-            reading.by_priority,
-            reading.findings,
-          ),
-          FINDING_IDENTITY,
-        );
-      },
-    ),
+    terse: (document: string) => {
+      const reading = parseAtcWorklist(document);
+      const note = noteOf(reading).note;
+      return findingsText(
+        [
+          { head: 'worklist', value: worklistId },
+          {
+            head: 'objects_checked',
+            value: String(reading.objects_checked),
+          },
+          {
+            head: 'finding_count',
+            value: String(reading.findings.length),
+          },
+          ...(note === undefined ? [] : [{ head: 'note', value: note }]),
+        ],
+        reading.by_priority,
+        reading.findings,
+      );
+    },
     medium: whole,
     full: whole,
     raw: (document) => document,

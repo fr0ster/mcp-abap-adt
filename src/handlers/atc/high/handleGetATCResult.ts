@@ -2,23 +2,14 @@ import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
-import {
-  type AnswerTable,
-  answerAt,
-  completeAnswer,
-  Written,
-} from '../../../lib/detail';
+import { type AnswerTable, answerAt } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
 } from '../../../lib/longTools';
-import {
-  FINDING_IDENTITY,
-  findingIdentity,
-  findingLines,
-} from '../../../lib/strategies/atcFindings';
+import { findingsText } from '../../../lib/strategies/atcFindings';
 import { parseAtcResult } from '../../../lib/strategies/atcResults';
 import {
   DETAIL_SHAPE,
@@ -96,41 +87,31 @@ const RESULT_ANSWERS: AnswerTable<string, string | object> = (() => {
   };
   return {
     // A row per finding (TSV), every one, or nothing (`completeAnswer`).
-    terse: completeAnswer(
-      'GetATCResult',
-      (document: string) =>
-        parseAtcResult(document).findings.map(findingIdentity),
-      (document: string) => {
-        const reading = parseAtcResult(document);
-        return Written.text(
-          findingLines(
-            [
-              { head: 'result', value: reading.display_id },
-              ...(reading.title
-                ? [{ head: 'title', value: reading.title }]
-                : []),
-              ...(reading.check_variant
-                ? [{ head: 'check_variant', value: reading.check_variant }]
-                : []),
-              ...(reading.created_at
-                ? [{ head: 'created_at', value: reading.created_at }]
-                : []),
-              {
-                head: 'objects_checked',
-                value: String(reading.objects_checked),
-              },
-              {
-                head: 'finding_count',
-                value: String(reading.findings.length),
-              },
-            ],
-            reading.by_priority,
-            reading.findings,
-          ),
-          FINDING_IDENTITY,
-        );
-      },
-    ),
+    terse: (document: string) => {
+      const reading = parseAtcResult(document);
+      return findingsText(
+        [
+          { head: 'result', value: reading.display_id },
+          ...(reading.title ? [{ head: 'title', value: reading.title }] : []),
+          ...(reading.check_variant
+            ? [{ head: 'check_variant', value: reading.check_variant }]
+            : []),
+          ...(reading.created_at
+            ? [{ head: 'created_at', value: reading.created_at }]
+            : []),
+          {
+            head: 'objects_checked',
+            value: String(reading.objects_checked),
+          },
+          {
+            head: 'finding_count',
+            value: String(reading.findings.length),
+          },
+        ],
+        reading.by_priority,
+        reading.findings,
+      );
+    },
     medium: whole,
     full: whole,
     raw: (document: string) => document,

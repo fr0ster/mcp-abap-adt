@@ -32,7 +32,7 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { identityOf, type Line } from '../detail';
+import { type Column, rows, writeListing } from '../detail';
 import { fragmentStart, hrefParts } from '../sourceHref';
 import { parseXml } from '../xml/node';
 
@@ -128,34 +128,37 @@ export function findingCells(finding: AtcFindingFull): string[] {
   ];
 }
 
-/** A finding's identity columns: all but the priority — two findings at other lines or columns stay two. */
-export const FINDING_IDENTITY = [0, 1, 2, 3, 4, 6, 7];
-
-/** A finding's identity, as its terse row writes it. */
-export function findingIdentity(finding: AtcFindingFull): string {
-  const cells = findingCells(finding);
-  return identityOf(FINDING_IDENTITY.map((index) => cells[index] ?? ''));
-}
-
 /**
  * Findings as terse lines: the run's facts as `#` lines (the counts per
  * priority as `priority N count` lines), then a row per finding — every
  * finding, or nothing (the guard).
  */
-export function findingLines(
+export function findingsText(
   heads: readonly { head: string; value?: string | undefined }[],
   byPriority: Record<string, number>,
   findings: readonly AtcFindingFull[],
-): Line[] {
-  return [
-    ...heads,
-    ...Object.entries(byPriority).map(([priority, count]) => ({
-      head: 'priority',
-      value: `${priority} ${count}`,
-    })),
-    { header: [...FINDING_COLUMNS] },
-    ...findings.map((finding) => ({ row: findingCells(finding) })),
-  ];
+): string {
+  return writeListing({
+    heads: [
+      ...heads,
+      ...Object.entries(byPriority).map(([priority, count]) => ({
+        head: 'priority',
+        value: `${priority} ${count}`,
+      })),
+    ],
+    reading: { findings },
+    lists: {
+      findings: rows('findings', {
+        columns: FINDING_COLUMNS.map(
+          (name, index): Column<AtcFindingFull> => ({
+            name,
+            cell: (finding) => findingCells(finding)[index] ?? '',
+          }),
+        ),
+        header: 'always',
+      }),
+    },
+  }).answer;
 }
 
 export function terseFinding(finding: AtcFindingFull): AtcFinding {

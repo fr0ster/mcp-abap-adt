@@ -6,7 +6,7 @@
  * free words reach a description's Returns.
  */
 
-import type { KindShape, ListShape } from '../detail';
+import type { HeadShape, KindShape, ListShape } from '../detail';
 
 /** Only this module mints a fact. */
 const minted: unique symbol = Symbol('returns fact');
@@ -103,12 +103,12 @@ function listFacts(shape: ListShape, seen: Set<object>): ReturnsFact[] {
  * terse's, then any medium adds — each fact once.
  */
 export function returnsOf(source: {
-  readonly about?: readonly string[] | undefined;
+  readonly heads?: readonly HeadShape[] | undefined;
   readonly shapes: readonly (readonly ListShape[])[];
 }): ReturnsFact[] {
   const seen = new Set<ListShape>();
   const facts = [
-    ...(source.about ?? []).map((noun) => fact(sentence(noun))),
+    ...(source.heads ?? []).map((head) => fact(sentence(head.about))),
     ...source.shapes.flat().flatMap((shape) => {
       if (seen.has(shape)) return [];
       seen.add(shape);
@@ -121,18 +121,4 @@ export function returnsOf(source: {
     once.add(each.text);
     return true;
   });
-}
-
-/** What `detail: 'raw'` gives of a tool: what SAP sent, one document or each the call read. */
-export function rawReturns(kind: 'one' | 'every'): ReturnsFact {
-  return fact(
-    kind === 'one'
-      ? 'At raw: what SAP sent, as it sent it.'
-      : 'At raw: everything SAP sent for the call, in the order it was read.',
-  );
-}
-
-/** A fact stated by its tool group's factory, in domain words (`src/lib/description`). */
-export function statedReturns(text: string): ReturnsFact {
-  return fact(sentence(text));
 }

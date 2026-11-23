@@ -6,12 +6,7 @@
 
 export { batchable, longRunning, type Note } from './notes';
 export { type Purpose, purpose } from './purpose';
-export {
-  type ReturnsFact,
-  rawReturns,
-  returnsOf,
-  statedReturns,
-} from './returns';
+export { type ReturnsFact, returnsOf } from './returns';
 export {
   type DescriptionParts,
   type DescriptionTag,

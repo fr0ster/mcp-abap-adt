@@ -326,6 +326,59 @@ describe('a node SAP could not load is reported', () => {
   });
 });
 
+// Codex round 9: two nodes SAP could not load in one level carry the same
+// words — they stay two rows, in both walks.
+describe('two nodes SAP could not load in one level', () => {
+  const twoFailed =
+    '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+    '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+  const levels: Record<string, NodeLevel> = {
+    'P|root': levelOf([], [{ type: 'VIEW/DV', nodeId: '1' }]),
+    'P|1': nodeLevelOfXml(twoFailed),
+  };
+  const source: NodeStructureSource = {
+    async fetchNodeStructure(_t, name, options) {
+      return succeeded(
+        levels[`${name}|${options?.nodeId ?? 'root'}`] ?? levelOf([], []),
+      );
+    },
+  };
+  const TWO = [
+    ['VIEW/DV', 'not loaded by SAP'],
+    ['VIEW/DV', 'not loaded by SAP'],
+  ];
+
+  it('walkPackage answers two rows', async () => {
+    const walked = await walkPackage(source, 'P');
+    assert.deepStrictEqual(
+      walked.map((o) => [o.type, o.name]),
+      TWO,
+    );
+  });
+
+  it('walkPackages answers two rows', async () => {
+    const read = async (
+      requests: readonly { parentName: string; nodeId?: string }[],
+    ) =>
+      Promise.all(
+        requests.map(async (request) => ({
+          ok: true as const,
+          value: await source.fetchNodeStructure('DEVC/K', request.parentName, {
+            ...(request.nodeId === undefined ? {} : { nodeId: request.nodeId }),
+          }),
+        })),
+      );
+    const [answered] = await walkPackages(read, ['P']);
+    assert.ok(answered?.ok);
+    assert.deepStrictEqual(
+      answered.value.map((o) => [o.type, o.name]),
+      TWO,
+    );
+  });
+});
+
 describe('concurrentReader', () => {
   const context = { connection: {} } as unknown as HandlerContext;
   const tick = () => new Promise((resolve) => setImmediate(resolve));

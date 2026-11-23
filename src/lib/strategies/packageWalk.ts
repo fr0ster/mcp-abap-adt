@@ -614,7 +614,9 @@ function listedKeyOf(object: WalkedItem): string {
  * `objects` appended to `found`, each one `found` does not list yet (the same
  * type and name). A package root that has subpackages answers them in its own
  * `TREE_CONTENT`, and the subpackages type node it lists answers them again
- * (measured on premise, 2026-11-22, BASIS 816): each is listed once.
+ * (measured on premise, 2026-11-22, BASIS 816): each is listed once. A node
+ * SAP could not load is pushed beside it, never through this: two such nodes
+ * are two rows, and their rows carry the same words.
  */
 function appendUnlisted(
   found: WalkedItem[],
@@ -762,10 +764,11 @@ export async function walkPackages(
       if (root === undefined) return;
       // A package's own level SAP could not load is a row, never an empty
       // package.
-      appendUnlisted(walk.found, [
-        ...notLoadedRow(root, PACKAGE_CODE, walk.name),
-        ...nodeItemsOf(root).map((o) => objectOf(o, walk.name)),
-      ]);
+      walk.found.push(...notLoadedRow(root, PACKAGE_CODE, walk.name));
+      appendUnlisted(
+        walk.found,
+        nodeItemsOf(root).map((o) => objectOf(o, walk.name)),
+      );
       for (const child of childNodesOf(root)) {
         typeNodes.push({ walk, nodeId: child.nodeId, type: child.type });
       }
@@ -783,10 +786,11 @@ export async function walkPackages(
       typeNodes.forEach(({ walk, nodeId, type }, i) => {
         const typed = settle(walk, typeAnswers[i], { id: nodeId, type });
         if (typed === undefined) return;
-        appendUnlisted(walk.found, [
-          ...notLoadedRow(typed, type, walk.name),
-          ...nodeItemsOf(typed).map((o) => objectOf(o, walk.name)),
-        ]);
+        walk.found.push(...notLoadedRow(typed, type, walk.name));
+        appendUnlisted(
+          walk.found,
+          nodeItemsOf(typed).map((o) => objectOf(o, walk.name)),
+        );
       });
     }
 
@@ -874,10 +878,8 @@ export async function walkPackage(
   const found: WalkedItem[] = [];
   // A package's own level SAP could not load is a row, never an empty
   // package.
-  appendUnlisted(found, [
-    ...notLoadedRow(root, PACKAGE_CODE, pkg),
-    ...nodeItemsOf(root).map(owned),
-  ]);
+  found.push(...notLoadedRow(root, PACKAGE_CODE, pkg));
+  appendUnlisted(found, nodeItemsOf(root).map(owned));
   for (const child of childNodesOf(root)) {
     const level = await underBranchRule(
       options,
@@ -896,10 +898,8 @@ export async function walkPackage(
         ),
     );
     if (level !== undefined) {
-      appendUnlisted(found, [
-        ...notLoadedRow(level, child.type, pkg),
-        ...nodeItemsOf(level).map(owned),
-      ]);
+      found.push(...notLoadedRow(level, child.type, pkg));
+      appendUnlisted(found, nodeItemsOf(level).map(owned));
     }
   }
 

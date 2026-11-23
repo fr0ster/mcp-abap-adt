@@ -220,11 +220,15 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    drifted from what the tool returns whenever the code changed, and with `detail` any shape a
    description states is wrong at the other levels. As step 9 did for completeness, the
    description is assembled from parts the code already holds, and tests tie it to the output.
+   A description describes the tool's function first, and never what the result looks like
+   (owner): the purpose is its main part, the information facts follow it, then the notes. The
+   one place that describes form is the `detail` parameter's shared text (10.3).
 
    10.1 **The builder** (`src/lib/description/`, exported through `src/lib/description/index.ts`).
    - `toolDescription({ purpose, returns, notes? })` is the only producer of a tool's
-     `description`. It joins the purpose sentence, the Returns facts (one sentence per fact, in
-     the order given) and the notes that apply to the tool, and nothing else. `TOOL_DEFINITION`
+     `description`. It joins, in this order, the purpose sentence (the function, the main part),
+     the Returns facts (one sentence per fact, in the order given) and the notes that apply to
+     the tool, and nothing else. `TOOL_DEFINITION`
      takes its result; a plain string literal for `description` is refused by a source scan
      (10.6).
    - `purpose` is the only free text: one sentence of what the tool does, written by hand, typed
@@ -250,8 +254,13 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
      `omit` kinds with their reasons. A binding carries this as data, so the description and the
      writer read one value.
    - `returnsOf(schemas)` walks a tool's `RowSchemas` / `JsonSchemas` record and makes one fact
-     per list: "each <list> a row: <columns>", "each <kind> a `# <mark>` line", "a tree, each
-     node indented below its parent: <columns>", "<omitted kind>: left out at terse (<reason>)".
+     per list naming only what information comes back, in domain words, never its form: "for each
+     object: its type, name and description", "objects SAP could not load are named",
+     "subpackages with their objects". The list names, column names and kinds become the domain
+     nouns, each declared beside its schema as a noun phrase (`each object`, `its type`), so a
+     fact is still generated from the schemas and cannot drift. An `omit` kind is a plain domain
+     statement with its reason ("package and container nodes are not listed at terse"). No fact
+     says row, line, entry, value, tree or indentation.
      A tool states its schemas once, as a value both the writer and the description read; a
      table whose schemas are built per call (from the reading's options: a description column,
      a source column) states the variants as named schema records, and the description lists
@@ -277,8 +286,10 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
      boundaries: `{`, `}`, `[`, `]`, `` ` ``, `json`, `tsv`, `xml`, `list of`, `flat`, `tree`,
      `array`, `row`, `column`, `entry`, `entries`, `batch`, `envelope`, `request`, `requests`,
      `node structure`, `nodestructure`, `endpoint`, `parse`, `document`, `field`, `fields`,
-     `returns`, `answers`. The set lives in the test as one constant; adding a marker is a
-     reviewed change.
+     `returns`, `answers`, `line`, `lines`, `indented`, `mark`, `#`, `tab`. The set lives in the
+     test as one constant; adding a marker is a reviewed change.
+   - The same marker set applies to every generated Returns fact of every tool (a fact naming a
+     marker fails, naming the tool and the fact); `rows` and `row` are in it.
    - A purpose may name the domain: object kinds, SAP terms, what the user gets (`the source of a
      class`, `the objects of a package`, `where an object is used`).
    - The compact descriptions (`src/lib/compact/compactDescriptions.ts`,
@@ -289,8 +300,9 @@ Every rule gets a mutation that turns its test red. Each step changes the CHANGE
    10.5 **Description and output are tied** (`src/__tests__/unit/descriptions/returnsMatch.test.ts`).
    - For every tool on the writers, the test runs its golden fixtures (`terse-goldens.json`,
      `shipped-readings.json`) at terse and medium and reads what was written: the header columns,
-     the `#` heads and marks, the JSON member names. Every one of them is named in the tool's
-     generated Returns, and the Returns names nothing that no fixture of the tool writes.
+     the `#` heads and marks, the JSON member names. Each is declared in the schemas with its
+     domain noun; the noun of every one written is in the tool's generated Returns, and the
+     Returns names no noun whose column, head, mark or member no fixture of the tool writes.
    - A fixture set that does not reach a list or a kind the schemas declare fails the test,
      naming the list: the fixtures must cover every declared list.
    - Mutations: a column added to a writer and not to its schemas does not compile; a column

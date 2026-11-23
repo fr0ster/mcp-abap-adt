@@ -25,6 +25,8 @@ import {
   type DetailLevel,
   identityOf,
   type Line,
+  type ListedPart,
+  listedText,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -284,6 +286,20 @@ interface StructuresRead {
 /** What a level answers of one structure's tree. */
 type StructuresShown = (read: StructuresRead) => string;
 
+/**
+ * Each answered structure's read, by the answer it became: a list call
+ * writes every structure's terse text from these through `Written`, never
+ * by splicing the single answers' texts.
+ */
+const readsOf = new WeakMap<McpResult, StructuresRead>();
+
+/** One structure's answer at its level, its read kept for a list call. */
+function readAnswer(shown: StructuresShown, read: StructuresRead): McpResult {
+  const result = return_response({ data: shown(read) });
+  readsOf.set(result, read);
+  return result;
+}
+
 /** The tree as indented rows: structure, kind, the component it is under. */
 function structureRows(node: StructureNode, depth = 0): Line[] {
   const marks = [
@@ -337,26 +353,28 @@ const heldStructures = (read: StructuresRead) => [
   ),
 ];
 
+/** A structure's terse text: its heads, unread candidates and node rows. */
+const terseStructures = (read: StructuresRead) =>
+  Written.text(
+    [
+      { head: 'structure', value: read.structure_name },
+      ...(read.appends_unavailable ? [{ head: 'appends_unavailable' }] : []),
+      // Each candidate SAP refused to read, by name: the one to read again.
+      ...read.append_candidates_unread.map(
+        (unread): Line => ({
+          mark: 'append_candidate_unread',
+          words: [unread.candidate],
+        }),
+      ),
+      ...structureRows(read.tree),
+    ],
+    [0, 1, 2],
+  );
+
 // Every node and unread candidate, or nothing (`completeAnswer`); medium
 // and full write the tree whole.
 const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
-  terse: completeAnswer('GetStructuresList', heldStructures, (read) =>
-    Written.text(
-      [
-        { head: 'structure', value: read.structure_name },
-        ...(read.appends_unavailable ? [{ head: 'appends_unavailable' }] : []),
-        // Each candidate SAP refused to read, by name: the one to read again.
-        ...read.append_candidates_unread.map(
-          (unread): Line => ({
-            mark: 'append_candidate_unread',
-            words: [unread.candidate],
-          }),
-        ),
-        ...structureRows(read.tree),
-      ],
-      [0, 1, 2],
-    ),
-  ),
+  terse: completeAnswer('GetStructuresList', heldStructures, terseStructures),
   medium: fullStructures,
   full: fullStructures,
   raw: fullStructures,
@@ -597,15 +615,13 @@ async function structuresListOf(
       children: await buildChildren(rootName, rootSource),
     };
 
-    return return_response({
-      data: shown({
-        structure_name: rootName,
-        // True when a where-used lookup failed, so appends could not be
-        // determined and the tree may be missing them (≠ "no appends"). #128
-        appends_unavailable: includeExtensions && appendsUnavailable,
-        append_candidates_unread: unreadCandidates,
-        tree,
-      }),
+    return readAnswer(shown, {
+      structure_name: rootName,
+      // True when a where-used lookup failed, so appends could not be
+      // determined and the tree may be missing them (≠ "no appends"). #128
+      appends_unavailable: includeExtensions && appendsUnavailable,
+      append_candidates_unread: unreadCandidates,
+      tree,
     });
   } catch (error) {
     return return_error(error);
@@ -1071,15 +1087,13 @@ async function structureTreeFromAnswers(
       kind: 'root',
       children: await buildChildren(rootName, root.source),
     };
-    return return_response({
-      data: shown({
-        structure_name: rootName,
-        // True when a where-used lookup failed, so appends could not be
-        // determined and the tree may be missing them (≠ "no appends"). #128
-        appends_unavailable: includeExtensions && appendsUnavailable,
-        append_candidates_unread: unreadCandidates,
-        tree,
-      }),
+    return readAnswer(shown, {
+      structure_name: rootName,
+      // True when a where-used lookup failed, so appends could not be
+      // determined and the tree may be missing them (≠ "no appends"). #128
+      appends_unavailable: includeExtensions && appendsUnavailable,
+      append_candidates_unread: unreadCandidates,
+      tree,
     });
   } catch (error) {
     return return_error(error);
@@ -1191,13 +1205,23 @@ function listAnswer(
   level: DetailLevel,
 ): McpResult {
   if (level === 'terse') {
-    const text = results
-      .map((result, i) =>
-        result.isError
-          ? `# structure ${names[i] ?? ''}\n# error ${JSON.stringify(payloadOfAnswer(result))}`
-          : (result.content[0]?.text ?? ''),
-      )
-      .join('\n');
+    // Every structure's text through `Written`: a failure under its escaped
+    // `# structure` line and one `# error` line; an answered one as its own
+    // terse writer writes it.
+    const text = listedText(
+      'GetStructuresList',
+      results.map((result, i): ListedPart<StructuresRead> => {
+        const read = readsOf.get(result);
+        return result.isError || read === undefined
+          ? {
+              heads: [{ head: 'structure', value: names[i] ?? '' }],
+              error: JSON.stringify(payloadOfAnswer(result)),
+            }
+          : { heads: [], read };
+      }),
+      heldStructures,
+      terseStructures,
+    );
     return { isError: false, content: [{ type: 'text', text }] };
   }
   const entries = results.map((result, i) =>

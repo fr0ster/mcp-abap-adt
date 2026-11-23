@@ -15,12 +15,7 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import {
-  answerAt,
-  completeAnswer,
-  identityOf,
-  Written,
-} from '../../../lib/detail';
+import { answerAt, omitting, rows, writeListing } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -73,7 +68,12 @@ const textOf = (entry: XmlRead): string => {
   return String(text);
 };
 
-const entriesOf = (value: XmlRead): { text: string }[] => {
+/** One line of the log. */
+interface LogEntry {
+  readonly text: string;
+}
+
+const entriesOf = (value: XmlRead): LogEntry[] => {
   const log = child(value, 'log:log') ?? value;
   const raw = child(log, 'log:entry');
   const list = isList(raw) ? raw : raw ? [raw] : [];
@@ -123,29 +123,37 @@ export async function handleReadTransportActionLog(
     string | XmlRead | ReturnType<typeof terseLog>
   >(
     {
-      // Every entry, or nothing (`completeAnswer`): a separator line (only
-      // `=` or `-`) is no entry, and is not counted.
-      terse: completeAnswer(
-        'ReadTransportActionLog',
-        (reading: AdtReading<XmlRead>) =>
-          entriesOf(reading.value)
-            .filter((entry) => !isSeparator(entry.text))
-            .map((entry) => identityOf([entry.text])),
-        (reading: AdtReading<XmlRead>) => {
-          const entries = entriesOf(reading.value).filter(
-            (entry) => !isSeparator(entry.text),
-          );
-          return Written.text(
-            [
-              { head: 'transport', value: args.transport_number },
-              { head: 'count', value: String(entries.length) },
-              { header: ['entry'] },
-              ...entries.map((entry) => ({ row: [entry.text] })),
-            ],
-            [0],
-          );
-        },
-      ),
+      // Every entry, written by the listing writer: a separator line (only
+      // `=` or `-`) is no entry — an omit kind of the approved shape — and
+      // is not counted.
+      terse: (reading: AdtReading<XmlRead>) => {
+        const entries = entriesOf(reading.value);
+        return writeListing({
+          heads: [
+            { head: 'transport', value: args.transport_number },
+            {
+              head: 'count',
+              value: String(
+                entries.filter((entry) => !isSeparator(entry.text)).length,
+              ),
+            },
+          ],
+          reading: { entries },
+          lists: {
+            entries: rows('entries', {
+              columns: [
+                { name: 'entry', cell: (entry: LogEntry) => entry.text },
+              ],
+              header: 'always',
+              omit: omitting(
+                (entry: LogEntry) =>
+                  isSeparator(entry.text) ? 'separator' : 'entry',
+                { separator: 'a separator line: no entry' },
+              ),
+            }),
+          },
+        }).answer;
+      },
       medium: (reading) => terseLog(reading.value),
       full: (reading) => reading.value ?? reading.raw,
       raw: (reading) => reading.raw,

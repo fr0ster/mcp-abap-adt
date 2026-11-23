@@ -61,7 +61,7 @@ const IMPORTS =
  * (`CL_ABAPGIT_BG_ACTION_PULL->execute` L123–152; Code): `overwrite`.
  */
 const CLOUD_IMPORTS =
-  'every object changed only in the remote is imported; of the objects GetAbapGitModifiedObjects lists (changed in the system, or held by another package), the pull overwrites those named in overwrite with their remote version, and the others keep their system version';
+  'every object changed only in the remote is imported; of the objects changed in the system or held by another package, the pull overwrites those named in overwrite with their remote version, and the others keep their system version';
 
 const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 

@@ -23,6 +23,7 @@ import {
   FILENAME_FIELD,
   FOLDER_LOGIC_FIELD,
   OBJECTS_FIELD,
+  OVERWRITE_FIELD,
   PACKAGE_NAME_FIELD,
   REPOSITORY_KEY_FIELD,
   TRANSPORT_REQUEST_FIELD,
@@ -262,6 +263,11 @@ function writeProperties(actions: readonly AbapGitWriteAction[]) {
         push: 'required, the objects and files to commit, as staging with detail "medium" answers them.',
       }),
     ),
+    overwrite: OVERWRITE_FIELD.optional().describe(
+      said(actions, {
+        pull: 'cloud: the objects modified_objects lists that the pull overwrites with their remote version, each once, by type and name.',
+      }),
+    ),
     comment: COMMENT_FIELD.optional().describe(
       said(actions, { push: 'required, the commit message.' }),
     ),
@@ -314,7 +320,12 @@ function writeTakes(variant: ProjectionVariant): {
       ...background,
     ],
     unlink: ['repository_key'],
-    pull: ['repository_key', 'transport_request', ...background],
+    pull: [
+      'repository_key',
+      'transport_request',
+      ...(variant === 'cloud' ? (['overwrite'] as const) : []),
+      ...background,
+    ],
     push: [
       'repository_key',
       'objects',
@@ -348,7 +359,7 @@ const ACTION_SENTENCES_WRITE: Readonly<Record<AbapGitWriteAction, string>> = {
   link: 'link(package_name*, url*, branch*, transport_request) links the package to the remote repository; on premise it also imports every object of the branch',
   unlink:
     "unlink(repository_key*) ends the repository's binding to its package; the objects stay",
-  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job, its objects are inactive, and an object changed in the system or held by another package keeps its system version (modified_objects lists those objects)',
+  pull: 'pull(repository_key*, transport_request) imports every object changed in the remote branch the repository is linked on, overwriting local changes and objects of other packages; on cloud SAP runs it as its own job, its objects are inactive, and of the objects modified_objects lists (changed in the system, or held by another package) it overwrites those named in overwrite, the others keeping their system version',
   push: 'push(repository_key*, objects*, comment*, author*, committer*) commits the chosen objects and pushes the commit; on cloud SAP runs it as its own job',
   switch_branch:
     'switch_branch(repository_key*, branch*, create*) switches the branch, creating it in the remote with create true',

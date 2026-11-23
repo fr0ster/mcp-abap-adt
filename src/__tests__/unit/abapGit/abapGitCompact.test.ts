@@ -151,6 +151,8 @@ describe('the compact abapGit tools: registration', () => {
     assert.equal(keys(write, 'cloud').includes('folder_logic'), true);
     assert.equal(keys(write, 'onprem').includes('create'), true);
     assert.equal(keys(write, 'cloud').includes('create'), false);
+    assert.equal(keys(write, 'onprem').includes('overwrite'), false);
+    assert.equal(keys(write, 'cloud').includes('overwrite'), true);
   });
 
   it('each action is deniable: the narrowed enum leaves the denied one out', () => {
@@ -379,6 +381,43 @@ describe('the compact abapGit tools: each action is its full tool', () => {
       assert.deepEqual(viaCompact, viaFull);
     });
   }
+
+  it('HandlerAbapGit pull with overwrite sends and answers as PullAbapGitRepo: R6, then the selected entries', async () => {
+    const full = abapGitWriteEntries().find(
+      (entry) => entry.toolDefinition.name === 'PullAbapGitRepo',
+    );
+    assert.ok(full);
+    const args = {
+      repository_key: REPO_KEY,
+      overwrite: [{ type: 'CLAS/OC', name: 'ZCL_DEMO' }],
+    };
+    const through = async (entry: HandlerEntry, callArgs: ToolArgs) => {
+      const sap = stubSap((request) =>
+        request.method === 'GET'
+          ? { status: 200, data: modifiedObjects }
+          : { status: 202, data: '' },
+      );
+      declareSystemKind(sap.connection, 'cloud');
+      const result = await entry.call(contextOn(sap.connection, R1), callArgs);
+      return {
+        sent: sap.sent.map((request) => ({
+          method: request.method,
+          url: request.url,
+          data: request.data,
+          headers: request.headers,
+        })),
+        text: answerText(toolAnswer(result)),
+      };
+    };
+    const viaFull = await through(full, args);
+    const viaCompact = await through(compactEntry('HandlerAbapGit'), {
+      action: 'pull',
+      ...args,
+    });
+    assert.equal(viaFull.sent.length, 2);
+    assert.equal(String(viaFull.sent[1]?.data).includes('ZCL_DEMO'), true);
+    assert.deepEqual(viaCompact, viaFull);
+  });
 
   it("an action's missing argument is refused naming its full tool, nothing sent", async () => {
     const sap = stubSap();

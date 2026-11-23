@@ -5,10 +5,13 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import * as z from 'zod';
 import type { AdtCodes } from '../../../lib/adtProjections';
 import {
+  answerPayload,
   type FailureEntry,
   failedPayloadOf,
   failureEntry,
   isCredentialPayload,
+  type ListedAnswer,
+  listedAnswer,
   type McpResult,
   thrownEntry,
 } from '../../../lib/answer';
@@ -30,10 +33,11 @@ import {
   listAnswerAt,
   marks,
   nest,
-  omitted,
-  parts,
+  node,
+  partsOf,
   type RowSchemas,
   rows,
+  sections,
   type TextResult,
   values,
   type Written,
@@ -48,7 +52,7 @@ import {
   READ_VERSION_FIELD,
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
-import { type JsonValue, jsonOrText } from '../../../lib/json';
+import type { JsonValue } from '../../../lib/json';
 import {
   LONG_BACKGROUND_FIELD,
   withLongToolAdvice,
@@ -329,14 +333,15 @@ const structureColumns: Column<StructureNode>[] = [
   },
 ];
 
+/** Each failure of a read as a `# failure` line, its JSON one cell. */
+const failureMarks = <K extends string>(key: K) =>
+  marks(key, 'failure', (entry: FailureEntry) => [JSON.stringify(entry)]);
+
 /** Every node below a node, one level deeper. */
 const structureSchemas: RowSchemas<StructureNode> = {
-  // The approved terse shape: a node not read is its `not read` cell; the
-  // failures of its read are full's.
-  error: omitted<FailureEntry, 'error'>(
-    'error',
-    'the failures of a node not read: its `not read` cell, full holds them',
-  ),
+  // A node not read: its `not read` cell, then each failure of its read
+  // (what each endpoint answered, with its step) a line of its own.
+  error: failureMarks('error'),
   children: rows('children', {
     columns: structureColumns,
     header: 'none',
@@ -373,35 +378,29 @@ function structuresWhole(read: StructuresRead) {
  * before `detail`. A tree reads many documents, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
-/** What one structure's terse text writes: the candidates not read, and the tree from its root. */
-interface StructuresTerse {
-  readonly append_candidates_unread: StructuresRead['append_candidates_unread'];
-  readonly tree: readonly StructureNode[];
-}
 
 /**
  * A structure's terse text, written from its read: its heads, a mark per
  * append candidate SAP refused to read, then the tree from its root.
  */
-const structuresListing = (read: StructuresRead): Listing<StructuresTerse> => ({
+const structuresListing = (read: StructuresRead): Listing<StructuresRead> => ({
   heads: [
     { head: 'structure', value: read.structure_name },
     ...(read.appends_unavailable ? [{ head: 'appends_unavailable' }] : []),
   ],
-  reading: {
-    append_candidates_unread: read.append_candidates_unread,
-    tree: [read.tree],
-  },
+  reading: read,
   lists: {
-    // Each candidate SAP refused to read, by name: the one to read again.
-    append_candidates_unread: marks(
+    // Each candidate SAP refused to read, by name — the one to read again —
+    // then each failure of its read.
+    append_candidates_unread: sections(
       'append_candidates_unread',
-      'append_candidate_unread',
       (unread: StructuresRead['append_candidates_unread'][number]) => [
-        unread.candidate,
+        { mark: 'append_candidate_unread', words: [unread.candidate] },
       ],
+      { failures: failureMarks('failures') },
     ),
-    tree: rows('tree', {
+    // The tree from its root: the root a row, every node below it.
+    tree: node('tree', {
       columns: structureColumns,
       header: 'none',
       tree: true,
@@ -1229,7 +1228,7 @@ async function structureTrees(
 
 /** An answer's payload: its JSON, else its text. */
 function payloadOfAnswer(result: McpResult): JsonValue {
-  return jsonOrText(result.content[0]?.text ?? '');
+  return answerPayload(result);
 }
 
 /** Whether an answer is a credential failure: it ends a call for several structures. */
@@ -1275,25 +1274,25 @@ function terseList({ names, results }: ListOf): Written<TextResult> {
     reading: {
       answered: results.map((result, i) => ({
         name: names[i] ?? '',
-        result,
+        answer: answerPayload(result),
         read: result.isError ? undefined : readsOf.get(result),
       })),
     },
     lists: {
-      answered: parts(
+      answered: partsOf(
         'answered',
-        ({ name, result, read }: AnsweredStructure): Head[] =>
+        ({ name, answer, read }: AnsweredStructure): Head[] =>
           read === undefined
             ? [
                 { head: 'structure', value: name },
                 {
                   head: 'error',
-                  value: JSON.stringify(payloadOfAnswer(result)),
+                  value: JSON.stringify(answer),
                 },
               ]
             : [],
-        ({ read }: AnsweredStructure) =>
-          read === undefined ? undefined : nest(structuresListing(read)),
+        'read',
+        (read) => nest(structuresListing(read)),
       ),
     },
   });
@@ -1303,7 +1302,7 @@ function terseList({ names, results }: ListOf): Written<TextResult> {
 /** One structure of a list call: its name, its answer, and its read when answered. */
 interface AnsweredStructure {
   readonly name: string;
-  readonly result: McpResult;
+  readonly answer: JsonValue;
   readonly read: StructuresRead | undefined;
 }
 
@@ -1312,12 +1311,14 @@ function jsonList({ names, results }: ListOf): Written<TextResult> {
   // Every answer one entry, written by the listing writer.
   return asJsonResult(
     writeJsonList(
-      { answered: results.map((result, i) => ({ result, i })) },
-      values('answered', ({ result, i }: { result: McpResult; i: number }) =>
-        ((result, i) =>
-          result.isError
-            ? { structure_name: names[i], error: payloadOfAnswer(result) }
-            : payloadOfAnswer(result))(result, i),
+      { answered: results.map(listedAnswer) },
+      values('answered', ({ isError, answer, i }: ListedAnswer) =>
+        ((isError, answer, i) =>
+          isError ? { structure_name: names[i], error: answer } : answer)(
+          isError,
+          answer,
+          i,
+        ),
       ),
     ),
   );

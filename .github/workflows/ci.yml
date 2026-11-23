@@ -340,7 +340,7 @@ jobs:
 
   # Plan step 10.8a: the vector checks of meaning — each assembled tool's
   # description and its name must rank its own function first among every
-  # tool's — with one model, `mxbai-embed-large` (fewest held-out failures: plan 10.8a), served by an Ollama service
+  # tool's — with one model, `bge-m3` on the CPU (the owner's interim choice: plan 10.8a), served by an Ollama service
   # container. The branch ruleset requires this job by its exact name.
   meaning-vectors:
     name: meaning-vectors
@@ -373,7 +373,7 @@ jobs:
         run: |
           digest=$(curl -fsSL \
             -H 'Accept: application/vnd.docker.distribution.manifest.v2+json' \
-            https://registry.ollama.ai/v2/library/mxbai-embed-large/manifests/latest \
+            https://registry.ollama.ai/v2/library/bge-m3/manifests/latest \
             | sha256sum | cut -d' ' -f1)
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
@@ -386,17 +386,17 @@ jobs:
         uses: actions/cache@v4
         with:
           path: /home/runner/ollama-models
-          key: ollama-mxbai-embed-large-${{ steps.model.outputs.digest }}
+          key: ollama-bge-m3-${{ steps.model.outputs.digest }}
 
       # Idempotent: a cached model is found and kept, a missing one fetched.
       - name: Pull the model
         run: |
           curl -fsS http://127.0.0.1:11434/api/pull \
-            -d '{"model":"mxbai-embed-large","stream":false}'
+            -d '{"model":"bge-m3","stream":false}'
           sudo chown -R "$(id -u):$(id -g)" /home/runner/ollama-models
 
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
       - name: Run the meaning checks
-        run: npm test -- --concurrency 1 --env MEANING_MODELS=mxbai-embed-large src/__tests__/unit/descriptions/meaning.test.ts
+        run: npm test -- --concurrency 1 --env MEANING_MODELS=bge-m3 src/__tests__/unit/descriptions/meaning.test.ts

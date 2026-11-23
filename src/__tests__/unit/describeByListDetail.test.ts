@@ -22,7 +22,7 @@ const HIT =
 const NONE =
   '<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"/>';
 
-async function describe_(detail?: 'terse' | 'full') {
+async function describe_(detail?: 'terse' | 'medium' | 'full') {
   const connection = recordingConnection([{ data: HIT }, { data: NONE }]);
   declareSystemKind(connection, 'onprem');
   const batchAvailability = createBatchAvailability();
@@ -34,7 +34,7 @@ async function describe_(detail?: 'terse' | 'full') {
       ...(detail === undefined ? {} : { detail }),
     },
   );
-  assert.equal(result.isError, false);
+  assert.equal(result.isError, false, result.content[0]?.text);
   return result;
 }
 
@@ -52,9 +52,17 @@ describe('DescribeByList detail', () => {
     );
   });
 
-  it('full: one content entry per object found, as before detail', async () => {
-    const result = await describe_('full');
-    assert.equal(result.content.length, 2);
-    assert.equal(JSON.parse(result.content[0]?.text ?? '').name, 'ZCL_A');
-  });
+  // Every object asked, at every level (the owner's rule: complete or an
+  // error): one no search found is answered as not found, never left out.
+  for (const detail of ['medium', 'full'] as const) {
+    it(`${detail}: one content entry per object asked, the one not found as such`, async () => {
+      const result = await describe_(detail);
+      assert.equal(result.content.length, 2);
+      assert.equal(JSON.parse(result.content[0]?.text ?? '').name, 'ZCL_A');
+      assert.deepStrictEqual(JSON.parse(result.content[1]?.text ?? ''), {
+        name: 'ZNONE',
+        found: false,
+      });
+    });
+  }
 });

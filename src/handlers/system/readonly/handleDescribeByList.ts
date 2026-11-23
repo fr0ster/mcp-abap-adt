@@ -112,7 +112,7 @@ type Described =
   | { ends: McpResult }
   | {
       ends?: undefined;
-      entry: ContentEntry | undefined;
+      entry: ContentEntry;
       /** The search's own answer text, its TSV rows: what terse answers. */
       hits?: string;
       /** The object's failure, when its search was refused. */
@@ -125,25 +125,45 @@ interface DescribedItem {
   described: Described & { ends?: undefined };
 }
 
+/** An object asked for, by its name and type. */
+const askedIdentity = ({ obj }: DescribedItem) =>
+  `object|${obj.name}|${obj.type ?? ''}`;
+
+/** Every object asked for, by its identity. */
+const heldAsked = (items: readonly DescribedItem[]) => items.map(askedIdentity);
+
+/**
+ * One content entry per object asked, in order — its results, its failure,
+ * or `found: false` for one no search found — or nothing
+ * (`completeAnswer`).
+ */
+const fullDescribed = completeAnswer(
+  'DescribeByList',
+  heldAsked,
+  (items: readonly DescribedItem[]): Rendered<McpResult> => {
+    const rendered: string[] = [];
+    const content = items.map((item) => {
+      rendered.push(askedIdentity(item));
+      return item.described.entry;
+    });
+    return { answer: { isError: false, content }, rendered };
+  },
+);
+
 /**
  * What DescribeByList answers at each `detail`, selected before the
  * searches (`src/lib/detail`): terse one TSV — one header, each object's
  * rows (name, type, description, package), `NAME\t-` for an object no
  * search found, `# error NAME` and its failure for a refused one; medium and
- * full the answer before `detail`, one content entry per object found. The
- * answer is built from several searches, so
- * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
+ * full one content entry per object asked ({@link fullDescribed}). The
+ * answer is built from several searches, so raw never reaches this table:
+ * the handler answers it as the wire documents (`wireAnswer`). Every level
+ * answers every object asked, or nothing (`completeAnswer`).
  */
-/** An object asked for, by its name and type. */
-const askedIdentity = ({ obj }: DescribedItem) =>
-  `object|${obj.name}|${obj.type ?? ''}`;
-
 const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
-  // Every object asked for — its hits, its not-found row or its failure —
-  // or nothing (`completeAnswer`).
   terse: completeAnswer(
     'DescribeByList',
-    (items: readonly DescribedItem[]) => items.map(askedIdentity),
+    heldAsked,
     (items: readonly DescribedItem[]): Rendered<McpResult> => {
       const lines = ['name\ttype\tdescription\tpackage'];
       const rendered: string[] = [];
@@ -178,16 +198,6 @@ const DESCRIBE_ANSWERS: AnswerTable<readonly DescribedItem[], McpResult> = {
   raw: fullDescribed,
 };
 
-/** The answer before `detail`: one content entry per object found, in order. */
-function fullDescribed(items: readonly DescribedItem[]): McpResult {
-  return {
-    isError: false,
-    content: items.flatMap(({ described }) =>
-      described.entry === undefined ? [] : [described.entry],
-    ),
-  };
-}
-
 /**
  * One object's entry from its first search's answer and, when that was
  * empty or failed, its second's (without the type).
@@ -220,9 +230,22 @@ function describedBy(
       };
     }
   }
-  // Empty: skip this object
-  if (res === undefined || res.content.length === 0) {
-    return { entry: undefined };
+  // No search found it: the object is answered as not found, at every
+  // level — never left out.
+  if (
+    res === undefined ||
+    res.content.every((item) => (item.text ?? '') === '')
+  ) {
+    return {
+      entry: {
+        type: 'text',
+        text: JSON.stringify({
+          name: obj.name,
+          ...(obj.type !== undefined ? { type: obj.type } : {}),
+          found: false,
+        }),
+      },
+    };
   }
   // Handle SearchObject-style payloads containing a results array
   const allResults: AnswerValue[] = [];

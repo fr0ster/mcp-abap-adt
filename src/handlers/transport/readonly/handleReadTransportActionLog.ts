@@ -15,7 +15,7 @@ import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt, tsv } from '../../../lib/detail';
+import { answerAt, completeAnswer, tsv, Written } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
@@ -118,19 +118,31 @@ export async function handleReadTransportActionLog(
     string | XmlRead | ReturnType<typeof terseLog>
   >(
     {
-      terse: (reading) => {
-        const entries = entriesOf(reading.value).filter(
-          (entry) => !isSeparator(entry.text),
-        );
-        return [
-          `# transport ${args.transport_number}`,
-          `# count ${entries.length}`,
-          tsv(
-            ['entry'],
-            entries.map((entry) => [entry.text]),
-          ),
-        ].join('\n');
-      },
+      // Every entry, or nothing (`completeAnswer`): a separator line (only
+      // `=` or `-`) is no entry, and is not counted.
+      terse: completeAnswer(
+        'ReadTransportActionLog',
+        (reading: AdtReading<XmlRead>) =>
+          entriesOf(reading.value)
+            .filter((entry) => !isSeparator(entry.text))
+            .map((entry) => entry.text),
+        (reading: AdtReading<XmlRead>) => {
+          const entries = entriesOf(reading.value).filter(
+            (entry) => !isSeparator(entry.text),
+          );
+          return Written.lines([
+            `# transport ${args.transport_number}`,
+            `# count ${entries.length}`,
+            Written.tsv(
+              ['entry'],
+              entries.map((entry) => ({
+                cells: [entry.text],
+                identity: entry.text,
+              })),
+            ),
+          ]);
+        },
+      ),
       medium: (reading) => terseLog(reading.value),
       full: (reading) => reading.value ?? reading.raw,
       raw: (reading) => reading.raw,

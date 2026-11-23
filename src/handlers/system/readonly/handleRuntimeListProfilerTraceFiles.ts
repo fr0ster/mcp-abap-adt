@@ -8,11 +8,13 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   rawLevel,
   readingAt,
   tsv,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -48,27 +50,53 @@ function mediumEntry(entry: IAbapTraceEntry) {
  * view's); medium every field but the uri; full the answer before `detail`;
  * raw the feed as ADT sent it.
  */
+/** Every trace the feed held, by its id. */
+const heldTraces = (entries: readonly IAbapTraceEntry[]) =>
+  entries.map((entry) => entry.id);
+
+// Every trace the feed held, or nothing (`completeAnswer`).
 const TRACE_READINGS: DetailTable<string | object> = {
-  terse: formatted(profilerTraceEntries, (entries: IAbapTraceEntry[]) =>
-    [
-      `# count ${entries.length}`,
-      tsv(
-        ['id', 'recordedAt', 'objectName', 'state', 'runtime'],
-        entries.map((entry) => [
-          entry.id,
-          entry.recordedAt,
-          entry.objectName,
-          entry.state?.text ?? '',
-          String(entry.runtime),
+  terse: formatted(
+    profilerTraceEntries,
+    completeAnswer(
+      'RuntimeListProfilerTraceFiles',
+      heldTraces,
+      (entries: IAbapTraceEntry[]) =>
+        Written.lines([
+          `# count ${entries.length}`,
+          Written.tsv(
+            ['id', 'recordedAt', 'objectName', 'state', 'runtime'],
+            entries.map((entry) => ({
+              cells: [
+                entry.id,
+                entry.recordedAt,
+                entry.objectName,
+                entry.state?.text ?? '',
+                String(entry.runtime),
+              ],
+              identity: entry.id,
+            })),
+          ),
         ]),
-      ),
-    ].join('\n'),
+    ),
   ),
-  medium: formatted(profilerTraceEntries, (entries: IAbapTraceEntry[]) => ({
-    success: true,
-    count: entries.length,
-    entries: entries.map(mediumEntry),
-  })),
+  medium: formatted(
+    profilerTraceEntries,
+    completeAnswer(
+      'RuntimeListProfilerTraceFiles',
+      heldTraces,
+      (entries: IAbapTraceEntry[]) =>
+        Written.list(
+          {
+            success: true,
+            count: entries.length,
+            entries: entries.map(mediumEntry),
+          },
+          (answer) => answer.entries,
+          (entry) => entry.id,
+        ),
+    ),
+  ),
   full: formatted(profilerTraceEntries, (entries: IAbapTraceEntry[]) => ({
     success: true,
     count: entries.length,

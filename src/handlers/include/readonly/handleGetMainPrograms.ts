@@ -6,11 +6,13 @@ import { answer } from '../../../lib/answer';
 import { createOnPremAdtClient } from '../../../lib/clients';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   rawLevel,
   readingAt,
   tsv,
+  Written,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -89,20 +91,40 @@ function mainProgramReadings(
 ): DetailTable<string | object> {
   const programsOf = (answer: Parameters<typeof rawOf>[0]) =>
     mainProgramsOf(rawOf(answer));
+  // Every main program the reading held, or nothing (`completeAnswer`).
+  const programIdentity = (program: { type: string; name: string }) =>
+    `${program.type}|${program.name}`;
+  const held = (programs: readonly MainProgram[]) =>
+    programs.map(programIdentity);
   return {
-    terse: formatted(programsOf, (programs) =>
-      [
-        `# include ${includeName}`,
-        tsv(
-          ['type', 'name'],
-          programs.map((program) => [program.type, program.name]),
-        ),
-      ].join('\n'),
+    terse: formatted(
+      programsOf,
+      completeAnswer('GetMainPrograms', held, (programs: MainProgram[]) =>
+        Written.lines([
+          `# include ${includeName}`,
+          Written.tsv(
+            ['type', 'name'],
+            programs.map((program) => ({
+              cells: [program.type, program.name],
+              identity: programIdentity(program),
+            })),
+          ),
+        ]),
+      ),
     ),
-    medium: formatted(programsOf, (programs) => ({
-      include_name: includeName,
-      main_programs: programs.map(({ uri: _uri, ...fields }) => fields),
-    })),
+    medium: formatted(
+      programsOf,
+      completeAnswer('GetMainPrograms', held, (programs: MainProgram[]) =>
+        Written.list(
+          {
+            include_name: includeName,
+            main_programs: programs.map(({ uri: _uri, ...fields }) => fields),
+          },
+          (answer) => answer.main_programs,
+          programIdentity,
+        ),
+      ),
+    ),
     full: formatted(programsOf, (programs) => ({
       success: true,
       include_name: includeName,

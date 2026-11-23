@@ -833,6 +833,7 @@ export async function runPinCase(
   assert.deepStrictEqual(
     { isError: answer.isError },
     { isError: c.refusal === 'answer' },
+    answer.content[0]?.text,
   );
   if (c.expected === 'none') {
     assert.deepStrictEqual(first.requests, []);

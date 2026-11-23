@@ -8,11 +8,13 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   rawLevel,
   readingAt,
   tsv,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -21,6 +23,10 @@ import {
   levelOf,
 } from '../../../lib/strategies/detail';
 import { ourFeeds } from '../../../lib/strategies/resultSets';
+
+/** A message's identity: its id, and when it was created. */
+const messageIdentity = (m: ISystemMessageEntry) =>
+  `${m.id ?? m.messageId ?? ''}|${m.createdOn ?? ''}|${m.title ?? ''}`;
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
@@ -90,19 +96,29 @@ const SYSTEM_MESSAGE_READINGS: DetailTable<string | object> = (() => {
     }),
   );
   return {
-    terse: formatted(feedSystemMessages, (messages: ISystemMessageEntry[]) =>
-      [
-        `# count ${messages.length}`,
-        tsv(
-          ['id', 'createdOn', 'author', 'title'],
-          messages.map((m) => [
-            m.id ?? m.messageId ?? '',
-            m.createdOn ?? '',
-            m.author ?? m.createdBy ?? '',
-            m.title ?? '',
+    // Every message the feed held, or nothing (`completeAnswer`).
+    terse: formatted(
+      feedSystemMessages,
+      completeAnswer(
+        'RuntimeListSystemMessages',
+        (messages: ISystemMessageEntry[]) => messages.map(messageIdentity),
+        (messages: ISystemMessageEntry[]) =>
+          Written.lines([
+            `# count ${messages.length}`,
+            Written.tsv(
+              ['id', 'createdOn', 'author', 'title'],
+              messages.map((m) => ({
+                cells: [
+                  m.id ?? m.messageId ?? '',
+                  m.createdOn ?? '',
+                  m.author ?? m.createdBy ?? '',
+                  m.title ?? '',
+                ],
+                identity: messageIdentity(m),
+              })),
+            ),
           ]),
-        ),
-      ].join('\n'),
+      ),
     ),
     medium: every,
     full: every,

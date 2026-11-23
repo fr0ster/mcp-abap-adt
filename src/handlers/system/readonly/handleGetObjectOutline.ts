@@ -30,8 +30,9 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
-  indentedTsv,
-  type TreeRow,
+  completeAnswer,
+  type TreeItemRow,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -210,11 +211,29 @@ function definitionOf(component: AnsweredComponent): AnsweredLink | undefined {
  * line, and its source where it is not the one the `# source` line names (a
  * local include, a module's include).
  */
+/** A component's identity: its depth, name and type. */
+function componentIdentity(component: AnsweredComponent, depth: number) {
+  return `${depth}|${component.name}|${component.type}`;
+}
+
+/** Every component of a tree, with and below its root. */
+function componentIdentities(
+  component: AnsweredComponent,
+  depth = 0,
+): string[] {
+  return [
+    componentIdentity(component, depth),
+    ...component.children.flatMap((child) =>
+      componentIdentities(child, depth + 1),
+    ),
+  ];
+}
+
 function outlineRows(
   component: AnsweredComponent,
   source: string | undefined,
   depth = 0,
-): TreeRow[] {
+): TreeItemRow[] {
   const definition = definitionOf(component);
   const line =
     definition?.start === undefined ? '' : String(definition.start.line);
@@ -232,6 +251,7 @@ function outlineRows(
         line,
         elsewhere,
       ],
+      identity: componentIdentity(component, depth),
     },
     ...component.children.flatMap((child) =>
       outlineRows(child, source, depth + 1),
@@ -257,18 +277,25 @@ function outlineAnswers(
       ? undefined
       : componentOf(outline.base, outline.root);
   return {
-    terse: ({ document, outline }) => {
-      if (outline === undefined) return document;
-      const root = components(outline);
-      if (root === undefined) return document;
-      const source = definitionOf(root)?.source;
-      return [
-        `# object ${objectType} ${objectName}`,
-        ...(source === undefined ? [] : [`# source ${source}`]),
-        'name\ttype\tvisibility\tline\tsource',
-        indentedTsv(outlineRows(root, source)),
-      ].join('\n');
-    },
+    // Every component of the outline, or nothing (`completeAnswer`).
+    terse: completeAnswer(
+      'GetObjectOutline',
+      ({ outline }: OutlineRead) => {
+        const root = outline === undefined ? undefined : components(outline);
+        return root === undefined ? [] : componentIdentities(root);
+      },
+      ({ document, outline }: OutlineRead) => {
+        const root = outline === undefined ? undefined : components(outline);
+        if (root === undefined) return Written.lines([document]);
+        const source = definitionOf(root)?.source;
+        return Written.lines([
+          `# object ${objectType} ${objectName}`,
+          ...(source === undefined ? [] : [`# source ${source}`]),
+          'name\ttype\tvisibility\tline\tsource',
+          Written.indented(outlineRows(root, source)),
+        ]);
+      },
+    ),
     medium: ({ document, outline }) =>
       outline === undefined
         ? document

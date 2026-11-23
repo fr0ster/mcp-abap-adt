@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { completeAnswer, Written } from '../../../lib/detail';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * Handler for retrieving ADT object structure and returning a compact tree.
@@ -52,6 +53,8 @@ interface ObjectStructureTreeNode {
   description?: string | undefined;
   isfolder: boolean;
   children: ObjectStructureTreeNode[];
+  /** The object asked for, which SAP does not send: no node of the document. */
+  synthetic?: true;
 }
 
 /**
@@ -105,7 +108,7 @@ function buildNestedTree(
   });
   const roots: ObjectStructureTreeNode[] = [];
   const synthetic: ObjectStructureTreeNode | undefined = root
-    ? { ...root, isfolder: false, children: [] }
+    ? { ...root, isfolder: false, children: [], synthetic: true }
     : undefined;
   flatNodes.forEach((node) => {
     if (node.parentid && nodeMap[node.parentid]) {
@@ -201,6 +204,56 @@ export function treeText(
   return `tree:\n${serializeTree(buildNestedTree(nodes, root), withOwner)}`;
 }
 
+/** A node's identity: its type, its owner's name and its own. */
+function nodeIdentity(node: {
+  objecttype?: string | undefined;
+  objectname?: string | undefined;
+  description?: string | undefined;
+}): string {
+  return `${node.objecttype ?? ''}|${node.objectname ?? ''}|${node.description ?? ''}`;
+}
+
+/** The tree as bulleted rows, depth first; the object asked, which SAP did not send, no item. */
+function bulletRows(
+  tree: ObjectStructureTreeNode[],
+  withOwner: boolean,
+  depth = 0,
+): { depth: number; label: string; identity: string }[] {
+  return tree.flatMap((node) => [
+    {
+      depth,
+      label: labelOf(node, withOwner),
+      identity: node.synthetic === true ? '' : nodeIdentity(node),
+    },
+    ...bulletRows(node.children, withOwner, depth + 1),
+  ]);
+}
+
+/**
+ * {@link treeText}, guarded: every node of the document, or nothing
+ * (`completeAnswer`).
+ */
+function completeTreeText(
+  value: XmlRead,
+  root: { objecttype: string; objectname: string },
+  withOwner: boolean,
+): string {
+  assertObjectStructurePresent(value);
+  return completeAnswer(
+    'GetObjectStructure',
+    (nodes: FlatObjectStructureNode[]) => nodes.map(nodeIdentity),
+    (nodes: FlatObjectStructureNode[]) =>
+      nodes.length === 0
+        ? Written.lines(['No nodes found in object structure response.'])
+        : Written.lines([
+            'tree:',
+            Written.bulleted(
+              bulletRows(buildNestedTree(nodes, root), withOwner),
+            ),
+          ]),
+  )(flatNodesOf(value));
+}
+
 export async function handleGetObjectStructure(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
@@ -234,8 +287,8 @@ export async function handleGetObjectStructure(
   // parse; raw the document.
   const shown = answerAt<AdtReading<XmlRead>, XmlRead | string>(
     {
-      terse: (reading) => treeText(reading.value, root, false),
-      medium: (reading) => treeText(reading.value, root, true),
+      terse: (reading) => completeTreeText(reading.value, root, false),
+      medium: (reading) => completeTreeText(reading.value, root, true),
       full: (reading) => reading.value ?? reading.raw,
       raw: (reading) => reading.raw,
     },

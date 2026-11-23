@@ -9,11 +9,13 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import {
   answered,
+  completeAnswer,
   type DetailTable,
   formatted,
   rawLevel,
   readingAt,
   tsv,
+  Written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -149,21 +151,33 @@ export function detailKindOf(entry: IGatewayErrorEntry): string {
 
 /** The list at terse: a TSV row per error. */
 function terseErrors(errors: readonly IGatewayErrorEntry[]): string {
-  return [
-    `# count ${errors.length}`,
-    tsv(
-      ['opid', 'detail_kind', 'dateTime', 'type', 'shortText', 'username'],
-      errors.map((error) => [
-        error.opid ?? '',
-        detailKindOf(error),
-        error.dateTime ?? '',
-        error.type ?? '',
-        error.shortText ?? '',
-        error.username ?? '',
+  return completeAnswer(
+    'RuntimeGetGatewayErrorLog',
+    (held: readonly IGatewayErrorEntry[]) => held.map(errorIdentity),
+    (held: readonly IGatewayErrorEntry[]) =>
+      Written.lines([
+        `# count ${held.length}`,
+        Written.tsv(
+          ['opid', 'detail_kind', 'dateTime', 'type', 'shortText', 'username'],
+          held.map((error) => ({
+            cells: [
+              error.opid ?? '',
+              detailKindOf(error),
+              error.dateTime ?? '',
+              error.type ?? '',
+              error.shortText ?? '',
+              error.username ?? '',
+            ],
+            identity: errorIdentity(error),
+          })),
+        ),
       ]),
-    ),
-  ].join('\n');
+  )(errors);
 }
+
+/** An error's identity: its opid and time. */
+const errorIdentity = (error: IGatewayErrorEntry) =>
+  `${error.opid ?? ''}|${error.dateTime ?? ''}`;
 
 /**
  * What the list answers at each `detail`: the reading passed to the call

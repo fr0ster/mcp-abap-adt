@@ -2,7 +2,7 @@ import { analyseObjectProperties } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { answerAt, tsv } from '../../../lib/detail';
+import { answerAt, completeAnswer, tsv, Written } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   DETAIL_SHAPE,
@@ -72,6 +72,10 @@ export function transactionPropertiesOf(value: XmlRead): {
   };
 }
 
+/** A property's identity: its facet, name and text. */
+const propertyIdentity = (property: Record<string, string>) =>
+  `${property.facet ?? ''}|${property.name ?? ''}|${property.text ?? ''}`;
+
 export async function handleGetTransaction(
   context: HandlerContext,
   args: z.output<typeof TOOL_DEFINITION.inputSchema>,
@@ -98,24 +102,37 @@ export async function handleGetTransaction(
         }),
     answerAt<AdtReading<XmlRead>, string | object>(
       {
-        terse: (reading) => {
-          const { object, properties } = transactionPropertiesOf(reading.value);
-          return [
-            `# transaction ${name}`,
-            ...(object?.text === undefined ? [] : [`# text ${object.text}`]),
-            ...(object?.package === undefined
-              ? []
-              : [`# package ${object.package}`]),
-            tsv(
-              ['facet', 'name', 'text'],
-              properties.map((property) => [
-                property.facet ?? '',
-                property.name ?? '',
-                property.text ?? '',
-              ]),
+        // Every property the document held, or nothing (`completeAnswer`).
+        terse: completeAnswer(
+          'GetTransaction',
+          (reading: AdtReading<XmlRead>) =>
+            transactionPropertiesOf(reading.value).properties.map(
+              propertyIdentity,
             ),
-          ].join('\n');
-        },
+          (reading: AdtReading<XmlRead>) => {
+            const { object, properties } = transactionPropertiesOf(
+              reading.value,
+            );
+            return Written.lines([
+              `# transaction ${name}`,
+              ...(object?.text === undefined ? [] : [`# text ${object.text}`]),
+              ...(object?.package === undefined
+                ? []
+                : [`# package ${object.package}`]),
+              Written.tsv(
+                ['facet', 'name', 'text'],
+                properties.map((property) => ({
+                  cells: [
+                    property.facet ?? '',
+                    property.name ?? '',
+                    property.text ?? '',
+                  ],
+                  identity: propertyIdentity(property),
+                })),
+              ),
+            ]);
+          },
+        ),
         medium: (reading) => ({
           success: true,
           transaction_name: name,

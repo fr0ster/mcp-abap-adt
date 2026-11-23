@@ -15,7 +15,13 @@ import {
 } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { type AnswerTable, answerAt, tsv } from '../../../lib/detail';
+import {
+  type AnswerTable,
+  answerAt,
+  completeAnswer,
+  tsv,
+  Written,
+} from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_SHAPE, levelOf } from '../../../lib/strategies/detail';
 import { asError } from '../../../lib/thrownValue';
@@ -69,21 +75,33 @@ interface VersionsRead {
  * under the object; medium every field of each version; full the answer
  * before `detail`; raw the feed as ADT sent it.
  */
+/** A version's identity: its id and where its content is. */
+const versionIdentity = (version: IObjectVersion) =>
+  `${version.versionId}|${version.contentUri}`;
+
+/** Every version the feed held. */
+const heldVersions = (read: VersionsRead) => read.versions.map(versionIdentity);
+
+// Every version the feed held, or nothing (`completeAnswer`).
 const VERSION_ANSWERS: AnswerTable<VersionsRead, string> = {
-  terse: (read) =>
-    [
+  terse: completeAnswer('GetObjectVersions', heldVersions, (read) =>
+    Written.lines([
       `# object ${read.object_type} ${read.object_name}`,
-      tsv(
+      Written.tsv(
         ['versionId', 'author', 'updatedAt', 'transport', 'content_uri'],
-        read.versions.map((version) => [
-          version.versionId,
-          version.author ?? '',
-          version.updatedAt ?? '',
-          version.transportRequest ?? '',
-          version.contentUri,
-        ]),
+        read.versions.map((version) => ({
+          cells: [
+            version.versionId,
+            version.author ?? '',
+            version.updatedAt ?? '',
+            version.transportRequest ?? '',
+            version.contentUri,
+          ],
+          identity: versionIdentity(version),
+        })),
       ),
-    ].join('\n'),
+    ]),
+  ),
   medium: ({ document: _document, ...read }) => JSON.stringify(read),
   full: ({ document: _document, ...read }) =>
     JSON.stringify({ success: true, ...read }),

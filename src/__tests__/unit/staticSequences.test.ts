@@ -232,7 +232,7 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     });
     assert.equal(
       result.content[0].text,
-      '# function_group ZFG\n# total 1\nname\tdescription\nZ_FM_ONLY\t',
+      '# function_group ZFG\n# total 1\nname\turi\tdescription\nZ_FM_ONLY\t\t',
     );
   });
 
@@ -282,7 +282,7 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
     });
     assert.equal(
       result.content[0].text,
-      '# function_group ZFG\n# total 1\nname\tdescription\nLFGTOP\t',
+      '# function_group ZFG\n# total 1\nname\turi\tdescription\nLFGTOP\t\t',
     );
   });
 

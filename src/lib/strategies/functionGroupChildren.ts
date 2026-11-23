@@ -5,13 +5,19 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 
 import type { AdtCodes } from '../adtProjections';
-import { type AnswerTable, completeAnswer, Written } from '../detail';
+import {
+  type AnswerTable,
+  completeAnswer,
+  identityOf,
+  Written,
+} from '../detail';
 import {
   childNodesOf,
+  isNotLoaded,
+  NOT_LOADED_BY_SAP,
   type NodeItem,
   type NodeLevel,
   nodeItemsOf,
-  walkedIdentity,
 } from './packageWalk';
 import { succeeded } from './stepResponse';
 
@@ -35,8 +41,23 @@ export interface FunctionGroupNodeSource {
   ): Promise<IAdtResponse<NodeLevel, IAdtError>>;
 }
 
-function okObjects(objects: NodeItem[]): IAdtResponse<NodeItem[], IAdtError> {
+/** A child of a function group's list, or a node SAP could not load (its row). */
+export interface GroupChild extends NodeItem {
+  /** A node SAP could not load (`utilNodeContents`' `notLoaded`): its row, named {@link NOT_LOADED_BY_SAP}. */
+  notLoaded?: true;
+}
+
+function okObjects(
+  objects: GroupChild[],
+): IAdtResponse<GroupChild[], IAdtError> {
   return succeeded(objects, 'fetchFunctionGroupChildren');
+}
+
+/** A level SAP could not load: its row, of the node's type — never an empty success. */
+function notLoadedRows(level: NodeLevel, type: AdtTypeCode): GroupChild[] {
+  return isNotLoaded(level)
+    ? [{ type, name: NOT_LOADED_BY_SAP, notLoaded: true }]
+    : [];
 }
 
 /**
@@ -51,7 +72,7 @@ export async function fetchFunctionGroupChildren(
   utils: FunctionGroupNodeSource,
   functionGroupName: string,
   childType: AdtCodes<'FUGR/FF' | 'FUGR/I'>,
-): Promise<IAdtResponse<NodeItem[], IAdtError>> {
+): Promise<IAdtResponse<GroupChild[], IAdtError>> {
   const root = await utils.fetchNodeStructure('FUGR/F', functionGroupName, {
     withShortDescriptions: true,
   });
@@ -59,11 +80,10 @@ export async function fetchFunctionGroupChildren(
     return root;
   }
 
-  const child = childNodesOf(root.getResult().value).find(
-    (c) => c.type === childType,
-  );
+  const rootLevel = root.getResult().value;
+  const child = childNodesOf(rootLevel).find((c) => c.type === childType);
   if (!child) {
-    return okObjects([]);
+    return okObjects(notLoadedRows(rootLevel, 'FUGR/F'));
   }
 
   const level = await utils.fetchNodeStructure('FUGR/F', functionGroupName, {
@@ -74,7 +94,12 @@ export async function fetchFunctionGroupChildren(
     return level;
   }
 
-  return okObjects(nodeItemsOf(level.getResult().value));
+  const found = level.getResult().value;
+  return okObjects([
+    ...notLoadedRows(rootLevel, 'FUGR/F'),
+    ...nodeItemsOf(found),
+    ...notLoadedRows(found, childType),
+  ]);
 }
 
 /**
@@ -88,10 +113,10 @@ export async function fetchFunctionGroupChildren(
 export function functionGroupListAnswers(
   functionGroupName: string,
   listKey: 'function_modules' | 'includes',
-): AnswerTable<NodeItem[], string | object> {
+): AnswerTable<GroupChild[], string | object> {
   // The answer before `detail`, and every field the node structure read
   // beside it: full carries no less than medium.
-  const full = (objects: NodeItem[]) => ({
+  const full = (objects: GroupChild[]) => ({
     success: true,
     function_group_name: functionGroupName,
     total: objects.length,
@@ -102,51 +127,57 @@ export function functionGroupListAnswers(
     listKey === 'includes'
       ? 'ListFunctionGroupIncludes'
       : 'ListFunctionModules';
-  /** A child's identity: its type and name, a nameless one's technical name and URI. */
-  const identity = (o: {
-    type: string;
-    name: string;
-    techName?: string | undefined;
-    uri?: string | undefined;
-  }) => walkedIdentity(o);
-  const held = (objects: NodeItem[]) => objects.map(identity);
-  // Every child the node structure held, or nothing (`completeAnswer`).
+  /** A nameless child's URI, what tells it apart; `''` for a named one. */
+  const namelessUri = (o: GroupChild) => (o.name === '' ? (o.uri ?? '') : '');
+  // Every child the node structure held, or nothing (`completeAnswer`);
+  // each identified by the cells or fields written.
   return {
-    terse: completeAnswer(tool, held, (objects: NodeItem[]) =>
-      Written.lines([
-        `# function_group ${functionGroupName}`,
-        `# total ${objects.length}`,
-        Written.tsv(
-          ['name', 'description'],
-          objects.map((o) => ({
-            cells: [o.name, o.description ?? ''],
-            identity: identity(o),
-          })),
+    terse: completeAnswer(
+      tool,
+      (objects: GroupChild[]) =>
+        objects.map((o) => identityOf([o.name, namelessUri(o)])),
+      (objects: GroupChild[]) =>
+        Written.text(
+          [
+            { head: 'function_group', value: functionGroupName },
+            { head: 'total', value: String(objects.length) },
+            { header: ['name', 'uri', 'description'] },
+            ...objects.map((o) => ({
+              row: [o.name, namelessUri(o), o.description ?? ''],
+            })),
+          ],
+          [0, 1],
         ),
-      ]),
     ),
     // Every field the node structure read but the uri — kept for a child
-    // SAP listed without a name, what tells it apart; the children read
-    // from the answer written.
-    medium: completeAnswer(tool, held, (objects: NodeItem[]) => {
-      const kept = objects.map(({ uri, ...fields }) =>
-        fields.name === '' && uri !== undefined ? { ...fields, uri } : fields,
-      );
-      const answer: {
-        function_group_name: string;
-        total: number;
-      } & Partial<Record<typeof listKey, typeof kept>> = {
-        function_group_name: functionGroupName,
-        total: objects.length,
-        [listKey]: kept,
-      };
-      return Written.list(
-        answer,
-        (written) => written[listKey] ?? [],
-        identity,
-      );
-    }),
-    full,
+    // SAP listed without a name, what tells it apart.
+    medium: completeAnswer(
+      tool,
+      (objects: GroupChild[]) =>
+        objects.map((o) => identityOf([o.type, o.name, namelessUri(o)])),
+      (objects: GroupChild[]) =>
+        Written.json(
+          { function_group_name: functionGroupName, total: objects.length },
+          {
+            [listKey]: objects.map(
+              ({ uri, ...fields }): GroupChild =>
+                fields.name === '' && uri !== undefined
+                  ? { ...fields, uri }
+                  : fields,
+            ),
+          },
+          ['type', 'name', 'uri'],
+        ),
+    ),
+    full: completeAnswer(
+      tool,
+      (objects: GroupChild[]) =>
+        objects.map((o) => identityOf([o.type, o.name, o.uri ?? ''])),
+      (objects: GroupChild[]) => {
+        const { objects: rows, ...rest } = full(objects);
+        return Written.json(rest, { objects: rows }, ['type', 'name', 'uri']);
+      },
+    ),
     raw: full,
   };
 }

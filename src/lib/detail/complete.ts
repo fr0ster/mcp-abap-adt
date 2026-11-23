@@ -50,7 +50,8 @@ export function renderLines(lines: readonly Line[]): string {
       }
       if ('group' in entry)
         return `# ${cell(entry.group)} ${cell(entry.value)}`;
-      if ('header' in entry) return entry.header.map(cell).join('\t');
+      // A header cell starting with `#` escaped like a row's first cell.
+      if ('header' in entry) return line(entry.header);
       if ('row' in entry) return written(entry.row, entry.depth);
       if ('root' in entry) return written(entry.root, entry.depth);
       if ('mark' in entry) {

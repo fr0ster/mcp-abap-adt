@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   marks,
+  omitted,
   type RowSchemas,
   rows,
   Written,
@@ -31,6 +32,9 @@ const rowsOf = (...lines: (readonly string[])[]) =>
           when: (line: Cells) => i < line.cells.length,
         })),
         header: 'none',
+        lists: {
+          cells: omitted<string, 'cells'>('cells', 'written as the columns'),
+        },
       }),
     },
   }).answer;
@@ -46,6 +50,9 @@ describe('the writers escape every value', () => {
             { name: 'name', cell: (line: Cells) => line.cells[0] ?? '' },
           ],
           header: 'always',
+          lists: {
+            cells: omitted<string, 'cells'>('cells', 'written as the columns'),
+          },
         }),
       },
     }).answer;
@@ -96,10 +103,34 @@ describe('the writers escape every value', () => {
             { name: 'x\ny', cell: (line: Cells) => line.cells[0] ?? '' },
           ],
           header: 'always',
+          lists: {
+            cells: omitted<string, 'cells'>('cells', 'written as the columns'),
+          },
         }),
       },
     }).answer;
     assert.equal(text.split('\n').length, 2, text);
+  });
+
+  // Codex round 10: a header's first cell starting with `#` is escaped as a
+  // row's is — no header reads as a `#` line.
+  it('a header cell starting with # is escaped', () => {
+    const text = writeListing({
+      heads: [],
+      reading: { lines: [] },
+      lists: {
+        lines: rows('lines', {
+          columns: [
+            { name: '# forged', cell: (line: Cells) => line.cells[0] ?? '' },
+          ],
+          header: 'always',
+          lists: {
+            cells: omitted<string, 'cells'>('cells', 'written as the columns'),
+          },
+        }),
+      },
+    }).answer;
+    assert.equal(text, '\\# forged');
   });
 
   it('two lists of mark words never render alike', () => {

@@ -48,7 +48,23 @@ export const FORM_MARKERS: readonly string[] = [
   'indented',
   'mark',
   'tab',
+  'list-of',
+  'parsed',
+  'read with',
+  'at raw',
+  'terse',
+  'medium',
+  'full',
+  'raw',
 ];
+
+/**
+ * The one marker a note may say: the batch note's `batch` (batch mode is
+ * what it tells of), named here so nothing else passes unseen.
+ */
+export const NOTE_EXCEPTIONS: Readonly<Record<string, readonly string[]>> = {
+  batch: ['batch'],
+};
 
 function isWordCharacter(character: string | undefined): boolean {
   if (character === undefined || character === '') return false;
@@ -94,6 +110,10 @@ export function purposeFaults(text: string): string[] {
   const trimmed = text.trim();
   if (!trimmed.endsWith('.')) faults.push('does not end with a full stop');
   const body = trimmed.slice(0, -1);
+  if (text.includes('\n') || text.includes('\r')) {
+    faults.push('holds a line break');
+  }
+  if (text.includes('..')) faults.push('holds ".."');
   for (const end of ['. ', '? ', '! ', '?', '!']) {
     if (body.includes(end)) {
       faults.push('holds more than one sentence');
@@ -108,3 +128,35 @@ export function purposeFaults(text: string): string[] {
 export function factFaults(text: string): string[] {
   return markersIn(text).map((marker) => `says "${marker}"`);
 }
+
+/** What breaks the rules in a note: a marker of form, but its named exception. */
+export function noteFaults(
+  text: string,
+  kind: keyof typeof NOTE_EXCEPTIONS | 'long',
+): string[] {
+  const allowed = new Set(NOTE_EXCEPTIONS[kind] ?? []);
+  return markersIn(text)
+    .filter((marker) => !allowed.has(marker))
+    .map((marker) => `says "${marker}"`);
+}
+
+/**
+ * The level names: words of form everywhere but in the `detail` parameter's
+ * shared text, the one place they belong (the owner's option A).
+ */
+export const LEVEL_NAMES: readonly string[] = [
+  'terse',
+  'medium',
+  'full',
+  'raw',
+];
+
+/** What breaks the rules in the shared `detail` text: a marker of form, its level names excepted. */
+export function detailFaults(text: string): string[] {
+  return markersIn(text)
+    .filter((marker) => !LEVEL_NAMES.includes(marker))
+    .map((marker) => `says "${marker}"`);
+}
+
+/** The tags a description may open with, rendered. */
+export const TAGS: readonly string[] = ['[read-only]', '[low-level]'];

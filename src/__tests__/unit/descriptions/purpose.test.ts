@@ -15,7 +15,6 @@ import {
   longRunning,
   partsOfDescription,
   purpose,
-  rawReturns,
   returnsOf,
   toolDescription,
 } from '../../../lib/description';
@@ -26,15 +25,26 @@ import {
   rows,
   shapesOf,
 } from '../../../lib/detail';
+import { LEVEL_SENTENCES, levelWords } from '../../../lib/strategies/detail';
 import { type AdtStandIn, adtStandIn } from '../../helpers/adtStandIn';
 import { type Listing, listBinaries } from '../../helpers/servedTools';
 import {
+  detailFaults,
   FORM_MARKERS,
   factFaults,
+  noteFaults,
   PURPOSE_LIMIT,
   purposeFaults,
+  TAGS,
 } from './descriptionRules';
 import { NOT_YET_ASSEMBLED } from './notYetAssembled';
+
+/** A member of a listed schema (outside the type system), or none. */
+function memberOf(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null
+    ? Reflect.get(value, key)
+    : undefined;
+}
 
 describe('the purpose rules', () => {
   it('takes one sentence of the function, in domain words', () => {
@@ -72,11 +82,57 @@ describe('the purpose rules', () => {
     });
   }
 
+  it('refuses ".." and a line break inside the sentence', () => {
+    assert.ok(purposeFaults('Reads a class.. fast.').includes('holds ".."'));
+    assert.ok(purposeFaults('Reads a\nclass.').includes('holds a line break'));
+  });
+
   it('matches a word marker on word boundaries only', () => {
     assert.deepStrictEqual(
       factFaults('Reads the arrows and the entryway.'),
       [],
     );
+  });
+});
+
+describe('the notes and the tags', () => {
+  it('the long-running note says no word of form', () => {
+    assert.deepStrictEqual(noteFaults(longRunning.text, 'long'), []);
+  });
+
+  it("every tool's batch note says no word of form but `batch`", () => {
+    const faults = [...NOT_YET_ASSEMBLED].flatMap((tool) =>
+      noteFaults(batchable(tool).text, 'batch').map(
+        (fault) => `${tool}: ${fault}`,
+      ),
+    );
+    assert.deepStrictEqual([...new Set(faults)], []);
+  });
+
+  it('the shared detail text names the levels and no other word of form', () => {
+    assert.deepStrictEqual(
+      detailFaults(levelWords(['terse', 'medium', 'full', 'raw'])),
+      [],
+    );
+    assert.ok(detailFaults('"terse" rows as TSV.').length > 0);
+  });
+
+  it('a note saying a word of form is refused', () => {
+    assert.ok(noteFaults('Returns a JSON array.', 'long').length > 0);
+  });
+
+  it('renders each tag as one of the tags', () => {
+    for (const tag of ['read-only', 'low-level'] as const) {
+      const text = toolDescription({
+        tag,
+        purpose: purpose('Reads a class.'),
+        returns: [],
+      });
+      assert.ok(
+        TAGS.some((each) => text.startsWith(`${each} `)),
+        text,
+      );
+    }
   });
 });
 
@@ -106,10 +162,7 @@ describe('the description builder', () => {
   it('states the purpose first, then the facts from the schemas, then the notes', () => {
     const text = toolDescription({
       purpose: purpose('Reads the objects a package holds.'),
-      returns: [
-        ...returnsOf({ shapes: [shapesOf<Reading>(schemas)] }),
-        rawReturns('one'),
-      ],
+      returns: returnsOf({ shapes: [shapesOf<Reading>(schemas)] }),
       notes: [longRunning],
     });
     assert.ok(text.startsWith('Reads the objects a package holds. '), text);
@@ -207,6 +260,53 @@ describe('every served tool is assembled, or still listed as not yet', () => {
     assert.ok(listings.some((listing) => listing.tools.length > 10));
   });
 
+  it("every tool's detail parameter holds the shared text over its levels, and no word of form but the level names", () => {
+    const faults: string[] = [];
+    for (const listing of listings) {
+      for (const tool of listing.tools) {
+        const detail = memberOf(
+          memberOf(tool.inputSchema, 'properties'),
+          'detail',
+        );
+        if (detail === undefined) continue;
+        const levels = memberOf(detail, 'enum');
+        const text = memberOf(detail, 'description');
+        const offered = Array.isArray(levels)
+          ? levels.filter(
+              (level): level is keyof typeof LEVEL_SENTENCES =>
+                typeof level === 'string' && level in LEVEL_SENTENCES,
+            )
+          : [];
+        // A compact tool states it for the actions that take it:
+        // `<actions>: <the shared text>`.
+        const shared = levelWords(offered);
+        // `<actions>: <shared>`, once or per group of actions: what is
+        // left without the shared text is action names alone.
+        const left =
+          typeof text === 'string' && text.includes(shared)
+            ? text.split(shared).join('')
+            : undefined;
+        const forActions =
+          left !== undefined &&
+          [...left].every(
+            (character) =>
+              (character >= 'a' && character <= 'z') ||
+              character === '_' ||
+              character === ',' ||
+              character === ':' ||
+              character === ' ',
+          );
+        if (text !== shared && !forActions) {
+          faults.push(`${tool.name}: its detail text is not the shared one`);
+        }
+        for (const fault of detailFaults(String(text))) {
+          faults.push(`${tool.name}: its detail text ${fault}`);
+        }
+      }
+    }
+    assert.deepStrictEqual([...new Set(faults)], []);
+  });
+
   it('each served tool is assembled or listed, never both; each assembled one keeps the rules', () => {
     const faults: string[] = [];
     for (const listing of listings) {
@@ -229,6 +329,15 @@ describe('every served tool is assembled, or still listed as not yet', () => {
           for (const fault of factFaults(fact.text)) {
             faults.push(`${tool.name}: its fact "${fact.text}" ${fault}`);
           }
+        }
+        for (const note of parts.notes ?? []) {
+          const kind = note === longRunning ? 'long' : 'batch';
+          for (const fault of noteFaults(note.text, kind)) {
+            faults.push(`${tool.name}: its note ${fault}`);
+          }
+        }
+        if (parts.tag !== undefined && !TAGS.includes(`[${parts.tag}]`)) {
+          faults.push(`${tool.name}: its tag is none of the tags`);
         }
       }
     }

@@ -21,6 +21,7 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
   type DetailLevel,
   indentedTsv,
   type TreeRow,
@@ -316,17 +317,48 @@ function fullStructures(read: StructuresRead): string {
  * before `detail`. A tree reads many documents, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
+/** Every node of a structure's tree, with and below its root, by depth and name. */
+function structureIdentities(node: StructureNode, depth = 0): string[] {
+  return [
+    `structure|${depth}|${node.structure}|${node.kind}|${node.attribute ?? ''}`,
+    ...node.children.flatMap((child) => structureIdentities(child, depth + 1)),
+  ];
+}
+
+/** Every item one structure's read held: its tree's nodes and each candidate not read. */
+const heldStructures = (read: StructuresRead) => [
+  ...structureIdentities(read.tree),
+  ...read.append_candidates_unread.map(
+    (unread) => `unread|${unread.candidate}`,
+  ),
+];
+
+// Every node and unread candidate, or nothing (`completeAnswer`); medium
+// and full write the tree whole.
 const STRUCTURES_ANSWERS: AnswerTable<StructuresRead, string> = {
-  terse: (read) =>
-    [
-      `# structure ${read.structure_name}`,
-      ...(read.appends_unavailable ? ['# appends_unavailable'] : []),
-      // Each candidate SAP refused to read, by name: the one to read again.
-      ...read.append_candidates_unread.map(
-        (unread) => `# append_candidate_unread ${unread.candidate}`,
-      ),
-      indentedTsv(structureRows(read.tree)),
-    ].join('\n'),
+  terse: completeAnswer('GetStructuresList', heldStructures, (read) => {
+    const rows = structureRows(read.tree);
+    return {
+      answer: [
+        `# structure ${read.structure_name}`,
+        ...(read.appends_unavailable ? ['# appends_unavailable'] : []),
+        // Each candidate SAP refused to read, by name: the one to read again.
+        ...read.append_candidates_unread.map(
+          (unread) => `# append_candidate_unread ${unread.candidate}`,
+        ),
+        indentedTsv(rows),
+      ].join('\n'),
+      rendered: [
+        ...rows.map(
+          (row) =>
+            `structure|${row.depth}|${row.cells[0] ?? ''}|${row.cells[1] ?? ''}|${row.cells[2] ?? ''}`,
+        ),
+        ...read.append_candidates_unread.map(
+          (unread) => `unread|${unread.candidate}`,
+        ),
+      ],
+    };
+  }),
   medium: fullStructures,
   full: fullStructures,
   raw: fullStructures,

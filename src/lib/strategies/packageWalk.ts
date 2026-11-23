@@ -956,6 +956,30 @@ export type WalkedItem = {
   uri?: string | undefined;
 };
 
+/**
+ * A walked item's identity, for the completeness guard
+ * (`src/lib/detail/complete.ts`): its type and name, a nameless one's
+ * technical name and URI, and whether SAP could not load it.
+ */
+export function walkedIdentity(item: {
+  type: string;
+  name: string;
+  techName?: string | undefined;
+  uri?: string | undefined;
+  notLoaded?: boolean | undefined;
+}): string {
+  // A named row is its type and name; a nameless one its technical name
+  // and URI, the fields that tell it apart.
+  const nameless = item.name === '';
+  return [
+    item.type.toUpperCase(),
+    item.name.toUpperCase(),
+    nameless ? (item.techName ?? '').toUpperCase() : '',
+    nameless ? (item.uri ?? '').toLowerCase() : '',
+    item.notLoaded === true ? 'not-loaded' : '',
+  ].join('|');
+}
+
 /** The step of a failed object metadata read. */
 export const METADATA_STEP = 'read object metadata';
 

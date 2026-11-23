@@ -39,6 +39,7 @@ import { createAdtClient, variantOf } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
   type DetailLevel,
   indentedTsv,
   type TreeRow,
@@ -359,22 +360,60 @@ function mediumInclude(node: IncludeNode): MediumIncludeNode {
  * `detail`. A tree reads many documents, so
  * raw never reaches this table: the handler answers it as the wire documents (`wireAnswer`).
  */
+/** Every node of a tree below and with its root, by name and depth. */
+function treeIdentities<N extends { name: string }>(
+  node: N,
+  childrenOf: (n: N) => readonly N[],
+  depth = 0,
+): string[] {
+  return [
+    `include|${depth}|${node.name}`,
+    ...childrenOf(node).flatMap((child) =>
+      treeIdentities(child, childrenOf, depth + 1),
+    ),
+  ];
+}
+
+/** Every item one object's read held: its tree's nodes and each include it could not read. */
+const heldIncludes = (read: IncludesRead) => [
+  ...treeIdentities(read.tree, (n) => n.children),
+  ...read.unreadable.map((entry) => `unreadable|${String(entry.name ?? '')}`),
+];
+
+// Every node and unreadable include, or nothing (`completeAnswer`).
 const INCLUDES_ANSWERS: AnswerTable<IncludesRead, string> = {
-  terse: (read) =>
-    [
-      `# object ${read.object_type} ${read.object_name}`,
-      ...read.unreadable.map(
-        (entry) => `# unreadable ${String(entry.name ?? '')}`,
-      ),
-      indentedTsv(includeRows(read.tree)),
-    ].join('\n'),
-  medium: (read) =>
-    JSON.stringify({
-      object_name: read.object_name,
-      object_type: read.object_type,
-      tree: mediumInclude(read.tree),
-      ...(read.unreadable.length > 0 ? { unreadable: read.unreadable } : {}),
-    }),
+  terse: completeAnswer('GetIncludesList', heldIncludes, (read) => {
+    const rows = includeRows(read.tree);
+    const unreadable = read.unreadable.map((entry) => String(entry.name ?? ''));
+    return {
+      answer: [
+        `# object ${read.object_type} ${read.object_name}`,
+        ...unreadable.map((name) => `# unreadable ${name}`),
+        indentedTsv(rows),
+      ].join('\n'),
+      rendered: [
+        ...rows.map((row) => `include|${row.depth}|${row.cells[0] ?? ''}`),
+        ...unreadable.map((name) => `unreadable|${name}`),
+      ],
+    };
+  }),
+  medium: completeAnswer('GetIncludesList', heldIncludes, (read) => {
+    const tree = mediumInclude(read.tree);
+    return {
+      answer: JSON.stringify({
+        object_name: read.object_name,
+        object_type: read.object_type,
+        tree,
+        ...(read.unreadable.length > 0 ? { unreadable: read.unreadable } : {}),
+      }),
+      rendered: [
+        ...treeIdentities(tree, (n) => n.children ?? []),
+        ...read.unreadable.map(
+          (entry) => `unreadable|${String(entry.name ?? '')}`,
+        ),
+      ],
+    };
+  }),
   full: fullIncludes,
   raw: fullIncludes,
 };

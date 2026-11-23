@@ -3,6 +3,8 @@ import { notATableType, tableTypeOf } from '../../../lib/adtTypeCode';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
+  type Rendered,
   tsv,
   wireAnswer,
 } from '../../../lib/detail';
@@ -174,6 +176,7 @@ import {
   type NodeLevel,
   nodeItemsOf,
   nodeStructureOn,
+  walkedIdentity,
 } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -453,25 +456,41 @@ interface ParentList {
  * One parent's objects as TSV: type, name, the technical name where it
  * differs, and the short description when it was asked for (the default).
  */
-function parentRows(list: ParentList, descriptions: boolean): string {
-  return [
+function parentRows(list: ParentList, descriptions: boolean): Rendered<string> {
+  // The identity of each object, recorded where its row is written.
+  const rendered: string[] = [];
+  const rows = list.objects.map((o) => {
+    rendered.push(objectIdentity(o));
+    return [
+      o.OBJECT_TYPE,
+      o.OBJECT_NAME,
+      o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
+        ? o.TECH_NAME
+        : '',
+      ...(descriptions ? [o.DESCRIPTION ?? ''] : []),
+    ];
+  });
+  const answer = [
     `# parent ${list.parent_type ?? ''} ${list.parent_name ?? ''}`,
     `# total ${list.objects.length}`,
     tsv(
       descriptions
         ? ['type', 'name', 'tech_name', 'description']
         : ['type', 'name', 'tech_name'],
-      list.objects.map((o) => [
-        o.OBJECT_TYPE,
-        o.OBJECT_NAME,
-        o.TECH_NAME !== undefined && o.TECH_NAME !== o.OBJECT_NAME
-          ? o.TECH_NAME
-          : '',
-        ...(descriptions ? [o.DESCRIPTION ?? ''] : []),
-      ]),
+      rows,
     ),
   ].join('\n');
+  return { answer, rendered };
 }
+
+/** A listed object's identity: its type and name, a nameless one's technical name and URI. */
+const objectIdentity = (o: FlatObject) =>
+  walkedIdentity({
+    type: o.OBJECT_TYPE,
+    name: o.OBJECT_NAME,
+    techName: o.TECH_NAME,
+    uri: o.OBJECT_URI,
+  });
 
 /**
  * What GetObjectsList answers of one parent at each `detail`, selected
@@ -483,7 +502,10 @@ function parentRows(list: ParentList, descriptions: boolean): string {
  */
 function objectsListAnswers(
   descriptions: boolean,
+  held: (list: ParentList) => readonly string[],
 ): AnswerTable<ParentList, string | object> {
+  const every = <A>(render: (list: ParentList) => Rendered<A>) =>
+    completeAnswer('GetObjectsList', held, render);
   const full = (list: ParentList) => ({
     parent_name: list.parent_name,
     ...('parent_tech_name' in list
@@ -494,20 +516,44 @@ function objectsListAnswers(
     objects: list.objects,
   });
   return {
-    terse: (list) => parentRows(list, descriptions),
-    medium: (list) => ({
-      parent_name: list.parent_name,
-      parent_type: list.parent_type,
-      total_objects: list.objects.length,
-      objects: list.objects.map((o) => ({
+    terse: every((list) => parentRows(list, descriptions)),
+    medium: every((list) => {
+      const objects = list.objects.map((o) => ({
         type: o.OBJECT_TYPE,
         name: o.OBJECT_NAME,
         ...(o.TECH_NAME !== undefined ? { tech_name: o.TECH_NAME } : {}),
+        ...(o.OBJECT_URI !== undefined && o.OBJECT_NAME === ''
+          ? { uri: o.OBJECT_URI }
+          : {}),
         ...(o.DESCRIPTION !== undefined ? { description: o.DESCRIPTION } : {}),
-      })),
+      }));
+      return {
+        rendered: objects.map((o) =>
+          walkedIdentity({
+            type: o.type,
+            name: o.name,
+            techName: o.tech_name,
+            uri: o.uri,
+          }),
+        ),
+        answer: mediumOf(list, objects),
+      };
     }),
-    full,
+    full: every((list) => ({
+      answer: full(list),
+      rendered: full(list).objects.map(objectIdentity),
+    })),
     raw: full,
+  };
+}
+
+/** The medium answer of one parent: every field read but the uri. */
+function mediumOf(list: ParentList, objects: object[]) {
+  return {
+    parent_name: list.parent_name,
+    parent_type: list.parent_type,
+    total_objects: list.objects.length,
+    objects,
   };
 }
 
@@ -545,7 +591,13 @@ async function answeredGetObjectsList(
       ? Boolean(with_short_descriptions)
       : true;
   const level = levelOf(args);
-  const shown = answerAt(objectsListAnswers(withDescriptions), levelOf(args));
+  // Every object the parent's walk held, or nothing (`completeAnswer`).
+  const shown = answerAt(
+    objectsListAnswers(withDescriptions, (list) =>
+      list.objects.map(objectIdentity),
+    ),
+    levelOf(args),
+  );
 
   if (listed !== undefined && listed.length > 0) {
     const parents: Parent[] = [];

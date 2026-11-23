@@ -12,7 +12,9 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
   groupedTsv,
+  type Rendered,
   wireAnswer,
 } from '../../../lib/detail';
 import { stated, withInCallSchema } from '../../../lib/handlers/argumentRules';
@@ -36,6 +38,7 @@ import {
   readNode,
   rootByRoot,
   type WalkedItem,
+  walkedIdentity,
   walkPackage,
   walkPackages,
 } from '../../../lib/strategies/packageWalk';
@@ -152,6 +155,23 @@ function contentsRows(
   items: readonly WalkedItem[],
   descriptions: boolean,
 ): string {
+  return completeAnswer(TOOL, heldItems, (all: readonly WalkedItem[]) =>
+    contentsRendered(packageName, all, descriptions),
+  )(items);
+}
+
+const TOOL = 'GetPackageContents';
+
+/** Every item a package's walk held, each by its identity. */
+const heldItems = (items: readonly WalkedItem[]) => items.map(walkedIdentity);
+
+/** One package's objects as TSV, and the identity of each row written. */
+function contentsRendered(
+  packageName: string,
+  items: readonly WalkedItem[],
+  descriptions: boolean,
+): Rendered<string> {
+  const rendered: string[] = [];
   const groups = new Map<string, string[][]>();
   for (const item of items) {
     const owner = (item.packageName ?? packageName).toUpperCase();
@@ -171,14 +191,27 @@ function contentsRows(
         ? [item.type, item.name, techName, uri, item.description ?? '']
         : [item.type, item.name, techName, uri],
     );
+    rendered.push(walkedIdentity(item));
     groups.set(owner, rows);
   }
-  return groupedTsv(
+  const answer = groupedTsv(
     descriptions
       ? ['type', 'name', 'tech_name', 'uri', 'description']
       : ['type', 'name', 'tech_name', 'uri'],
     [...groups].map(([value, rows]) => ({ field: 'package', value, rows })),
   );
+  return { answer, rendered };
+}
+
+/** Each item through `each`, guarded: every item the walk held, or nothing. */
+function everyItem<A>(
+  each: (item: WalkedItem) => A,
+  identityOf: (answered: A) => string,
+) {
+  return completeAnswer(TOOL, heldItems, (items: readonly WalkedItem[]) => {
+    const answer = items.map(each);
+    return { answer, rendered: answer.map(identityOf) };
+  });
 }
 
 /** Every field the walk read of an object, without its uri. */
@@ -228,10 +261,37 @@ const CONTENTS_ANSWERS: AnswerTable<ContentsRead, string> = {
   medium: (read) =>
     JSON.stringify(
       perPackage(read, (name, items) =>
-        items.map((item) => mediumItem(name, item)),
+        everyItem(
+          (item) => mediumItem(name, item),
+          (o) =>
+            walkedIdentity({
+              type: o.type,
+              name: o.name,
+              techName: o.tech_name,
+              uri: o.uri,
+              notLoaded: o.not_loaded,
+            }),
+        )(items),
       ),
     ),
-  full: (read) => JSON.stringify(perPackage(read, assembleList)),
+  full: (read) =>
+    JSON.stringify(
+      perPackage(read, (name, items) =>
+        everyItem(
+          (item) => assembleList(name, [item])[0],
+          (o) =>
+            o === undefined
+              ? ''
+              : walkedIdentity({
+                  type: o.type,
+                  name: o.name,
+                  techName: o.name === '' ? o.techName : undefined,
+                  uri: o.uri,
+                  notLoaded: o.notLoaded,
+                }),
+        )(items),
+      ),
+    ),
   raw: (read) => JSON.stringify(perPackage(read, assembleList)),
 };
 

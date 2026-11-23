@@ -22,6 +22,7 @@ import { createAdtClient } from '../../../lib/clients';
 import {
   type AnswerTable,
   answerAt,
+  completeAnswer,
   indentedTsv,
   type TreeRow,
   wireAnswer,
@@ -45,6 +46,7 @@ import {
   type PackageNode,
   readNode,
   type WalkedItem,
+  walkedIdentity,
   walkPackage,
   walkPackages,
 } from '../../../lib/strategies/packageWalk';
@@ -395,10 +397,11 @@ function treeRows(
   node: PackageNode,
   descriptions: boolean,
   depth = 0,
-): TreeRow[] {
+): Array<TreeRow & { identity: string }> {
   return [
     {
       depth,
+      identity: nodeIdentity(node),
       // An object SAP listed without a name: its technical name and URI
       // after its type and empty name, what tells it apart.
       cells: [
@@ -457,17 +460,59 @@ interface TreeAnswerRead {
  */
 type TreeAnswer = string | MediumNode | ReturnType<typeof treeOf>;
 
+const TOOL = 'GetPackageTree';
+
+/** Every item the walk held, each by its identity. */
+const heldItems = ({ walked }: TreeAnswerRead) => walked.map(walkedIdentity);
+
+/** The identities of a tree's nodes below its root, depth first. */
+function belowRoot<N extends { children?: N[] | undefined }>(
+  root: N,
+  identityOf: (node: N) => string,
+): string[] {
+  const below = (node: N): string[] =>
+    (node.children ?? []).flatMap((child) => [
+      identityOf(child),
+      ...below(child),
+    ]);
+  return below(root);
+}
+
+/** A tree node's identity, the walk's (`walkedIdentity`). */
+const nodeIdentity = (node: PackageNode) => walkedIdentity(node);
+
+// Every level answers every item the walk held, or nothing (`completeAnswer`).
 const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
   // With include_descriptions, each row's description beside its type and
   // name.
-  terse: ({ packageName, walked, options }) =>
-    indentedTsv(
-      treeRows(assembleTree(packageName, walked), options.includeDescriptions),
-    ),
-  medium: ({ packageName, walked }) =>
-    mediumNode(assembleTree(packageName, walked)),
-  full: ({ packageName, walked, options }) =>
-    treeOf(packageName, walked, options),
+  terse: completeAnswer(TOOL, heldItems, ({ packageName, walked, options }) => {
+    const tree = assembleTree(packageName, walked);
+    const rows = treeRows(tree, options.includeDescriptions);
+    return {
+      answer: indentedTsv(rows),
+      // The rows below the package's own, by the node each was written of.
+      rendered: rows.slice(1).map((row) => row.identity),
+    };
+  }),
+  medium: completeAnswer(TOOL, heldItems, ({ packageName, walked }) => {
+    const answer = mediumNode(assembleTree(packageName, walked));
+    return {
+      answer,
+      rendered: belowRoot(answer, (node) =>
+        walkedIdentity({
+          type: node.type,
+          name: node.name,
+          techName: node.tech_name,
+          uri: node.uri,
+          notLoaded: node.not_loaded,
+        }),
+      ),
+    };
+  }),
+  full: completeAnswer(TOOL, heldItems, ({ packageName, walked, options }) => {
+    const answer = treeOf(packageName, walked, options);
+    return { answer, rendered: belowRoot(answer.tree, nodeIdentity) };
+  }),
   raw: ({ packageName, walked, options }) =>
     treeOf(packageName, walked, options),
 };

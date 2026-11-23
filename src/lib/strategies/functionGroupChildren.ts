@@ -5,12 +5,13 @@ import type {
 } from '@mcp-abap-adt/interfaces-adt';
 
 import type { AdtCodes } from '../adtProjections';
-import { type AnswerTable, tsv } from '../detail';
+import { type AnswerTable, completeAnswer, tsv } from '../detail';
 import {
   childNodesOf,
   type NodeItem,
   type NodeLevel,
   nodeItemsOf,
+  walkedIdentity,
 } from './packageWalk';
 import { succeeded } from './stepResponse';
 
@@ -97,20 +98,50 @@ export function functionGroupListAnswers(
     [listKey]: objects.map((o) => o.name),
     objects,
   });
+  const tool =
+    listKey === 'includes'
+      ? 'ListFunctionGroupIncludes'
+      : 'ListFunctionModules';
+  /** A child's identity: its type and name, a nameless one's technical name and URI. */
+  const identity = (o: {
+    type: string;
+    name: string;
+    techName?: string | undefined;
+    uri?: string | undefined;
+  }) => walkedIdentity(o);
+  const held = (objects: NodeItem[]) => objects.map(identity);
+  // Every child the node structure held, or nothing (`completeAnswer`).
   return {
-    terse: (objects) =>
-      [
-        `# function_group ${functionGroupName}`,
-        `# total ${objects.length}`,
-        tsv(
-          ['name', 'description'],
-          objects.map((o) => [o.name, o.description ?? '']),
+    terse: completeAnswer(tool, held, (objects: NodeItem[]) => {
+      const rows = objects.map((o) => ({
+        cells: [o.name, o.description ?? ''],
+        identity: identity(o),
+      }));
+      return {
+        answer: [
+          `# function_group ${functionGroupName}`,
+          `# total ${objects.length}`,
+          tsv(
+            ['name', 'description'],
+            rows.map((row) => row.cells),
+          ),
+        ].join('\n'),
+        rendered: rows.map((row) => row.identity),
+      };
+    }),
+    medium: completeAnswer(tool, held, (objects: NodeItem[]) => {
+      const kept = objects.map(({ uri: _uri, ...fields }) => fields);
+      return {
+        answer: {
+          function_group_name: functionGroupName,
+          total: objects.length,
+          [listKey]: kept,
+        },
+        // The uri leaves; a nameless child is still told apart by it.
+        rendered: kept.map((fields, i) =>
+          identity({ ...fields, uri: objects[i]?.uri }),
         ),
-      ].join('\n'),
-    medium: (objects) => ({
-      function_group_name: functionGroupName,
-      total: objects.length,
-      [listKey]: objects.map(({ uri: _uri, ...fields }) => fields),
+      };
     }),
     full,
     raw: full,

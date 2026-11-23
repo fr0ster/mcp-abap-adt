@@ -33,10 +33,7 @@ import {
 } from '../../../lib/abapGit/client';
 import { objectsAnswer } from '../../../lib/abapGit/formats';
 import type { KindToolDefinition } from '../../../lib/abapGit/kindTool';
-import {
-  assertEachOnce,
-  pullSelection,
-} from '../../../lib/abapGit/pullSelection';
+import { pullSelection } from '../../../lib/abapGit/pullSelection';
 import type { McpResult } from '../../../lib/answer';
 import { BACKGROUND_FIELD } from '../../../lib/backgroundRuns/tools';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -67,7 +64,7 @@ const IMPORTS =
  * `warning_package_adjust`): a remote-only change is imported either way.
  */
 const CLOUD_IMPORTS =
-  'every object the modified-objects read lists is brought to its remote version; with overwrite, the objects changed in the system or held by another package are overwritten only when overwrite names them, the others keeping their system version, and the objects changed only in the remote are imported either way';
+  'every object the modified-objects read lists is brought to its remote version; with overwrite, SAP selects by name against the list as it stands when its job runs: the objects changed in the system or held by another package are overwritten when overwrite names them, the others keeping their system version, and the objects changed only in the remote are imported either way';
 
 const ONPREM_DESCRIPTION = `Pulls the repository repository_key from the branch it is linked on, recorded in transport_request: ${IMPORTS}. Ends on SAP's answer, or with background true runs on an ABAP session of its own. Answers facts only: SAP's status, done, and the objects SAP lists.`;
 
@@ -98,7 +95,6 @@ async function selectionOf(
   | { readonly refused: McpResult }
 > {
   try {
-    assertEachOnce(overwrite);
     const admission = admissionOf(context);
     const repo = admittedRepo(admission);
     const modified = await abapGitClientOf(

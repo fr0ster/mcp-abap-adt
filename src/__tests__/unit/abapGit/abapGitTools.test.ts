@@ -460,20 +460,46 @@ describe('the abapGit tools: requests', () => {
     );
   });
 
-  it('an overwrite naming one object twice is refused with nothing sent', async () => {
+  it('a selected package-warning entry is sent in packageWarningObjects as R6 answered it, the overwrite list empty', async () => {
+    const { sent } = await run(
+      (context) =>
+        handlePullAbapGitRepo(context, {
+          repository_key: REPO_KEY,
+          overwrite: [{ type: 'PROG/P', name: 'ZDEMO' }],
+        }),
+      R1,
+      (request) =>
+        request.method === 'GET'
+          ? { status: 200, data: modifiedObjects }
+          : { status: 202, data: '' },
+    );
+    const body = String(sent[1]?.data);
+    assert.equal(
+      body.includes(
+        '<agitpullmodifiedobjects:packageWarningObjects><agitpullmodifiedobjects:abapgitobjects adtcore:uri="/sap/bc/adt/programs/programs/zdemo" adtcore:type="PROG/P" adtcore:name="ZDEMO" adtcore:packageName="ZOTHER" agitpullmodifiedobjects:action="3"/></agitpullmodifiedobjects:packageWarningObjects>',
+      ),
+      true,
+      body,
+    );
+    assert.equal(body.includes('ZCL_DEMO'), false, body);
+  });
+
+  it('a selected name R6 lists under another type too is refused after R6, nothing pulled: SAP matches by name alone', async () => {
+    const shared = modifiedObjects.replace(
+      'adtcore:name="ZDEMO"',
+      'adtcore:name="ZCL_DEMO"',
+    );
     const { sent, text } = await run(
       (context) =>
         handlePullAbapGitRepo(context, {
           repository_key: REPO_KEY,
-          overwrite: [
-            { type: 'CLAS/OC', name: 'ZCL_DEMO' },
-            { type: 'CLAS/OC', name: 'ZCL_DEMO' },
-          ],
+          overwrite: [{ type: 'CLAS/OC', name: 'ZCL_DEMO' }],
         }),
       R1,
+      () => ({ status: 200, data: shared }),
     );
-    assert.equal(sent.length, 0);
-    assert.equal(JSON.parse(text).error, 'abapgit_overwrite_duplicate');
+    assert.equal(only(sent).method, 'GET');
+    assert.equal(JSON.parse(text).error, 'abapgit_overwrite_ambiguous');
   });
 
   it('a cloud pull answers accepted after its one request; on premise done with the objects', async () => {

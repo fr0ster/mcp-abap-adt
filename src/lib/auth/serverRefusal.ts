@@ -52,6 +52,8 @@ export type ServerRefusalCode =
   | 'abapgit_run_log_ambiguous'
   | 'abapgit_run_log_not_served'
   | 'abapgit_overwrite_duplicate'
+  | 'abapgit_overwrite_not_declared'
+  | 'abapgit_overwrite_ambiguous'
   | 'abapgit_overwrite_not_listed'
   | 'abapgit_url_refused'
   | 'abapgit_endpoint_refused'
@@ -109,7 +111,15 @@ export const ABAPGIT_OVERWRITE_DUPLICATE_WORDS =
 
 /** A pull's `overwrite` naming an object the modified-objects read (R6) does not list. */
 export const ABAPGIT_OVERWRITE_NOT_LISTED_WORDS =
-  'overwrite names an object the modified-objects read does not list for repository_key: name objects by their type and name as GetAbapGitModifiedObjects answers them; nothing but that read was sent';
+  'overwrite names an object the modified-objects read does not list for repository_key: name objects by their type and name as GetAbapGitModifiedObjects answers them; the repository list and the modified-objects read were sent, no pull';
+
+/** A pull's `overwrite` on a system whose pull takes no selection (on premise). */
+export const ABAPGIT_OVERWRITE_NOT_DECLARED_WORDS =
+  'overwrite is taken by the pull on ABAP Cloud only: on premise SAP pulls every changed object; nothing was sent';
+
+/** A selected name R6 lists under another type too: SAP's job matches by name alone. */
+export const ABAPGIT_OVERWRITE_AMBIGUOUS_WORDS =
+  'overwrite names an object whose name the modified-objects read lists under another type too, and SAP selects by name alone, so the pull would overwrite both; the repository list and the modified-objects read were sent, no pull';
 
 /** A `url` argument that is no URL, or carries userinfo, a query, a fragment or a dot segment (spec §5.1). */
 export const ABAPGIT_URL_REFUSED_WORDS =
@@ -452,6 +462,8 @@ const WORDS: Readonly<Record<FixedCode, string>> = {
   abapgit_run_log_ambiguous: ABAPGIT_RUN_LOG_AMBIGUOUS_WORDS,
   abapgit_run_log_not_served: ABAPGIT_RUN_LOG_NOT_SERVED_WORDS,
   abapgit_overwrite_duplicate: ABAPGIT_OVERWRITE_DUPLICATE_WORDS,
+  abapgit_overwrite_not_declared: ABAPGIT_OVERWRITE_NOT_DECLARED_WORDS,
+  abapgit_overwrite_ambiguous: ABAPGIT_OVERWRITE_AMBIGUOUS_WORDS,
   abapgit_overwrite_not_listed: ABAPGIT_OVERWRITE_NOT_LISTED_WORDS,
   abapgit_url_refused: ABAPGIT_URL_REFUSED_WORDS,
   abapgit_endpoint_refused: ABAPGIT_ENDPOINT_REFUSED_WORDS,

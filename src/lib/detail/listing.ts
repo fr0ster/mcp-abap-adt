@@ -344,6 +344,12 @@ export type ChildLists<I> = [SchemaKeys<I>] extends [never]
 export interface RowSpecBase<I> {
   readonly columns: readonly Column<I>[];
   readonly header: 'always' | 'when-rows' | 'none';
+  /**
+   * A head line naming the list, written before it whenever the list is
+   * present — an empty one too (`# list staged`): one list among several of
+   * the same items.
+   */
+  readonly heading?: Head | undefined;
   readonly groups?: readonly Group<I>[] | undefined;
   /** The list is a tree's top: its rows at depth 0, their own lists one level deeper each. */
   readonly tree?: boolean | undefined;
@@ -408,7 +414,12 @@ export function rows<I, K extends string>(
     // An absent list writes nothing, its header neither; an empty one its
     // header where the spec asks for it.
     write: (reading, depth) =>
-      present(reading, key) ? rowLines(itemsOf(reading, key), spec, depth) : [],
+      present(reading, key)
+        ? [
+            ...(spec.heading === undefined ? [] : [spec.heading]),
+            ...rowLines(itemsOf(reading, key), spec, depth),
+          ]
+        : [],
   };
 }
 

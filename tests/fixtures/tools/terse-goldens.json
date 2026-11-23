@@ -629,6 +629,110 @@
       "{\"main_object\":{\"name\":\"ZPROG\",\"type\":\"program\"},\"include_nested\":true,\"total_objects_analyzed\":2,\"total_enhancements_found\":2,\"objects\":[{\"object_name\":\"ZPROG\",\"object_type\":\"program\",\"total_enhancements\":0,\"enhancements\":[],\"unreadable\":[{\"message\":\"Request failed with status code 403\",\"origin\":\"connection\",\"step\":\"read class metadata\",\"status\":403,\"adt_type\":\"ExceptionNotAuthorized\",\"namespace\":\"com.sap.adt\",\"messages\":[{\"type\":\"E\",\"text\":\"no authorization\",\"code\":\"ExceptionNotAuthorized\"}],\"raw_body\":\"<?xml version=\\\"1.0\\\" encoding=\\\"utf-8\\\"?><exc:exception xmlns:exc=\\\"http://www.sap.com/abapxml/types/communicationframework\\\"><namespace id=\\\"com.sap.adt\\\"/><type id=\\\"ExceptionNotAuthorized\\\"/><message lang=\\\"EN\\\">no authorization</message></exc:exception>\"}]},{\"object_name\":\"ZINC_OK\",\"object_type\":\"include\",\"total_enhancements\":2,\"enhancements\":[{\"name\":\"Z_FIRST\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_first.\\nENDENHANCEMENT.\"},{\"name\":\"Z_SECOND\",\"type\":\"ENHO/XHH\",\"sourceCode\":\"ENHANCEMENT 1 z_second.\"}]}],\"detailed\":false,\"total_objects_with_enhancements\":1}"
     ]
   },
+  "ListAbapGitRepos two repositories @terse": {
+    "isError": false,
+    "parts": [
+      "key\tpackage\tbranch_name\turl\trun_status\n000001\tZPKG_GIT\trefs/heads/feature-run\thttps://git.example.invalid/team/repo.git\tS\n000002\tZPKG_OTHER\trefs/heads/main\thttps://git.example.invalid/team/other.git\t"
+    ]
+  },
+  "ListAbapGitRepos two repositories @medium": {
+    "isError": false,
+    "parts": [
+      "key\tpackage\tbranch_name\turl\trun_status\tstatus_text\tapp_log_key\n000001\tZPKG_GIT\trefs/heads/feature-run\thttps://git.example.invalid/team/repo.git\tS\tPull finished\t0123456789ABCDEF0123456789ABCDEF\n000002\tZPKG_OTHER\trefs/heads/main\thttps://git.example.invalid/team/other.git\t\t\t"
+    ]
+  },
+  "ListAbapGitRepos two repositories @full": {
+    "isError": false,
+    "parts": [
+      "{\"repos\":[{\"key\":\"000001\",\"package\":\"ZPKG_GIT\",\"url\":\"https://git.example.invalid/team/repo.git\",\"branchName\":\"refs/heads/feature-run\",\"runStatus\":\"S\",\"statusText\":\"Pull finished\",\"appLogKey\":\"0123456789ABCDEF0123456789ABCDEF\"},{\"key\":\"000002\",\"package\":\"ZPKG_OTHER\",\"url\":\"https://git.example.invalid/team/other.git\",\"branchName\":\"refs/heads/main\"}]}"
+    ]
+  },
+  "CheckAbapGitExternalRepo its branches @terse": {
+    "isError": false,
+    "parts": ["# access_mode PRIVATE\nname\tis_head\nrefs/heads/main\tX"]
+  },
+  "CheckAbapGitExternalRepo its branches @medium": {
+    "isError": false,
+    "parts": [
+      "# access_mode PRIVATE\nname\ttype\tis_head\tsha1\nrefs/heads/main\tHD\tX\t0123456789abcdef0123456789abcdef01234567"
+    ]
+  },
+  "CheckAbapGitExternalRepo its branches @full": {
+    "isError": false,
+    "parts": [
+      "{\"accessMode\":\"PRIVATE\",\"branches\":[{\"sha1\":\"0123456789abcdef0123456789abcdef01234567\",\"name\":\"refs/heads/main\",\"type\":\"HD\",\"isHead\":true}]}"
+    ]
+  },
+  "GetAbapGitBranchInfo a branch with its folder logic @terse": {
+    "isError": false,
+    "parts": [
+      "# access_mode PRIVATE\nname\tfolder_logic\nrefs/heads/main\tFULL"
+    ]
+  },
+  "GetAbapGitBranchInfo a branch with its folder logic @medium": {
+    "isError": false,
+    "parts": [
+      "# access_mode PRIVATE\nname\ttype\tis_head\tsha1\tfolder_logic\nrefs/heads/main\tHD\tX\t0123456789abcdef0123456789abcdef01234567\tFULL"
+    ]
+  },
+  "GetAbapGitBranchInfo a branch with its folder logic @full": {
+    "isError": false,
+    "parts": [
+      "{\"accessMode\":\"PRIVATE\",\"branches\":[{\"sha1\":\"0123456789abcdef0123456789abcdef01234567\",\"name\":\"refs/heads/main\",\"type\":\"HD\",\"isHead\":true,\"folderLogic\":\"FULL\"}]}"
+    ]
+  },
+  "GetAbapGitModifiedObjects what a pull would overwrite @terse": {
+    "isError": false,
+    "parts": [
+      "# list overwrite\ntype\tname\tpackage_name\nCLAS/OC\tZCL_DEMO\tZPKG\n# list package_warning\ntype\tname\tpackage_name\nPROG/P\tZDEMO\tZOTHER"
+    ]
+  },
+  "GetAbapGitModifiedObjects what a pull would overwrite @medium": {
+    "isError": false,
+    "parts": [
+      "# list overwrite\ntype\tname\tpackage_name\taction\turi\nCLAS/OC\tZCL_DEMO\tZPKG\t2\t/sap/bc/adt/oo/classes/zcl_demo\n# list package_warning\ntype\tname\tpackage_name\taction\turi\nPROG/P\tZDEMO\tZOTHER\t3\t/sap/bc/adt/programs/programs/zdemo"
+    ]
+  },
+  "GetAbapGitModifiedObjects what a pull would overwrite @full": {
+    "isError": false,
+    "parts": [
+      "{\"overwriteObjects\":[{\"uri\":\"/sap/bc/adt/oo/classes/zcl_demo\",\"type\":\"CLAS/OC\",\"name\":\"ZCL_DEMO\",\"packageName\":\"ZPKG\",\"action\":2}],\"packageWarningObjects\":[{\"uri\":\"/sap/bc/adt/programs/programs/zdemo\",\"type\":\"PROG/P\",\"name\":\"ZDEMO\",\"packageName\":\"ZOTHER\",\"action\":3}]}"
+    ]
+  },
+  "GetAbapGitStaging the staging @terse": {
+    "isError": false,
+    "parts": [
+      "# author Ada Author <ada@example.invalid>\n# committer Carl Committer <carl@example.invalid>\n# list unstaged\ntype\tname\tpackage_name\tfile\tlocal_state\tremote_state\nCLAS/OC\tZCL_DEMO\tZPKG\tzcl_demo.clas.abap\tM\t\n# list staged\n# list ignored"
+    ]
+  },
+  "GetAbapGitStaging the staging @medium": {
+    "isError": false,
+    "parts": [
+      "# author Ada Author <ada@example.invalid>\n# committer Carl Committer <carl@example.invalid>\n# list unstaged\nwbkey\tversion\turi\ttype\tname\tpackage_name\tfile\tpath\tlocal_state\tremote_state\nCLASZCL_DEMO\tactive\t/sap/bc/adt/oo/classes/zcl_demo\tCLAS/OC\tZCL_DEMO\tZPKG\tzcl_demo.clas.abap\t/src/\tM\t\n# list staged\n# list ignored"
+    ]
+  },
+  "GetAbapGitStaging the staging @full": {
+    "isError": false,
+    "parts": [
+      "{\"unstaged\":[{\"wbkey\":\"CLASZCL_DEMO\",\"version\":\"active\",\"uri\":\"/sap/bc/adt/oo/classes/zcl_demo\",\"type\":\"CLAS/OC\",\"name\":\"ZCL_DEMO\",\"packageName\":\"ZPKG\",\"files\":[{\"name\":\"zcl_demo.clas.abap\",\"path\":\"/src/\",\"localState\":\"M\",\"remoteState\":\"\"}]}],\"staged\":[],\"ignored\":[],\"author\":{\"name\":\"Ada Author\",\"email\":\"ada@example.invalid\"},\"committer\":{\"name\":\"Carl Committer\",\"email\":\"carl@example.invalid\"}}"
+    ]
+  },
+  "GetAbapGitErrorLog a run's log @terse": {
+    "isError": false,
+    "parts": ["type\tname\tmessage_type\nCLAS\tZCL_DEMO\tE"]
+  },
+  "GetAbapGitErrorLog a run's log @medium": {
+    "isError": false,
+    "parts": [
+      "type\tname\tpackage\tstatus\tmessage_type\nCLAS\tZCL_DEMO\tZPKG\tE\tE"
+    ]
+  },
+  "GetAbapGitErrorLog a run's log @full": {
+    "isError": false,
+    "parts": [
+      "{\"objects\":[{\"type\":\"CLAS\",\"name\":\"ZCL_DEMO\",\"package\":\"ZPKG\",\"status\":\"E\",\"messageType\":\"E\"}]}"
+    ]
+  },
   "GetObjectsByType objects, a nameless one, two nodes not loaded, descriptions": {
     "isError": false,
     "parts": [
@@ -700,5 +804,19 @@
     "parts": [
       "{\"name\":\"P\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"SUB\",\"type\":\"DEVC/K\",\"kind\":\"package\",\"isPackage\":true,\"codeFormat\":\"xml\",\"restoreStatus\":\"ok\",\"children\":[{\"name\":\"ZA\",\"type\":\"CLAS/OC\",\"kind\":\"class\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]},{\"name\":\"ZORPHAN\",\"type\":\"PROG/P\",\"kind\":\"program\",\"isPackage\":false,\"codeFormat\":\"source\",\"restoreStatus\":\"ok\",\"children\":[]}]}"
     ]
+  },
+  "CheckAbapGitRepo the check": {
+    "isError": false,
+    "parts": ["{\"status\":200,\"result\":\"done\"}"]
+  },
+  "LinkAbapGitRepo a link with its objects": {
+    "isError": false,
+    "parts": [
+      "{\"status\":200,\"result\":\"done\",\"objects\":[{\"type\":\"CLAS\",\"name\":\"ZCL_DEMO\",\"package\":\"ZPKG\",\"status\":\"E\",\"messageType\":\"E\"}]}"
+    ]
+  },
+  "PullAbapGitRepo a pull without objects": {
+    "isError": false,
+    "parts": ["{\"status\":200,\"result\":\"done\"}"]
   }
 }

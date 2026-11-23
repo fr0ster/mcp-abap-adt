@@ -1,5 +1,6 @@
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import type { AbapGitAdmission } from '../lib/abapGit/admission';
 import type { IAccessChecks } from '../lib/access/accessChecks';
 import type { AdtHeaderPort } from '../lib/adtHeaders/AdtHeaderPairs';
 import type { BackgroundRunTools } from '../lib/backgroundRuns/port';
@@ -141,4 +142,11 @@ export interface HandlerContext {
    * the call's connection, never from a recorder of an ended batch.
    */
   recordedFrom?: HandlerContext;
+  /**
+   * An abapGit call's admission (`admitAbapGitCall`): the R1 entry it is
+   * addressed to, and the URL and credential its request sends. Set only
+   * for abapGit tools; a background run gets it in memory, never in its
+   * record.
+   */
+  abapGitAdmission?: AbapGitAdmission;
 }

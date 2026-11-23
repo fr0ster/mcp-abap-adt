@@ -212,7 +212,7 @@
     "crud"
   ],
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
-  "description": "ADT tool handlers and an embeddable MCP server for SAP ABAP. The standalone server is @mcp-abap-adt/core.",
+  "description": "ADT tool handlers and an embeddable MCP server for SAP ABAP, the abapGit tools included (link, pull, stage, push, through the system's ADT abapGit service). The standalone server is @mcp-abap-adt/core.",
   "license": "Apache-2.0",
   "publishConfig": {
     "access": "public"

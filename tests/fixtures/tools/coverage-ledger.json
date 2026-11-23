@@ -96,6 +96,22 @@
       "cloud": "src/__tests__/integration/coverage/amdpDebugger.live.test.ts"
     }
   },
+  "CheckAbapGitExternalRepo": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
+  "CheckAbapGitRepo": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": {
+        "reason": "on the onprem system named by abapgit.check_repo_fault_system, whose abapGit cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); there the live case asserts that refusal whole, 500 with no T100 key, and on any other system it must answer \u2014 the ledger cannot name a system, so this row stands for every onprem run"
+      },
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
   "CreateMessageClass": {
     "unit": "src/__tests__/unit/pins/messageClass.pins.test.ts",
     "live": {
@@ -206,6 +222,38 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/backgroundRuns.live.test.ts"
+    }
+  },
+  "GetAbapGitBranchInfo": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
+  "GetAbapGitErrorLog": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
+  "GetAbapGitFile": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
+  "GetAbapGitModifiedObjects": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
+  "GetAbapGitStaging": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
     }
   },
   "GetBackgroundRun": {
@@ -685,6 +733,95 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/unitTests.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/unitTests.live.test.ts"
+    }
+  },
+  "HandlerAbapGit#branch_info": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGit#link": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGit#pull": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGit#push": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGit#switch_branch": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGit#unlink": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGitGet#checks": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": {
+        "reason": "on the onprem system named by abapgit.check_repo_fault_system, whose abapGit cannot answer it: ZCL_ABAPGIT_RES_REPO_CHECKS ends in SYNTAX_ERROR (no value for the mandatory IV_SERVICE at L53, measured 2026-11-22); there the live case asserts that refusal whole, 500 with no T100 key, and on any other system it must answer \u2014 the ledger cannot name a system, so this row stands for every onprem run"
+      },
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGitGet#error_log": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGitGet#external_repo": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGitGet#file": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGitGet#modified_objects": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGitGet#repos": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
+    }
+  },
+  "HandlerAbapGitGet#staging": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGitCompact.live.test.ts"
     }
   },
   "HandlerActivate#CLASS_TEXT_ELEMENTS": {
@@ -1176,6 +1313,20 @@
       "cloud": "src/__tests__/integration/coverage/tableSettings.live.test.ts"
     }
   },
+  "LinkAbapGitRepo": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
+  "ListAbapGitRepos": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
   "ListBackgroundRuns": {
     "unit": "src/__tests__/unit/pins/backgroundRuns.pins.test.ts",
     "live": {
@@ -1225,6 +1376,20 @@
       "cloud": "src/__tests__/integration/coverage/debugger.live.test.ts"
     }
   },
+  "PullAbapGitRepo": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
+  "PushAbapGitRepo": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
   "RunAbapUnit": {
     "unit": "src/__tests__/unit/pins/unitTests.pins.test.ts",
     "live": {
@@ -1244,6 +1409,19 @@
     "live": {
       "onprem": "src/__tests__/integration/coverage/searchSource.live.test.ts",
       "cloud": "src/__tests__/integration/coverage/searchSource.live.test.ts"
+    }
+  },
+  "SwitchAbapGitBranch": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts"
+    }
+  },
+  "UnlinkAbapGitRepo": {
+    "unit": "src/__tests__/unit/pins/abapGit.pins.test.ts",
+    "live": {
+      "onprem": "src/__tests__/integration/coverage/abapGit.live.test.ts",
+      "cloud": "src/__tests__/integration/coverage/abapGit.live.test.ts"
     }
   },
   "UpdateMessageClass": {

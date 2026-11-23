@@ -17,6 +17,10 @@ import * as z from 'zod';
 import * as http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type {
+  IRfcConversation,
+  RfcConversationFactory,
+} from '@mcp-abap-adt/connection';
+import type {
   HandlerEntry,
   IHandlerGroup,
 } from '../../lib/handlers/interfaces';
@@ -429,4 +433,98 @@ export function probeGroup(
       ...extra,
     ],
   } as never;
+}
+
+/** A field of a value the RFC SDK's contract types `unknown`, or `undefined`. */
+function fieldOf(value: unknown, name: string): unknown {
+  return typeof value === 'object' && value !== null && name in value
+    ? Reflect.get(value, name)
+    : undefined;
+}
+
+/** Headers `fetch` sets itself and refuses from a caller. */
+const FETCH_OWN_HEADERS: ReadonlySet<string> = new Set([
+  'connection',
+  'content-length',
+  'host',
+  'keep-alive',
+  'transfer-encoding',
+]);
+
+/** The stand-in reached over RFC: the conversations, and the logons they were opened with. */
+export interface StandInRfcPath {
+  /**
+   * The conversation factory for the connector's real `RfcTransport`: each
+   * `SADT_REST_RFC_ENDPOINT` call is sent to the stand-in as the HTTP
+   * request it carries (its method, URI, header fields and body), so the
+   * stand-in records it and answers it as ever; the answer goes back as
+   * `STATUS_LINE`, `HEADER_FIELDS` and `MESSAGE_BODY`.
+   */
+  conversations: RfcConversationFactory;
+  /** The logon parameters of every conversation opened, in order. */
+  logons: Array<Readonly<Record<string, string>>>;
+  /** The URI of every call carried, in order. */
+  carried: string[];
+}
+
+/**
+ * The RFC path to the stand-in: what a suite builds an on-premise RFC
+ * connection on, so a real dispatch over RFC reaches the same stand-in, its
+ * holds, answers and records, as one over HTTP.
+ */
+export function rfcPathTo(stand: AdtStandIn): StandInRfcPath {
+  const logons: Array<Readonly<Record<string, string>>> = [];
+  const carried: string[] = [];
+  const conversations: RfcConversationFactory = (logon) => {
+    let alive = false;
+    const conversation: IRfcConversation = {
+      get alive() {
+        return alive;
+      },
+      open: async () => {
+        logons.push({ ...logon });
+        alive = true;
+      },
+      close: async () => {
+        alive = false;
+      },
+      call: async (_fm, params) => {
+        const request = fieldOf(params, 'REQUEST');
+        const line = fieldOf(request, 'REQUEST_LINE');
+        const method = String(fieldOf(line, 'METHOD'));
+        const uri = String(fieldOf(line, 'URI'));
+        carried.push(uri);
+        const headers: Record<string, string> = {};
+        const fields = fieldOf(request, 'HEADER_FIELDS');
+        for (const field of Array.isArray(fields) ? fields : []) {
+          const name = String(fieldOf(field, 'NAME'));
+          if (FETCH_OWN_HEADERS.has(name.toLowerCase())) continue;
+          headers[name] = String(fieldOf(field, 'VALUE'));
+        }
+        const sent = fieldOf(request, 'MESSAGE_BODY');
+        const body =
+          Buffer.isBuffer(sent) && sent.length > 0
+            ? sent.toString('utf8')
+            : undefined;
+        const response = await fetch(`${stand.url}${uri}`, {
+          method,
+          headers,
+          ...(body !== undefined ? { body } : {}),
+        });
+        return {
+          STATUS_LINE: {
+            STATUS_CODE: String(response.status),
+            REASON_PHRASE: response.statusText,
+          },
+          HEADER_FIELDS: [...response.headers].map(([NAME, VALUE]) => ({
+            NAME,
+            VALUE,
+          })),
+          MESSAGE_BODY: Buffer.from(await response.arrayBuffer()),
+        };
+      },
+    };
+    return conversation;
+  };
+  return { conversations, logons, carried };
 }

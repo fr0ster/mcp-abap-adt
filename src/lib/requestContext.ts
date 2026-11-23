@@ -58,6 +58,20 @@ export interface RequestContext {
    * presence rule as `debugTerminalId`.
    */
   debugBreakpointConflict?: string | undefined;
+  /**
+   * The one approved git endpoint the request states (spec §5.2):
+   * `x-abapgit-remote`, `x-abapgit-user`, `x-abapgit-token`, for this
+   * request only (Streamable HTTP), or for the stream that stated them on
+   * its opening GET (SSE). `undefined` when none of the three is given.
+   */
+  abapGitRemote?: AbapGitRemoteHeaders | undefined;
+}
+
+/** The git endpoint a request's headers state, each `''` when not given. */
+export interface AbapGitRemoteHeaders {
+  readonly url: string;
+  readonly user: string;
+  readonly token: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -91,6 +105,8 @@ function headerValue(
  * `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` or `SAP_DEBUG_*`: http/sse take
  * request values from headers only. The login and the connection's
  * parameters (the rules, the cloud lookup) still fill the responsible.
+ * `x-abapgit-remote`, `x-abapgit-user` and `x-abapgit-token` are the
+ * request's one approved git endpoint (`abapGitRemote`).
  * `x-sap-login` is not read here: it is a login only on an `x-sap-*` basic
  * connection, which the server enters itself.
  */
@@ -105,6 +121,9 @@ export function requestContextFromHeaders(
     headers,
     'x-sap-debug-breakpoint-conflict',
   );
+  const remote = headerValue(headers, 'x-abapgit-remote');
+  const user = headerValue(headers, 'x-abapgit-user');
+  const token = headerValue(headers, 'x-abapgit-token');
   return {
     masterLanguage: headerValue(headers, 'x-sap-language'),
     responsible,
@@ -112,6 +131,10 @@ export function requestContextFromHeaders(
     debugTerminalId,
     debugIdeId,
     debugBreakpointConflict,
+    abapGitRemote:
+      remote === undefined && user === undefined && token === undefined
+        ? undefined
+        : { url: remote ?? '', user: user ?? '', token: token ?? '' },
   };
 }
 

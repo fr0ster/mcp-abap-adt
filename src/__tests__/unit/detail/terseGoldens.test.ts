@@ -16,6 +16,15 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
+import { handleGetAbapGitBranchInfo } from '../../../handlers/abapgit/high/handleGetAbapGitBranchInfo';
+import { handleLinkAbapGitRepo } from '../../../handlers/abapgit/high/handleLinkAbapGitRepo';
+import { handlePullAbapGitRepo } from '../../../handlers/abapgit/high/handlePullAbapGitRepo';
+import { handleCheckAbapGitExternalRepo } from '../../../handlers/abapgit/readonly/handleCheckAbapGitExternalRepo';
+import { handleCheckAbapGitRepo } from '../../../handlers/abapgit/readonly/handleCheckAbapGitRepo';
+import { handleGetAbapGitErrorLog } from '../../../handlers/abapgit/readonly/handleGetAbapGitErrorLog';
+import { handleGetAbapGitModifiedObjects } from '../../../handlers/abapgit/readonly/handleGetAbapGitModifiedObjects';
+import { handleGetAbapGitStaging } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
+import { handleListAbapGitRepos } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
 import { handleGetATCFindings } from '../../../handlers/atc/high/handleGetATCFindings';
 import { handleGetATCResult } from '../../../handlers/atc/high/handleGetATCResult';
 import { handleGetEnhancements } from '../../../handlers/enhancement/readonly/handleGetEnhancements';
@@ -51,6 +60,21 @@ import { runSearchSource } from '../../../lib/search-source/orchestrator';
 import { skipSapAnswers } from '../../../lib/search-source/readFailure';
 import { assembleTree } from '../../../lib/strategies/packageWalk';
 import { declareSystemKind } from '../../../lib/systemKind';
+import {
+  ADMITTED_REPO,
+  BOUND_CREDENTIALS,
+  contextOn,
+  externalRepo,
+  modifiedObjects,
+  noObjects,
+  objectResults,
+  REPO_KEY,
+  REPO_PACKAGE,
+  REPO_URL,
+  reposDocument,
+  staging,
+  stubSap,
+} from '../../helpers/abapGitSap';
 import { corpusBody } from '../../helpers/adtCorpus';
 import { recordingConnection } from '../../helpers/recordingConnection';
 import { repositoryRoot } from '../../helpers/repoRoot';
@@ -937,6 +961,113 @@ SINGLE['assembleTree an object of a package the tree does not reach'] =
 
 // Codex round 11: GetStructuresList writes every failure of a node not
 // read, each its own line — the structure read's and the table read's.
+// The abapGit tools (merged from #374): each read at every level its
+// schema offers, each write's answer, over the abapGit unit fixtures.
+const abapGitRun = async (
+  handler: (context: ReturnType<typeof contextOn>) => Promise<{
+    content: ReadonlyArray<{ text?: string }>;
+    isError?: boolean;
+  }>,
+  admission: Parameters<typeof contextOn>[1],
+  data: string,
+): Promise<Answered> => {
+  const sap = stubSap(() => ({ status: 200, data }));
+  const result = await handler(contextOn(sap.connection, admission));
+  return {
+    isError: result.isError === true,
+    parts: result.content.map((part) => part.text ?? ''),
+  };
+};
+const ABAPGIT_R1 = { repo: ADMITTED_REPO, credentials: BOUND_CREDENTIALS };
+const ABAPGIT_BOUND = { sendUrl: REPO_URL, credentials: BOUND_CREDENTIALS };
+type AbapGitLevel = 'terse' | 'medium' | 'full';
+const abapGitLevel = (detail: DetailLevel): AbapGitLevel =>
+  detail === 'raw' ? 'full' : detail;
+
+CASES['ListAbapGitRepos two repositories'] = (detail) =>
+  abapGitRun(
+    (context) =>
+      handleListAbapGitRepos(context, { detail: abapGitLevel(detail) }),
+    {},
+    reposDocument,
+  );
+CASES['CheckAbapGitExternalRepo its branches'] = (detail) =>
+  abapGitRun(
+    (context) =>
+      handleCheckAbapGitExternalRepo(context, {
+        url: REPO_URL,
+        detail: abapGitLevel(detail),
+      }),
+    ABAPGIT_BOUND,
+    externalRepo(),
+  );
+CASES['GetAbapGitBranchInfo a branch with its folder logic'] = (detail) =>
+  abapGitRun(
+    (context) =>
+      handleGetAbapGitBranchInfo(context, {
+        url: REPO_URL,
+        branch: 'refs/heads/main',
+        package_name: REPO_PACKAGE,
+        detail: abapGitLevel(detail),
+      }),
+    { sendUrl: REPO_URL, credentials: null },
+    externalRepo({ folderLogic: true }),
+  );
+CASES['GetAbapGitModifiedObjects what a pull would overwrite'] = (detail) =>
+  abapGitRun(
+    (context) =>
+      handleGetAbapGitModifiedObjects(context, {
+        repository_key: REPO_KEY,
+        detail: abapGitLevel(detail),
+      }),
+    ABAPGIT_R1,
+    modifiedObjects,
+  );
+CASES['GetAbapGitStaging the staging'] = (detail) =>
+  abapGitRun(
+    (context) =>
+      handleGetAbapGitStaging(context, {
+        repository_key: REPO_KEY,
+        detail: abapGitLevel(detail),
+      }),
+    ABAPGIT_R1,
+    staging,
+  );
+CASES["GetAbapGitErrorLog a run's log"] = (detail) =>
+  abapGitRun(
+    (context) =>
+      handleGetAbapGitErrorLog(context, {
+        repository_key: REPO_KEY,
+        app_log_key: '0123456789ABCDEF0123456789ABCDEF',
+        detail: abapGitLevel(detail),
+      }),
+    ABAPGIT_R1,
+    objectResults,
+  );
+SINGLE['CheckAbapGitRepo the check'] = () =>
+  abapGitRun(
+    (context) => handleCheckAbapGitRepo(context, { repository_key: REPO_KEY }),
+    ABAPGIT_R1,
+    '',
+  );
+SINGLE['LinkAbapGitRepo a link with its objects'] = () =>
+  abapGitRun(
+    (context) =>
+      handleLinkAbapGitRepo(context, {
+        package_name: REPO_PACKAGE,
+        url: REPO_URL,
+        branch: 'refs/heads/main',
+      }),
+    { sendUrl: REPO_URL, credentials: null },
+    objectResults,
+  );
+SINGLE['PullAbapGitRepo a pull without objects'] = () =>
+  abapGitRun(
+    (context) => handlePullAbapGitRepo(context, { repository_key: REPO_KEY }),
+    ABAPGIT_R1,
+    noObjects,
+  );
+
 describe('GetStructuresList terse: every failure of a node not read', () => {
   it('ZGONE: the structure read and the table read, each a # failure line', async () => {
     const run =

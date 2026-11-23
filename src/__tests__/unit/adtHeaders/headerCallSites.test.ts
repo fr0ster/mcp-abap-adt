@@ -40,6 +40,20 @@ describe('headerCallSites', () => {
     assert.ok(offenders[0].includes('not the pair `withAdtHeaders` hands it'));
   });
 
+  it("passes an abapGit new form's pair taken from ABAPGIT_HEADERS", () => {
+    const { offenders, inspected } = headerCallSites([fixture('abapGitPair')]);
+    assert.equal(inspected, 1);
+    assertEquals(offenders, []);
+  });
+
+  it('reports a pair of its own named ABAPGIT_HEADERS', () => {
+    const { offenders, inspected } = headerCallSites([
+      fixture('localAbapGitPair'),
+    ]);
+    assert.equal(inspected, 1);
+    assert.equal(offenders.length, 1);
+  });
+
   it('reports an operation naming another member', () => {
     const { offenders } = headerCallSites([fixture('otherMember')]);
     assert.equal(offenders.length, 1);

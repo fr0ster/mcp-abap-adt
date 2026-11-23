@@ -239,7 +239,8 @@ function flatObjects(level: NodeLevel, nodeType: string): FlatObject[] {
     // `get_the_shorttexts`, `INDEX start_tabix + sy-tabix`), so a batched
     // part's descriptions belong to other parts (the owner's decision).
   }));
-  if (isNotLoaded(level)) {
+  // Each node SAP could not load is its own row: two stay two.
+  for (const _notLoaded of level.notLoaded ?? []) {
     objects.push({
       OBJECT_TYPE: nodeType,
       OBJECT_NAME: NOT_LOADED_BY_SAP,
@@ -684,7 +685,10 @@ function secondReads(
   return lists.flatMap((list, l) =>
     list.objects.flatMap((o, index): SecondRead[] => {
       if (o.NOT_LOADED === true) return [];
-      if (o.OBJECT_TYPE === '') {
+      // An object SAP listed without a type or a name is read by its own
+      // URI — never an address built from an empty name.
+      if (o.OBJECT_TYPE === '' || o.OBJECT_NAME === '') {
+        if (pass === 'types' && o.OBJECT_TYPE !== '') return [];
         return o.OBJECT_URI === undefined
           ? []
           : [{ list: l, index, read: uriRead(o.OBJECT_URI) }];

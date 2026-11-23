@@ -13,7 +13,6 @@ import {
 } from '../detail';
 import {
   childNodesOf,
-  isNotLoaded,
   NOT_LOADED_BY_SAP,
   type NodeItem,
   type NodeLevel,
@@ -55,9 +54,10 @@ function okObjects(
 
 /** A level SAP could not load: its row, of the node's type — never an empty success. */
 function notLoadedRows(level: NodeLevel, type: AdtTypeCode): GroupChild[] {
-  return isNotLoaded(level)
-    ? [{ type, name: NOT_LOADED_BY_SAP, notLoaded: true }]
-    : [];
+  // Each node SAP could not load is its own row: two stay two.
+  return (level.notLoaded ?? []).map(
+    (): GroupChild => ({ type, name: NOT_LOADED_BY_SAP, notLoaded: true }),
+  );
 }
 
 /**

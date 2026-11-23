@@ -638,9 +638,15 @@ function notLoadedRow(
   type: string,
   packageName: string,
 ): WalkedItem[] {
-  return isNotLoaded(level)
-    ? [{ name: NOT_LOADED_BY_SAP, type, packageName, notLoaded: true }]
-    : [];
+  // Each node SAP could not load is its own row: two stay two.
+  return (level.notLoaded ?? []).map(
+    (): WalkedItem => ({
+      name: NOT_LOADED_BY_SAP,
+      type,
+      packageName,
+      notLoaded: true,
+    }),
+  );
 }
 
 function flatten(walk: PackageWalk): WalkedItem[] {

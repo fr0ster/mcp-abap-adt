@@ -182,4 +182,46 @@ describe('GetObjectsList detail', () => {
     );
     assert.equal(result.isError, true, result.content[0]?.text);
   });
+
+  // Codex round 8: a nameless row is addressed by its URI, never by an
+  // address built from an empty name.
+  it('medium: a typed nameless include is read by its URI', async () => {
+    const connection = recordingConnection([
+      { data: NAMELESS },
+      {
+        data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="One"/>',
+      },
+      {
+        data: '<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="Two"/>',
+      },
+    ]);
+    declareSystemKind(connection, 'onprem');
+    const batchAvailability = createBatchAvailability();
+    batchAvailability.noteOuterStatus(NO_BATCH_ENDPOINT_STATUS);
+    const result = await handleGetObjectsList(
+      { connection, logger: undefined, batchAvailability },
+      {
+        parent_name: 'ZFG',
+        parent_tech_name: 'ZFG',
+        parent_type: 'FUGR/F',
+        detail: 'medium',
+      },
+    );
+    assert.equal(result.isError, false, result.content[0]?.text);
+    const urls = connection.requests.slice(1).map((r) => r.url);
+    assert.deepStrictEqual(urls, ['/sap/bc/adt/x/one', '/sap/bc/adt/x/two']);
+  });
+
+  it('two nodes SAP could not load in one response stay two rows', async () => {
+    const TWO = NOT_LOADED.replace(
+      '</TREE_CONTENT>',
+      '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_NAME>the second could not be loaded</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE></TREE_CONTENT>',
+    );
+    const lines = (await objectsList('terse', TWO)).split('\n');
+    assert.equal(
+      lines.filter((line) => line.includes('not loaded by SAP')).length,
+      2,
+      lines.join('\n'),
+    );
+  });
 });

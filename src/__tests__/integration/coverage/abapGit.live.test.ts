@@ -2,7 +2,8 @@
  * abapGit live, the full tools (plan T6.9, spec §7 steps 1–8), on premise
  * and on the cloud, on run-owned fixtures: check the remote, link, push a
  * run-owned interface, pull a remote change, switch branches (on premise),
- * checks and files with SAP's T100 key on a missing file, link and pull
+ * the checks (on premise SAP's measured SYNTAX_ERROR), the files, SAP's
+ * T100 key on the remote file read without a credential, link and pull
  * refused under an allowed-packages entry, push and unlink checked against
  * the repository's package, the unlink, and the cleanup. Each call under
  * test is a `liveCall`, so the run records its key; the fixtures, the
@@ -15,7 +16,8 @@ import { describe, it } from 'node:test';
 import { liveCall, liveSuite, throughServer } from '../helpers/live';
 import {
   AbapGitRun,
-  assertT100,
+  assertAnonymousFileT100,
+  assertOnpremChecksFault,
   branchNamesOf,
   json,
   list,
@@ -154,26 +156,35 @@ liveSuite(['onprem', 'cloud'], 'abapGit, the full tools', () => {
     await run.followBranch(run.branch);
   });
 
-  it('6. runs the checks and reads the file local; a missing file carries SAP’s T100 key', async (t) => {
+  it('6. runs the checks and reads the file local; the checks as SAP answers them on each system', async (t) => {
     if (run.skipped(t)) return;
     const checks = await liveCall('CheckAbapGitRepo', {
       repository_key: run.key(),
     });
-    // On premise SAP answers SYNTAX_ERROR here (measured): either answer
-    // is SAP's own.
-    assert.ok(checks.text.length > 0);
+    // On premise SAP's handler ends in SYNTAX_ERROR (measured): its refusal,
+    // asserted whole; the ledger covers this key there by that reason. On
+    // the cloud the checks answer.
+    if (run.backend === 'onprem') assertOnpremChecksFault(checks);
+    else assert.equal(checks.isError, false, checks.text);
     const local = await liveCall('GetAbapGitFile', {
       repository_key: run.key(),
       filename: run.fileName,
       version: 'local',
     });
     assert.equal(local.isError, false, local.text);
-    const missing = await liveCall('GetAbapGitFile', {
-      repository_key: run.key(),
-      filename: run.missingFileName,
-      version: 'remote',
+  });
+
+  describe('6b. with no approved endpoint: the remote file read goes without a credential', () => {
+    throughServer(() => Promise.resolve(run.anonymousRestriction()));
+    it('the private remote refuses it: 500 with SAP’s T100 key 00/001', async (t) => {
+      if (run.skipped(t)) return;
+      const remote = await liveCall('GetAbapGitFile', {
+        repository_key: run.key(),
+        filename: run.fileName,
+        version: 'remote',
+      });
+      assertAnonymousFileT100(remote);
     });
-    assertT100(missing);
   });
 
   describe('7. under an allowed-packages entry naming the run’s package', () => {

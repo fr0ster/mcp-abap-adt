@@ -12,7 +12,8 @@ import { describe, it } from 'node:test';
 import { liveCall, liveSuite, throughServer } from '../helpers/live';
 import {
   AbapGitRun,
-  assertT100,
+  assertAnonymousFileT100,
+  assertOnpremChecksFault,
   branchNamesOf,
   json,
   list,
@@ -163,15 +164,17 @@ liveSuite(['onprem', 'cloud'], 'abapGit, compact', () => {
     await run.followBranch(run.branch);
   });
 
-  it('6. runs the checks and reads the file local; a missing file carries SAP’s T100 key', async (t) => {
+  it('6. runs the checks and reads the file local; the checks as SAP answers them on each system', async (t) => {
     if (run.skipped(t)) return;
     const checks = await liveCall('HandlerAbapGitGet', {
       action: 'checks',
       repository_key: run.key(),
     });
-    // On premise SAP answers SYNTAX_ERROR here (measured): either answer
-    // is SAP's own.
-    assert.ok(checks.text.length > 0);
+    // On premise SAP's handler ends in SYNTAX_ERROR (measured): its refusal,
+    // asserted whole; the ledger covers this key there by that reason. On
+    // the cloud the checks answer.
+    if (run.backend === 'onprem') assertOnpremChecksFault(checks);
+    else assert.equal(checks.isError, false, checks.text);
     const local = await liveCall('HandlerAbapGitGet', {
       action: 'file',
       repository_key: run.key(),
@@ -179,13 +182,20 @@ liveSuite(['onprem', 'cloud'], 'abapGit, compact', () => {
       version: 'local',
     });
     assert.equal(local.isError, false, local.text);
-    const missing = await liveCall('HandlerAbapGitGet', {
-      action: 'file',
-      repository_key: run.key(),
-      filename: run.missingFileName,
-      version: 'remote',
+  });
+
+  describe('6b. with no approved endpoint: the remote file read goes without a credential', () => {
+    throughServer(() => Promise.resolve(run.anonymousRestriction()));
+    it('the private remote refuses it: 500 with SAP’s T100 key 00/001', async (t) => {
+      if (run.skipped(t)) return;
+      const remote = await liveCall('HandlerAbapGitGet', {
+        action: 'file',
+        repository_key: run.key(),
+        filename: run.fileName,
+        version: 'remote',
+      });
+      assertAnonymousFileT100(remote);
     });
-    assertT100(missing);
   });
 
   describe('7. under an allowed-packages entry naming the run’s package', () => {

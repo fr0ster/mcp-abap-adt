@@ -44,6 +44,7 @@
 import assert from 'node:assert/strict';
 import { randomBytes } from 'node:crypto';
 import { after, before, type TestContext } from 'node:test';
+import { ABAPGIT_ERROR_MESSAGES } from '@mcp-abap-adt/interfaces-adt';
 import {
   type ApprovedEndpoint,
   parseApprovedEndpoints,
@@ -163,12 +164,39 @@ export function pushedObjectsOf(staging: unknown, name: string) {
     }));
 }
 
-/** SAP's T100 key on a refusal: the message class and number are there. */
-export function assertT100(answer: LiveAnswer): void {
-  assert.equal(answer.isError, true);
-  const facts = member(JSON.parse(answer.text), 'facts');
-  assert.equal(typeof member(facts, 'messageClass'), 'string');
-  assert.equal(typeof member(facts, 'messageNumber'), 'string');
+/**
+ * The remote file read without a credential, refused with SAP's T100 key:
+ * SAP reads the private remote anonymously, the git host refuses, and the
+ * abapGit exception is answered 500 with T100 00/001 (onprem
+ * `ZCL_ABAPGIT_RES_REPO_FILES->get` L84–87, cloud L97–100; measured
+ * 2026-11-22 on both systems, adt-clients ERRATA). Not a file the
+ * repository does not hold: that read answers 200 with an empty text
+ * (L69 / L80, measured on premise). The facts are asserted whole.
+ */
+export function assertAnonymousFileT100(answer: LiveAnswer): void {
+  assert.equal(answer.isError, true, answer.text);
+  assert.deepEqual(member(JSON.parse(answer.text), 'facts'), {
+    status: 500,
+    messageClass: '00',
+    messageNumber: '001',
+  });
+}
+
+/**
+ * On premise, the checks are SAP's handler fault: every call ends in
+ * SYNTAX_ERROR in `ZCL_ABAPGIT_RES_REPO_CHECKS` (no value for the mandatory
+ * `IV_SERVICE` at L53; measured 2026-11-22, adt-clients ERRATA), answered
+ * 500 with no T100 key. The answer is asserted whole — the fixed refused
+ * words and the status alone — so a 500 that carries anything more, or any
+ * other refusal, fails. The facts cannot name the dump: this is what the
+ * measured fault answers, not proof of it.
+ */
+export function assertOnpremChecksFault(answer: LiveAnswer): void {
+  assert.equal(answer.isError, true, answer.text);
+  assert.deepEqual(JSON.parse(answer.text), {
+    message: ABAPGIT_ERROR_MESSAGES.refused,
+    facts: { status: 500 },
+  });
 }
 
 /** The person a push names as author and committer. */
@@ -261,11 +289,6 @@ export class AbapGitRun {
   /** The interface's file name in the repository. */
   get fileName(): string {
     return `${this.interfaceName.toLowerCase()}.intf.abap`;
-  }
-
-  /** A file name no repository holds. */
-  get missingFileName(): string {
-    return `zif_none_${this.runId.toLowerCase()}.intf.abap`;
   }
 
   /** Skips `t` with the run's reason, when there is one. */
@@ -386,6 +409,14 @@ export class AbapGitRun {
   /** The server's restriction: the run's remote, and what a case adds. */
   restriction(over: ServerRestriction = {}): ServerRestriction {
     return { abapGitEndpoints: this.endpoints, ...over };
+  }
+
+  /**
+   * No approved endpoint: every abapGit request goes without a credential
+   * (no remote matches), so SAP reads the private remote anonymously.
+   */
+  anonymousRestriction(): ServerRestriction {
+    return this.restriction({ abapGitEndpoints: [] });
   }
 
   /** Link and pull refused (the import refusal), switch checked against the run's package. */

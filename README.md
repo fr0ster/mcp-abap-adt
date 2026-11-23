@@ -254,24 +254,25 @@ row SAP answered is answered. `detail` has four levels:
   assembles reads — package contents and tree, the other repository walks, `SearchSource`,
   `DescribeByList`, the include, structure and function group lists, `GetEnhancements`,
   `GetWhereUsed`, `GetUnitTest`, `GetCdsUnitTest`, `GetUnitTestResult`, `GetCdsUnitTestResult`, the
-  unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `ActivateObjectLow` — always answers a JSON
-  array of the documents SAP answered to the call's requests, in read order, each as ADT sent it,
-  an array even when the call read one: no parse, no projection, nothing of ours mixed in. A
-  refused request's body is no document, so a refused read shows as the document missing — at
-  `CreateTransport`, a failed read-back. A body the connection hands over as an object is its JSON
-  text. Raw never hides an error: a call `full` refuses, or answers with an error explained in it,
-  is answered at `raw` exactly as at `full`. `full` is the whole parse, and the two levels never
-  give the same answer.
+  unit-test runs, `RuntimeListFeeds`, `CreateTransport`, `CreateTransportTask`, `ActivateObjectLow`
+  — always answers a JSON array of every response the call got, in read order, each as
+  `{ "status", "body" }` as ADT sent it, an array even when the call read one: no parse, no
+  projection, nothing of ours mixed in. A failed read is there as its failed response, never as a
+  gap — at `CreateTransport`, a read-back SAP refused. A body the connection hands over as an object
+  is its JSON text. When the call fails — `full` refuses it, or answers with an error explained in
+  it — `raw` gives the same error answer as `full`; otherwise the two differ: `full` is the whole
+  parse, `raw` what ADT sent.
 
 An answer is the complete result or an error, never a partial one. A formatter that reshapes a
-reading writes through shared serializers that return the text and the identity of every item in it,
-both from the same rows, and those are compared with every item the reading held — its entries, and
-the incomplete entries, not-loaded nodes and incomplete objects beside them. On any difference the
-call answers the error `incomplete_answer`, in fixed words that name the tool and ask for
-`detail: 'full'`, which gives the whole parse; `raw` gives the documents as ADT sent them. Terse
+reading writes through shared writers that take typed rows and read each item's identity from the
+cells they write, and those are compared with every item the reading held — its entries, and the
+incomplete entries, not-loaded nodes and incomplete objects beside them. On any difference the call
+answers the error `incomplete_answer`, in fixed words that name the tool and ask for
+`detail: 'full'`, which gives the whole parse; `raw` gives the responses as ADT sent them. Terse
 lists what SAP returned: no row says that something asked for is absent — a consumer reads that with
 its own call, or asks `medium` or `full` where a tool states it — while what SAP itself returned stays,
-incomplete objects and nodes SAP could not load included.
+incomplete objects and nodes SAP could not load included (a node SAP could not load is its
+`not loaded by SAP` row at terse, medium and full; at raw, SAP's XML carries it).
 
 JSON answers are minified. A compact tool answers as the full tool it reads through, at every
 level.

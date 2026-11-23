@@ -130,7 +130,8 @@ None left: every site reads with its shipped reading (adt-strategies 0.28.1).
 The completeness guard (`src/lib/detail/complete.ts`) covers every list or tree formatter this PR
 changed. Three tools this PR did not change, and which take no `detail`, keep their formatters
 unguarded: `GetObjectsByType`, `GetObjectInfo` and `GetNodeStructureLow`. Putting them under the
-guard is a task of its own.
+guard is a task of its own. The same holds for `ListATCResults`, `GetTableContents` and
+`GetSqlQuery`, which this PR did not change either.
 
 ## Order and review
 

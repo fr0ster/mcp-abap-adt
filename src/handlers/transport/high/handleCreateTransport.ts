@@ -69,6 +69,8 @@ interface TypedTask {
    * credentials, refused otherwise, or answered what is not the request.
    */
   readBackFailed?: ReadBackFailure;
+  /** The request read back, as SAP sent it, when it was read. */
+  readBack?: string;
 }
 
 /** Why a created request's read-back failed. */
@@ -202,8 +204,9 @@ export async function handleCreateTransport(
     medium: createdAt(
       (created) => (settled) => terseCreatedTransport(created, settled),
     ),
-    // full the parse of the create's answer, and raw its document; a failed
-    // read-back's note beside either, so it is said at every level.
+    // full the parse of the create's answer, a failed read-back's note
+    // beside it; raw what ADT sent — the create's document and the request
+    // read back, so a failed read-back shows as the missing document.
     full: createdAt((created, raw) => (settled) => {
       const parsed = parseStructure(raw) ?? raw;
       return settled.readBackFailed === undefined
@@ -217,16 +220,10 @@ export async function handleCreateTransport(
           };
     }),
     raw: createdAt(
-      (created, raw) => (settled) =>
-        settled.readBackFailed === undefined
-          ? raw
-          : {
-              documents: [raw],
-              read_back: readBackFailedNote(
-                created.transportNumber,
-                settled.readBackFailed,
-              ),
-            },
+      (_created, raw) => (settled) =>
+        JSON.stringify(
+          settled.readBack === undefined ? [raw] : [raw, settled.readBack],
+        ),
     ),
   };
   type Terse =
@@ -234,8 +231,7 @@ export async function handleCreateTransport(
     | ReturnType<typeof terseNumbers>
     | XmlNode
     | string
-    | { create: XmlNode | string; read_back: string }
-    | { documents: string[]; read_back: string };
+    | { create: XmlNode | string; read_back: string };
 
   // The request read back as adt-strategies reads it by its number
   // (`readTransportItem`), the reading made for that number.
@@ -309,11 +305,12 @@ export async function handleCreateTransport(
         return created;
       }
       const first = taskRead.first;
+      const readBackDocument = taskRead.document;
       if (first === undefined) {
-        task = { number: null, type: null };
+        task = { number: null, type: null, readBack: readBackDocument };
         return created;
       }
-      task = { number: first, type: 'X' };
+      task = { number: first, type: 'X', readBack: readBackDocument };
       if (taskType === 'X') return created;
       const taskNumber = first;
       const changed = await withAdtHeaders(
@@ -326,12 +323,17 @@ export async function handleCreateTransport(
           }),
       );
       if (changed.ok) {
-        task = { number: taskNumber, type: taskType };
+        task = {
+          number: taskNumber,
+          type: taskType,
+          readBack: readBackDocument,
+        };
         return created;
       }
       task = {
         number: taskNumber,
         type: 'X',
+        readBack: readBackDocument,
         error: failureEntry(changed.getError(), 'change task type'),
       };
       return refusedAfterCreate(
@@ -400,18 +402,25 @@ function createdAt<A>(
  * verdict, where the read it replaced threw it.
  */
 type TaskRead =
-  | { readonly kind: 'read'; readonly first: string | undefined }
+  | {
+      readonly kind: 'read';
+      readonly first: string | undefined;
+      /** The read-back's document, as SAP sent it. */
+      readonly document: string;
+    }
   | { readonly kind: 'threw'; readonly thrown: unknown };
 
 function firstTaskOf(number: string) {
   return (answer: IAdtWireResponse): TaskRead => {
     try {
-      const item = readTransportItem(rawOf(answer), number);
+      const document = rawOf(answer);
+      const item = readTransportItem(document, number);
       const first =
         item.kind === 'request' ? item.tasks[0]?.header.number : undefined;
       return {
         kind: 'read',
         first: first !== undefined && first !== '' ? first : undefined,
+        document,
       };
     } catch (thrown) {
       return { kind: 'threw', thrown };

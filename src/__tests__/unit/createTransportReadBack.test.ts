@@ -2,8 +2,10 @@
  * Once SAP has created a request, its number is never lost (Codex P1 on
  * terse answers): a read-back that fails — refused, or an answer that is not
  * the request created — is answered as a success carrying the number, with
- * fixed words naming how to read it again, at every `detail`; `full` is the
- * parse of the create's answer, `raw` the document.
+ * fixed words naming how to read it again, at terse, medium and full;
+ * `full` is the parse of the create's answer. `raw` is what ADT sent: the
+ * create's document and the request read back, so a failed read-back shows
+ * as the missing document (the coordinator's ruling, Codex round 4).
  */
 
 import assert from 'node:assert/strict';
@@ -70,7 +72,13 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
       assert.equal(body.note, READ_BACK_WORDS(kind));
     });
 
-    for (const detail of ['medium', 'full', 'raw'] as const) {
+    it(`${label}: raw is the create's document alone — the read-back missing`, async () => {
+      const answered = await run(readBack, 'raw');
+      assert.equal(answered.isError === true, false, answered.content[0]?.text);
+      assert.equal(answered.content[0]?.text, JSON.stringify([CREATED]));
+    });
+
+    for (const detail of ['medium', 'full'] as const) {
       it(`${label}: detail ${detail} still succeeds and names the number`, async () => {
         const answered = await run(readBack, detail);
         assert.equal(
@@ -83,16 +91,28 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
     }
   }
 
+  it('a read-back that came: raw is the create and the request read back, in order', async () => {
+    const READ = `${head}<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core" tm:object_type="R" adtcore:name="${NUMBER}"><tm:request tm:number="${NUMBER}" tm:owner="SAPUSER01" tm:desc="x" tm:type="K" tm:status="D"><tm:task tm:number="SIDK900012" tm:owner="SAPUSER01" tm:desc="x" tm:type="X" tm:status="D"/></tm:request></tm:root>`;
+    const connection = recordingConnection([{ data: CREATED }, { data: READ }]);
+    declareSystemKind(connection, 'onprem');
+    const answered = (await handleCreateTransport(
+      { connection, logger: undefined } as never,
+      { description: 'x', task_type: 'X', detail: 'raw' } as never,
+    )) as { isError?: boolean; content: Array<{ text?: string }> };
+    assert.equal(answered.isError === true, false, answered.content[0]?.text);
+    assert.equal(answered.content[0]?.text, JSON.stringify([CREATED, READ]));
+  });
+
   it('full is the parse of the create, raw its document: not the same', async () => {
     const full = (await run({ data: `${head}<html/>` }, 'full')).content[0]
       ?.text;
     const raw = (await run({ data: `${head}<html/>` }, 'raw')).content[0]?.text;
     assert.notEqual(full, raw);
-    assert.ok((raw ?? '').includes('<tm:root'));
+    assert.equal(raw, JSON.stringify([CREATED]));
     assert.ok(!(full ?? '').includes('<tm:root'));
   });
 
-  it('a read-back the connection refuses (AuthRefusedError) keeps the number at every level', async () => {
+  it('a read-back the connection refuses (AuthRefusedError) keeps the number at every level, raw as the missing document', async () => {
     for (const detail of ['terse', 'medium', 'full', 'raw'] as const) {
       let sent = 0;
       const connection = recordingConnection([{ data: CREATED }]);
@@ -115,6 +135,10 @@ describe('CreateTransport keeps the created number when the read-back fails', ()
       )) as { isError?: boolean; content: Array<{ text?: string }> };
       const text = answered.content[0]?.text ?? '';
       assert.equal(answered.isError === true, false, text);
+      if (detail === 'raw') {
+        assert.equal(text, JSON.stringify([CREATED]));
+        continue;
+      }
       assert.ok(text.includes(NUMBER), text);
       assert.ok(text.includes(READ_BACK_WORDS('authentication')), text);
     }

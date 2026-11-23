@@ -456,9 +456,7 @@ describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READ
   }
 
   // `raw` is what ADT sent (the owner's ruling): one document as it came,
-  // or the array of the documents read, in order — never the parse. The one
-  // named exception: a created request whose read-back failed carries the
-  // read-back's diagnostic beside the create document (Codex round 4, P1).
+  // or the array of the documents read, in order — never the parse.
   it('raw is wire text: a document served, or the array of every one', () => {
     let checked = 0;
     for (const [key, recorded] of Object.entries(answered)) {
@@ -469,18 +467,27 @@ describe('the tools a shipped reading reads answer as before (WRITE_SHIPPED_READ
       if (first !== first.toUpperCase()) continue;
       const served = wire[key] ?? [];
       checked += 1;
-      if (recorded.text.startsWith('{"documents":')) {
-        const { documents, read_back } = JSON.parse(recorded.text);
-        assert.ok(key.startsWith('CreateTransport'), key);
-        assert.equal(typeof read_back, 'string', key);
+      // One document as it came, or an array of documents read: each served,
+      // in the order served (a write's status answer and a read-back that
+      // failed are served, not read).
+      const inOrder = (documents: readonly unknown[]) => {
+        let at = 0;
         for (const document of documents) {
-          assert.ok(served.includes(document), key);
+          while (at < served.length && served[at] !== document) at += 1;
+          if (at === served.length) return false;
+          at += 1;
         }
-        continue;
+        return documents.length > 0;
+      };
+      let documents: unknown;
+      try {
+        documents = JSON.parse(recorded.text);
+      } catch {
+        documents = undefined;
       }
       assert.ok(
         served.includes(recorded.text) ||
-          recorded.text === JSON.stringify(served),
+          (Array.isArray(documents) && inOrder(documents)),
         `${key}: ${recorded.text.slice(0, 120)}`,
       );
     }

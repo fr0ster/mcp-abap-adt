@@ -394,5 +394,17 @@
   "RuntimeListFeeds terse gateway_errors @full": {
     "isError": false,
     "text": "# feed gateway_errors\n# count 1\nopid\tdetail_kind\tdateTime\ttype\tshortText\tusername\nOP1\t\t2026-11-22T10:00:00Z\tE\tfailed\tSAPUSER01"
+  },
+  "ReadTransportActionLog lines and separators @terse": {
+    "isError": false,
+    "text": "# transport SIDK900012\n# count 3\nentry\nExport started\nObject ZCL_A\\texported\n\\#Done"
+  },
+  "ReadTransportActionLog lines and separators @medium": {
+    "isError": false,
+    "text": "{\"success\":true,\"transport_number\":\"SIDK900012\",\"count\":5,\"entries\":[\"========\",\"Export started\",\"--------\",\"Object ZCL_A\\texported\",\"#Done\"]}"
+  },
+  "ReadTransportActionLog lines and separators @full": {
+    "isError": false,
+    "text": "{\"?xml\":{\"@\":{\"version\":\"1.0\",\"encoding\":\"utf-8\"}},\"log:log\":{\"log:entry\":[{\"log:message\":{\"log:messageText\":{\"#text\":\"========\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"Export started\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"--------\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"Object ZCL_A\\texported\",\"@\":{\"key\":\"TK(188)\"}}}},{\"log:message\":{\"log:messageText\":{\"#text\":\"#Done\",\"@\":{\"key\":\"TK(188)\"}}}}],\"@\":{\"xmlns:log\":\"http://www.sap.com/cts/adt/log\"}}}"
   }
 }

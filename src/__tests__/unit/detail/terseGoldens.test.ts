@@ -33,6 +33,7 @@ import {
   terseFeedText,
 } from '../../../handlers/system/readonly/handleRuntimeListFeeds';
 import { searchSourceRows } from '../../../handlers/system/readonly/handleSearchSource';
+import { handleReadTransportActionLog } from '../../../handlers/transport/readonly/handleReadTransportActionLog';
 import {
   createBatchAvailability,
   NO_BATCH_ENDPOINT_STATUS,
@@ -652,6 +653,28 @@ for (const shown of FEEDS) {
     text: terseFeedText(shown),
   });
 }
+
+const logEntry = (text: string) =>
+  `<log:entry><log:message><log:messageText key="TK(188)">${text}</log:messageText></log:message></log:entry>`;
+CASES['ReadTransportActionLog lines and separators'] = async (detail) =>
+  answeredOf(
+    await handleReadTransportActionLog(
+      ctx([
+        {
+          data: `${xmlHead}<log:log xmlns:log="http://www.sap.com/cts/adt/log">${[
+            '========',
+            'Export started',
+            '--------',
+            'Object ZCL_A\texported',
+            '#Done',
+          ]
+            .map(logEntry)
+            .join('')}</log:log>`,
+        },
+      ]) as never,
+      { transport_number: 'SIDK900012', detail } as never,
+    ),
+  );
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

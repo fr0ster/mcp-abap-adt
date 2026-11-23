@@ -19,6 +19,7 @@ import {
   fullLevel,
   rawLevel,
   readingAt,
+  tsv,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf, levelOf } from '../../../lib/strategies/detail';
@@ -29,7 +30,7 @@ export const TOOL_DEFINITION = {
   name: 'GetInactiveObjects',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation.',
+    '[read-only] Get a list of inactive ABAP objects — modified and pending activation. Shows classes, tables, CDS views, and other objects awaiting activation: by default (detail terse) TSV rows of type, name and owner; with detail medium the same as JSON; full the parse; raw the document.',
   inputSchema: z.object({ ...DETAIL_SHAPE }),
 } as const;
 
@@ -70,9 +71,21 @@ function inactiveAnswer(read: IInactiveObjectsResponse) {
   return { success: true, count: objects.length, objects };
 }
 
+/** The list at terse: a TSV row per object — its type, name and owner. */
+function terseInactive(read: IInactiveObjectsResponse): string {
+  const objects = read.objects.map(refOf);
+  return [
+    `# count ${objects.length}`,
+    tsv(
+      ['type', 'name', 'parent'],
+      objects.map((o) => [o.type, o.name, o.parentName ?? '']),
+    ),
+  ].join('\n');
+}
+
 /**
  * What `GetInactiveObjects` answers at each `detail`: the reading passed to
- * the call, selected before it (`src/lib/detail`) — terse and medium over
+ * the call, selected before it (`src/lib/detail`) — terse (TSV) and medium over
  * adt-strategies' `utilInactiveObjects` (0.28.0: both forms SAP answers,
  * every object of an entry, and a document of another kind refused, since an
  * activation is confirmed off this list), full the parse, raw the document.
@@ -80,7 +93,7 @@ function inactiveAnswer(read: IInactiveObjectsResponse) {
 const INACTIVE_READINGS: DetailTable<
   ReturnType<typeof inactiveAnswer> | XmlNode | string
 > = {
-  terse: formatted(utilInactiveObjects, inactiveAnswer),
+  terse: formatted(utilInactiveObjects, terseInactive),
   medium: formatted(utilInactiveObjects, inactiveAnswer),
   full: fullLevel,
   raw: rawLevel,

@@ -35,13 +35,30 @@ async function run(body: string) {
   const conn = recordingConnection([{ data: body }]);
   const result: any = await handleGetInactiveObjects(
     { connection: conn, logger: undefined } as any,
-    {},
+    { detail: 'medium' },
   );
   assert.equal(result.isError, false);
   return JSON.parse(result.content[0].text);
 }
 
 describe('GetInactiveObjects', () => {
+  it('terse, by default: a TSV row per object, its type, name and owner', async () => {
+    const conn = recordingConnection([{ data: TWO_INACTIVE }]);
+    const result: any = await handleGetInactiveObjects(
+      { connection: conn, logger: undefined } as any,
+      {},
+    );
+    assert.equal(
+      result.content[0].text,
+      [
+        '# count 2',
+        'type\tname\tparent',
+        'BDEF/BDO\tZI_MCP_SHR_ROOT\t',
+        'FUGR/F\tZMCP_SHR_FGRP\t',
+      ].join('\n'),
+    );
+  });
+
   // adt-strategies 0.28.0 refuses a list holding a reference with no address
   // (neither uri nor parentUri): an activation is matched by it, and a
   // reference dropped would read as activated.

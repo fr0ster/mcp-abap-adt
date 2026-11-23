@@ -817,7 +817,7 @@
   },
   "GetInactiveObjects two entries @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"count\":2,\"objects\":[{\"type\":\"BDEF/BDO\",\"name\":\"ZI_ROOT\"},{\"type\":\"FUGR/FF\",\"name\":\"Z_FM\",\"parentName\":\"ZFG\"}]}",
+    "text": "# count 2\ntype\tname\tparent\nBDEF/BDO\tZI_ROOT\t\nFUGR/FF\tZ_FM\tZFG",
     "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects two entries @medium": {
@@ -837,7 +837,7 @@
   },
   "GetInactiveObjects the 7.40 form @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"count\":1,\"objects\":[{\"type\":\"FUGR/F\",\"name\":\"ZOBJ_FGRP\"}]}",
+    "text": "# count 1\ntype\tname\tparent\nFUGR/F\tZOBJ_FGRP\t",
     "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects the 7.40 form @medium": {
@@ -857,7 +857,7 @@
   },
   "GetInactiveObjects none inactive @terse": {
     "isError": false,
-    "text": "{\"success\":true,\"count\":0,\"objects\":[]}",
+    "text": "# count 0\ntype\tname\tparent",
     "requests": ["GET /sap/bc/adt/activation/inactiveobjects"]
   },
   "GetInactiveObjects none inactive @medium": {

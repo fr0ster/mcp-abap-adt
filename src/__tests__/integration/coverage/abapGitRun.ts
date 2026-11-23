@@ -66,7 +66,6 @@ import {
   RunWaitCancelled,
   releasingRunLock,
   repoRowOf,
-  stopSignalOf,
   systemIdentityOf,
   type WriteOutcome,
   waitForRun,
@@ -83,6 +82,7 @@ import {
 const ACTION_UPDATE = 2;
 const ACTION_OVERWRITE = 3;
 
+import { stopSignalOf } from '../../helpers/stopSignal';
 import {
   GitHubFixtures,
   GitHubRefusal,

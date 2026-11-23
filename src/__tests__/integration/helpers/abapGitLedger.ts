@@ -21,7 +21,7 @@
  * entry against the ledger before the unlink, then deletes what the entry
  * names — an unconfirmed fixture only once it is seen to exist — and removes
  * the entry. Nothing the entry does not name is ever deleted. The waits end
- * on SAP's answer or the runner's stop request (`stopSignalOf`).
+ * on SAP's answer or the runner's stop request (`stopSignalOf`, `helpers/stopSignal.ts`).
  *
  * **One run at a time.** Recovery takes every entry of its system for
  * abandoned, and the file is written whole on every change; both hold only
@@ -533,41 +533,6 @@ export function isRouteRefusal(answer: {
     typeof messageNumber === 'string' &&
     messageNumber !== ''
   );
-}
-
-/** How often the stop file is polled: short, and the poll keeps no process alive. */
-export const STOP_POLL_MS = 100;
-
-/**
- * A signal the runner's stop request aborts (its stop file, `file`, written
- * on the first interrupt): checked once at once, then every
- * `STOP_POLL_MS` by an unreferenced interval, aborted the first time the
- * file is there. A state poll has no baseline, so it misses no file, unlike
- * change detection (`fs.watch` rides FSEvents on macOS, `fs.watchFile`
- * takes its first stat asynchronously). The abort and `close` clear the
- * interval. Without a stop file the signal never aborts.
- */
-export function stopSignalOf(file: string | undefined): {
-  readonly signal: AbortSignal;
-  close(): void;
-} {
-  const controller = new AbortController();
-  if (file === undefined || file === '') {
-    return { signal: controller.signal, close: () => {} };
-  }
-  let poll: ReturnType<typeof setInterval> | undefined;
-  const check = () => {
-    if (controller.signal.aborted || !existsSync(file)) return;
-    clearInterval(poll);
-    controller.abort();
-  };
-  check();
-  if (controller.signal.aborted) {
-    return { signal: controller.signal, close: () => {} };
-  }
-  poll = setInterval(check, STOP_POLL_MS);
-  poll.unref();
-  return { signal: controller.signal, close: () => clearInterval(poll) };
 }
 
 /** What cleaning up one ledger entry needs, injected by the suite. */

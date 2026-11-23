@@ -32,6 +32,7 @@ import {
   useFakeTimers,
   useRealTimers,
 } from '../../helpers/fakeTime';
+import { STOP_POLL_MS, stopSignalOf } from '../../helpers/stopSignal';
 import {
   AbapGitLedger,
   acquireRunLock,
@@ -48,8 +49,6 @@ import {
   readRunLock,
   releasingRunLock,
   runState,
-  STOP_POLL_MS,
-  stopSignalOf,
   systemIdentityOf,
   waitForRun,
 } from '../../integration/helpers/abapGitLedger';
@@ -656,7 +655,7 @@ describe("the runner's stop request: a state poll on fake time", () => {
   it('an open watch keeps no process alive: a node that opens one and returns exits by itself', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'abapgit-stop-'));
     try {
-      const helper = require.resolve('../../integration/helpers/abapGitLedger');
+      const helper = require.resolve('../../helpers/stopSignal');
       const script = `const { stopSignalOf } = require(${JSON.stringify(helper)}); stopSignalOf(${JSON.stringify(join(dir, 'stop'))}); process.stdout.write('opened');`;
       const { stdout } = await promisify(execFile)(
         process.execPath,

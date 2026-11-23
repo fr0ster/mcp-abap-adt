@@ -25,6 +25,8 @@ import {
   completeAnswer,
   identityOf,
   type Line,
+  type ListedPart,
+  listedText,
   Written,
   wireAnswer,
 } from '../../../lib/detail';
@@ -487,16 +489,18 @@ const heldJson = ({ walked }: TreeAnswerRead) =>
     ]),
   );
 
+/** The terse tree: indented rows, the package's own row no item. */
+const terseTree = ({ packageName, walked, options }: TreeAnswerRead) =>
+  Written.text(
+    treeRows(assembleTree(packageName, walked), options.includeDescriptions),
+    [0, 1],
+  );
+
 // Every level answers every item the walk held, or nothing (`completeAnswer`).
 const TREE_ANSWERS: AnswerTable<TreeAnswerRead, TreeAnswer> = {
   // With include_descriptions, each row's description beside its type and
   // name; the package's own row is no item, the rows below it are.
-  terse: completeAnswer(TOOL, heldTerse, ({ packageName, walked, options }) =>
-    Written.text(
-      treeRows(assembleTree(packageName, walked), options.includeDescriptions),
-      [0, 1],
-    ),
-  ),
+  terse: completeAnswer(TOOL, heldTerse, terseTree),
   // The nodes below the root, each identified by the fields written.
   medium: completeAnswer(TOOL, heldJson, ({ packageName, walked }) =>
     Written.jsonTreeRoot(
@@ -618,7 +622,8 @@ async function answeredGetPackageTree(
       });
     }
 
-    const entries = reads.map((read, i) => {
+    // Each package's read, or its failure entry.
+    const outcomes = reads.map((read, i) => {
       const package_name = packageNames[i];
       const metadata = read.metadata;
       if (!metadata.ok) {
@@ -638,26 +643,40 @@ async function answeredGetPackageTree(
       }
       const walked = walkOf(read, package_name);
       return walked.ok
-        ? shown({ packageName: package_name, walked: walked.value, options })
+        ? {
+            read: {
+              packageName: package_name,
+              walked: walked.value,
+              options,
+            },
+          }
         : {
             package_name,
             error: thrownEntry(walked.error, 'read package node structure'),
           };
     });
-    // At terse each package's tree is text: one text, each under its
-    // `# asked` line; at the other levels a JSON array of the entries.
-    return return_response({
-      data:
-        levelOf(args) === 'terse'
-          ? entries
-              .map((entry, i) =>
-                typeof entry === 'string'
-                  ? `# asked ${packageNames[i]}\n${entry}`
-                  : `# asked ${packageNames[i]}\n# error ${JSON.stringify(entry)}`,
-              )
-              .join('\n')
-          : JSON.stringify(entries),
-    });
+    // At terse each package's tree is text written through `Written`: one
+    // text, each under its escaped `# asked` line; at the other levels a
+    // JSON array of the entries.
+    if (levelOf(args) === 'terse') {
+      return return_response({
+        data: listedText(
+          TOOL,
+          outcomes.map((outcome, i): ListedPart<TreeAnswerRead> => {
+            const heads = [{ head: 'asked', value: packageNames[i] ?? '' }];
+            return 'read' in outcome
+              ? { heads, read: outcome.read }
+              : { heads, error: JSON.stringify(outcome) };
+          }),
+          heldTerse,
+          terseTree,
+        ),
+      });
+    }
+    const entries = outcomes.map((outcome) =>
+      'read' in outcome ? shown(outcome.read) : outcome,
+    );
+    return return_response({ data: JSON.stringify(entries) });
   } catch (error) {
     logger?.error('Failed to fetch package tree', error);
     return return_error(error);

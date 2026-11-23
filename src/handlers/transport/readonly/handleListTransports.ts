@@ -17,14 +17,15 @@ import {
   answered,
   type DetailTable,
   entries,
-  formatted,
   fullLevel,
+  type ListDetailTable,
   omitting,
   rawLevel,
   readingAt,
   rows,
   writeJson,
   writeListing,
+  written,
 } from '../../../lib/detail';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -140,7 +141,8 @@ interface ListedRequest {
 /**
  * Every request of a listing, in order, each with its row's fields. A
  * request SAP lists through several branches is a repeat only when it is
- * the same request again — its number, every field and its tasks alike;
+ * the same request again — its number, every attribute, link and task
+ * alike;
  * the same number with other content is written again. A request without
  * a number is a request all the same: its row has an empty number.
  */
@@ -148,8 +150,13 @@ export function listedRequests(tree: ITransportTree): ListedRequest[] {
   const seen = new Set<string>();
   return tree.requests.map((request) => {
     const entry = entryOf(request);
+    // The whole request as the reading holds it — every attribute, link,
+    // long description and task — and its row (the status a branch gives
+    // it). Only the branch itself, its containers, may differ in a repeat.
     const content = JSON.stringify([
       entry,
+      request.attributes,
+      request.links,
       request.longDesc ?? null,
       request.tasks,
     ]);
@@ -189,12 +196,12 @@ type ListAnswer = object | XmlNode | string;
  * requests as JSON; full the parse; raw the document. Each is pure: it
  * reads the answer and nothing else, the logger included.
  */
-const LIST_READINGS: DetailTable<ListAnswer> = (() => {
+const LIST_READINGS: ListDetailTable<ListAnswer> = (() => {
   /** The requests a listing writes, a repeat counted once. */
   const counted = (requests: readonly ListedRequest[]) =>
     requests.filter((listed) => !REPEATS.omits(listed)).length;
   return {
-    terse: formatted(listingOf, (tree) => {
+    terse: written(listingOf, (tree) => {
       const requests = listedRequests(tree);
       return writeListing({
         heads: [{ head: 'count', value: String(counted(requests)) }],
@@ -225,9 +232,9 @@ const LIST_READINGS: DetailTable<ListAnswer> = (() => {
             omit: REPEATS,
           }),
         },
-      }).answer;
+      });
     }),
-    medium: formatted(listingOf, (tree) => {
+    medium: written(listingOf, (tree) => {
       const requests = listedRequests(tree);
       return writeJson(
         { success: true, count: counted(requests) },
@@ -238,7 +245,7 @@ const LIST_READINGS: DetailTable<ListAnswer> = (() => {
             omit: REPEATS,
           }),
         },
-      ).answer;
+      );
     }),
     full: fullLevel,
     raw: rawLevel,

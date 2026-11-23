@@ -18,6 +18,7 @@ import * as path from 'node:path';
 import { after, describe, it } from 'node:test';
 import { handleGetPackageContents } from '../../../handlers/package/readonly/handleGetPackageContents';
 import { handleGetObjectsByType } from '../../../handlers/search/readonly/handleGetObjectsByType';
+import { handleGetObjectsList } from '../../../handlers/search/readonly/handleGetObjectsList';
 import { handleGetPackageTree } from '../../../handlers/system/high/handleGetPackageTree';
 import {
   createBatchAvailability,
@@ -206,6 +207,53 @@ for (const descriptions of [false, true]) {
       ),
     );
 }
+
+/** A function group's level: a module, an include, a nameless one, a node not loaded. */
+const GROUP_LEVEL = level(
+  '<OBJECT_TYPE>FUGR/FF</OBJECT_TYPE><OBJECT_NAME>Z_FM</OBJECT_NAME><TECH_NAME>Z_FM</TECH_NAME><OBJECT_URI>/sap/bc/adt/functions/groups/zfg/fmodules/z_fm</OBJECT_URI><DESCRIPTION>A module</DESCRIPTION>',
+  '<OBJECT_TYPE>FUGR/I</OBJECT_TYPE><OBJECT_NAME>ZFG_TOP</OBJECT_NAME><TECH_NAME>LZFGTOP</TECH_NAME><OBJECT_URI>/sap/bc/adt/functions/groups/zfg/includes/lzfgtop</OBJECT_URI>',
+  '<OBJECT_TYPE>FUGR/I</OBJECT_TYPE><OBJECT_NAME/><OBJECT_URI>/sap/bc/adt/functions/groups/zfg/includes/nameless</OBJECT_URI>',
+  '<OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME>',
+);
+const metadataOf = (description: string) =>
+  `${xmlHead}<adtcore:x xmlns:adtcore="http://www.sap.com/adt/core" adtcore:description="${description}"/>`;
+
+CASES['GetObjectsList one parent'] = async (detail) =>
+  answeredOf(
+    await handleGetObjectsList(
+      sequential([
+        { data: GROUP_LEVEL },
+        { data: metadataOf('Module') },
+        { data: metadataOf('Top') },
+        { data: metadataOf('Nameless') },
+      ]) as never,
+      {
+        parent_name: 'ZFG',
+        parent_tech_name: 'ZFG',
+        parent_type: 'FUGR/F',
+        detail,
+      } as never,
+    ),
+  );
+CASES['GetObjectsList two parents, one refused'] = async (detail) =>
+  answeredOf(
+    await handleGetObjectsList(
+      sequential([
+        { data: GROUP_LEVEL },
+        REFUSED,
+        { data: metadataOf('Module') },
+        { data: metadataOf('Top') },
+        { data: metadataOf('Nameless') },
+      ]) as never,
+      {
+        objects: [
+          { parent_name: 'ZFG', parent_type: 'FUGR/F' },
+          { parent_name: 'ZGONE', parent_type: 'FUGR/F' },
+        ],
+        detail,
+      } as never,
+    ),
+  );
 
 describe('terse goldens: answers stay byte-identical (WRITE_TERSE_GOLDENS=1 records them)', () => {
   const writing = process.env.WRITE_TERSE_GOLDENS === '1';

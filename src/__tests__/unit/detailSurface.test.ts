@@ -425,6 +425,7 @@ for (const [fixture, declaring] of [
   ['declares-debug-fixed-level', ['FixtureDebugFixedLevel']],
   ['declares-reading-at-fixed-level', ['FixtureReadingAtFixedLevel']],
   ['declares-uncalled-selector', ['FixtureUncalledSelector']],
+  ['declares-inner-unselected', ['FixtureInnerUnselected']],
   ['undeclared-debug-reads-args', []],
 ] as const) {
   it(format('reports %s rather than skipping it', fixture), () => {
@@ -443,6 +444,16 @@ it('accepts a tool without answer() whose handler selects its formatter by the l
     detailWiring(
       ['src/__tests__/fixtures/detail/declares-answer-selected.ts'],
       new Set(['FixtureAnswerSelected']),
+    ),
+    [],
+  );
+});
+
+it('accepts a tool whose handler hands its arguments to a function of its file that selects by level', () => {
+  assert.deepStrictEqual(
+    detailWiring(
+      ['src/__tests__/fixtures/detail/declares-answer-selected-inner.ts'],
+      new Set(['FixtureAnswerSelectedInner']),
     ),
     [],
   );

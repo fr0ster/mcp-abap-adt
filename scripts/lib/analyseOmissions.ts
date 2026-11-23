@@ -683,42 +683,75 @@ function selectsReadingByLevel(call: ts.CallExpression): boolean {
 /**
  * Whether a handler that answers without `answer()` — it builds the answer
  * from several requests itself (a walk, a scan) — selects that answer's
- * formatter by the level asked for: an exported `handle…` function holding
- * `answerAt(<table>, levelOf(…))` in its own body.
+ * formatter by the level asked for: `answerAt(<table>, levelOf(…))` in the
+ * body of an exported `handle…` function, or of the function of the same
+ * file it hands its arguments to (`return inner(context, args)`: the raw
+ * wrapper, `src/lib/detail/wire.ts`).
  */
 function handlerSelectsAnswer(source: ts.SourceFile): boolean {
-  let found = false;
+  const local = new Map<string, ts.FunctionDeclaration>();
   for (const statement of source.statements) {
-    if (
-      ts.isFunctionDeclaration(statement) &&
-      statement.name?.text.startsWith('handle') === true &&
-      statement.modifiers?.some(
-        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
-      ) === true &&
-      statement.body !== undefined
-    ) {
-      const visit = (node: ts.Node): void => {
-        if (found) return;
-        if (
-          ts.isCallExpression(node) &&
-          node.expression.getText() === 'answerAt'
-        ) {
-          const level = node.arguments[1];
-          if (
-            level !== undefined &&
-            ts.isCallExpression(level) &&
-            level.expression.getText() === 'levelOf'
-          ) {
-            found = true;
-            return;
-          }
-        }
-        ts.forEachChild(node, visit);
-      };
-      visit(statement.body);
+    if (ts.isFunctionDeclaration(statement) && statement.name !== undefined) {
+      local.set(statement.name.text, statement);
     }
   }
-  return found;
+  const selects = (body: ts.Block): boolean => {
+    let found = false;
+    const visit = (node: ts.Node): void => {
+      if (found) return;
+      if (
+        ts.isCallExpression(node) &&
+        node.expression.getText() === 'answerAt'
+      ) {
+        const level = node.arguments[1];
+        if (
+          level !== undefined &&
+          ts.isCallExpression(level) &&
+          level.expression.getText() === 'levelOf'
+        ) {
+          found = true;
+          return;
+        }
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(body);
+    return found;
+  };
+  for (const statement of source.statements) {
+    if (
+      !ts.isFunctionDeclaration(statement) ||
+      statement.name?.text.startsWith('handle') !== true ||
+      statement.modifiers?.some(
+        (modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword,
+      ) !== true ||
+      statement.body === undefined
+    ) {
+      continue;
+    }
+    if (selects(statement.body)) return true;
+    const argsParameter = statement.parameters[1]?.name;
+    if (argsParameter === undefined || !ts.isIdentifier(argsParameter)) {
+      continue;
+    }
+    for (const inner of statement.body.statements) {
+      if (
+        !ts.isReturnStatement(inner) ||
+        inner.expression === undefined ||
+        !ts.isCallExpression(inner.expression) ||
+        !ts.isIdentifier(inner.expression.expression) ||
+        !inner.expression.arguments.some(
+          (argument) =>
+            ts.isIdentifier(argument) && argument.text === argsParameter.text,
+        )
+      ) {
+        continue;
+      }
+      const target = local.get(inner.expression.expression.text);
+      if (target?.body !== undefined && selects(target.body)) return true;
+    }
+  }
+  return false;
 }
 
 /**

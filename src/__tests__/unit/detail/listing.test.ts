@@ -9,13 +9,17 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
   entries,
+  type JsonSchemas,
   kinds,
   marks,
+  nest,
+  parts,
   type RowSchemas,
   rows,
   sections,
   writeJson,
   writeJsonList,
+  writeJsonRoot,
   writeListing,
 } from '../../../lib/detail';
 
@@ -294,5 +298,75 @@ describe('writeJson: every item of every list one entry, by construction', () =>
   it('a list without a JSON schema does not compile', () => {
     // @ts-expect-error `parts` is a list of the reading and has no schema.
     writeJson({}, reading, {});
+  });
+});
+
+describe('nested listings, conditional cells, JSON trees', () => {
+  type N = {
+    readonly name: string;
+    readonly children?: readonly N[] | undefined;
+  };
+  const tree: RowSchemas<N> = {
+    children: rows('children', {
+      columns: [
+        { name: 'name', cell: (n: N) => n.name },
+        { name: 'uri', cell: () => '/u', when: (n: N) => n.name === '' },
+      ],
+      header: 'none',
+      get lists() {
+        return tree;
+      },
+    }),
+  };
+  const listingOf = (root: N) => ({
+    heads: [],
+    reading: root,
+    root: { columns: [{ name: 'name', cell: (n: N) => n.name }] },
+    lists: tree,
+  });
+
+  it('parts: each part its heads, then its own nested listing', () => {
+    type Asked = { readonly name: string; readonly tree?: N | undefined };
+    const text = writeListing({
+      heads: [],
+      reading: {
+        asked: [
+          { name: 'A', tree: { name: 'A', children: [{ name: '' }] } },
+          { name: 'B' },
+        ],
+      },
+      lists: {
+        asked: parts(
+          'asked',
+          (a: Asked) => [{ head: 'asked', value: a.name }],
+          (a: Asked) =>
+            a.tree === undefined ? undefined : nest(listingOf(a.tree)),
+        ),
+      },
+    }).answer;
+    assert.equal(text, '# asked A\nA\n  \t/u\n# asked B');
+  });
+
+  it('writeJsonRoot: a leaf without its empty children where asked', () => {
+    type M = {
+      readonly name: string;
+      readonly children?: readonly M[] | undefined;
+    };
+    const schemas: JsonSchemas<M> = {
+      children: entries('children', (m: M) => ({ name: m.name }), {
+        omitEmpty: true,
+        get lists() {
+          return schemas;
+        },
+      }),
+    };
+    assert.deepStrictEqual(
+      writeJsonRoot(
+        { name: 'R', children: [{ name: 'a', children: [] }, { name: 'b' }] },
+        (m: M) => ({ name: m.name }),
+        schemas,
+      ).answer,
+      { name: 'R', children: [{ name: 'a' }, { name: 'b' }] },
+    );
   });
 });

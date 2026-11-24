@@ -3,17 +3,26 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  headShape,
   type ListAnswerTable,
   listAnswerAt,
+  shapesOf,
   writeWhole,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
-import { findingsText } from '../../../lib/strategies/atcFindings';
+  FINDINGS_LISTS,
+  findingsText,
+  PRIORITY_HEAD,
+} from '../../../lib/strategies/atcFindings';
 import { parseAtcResult } from '../../../lib/strategies/atcResults';
 import {
   DETAIL_SHAPE,
@@ -29,12 +38,31 @@ import { ourAtc } from '../../../lib/strategies/resultSets';
  * read zero while it holds findings (measured), so the counts are the
  * findings'.
  */
+/** The heads the findings listing opens with. */
+export const ATC_RESULT_HEADS = [
+  headShape('result', 'the result ID'),
+  headShape('title', 'its title'),
+  headShape('check_variant', 'its check variant'),
+  headShape('created_at', 'when it was created'),
+  headShape('objects_checked', 'how many objects it covered'),
+  headShape('finding_count', 'how many findings there are'),
+  PRIORITY_HEAD,
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetATCResult',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    "[read-only] Reads the stored ATC result named by display_id. Answers the result's title, check_variant and created_at, how many objects it covered, the counts per priority and each finding with the object, the source position (location and line), the priority, which check ran and what it said. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the result gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes).",
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads a stored ATC result by its display ID: its findings and the counts per priority.',
+    ),
+    returns: returnsOf({
+      heads: ATC_RESULT_HEADS,
+      shapes: [shapesOf(FINDINGS_LISTS)],
+    }),
+    notes: [longRunning],
+  }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     display_id: requiredText(

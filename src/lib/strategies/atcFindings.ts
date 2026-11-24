@@ -32,7 +32,15 @@
  */
 
 import { XMLParser } from 'fast-xml-parser';
-import { type Column, rows, type Written, writeListing } from '../detail';
+import {
+  about,
+  type Column,
+  headShape,
+  type RowSchemas,
+  rows,
+  type Written,
+  writeListing,
+} from '../detail';
 import { fragmentStart, hrefParts } from '../sourceHref';
 import { parseXml } from '../xml/node';
 
@@ -128,6 +136,45 @@ export function findingCells(finding: AtcFindingFull): string[] {
   ];
 }
 
+/** What each terse column of a finding tells, in domain words. */
+const FINDING_MEANS: Readonly<
+  Record<(typeof FINDING_COLUMNS)[number], string>
+> = {
+  object: 'its object',
+  object_type: "its object's type",
+  location: 'the part of the source it is in',
+  line: 'its position in that source',
+  column: 'its offset at that position',
+  priority: 'its priority',
+  check: 'the check that found it',
+  message: 'what the check says',
+};
+
+/** The lists a findings listing writes: what its description states. */
+export const FINDINGS_LISTS: RowSchemas<{
+  findings: readonly AtcFindingFull[];
+}> = {
+  findings: about(
+    'for each finding',
+    rows('findings', {
+      columns: FINDING_COLUMNS.map(
+        (name, index): Column<AtcFindingFull> => ({
+          name,
+          means: FINDING_MEANS[name],
+          cell: (finding) => findingCells(finding)[index] ?? '',
+        }),
+      ),
+      header: 'always',
+    }),
+  ),
+};
+
+/** The head of the counts per priority every findings listing writes. */
+export const PRIORITY_HEAD = headShape(
+  'priority',
+  'how many findings each priority has',
+);
+
 /**
  * Findings as terse lines: the run's facts as `#` lines (the counts per
  * priority as `priority N count` lines), then a row per finding — every
@@ -147,17 +194,7 @@ export function findingsText(
       })),
     ],
     reading: { findings },
-    lists: {
-      findings: rows('findings', {
-        columns: FINDING_COLUMNS.map(
-          (name, index): Column<AtcFindingFull> => ({
-            name,
-            cell: (finding) => findingCells(finding)[index] ?? '',
-          }),
-        ),
-        header: 'always',
-      }),
-    },
+    lists: FINDINGS_LISTS,
   });
 }
 

@@ -18,6 +18,14 @@ import { TOOL_DEFINITION as MODIFIED } from '../../../handlers/abapgit/readonly/
 import { TOOL_DEFINITION as STAGING } from '../../../handlers/abapgit/readonly/handleGetAbapGitStaging';
 import { TOOL_DEFINITION as REPOS } from '../../../handlers/abapgit/readonly/handleListAbapGitRepos';
 import {
+  TOOL_DEFINITION as ATC_FINDINGS,
+  ATC_FINDINGS_HEADS,
+} from '../../../handlers/atc/high/handleGetATCFindings';
+import {
+  TOOL_DEFINITION as ATC_RESULT,
+  ATC_RESULT_HEADS,
+} from '../../../handlers/atc/high/handleGetATCResult';
+import {
   TOOL_DEFINITION as OBJECT_VERSIONS,
   VERSIONS_HEADS,
   VERSIONS_LISTS,
@@ -164,6 +172,7 @@ import {
   writeJson,
   writtenLines,
 } from '../../../lib/detail';
+import { FINDINGS_LISTS } from '../../../lib/strategies/atcFindings';
 import {
   GROUP_CHILD_HEADS,
   type GroupChild,
@@ -213,7 +222,41 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   RuntimeListSystemMessages: SYSTEM_MESSAGES.description,
   RuntimeGetGatewayErrorLog: GATEWAY_ERRORS.description,
   RuntimeListProfilerTraceFiles: TRACE_FILES.description,
+  GetATCFindings: ATC_FINDINGS.description,
+  GetATCResult: ATC_RESULT.description,
 };
+
+/** An ATC tool's tie: one finding, under the heads the tool writes. */
+function atcTie(
+  tool: string,
+  heads: readonly HeadShape[],
+  written: readonly Head[],
+): ReturnsTie {
+  const reading = {
+    findings: [
+      {
+        object: 'ZCL_A',
+        object_type: 'CLAS',
+        location: 'ZCL_A=======CM001',
+        line: 3,
+        column: 2,
+        priority: 1,
+        check: 'Syntax',
+        message: 'An error',
+      },
+    ],
+  };
+  return writtenTie(tool, [FINDINGS_LISTS], heads, [
+    {
+      reading,
+      lines: writtenLines({
+        heads: [...written, { head: 'priority', value: '1 1' }],
+        reading,
+        lists: FINDINGS_LISTS,
+      }),
+    },
+  ]);
+}
 
 /** A writer tool's tie: its lists (every variant), its heads, its fixtures' lines. */
 function writtenTie(
@@ -311,6 +354,22 @@ const bothLevels = (
 
 /** The writer tools tied so far, by name. */
 const TIED: Readonly<Record<string, () => ReturnsTie>> = {
+  GetATCFindings: () =>
+    atcTie('GetATCFindings', ATC_FINDINGS_HEADS, [
+      { head: 'worklist', value: 'W1' },
+      { head: 'objects_checked', value: '0' },
+      { head: 'finding_count', value: '1' },
+      { head: 'note', value: 'empty' },
+    ]),
+  GetATCResult: () =>
+    atcTie('GetATCResult', ATC_RESULT_HEADS, [
+      { head: 'result', value: 'R1' },
+      { head: 'title', value: 'A run' },
+      { head: 'check_variant', value: 'DEFAULT' },
+      { head: 'created_at', value: '2026-01-01' },
+      { head: 'objects_checked', value: '1' },
+      { head: 'finding_count', value: '1' },
+    ]),
   RuntimeListSystemMessages: () => {
     const reading = {
       messages: [

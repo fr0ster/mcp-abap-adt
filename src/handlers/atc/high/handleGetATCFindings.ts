@@ -3,18 +3,25 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  headShape,
   type ListAnswerTable,
   listAnswerAt,
+  shapesOf,
   writeWhole,
 } from '../../../lib/detail';
 import { requiredText } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
-import {
+  FINDINGS_LISTS,
   findingsText,
+  PRIORITY_HEAD,
   parseAtcWorklist,
 } from '../../../lib/strategies/atcFindings';
 import {
@@ -34,12 +41,32 @@ import { ourAtc } from '../../../lib/strategies/resultSets';
  * reading is ours: see `atcFindings.ts`, written against the captured
  * document rather than an imagined one.
  */
+/** The heads the findings listing opens with. */
+export const ATC_FINDINGS_HEADS = [
+  headShape('worklist', 'the worklist ID'),
+  headShape('objects_checked', 'how many objects the run covered'),
+  headShape('finding_count', 'how many findings there are'),
+  headShape(
+    'note',
+    'what an empty worklist means, while the run is still filling it',
+  ),
+  PRIORITY_HEAD,
+];
+
 export const TOOL_DEFINITION = {
   name: 'GetATCFindings',
   available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    "[read-only] Reads the findings of the ATC run whose worklist is named by worklist_id, for a run started with wait=true or wait=false. Answers each finding with the object, the source position (location and line), the priority, which check ran and what it said, plus how many objects were covered and the counts per priority. With detail=full each finding also carries the column, check_id, check_class, message_id, documentation_uri (the finding's ATC documentation), exemption_approval and exemption_kind as the worklist gives them, and quickfixes (the manual, automatic, pseudo, ai_based and ai_enabled flags of the finding's quick fixes).",
-  ),
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the findings of an ATC run by its worklist, whether the run was waited for or goes on in the background.',
+    ),
+    returns: returnsOf({
+      heads: ATC_FINDINGS_HEADS,
+      shapes: [shapesOf(FINDINGS_LISTS)],
+    }),
+    notes: [longRunning],
+  }),
   inputSchema: z.object({
     background: LONG_BACKGROUND_FIELD,
     worklist_id: requiredText(

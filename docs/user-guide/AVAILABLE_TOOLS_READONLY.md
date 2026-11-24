@@ -576,7 +576,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
-**Description:** [read-only] List the includes (TOP, custom) of an ABAP function group, read at its active version.
+**Description:** [read-only] Lists the includes of an ABAP function group, its TOP include among them, at its active version. The function group's name. How many there are. For each include: its name, its URI when SAP lists it nameless and its description.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
@@ -588,7 +588,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listfunctionmodules-read-only-function-include"></a>
 #### ListFunctionModules (Read-Only / Function Include)
-**Description:** [read-only] List the function modules of an ABAP function group, read at its active version.
+**Description:** [read-only] Lists the function modules of an ABAP function group, at its active version. The function group's name. How many there are. For each function module: its name, its URI when SAP lists it nameless and its description.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
@@ -657,7 +657,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getincludeslist-read-only-include"></a>
 #### GetIncludesList (Read-Only / Include)
-**Description:** [read-only] Lists every include of an ABAP program or include, with the includes each one includes, down to the last. The object's type and name. The includes SAP could not read are named. The object itself, its root and for each include it includes: its name and whether it includes itself again or was met before elsewhere. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
+**Description:** [read-only] Lists every include of an ABAP program or include, with the includes each one includes, down to the last. The object's type and name. The includes left unread are named. The object itself, its root and for each include it includes: its name and whether it includes itself again or was met before elsewhere. Runs on an ABAP session of its own. By default the run goes on after the call, and its result comes back under the run_handle the call gives; with background false the result comes back in the call.
 
 **Source:** `src/handlers/include/readonly/handleGetIncludesList.ts`
 
@@ -673,7 +673,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getmainprograms-read-only-include"></a>
 #### GetMainPrograms (Read-Only / Include)
-**Description:** [read-only] Reads the main programs of the ABAP include named by include_name in one request: each program that includes it, or for an include of a function group the group. Returns the type and name of each main program (PROG/P for a program, FUGR/F for a function group): by default as TSV rows; with detail full, main_programs, a list of { name, type, uri }.
+**Description:** [read-only] Finds the main programs of an ABAP include: each program that includes it, or the function group it belongs to. The include's name. For each main program: its type, PROG/P for a program or FUGR/F for a function group and its name.
 
 **Source:** `src/handlers/include/readonly/handleGetMainPrograms.ts`
 

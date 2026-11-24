@@ -1836,7 +1836,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Update source code of an existing ABAP function group include.
+**Description:** Writes new source code into an existing include of an ABAP function group, activating it when asked.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 

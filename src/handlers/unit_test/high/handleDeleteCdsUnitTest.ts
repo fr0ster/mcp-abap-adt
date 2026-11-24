@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { purpose, toolDescription } from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 /**
  * DeleteCdsUnitTest Handler - Delete a CDS unit test class (global class)
@@ -42,8 +43,12 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'DeleteCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Deletes the CDS view test class named by class_name, with the ABAP Unit test classes it holds.',
+  description: toolDescription({
+    purpose: purpose(
+      'Deletes a CDS view test class, with the ABAP Unit test classes it holds.',
+    ),
+    returns: [],
+  }),
   inputSchema: z.object({
     class_name: z.string().describe('Test class of the CDS view.'),
     transport_request: z

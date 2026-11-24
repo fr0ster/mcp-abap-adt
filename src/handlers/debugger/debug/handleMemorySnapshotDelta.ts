@@ -3,6 +3,11 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { debugAnswer } from '../../../lib/debugger/answer';
 import { readXmlDocument } from '../../../lib/debugger/memoryReadings';
+import {
+  purpose,
+  toolDescription,
+  untypedReturns,
+} from '../../../lib/description';
 import { DETAIL_SHAPE } from '../../../lib/strategies/detail';
 import { carryingFailure } from '../../../lib/strategies/step';
 import type { HandlerContext } from '../../interfaces';
@@ -15,8 +20,13 @@ import {
 export const TOOL_DEFINITION = {
   name: 'MemorySnapshotDelta',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    "[read-only] [debug] Two memory snapshots compared in a view: memory by kind, largest objects, an object's children or its referrers. Needs the memory snapshot authorization.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      "Compares two memory snapshots in a view: memory by kind, largest objects, an object's children or its referrers.",
+    ),
+    returns: untypedReturns(),
+  }),
   inputSchema: z.object({
     from_id: z.string().describe('Snapshot id to compare from.'),
     to_id: z.string().describe('Snapshot id to compare to.'),

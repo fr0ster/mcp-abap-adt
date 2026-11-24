@@ -116,6 +116,7 @@ import {
   createOnPremAdtClient,
   variantOf,
 } from '../../../lib/clients';
+import { activateTool } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { activationRunsOffered } from '../../../lib/strategies/activationEndpoint';
 import {
@@ -187,8 +188,11 @@ export const TOOL_DEFINITION = {
   name: 'ActivateObjectLow',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description:
-      '[low-level] Activate one or multiple ABAP repository objects. Works with any object type; URI is auto-generated from name and type. Answers whether SAP activated them, with its messages, each with its type, text, the object it is about, the source uri, the position in that source (line from 1, column from 0, and the end where SAP states one) and its code, as SAP states them. An error-severity message is an error carrying the messages, and objects SAP left inactive are an error naming them in still_inactive.',
+    description: activateTool({
+      tag: 'low-level',
+      object: 'one or several ABAP repository objects of any type together',
+      how: ', each by its name and type',
+    }),
     inputSchema: activateObjectSchema(variant),
   })),
 } as const;

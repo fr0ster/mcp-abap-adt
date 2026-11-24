@@ -946,12 +946,17 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         directCall: () => Promise<any>,
       ) => tester.invokeToolOrHandler(toolName, args, directCall);
       const listDumps = (args: Record<string, any>) =>
-        invoke('RuntimeListFeeds', { feed_type: 'dumps', ...args }, () =>
-          handleRuntimeListFeeds(handlerContext(), {
-            feed_type: 'dumps',
-            detail: 'full',
-            ...args,
-          }),
+        // The server call carries the detail the handler is given: full,
+        // the JSON read below.
+        invoke(
+          'RuntimeListFeeds',
+          { feed_type: 'dumps', detail: 'full', ...args },
+          () =>
+            handleRuntimeListFeeds(handlerContext(), {
+              feed_type: 'dumps',
+              detail: 'full',
+              ...args,
+            }),
         );
 
       // The newest dump — so a filter that matches it finds it on the

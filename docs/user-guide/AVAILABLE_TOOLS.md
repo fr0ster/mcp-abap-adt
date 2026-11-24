@@ -602,7 +602,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
 
-**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), program (PROG), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose.
+**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), function module (FUGR), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose.
 
 **Parameters (`cloud`):**
 - `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
@@ -770,7 +770,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="getfunctioninclude-read-only-function-include"></a>
 #### GetFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Reads the current source code of an include (PROG) of an ABAP function group (FUGR), or its metadata.
+**Description:** [read-only] Reads the current source code of an include (FUGR) of an ABAP function group (FUGR), or its metadata.
 
 **Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
 
@@ -786,7 +786,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
-**Description:** [read-only] Lists the includes (PROG) of an ABAP function group (FUGR), its TOP include among them, at its active version.
+**Description:** [read-only] Lists the includes (FUGR) of an ABAP function group (FUGR), its TOP include among them, at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
@@ -3165,7 +3165,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Creates an include (PROG) in an existing ABAP function group (FUGR), with its description, recorded in the transport given.
+**Description:** Creates an include (FUGR) in an existing ABAP function group (FUGR), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
@@ -3180,7 +3180,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Deletes an include (PROG) of an ABAP function group (FUGR), recorded in the transport given.
+**Description:** Deletes an include (FUGR) of an ABAP function group (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -3194,7 +3194,7 @@ The binary fixes its tool set (19.0.0); there is no `--exposition`.
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Updates the source code of an existing include (PROG) of an ABAP function group (FUGR), activating it when asked.
+**Description:** Updates the source code of an existing include (FUGR) of an ABAP function group (FUGR), activating it when asked.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 

@@ -414,7 +414,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required, one of: `PROGRAM`, `INCLUDE`, `INTERFACE`, `CLASS`, `BEHAVIOR_IMPLEMENTATION`, `FUNCTION_MODULE`, `FUNCTION_GROUP`, `DDL`, `BEHAVIOR_DEFINITION`, `METADATA_EXTENSION`, `SERVICE_DEFINITION`, `TABLE`, `STRUCTURE`, `DOMAIN`, `DATA_ELEMENT`, `TABLE_TYPE`) - Object type.
 
-**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), program (PROG), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose.
+**On ABAP Cloud (`cloud`):** [read-only] Reads whether an ABAP class (CLAS), interface (INTF), function module (FUGR), CDS view (DDLS), table (TABL) or other development object holds an unactivated change, and whose.
 
 **Parameters (`cloud`):**
 - `function_group_name` (string, optional) - The function group of a FUNCTION_MODULE (required for it).
@@ -568,7 +568,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="listfunctiongroupincludes-read-only-function-include"></a>
 #### ListFunctionGroupIncludes (Read-Only / Function Include)
-**Description:** [read-only] Lists the includes (PROG) of an ABAP function group (FUGR), its TOP include among them, at its active version.
+**Description:** [read-only] Lists the includes (FUGR) of an ABAP function group (FUGR), its TOP include among them, at its active version.
 
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
@@ -592,7 +592,7 @@ Exactly the tools `mcp-abap-adt-ro` serves, with the parameters they take there 
 
 <a id="getfunctioninclude-read-only-function-include"></a>
 #### GetFunctionInclude (Read-Only / Function Include)
-**Description:** [read-only] Reads the current source code of an include (PROG) of an ABAP function group (FUGR), or its metadata.
+**Description:** [read-only] Reads the current source code of an include (FUGR) of an ABAP function group (FUGR), or its metadata.
 
 **Source:** `src/handlers/function_include/readonly/handleGetFunctionInclude.ts`
 

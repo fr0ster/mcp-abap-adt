@@ -1799,7 +1799,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Creates an include (PROG) in an existing ABAP function group (FUGR), with its description, recorded in the transport given.
+**Description:** Creates an include (FUGR) in an existing ABAP function group (FUGR), with its description, recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
@@ -1814,7 +1814,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Deletes an include (PROG) of an ABAP function group (FUGR), recorded in the transport given.
+**Description:** Deletes an include (FUGR) of an ABAP function group (FUGR), recorded in the transport given.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -1828,7 +1828,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Updates the source code of an existing include (PROG) of an ABAP function group (FUGR), activating it when asked.
+**Description:** Updates the source code of an existing include (FUGR) of an ABAP function group (FUGR), activating it when asked.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 

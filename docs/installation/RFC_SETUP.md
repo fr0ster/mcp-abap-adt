@@ -240,7 +240,7 @@ per ABAP session.
   - Measured on BASIS 816 and on BASIS 756. Before, the older release answered every package `PUT` on the same connection with `423` "invalid lock handle".
 - **RFC: in this server** (`src/lib/packageSessions.ts`). An RFC connection has no stateless request: every call shares its one ABAP session. So over RFC:
   - `CreatePackage`, `UpdatePackage` and compact `HandlerCreate` of a `PACKAGE` run on a new connection, closed when they answer.
-  - Compact `HandlerLock` of a `PACKAGE` opens a new connection, locks on it, and keeps it under the lock handle. `HandlerUpdate` with that handle runs on it, and `HandlerUnlock` unlocks there and closes it, whatever the unlock answered.
+  - Compact `HandlerLock` of a `PACKAGE` opens a new connection, locks on it, and keeps it under the lock handle. `HandlerUpdate` with that handle runs on it, and `HandlerLock` `action: unlock` unlocks there and closes it, whatever the unlock answered.
 - **`DeletePackage`:** `force_new_connection: true` still deletes from a new session, for a package saved elsewhere through the same connection.
 
 The package integration test (create, two updates through the tools on one connection, delete) passes on RFC and on HTTP.

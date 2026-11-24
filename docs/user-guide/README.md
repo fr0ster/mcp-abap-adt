@@ -204,7 +204,7 @@ elements in `still_inactive` (measured on premise). Name both: `PROG/PX` is a pr
 elements, or with `parentName` a function group's; `CLAS/OCX` is a class's. Compact
 `HandlerActivate` names them `PROGRAM_TEXT_ELEMENTS`, `FUNCTION_GROUP_TEXT_ELEMENTS` and
 `CLASS_TEXT_ELEMENTS`; in compact the sequence is `HandlerLock`, `HandlerUpdate` (under the
-handle), `HandlerUnlock`, `HandlerActivate`, the same for `TABLE_SETTINGS` with the table
+handle), `HandlerLock` `action: unlock`, `HandlerActivate`, the same for `TABLE_SETTINGS` with the table
 activated as `TABLE`. `UpdateTextElements` with `activate: true` names both itself. Where-used of
 text elements is `GetWhereUsed` with `object_type: PROG/PX` and `container` (`program` or
 `function_group`).

@@ -52,7 +52,7 @@ does not see it and cannot call it. No call checks a deny list.
 |---|---|
 | `Tool` | the tool (`DeleteClass`) |
 | `Prefix*` | every tool whose name starts with `Prefix` (`Delete*`) |
-| `Tool.value` | one value of a compact tool's dispatching argument: `object_type` (HandlerActivate, HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerGet, HandlerLock, HandlerUnlock, HandlerUpdate, HandlerValidate), `target_type` (HandlerProfileRun), `action` (HandlerAbapGit, HandlerAbapGitGet, HandlerBatch, HandlerDebugBatch, HandlerSession, HandlerSystem), `operation` (HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints, HandlerDebugMaintain); and `HandlerGetData.sql`, the `sql_query` mode |
+| `Tool.value` | one value of a compact tool's dispatching argument: `object_type` (HandlerActivate, HandlerCheckRun, HandlerCreate, HandlerDelete, HandlerDeletionCheck, HandlerGet, HandlerLock (with `action` too), HandlerUpdate, HandlerValidate), `target_type` (HandlerProfileRun), `action` (HandlerAbapGit, HandlerAbapGitGet, HandlerBatch, HandlerDebugBatch, HandlerSession, HandlerSystem), `operation` (HandlerDebugSession, HandlerDebugStep, HandlerDebugBreakpoints, HandlerDebugMaintain); and `HandlerGetData.sql`, the `sql_query` mode |
 | `Tool.CODE` | on HandlerActivate and HandlerGet, an ADT type code as the ADT tables write it (`HandlerActivate.CLAS/OC`, `HandlerGet.DDLS/DF`) |
 | `Tool.prefix*` | every value (and, on HandlerActivate and HandlerGet, every code) starting with `prefix` (`HandlerDebugSession.get*`; `HandlerActivate.CLAS*` names `CLASS` and `CLAS/OC`) |
 

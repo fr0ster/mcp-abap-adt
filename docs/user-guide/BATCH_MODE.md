@@ -106,7 +106,7 @@ with the single-step tools:
 3. write — `HandlerUpdate` with `lock_handle` (for PACKAGE, DOMAIN, DATA_ELEMENT and
    FUNCTION_GROUP the whole metadata document in `source_code`, read beforehand with `HandlerGet`
    part `metadata`);
-4. unlock — `HandlerUnlock`;
+4. unlock — `HandlerLock` `action: unlock`;
 5. read back, check — `HandlerGet` (one part per call: `source`, `metadata`), `HandlerCheckRun`.
 6. activate — `HandlerActivate`: one object of a type the per-object activation maps answers its
    verdict; a list (`objects[]`), an `object_adt_type`, PACKAGE, SERVICE_DEFINITION and
@@ -170,7 +170,7 @@ the metadata document, and for `SERVICE_BINDING` its publication request. For PA
 DATA_ELEMENT, FUNCTION_GROUP and TABLE_TYPE, and for INCLUDE with `part: 'metadata'`, `source_code`
 is the whole metadata document, sent byte for byte:
 nothing is read before the write or after it. Locking, unlocking and activating are their own
-calls (`HandlerLock`, `HandlerUnlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
+calls (`HandlerLock`, `HandlerLock` `action: unlock`, `HandlerActivate`); for `LOCAL_*`, `UNIT_TEST` and
 `CDS_UNIT_TEST` the lock is the class's — `HandlerLock` with `object_type: CLASS`. A `PACKAGE` update is recorded over HTTP
 only: over RFC the package lock is held in an ABAP session of its own, outside the batch.
 
@@ -253,7 +253,7 @@ request. Each phase was one `HandlerBatch` begin, the calls, end, then the answe
 4. lock — `HandlerLock` × 3, the lock handles read from the answers;
 5. write — `HandlerUpdate` × 3 under those handles: the class's and the interface's sources, the
    domain's whole document in `source_code`;
-6. unlock — `HandlerUnlock` × 3;
+6. unlock — `HandlerLock` `action: unlock` × 3;
 7. activate — `HandlerActivate` × 3, one object each, each answering `activated: true`;
 8. reads — `HandlerGet` × 3: the sources and the document as written;
 9. deletion check — `HandlerDeletionCheck` × 3, each answering `deletable: true`;

@@ -533,7 +533,7 @@ it arose. A tool never rewrites it:
   - `cleanup` then names the `object` and its `warning` says so: "the lock went with its SAP
     session: the unlock found that session ended, and SAP's logoff of it released the lock". It
     carries no `left_locked` and no `lock_handle`.
-  - Compact `HandlerUnlock` answers the same case with `unlocked: false` and those words, and
+  - Compact `HandlerLock` `action: unlock` answers the same case with `unlocked: false` and those words, and
     the instance no longer holds the handle.
   - Every other failed unlock stays as above.
 - **`hint` — the request SAP names.** A failure whose T100 messages hold `CTS_WBO_API` 019 (the

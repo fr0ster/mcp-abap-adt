@@ -118,7 +118,7 @@ in batch mode they run at once and are never recorded — open leaves the batch 
 it. No stdio or SSE binary serves them: there the instance lives as long as the connection.
 
 **Locks (compact).** compact `HandlerLock` holds the lock as the pooled instance's state and answers its `state_handle`;
-`HandlerUpdate`, `HandlerDelete` of a class include and `HandlerUnlock` under that lock send it as
+`HandlerUpdate`, `HandlerDelete` of a class include and `HandlerLock` `action: unlock` under that lock send it as
 the `state_handle` argument (or in the `x-mcp-state-handle` header) and reach the SAP session that
 holds the lock — without it they reach another instance and are refused, sending nothing. A
 request with another credential (a renewed token, a new user and password) works on the held

@@ -27,6 +27,7 @@ import {
   unlockUnderLock,
   withArticle,
 } from '../description/index';
+import { HANDLER_GET_DRAFT_TYPES } from '../draft/draftTypes';
 import type { CompactObjectType } from './compactObjectTypes';
 import { LOCK_ACTIONS } from './compactSchemas';
 import { leftOf } from './memberTexts';
@@ -250,7 +251,14 @@ export function compactGetParts(
       ...(variant === 'onprem' && left(variant, members).has('INCLUDE')
         ? ['reads the main programs of an include']
         : []),
-      "reads a repository object's unactivated change",
+      // The draft part, served while a type it reads is left.
+      ...(HANDLER_GET_DRAFT_TYPES[variant].some((type) =>
+        members.some((member) => member === type),
+      )
+        ? [
+            'reads whether a repository object holds an unactivated change, and whose',
+          ]
+        : []),
       "reads a repository object's structure",
       'reads a repository browser node',
       'reads virtual folders',

@@ -322,6 +322,7 @@ liveSuite(['onprem', 'cloud'], 'Compact transports', () => {
         'accepted',
       ),
       true,
+      sorted.text,
     );
     if (configuredSystemKind() === 'onprem') {
       assert.equal((await entriesOn(mine.task, SORTED)).length, 1);
@@ -351,7 +352,7 @@ liveSuite(['onprem'], 'Compact transport create with a typed task', () => {
     });
     await reconcileRequestCreate(plan, created);
     const answered = payloadOf(created);
-    assert.equal(member(answered, 'task_type'), 'R');
+    assert.equal(member(answered, 'task_type'), 'R', created.text);
     const request = member(answered, 'transport_number');
     if (typeof request !== 'string') throw new Error('no request number');
     const task = member(answered, 'task_number');
@@ -429,6 +430,7 @@ liveSuite(
           'accepted',
         ),
         true,
+        moved.text,
       );
       assert.equal((await entriesOn(source.task, MOVED)).length, 0);
       assert.equal((await entriesOn(destination.task, MOVED)).length, 1);
@@ -439,7 +441,7 @@ liveSuite(
 /** A listing of the session user's modifiable requests: its count, each number, each status D, L or unstated. */
 function expectModifiableListing(answer: LiveAnswer): void {
   const listed = payloadOf(succeeded('HandlerSystem transports', answer));
-  assert.equal(member(listed, 'success'), true);
+  assert.equal(member(listed, 'success'), true, answer.text);
   const transports = member(listed, 'transports');
   if (!Array.isArray(transports)) throw new Error('no transports list');
   assert.equal(member(listed, 'count'), transports.length);
@@ -462,6 +464,8 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem transports', () => {
       const answer = await liveCall('HandlerSystem', {
         action: 'transports',
         background: false,
+        // The fields read below: the JSON of detail medium.
+        detail: 'medium',
       });
       expectModifiableListing(answer);
     });
@@ -469,6 +473,7 @@ liveSuite(['onprem', 'cloud'], 'HandlerSystem transports', () => {
     it('without background it starts a run, whose answer HandlerBackgroundRunGet reads once', async () => {
       const started = await liveCall('HandlerSystem', {
         action: 'transports',
+        detail: 'medium',
       });
       expectModifiableListing(await finishedRun(startedRun(started)));
     });

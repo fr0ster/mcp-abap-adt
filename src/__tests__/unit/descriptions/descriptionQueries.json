@@ -79,6 +79,12 @@
       "search for objects whose name starts with ZMY_",
       "знайди клас ZCL_MY_CLASS",
       "чи існує таблиця ZMY_TABLE?"
+    ],
+    "DescribeByList": [
+      "what are ZCL_A, ZMY_TABLE and ZMY_PROG, and which package is each in?",
+      "describe these objects: ZCL_A, ZIF_B, ZMY_TABLE",
+      "що це за об'єкти ZCL_A, ZMY_TABLE і ZMY_PROG і в яких вони пакетах?",
+      "опиши об'єкти ZCL_A, ZIF_B, ZMY_TABLE"
     ]
   },
   "siblings": {},
@@ -110,6 +116,10 @@
     "SearchObject: does table ZMY_TABLE exist?",
     "SearchObject: search for objects whose name starts with ZMY_",
     "SearchObject: знайди клас ZCL_MY_CLASS",
-    "SearchObject: чи існує таблиця ZMY_TABLE?"
+    "SearchObject: чи існує таблиця ZMY_TABLE?",
+    "DescribeByList: what are ZCL_A, ZMY_TABLE and ZMY_PROG, and which package is each in?",
+    "DescribeByList: describe these objects: ZCL_A, ZIF_B, ZMY_TABLE",
+    "DescribeByList: що це за об'єкти ZCL_A, ZMY_TABLE і ZMY_PROG і в яких вони пакетах?",
+    "DescribeByList: опиши об'єкти ZCL_A, ZIF_B, ZMY_TABLE"
   ]
 }

@@ -37,6 +37,10 @@ import {
   TOOL_DEFINITION as SEARCH_OBJECT,
 } from '../../../handlers/search/readonly/handleSearchObject';
 import {
+  TOOL_DEFINITION as DESCRIBE_BY_LIST,
+  DESCRIBED_LISTS,
+} from '../../../handlers/system/readonly/handleDescribeByList';
+import {
   TOOL_DEFINITION as SEARCH_SOURCE,
   SEARCH_SOURCE_HEADS,
   SEARCH_SOURCE_LISTS,
@@ -113,6 +117,7 @@ const DESCRIPTIONS: Readonly<Record<string, string>> = {
   GetMainPrograms: GET_MAIN_PROGRAMS.description,
   SearchSource: SEARCH_SOURCE.description,
   SearchObject: SEARCH_OBJECT.description,
+  DescribeByList: DESCRIBE_BY_LIST.description,
 };
 const descriptionOf = (tool: string): string => DESCRIPTIONS[tool] ?? '';
 
@@ -212,6 +217,40 @@ const TIED: Readonly<Record<string, () => ReturnsTie>> = {
         {
           reading,
           lines: writtenLines({ heads: [], reading, lists: SEARCH_HITS_LISTS }),
+        },
+      ],
+    };
+  },
+  DescribeByList: () => {
+    const parts = partsOfDescription(descriptionOf('DescribeByList'));
+    assert.ok(parts !== undefined);
+    // An object its search described, and one whose search SAP refused.
+    const reading = {
+      lines: [
+        {
+          kind: 'row' as const,
+          hit: {
+            name: 'ZCL_A',
+            type: 'CLAS/OC' as const,
+            description: 'A class',
+            packageName: 'ZPKG',
+          },
+        },
+        {
+          kind: 'error' as const,
+          name: 'ZGONE',
+          failure: { message: 'refused', step: 'search' },
+        },
+      ],
+    };
+    return {
+      terse: shapesOf(DESCRIBED_LISTS),
+      heads: [],
+      returns: parts.returns,
+      samples: [
+        {
+          reading,
+          lines: writtenLines({ heads: [], reading, lists: DESCRIBED_LISTS }),
         },
       ],
     };

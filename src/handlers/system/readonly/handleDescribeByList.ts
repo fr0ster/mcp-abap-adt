@@ -1,41 +1,14 @@
+import type { ISearchResult } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
-import { requiredText } from '../../../lib/handlers/argumentRules';
 import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import { requiredText } from '../../../lib/handlers/argumentRules';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { ASSEMBLED_DETAIL_SHAPE } from '../../../lib/strategies/detail';
-
-/** The refusal of a call without objects. */
-const OBJECTS_REQUIRED =
-  'Missing or invalid parameters: objects (array) is required and must not be empty.';
-
-export const TOOL_DEFINITION = {
-  name: 'DescribeByList',
-  available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    "[read-only] Describes each repository object named in objects, in one call: its type, description and package. Input: objects: Array<{ name: string, type?: string }>. Each object's type is optional: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone.",
-  ),
-  inputSchema: z.object({
-    background: LONG_BACKGROUND_FIELD,
-    objects: z
-      .array(
-        z.object({
-          name: requiredText('object_name is required').describe(
-            '[read-only] Object name (required, must be valid ABAP object name or mask)',
-          ),
-          type: z
-            .string()
-            .optional()
-            .describe('[read-only] Optional type (e.g. PROG/P, CLAS/OC, etc.)'),
-        }),
-      )
-      .refine((objects) => objects.length > 0, {
-        message: OBJECTS_REQUIRED,
-      }),
-    ...ASSEMBLED_DETAIL_SHAPE,
-  }),
-} as const;
 
 // DescribeByList: Batch description for a list of ABAP objects
 
@@ -52,17 +25,18 @@ import {
 } from '../../../lib/batch/phases';
 import {
   type AnswerTable,
+  about,
   answerAt,
   asContentResult,
   asTextResult,
-  cellsOf,
+  type Column,
   entries,
   kinds,
   type ListAnswerTable,
   listAnswerAt,
-  marks,
+  type RowSchemas,
+  shapesOf,
   wireAnswer,
-  within,
   writeJsonList,
   writeListing,
 } from '../../../lib/detail';
@@ -76,7 +50,11 @@ import {
 } from '../../../lib/json';
 import { levelOf } from '../../../lib/strategies/detail';
 import { return_error } from '../../../lib/utils';
-import { handleSearchObject } from '../../search/readonly/handleSearchObject';
+import {
+  SEARCH_HIT_COLUMNS,
+  type SearchedObjects,
+  searchObjects,
+} from '../../search/readonly/handleSearchObject';
 
 /** DescribeByList's arguments, as its schema parses them. */
 type DescribeArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
@@ -159,8 +137,8 @@ type Described =
   | {
       ends?: undefined;
       entry: ContentEntry;
-      /** The search's own answer text, its TSV rows: what terse answers. */
-      hits?: string;
+      /** The hits the search's typed reading read: what terse answers. */
+      hits?: readonly ISearchResult[];
       /** The object's failure, when its search was refused. */
       failure?: FailureEntry;
     };
@@ -179,37 +157,10 @@ interface DescribedItem {
 const fullDescribed = (items: readonly DescribedItem[]) =>
   asContentResult(
     writeJsonList(
-      { items },
-      entries('items', (item: DescribedItem) => item.described.entry),
+      { items: items.map((item) => item.described.entry) },
+      entries('items', (entry: ContentEntry) => entry),
     ),
   );
-
-/** The hit rows a search answered for an object, read back into their cells. */
-const hitRowsOf = ({ described }: DescribedItem): HitCells[] =>
-  (described.hits ?? '')
-    .split('\n')
-    .slice(1)
-    .filter((row) => row !== '')
-    .map(cellsOf)
-    .map(([name = '', type = '', description = '', pkg = '', ...extra]) => ({
-      name,
-      type,
-      description,
-      package: pkg,
-      extra,
-    }));
-
-/**
- * A hit row's cells, by the columns SearchObject writes; any cell past them
- * kept, written after them.
- */
-interface HitCells {
-  readonly name: string;
-  readonly type: string;
-  readonly description: string;
-  readonly package: string;
-  readonly extra: readonly string[];
-}
 
 /** An object's failure line: its name and its failure, as written. */
 const failureWords = (line: DescribedFailure): string[] => [
@@ -219,7 +170,7 @@ const failureWords = (line: DescribedFailure): string[] => [
 
 /** One line of the terse TSV: a hit row an object was described with, or a refused search. */
 type DescribedLine =
-  | { readonly kind: 'row'; readonly cells: HitCells }
+  | { readonly kind: 'row'; readonly hit: ISearchResult }
   | DescribedFailure;
 
 /** A refused search: the object's name and its failure, its mark line. */
@@ -227,7 +178,7 @@ interface DescribedFailure {
   readonly kind: 'error';
   readonly name: string;
   readonly failure: FailureEntry | undefined;
-  readonly cells?: undefined;
+  readonly hit?: undefined;
 }
 
 /**
@@ -246,8 +197,83 @@ const describedLines = (items: readonly DescribedItem[]): DescribedLine[] =>
             failure: item.described.failure,
           },
         ]
-      : hitRowsOf(item).map((cells): DescribedLine => ({ kind: 'row', cells })),
+      : (item.described.hits ?? []).map(
+          (hit): DescribedLine => ({ kind: 'row', hit }),
+        ),
   );
+
+/**
+ * The lists a description's listing writes: what its description states —
+ * each hit row by the columns SearchObject writes of it.
+ */
+export const DESCRIBED_LISTS: RowSchemas<{ lines: DescribedLine[] }> = {
+  lines: about(
+    'for each object found',
+    kinds<DescribedLine, 'lines', 'kind'>(
+      'lines',
+      'kind',
+      {
+        row: {
+          row: {
+            columns: SEARCH_HIT_COLUMNS.map(
+              (column): Column<DescribedLine> => ({
+                name: column.name,
+                means: column.means,
+                cell: (line) =>
+                  line.kind === 'row' ? column.cell(line.hit) : '',
+              }),
+            ),
+            header: 'none',
+          },
+        },
+        error: {
+          mark: 'error',
+          words: (line: DescribedLine) =>
+            line.kind === 'error' ? failureWords(line) : [],
+        },
+      },
+      SEARCH_HIT_COLUMNS.map((column) => column.name),
+    ),
+  ),
+};
+
+/** The refusal of a call without objects. */
+const OBJECTS_REQUIRED =
+  'Missing or invalid parameters: objects (array) is required and must not be empty.';
+
+export const TOOL_DEFINITION = {
+  name: 'DescribeByList',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Describes several ABAP repository objects named in one call, each by its name and, when known, its type.',
+    ),
+    returns: returnsOf({ shapes: [shapesOf(DESCRIBED_LISTS)] }),
+    notes: [longRunning],
+  }),
+  inputSchema: z.object({
+    background: LONG_BACKGROUND_FIELD,
+    objects: z
+      .array(
+        z.object({
+          name: requiredText('object_name is required').describe(
+            '[read-only] Object name (required, must be valid ABAP object name or mask)',
+          ),
+          type: z
+            .string()
+            .optional()
+            .describe(
+              "[read-only] Optional type: a name of the system's object types list (e.g. CLAS, DTAB, STRU) or an ADT type code (e.g. PROG/P, PROG/I, FUGR/F, FUGR/FF, CLAS/OC, INTF/OI), either case, or a name standing for a code, in lower case (e.g. class, table, structure; view is a CDS view, while VIEW is the dictionary views); an object of any other type is searched by its name alone.",
+            ),
+        }),
+      )
+      .refine((objects) => objects.length > 0, {
+        message: OBJECTS_REQUIRED,
+      }),
+    ...ASSEMBLED_DETAIL_SHAPE,
+  }),
+} as const;
 
 /**
  * What DescribeByList answers at each `detail`, selected before the
@@ -265,53 +291,7 @@ const DESCRIBE_ANSWERS: ListAnswerTable<readonly DescribedItem[], McpResult> = {
       writeListing({
         heads: [],
         reading: { lines: describedLines(items) },
-        lists: {
-          lines: kinds<DescribedLine, 'lines', 'kind'>(
-            'lines',
-            'kind',
-            {
-              row: {
-                row: {
-                  columns: [
-                    {
-                      name: 'name',
-                      cell: (line) =>
-                        line.kind === 'row' ? line.cells.name : '',
-                    },
-                    {
-                      name: 'type',
-                      cell: (line) =>
-                        line.kind === 'row' ? line.cells.type : '',
-                    },
-                    {
-                      name: 'description',
-                      cell: (line) =>
-                        line.kind === 'row' ? line.cells.description : '',
-                    },
-                    {
-                      name: 'package',
-                      cell: (line) =>
-                        line.kind === 'row' ? line.cells.package : '',
-                    },
-                  ],
-                  header: 'none',
-                  // Any cell past the four, as SAP's row held it: a line each.
-                  lists: {
-                    cells: within<HitCells, 'cells'>('cells', {
-                      extra: marks('extra', 'extra', (cell: string) => [cell]),
-                    }),
-                  },
-                },
-              },
-              error: {
-                mark: 'error',
-                words: (line: DescribedLine) =>
-                  line.kind === 'error' ? failureWords(line) : [],
-              },
-            },
-            ['name', 'type', 'description', 'package'],
-          ),
-        },
+        lists: DESCRIBED_LISTS,
       }),
     ),
 
@@ -326,12 +306,13 @@ const DESCRIBE_ANSWERS: ListAnswerTable<readonly DescribedItem[], McpResult> = {
  */
 function describedBy(
   obj: DescribedObject,
-  first: McpResult | undefined,
-  second: McpResult | undefined,
+  first: SearchedObjects | undefined,
+  second: SearchedObjects | undefined,
 ): Described {
-  let res = first;
-  if (emptyOrFailed(res)) {
-    res = second;
+  let searched = first;
+  if (emptyOrFailed(searched?.result)) {
+    searched = second;
+    const res = searched?.result;
     // A refusal is the search's error as it is, with the step — this
     // object's answer beside the others', not an object skipped as if
     // nothing were found, and not the end of the call.
@@ -354,7 +335,8 @@ function describedBy(
   }
   // No search found it: the object is answered as not found, at every
   // level — never left out.
-  if (res === undefined || !holdsHits(res)) {
+  const res = searched?.result;
+  if (searched === undefined || res === undefined || !holdsHits(res)) {
     return {
       entry: {
         type: 'text',
@@ -384,7 +366,7 @@ function describedBy(
       type: 'text',
       text: JSON.stringify({ name: obj.name, results: allResults }),
     },
-    hits: res.content.map((item) => item.text).join('\n'),
+    hits: searched.hits,
   };
 }
 
@@ -406,20 +388,20 @@ async function describeOneByOne(
   const items: DescribedItem[] = [];
   try {
     for (const obj of objects) {
-      const first = await handleSearchObject(context, {
+      const first = await searchObjects(context, {
         object_name: obj.name,
         object_type: obj.type,
         detail: searchAt,
       });
       // A credential failure is every object's: the call ends with it as it
       // came, before any second search is sent.
-      if (endsDescribe(first)) return first;
+      if (endsDescribe(first.result)) return first.result;
       // If the response is empty or flagged as an error, retry without
       // explicit type; a second search that throws is the call's error — no
       // object is skipped in silence.
-      let second: McpResult | undefined;
-      if (emptyOrFailed(first)) {
-        second = await handleSearchObject(context, {
+      let second: SearchedObjects | undefined;
+      if (emptyOrFailed(first.result)) {
+        second = await searchObjects(context, {
           object_name: obj.name,
           detail: searchAt,
         });
@@ -454,42 +436,44 @@ async function describeInEnvelopes(
   const objects = args.objects;
   logger?.info(`Describing ${objects.length} objects via search`);
   const typed = await runPhase(context, objects, (obj, batch) =>
-    handleSearchObject(
+    searchObjects(
       { ...context, connection: batch },
       { object_name: obj.name, object_type: obj.type, detail: searchAt },
     ),
   );
-  const typedAnswer = (i: number): McpResult | undefined => {
+  const typedAnswer = (i: number): SearchedObjects | undefined => {
     const result = typed[i];
     if (result === undefined) return undefined;
     if (!result.ok) throw result.error;
     return result.value;
   };
   for (const result of typed) {
-    if (result.ok && endsDescribe(result.value)) return result.value;
+    if (result.ok && endsDescribe(result.value.result)) {
+      return result.value.result;
+    }
   }
   const again: number[] = [];
   objects.forEach((_obj, i) => {
     const result = typed[i];
     if (
       result?.ok === true &&
-      emptyOrFailed(result.value) &&
-      notAcceptable(result.value) === undefined
+      emptyOrFailed(result.value.result) &&
+      notAcceptable(result.value.result) === undefined
     )
       again.push(i);
   });
   const untypedResults = await runPhase(context, again, (i, batch) =>
-    handleSearchObject(
+    searchObjects(
       { ...context, connection: batch },
       { object_name: objects[i]?.name ?? '', detail: searchAt },
     ),
   );
-  const untyped = new Map<number, PhaseResult<McpResult>>();
+  const untyped = new Map<number, PhaseResult<SearchedObjects>>();
   again.forEach((i, at) => {
     const result = untypedResults[at];
     if (result !== undefined) untyped.set(i, result);
   });
-  const untypedAnswer = (i: number): McpResult | undefined => {
+  const untypedAnswer = (i: number): SearchedObjects | undefined => {
     const result = untyped.get(i);
     if (result === undefined) return undefined;
     if (!result.ok) throw result.error;
@@ -500,7 +484,7 @@ async function describeInEnvelopes(
   try {
     for (const [i, obj] of objects.entries()) {
       const res = typedAnswer(i);
-      const refused = notAcceptable(res);
+      const refused = notAcceptable(res?.result);
       if (refused !== undefined) {
         items.push({
           obj,
@@ -514,7 +498,7 @@ async function describeInEnvelopes(
         });
         continue;
       }
-      const second = emptyOrFailed(res) ? untypedAnswer(i) : undefined;
+      const second = emptyOrFailed(res?.result) ? untypedAnswer(i) : undefined;
       const described = describedBy(obj, res, second);
       if (described.ends !== undefined) return described.ends;
       items.push({ obj, described });

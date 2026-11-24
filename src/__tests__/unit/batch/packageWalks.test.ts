@@ -15,7 +15,7 @@
 
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { isDeepStrictEqual } from 'node:util';
+import { format, isDeepStrictEqual } from 'node:util';
 import { authError } from '@mcp-abap-adt/auth-errors';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type {
@@ -142,24 +142,24 @@ const NODES: Record<string, NodeDoc> = {
     ],
   },
   [nodeKey('PROG/P', 'ZPROG_X', '101')]: {
-    objects: [{ type: 'PROG/I', name: 'ZINCL_X1' }],
+    objects: [{ type: 'PROG/I', name: 'ZINCL_X1', description: 'Include X1' }],
     types: [{ type: 'PROG/PY', nodeId: '000103' }],
   },
   [nodeKey('PROG/P', 'ZPROG_X', '102')]: {
-    objects: [{ type: 'PROG/PX', name: 'ZEVENT_X' }],
+    objects: [{ type: 'PROG/PX', name: 'ZEVENT_X', description: 'Event X' }],
   },
   [nodeKey('PROG/P', 'ZPROG_X', '103')]: {
-    objects: [{ type: 'PROG/PY', name: 'ZFORM_X' }],
+    objects: [{ type: 'PROG/PY', name: 'ZFORM_X', description: 'Form X' }],
   },
   [nodeKey('PROG/P', 'ZPROG_Y')]: {
     types: [{ type: 'PROG/I', nodeId: '000101' }],
   },
   [nodeKey('PROG/P', 'ZPROG_Y', '101')]: {
-    objects: [{ type: 'PROG/I', name: 'ZINCL_Y1' }],
+    objects: [{ type: 'PROG/I', name: 'ZINCL_Y1', description: 'Include Y1' }],
     types: [{ type: 'PROG/PY', nodeId: '000103' }],
   },
   [nodeKey('PROG/P', 'ZPROG_Y', '103')]: {
-    objects: [{ type: 'PROG/PY', name: 'ZFORM_Y' }],
+    objects: [{ type: 'PROG/PY', name: 'ZFORM_Y', description: 'Form Y' }],
   },
 };
 
@@ -1769,3 +1769,45 @@ for (const { tool, call } of [
     });
   });
 }
+
+describe('GetObjectsList: descriptions', () => {
+  // GetObjectsList answers each object's type, name, technical name and
+  // URI — never a description (`flatObjects`). So a node structure part
+  // carrying another part's DESCRIPTION, as SAP answers inside an envelope
+  // (measured, 2026-10-18), reaches no answer: the batched answer is the
+  // sequential one, read alone.
+  for (const args of [
+    {},
+    { with_short_descriptions: true },
+    { with_short_descriptions: false },
+  ]) {
+    it(
+      format(
+        "parts carrying each other's DESCRIPTION: the sequential answer, no description in it: %j",
+        args,
+      ),
+      async () => {
+        const call: Call = (c) =>
+          handleGetObjectsList(c, {
+            objects: [
+              { parent_type: 'PROG/P', parent_name: 'ZPROG_X' },
+              { parent_type: 'PROG/P', parent_name: 'ZPROG_Y' },
+            ],
+            ...args,
+          });
+        const leaking = leakingSystem();
+        const batched = await withinTurns(call(contextOn(leaking as Fake)));
+        const sequential = await withinTurns(
+          call(contextOn(leakingSystem() as Fake, 'absent')),
+        );
+        assert.ok(leaking.envelopes.length > 0);
+        assert.ok(leaking.leaks.count > 0);
+        assert.equal(textOf(batched), textOf(sequential));
+        assert.equal(textOf(batched).includes('DESCRIPTION'), false);
+        for (const own of ['Include X1', 'Event X', 'Form X', 'Form Y']) {
+          assert.equal(textOf(batched).includes(own), false);
+        }
+      },
+    );
+  }
+});

@@ -84,7 +84,7 @@ describe('the kind factories', () => {
   });
 
   it("activate: the activation's verdict, then each message", () => {
-    const activated = `Whether SAP activated it, whether SAP generated it and whether there was nothing to activate. ${MESSAGES}`;
+    const activated = `Whether SAP activated it, whether SAP generated it and whether it was already active. ${MESSAGES}`;
     assert.equal(
       activateTool({ object: 'an ABAP class' }),
       `Activates an ABAP class. ${activated}`,

@@ -5,11 +5,13 @@
  * not compile; only the members a terse answer writes are stated.
  */
 
+import type { StatusAnswer } from '../abapGit/formats';
 import type {
   PublicationAnswer,
   TerseActivationAnswer,
   terseCheck,
   terseDeletion,
+  terseTransportCheck,
   terseValidation,
   terseWrite,
 } from '../strategies/projections';
@@ -85,11 +87,43 @@ export const CHECKED = resultShape<CheckAnswer>({
 export const ACTIVATED = resultShape<TerseActivationAnswer>({
   activated: 'whether SAP activated it',
   generated: 'whether SAP generated it',
-  nothing_to_activate: 'whether there was nothing to activate',
+  nothing_to_activate: 'whether it was already active',
   messages: listOf<SourceMessageOf<TerseActivationAnswer>>(
     'for each message',
     MESSAGE_NOUNS,
   ),
+});
+
+/** What a check run answers with the object it checked named. */
+export const CHECKED_NAMED = resultShape<
+  CheckAnswer & { readonly object_name: string }
+>({
+  object_name: 'the object checked',
+  ran: 'whether the check ran',
+  status_text: "SAP's status text",
+  messages: listOf<SourceMessageOf<CheckAnswer>>(
+    'for each message',
+    MESSAGE_NOUNS,
+  ),
+});
+
+/** A transport check's answer (a new service binding's validation). */
+type TransportCheckAnswer = NonNullable<ReturnType<typeof terseTransportCheck>>;
+
+/** What a transport check answers. */
+export const TRANSPORT_CHECKED = resultShape<TransportCheckAnswer>({
+  admissible: 'whether SAP admits it',
+  result: "SAP's verdict when it is another",
+  messages: listOf<{ type: string; text: string }>('for each message', {
+    type: 'its severity',
+    text: 'its text',
+  }),
+});
+
+/** What an abapGit write or check answers that SAP answers with no document. */
+export const ABAPGIT_STATUS = resultShape<StatusAnswer>({
+  status: "SAP's status",
+  result: 'whether SAP has done it or accepted it',
 });
 
 /** What a validation answers. */

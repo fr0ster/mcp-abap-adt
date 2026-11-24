@@ -65,8 +65,6 @@ const stated = (
 
 /** What one list states, then its items' own lists. */
 function listStated(shape: ListShape, seen: Set<object>): Stated[] {
-  const omits = (reasons: Readonly<Record<string, string>> | undefined) =>
-    Object.values(reasons ?? {}).map((reason) => stated(reason));
   const below = (lists: () => readonly ListShape[]): Stated[] =>
     lists().flatMap((child) => {
       // A tree's lists name themselves: each list is stated once.
@@ -78,19 +76,21 @@ function listStated(shape: ListShape, seen: Set<object>): Stated[] {
   const subject = about === undefined ? [] : [stated(about)];
   switch (shape.kind) {
     case 'omitted':
-      return [stated(shape.reason)];
+      // A kind left out of an answer is stated by no fact: a description
+      // says what comes back (owner, positive statements only). Its reason
+      // stays in the schema, for reviewers.
+      return [];
     case 'rows':
     case 'node':
       return [
         ...(about === undefined ? [] : [stated(about, shape.means)]),
-        ...omits(shape.omits),
         ...below(shape.lists),
       ];
     case 'kinds':
       return [
         ...subject,
         ...shape.kinds.flatMap((kind: KindShape): Stated[] => {
-          if ('omit' in kind) return [stated(kind.omit)];
+          if ('omit' in kind) return [];
           // A row kind's cells, by their nouns — headerless or not.
           return [
             ...('means' in kind && about !== undefined
@@ -120,13 +120,9 @@ function listStated(shape: ListShape, seen: Set<object>): Stated[] {
     case 'within':
     case 'entries':
     case 'member':
-      return [
-        ...subject,
-        ...('omits' in shape ? omits(shape.omits) : []),
-        ...below(shape.lists),
-      ];
+      return [...subject, ...below(shape.lists)];
     default:
-      return [...subject, ...('omits' in shape ? omits(shape.omits) : [])];
+      return subject;
   }
 }
 

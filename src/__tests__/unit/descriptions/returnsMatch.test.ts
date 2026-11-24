@@ -103,6 +103,7 @@ import {
   jsonShapesOf,
   kinds,
   marks,
+  omitting,
   type RowSchemas,
   rows,
   shapesOf,
@@ -802,6 +803,23 @@ describe('a tool description tied to what its writers write', () => {
     // @ts-expect-error a fact is nominal: no spread of one is a fact.
     const forged: ReturnsFact = { ...first, text: 'Forged.' };
     void forged;
+  });
+
+  it('states no fact of a kind left out: its reason stays in the schema', () => {
+    const left: RowSchemas<{ objects: readonly Item[] }> = {
+      objects: about(
+        'for each object',
+        rows('objects', {
+          columns,
+          header: 'always',
+          omit: omitting((o: Item) => (o.type === '' ? 'node' : 'object'), {
+            node: 'the nodes are left out',
+          }),
+        }),
+      ),
+    };
+    const facts = returnsOf({ shapes: [shapesOf(left)] }).map((f) => f.text);
+    assert.deepStrictEqual(facts, ['For each object: its type and its name.']);
   });
 
   it('fails on a fact stated twice', () => {

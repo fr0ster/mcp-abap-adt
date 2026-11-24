@@ -3,6 +3,11 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  purpose,
+  sourceReader,
+  toolDescription,
+} from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   READ_PART_FIELD,
@@ -17,7 +22,6 @@ import {
   answerSourceRead,
   rangeFields,
   SOURCE_RANGE_SHAPE,
-  SOURCE_RANGE_WORDS,
   type SourceRangeArgs,
   sourceRangeOf,
 } from '../../../lib/handlers/sourceRange';
@@ -33,7 +37,16 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetFunctionModule',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. The module's metadata is read first, and the part is answered only when the function group named holds the module. Returns the part read. ${SOURCE_RANGE_WORDS}`,
+  description: toolDescription(
+    sourceReader({
+      object: 'an ABAP function module',
+      purpose: purpose(
+        'Reads the source of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, at the version asked, or its metadata.',
+      ),
+      range: 'with-count',
+      metadata: true,
+    }),
+  ),
   inputSchema: z.object({
     function_module_name: z.string().describe('Function module name.'),
     function_group_name: z

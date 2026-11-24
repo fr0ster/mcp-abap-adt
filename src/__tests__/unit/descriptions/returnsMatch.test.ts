@@ -1493,9 +1493,33 @@ describe('a tool description tied to what its writers write', () => {
   });
 });
 
+/**
+ * The writer tools assembled and left out of the tie (owner): their
+ * descriptions are checked by the final vector measurement against their
+ * output instead. Each with its reason.
+ */
+const UNTIED: Readonly<Record<string, string>> = {
+  GetStructuresList:
+    'its sections write a mark line from each item, and the sections schema records no labels',
+  GetEnhancements:
+    'its sections write head lines from each item, and the sections schema records no labels',
+  GetTransport:
+    'its terse answer is JSON, whose entries carry no per-member nouns',
+  RuntimeListFeeds:
+    'left out with the other three by the owner; its heads are written from the reading as head lines, and it has no fixture set of its own',
+};
+
 describe('every writer tool is tied, or still listed as not yet assembled', () => {
   for (const tool of WRITER_TOOLS) {
     it(tool, () => {
+      if (UNTIED[tool] !== undefined) {
+        assert.ok(
+          !NOT_YET_ASSEMBLED.has(tool),
+          `${tool} is left out of the tie and still listed`,
+        );
+        assert.ok(TIED[tool] === undefined, `${tool} is tied and left out`);
+        return;
+      }
       const tied = TIED[tool];
       if (tied === undefined) {
         assert.ok(

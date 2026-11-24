@@ -9,28 +9,49 @@ import type { ProjectionVariant } from '../../../lib/adtProjections';
 import { acceptedOf } from '../../../lib/adtTypeCode';
 import { answer, answerCaught } from '../../../lib/answer';
 import { createAdtClient, variantOf } from '../../../lib/clients';
-import { draftOf } from '../../../lib/draft/draftOf';
-import {
-  DRAFT_TYPES,
-  draftPartWords,
-  draftRuleOf,
-} from '../../../lib/draft/draftTypes';
+import { membersOf, purpose, toolDescription } from '../../../lib/description';
+import { type DraftPartState, draftOf } from '../../../lib/draft/draftOf';
+import { DRAFT_TYPES, draftRuleOf } from '../../../lib/draft/draftTypes';
 import { readDraftEtags } from '../../../lib/draft/readDraftEtags';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error, return_response } from '../../../lib/utils';
 import { byVariant } from '../../../lib/variantDefinition';
 
-/** What the tool answers, beside the object's type and name. */
-/** What the tool answers on `variant`, beside the object's type and name. */
-function answerWords(variant: ProjectionVariant): string {
-  return `Answers { object_type, object_name, has_draft, parts }: per part (${draftPartWords(variant, DRAFT_TYPES[variant])}) draft states whose unactivated change it holds — own (the caller's), other (another user's), undetermined (its three ETags in another pattern), and the active state when its versions are equal — with changed_at (the change's last write, UTC) and age_seconds by the server's clock for own and other (null for METADATA_EXTENSION and SERVICE_DEFINITION, whose ETag carries a constant time), and the three ETags (active, inactive, workspace); has_draft is true when any part holds a change of a user's`;
-}
+/** One part of the object, as the tool answers it. */
+type DraftPartAnswer = { readonly part: string } & DraftPartState;
+
+/** What the tool gives back: whether the object holds a change, then each part's state. */
+const DRAFT_RETURNS = [
+  ...membersOf<{ readonly has_draft: boolean }>({
+    of: 'whether',
+    nouns: {
+      has_draft: 'the object holds an unactivated change of any user',
+    },
+  }),
+  ...membersOf<DraftPartAnswer>({
+    of: 'for each part, its main source or metadata or a class include:',
+    nouns: {
+      part: 'its name',
+      draft:
+        "its state (active, the caller's change, another user's change or undetermined)",
+      changed_at: 'when that change was last written',
+      age_seconds: 'how many seconds ago',
+      etags: 'the ETags of its active, inactive and working versions',
+    },
+  }),
+];
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectDraft',
   available_in: ['onprem', 'cloud'] as const,
   ...byVariant((variant) => ({
-    description: `[read-only] Reads the active, inactive and working versions of each part of the object named by object_type and object_name, together, and tells whether it holds an unactivated change and whose. ${answerWords(variant)}`,
+    description: toolDescription({
+      tag: 'read-only',
+      purpose: purpose(
+        'Tells whether an ABAP class, interface, program, CDS view, table or other development object holds an unactivated change, and whose.',
+      ),
+      returns: DRAFT_RETURNS,
+    }),
     inputSchema: objectDraftSchema(variant),
   })),
 } as const;

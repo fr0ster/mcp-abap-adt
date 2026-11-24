@@ -37,13 +37,16 @@ import {
   withSequentialFallback,
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
+import { purpose, returnsOf, toolDescription } from '../../../lib/description';
 import {
+  about,
   asJsonResult,
   asTextResult,
   byListing,
   type DetailLevel,
   entries,
   type Head,
+  headShape,
   type JsonSchemas,
   type ListAnswerTable,
   type Listing,
@@ -55,6 +58,7 @@ import {
   type RowSchemas,
   rows,
   sections,
+  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -141,60 +145,6 @@ const HOST_SPELLINGS = {
 function spelledAs(kind: string, host: HostSpelling): boolean {
   return kind === host.code || kind === host.main || host.names.includes(kind);
 }
-
-export const TOOL_DEFINITION = {
-  name: 'GetEnhancements',
-  available_in: ['onprem', 'cloud'] as const,
-  description:
-    '[read-only] Lists the enhancements (enhancement implementations) of the program, include, function group or class named by object_name and object_type, read at its active version. Takes object_name and object_type (one object: its enhancements) or objects (several objects: one entry per object, in the order given, each its enhancements answer or { object_name, object_type, error }).',
-  inputSchema: z.object({
-    object_name: z
-      .string()
-      .optional()
-      .describe('Name of the ABAP object (with object_type; or give objects)'),
-    object_type: z
-      .string()
-      .optional()
-      .describe('[read-only] Type of the ABAP object'),
-    objects: z
-      .array(
-        z.object({
-          object_name: z.string().describe('Name of the ABAP object'),
-          object_type: z.string().describe('Type of the ABAP object'),
-        }),
-      )
-      .optional()
-      .describe(
-        '[read-only] Several objects, read together (give this or object_name and object_type)',
-      ),
-    program: z
-      .string()
-      .optional()
-      .describe(
-        "[read-only] An include's main program, when its metadata names none",
-      ),
-    include_nested: z
-      .boolean()
-      .optional()
-      .describe(
-        '[read-only] true: also the enhancements of every include of a program or function group',
-      ),
-    detailed: z
-      .boolean()
-      .optional()
-      .describe(
-        '[read-only] true: every field of each enhancement, as read; false (default): each enhancement by name, type and source. Either way every object read is answered, one without enhancements with total_enhancements 0',
-      ),
-    max_includes: z
-      .number()
-      .int()
-      .optional()
-      .describe(
-        '[read-only] With include_nested: how many includes are read (default 50)',
-      ),
-    ...ASSEMBLED_DETAIL_SHAPE,
-  }),
-} as const;
 
 /** The tool's arguments, as its schema parses them. */
 type GetEnhancementsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
@@ -855,21 +805,36 @@ const objectHeads = (response: EnhancementResponse): Head[] => [
 
 /** One object's lists: its enhancements as rows (no source), then each probe that was refused. */
 const objectSchemas: RowSchemas<EnhancementResponse> = {
-  enhancements: rows('enhancements', {
-    columns: [
-      { name: 'name', cell: (enh: EnhancementImplementation) => enh.name },
-      { name: 'type', cell: (enh: EnhancementImplementation) => enh.type },
-      {
-        name: 'description',
-        cell: (enh: EnhancementImplementation) =>
-          (enh.description ?? '').split('\n')[0] ?? '',
-      },
-    ],
-    header: 'when-rows',
-  }),
-  unreadable: marks('unreadable', 'unreadable', (entry: FailureEntry) => [
-    JSON.stringify(entry),
-  ]),
+  enhancements: about(
+    'for each enhancement',
+    rows('enhancements', {
+      columns: [
+        {
+          name: 'name',
+          means: 'its name',
+          cell: (enh: EnhancementImplementation) => enh.name,
+        },
+        {
+          name: 'type',
+          means: 'its type',
+          cell: (enh: EnhancementImplementation) => enh.type,
+        },
+        {
+          name: 'description',
+          means: 'its description',
+          cell: (enh: EnhancementImplementation) =>
+            (enh.description ?? '').split('\n')[0] ?? '',
+        },
+      ],
+      header: 'when-rows',
+    }),
+  ),
+  unreadable: about(
+    'what SAP answered to each read it refused while finding the kind of an object',
+    marks('unreadable', 'unreadable', (entry: FailureEntry) => [
+      JSON.stringify(entry),
+    ]),
+  ),
 };
 
 /** The lists of a response with its includes: each object's section, then every include not read. */
@@ -877,9 +842,12 @@ const nestedSchemas: RowSchemas<NestedEnhancements> = {
   objects: sections('objects', objectHeads, objectSchemas),
   // Each include whose enhancements could not be read, whole: its
   // failures inside it.
-  includes_unread: wholeMarks<IncludeUnread, 'includes_unread'>(
-    'includes_unread',
-    'include_unread',
+  includes_unread: about(
+    'the includes whose enhancements SAP refused to read, with what it answered',
+    wholeMarks<IncludeUnread, 'includes_unread'>(
+      'includes_unread',
+      'include_unread',
+    ),
   ),
 };
 
@@ -900,6 +868,77 @@ const ENHANCEMENTS_LISTS: RowSchemas<EnhancementsTerse> = {
   single: within<EnhancementResponse, 'single'>('single', objectSchemas),
   nested: within<NestedEnhancements, 'nested'>('nested', nestedSchemas),
 };
+
+/** The heads an enhancements listing writes, each object's and the total. */
+const ENHANCEMENTS_HEADS = [
+  headShape('object', 'its type and name'),
+  headShape('context', 'the main program of an include'),
+  headShape('count', 'how many enhancements it has'),
+  headShape('total', 'the total found across its includes'),
+];
+
+export const TOOL_DEFINITION = {
+  name: 'GetEnhancements',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Lists the enhancement implementations of ABAP programs, includes, function groups or classes at their active version, and of their includes when asked.',
+    ),
+    returns: returnsOf({
+      heads: ENHANCEMENTS_HEADS,
+      of: 'for each object read:',
+      shapes: [shapesOf(ENHANCEMENTS_LISTS)],
+    }),
+  }),
+  inputSchema: z.object({
+    object_name: z
+      .string()
+      .optional()
+      .describe('Name of the ABAP object (with object_type; or give objects)'),
+    object_type: z
+      .string()
+      .optional()
+      .describe('[read-only] Type of the ABAP object'),
+    objects: z
+      .array(
+        z.object({
+          object_name: z.string().describe('Name of the ABAP object'),
+          object_type: z.string().describe('Type of the ABAP object'),
+        }),
+      )
+      .optional()
+      .describe(
+        '[read-only] Several objects, read together (give this or object_name and object_type)',
+      ),
+    program: z
+      .string()
+      .optional()
+      .describe(
+        "[read-only] An include's main program, when its metadata names none",
+      ),
+    include_nested: z
+      .boolean()
+      .optional()
+      .describe(
+        '[read-only] true: also the enhancements of every include of a program or function group',
+      ),
+    detailed: z
+      .boolean()
+      .optional()
+      .describe(
+        '[read-only] true: every field of each enhancement, as read; false (default): each enhancement by name, type and source. Either way every object read is answered, one without enhancements with total_enhancements 0',
+      ),
+    max_includes: z
+      .number()
+      .int()
+      .optional()
+      .describe(
+        '[read-only] With include_nested: how many includes are read (default 50)',
+      ),
+    ...ASSEMBLED_DETAIL_SHAPE,
+  }),
+} as const;
 
 /**
  * The terse listing of a read, written from its own lists: one object's

@@ -34,12 +34,20 @@ import {
 } from '../../../lib/batch/phases';
 import { withSystemKindOf } from '../../../lib/connectionFactory';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   asJsonResult,
   asTextResult,
   byListing,
   type DetailLevel,
   type Head,
   headLines,
+  headShape,
   type ListAnswerTable,
   type Listing,
   listAnswerAt,
@@ -48,6 +56,7 @@ import {
   partsOf,
   type RowSchemas,
   rows,
+  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -65,10 +74,7 @@ import {
 import { withInCallSchema } from '../../../lib/handlers/argumentRules';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { JsonValue } from '../../../lib/json';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import { afterLast } from '../../../lib/plainText';
 import {
   ASSEMBLED_DETAIL_SHAPE,
@@ -211,20 +217,6 @@ function oneFeedForm(
   if (refused !== undefined) refuse(refused.words, refused.path);
 }
 
-export const TOOL_DEFINITION = {
-  name: 'RuntimeListFeeds',
-  available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] [runtime] Reads the ADT runtime feed named by feed_type: with feed_type "dumps", the ABAP short dumps (runtime errors) of the program or object named by object_name, of the user named by user, in the time range from–to, filtered also by runtime error, exception, package and application component; with "system_messages" or "gateway_errors", the system messages or SAP Gateway errors of the user and time range; with "descriptors" (the default) or "variants", the feeds and their variants. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request. Takes feed_type (one feed: its answer) or feed_types (several feeds with the same filters: one entry per feed, in the order given, each its answer or { feed_type, error }). By default (detail terse) TSV under "# feed" and "# count" lines, next_to and incomplete_second as "#" lines: descriptors id, title, category; variants feed, title, query, is_default; dumps dump_id, updated, title; system messages id, createdOn, author, title; gateway errors opid, detail_kind, dateTime, type, shortText, username. With detail medium or full every field as JSON.',
-  ),
-  inputSchema: withInCallSchema(
-    z
-      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
-      .superRefine(oneFeedForm),
-    z.object(FIELDS).superRefine(oneFeedForm),
-  ),
-} as const;
-
 type RuntimeListFeedsArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
 /**
@@ -356,103 +348,197 @@ function feedTerse(shown: FeedShown): FeedTerse {
 }
 
 /** Each feed's entries: one row per entry — a feed without variants one row with none. */
-const FEED_SCHEMAS: RowSchemas<FeedTerse> = {
+export const FEED_SCHEMAS: RowSchemas<FeedTerse> = {
   // The feed, its count and SAP's paging, before its entries.
   heads: headLines('heads'),
   descriptors: within<FeedAnswer<'descriptors'>, 'descriptors'>('descriptors', {
-    entries: rows('entries', {
-      header: 'always',
-      columns: [
-        { name: 'id', cell: (e: IFeedDescriptor) => e.id },
-        { name: 'title', cell: (e: IFeedDescriptor) => e.title },
-        {
-          name: 'category',
-          cell: (e: IFeedDescriptor) => e.category ?? '',
-        },
-      ],
-    }),
+    entries: about(
+      'for each feed there is',
+      rows('entries', {
+        header: 'always',
+        columns: [
+          { name: 'id', means: 'its ID', cell: (e: IFeedDescriptor) => e.id },
+          {
+            name: 'title',
+            means: 'its title',
+            cell: (e: IFeedDescriptor) => e.title,
+          },
+          {
+            name: 'category',
+            means: 'its category',
+            cell: (e: IFeedDescriptor) => e.category ?? '',
+          },
+        ],
+      }),
+    ),
   }),
   variants: within<VariantRows, 'variants'>('variants', {
     // Every variant of every feed; a feed without variants a row with none.
-    rows: rows('rows', {
-      columns: [
-        { name: 'feed', cell: (row: VariantRow) => row.feed },
-        { name: 'title', cell: (row: VariantRow) => row.variant?.title ?? '' },
-        { name: 'query', cell: (row: VariantRow) => row.variant?.query ?? '' },
-        {
-          name: 'is_default',
-          cell: (row: VariantRow) =>
-            row.variant === undefined ? '' : String(row.variant.is_default),
-        },
-      ],
-      header: 'always',
-    }),
+    rows: about(
+      'for each variant of a feed',
+      rows('rows', {
+        columns: [
+          {
+            name: 'feed',
+            means: 'its feed',
+            cell: (row: VariantRow) => row.feed,
+          },
+          {
+            name: 'title',
+            means: 'its title',
+            cell: (row: VariantRow) => row.variant?.title ?? '',
+          },
+          {
+            name: 'query',
+            means: 'its query',
+            cell: (row: VariantRow) => row.variant?.query ?? '',
+          },
+          {
+            name: 'is_default',
+            means: 'whether it is the default',
+            cell: (row: VariantRow) =>
+              row.variant === undefined ? '' : String(row.variant.is_default),
+          },
+        ],
+        header: 'always',
+      }),
+    ),
   }),
   dumps: within<FeedAnswer<'dumps'>, 'dumps'>('dumps', {
-    entries: rows('entries', {
-      header: 'always',
-      columns: [
-        { name: 'dump_id', cell: (e: DumpEntry) => e.dump_id },
-        { name: 'updated', cell: (e: DumpEntry) => e.updated },
-        { name: 'title', cell: (e: DumpEntry) => e.title },
-      ],
-    }),
+    entries: about(
+      'for each short dump, newest first',
+      rows('entries', {
+        header: 'always',
+        columns: [
+          {
+            name: 'dump_id',
+            means: 'its dump ID',
+            cell: (e: DumpEntry) => e.dump_id,
+          },
+          {
+            name: 'updated',
+            means: 'when it happened',
+            cell: (e: DumpEntry) => e.updated,
+          },
+          {
+            name: 'title',
+            means: 'its title',
+            cell: (e: DumpEntry) => e.title,
+          },
+        ],
+      }),
+    ),
   }),
   system_messages: within<FeedAnswer<'system_messages'>, 'system_messages'>(
     'system_messages',
     {
-      entries: rows('entries', {
-        header: 'always',
-        columns: [
-          {
-            name: 'id',
-            cell: (e: ISystemMessageEntry) => e.id ?? e.messageId ?? '',
-          },
-          {
-            name: 'createdOn',
-            cell: (e: ISystemMessageEntry) => e.createdOn ?? '',
-          },
-          {
-            name: 'author',
-            cell: (e: ISystemMessageEntry) => e.author ?? e.createdBy ?? '',
-          },
-          {
-            name: 'title',
-            cell: (e: ISystemMessageEntry) => e.title ?? '',
-          },
-        ],
-      }),
+      entries: about(
+        'for each system message',
+        rows('entries', {
+          header: 'always',
+          columns: [
+            {
+              name: 'id',
+              means: 'its ID',
+              cell: (e: ISystemMessageEntry) => e.id ?? e.messageId ?? '',
+            },
+            {
+              name: 'createdOn',
+              means: 'when it was created',
+              cell: (e: ISystemMessageEntry) => e.createdOn ?? '',
+            },
+            {
+              name: 'author',
+              means: 'its author',
+              cell: (e: ISystemMessageEntry) => e.author ?? e.createdBy ?? '',
+            },
+            {
+              name: 'title',
+              means: 'its title',
+              cell: (e: ISystemMessageEntry) => e.title ?? '',
+            },
+          ],
+        }),
+      ),
     },
   ),
   gateway_errors: within<FeedAnswer<'gateway_errors'>, 'gateway_errors'>(
     'gateway_errors',
     {
-      entries: rows('entries', {
-        header: 'always',
-        columns: [
-          { name: 'opid', cell: (e: IGatewayErrorEntry) => e.opid ?? '' },
-          {
-            name: 'detail_kind',
-            cell: (e: IGatewayErrorEntry) => detailKindOf(e),
-          },
-          {
-            name: 'dateTime',
-            cell: (e: IGatewayErrorEntry) => e.dateTime ?? '',
-          },
-          { name: 'type', cell: (e: IGatewayErrorEntry) => e.type ?? '' },
-          {
-            name: 'shortText',
-            cell: (e: IGatewayErrorEntry) => e.shortText ?? '',
-          },
-          {
-            name: 'username',
-            cell: (e: IGatewayErrorEntry) => e.username ?? '',
-          },
-        ],
-      }),
+      entries: about(
+        'for each SAP Gateway error',
+        rows('entries', {
+          header: 'always',
+          columns: [
+            {
+              name: 'opid',
+              means: 'its operation ID',
+              cell: (e: IGatewayErrorEntry) => e.opid ?? '',
+            },
+            {
+              name: 'detail_kind',
+              means: 'the kind of its detail',
+              cell: (e: IGatewayErrorEntry) => detailKindOf(e),
+            },
+            {
+              name: 'dateTime',
+              means: 'when it happened',
+              cell: (e: IGatewayErrorEntry) => e.dateTime ?? '',
+            },
+            {
+              name: 'type',
+              means: 'its type',
+              cell: (e: IGatewayErrorEntry) => e.type ?? '',
+            },
+            {
+              name: 'shortText',
+              means: 'its short text',
+              cell: (e: IGatewayErrorEntry) => e.shortText ?? '',
+            },
+            {
+              name: 'username',
+              means: 'the user it happened to',
+              cell: (e: IGatewayErrorEntry) => e.username ?? '',
+            },
+          ],
+        }),
+      ),
     },
   ),
 };
+
+/** The heads a feed's listing opens with. */
+export const FEED_HEADS = [
+  headShape('count', 'how many items it holds'),
+  headShape('next_to', 'where the next read starts when more remain'),
+  headShape(
+    'incomplete_second',
+    'the second holding more items than one read gives',
+  ),
+];
+
+export const TOOL_DEFINITION = {
+  name: 'RuntimeListFeeds',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the runtime feeds of an ABAP system: its short dumps, system messages or SAP Gateway errors by user and time, or the feeds there are and their variants.',
+    ),
+    returns: returnsOf({
+      heads: FEED_HEADS,
+      of: 'for the feed read:',
+      shapes: [shapesOf(FEED_SCHEMAS)],
+    }),
+    notes: [longRunning],
+  }),
+  inputSchema: withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(oneFeedForm),
+    z.object(FIELDS).superRefine(oneFeedForm),
+  ),
+} as const;
 
 /** A feed's entries as written, under its heads. */
 function feedListing(read: FeedTerse): Listing<FeedTerse> {

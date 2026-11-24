@@ -235,11 +235,18 @@ export interface EachNouns<I> {
   readonly nouns: MemberNouns<I>;
 }
 
+/**
+ * What leads an item's sentence: `each` (`for each object: its …`), or the
+ * words `of` in place of `its` (`for each version: its ID, …`, `the
+ * source`), or `its` alone before the first noun.
+ */
+interface Lead {
+  readonly each?: string | undefined;
+  readonly of?: string | undefined;
+}
+
 /** One sentence of an item's members, then one per list member, nested lists after their own. */
-function membersStated<T>(
-  each: string | undefined,
-  nouns: MemberNouns<T>,
-): string[] {
+function membersStated<T>(lead: Lead, nouns: MemberNouns<T>): string[] {
   const plain: string[] = [];
   const clauses: string[] = [];
   const lists: string[] = [];
@@ -248,19 +255,23 @@ function membersStated<T>(
     if (noun === null) continue;
     if (typeof noun === 'string') plain.push(noun);
     else if ('clause' in noun) clauses.push(noun.clause);
-    else lists.push(...membersStated(noun.each, noun.nouns));
+    else lists.push(...membersStated({ each: noun.each }, noun.nouns));
   }
   const told = [
-    ...plain.map((noun, i) => (i === 0 ? `its ${noun}` : noun)),
+    ...plain.map((noun, i) =>
+      i === 0 && lead.of === undefined ? `its ${noun}` : noun,
+    ),
     ...clauses,
   ];
   const own =
     told.length === 0
       ? []
       : [
-          each === undefined
-            ? joined(told)
-            : `for each ${each}: ${joined(told)}`,
+          lead.of !== undefined
+            ? `${lead.of} ${joined(told)}`
+            : lead.each === undefined
+              ? joined(told)
+              : `for each ${lead.each}: ${joined(told)}`,
         ];
   return [...own, ...lists];
 }
@@ -270,13 +281,24 @@ function membersStated<T>(
  * (plan step 10.6, metadata readers): one sentence of the item's own
  * members (`its data class, size category and buffering`), then one per
  * list member (`for each BAdI definition: its name and short text`). With
- * `each`, the item is itself one of several (`for each object: …`).
+ * `each`, the item is itself one of several (`for each object: …`); with
+ * `of`, those words lead the sentence in place of `its` (`for each
+ * version:`, `the`, `with a range asked,`).
  */
-export function membersOf<T>(source: {
-  readonly each?: string | undefined;
-  readonly nouns: MemberNouns<T>;
-}): ReturnsFact[] {
-  return membersStated(source.each, source.nouns).map((text) =>
+export function membersOf<T>(
+  source:
+    | {
+        readonly each?: string | undefined;
+        readonly of?: undefined;
+        readonly nouns: MemberNouns<T>;
+      }
+    | {
+        readonly each?: undefined;
+        readonly of: string;
+        readonly nouns: MemberNouns<T>;
+      },
+): ReturnsFact[] {
+  return membersStated(source, source.nouns).map((text) =>
     fact(sentence(text)),
   );
 }

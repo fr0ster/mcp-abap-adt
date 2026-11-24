@@ -4,6 +4,7 @@ import * as z from 'zod';
 import { tableCodeOf } from '../../../lib/adtTypeCode';
 import { failureEntry, isCredentialPayload } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
+import { membersOf, purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { carryingFailure } from '../../../lib/strategies/step';
 import { logger, return_error } from '../../../lib/utils';
@@ -56,8 +57,20 @@ export const TOOL_DEFINITION = {
   // On premise only: it reads a source code plugin (`ENHO/XHH`), which ABAP
   // Cloud does not support (SAP's CL_ENH_ADT_HOOK_IMPL_WB_ACCESS says so).
   available_in: ['onprem'] as const,
-  description:
-    '[read-only] Retrieve the active source code of a specific enhancement implementation by its name and enhancement spot.',
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the active source of an ABAP enhancement implementation, by its name and enhancement spot.',
+    ),
+    returns: membersOf<EnhancementByNameResponse>({
+      of: 'the',
+      nouns: {
+        enhancement_spot: 'enhancement spot',
+        enhancement_name: "implementation's name",
+        source_code: 'its source code',
+      },
+    }),
+  }),
   inputSchema: z.object({
     enhancement_spot: z.string().describe('Name of the enhancement spot'),
     enhancement_name: z

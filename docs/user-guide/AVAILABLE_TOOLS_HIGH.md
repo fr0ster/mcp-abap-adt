@@ -490,7 +490,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinition-high-level-behavior-definition"></a>
 #### GetBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** [read-only] Reads the RAP behavior definition named by behavior_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of a RAP behavior definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
@@ -560,7 +560,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviorimplementation-high-level-behavior-implementation"></a>
 #### GetBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** [read-only] Reads the RAP behavior implementation (its class) named by behavior_implementation_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of a RAP behavior implementation class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
@@ -727,7 +727,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclass-high-level-class"></a>
 #### GetClass (High-Level / Class)
-**Description:** [read-only] Reads the ABAP class named by class_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of an ABAP class at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
@@ -744,7 +744,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaldefinitions-high-level-class"></a>
 #### GetLocalDefinitions (High-Level / Class)
-**Description:** [read-only] Reads the local definitions include (the definitions include) of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of the local definitions include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
 
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
@@ -760,7 +760,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocalmacros-high-level-class"></a>
 #### GetLocalMacros (High-Level / Class)
-**Description:** [read-only] Reads the local macros include of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of the local macros include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
 
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
@@ -776,7 +776,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** [read-only] Reads the local test classes include of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of the local test classes include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
@@ -792,7 +792,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getlocaltypes-high-level-class"></a>
 #### GetLocalTypes (High-Level / Class)
-**Description:** [read-only] Reads the local types include (the implementations include) of the ABAP class named by class_name, at the version asked. Returns { class_name, version, part: 'source', source }. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of the local types (implementations) include of an ABAP class at the version asked. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source.
 
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
@@ -928,7 +928,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinitionversions-high-level-common"></a>
 #### GetBehaviorDefinitionVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the RAP behavior definition named by behavior_definition_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of a RAP behavior definition. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -939,7 +939,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getbehaviordefinitionversionsource-high-level-common"></a>
 #### GetBehaviorDefinitionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the RAP behavior definition version named by content_uri, an entry of the RAP behavior definition's version history.
+**Description:** [read-only] Reads the source of one version of a RAP behavior definition, from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -962,7 +962,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP class named by class_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of an ABAP class. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -973,7 +973,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getclassversionsource-high-level-common"></a>
 #### GetClassVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP class version named by content_uri, an entry of the ABAP class's version history.
+**Description:** [read-only] Reads the source of one version of an ABAP class, from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -996,7 +996,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddlversions-high-level-common"></a>
 #### GetDdlVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the CDS view (DDL source) named by ddl_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of a CDS view (DDL source). For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1007,7 +1007,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddlversionsource-high-level-common"></a>
 #### GetDdlVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the CDS view (DDL source) version named by content_uri, an entry of the CDS view (DDL source)'s version history.
+**Description:** [read-only] Reads the source of one version of a CDS view (DDL source), from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1030,7 +1030,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmoduleversions-high-level-common"></a>
 #### GetFunctionModuleVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP function module named by function_module_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of an ABAP function module. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1042,7 +1042,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmoduleversionsource-high-level-common"></a>
 #### GetFunctionModuleVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP function module version named by content_uri, an entry of the ABAP function module's version history.
+**Description:** [read-only] Reads the source of one version of an ABAP function module, from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1065,7 +1065,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP interface named by interface_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of an ABAP interface. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1076,7 +1076,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterfaceversionsource-high-level-common"></a>
 #### GetInterfaceVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP interface version named by content_uri, an entry of the ABAP interface's version history.
+**Description:** [read-only] Reads the source of one version of an ABAP interface, from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1099,7 +1099,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextensionversions-high-level-common"></a>
 #### GetMetadataExtensionVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the CDS metadata extension named by metadata_extension_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of a CDS metadata extension. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1110,7 +1110,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextensionversionsource-high-level-common"></a>
 #### GetMetadataExtensionVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the CDS metadata extension version named by content_uri, an entry of the CDS metadata extension's version history.
+**Description:** [read-only] Reads the source of one version of a CDS metadata extension, from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1133,7 +1133,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogramversions-high-level-common"></a>
 #### GetProgramVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP program named by program_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** [read-only] Lists the version history of an ABAP program, on ABAP Cloud one of SAP's standard programs. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1144,7 +1144,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogramversionsource-high-level-common"></a>
 #### GetProgramVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP program version named by content_uri, an entry of the ABAP program's version history. On ABAP Cloud, the programs are SAP's standard programs.
+**Description:** [read-only] Reads the source of one version of an ABAP program, on ABAP Cloud one of SAP's standard programs, from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1167,7 +1167,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructureversions-high-level-common"></a>
 #### GetStructureVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP structure named by structure_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of an ABAP structure. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1178,7 +1178,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getstructureversionsource-high-level-common"></a>
 #### GetStructureVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP structure version named by content_uri, an entry of the ABAP structure's version history.
+**Description:** [read-only] Reads the source of one version of an ABAP structure, from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1189,7 +1189,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettabletypeversions-high-level-common"></a>
 #### GetTableTypeVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP table type named by table_type_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of an ABAP table type. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1212,7 +1212,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettableversions-high-level-common"></a>
 #### GetTableVersions (High-Level / Common)
-**Description:** [read-only] Lists the version history of the ABAP table named by table_name: each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and the opaque content_uri that names the version's source.
+**Description:** [read-only] Lists the version history of an ABAP table. For each version: its ID, its author, when it was saved, its title, the reference that reads its source, the transport that produced it and that transport's description.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1223,7 +1223,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="gettableversionsource-high-level-common"></a>
 #### GetTableVersionSource (High-Level / Common)
-**Description:** [read-only] Reads the source of the ABAP table version named by content_uri, an entry of the ABAP table's version history.
+**Description:** [read-only] Reads the source of one version of an ABAP table, from its version history. The reference of the version read and its source code.
 
 **Source:** `src/handlers/common/high/objectVersionTools.ts`
 
@@ -1419,7 +1419,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** [read-only] Reads the CDS view (or classic DDL view) named by ddl_name in one request: its DDL source (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of a CDS view or classic DDL view at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
@@ -1863,7 +1863,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** [read-only] Reads the ABAP function module named by function_module_name, BAPI or RFC-enabled ones included, in the function group named by function_group_name: its source code, which declares the parameter signature (part "source", the default), or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. The module's metadata is read first, and the part is answered only when the function group named holds the module. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of an ABAP function module, BAPI and RFC-enabled ones too, with its parameter signature, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -2026,7 +2026,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getinterface-high-level-interface"></a>
 #### GetInterface (High-Level / Interface)
-**Description:** [read-only] Reads the ABAP interface named by interface_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of an ABAP interface at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
@@ -2193,7 +2193,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getmetadataextension-high-level-metadata-extension"></a>
 #### GetMetadataExtension (High-Level / Metadata Extension)
-**Description:** [read-only] Reads the CDS metadata extension named by metadata_extension_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of a CDS metadata extension at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
@@ -2362,7 +2362,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getprogram-high-level-program"></a>
 #### GetProgram (High-Level / Program)
-**Description:** [read-only] Reads the ABAP program (report) named by program_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. On ABAP Cloud, the programs are SAP's standard programs. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of an ABAP program (report), on ABAP Cloud one of SAP's standard programs, at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
@@ -2566,7 +2566,7 @@ The high-level tools of `mcp-abap-adt`, `-http` and `-sse`.
 
 <a id="getservicedefinition-high-level-service-definition"></a>
 #### GetServiceDefinition (High-Level / Service Definition)
-**Description:** [read-only] Reads the service definition named by service_definition_name in one request: its source code (part "source", the default) or its ADT metadata document (part "metadata": package, responsible, description), at the version asked. Returns the part read. With start_line and/or end_line, returns only those lines of the source, with start_line, end_line and line_count (the number of lines of the whole source).
+**Description:** [read-only] Reads the source of a service definition at the version asked, or its metadata. Its source code and the version read. With a range asked, only that part of the source: where it starts, where it ends and the length of the whole source. Or, when asked, its metadata: its package, person responsible and description.
 
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 

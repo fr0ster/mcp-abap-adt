@@ -6,49 +6,6 @@
  * refused once it is assembled, so the list only shrinks.
  */
 export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
-  'GetBehaviorDefinition',
-  'GetBehaviorDefinitionVersionSource',
-  'GetBehaviorDefinitionVersions',
-  'GetBehaviorImplementation',
-  'GetClass',
-  'GetClassVersionSource',
-  'GetClassVersions',
-  'GetDdl',
-  'GetDdlVersionSource',
-  'GetDdlVersions',
-  'GetEnhancementImpl',
-  'GetEnhancements',
-  'GetFunctionInclude',
-  'GetFunctionModule',
-  'GetFunctionModuleVersionSource',
-  'GetFunctionModuleVersions',
-  'GetInclude',
-  'GetInterface',
-  'GetInterfaceVersionSource',
-  'GetInterfaceVersions',
-  'GetLocalDefinitions',
-  'GetLocalMacros',
-  'GetLocalTestClass',
-  'GetLocalTypes',
-  'GetMetadataExtension',
-  'GetMetadataExtensionVersionSource',
-  'GetMetadataExtensionVersions',
-  'GetObjectDraft',
-  'GetObjectVersionSource',
-  'GetProgram',
-  'GetProgramVersionSource',
-  'GetProgramVersions',
-  'GetServiceDefinition',
-  'GetSqlQuery',
-  'GetStructureVersionSource',
-  'GetStructureVersions',
-  'GetStructuresList',
-  'GetTableContents',
-  'GetTableTypeVersions',
-  'GetTableVersionSource',
-  'GetTableVersions',
-  'GetTextElements',
-  'GetTransport',
   'HandlerAbapGit',
   'HandlerAbapGitGet',
   'HandlerActivate',
@@ -98,7 +55,7 @@ export const NOT_YET_ASSEMBLED: ReadonlySet<string> = new Set([
  * shrinks — a group of step 10.7 that moves tools lowers this number with
  * them, and a list longer than it fails (`assembledDescriptions.test.ts`).
  */
-export const NOT_YET_ASSEMBLED_MOST = 85;
+export const NOT_YET_ASSEMBLED_MOST = 42;
 
 /**
  * The tools written by the listing writers (plan steps 9.3–9.7): their

@@ -22,12 +22,20 @@ import {
 } from '../../../lib/batch/phases';
 import { createAdtClient } from '../../../lib/clients';
 import {
+  longRunning,
+  purpose,
+  returnsOf,
+  toolDescription,
+} from '../../../lib/description';
+import {
+  about,
   asJsonResult,
   asTextResult,
   byListing,
   type Column,
   type DetailLevel,
   type Head,
+  headShape,
   jsonText,
   type ListAnswerTable,
   type Listing,
@@ -39,6 +47,7 @@ import {
   type RowSchemas,
   rows,
   sections,
+  shapesOf,
   type TextResult,
   values,
   type Written,
@@ -54,10 +63,7 @@ import {
   type ReadVersion,
 } from '../../../lib/handlers/readVersion';
 import type { JsonValue } from '../../../lib/json';
-import {
-  LONG_BACKGROUND_FIELD,
-  withLongToolAdvice,
-} from '../../../lib/longTools';
+import { LONG_BACKGROUND_FIELD } from '../../../lib/longTools';
 import {
   afterBlanksAt,
   asciiLower,
@@ -141,23 +147,6 @@ function oneStructureForm(
     });
   }
 }
-
-export const TOOL_DEFINITION = {
-  name: 'GetStructuresList',
-  available_in: ['onprem', 'cloud'] as const,
-  description: withLongToolAdvice(
-    '[read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. ' +
-      'Takes structure_name (one structure: its tree) or structure_names (several structures: one entry per structure, in the order given, each its tree answer or { structure_name, error }). ' +
-      'Works on BASIS 7.50 and later, where the DDIC structure/table endpoints it reads exist; ' +
-      'legacy systems (BASIS < 7.50) refuse it (issue #207).',
-  ),
-  inputSchema: withInCallSchema(
-    z
-      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
-      .superRefine(oneStructureForm),
-    z.object(FIELDS).superRefine(oneStructureForm),
-  ),
-} as const;
 
 interface StructureNode {
   structure: string; // the embedded structure's own name (root = the requested structure)
@@ -319,16 +308,26 @@ function readAnswer(shown: StructuresShown, read: StructuresRead): McpResult {
 
 /** A node's row: its structure, kind and attribute, then `cyclic` or `not read` where it is so. */
 const structureColumns: Column<StructureNode>[] = [
-  { name: 'structure', cell: (node) => node.structure },
-  { name: 'kind', cell: (node) => node.kind },
-  { name: 'attribute', cell: (node) => node.attribute ?? '' },
+  { name: 'structure', means: 'its name', cell: (node) => node.structure },
+  {
+    name: 'kind',
+    means: 'whether it is an include or an append',
+    cell: (node) => node.kind,
+  },
+  {
+    name: 'attribute',
+    means: 'the component it is embedded under',
+    cell: (node) => node.attribute ?? '',
+  },
   {
     name: 'cyclic',
+    means: 'whether it embeds itself again',
     cell: () => 'cyclic',
     when: (node) => node.cyclic === true,
   },
   {
     name: 'not_read',
+    means: 'whether SAP refused to read it',
     cell: () => 'not read',
     when: (node) => node.error !== undefined,
   },
@@ -342,14 +341,20 @@ const failureMarks = <K extends string>(key: K) =>
 const structureSchemas: RowSchemas<StructureNode> = {
   // A node not read: its `not read` cell, then each failure of its read
   // (what each endpoint answered, with its step) a line of its own.
-  error: failureMarks('error'),
-  children: rows('children', {
-    columns: structureColumns,
-    header: 'none',
-    get lists() {
-      return structureSchemas;
-    },
-  }),
+  error: about(
+    'what SAP answered for each structure it refused to read',
+    failureMarks('error'),
+  ),
+  children: about(
+    'for each structure it embeds',
+    rows('children', {
+      columns: structureColumns,
+      header: 'none',
+      get lists() {
+        return structureSchemas;
+      },
+    }),
+  ),
 };
 
 /** The answer before `detail` (full). */
@@ -381,24 +386,59 @@ function structuresWhole(read: StructuresRead) {
  */
 
 /** The lists a StructuresRead listing writes: what its description states. */
-const STRUCTURES_LISTS: RowSchemas<StructuresRead> = {
+export const STRUCTURES_LISTS: RowSchemas<StructuresRead> = {
   // Each candidate SAP refused to read, by name — the one to read again —
   // then each failure of its read.
-  append_candidates_unread: sections(
-    'append_candidates_unread',
-    (unread: StructuresRead['append_candidates_unread'][number]) => [
-      { mark: 'append_candidate_unread', words: [unread.candidate] },
-    ],
-    { failures: failureMarks('failures') },
+  append_candidates_unread: about(
+    'the appends SAP refused to read are named',
+    sections(
+      'append_candidates_unread',
+      (unread: StructuresRead['append_candidates_unread'][number]) => [
+        { mark: 'append_candidate_unread', words: [unread.candidate] },
+      ],
+      { failures: failureMarks('failures') },
+    ),
   ),
   // The tree from its root: the root a row, every node below it.
-  tree: node('tree', {
-    columns: structureColumns,
-    header: 'none',
-    tree: true,
-    lists: structureSchemas,
-  }),
+  tree: about(
+    'for the structure itself',
+    node('tree', {
+      columns: structureColumns,
+      header: 'none',
+      tree: true,
+      lists: structureSchemas,
+    }),
+  ),
 };
+
+/** The heads a structure's listing opens with. */
+export const STRUCTURES_HEADS = [
+  headShape('structure', 'name of the structure read'),
+  headShape('appends_unavailable', 'whether its appends could be found'),
+];
+
+export const TOOL_DEFINITION = {
+  name: 'GetStructuresList',
+  available_in: ['onprem', 'cloud'] as const,
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads the structures embedded in one or more ABAP structures, through their includes and appends, down to the last, at the version asked.',
+    ),
+    returns: returnsOf({
+      heads: STRUCTURES_HEADS,
+      of: 'the',
+      shapes: [shapesOf(STRUCTURES_LISTS)],
+    }),
+    notes: [longRunning],
+  }),
+  inputSchema: withInCallSchema(
+    z
+      .object({ background: LONG_BACKGROUND_FIELD, ...FIELDS })
+      .superRefine(oneStructureForm),
+    z.object(FIELDS).superRefine(oneStructureForm),
+  ),
+} as const;
 
 /**
  * A structure's terse text, written from its read: its heads, a mark per

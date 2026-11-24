@@ -3,6 +3,7 @@
  * remote's (R12), with the credential bound to the R1 entry's URL.
  */
 
+import type { IAbapGitFileFacts } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/abapGit/answers';
 import {
@@ -17,12 +18,23 @@ import {
   admittedRepo,
   credentialOption,
 } from '../../../lib/abapGit/client';
+import { membersOf, purpose, toolDescription } from '../../../lib/description';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
 export const TOOL_DEFINITION = {
   name: 'GetAbapGitFile',
-  description:
-    "[read-only] Reads one file of the repository: the system's version (local) or the remote branch's (remote). Answers the file's text as it is.",
+  description: toolDescription({
+    tag: 'read-only',
+    purpose: purpose(
+      'Reads one file of an abapGit repository, as the system holds it or as the remote branch holds it.',
+    ),
+    returns: membersOf<Pick<IAbapGitFileFacts, 'content'>>({
+      of: 'the',
+      nouns: {
+        content: "file's text as it is",
+      },
+    }),
+  }),
   inputSchema: z.object({
     repository_key: REPOSITORY_KEY_FIELD,
     filename: FILENAME_FIELD,

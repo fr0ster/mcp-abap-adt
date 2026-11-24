@@ -34,6 +34,14 @@ export {
   untypedReturns,
 } from './returns';
 export {
+  type SourceReadAnswer,
+  type SourceReader,
+  sourceReader,
+  type VersionSourceAnswer,
+  versionHistoryReader,
+  versionSourceReader,
+} from './sourceReader';
+export {
   type DescriptionParts,
   type DescriptionTag,
   partsOfDescription,

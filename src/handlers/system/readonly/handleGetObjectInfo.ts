@@ -358,7 +358,7 @@ interface LeafRead {
  */
 function leafOf(
   o: NodeLevel['objects'][number],
-  parentType: string,
+  parentType: AdtTypeCode,
   parentName: string,
   describe: boolean,
   leaves: LeafRead[],

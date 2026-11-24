@@ -759,6 +759,8 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
   // walk `buildTree` runs, so the mock below answers per `nodeId` rather
   // than a single canned response — real bytes for both tiers, not one.
   it('answers the root two-tier tree for a real package', async () => {
+    const LEAF_META =
+      '<?xml version="1.0" encoding="utf-8"?><adtcore:mainObject xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMCP_SHR_I_ROOT" adtcore:description="From the leaf metadata"/>';
     const rootBody = corpusBody('read-object-tree-structure--01-nodestructure');
     const bdefBody = corpusBody('read-object-tree-structure--02-nodestructure');
     fakeClient = fakeClientOf({
@@ -772,12 +774,13 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
         // response — answered empty rather than invented.
         return okResponse(nodeLevel({ data: '' }));
       },
+      // Each leaf's metadata: its description, on both paths.
+      readMetadata: async () => okResponse(reading(LEAF_META, LEAF_META)),
     });
 
-    // The sequential reads, whose descriptions are the node structure's: a
-    // destination known to have no communication batch. (The batched walk
-    // takes its descriptions from each object's metadata:
-    // `unit/batch/packageWalks.test.ts`.)
+    // The sequential reads: a destination known to have no communication
+    // batch. The leaf descriptions are the leaves' metadata's, as on the
+    // batched walk (`unit/batch/packageWalks.test.ts`).
     const notServed = createBatchAvailability();
     notServed.noteOuterStatus(404);
     const read = async (describe: boolean) => {
@@ -802,8 +805,12 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
       return bdef;
     };
 
-    // Asked for: the node structure's description.
-    assert.ok((await read(true)).OBJECT_DESCRIPTION.includes('Shared BDEF'));
+    // Asked for: the leaf's metadata's description, not the node
+    // structure's.
+    assert.equal(
+      (await read(true)).OBJECT_DESCRIPTION,
+      'From the leaf metadata',
+    );
     // Not asked for: none, though the captured document carries one — the
     // batched path answers none either.
     assert.ok(bdefBody.includes('Shared BDEF'));

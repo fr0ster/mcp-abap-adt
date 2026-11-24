@@ -38,6 +38,7 @@ import { handleGetServiceDefinition } from '../../../handlers/service_definition
 import { handleGetStructure } from '../../../handlers/structure/high/handleGetStructure';
 import { handleGetTable } from '../../../handlers/table/high/handleGetTable';
 import { createBatchAvailability } from '../../../lib/batch/availability';
+import { READS_PER_ENVELOPE } from '../../../lib/batch/phases';
 import {
   METADATA_READ_TYPES,
   type MetadataTarget,
@@ -453,4 +454,59 @@ describe('one metadata read per type, shared by handler and batch', () => {
       },
     );
   }
+});
+
+describe('the metadata phase is bounded (GetObjectInfo include_descriptions)', () => {
+  const classes = (count: number): MetadataTarget[] =>
+    Array.from({ length: count }, (_, i) => ({
+      type: 'CLAS/OC',
+      name: `ZCL_${i}`,
+    }));
+  const contextOn = (fake: ReturnType<typeof envelopeConnection>) =>
+    ({
+      connection: fake.connection,
+      logger: undefined,
+      batchAvailability: createBatchAvailability(),
+    }) as unknown as HandlerContext;
+
+  it(`more than ${READS_PER_ENVELOPE} objects: consecutive envelopes of at most ${READS_PER_ENVELOPE} reads, every description read`, async () => {
+    const fake = envelopeConnection((parts) =>
+      envelopeResponse(
+        parts.map(() => ({
+          status: 200,
+          statusText: 'OK',
+          headers: { 'content-type': 'application/xml' },
+          body: DOC,
+        })),
+      ),
+    );
+    const { descriptions, refused } = await withinTurns(
+      metadataDescriptions(contextOn(fake), classes(READS_PER_ENVELOPE + 2)),
+      2000,
+    );
+    assert.deepStrictEqual(
+      fake.envelopes.map((e) => e.parts.length),
+      [READS_PER_ENVELOPE, 2],
+    );
+    assert.equal(descriptions.size, READS_PER_ENVELOPE + 2);
+    assert.equal(refused, undefined);
+  });
+
+  it('a credential refusal SAP answered in an envelope: the refusal, and no later envelope', async () => {
+    const fake = envelopeConnection((parts) =>
+      envelopeResponse(
+        parts.map(() => ({
+          status: 401,
+          statusText: 'Unauthorized',
+          body: '',
+        })),
+      ),
+    );
+    const { refused } = await withinTurns(
+      metadataDescriptions(contextOn(fake), classes(READS_PER_ENVELOPE + 2)),
+      2000,
+    );
+    assert.notEqual(refused, undefined);
+    assert.equal(fake.envelopes.length, 1);
+  });
 });

@@ -26,7 +26,12 @@ import {
 } from '../answer';
 import { appendAll } from '../appendAll';
 import { failureOf } from '../auth/failures';
-import { type PhaseResult, runPhase } from '../batch/phases';
+import {
+  chunksOf,
+  type PhaseResult,
+  READS_PER_ENVELOPE,
+  runPhase,
+} from '../batch/phases';
 import { createAdtClient } from '../clients';
 import { bodyTextOf } from '../wireValue';
 import { parseXml, type XmlNode } from '../xml/node';
@@ -921,8 +926,10 @@ export interface MetadataDescriptions {
 }
 
 /**
- * The description of every object of `targets`, read in one ADT batch
- * envelope (`runPhase`): one metadata read per distinct object, the one its
+ * The description of every object of `targets`, read in ADT batch
+ * envelopes (`runPhase`) of at most `READS_PER_ENVELOPE` reads, one after
+ * another; no envelope is sent after one that met a credential refusal.
+ * One metadata read per distinct object, the one its
  * type's `Get<Type>` handler sends (`metadataReadOf`), keyed by
  * `metadataKeyOf`. An object of a type with no metadata read, or whose read
  * failed, has no entry. A failure the server's reader answers ends the call,
@@ -941,34 +948,37 @@ export async function metadataDescriptions(
       reads.set(key, read);
     }
   }
-  const keyed = [...reads];
-  const keys = keyed.map(([key]) => key);
   const descriptions = new Map<string, string | undefined>();
-  if (keys.length === 0) return { descriptions };
-  const results = await runPhase(context, keyed, ([, read], connection) =>
-    atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
-  );
   let refused: IAdtFailure | undefined;
-  results.forEach((result, i) => {
-    if (!result.ok) {
-      if (endsTheCall(result.error)) throw result.error;
-      return;
-    }
-    const response = result.value;
-    if (response.ok) {
-      descriptions.set(
-        keys[i],
-        metadataDescriptionOf(rawOf(response.getResult().value)),
-      );
-      return;
-    }
-    if (
-      refused === undefined &&
-      isCredentialPayload(failureEntry(response.getError(), METADATA_STEP))
-    ) {
-      refused = response;
-    }
-  });
+  for (const keyed of chunksOf([...reads], READS_PER_ENVELOPE)) {
+    if (refused !== undefined) break;
+    const results = await runPhase(context, keyed, ([, read], connection) =>
+      atStep(METADATA_STEP, read)(createAdtClient(connection, context.logger)),
+    );
+    results.forEach((result, i) => {
+      if (!result.ok) {
+        if (endsTheCall(result.error)) throw result.error;
+        return;
+      }
+      const key = keyed[i]?.[0];
+      const response = result.value;
+      if (response.ok) {
+        if (key !== undefined) {
+          descriptions.set(
+            key,
+            metadataDescriptionOf(rawOf(response.getResult().value)),
+          );
+        }
+        return;
+      }
+      if (
+        refused === undefined &&
+        isCredentialPayload(failureEntry(response.getError(), METADATA_STEP))
+      ) {
+        refused = response;
+      }
+    });
+  }
   return refused === undefined ? { descriptions } : { descriptions, refused };
 }
 

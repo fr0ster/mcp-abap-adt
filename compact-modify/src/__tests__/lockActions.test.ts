@@ -12,10 +12,12 @@ import {
   LOCK_SUCCESS_XML,
   recordingConnection,
 } from '../../../src/__tests__/helpers/recordingConnection';
+import { eligible } from '../../../src/lib/batch/eligibility';
 import { HeldLocks } from '../../../src/lib/state/heldLocks';
 import { declareSystemKind } from '../../../src/lib/systemKind';
 import {
   handleHandlerLock,
+  TOOL_DEFINITION,
   UNLOCK_NEEDS_HANDLE_WORDS,
 } from '../handlers/handleHandlerLock';
 
@@ -84,5 +86,51 @@ describe('HandlerLock: lock, then unlock through the same tool', () => {
     assert.equal(refused.isError, true);
     assert.ok(textOf(refused).includes(UNLOCK_NEEDS_HANDLE_WORDS));
     assert.equal(connection.requests.length, 0);
+  });
+
+  it('the schema requires lock_handle for an unlock, on each variant, before any connection', () => {
+    for (const variant of ['onprem', 'cloud'] as const) {
+      const schema = TOOL_DEFINITION.variants[variant].inputSchema;
+      for (const lock_handle of [undefined, '', '  ']) {
+        const parsed = schema.safeParse({
+          action: 'unlock',
+          object_type: 'CLASS',
+          object_name: 'ZCL_A',
+          ...(lock_handle === undefined ? {} : { lock_handle }),
+        });
+        assert.equal(parsed.success, false);
+        assert.deepStrictEqual(
+          parsed.error?.issues.map((issue) => [issue.path, issue.message]),
+          [[['lock_handle'], UNLOCK_NEEDS_HANDLE_WORDS]],
+        );
+      }
+      assert.equal(
+        schema.safeParse({
+          action: 'unlock',
+          object_type: 'CLASS',
+          object_name: 'ZCL_A',
+          lock_handle: HANDLE,
+        }).success,
+        true,
+      );
+      assert.equal(
+        schema.safeParse({ object_type: 'CLASS', object_name: 'ZCL_A' })
+          .success,
+        true,
+      );
+    }
+  });
+
+  it('the batch table records an unlock only with its lock handle', () => {
+    const unlock = {
+      action: 'unlock',
+      object_type: 'CLASS',
+      object_name: 'ZCL_A',
+    };
+    assert.equal(eligible('HandlerLock', unlock, 'http').ok, false);
+    assert.equal(
+      eligible('HandlerLock', { ...unlock, lock_handle: HANDLE }, 'http').ok,
+      true,
+    );
   });
 });

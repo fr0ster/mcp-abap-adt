@@ -376,6 +376,10 @@
           "FUNCTION_GROUP_TEXT_ELEMENTS",
           "CLASS_TEXT_ELEMENTS"
         ]
+      },
+      {
+        "argument": "lock_handle",
+        "present": true
       }
     ]
   },
@@ -392,6 +396,10 @@
       {
         "argument": "object_type",
         "equals": ["PACKAGE"]
+      },
+      {
+        "argument": "lock_handle",
+        "present": true
       }
     ],
     "connection": "http"

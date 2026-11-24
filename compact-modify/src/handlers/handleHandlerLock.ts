@@ -9,6 +9,7 @@ import {
   subResourceRefusal,
   supported,
   toolDescription,
+  UNLOCK_NEEDS_HANDLE_WORDS,
 } from '@mcp-abap-adt/lib/compact-shared';
 import { type HandlerContext, variantOf } from '@mcp-abap-adt/lib/handlers';
 import { lockObjectAnswering } from '@mcp-abap-adt/lib/handlers/write';
@@ -32,9 +33,7 @@ export const LOCKS_NOT_KEPT_WORDS =
 
 type HandlerLockArgs = z.output<typeof TOOL_DEFINITION.inputSchema>;
 
-/** The words of an unlock asked with no lock handle. */
-export const UNLOCK_NEEDS_HANDLE_WORDS =
-  'lock_handle is required for action unlock: the handle the lock gave; nothing was sent';
+export { UNLOCK_NEEDS_HANDLE_WORDS };
 
 /** `action: 'lock'` (the default) locks the object; `action: 'unlock'` releases its lock. */
 export async function handleHandlerLock(
@@ -42,6 +41,8 @@ export async function handleHandlerLock(
   args: HandlerLockArgs,
 ) {
   if (args.action === 'unlock') {
+    // The schema refuses an unlock without its handle before anything is
+    // sent; its type does not say so, so the handle is read here.
     if (args.lock_handle === undefined) {
       return return_error(new Error(UNLOCK_NEEDS_HANDLE_WORDS));
     }
